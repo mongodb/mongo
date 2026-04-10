@@ -310,6 +310,11 @@ protected:
     // request. The sample will be freed on destruction of the SamplingEstimator instance or when a
     // re-sample is requested. A new sample will replace this.
     std::vector<BSONObj> _sample;
+    size_t _sampleSize;
+    bool _isSampleGenerated = false;
+    // Lazily computed on the first estimateNDV() call. Counts the number of documents with
+    // distinct _id values in the sample to detect duplicates from sampling with replacement.
+    mutable boost::optional<size_t> _uniqueDocCount;
 
 private:
     /**
@@ -356,10 +361,8 @@ private:
     NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     SamplingCEMethodEnum _samplingStyle;
-    size_t _sampleSize;
     // The set of top level fields that we want to include in the sampled documents.
     StringSet _topLevelSampleFieldNames;
-    bool _isSampleGenerated = false;
 
     boost::optional<int> _numChunks;
 

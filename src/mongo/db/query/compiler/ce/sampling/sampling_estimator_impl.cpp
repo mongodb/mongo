@@ -440,6 +440,7 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 
     // This function call could be a re-sample request, so the previous sample should be cleared.
     _sample.clear();
+    _uniqueDocCount = boost::none;
     BSONObj obj;
     // Execute the plan, exhaust results and cache the sample.
     while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
@@ -891,12 +892,12 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              SamplingCEMethodEnum samplingStyle,
                                              boost::optional<int> numChunks,
                                              CardinalityEstimate collectionCard)
-    : _opCtx(opCtx),
+    : _sampleSize(sampleSize),
+      _opCtx(opCtx),
       _collections(collections),
       _nss(nss),
       _yieldPolicy(yieldPolicy),
       _samplingStyle(samplingStyle),
-      _sampleSize(sampleSize),
       _numChunks(numChunks),
       _collectionCard(collectionCard) {}
 
@@ -933,16 +934,25 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
         }
     }
 
-    // Obtain the NDV for the sample. If this is equal to the sample size, don't bother with NR
-    // iteration, since it is likely to diverge. The best guess is that each element in the
-    // collection is unique.
+    // Obtain the NDV for the sample. Compare against the number of unique documents. If they are
+    // equal, skip NR iteration since it is likely to diverge. The best guess is that each element
+    // in the collection is unique. We compare sampleNDV against uniqueDocCount instead of
+    // sampleSize because we sample with replacement. This can produce duplicate documents, which
+    // may result in us oscillating in and out of NR for defacto unique fields. The unique doc count
+    // is lazily computed and cached.
     size_t sampleNDV = countNDV(fields, _sample, bounds);
-    if (sampleNDV == _sampleSize) {
+    if (!_uniqueDocCount) {
+        _uniqueDocCount = countUniqueDocuments(_sample);
+    }
+    if (sampleNDV == *_uniqueDocCount) {
         LOGV2_DEBUG(11228302,
                     5,
-                    "SamplingCE NDV is equal to the sample size, outputting collection size",
+                    "SamplingCE NDV is equal to the unique document count, outputting collection "
+                    "size",
                     "fields"_attr = fields,
                     "sampleNDV"_attr = sampleNDV,
+                    "uniqueDocCount"_attr = *_uniqueDocCount,
+                    "sampleSize"_attr = _sampleSize,
                     "collectionCard"_attr = _collectionCard);
         return _collectionCard;
     }
@@ -954,6 +964,8 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
         return cost_based_ranker::zeroCE;
     }
 
+    // Note that we use '_sampleSize' instead of '_uniqueDocCount' here because the method of
+    // moments estimator that we use assumes that we perform sampling with replacement.
     CardinalityEstimate estimate = newtonRaphsonNDV(sampleNDV, _sampleSize);
     LOGV2_DEBUG(11158506,
                 5,

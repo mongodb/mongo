@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/ce/ce_common.h"
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/path.h"
@@ -306,6 +307,14 @@ KeyCountResult countNDVMultiKey(const std::vector<FieldPathAndEqSemantics>& fiel
     } else {
         return countNDVInner(fields, docs, ArrayUnwindProjector(fields), filter::any);
     }
+}
+
+size_t countUniqueDocuments(const std::vector<BSONObj>& docs) {
+    BSONElementSet uniqueIds;
+    for (const auto& doc : docs) {
+        uniqueIds.insert(doc["_id"]);
+    }
+    return uniqueIds.size();
 }
 
 bool matchesInterval(const Interval& interval, BSONElement val) {

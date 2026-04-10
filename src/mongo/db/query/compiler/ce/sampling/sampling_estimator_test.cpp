@@ -1898,4 +1898,74 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithDifferentPathEqChildInMiddle) 
     ASSERT_EQ(ce, 50.0);
 }
 
+TEST_F(SamplingEstimatorTest, EstimateNDVReturnsCollCardWhenDuplicateDocsFromSampling) {
+    // Regression test for SERVER-123652.
+    // Verify that estimateNDV() returns _collectionCard for a defacto unique field even when the
+    // sample contains a duplicate document from sampling with replacement.
+    const size_t card = 5000;
+    insertDocuments(kTestNss, createDocuments(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    const size_t sampleSize = 10;
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          sampleSize,
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(card));
+
+    // Build a sample with 10 unique documents and all-unique "a" values, then append a duplicate
+    // of the first document (simulating sampling with replacement producing a duplicate).
+    std::vector<BSONObj> sample;
+    for (int i = 0; i < 9; i++) {
+        sample.push_back(BSON("_id" << i << "a" << i));
+    }
+    sample.push_back(BSON("_id" << 0 << "a" << 0));  // duplicate of doc 0
+
+    estimator.setSampleForTesting(std::move(sample));
+
+    auto ndv = estimator.estimateNDV({{.path = "a"}});
+    ASSERT_EQ(ndv.toDouble(), static_cast<double>(card));
+}
+
+TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {
+    // Verify that estimateNDV() does NOT return _collectionCard when two genuinely different
+    // documents (distinct _id) share a field value — i.e., the field is not unique.
+    const size_t card = 5000;
+    insertDocuments(kTestNss, createDocuments(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    const size_t sampleSize = 5;
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          sampleSize,
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(card));
+
+    // 5 documents with distinct _id values, but "a" is not unique: docs 0 and 4 share a=0.
+    std::vector<BSONObj> sample = {
+        BSON("_id" << 0 << "a" << 0),
+        BSON("_id" << 1 << "a" << 1),
+        BSON("_id" << 2 << "a" << 2),
+        BSON("_id" << 3 << "a" << 3),
+        BSON("_id" << 4 << "a" << 0),  // different doc, same "a" value as doc 0
+    };
+
+    estimator.setSampleForTesting(std::move(sample));
+
+    auto ndv = estimator.estimateNDV({{.path = "a"}});
+    ASSERT_LT(ndv.toDouble(), static_cast<double>(card));
+}
+
 }  // namespace mongo::ce

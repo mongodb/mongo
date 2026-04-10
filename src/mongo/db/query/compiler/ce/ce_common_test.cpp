@@ -553,4 +553,37 @@ INSTANTIATE_TEST_SUITE_P(
 DEATH_TEST(CountNDVMultiKeyDeathTest, ThrowsOnParallelArrays, "Parallel arrays are not supported") {
     countNDVMultiKey({{.path = "a"}, {.path = "b"}}, {fromjson("{a: [1, 2], b: [3, 4]}")});
 }
+TEST(CountUniqueDocuments, AllUnique) {
+    const std::vector<BSONObj> docs = {
+        fromjson("{_id: 1, a: 10}"),
+        fromjson("{_id: 2, a: 20}"),
+        fromjson("{_id: 3, a: 30}"),
+    };
+    ASSERT_EQ(3, countUniqueDocuments(docs));
+}
+
+TEST(CountUniqueDocuments, DuplicateDoc) {
+    const std::vector<BSONObj> docs = {
+        fromjson("{_id: 1, a: 10}"),
+        fromjson("{_id: 2, a: 20}"),
+        fromjson("{_id: 3, a: 30}"),
+        fromjson("{_id: 1, a: 10}"),
+    };
+    ASSERT_EQ(3, countUniqueDocuments(docs));
+}
+
+TEST(CountUniqueDocuments, UniqueIdsButSharedFieldValues) {
+    // Documents with distinct _id but identical other fields count as unique.
+    const std::vector<BSONObj> docs = {
+        fromjson("{_id: 1, a: 99}"),
+        fromjson("{_id: 2, a: 99}"),
+        fromjson("{_id: 3, a: 99}"),
+    };
+    ASSERT_EQ(3, countUniqueDocuments(docs));
+}
+
+TEST(CountUniqueDocuments, EmptyList) {
+    ASSERT_EQ(0, countUniqueDocuments({}));
+}
+
 }  // namespace mongo::ce

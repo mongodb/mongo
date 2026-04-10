@@ -54,6 +54,18 @@ public:
         return _sample;
     }
 
+    /**
+     * Directly sets the sample data, bypassing query execution. This allows tests to inject
+     * specific samples (including duplicate documents that simulate sampling with replacement)
+     * without needing a real collection.
+     */
+    void setSampleForTesting(std::vector<BSONObj> sample) {
+        _sample = std::move(sample);
+        _sampleSize = _sample.size();
+        _uniqueDocCount = boost::none;
+        _isSampleGenerated = true;
+    }
+
     static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError) {
         return SamplingEstimatorImpl::calculateSampleSize(ci, marginOfError);
     }

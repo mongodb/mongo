@@ -141,6 +141,14 @@ KeyCountResult countNDVMultiKey(
     boost::optional<std::span<const OrderedIntervalList>> bounds = boost::none);
 
 /**
+ * Returns the number of unique documents in the given vector by counting distinct _id values.
+ * This detects duplicate documents produced by sampling with replacement, where the same
+ * physical document may appear multiple times.
+ * This function assumes that every document passed to it contains an _id field.
+ */
+size_t countUniqueDocuments(const std::vector<BSONObj>& docs);
+
+/**
  * This helper checks if an element is within the given Interval.
  */
 bool matchesInterval(const Interval& interval, BSONElement val);
