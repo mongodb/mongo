@@ -1838,6 +1838,23 @@ tasks:
           docker_username: ${dockerhub_username}
           docker_password: ${dockerhub_password}
 
+  - name: test_crypt_packages
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: crypt_lib_package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "run crypt package test"
+        vars:
+          docker_username: ${dockerhub_username}
+          docker_password: ${dockerhub_password}
+          package_task_name: crypt_lib_package
+
   - name: test_packages_release
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     depends_on:

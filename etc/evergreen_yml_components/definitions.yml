@@ -2700,6 +2700,37 @@ functions:
           - "unused-url-placeholder"
           - "--evg-build-id"
           - "${build_id}"
+          - "--evg-package-task-name"
+          - "${package_task_name|package}"
+          - "--edition"
+          - "${repo_edition}"
+          - "--server-version"
+          - "${version}"
+
+  "run crypt package test":
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - command: subprocess.exec
+      display_name: "crypt package test py"
+      type: test
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "buildscripts/package_test.py"
+          - "--skip-enterprise-check"
+          - "--arch=${packager_arch}"
+          - "branch"
+          - "--test"
+          - "${packager_distro}"
+          - "unused-url-placeholder"
+          - "--evg-build-id"
+          - "${build_id}"
+          - "--evg-package-task-name"
+          - "${package_task_name|crypt_lib_package}"
           - "--edition"
           - "${repo_edition}"
           - "--server-version"

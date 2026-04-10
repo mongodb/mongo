@@ -38,7 +38,45 @@ handler.setFormatter(formatter)
 root.addHandler(handler)
 
 
-def download_packages_from_build(build_id: str, download_dir: Path) -> Path:
+def find_build_task(tasks: list[Any], task_display_name: str) -> Any:
+    """Find a unique Evergreen task by display name."""
+
+    matching_tasks = [task for task in tasks if task.display_name == task_display_name]
+
+    if not matching_tasks:
+        raise RuntimeError(f"Could not find task '{task_display_name}' in build task list")
+
+    if len(matching_tasks) > 1:
+        matching_task_ids = ", ".join(task.task_id for task in matching_tasks)
+        raise RuntimeError(
+            f"Found multiple tasks named '{task_display_name}' in build task list: {matching_task_ids}"
+        )
+
+    return matching_tasks[0]
+
+
+def find_task_artifact_url(task: Any, artifact_name: str) -> str:
+    """Find a unique artifact URL on a task."""
+
+    matching_artifacts = [artifact for artifact in task.artifacts if artifact.name == artifact_name]
+
+    if not matching_artifacts:
+        raise RuntimeError(
+            f"Could not find '{artifact_name}' artifact for task {task.task_id} ({task.display_name})"
+        )
+
+    if len(matching_artifacts) > 1:
+        matching_urls = ", ".join(artifact.url for artifact in matching_artifacts)
+        raise RuntimeError(
+            f"Found multiple '{artifact_name}' artifacts for task {task.task_id}: {matching_urls}"
+        )
+
+    return matching_artifacts[0].url
+
+
+def download_packages_from_build(
+    build_id: str, download_dir: Path, package_task_display_name: str = "package"
+) -> Path:
     """
     Download the packages artifact from the Evergreen API.
 
@@ -49,37 +87,25 @@ def download_packages_from_build(build_id: str, download_dir: Path) -> Path:
     Args:
         build_id: The Evergreen build ID to search for the package task
         download_dir: Directory where the packages tarball should be downloaded
+        package_task_display_name: The Evergreen task display name that owns the Packages artifact
 
     Returns:
         The local path to the downloaded packages tarball
     """
-    logging.info("Fetching packages artifact from Evergreen API for build: %s", build_id)
+    logging.info(
+        "Fetching packages artifact from Evergreen API for build: %s (task: %s)",
+        build_id,
+        package_task_display_name,
+    )
 
     evg_api = evergreen_conn.get_evergreen_api()
     tasks = evg_api.tasks_by_build(build_id)
 
-    package_task = None
-    for task in tasks:
-        if task.display_name == "package":
-            package_task = task
-            break
-
-    if package_task is None:
-        raise RuntimeError(f"Could not find 'package' task in build {build_id}")
-
+    package_task = find_build_task(tasks, package_task_display_name)
     logging.info("Found package task: %s", package_task.task_id)
 
-    packages_url = None
-    for artifact in package_task.artifacts:
-        if artifact.name == "Packages":
-            packages_url = artifact.url
-            logging.info("Found Packages artifact URL: %s", packages_url)
-            break
-
-    if packages_url is None:
-        raise RuntimeError(
-            f"Could not find 'Packages' artifact for package task {package_task.task_id}"
-        )
+    packages_url = find_task_artifact_url(package_task, "Packages")
+    logging.info("Found Packages artifact URL: %s", packages_url)
 
     # Download the packages file
     download_dir.mkdir(parents=True, exist_ok=True)
@@ -749,6 +775,12 @@ branch_test_parser.add_argument(
     "from the Evergreen API (required for private artifacts).",
     default=None,
 )
+branch_test_parser.add_argument(
+    "--evg-package-task-name",
+    type=str,
+    help="Evergreen task display name that owns the Packages artifact when using --evg-build-id.",
+    default="package",
+)
 args = parser.parse_args()
 
 if args.command == "release":
@@ -778,7 +810,9 @@ if args.command == "branch":
     local_packages_path: Optional[Path] = None
     if args.evg_build_id:
         download_dir = Path(__file__).parent / "downloaded_packages"
-        local_packages_path = download_packages_from_build(args.evg_build_id, download_dir)
+        local_packages_path = download_packages_from_build(
+            args.evg_build_id, download_dir, args.evg_package_task_name
+        )
 
     for test_pair in args.test:
         test_os = test_pair[0]
@@ -827,13 +861,12 @@ if args.command == "branch":
                 )
             )
 
-        validate_top_level_directory("mongo-binaries.tgz")
-
         if not args.skip_enterprise_check:
             logging.info(
                 "Checking the source files used to build the binaries, use --skip-enterprise-check to skip this check."
             )
 
+            validate_top_level_directory("mongo-binaries.tgz")
             os.makedirs("dist-test", exist_ok=True)
 
             tar = tarfile.open("mongo-binaries.tgz", "r:gz")

@@ -224,6 +224,9 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
+      - name: test_crypt_packages
+        distros:
+          - ubuntu2204-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
@@ -288,6 +291,9 @@ buildvariants:
         distros:
           - ubuntu2204-large
       - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: test_crypt_packages
         distros:
           - ubuntu2204-large
       - name: .development_critical !.requires_large_host
@@ -384,6 +390,9 @@ buildvariants:
         distros:
           - ubuntu2004-arm64-m8g-4xlarge
       - name: test_packages
+        distros:
+          - ubuntu2204-arm64-m8g-xlarge
+      - name: test_crypt_packages
         distros:
           - ubuntu2204-arm64-m8g-xlarge
       - name: .development_critical !.requires_large_host
@@ -487,6 +496,9 @@ buildvariants:
         distros:
           - ubuntu2204-arm64-m8g-4xlarge
       - name: test_packages
+        distros:
+          - ubuntu2204-arm64-m8g-4xlarge
+      - name: test_crypt_packages
         distros:
           - ubuntu2204-arm64-m8g-4xlarge
       - name: .development_critical !.requires_large_host
@@ -594,6 +606,9 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2404-large
+      - name: test_crypt_packages
+        distros:
+          - ubuntu2404-large
       - name: test_packages_release
         distros:
           - rhel94-large-packagetest
@@ -696,6 +711,9 @@ buildvariants:
         distros:
           - ubuntu2404-arm64-m8g-2xlarge
       - name: test_packages
+        distros:
+          - ubuntu2404-arm64-m8g-2xlarge
+      - name: test_crypt_packages
         distros:
           - ubuntu2404-arm64-m8g-2xlarge
       - name: test_packages_release
