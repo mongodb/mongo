@@ -124,6 +124,19 @@ server_parameters:
             gte: 1
         redact: false
 
+    primaryDrivenIndexBuildSorterInsertionBatchBytes:
+        description: "The maximum number of bytes in a batch when inserting into the sorter."
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: primaryDrivenIndexBuildSorterInsertionBatchBytes
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 4 * 1024 * 1024 # 4 MB
+        validator:
+            gte: 1
+        redact: false
+
     indexBuildSpillingMinAvailableDiskSpaceBytes:
         description: "Minimum disk space that should be available before spilling for an index build"
         set_at: [startup, runtime]

@@ -42,6 +42,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -536,15 +537,24 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
 }
 
 class ContainerBasedSpillerTest : public ServiceContextMongoDTest,
-                                  public testing::WithParamInterface<int64_t> {
+                                  public testing::WithParamInterface<std::tuple<int64_t, int64_t>> {
 public:
     // TODO (SERVER-116165): Remove.
     RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+
+    int64_t batchSize() const {
+        return std::get<0>(GetParam());
+    }
+    int64_t batchBytes() const {
+        return std::get<1>(GetParam());
+    }
 };
 
-INSTANTIATE_TEST_SUITE_P(ContainerBasedSpillerTest,
-                         ContainerBasedSpillerTest,
-                         testing::Values(1, 2, 4));
+INSTANTIATE_TEST_SUITE_P(
+    ContainerBasedSpillerTest,
+    ContainerBasedSpillerTest,
+    testing::Combine(testing::Values(1, 2, 4),
+                     testing::Values(1, sizeof(IntWrapper), std::numeric_limits<int64_t>::max())));
 
 TEST_P(ContainerBasedSpillerTest, Spill) {
     auto opCtx = makeOperationContext();
@@ -565,7 +575,8 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
         stats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        /*batchSize=*/GetParam(),
+        batchSize(),
+        batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
@@ -608,7 +619,8 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        /*batchSize=*/GetParam(),
+        batchSize(),
+        batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{
@@ -675,7 +687,8 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        /*batchSize=*/GetParam(),
+        batchSize(),
+        batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}},
@@ -772,7 +785,8 @@ TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
             stats,
             ns.dbName(),
             sorter::kLatestChecksumVersion,
-            /*batchSize=*/GetParam(),
+            batchSize(),
+            batchBytes(),
             testSpillingMinAvailableDiskSpaceBytes};
 
         auto spillPath = spiller.getSpillDir();

@@ -211,6 +211,7 @@ makeSpiller(OperationContext* opCtx,
             dbName,
             sorter::kLatestChecksumVersion,
             primaryDrivenIndexBuildSorterInsertionBatchSize.load(),
+            primaryDrivenIndexBuildSorterInsertionBatchBytes.load(),
             static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
     }
 

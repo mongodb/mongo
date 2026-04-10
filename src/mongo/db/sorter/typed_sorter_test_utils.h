@@ -48,6 +48,7 @@
 #include <concepts>
 #include <cstddef>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -228,6 +229,7 @@ struct ContainerTraits {
                                boost::none,
                                checksumVersion,
                                insertionBatchSize,
+                               std::numeric_limits<int64_t>::max(),
                                testSpillingMinAvailableDiskSpaceBytes),
         });
         return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>(

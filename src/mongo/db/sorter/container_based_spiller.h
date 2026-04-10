@@ -236,6 +236,7 @@ public:
             this->_checksumCalculator.addData(buffer.buf(), size);
         }
         _containerStats.addSpilledDataSizeUncompressed(size);
+        _lastAddedSize = size;
     }
 
     std::shared_ptr<Iterator> done() override {
@@ -257,6 +258,10 @@ public:
 
     void writeChunk() override {};
 
+    int64_t lastAddedSize() const {
+        return _lastAddedSize;
+    }
+
 private:
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
@@ -264,6 +269,7 @@ private:
     SorterContainerStats& _containerStats;
     int64_t _nextKey;
     int64_t _rangeStartKey;
+    int64_t _lastAddedSize = 0;
 };
 
 template <typename Key, typename Value>
@@ -344,6 +350,7 @@ public:
                           boost::optional<DatabaseName> dbName,
                           SorterChecksumVersion checksumVersion,
                           int64_t batchSize,
+                          int64_t batchBytes,
                           int64_t minAvailableDiskBytesToSpill)
         : SorterSpillerBase<Key, Value, Comparator>(
               std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
@@ -351,7 +358,8 @@ public:
               minAvailableDiskBytesToSpill),
           _opCtx(opCtx),
           _ru(ru),
-          _batchSize(batchSize) {}
+          _batchSize(batchSize),
+          _batchBytes(batchBytes) {}
 
     void mergeSpills(const SortOptions& opts,
                      const SorterSpillerBase<Key, Value, Comparator>::Settings& settings,
@@ -437,14 +445,27 @@ private:
         std::span<std::pair<Key, Value>> data) override {
         auto writer = this->_storage->makeWriter(opts, settings);
 
-        for (size_t i = 0; i < data.size(); i += _batchSize) {
-            auto batch =
-                data.subspan(i, i + _batchSize < data.size() ? _batchSize : std::dynamic_extent);
+        for (size_t i = 0; i < data.size();) {
+            auto batchStart = i;
+            auto batch = data.subspan(batchStart,
+                                      batchStart + _batchSize < data.size() ? _batchSize
+                                                                            : std::dynamic_extent);
             writeConflictRetry(
                 &_opCtx, _ru, "ContainerBasedSpiller::_spill", NamespaceString::kEmpty, [&] {
+                    i = batchStart;
+                    int64_t bytesInBatch = 0;
+
                     WriteUnitOfWork wuow{&_opCtx};
                     for (auto&& [key, value] : batch) {
                         writer->addAlreadySorted(key, value);
+                        ++i;
+
+                        bytesInBatch +=
+                            static_cast<SortedContainerWriter<Key, Value>*>(writer.get())
+                                ->lastAddedSize();
+                        if (bytesInBatch >= _batchBytes) {
+                            break;
+                        }
                     }
                     wuow.commit();
                 });
@@ -459,6 +480,7 @@ private:
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
     int64_t _batchSize;
+    int64_t _batchBytes;
     int64_t _current = 1;
 };
 
