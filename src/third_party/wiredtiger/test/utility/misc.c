@@ -588,6 +588,40 @@ dstrndup(const char *str, size_t len)
 }
 
 /*
+ * testutil_format_item --
+ *     Do printf-style formatting into a WT_ITEM buffer, growing as needed.
+ */
+void
+testutil_format_item(WT_ITEM *item, const char *fmt, ...)
+  WT_GCC_FUNC_ATTRIBUTE((format(printf, 2, 3)))
+{
+    size_t needed;
+    va_list ap, ap_copy;
+
+    va_start(ap, fmt);
+    va_copy(ap_copy, ap);
+
+    /* First call with a zero-size buffer to measure the required length. */
+    needed = 0;
+    testutil_check(__wt_vsnprintf_len_incr(NULL, 0, &needed, fmt, ap));
+    va_end(ap);
+
+    /* Grow the buffer if needed, accounting for the null terminator. */
+    if (needed + 1 > item->memsize) {
+        item->mem = drealloc(item->mem, needed + 1);
+        item->memsize = needed + 1;
+    }
+
+    /* Second call: write the string into the buffer. */
+    item->size = 0;
+    testutil_check(
+      __wt_vsnprintf_len_incr((char *)item->mem, item->memsize, &item->size, fmt, ap_copy));
+    va_end(ap_copy);
+
+    item->data = item->mem;
+}
+
+/*
  * example_setup --
  *     Set the program name, create a home directory for the example programs.
  */

@@ -640,10 +640,12 @@ struct __wt_connection_stats {
     int64_t eviction_force_hs_fail;
     int64_t eviction_force_hs;
     int64_t eviction_force_hs_success;
+    int64_t eviction_force_ingest_success;
     int64_t eviction_force_clean;
     int64_t eviction_force_dirty;
     int64_t eviction_force_long_update_list;
     int64_t eviction_force_delete;
+    int64_t eviction_force_ingest_fail;
     int64_t eviction_force;
     int64_t eviction_force_fail;
     int64_t cache_eviction_blocked_prune_timestamp;
@@ -675,6 +677,8 @@ struct __wt_connection_stats {
     int64_t cache_hs_write_squash;
     int64_t cache_inmem_splittable;
     int64_t cache_inmem_split;
+    int64_t cache_inmem_split_ingest;
+    int64_t eviction_ingest_success;
     int64_t cache_eviction_blocked_internal_page_split;
     int64_t cache_eviction_internal;
     int64_t eviction_internal_pages_queued;
@@ -745,6 +749,7 @@ struct __wt_connection_stats {
     int64_t eviction_fail_active_children_on_an_internal_page;
     int64_t eviction_fail_in_reconciliation;
     int64_t eviction_fail_checkpoint_no_ts;
+    int64_t eviction_fail_ingest;
     int64_t eviction_walk;
     int64_t cache_write;
     int64_t cache_write_restore_invisible;
@@ -1542,6 +1547,7 @@ struct __wt_dsrc_stats {
     int64_t cache_hs_write_squash;
     int64_t cache_inmem_splittable;
     int64_t cache_inmem_split;
+    int64_t cache_inmem_split_ingest;
     int64_t cache_eviction_blocked_internal_page_split;
     int64_t cache_eviction_internal;
     int64_t cache_eviction_split_internal;

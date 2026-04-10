@@ -228,7 +228,7 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
 {
     WT_CONNECTION_IMPL *conn;
     uint64_t eviction_time, eviction_time_milliseconds;
-
+    bool ingest = F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT);
     conn = S2C(session);
 
     if (session->evict_timeline.reentry_hs_eviction) {
@@ -248,12 +248,17 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
                 WT_STAT_CONN_INCR(session, eviction_force_clean);
             else
                 WT_STAT_CONN_INCR(session, eviction_force_dirty);
+            if (ingest)
+                WT_STAT_CONN_INCR(session, eviction_force_ingest_success);
         }
 
         if (LF_ISSET(WT_EVICT_STATS_CLEAN))
             WT_STAT_CONN_DSRC_INCR(session, cache_eviction_clean);
         else
             WT_STAT_CONN_DSRC_INCR(session, cache_eviction_dirty);
+
+        if (ingest)
+            WT_STAT_CONN_INCR(session, eviction_ingest_success);
 
         /* Count page evictions in parallel with checkpoint. */
         if (__wt_atomic_load_bool_v_relaxed(&conn->txn_global.checkpoint_running))
@@ -263,9 +268,13 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
             if (LF_ISSET(WT_EVICT_STATS_FORCE_HS))
                 WT_STAT_CONN_INCR(session, eviction_force_hs_fail);
             WT_STAT_CONN_INCR(session, eviction_force_fail);
+            if (ingest)
+                WT_STAT_CONN_INCR(session, eviction_force_ingest_fail);
         }
 
         WT_STAT_CONN_DSRC_INCR(session, eviction_fail);
+        if (ingest)
+            WT_STAT_CONN_INCR(session, eviction_fail_ingest);
     }
     if (!session->evict_timeline.reentry_hs_eviction) {
         eviction_time_milliseconds = eviction_time / WT_THOUSAND;

@@ -601,6 +601,8 @@ void testutil_deduce_build_dir(TEST_OPTS *opts);
 void testutil_delete_old_backups(int);
 void testutil_disagg_storage_configuration(
   TEST_OPTS *, const char *, char *, size_t, char *, size_t);
+void testutil_disagg_preserve(WT_CONNECTION *, const char *);
+
 bool testutil_exists(const char *, const char *);
 int testutil_general_event_handler(
   WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE, void *);
@@ -629,6 +631,8 @@ void testutil_sentinel(const char *, const char *);
 #ifndef _WIN32
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif
+void testutil_format_item(WT_ITEM *item, const char *fmt, ...)
+  WT_GCC_FUNC_ATTRIBUTE((format(printf, 2, 3)));
 void testutil_system_internal(const char *function, uint32_t line, const char *fmt, ...)
   WT_GCC_FUNC_ATTRIBUTE((format(printf, 2, 3)));
 void testutil_wiredtiger_open(

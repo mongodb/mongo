@@ -312,8 +312,13 @@ table_verify_mirror(
             table_mirror_fail_msg(session, checkpoint, base, base_keyno, &base_key, &base_value,
               table, table_keyno, &table_key, &table_value, last_match);
 
-            /* Dump the cursor pages for the first failure. */
+            /*
+             * Dump the cursor pages and preserve the disaggregated layered components for the first
+             * failure.
+             */
             if (++failures == 1) {
+                if (g.disagg_storage_config && GV(DISAGG_PRESERVE))
+                    testutil_disagg_preserve(conn, "preserve");
                 testutil_snprintf(
                   tagbuf, sizeof(tagbuf), "mirror error: base cursor (table %u)", base->id);
                 cursor_dump_page(base_cursor, tagbuf);

@@ -103,7 +103,7 @@
 
 #define MIN_TIMESTAMP 2 /* Minimum timestamp */
 
-#include "config.h"
+#include "format_config.h"
 extern CONFIG configuration_list[];
 
 typedef struct {

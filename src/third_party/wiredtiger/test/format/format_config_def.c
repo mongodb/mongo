@@ -201,6 +201,9 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"disagg.drain_threads", "set number of drain threads for disaggregated storage", 0x0, 1, 16, 256,
     V_GLOBAL_DISAGG_DRAIN_THREADS},
 
+  {"disagg.preserve", "preserve layered table constituents after data mismatches",
+    C_IGNORE | C_BOOL, 100, 1, 0, V_GLOBAL_DISAGG_PRESERVE},
+
   {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_DISK_CHECKSUM},
 

@@ -1320,6 +1320,31 @@ __checkpoint_clear_time(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_checkpoint_reset_stats --
+ *     Reset the per checkpoint statistic.
+ */
+void
+__wt_checkpoint_reset_stats(WT_CONNECTION_IMPL *conn)
+{
+    WT_EVICT *evict = conn->evict;
+    __wt_atomic_store_uint64_relaxed(&evict->evict_max_unvisited_gen_gap_per_checkpoint, 0);
+    __wt_atomic_store_uint64_relaxed(&evict->evict_max_visited_gen_gap_per_checkpoint, 0);
+    __wt_atomic_store_uint64_relaxed(&evict->evict_max_clean_page_size_per_checkpoint, 0);
+    __wt_atomic_store_uint64_relaxed(&evict->evict_max_dirty_page_size_per_checkpoint, 0);
+    __wt_atomic_store_uint64_relaxed(&evict->evict_max_updates_page_size_per_checkpoint, 0);
+    __wt_atomic_store_uint64_relaxed(&evict->evict_max_ms_per_checkpoint, 0);
+    __wt_atomic_store_uint16_relaxed(&evict->evict_max_eviction_queue_attempts, 0);
+    __wt_atomic_store_uint16_relaxed(&evict->evict_max_evict_page_attempts, 0);
+    __wt_atomic_store_uint64_relaxed(&evict->reentry_hs_eviction_ms, 0);
+    __wt_atomic_store_uint32_relaxed(&conn->heuristic_controls.obsolete_tw_btree_count, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_hs_wrapup_milliseconds, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_image_build_milliseconds, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_milliseconds, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_internal_delta_count, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_leaf_delta_count, 0);
+}
+
+/*
  * __checkpoint_db_debug_crash_points --
  *     Parse and apply the checkpoint_crash_point setting.
  */
@@ -1390,7 +1415,6 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *hs_dhandle, *hs_dhandle_shared;
     WT_DECL_RET;
-    WT_EVICT *evict;
     WT_PRECISE_CKPT_SAVED_TRIGGERS precise_ckpt_saved_triggers;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
@@ -1411,7 +1435,6 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CLEAR(precise_ckpt_saved_triggers);
     conn = S2C(session);
     ckpt_tmp_ts = WT_TS_NONE;
-    evict = conn->evict;
     drop_size = 0;
     hs_size = 0;
     hs_dhandle = hs_dhandle_shared = NULL;
@@ -1448,21 +1471,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     logging = F_ISSET(&conn->log_mgr, WT_LOG_ENABLED);
 
     /* Reset the statistics tracked per checkpoint. */
-    __wt_atomic_store_uint64_relaxed(&evict->evict_max_unvisited_gen_gap_per_checkpoint, 0);
-    __wt_atomic_store_uint64_relaxed(&evict->evict_max_visited_gen_gap_per_checkpoint, 0);
-    __wt_atomic_store_uint64_relaxed(&evict->evict_max_clean_page_size_per_checkpoint, 0);
-    __wt_atomic_store_uint64_relaxed(&evict->evict_max_dirty_page_size_per_checkpoint, 0);
-    __wt_atomic_store_uint64_relaxed(&evict->evict_max_updates_page_size_per_checkpoint, 0);
-    __wt_atomic_store_uint64_relaxed(&evict->evict_max_ms_per_checkpoint, 0);
-    __wt_atomic_store_uint16_relaxed(&evict->evict_max_eviction_queue_attempts, 0);
-    __wt_atomic_store_uint16_relaxed(&evict->evict_max_evict_page_attempts, 0);
-    __wt_atomic_store_uint64_relaxed(&evict->reentry_hs_eviction_ms, 0);
-    __wt_atomic_store_uint32_relaxed(&conn->heuristic_controls.obsolete_tw_btree_count, 0);
-    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_hs_wrapup_milliseconds, 0);
-    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_image_build_milliseconds, 0);
-    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_milliseconds, 0);
-    __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_internal_delta_count, 0);
-    __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_leaf_delta_count, 0);
+    __wt_checkpoint_reset_stats(conn);
 
     /* Initialize the verbose tracking timer */
     __wt_epoch(session, &conn->ckpt.ckpt_api.timer_start);

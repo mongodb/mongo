@@ -2190,6 +2190,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     if ((ret = __split_parent(session, ref, split_ref, 2, parent_incr, false, true)) == 0) {
         WT_STAT_CONN_DSRC_INCR(session, cache_inmem_split);
+        if (F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT))
+            WT_STAT_CONN_INCR(session, cache_inmem_split_ingest);
         return (0);
     }
 

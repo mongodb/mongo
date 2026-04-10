@@ -641,6 +641,14 @@ read:
                 goto skip_evict;
 
             /*
+             * Don't forcibly evict ingest b-tree pages, this often creates a negative pattern where
+             * writes (oplog application) threads are blocked waiting for pages to be evicted, but
+             * ultimately they cannot be evicted anyway.
+             */
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                goto skip_evict;
+
+            /*
              * Forcibly evict pages that are too big.
              */
             if (force_attempts < 10 && __evict_force_check(session, ref)) {

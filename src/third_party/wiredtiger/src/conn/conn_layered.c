@@ -526,6 +526,12 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
+    /*
+     * Reset the statistics tracked per checkpoint. Technically this isn't a checkpoint but we
+     * should reset the statistics so they are still useful.
+     */
+    __wt_checkpoint_reset_stats(conn);
+
     /* We should not pick up a checkpoint with an earlier LSN. */
     current_meta_lsn =
       __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_meta_lsn);
