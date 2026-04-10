@@ -71,6 +71,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_storage_options_config_string_flags_parser.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -1835,7 +1836,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
         }();
         // Check the storage options to determine if this is a cold collection.
         auto storageTier = getStorageTierFromStorageOptions(options.storageEngineCollectionOptions);
-        bool isColdCollection = storageTier && *storageTier == "cold";
+        bool isColdCollection = storageTier && *storageTier == StorageTierLevelEnum::cold;
 
         WiredTigerRecordStore::Params params{
             .uuid = uuid,
@@ -3195,7 +3196,8 @@ boost::optional<bool> WiredTigerKVEngine::getFlagFromStorageOptions(
 }
 
 BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
-                                                           StringData value) const {
+                                                           StorageTierLevelEnum value) const {
+    const auto serializedValue = idlSerialize(value);
     const auto configString =
         WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions);
 
@@ -3210,8 +3212,8 @@ BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storag
         }
     }
 
-    const std::string disaggConfigString = "disaggregated=(storage_tier=" + value + ")" +
-        (value == "cold" ? ",leaf_page_max=128KB" : "");
+    const std::string disaggConfigString = "disaggregated=(storage_tier=" + serializedValue + ")" +
+        (value == StorageTierLevelEnum::cold ? ",leaf_page_max=128KB" : "");
 
     const auto newConfigString =
         (configString ? WiredTigerUtil::concatConfigs(disaggConfigString, *configString)
@@ -3227,7 +3229,7 @@ BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storag
     return WiredTigerUtil::setConfigStringToStorageOptions(storageEngineOptions, newConfigString);
 }
 
-boost::optional<std::string> WiredTigerKVEngine::getStorageTierFromStorageOptions(
+boost::optional<StorageTierLevelEnum> WiredTigerKVEngine::getStorageTierFromStorageOptions(
     const BSONObj& storageEngineOptions) const {
     const auto configString =
         WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions);
@@ -3247,7 +3249,8 @@ boost::optional<std::string> WiredTigerKVEngine::getStorageTierFromStorageOption
         return boost::none;
     }
 
-    return std::string(storageTierValue.str, storageTierValue.len);
+    return idl::deserialize<StorageTierLevelEnum>(
+        StringData(storageTierValue.str, storageTierValue.len));
 }
 
 BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(

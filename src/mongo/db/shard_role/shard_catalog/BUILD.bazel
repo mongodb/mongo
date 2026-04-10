@@ -42,6 +42,7 @@ idl_generator(
     ],
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/storage:storage_tier_gen",
     ],
 )
 
@@ -71,6 +72,7 @@ mongo_cc_library(
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/collation:collator_interface",
         "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/storage:storage_tier",
         "//src/mongo/db/timeseries:timeseries_options",
     ],
 )

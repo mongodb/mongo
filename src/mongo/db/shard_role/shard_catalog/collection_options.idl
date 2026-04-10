@@ -34,6 +34,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/storage/storage_tier.idl"
 
 enums:
     ValidationLevel:
@@ -55,13 +56,6 @@ enums:
             error: error
             warn: warn
             errorAndLog: errorAndLog
-
-    StorageTierLevel:
-        description: "Disaggregated storage 'hotness' level for a collection or index"
-        type: string
-        values:
-            hot: hot
-            cold: cold
 
 structs:
     IndexOptionDefaults:

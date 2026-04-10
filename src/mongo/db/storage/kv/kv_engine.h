@@ -629,13 +629,13 @@ public:
      * index. Returns the updated storage engine options BSON object with the new value set.
      */
     [[nodiscard]] virtual BSONObj setStorageTierToStorageOptions(
-        const BSONObj& storageEngineOptions, StringData value) const = 0;
+        const BSONObj& storageEngineOptions, StorageTierLevelEnum value) const = 0;
 
     /**
      * Returns the value of `disaggregated.storage_tier` from the storage engine BSON object of a
      * collection / index, or boost::none if not set.
      */
-    virtual boost::optional<std::string> getStorageTierFromStorageOptions(
+    virtual boost::optional<StorageTierLevelEnum> getStorageTierFromStorageOptions(
         const BSONObj& storageEngineOptions) const = 0;
 
     /**

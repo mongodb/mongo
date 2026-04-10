@@ -1487,7 +1487,7 @@ TEST_F(WiredTigerKVEngineTest, PinAllDurableTimestamp) {
 
 TEST_F(WiredTigerKVEngineTest, SetStorageTierCold) {
     auto* engine = _helper->getWiredTigerKVEngine();
-    auto result = engine->setStorageTierToStorageOptions(BSONObj(), "cold");
+    auto result = engine->setStorageTierToStorageOptions(BSONObj(), StorageTierLevelEnum::cold);
     // Verify the returned storage options contain the cold tier WT config.
     auto wtObj = result.getObjectField("wiredTiger");
     auto configString = wtObj.getStringField("configString");
