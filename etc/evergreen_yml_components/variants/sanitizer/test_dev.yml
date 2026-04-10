@@ -915,12 +915,12 @@ buildvariants:
       - name: unittest_shell_hang_analyzer_gen
       - name: .watchdog !.requires_extra_system_deps
 
-  - name: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
-    display_name: "~Enterprise RHEL 8 SpiderMonkey Debug"
+  - name: enterprise-rhel8-arm64-dynamic-spider-monkey-dbg
+    display_name: "~Enterprise RHEL 8 arm64 SpiderMonkey Debug"
     tags: []
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-small
+      - rhel8.8-arm64-m8g-xlarge
     expansions:
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       # JS_GC_ZEAL modes can be found at https://github.com/mongodb/mongo/blob/r8.0.0-rc9/src/third_party/mozjs/extract/js/src/gc/GC.cpp#L563-L612.
@@ -928,11 +928,11 @@ buildvariants:
       # consistency check of the heap after every GC cycle (mode 15).
       mongo_mozjs_options: "7;15,75"
       bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=rhel88
         --spider_monkey_dbg=True
         --dtlto=False
         --pgo_profile_use=False
-      compile_variant: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
+      compile_variant: enterprise-rhel8-arm64-dynamic-spider-monkey-dbg
+      large_distro_name: rhel8.8-arm64-m8g-4xlarge
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout
       test_flags: >-
@@ -941,19 +941,19 @@ buildvariants:
     tasks:
       - name: compile_test_parallel_core_stream_TG
         distros:
-          - rhel8.8-xlarge
+          - rhel8.8-arm64-m8g-4xlarge
       - name: aggregation
       - name: aggregation_mongos_passthrough
         distros:
-          - rhel8.8-large
+          - rhel8.8-arm64-m8g-4xlarge
       - name: auth_gen
       - name: concurrency_simultaneous_gen
       - name: jsCore
         distros:
-          - rhel8.8-large
+          - rhel8.8-arm64-m8g-4xlarge
       - name: noPassthrough_gen
         distros:
-          - rhel8.8-large
+          - rhel8.8-arm64-m8g-4xlarge
       - name: sharding_gen
 
   - name: rhel8-arm64-debug-ubsan-roll-back-incremental-feature-flags
