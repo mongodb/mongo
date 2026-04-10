@@ -94,6 +94,9 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
+      - name: test_crypt_packages
+        distros:
+          - ubuntu2204-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
@@ -236,6 +239,9 @@ buildvariants:
         distros:
           - amazon2023.3-arm64-xxlarge
       - name: test_packages
+        distros:
+          - ubuntu2204-arm64-m8g-4xlarge
+      - name: test_crypt_packages
         distros:
           - ubuntu2204-arm64-m8g-4xlarge
       - name: full_bazel_compiledb

@@ -98,6 +98,9 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
+      - name: test_crypt_packages
+        distros:
+          - ubuntu2204-large
       - name: .development_critical !.requires_large_host !.incompatible_debian !.incompatible_oscrypto
       - name: .development_critical .requires_large_host !.incompatible_debian !.incompatible_oscrypto
         distros:

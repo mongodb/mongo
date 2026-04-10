@@ -132,6 +132,9 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
+      - name: test_crypt_packages
+        distros:
+          - ubuntu2204-large
       - name: selinux_rhel8_enterprise
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
@@ -230,6 +233,9 @@ buildvariants:
         distros:
           - rhel8.8-arm64-m8g-4xlarge
       - name: test_packages
+        distros:
+          - ubuntu2204-arm64-m8g-xlarge
+      - name: test_crypt_packages
         distros:
           - ubuntu2204-arm64-m8g-xlarge
       - name: .development_critical !.requires_large_host
@@ -333,6 +339,9 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
+      - name: test_crypt_packages
+        distros:
+          - ubuntu2204-large
       - name: selinux_rhel9_enterprise
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
@@ -430,6 +439,9 @@ buildvariants:
         distros:
           - rhel93-arm64-m8g-4xlarge
       - name: test_packages
+        distros:
+          - ubuntu2204-arm64-m8g-xlarge
+      - name: test_crypt_packages
         distros:
           - ubuntu2204-arm64-m8g-xlarge
       - name: .development_critical !.requires_large_host
@@ -534,6 +546,9 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
+      - name: test_crypt_packages
+        distros:
+          - ubuntu2204-large
       - name: selinux_rhel10_enterprise
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
@@ -633,6 +648,9 @@ buildvariants:
         distros:
           - rhel10.0-arm64-large
       - name: test_packages
+        distros:
+          - ubuntu2204-arm64-small
+      - name: test_crypt_packages
         distros:
           - ubuntu2204-arm64-small
       - name: .development_critical !.requires_large_host
