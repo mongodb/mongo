@@ -408,7 +408,7 @@ StatusWith<BSONObj> validateIndexSpec(
     bool unique = false;
     bool prepareUnique = false;
     auto clusteredField = indexSpec[IndexDescriptor::kClusteredFieldName];
-    bool apiStrict = opCtx && APIParameters::get(opCtx).getAPIStrict().value_or(false);
+    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     bool is2dIndexWithNonIntBits = false;
 
     auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec, allowedFieldNames);

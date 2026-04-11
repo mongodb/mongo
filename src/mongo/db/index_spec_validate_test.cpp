@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/operation_context.h"
@@ -717,5 +718,118 @@ TEST_F(IndexSpecWildcardTest, FailsWhenExclusionWithSubpath) {
 }
 
 }  // namespace index_spec_wildcard_test
+
+namespace index_spec_field_validate_test {
+
+class IndexSpecFieldValidateTest : public ServiceContextMongoDTest {};
+
+TEST_F(IndexSpecFieldValidateTest, CompoundHashedIndex) {
+    auto opCtx = makeOperationContext();
+    // Validation succeeds with hashed prefix in the index.
+    ASSERT_OK(
+        validateIndexSpec(opCtx.get(), fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}")));
+
+    // Validation succeeds with non-hashed prefix in the index.
+    ASSERT_OK(validateIndexSpec(opCtx.get(),
+                                fromjson("{key: {b: 1, a : 'hashed', c: 1}, name: 'index'}")));
+}
+
+TEST_F(IndexSpecFieldValidateTest, Background) {
+    auto opCtx = makeOperationContext();
+    ASSERT_OK(
+        validateIndexSpec(opCtx.get(), fromjson("{key: {a: 1}, name: 'index', background: true}")));
+
+    ASSERT_OK(
+        validateIndexSpec(opCtx.get(), fromjson("{key: {a: 1}, name: 'index', background: 1}")));
+
+    ASSERT_OK(
+        validateIndexSpec(opCtx.get(), fromjson("{key: {a: 1}, name: 'index', background: 0}")));
+
+    ASSERT_NOT_OK(validateIndexSpec(opCtx.get(),
+                                    fromjson("{key: {a: 1}, name: 'index', background: 'foo'}")));
+
+    ASSERT_NOT_OK(
+        validateIndexSpec(opCtx.get(), fromjson("{key: {a: 1}, name: 'index', background: []}")));
+}
+
+TEST_F(IndexSpecFieldValidateTest, UpdateTTLIndexNaNExpireAfterSeconds) {
+    auto opCtx = makeOperationContext();
+    ASSERT(
+        BSON("key" << BSON("a" << 1) << "name"
+                   << "index"
+                   << "expireAfterSeconds" << std::numeric_limits<int32_t>::max()
+                   << IndexDescriptor::kIndexVersionFieldName << IndexDescriptor::IndexVersion::kV2)
+            .binaryEqual(unittest::assertGet(validateIndexSpec(
+                opCtx.get(), fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: NaN}")))));
+}
+
+TEST_F(IndexSpecFieldValidateTest, ValidateAfterSecondsAcceptsFloatingPointNumber) {
+    auto opCtx = makeOperationContext();
+    auto spec = unittest::assertGet(validateIndexSpec(
+        opCtx.get(), fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 123.456}")));
+
+    // TTLMonitor extracts 'expireAfterSeconds' using BSONElement::safeNumberLong().
+    ASSERT_EQUALS(spec["expireAfterSeconds"].safeNumberLong(), 123LL);
+}
+
+// TODO (SERVER-120350): Remove this test case.
+TEST_F(IndexSpecFieldValidateTest, UpgradeRepairRejectsNonIntegerExpireAfterSeconds) {
+    auto opCtx = makeOperationContext();
+    // Non-integer expireAfterSeconds is accepted during normal validation.
+    ASSERT_OK(validateIndexSpec(opCtx.get(),
+                                fromjson("{key: {a: 1}, name: 'index', "
+                                         "expireAfterSeconds: 123.456}"))
+                  .getStatus());
+
+    // During upgrade repair, a non-integer expireAfterSeconds must return TypeMismatch so that
+    // repairIndexSpec() can convert the on-disk value to an integer.
+    auto status = validateIndexSpec(opCtx.get(),
+                                    fromjson("{key: {a: 1}, name: 'index', "
+                                             "expireAfterSeconds: 123.456}"),
+                                    index_key_validate::kAllowedFieldNames,
+                                    /*isUpgradeRepair=*/true)
+                      .getStatus();
+    ASSERT_EQ(status.code(), ErrorCodes::TypeMismatch);
+}
+
+TEST_F(IndexSpecFieldValidateTest, GeoIndexSpecs) {
+    auto opCtx = makeOperationContext();
+    ASSERT_OK(validateIndexSpec(
+        opCtx.get(),
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':17,'"
+                 "coarsestIndexedLevel':5}")));
+
+    ASSERT_NOT_OK(validateIndexSpec(
+        opCtx.get(),
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':'string','"
+                 "coarsestIndexedLevel':'string'}")));
+
+    ASSERT_NOT_OK(validateIndexSpec(
+        opCtx.get(),
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':17,'"
+                 "coarsestIndexedLevel':'string'}")));
+
+    ASSERT_NOT_OK(validateIndexSpec(
+        opCtx.get(),
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':'string','"
+                 "coarsestIndexedLevel':5}")));
+
+    ASSERT_NOT_OK(validateIndexSpec(
+        opCtx.get(),
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':true,'"
+                 "coarsestIndexedLevel':true}")));
+
+    ASSERT_NOT_OK(validateIndexSpec(
+        opCtx.get(),
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':17,'"
+                 "coarsestIndexedLevel':true}")));
+
+    ASSERT_NOT_OK(validateIndexSpec(
+        opCtx.get(),
+        fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':true,'"
+                 "coarsestIndexedLevel':5}")));
+}
+
+}  // namespace index_spec_field_validate_test
 }  // namespace
 }  // namespace mongo
