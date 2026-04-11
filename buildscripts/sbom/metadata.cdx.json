@@ -2125,7 +2125,7 @@
         },
         {
           "name": "import_script_path",
-          "value": "src/third_party/scripts/zlib_get_sources.sh"
+          "value": "src/third_party/zlib/scripts/import.sh"
         }
       ],
       "evidence": {

@@ -67,7 +67,7 @@ a notice will be included in
 | [valgrind.h]                                         | BSD-4-Clause                      | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
 | [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only      | 12.0.0                                   | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |
-| [zlib]                                               | Zlib                              | 1.3.1                                    | ✗                    | ✗                               |
+| [zlib]                                               | Zlib                              | 1.3.2                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only      | 1.5.5                                    | ✗                    | ✗                               |
 
 [AWS SDK for C++]: https://github.com/aws/aws-sdk-cpp.git
