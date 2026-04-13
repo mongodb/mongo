@@ -93,9 +93,44 @@ runTest({
 runTest({
     name: "$addFields deeper path {a: '$b.c.d'}",
     pipeline: [{$addFields: {a: "$b.c.d"}}, {$match: {a: 42}}],
-    negative: {
-        docs: [{b: {c: {d: 42}}}, {b: {c: {d: 99}}}],
+    positive: {
+        docs: [{b: {c: {d: 42}}}, {b: {c: {d: 99}}}, {b: {c: {d: 42}}}],
         index: {"b.c.d": 1},
+        expectedCount: 2,
+    },
+    negative: {
+        docs: [{b: [{c: {d: 42}}]}, {b: [{c: {d: 99}}]}],
+        index: {"b.c.d": 1},
+        expectedCount: 1,
+    },
+});
+
+runTest({
+    name: "$addFields depth-4 path {a: '$b.c.d.e'}",
+    pipeline: [{$addFields: {a: "$b.c.d.e"}}, {$match: {a: 42}}],
+    positive: {
+        docs: [{b: {c: {d: {e: 42}}}}, {b: {c: {d: {e: 99}}}}, {b: {c: {d: {e: 42}}}}],
+        index: {"b.c.d.e": 1},
+        expectedCount: 2,
+    },
+    negative: {
+        docs: [{b: {c: [{d: {e: 42}}]}}, {b: {c: [{d: {e: 99}}]}}],
+        index: {"b.c.d.e": 1},
+        expectedCount: 1,
+    },
+});
+
+runTest({
+    name: "$addFields depth-5 path {a: '$b.c.d.e.f'}",
+    pipeline: [{$addFields: {a: "$b.c.d.e.f"}}, {$match: {a: 42}}],
+    positive: {
+        docs: [{b: {c: {d: {e: {f: 42}}}}}, {b: {c: {d: {e: {f: 99}}}}}],
+        index: {"b.c.d.e.f": 1},
+        expectedCount: 1,
+    },
+    negative: {
+        docs: [{b: [{c: {d: {e: {f: 42}}}}]}, {b: [{c: {d: {e: {f: 99}}}}]}],
+        index: {"b.c.d.e.f": 1},
         expectedCount: 1,
     },
 });

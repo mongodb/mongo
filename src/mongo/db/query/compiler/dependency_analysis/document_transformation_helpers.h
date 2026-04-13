@@ -181,12 +181,15 @@ auto wrapDocumentTransformation(const Inner& inner, MakeVisitor&& makeVisitor) {
  */
 template <typename T, typename CanPathBeArray>
 auto withArraynessInfo(const T& t, CanPathBeArray&& canPathBeArray) {
-    auto noArraysInvolved = [canPathBeArray = std::forward<CanPathBeArray>(canPathBeArray)](
-                                const RenamePath& op) {
-        // To be done (SERVER-109703): Handle any number of dots on either side.
-        return op.getOldPathMaxArrayTraversals() == 1 && op.getNewPathMaxArrayTraversals() == 0 &&
-            !canPathBeArray(FieldPath::extractFirstFieldFromDottedPath(op.getOldPath()));
-    };
+    auto noArraysInvolved =
+        [canPathBeArray = std::forward<CanPathBeArray>(canPathBeArray)](const RenamePath& op) {
+            // To be done (SERVER-109703): Handle any number of dots on the left side.
+            if (op.getOldPathMaxArrayTraversals() < 1 || op.getNewPathMaxArrayTraversals() != 0) {
+                return false;
+            }
+            StringData oldPath = op.getOldPath();
+            return !canPathBeArray(oldPath.substr(0, oldPath.rfind('.')));
+        };
 
     return detail::wrapDocumentTransformation(
         t, [noArraysInvolved](DocumentOperationVisitor& visitor) {
