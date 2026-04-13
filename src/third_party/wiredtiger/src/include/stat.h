@@ -510,6 +510,7 @@ struct __wt_connection_stats {
     int64_t cache_bytes_other;
     int64_t cache_bytes_read;
     int64_t cache_bytes_write;
+    int64_t cache_tolerance_level;
     int64_t cache_eviction_blocked_checkpoint;
     int64_t cache_eviction_blocked_checkpoint_hs;
     int64_t cache_bytes_hs_dirty;

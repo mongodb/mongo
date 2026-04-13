@@ -690,7 +690,7 @@ __evict_is_session_cache_trigger_tolerant(WT_SESSION_IMPL *session, uint8_t cach
 
     if (bytes_updates > bytes_updates_trigger) {
         /* Updates content is more than update trigger. */
-        bytes_over_updates_trigger = bytes_dirty - bytes_dirty_trigger;
+        bytes_over_updates_trigger = bytes_updates - bytes_updates_trigger;
 
         if (bytes_over_updates_trigger > bytes_updates_tolerance) {
             /* More than 100% of tolerance level. 100% of the app threads are non-tolerant. */
