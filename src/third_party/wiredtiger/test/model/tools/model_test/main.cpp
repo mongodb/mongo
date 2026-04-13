@@ -319,17 +319,17 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(prepared_transaction_rollback_after_prepare, float);
         UPDATE_SPEC(prepared_transaction_rollback_before_prepare, float);
 
-        UPDATE_SPEC(timing_stress_ckpt_slow, float);
-        UPDATE_SPEC(timing_stress_ckpt_evict_page, float);
-        UPDATE_SPEC(timing_stress_ckpt_handle, float);
-        UPDATE_SPEC(timing_stress_ckpt_stop, float);
-        UPDATE_SPEC(timing_stress_compact_slow, float);
-        UPDATE_SPEC(timing_stress_hs_ckpt_delay, float);
-        UPDATE_SPEC(timing_stress_hs_search, float);
-        UPDATE_SPEC(timing_stress_hs_sweep_race, float);
-        UPDATE_SPEC(timing_stress_prepare_ckpt_delay, float);
-        UPDATE_SPEC(timing_stress_commit_txn_slow, float);
-        UPDATE_SPEC(timing_stress_rec_before_wrapup, float);
+        UPDATE_SPEC(timing_stress.ckpt_slow, float);
+        UPDATE_SPEC(timing_stress.ckpt_evict_page, float);
+        UPDATE_SPEC(timing_stress.ckpt_handle, float);
+        UPDATE_SPEC(timing_stress.ckpt_stop, float);
+        UPDATE_SPEC(timing_stress.compact_slow, float);
+        UPDATE_SPEC(timing_stress.hs_ckpt_delay, float);
+        UPDATE_SPEC(timing_stress.hs_search, float);
+        UPDATE_SPEC(timing_stress.hs_sweep_race, float);
+        UPDATE_SPEC(timing_stress.prepare_ckpt_delay, float);
+        UPDATE_SPEC(timing_stress.commit_txn_slow, float);
+        UPDATE_SPEC(timing_stress.rec_before_wrapup, float);
 
         else if (k == "connection_config") conn_config += "," + m.get_string("connection_config");
 

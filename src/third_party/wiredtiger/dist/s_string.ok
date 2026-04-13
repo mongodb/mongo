@@ -336,6 +336,7 @@ NZD
 Namespace
 NetBSD
 NoAddr
+NonInteractive
 Nul
 OBJECTID
 ONDISK
@@ -474,6 +475,7 @@ Timespec
 Tput
 TryCV
 Typedefs
+UB
 UBSAN
 UBSan
 UDF
@@ -599,6 +601,7 @@ backlink
 backoff
 bal
 basecfg
+basename
 batchtime
 bazel
 bazelisk
@@ -771,6 +774,7 @@ cx
 cxa
 cyclomatic
 cygdrive
+cygwin
 dKB
 dT
 da
@@ -1093,6 +1097,7 @@ lf
 libdatasource
 libmemkind
 libpthread
+libpython
 libs
 libsodium
 libwiredtiger
@@ -1199,6 +1204,7 @@ mutex
 mutexes
 mux
 mv
+mvenv
 mytable
 nTemp
 namespace
@@ -1305,6 +1311,7 @@ posix
 postfix
 postrun
 postsize
+powershell
 ppc
 pre
 pread
@@ -1513,6 +1520,7 @@ supd
 superset
 suppressions
 sw
+symlink
 symlinks
 syncop
 sys

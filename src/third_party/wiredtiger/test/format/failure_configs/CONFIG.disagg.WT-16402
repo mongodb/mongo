@@ -76,6 +76,8 @@ ops.pct.modify=0
 ops.bound_cursor=0
 ops.prepare=0
 ops.random_cursor=0
+# FIXME-WT-16483: reserve not supported for layered tables, change back when fixed
+ops.reserve=0
 ops.salvage=0
 ops.throttle=0
 ops.throttle.sleep_us=121942

@@ -34,6 +34,29 @@
 namespace model {
 
 /*
+ * kv_timing_stress_spec::kv_timing_stress_spec --
+ *     Create the timing stress specification using default weight values.
+ */
+kv_timing_stress_spec::kv_timing_stress_spec()
+{
+    /* Relative weights for the timing stress tests, which don't have to add up to 1.0. */
+    weight_init_block(total)
+    {
+        weight_init(ckpt_slow, 0.1f);
+        weight_init(ckpt_evict_page, 0.1f);
+        weight_init(ckpt_handle, 0.1f);
+        weight_init(ckpt_stop, 0.1f);
+        weight_init(compact_slow, 0.1f);
+        weight_init(hs_ckpt_delay, 0.1f);
+        weight_init(hs_search, 0.1f);
+        weight_init(hs_sweep_race, 0.1f);
+        weight_init(prepare_ckpt_delay, 0.1f);
+        weight_init(commit_txn_slow, 0.1f);
+        weight_init(rec_before_wrapup, 0.1f);
+    }
+}
+
+/*
  * kv_workload_generator_spec::kv_workload_generator_spec --
  *     Create the generator specification using default probability values.
  */
@@ -82,22 +105,6 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     nonprepared_transaction_rollback = 0.1;
     prepared_transaction_rollback_after_prepare = 0.1;
     prepared_transaction_rollback_before_prepare = 0.1;
-
-    /* Relative weights for the timing stress tests, which don't have to add up to 1.0. */
-    weight_init_block(timing_stress_total)
-    {
-        weight_init(timing_stress_ckpt_slow, 0.1f);
-        weight_init(timing_stress_ckpt_evict_page, 0.1f);
-        weight_init(timing_stress_ckpt_handle, 0.1f);
-        weight_init(timing_stress_ckpt_stop, 0.1f);
-        weight_init(timing_stress_compact_slow, 0.1f);
-        weight_init(timing_stress_hs_ckpt_delay, 0.1f);
-        weight_init(timing_stress_hs_search, 0.1f);
-        weight_init(timing_stress_hs_sweep_race, 0.1f);
-        weight_init(timing_stress_prepare_ckpt_delay, 0.1f);
-        weight_init(timing_stress_commit_txn_slow, 0.1f);
-        weight_init(timing_stress_rec_before_wrapup, 0.1f);
-    }
 }
 
 /*
@@ -343,29 +350,29 @@ std::string
 kv_workload_generator::generate_connection_stress_config()
 {
     std::string wt_env_config;
-    probability_switch(_random.next_float() * _spec.timing_stress_total())
+    probability_switch(_random.next_float() * _spec.timing_stress.total())
     {
-        probability_case(_spec.timing_stress_ckpt_slow) wt_env_config +=
+        probability_case(_spec.timing_stress.ckpt_slow) wt_env_config +=
           "timing_stress_for_test=[checkpoint_slow]";
-        probability_case(_spec.timing_stress_ckpt_evict_page) wt_env_config +=
+        probability_case(_spec.timing_stress.ckpt_evict_page) wt_env_config +=
           "timing_stress_for_test=[checkpoint_evict_page]";
-        probability_case(_spec.timing_stress_ckpt_handle) wt_env_config +=
+        probability_case(_spec.timing_stress.ckpt_handle) wt_env_config +=
           "timing_stress_for_test=[checkpoint_handle]";
-        probability_case(_spec.timing_stress_ckpt_stop) wt_env_config +=
+        probability_case(_spec.timing_stress.ckpt_stop) wt_env_config +=
           "timing_stress_for_test=[checkpoint_stop]";
-        probability_case(_spec.timing_stress_compact_slow) wt_env_config +=
+        probability_case(_spec.timing_stress.compact_slow) wt_env_config +=
           "timing_stress_for_test=[compact_slow]";
-        probability_case(_spec.timing_stress_hs_ckpt_delay) wt_env_config +=
+        probability_case(_spec.timing_stress.hs_ckpt_delay) wt_env_config +=
           "timing_stress_for_test=[history_store_checkpoint_delay]";
-        probability_case(_spec.timing_stress_hs_search) wt_env_config +=
+        probability_case(_spec.timing_stress.hs_search) wt_env_config +=
           "timing_stress_for_test=[history_store_search]";
-        probability_case(_spec.timing_stress_hs_sweep_race) wt_env_config +=
+        probability_case(_spec.timing_stress.hs_sweep_race) wt_env_config +=
           "timing_stress_for_test=[history_store_sweep_race]";
-        probability_case(_spec.timing_stress_prepare_ckpt_delay) wt_env_config +=
+        probability_case(_spec.timing_stress.prepare_ckpt_delay) wt_env_config +=
           "timing_stress_for_test=[prepare_checkpoint_delay]";
-        probability_case(_spec.timing_stress_commit_txn_slow) wt_env_config +=
+        probability_case(_spec.timing_stress.commit_txn_slow) wt_env_config +=
           "timing_stress_for_test=[commit_transaction_slow]";
-        probability_case(_spec.timing_stress_rec_before_wrapup) wt_env_config +=
+        probability_case(_spec.timing_stress.rec_before_wrapup) wt_env_config +=
           "timing_stress_for_test=[failpoint_rec_before_wrapup]";
     }
     return wt_env_config;

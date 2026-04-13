@@ -1133,20 +1133,6 @@ functions:
             ./t -R $format_args ${extra_args|} || fail
           fi
         done
-  "timestamp abort disagg":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/csuite/timestamp_abort"
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        ${PREPARE_TEST_ENV}
-        ${additional_san_vars}
-        for i in $(seq ${times|1}); do
-          echo Iteration $i/${times}
-          ./test_timestamp_abort -G -s
-        done
   "many dbs test":
     command: shell.exec
     params:
@@ -1775,60 +1761,6 @@ variables:
         vars:
           format_args: disagg.mode=follower runs.ops=500000:2000000
           times: 5
-
-  - &format-stress-test-disagg-switch
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          format_args: disagg.mode=switch runs.timer=10:15
-          times: 5
-
-  # FIXME-WT-16113: Consolidate this logic in test/format itself.
-  - &format-stress-test-disagg-switch-data-validation
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          # Validate data with a non-layered table.
-          format_args: disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
-          times: 5
-
-  - &format-stress-test-disagg-multi
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000
-          times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
-
-  - &format-stress-test-disagg-multi-data-validation
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          # Validate data with a non-layered table.
-          format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 runs.ops=500000:2000000
-          times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
-
-  - &timestamp-abort-test-disagg
-    depends_on:
-        - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "timestamp abort disagg"
-        vars:
-          times: 50
 
 #######################################
 #               Tasks                 #
@@ -5168,45 +5100,6 @@ tasks:
     name: format-stress-test-disagg-follower-2
     tags: ["stress-test-disagg"]
 
-  # FIXME-WT-16394: Enable disagg switch mode on all platforms once failures have been resolved.
-  - <<: *format-stress-test-disagg-switch
-    name: format-stress-test-disagg-switch-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-  - <<: *format-stress-test-disagg-switch
-    name: format-stress-test-disagg-switch-2
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-switch
-    name: format-stress-test-disagg-switch-3
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-switch-data-validation
-    name: format-stress-test-disagg-switch-data-validation-1
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-switch-data-validation
-    name: format-stress-test-disagg-switch-data-validation-2
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-switch-data-validation
-    name: format-stress-test-disagg-switch-data-validation-3
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi
-    name: format-stress-test-disagg-multi-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-  - <<: *format-stress-test-disagg-multi
-    name: format-stress-test-disagg-multi-2
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi-data-validation
-    name: format-stress-test-disagg-multi-validation-1
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi-data-validation
-    name: format-stress-test-disagg-multi-validation-2
-    tags: ["stress-test-disagg-fail"]
-
-  - <<: *timestamp-abort-test-disagg
-    name: timestamp-abort-test-disagg-1
-    tags: ["stress-test-disagg-fail"]
-  - <<: *timestamp-abort-test-disagg
-    name: timestamp-abort-test-disagg-2
-    tags: ["stress-test-disagg-fail"]
-
   - name: format-stress-test-disagg-leader-pull-request
     tags: ["pull_request"]
     depends_on:
@@ -7677,35 +7570,3 @@ buildvariants:
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours
-
-- name: amazon2023-disagg-stress
-  display_name: "[Failure Expected] Amazon2023 ARM64 Disagg Stress tests"
-  batchtime: 4320 # once every two days
-  run_on:
-  - amazon2023.3-arm64-large
-  expansions:
-    ENABLE_TCMALLOC: 1
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
-    disagg_run: true
-  tasks:
-    - name: compile
-    - name: ".stress-test-disagg-fail"
-
-- name: amazon2023-disagg-asan-stress
-  display_name: "[Failure Expected] Amazon2023 ARM64 ASAN Disagg Stress tests"
-  batchtime: 4320 # once every three days
-  run_on:
-  - amazon2023.3-arm64-large
-  expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
-    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
-    ENABLE_TCMALLOC: 0
-    additional_env_vars: |
-      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
-    disagg_run: true
-    <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
-    additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-  tasks:
-    - name: compile
-    - name: ".stress-test-disagg-san-fail"

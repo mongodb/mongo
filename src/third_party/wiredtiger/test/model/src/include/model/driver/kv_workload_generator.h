@@ -42,6 +42,38 @@
 namespace model {
 
 /*
+ * kv_timing_stress_spec --
+ *     A specification for WiredTiger timing stress configurations.
+ */
+struct kv_timing_stress_spec {
+
+    /* Weights of WiredTiger timing stress configurations. */
+    float ckpt_slow;
+    float ckpt_evict_page;
+    float ckpt_handle;
+    float ckpt_stop;
+    float compact_slow;
+    float hs_ckpt_delay;
+    float hs_search;
+    float hs_sweep_race;
+    float prepare_ckpt_delay;
+    float commit_txn_slow;
+    float rec_before_wrapup;
+
+    /*
+     * kv_timing_stress_spec::kv_timing_stress_spec --
+     *     Create the timing stress specification using default weight values.
+     */
+    kv_timing_stress_spec();
+
+    /*
+     * kv_timing_stress_spec::total --
+     *     The function to compute the sum of weights.
+     */
+    std::function<float()> total;
+};
+
+/*
  * kv_workload_generator_spec --
  *     A high-level workload specification.
  */
@@ -108,31 +140,14 @@ struct kv_workload_generator_spec {
     float prepared_transaction_rollback_after_prepare;
     float prepared_transaction_rollback_before_prepare;
 
-    /* Weights of WiredTiger timing stress configurations. */
-    /* FIXME-WT-13878 : Refactor this code and move into a separate structure. */
-    float timing_stress_ckpt_slow;
-    float timing_stress_ckpt_evict_page;
-    float timing_stress_ckpt_handle;
-    float timing_stress_ckpt_stop;
-    float timing_stress_compact_slow;
-    float timing_stress_hs_ckpt_delay;
-    float timing_stress_hs_search;
-    float timing_stress_hs_sweep_race;
-    float timing_stress_prepare_ckpt_delay;
-    float timing_stress_commit_txn_slow;
-    float timing_stress_rec_before_wrapup;
+    /* WiredTiger timing stress configuration. */
+    kv_timing_stress_spec timing_stress;
 
     /*
      * kv_workload_generator_spec::kv_workload_generator_spec --
      *     Create the generator specification using default probability values.
      */
     kv_workload_generator_spec();
-
-    /*
-     * kv_workload_generator_spec::compute_timing_stress_total --
-     *     The function to compute the sum of weights.
-     */
-    std::function<float()> timing_stress_total;
 };
 
 /*

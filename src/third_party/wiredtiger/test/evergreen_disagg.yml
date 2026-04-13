@@ -1,0 +1,697 @@
+#
+# This config file is used by the WiredTiger Disagg (wiredtiger-disagg) Evergreen project.
+# It contains only the "[Failure Expected]" disagg stress test variants.
+#
+# Functions, variables and settings are duplicated from test/evergreen.yml.
+#
+
+#######################################
+#            Project Settings         #
+#######################################
+
+stepback: true
+pre:
+  - func: "cleanup"
+  - func: "setup environment"
+post:
+  - func: "dump stacktraces"
+  - func: "upload stacktraces"
+  - func: "upload test/format config"
+  - func: "upload test/model workloads"
+  - func: "dump stderr/stdout"
+  - func: "upload stat files"
+  - func: "upload artifact"
+    vars:
+      postfix: -${execution}
+  - func: "save wt hang analyzer core/debugger files"
+  - func: "cleanup"
+timeout:
+  - func: "run wt hang analyzer"
+exec_timeout_secs: 21600 # 6 hrs
+
+#######################################
+#            Functions                #
+#######################################
+
+functions:
+  "cleanup":
+    command: shell.exec
+    type: setup
+    params:
+      shell: bash
+      script: |
+        rm -rf "wiredtiger"
+        rm -rf "wiredtiger.tgz"
+
+  "setup environment":
+    - command: expansions.update
+      type: setup
+      params:
+        updates:
+        # The expansion is used for each task that runs a WiredTiger test. The expansions are
+        # created before each task and is meant to be used at the start each task. All of these
+        # variables are common among the build variants, if there are any specific variables that
+        # needs to be set, users can add onto the additional_env_vars in the variant.
+        - key: PREPARE_TEST_ENV
+          value: |
+            export WT_TOPDIR=$(git rev-parse --show-toplevel)
+            export WT_BUILDDIR=$WT_TOPDIR/cmake_build
+
+            if [ "$OS" = "Windows_NT" ]; then
+              export PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
+            else
+              export PATH=/opt/mongodbtoolchain/v5/bin:$PATH
+              export LD_LIBRARY_PATH=$WT_BUILDDIR
+            fi
+
+            # Create the common sanitizer options and export the specific sanitizer environment
+            # variables.
+            COMMON_SAN_OPTIONS="abort_on_error=1:disable_coredump=0"
+            if [[ "${CMAKE_BUILD_TYPE|}" =~ ASan ]]; then
+              export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(dirname $(/opt/mongodbtoolchain/v5/bin/clang -print-file-name=libclang_rt.asan.so))"
+              export TESTUTIL_BYPASS_ASAN=1
+            elif [[ "${CMAKE_BUILD_TYPE|}" =~ MSan ]]; then
+              export MSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export TESTUTIL_MSAN=1
+            elif [[ "${CMAKE_BUILD_TYPE|}" =~ TSan ]]; then
+              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export TESTUTIL_TSAN=1
+            elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
+              export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"
+              export TESTUTIL_UBSAN=1
+            fi
+
+            if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
+              # The preloaded library should be downloaded/built during "configure wiredtiger" step.
+              # DO NOT MOVE:This variable must be set in the same function(shell) that runs a test,
+              # and as close as possible to the test execution, since it affects all the binaries.
+              export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/libtcmalloc.so
+
+              if [ ! -f "$LD_PRELOAD" ]; then
+                echo "Error: TCMalloc support was requested, but the library doesn't exist: $LD_PRELOAD"
+                exit 1
+              fi
+            fi
+
+            # Set extensions to load
+            EXT="extensions=["
+            EXT="$EXT ext/compressors/snappy/libwiredtiger_snappy.so,"
+            EXT="$EXT ext/collators/reverse/libwiredtiger_reverse_collator.so,"
+            EXT="$EXT ext/encryptors/rotn/libwiredtiger_rotn.so,"
+            EXT="$EXT ext/page_log/palite/libwiredtiger_palite.so,"
+            EXT="$EXT ]"
+            export EXT
+
+            ${additional_env_vars}
+
+            echo "Dump Environment"
+            printenv | sort
+        # The expansion is used for any task that requires the mongodbtoolchain binaries.
+        - key: PREPARE_PATH
+          value: |
+            if [ "$OS" = "Windows_NT" ]; then
+              export PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
+            else
+              export PATH=/opt/mongodbtoolchain/v5/bin:$PATH
+            fi
+
+            ${additional_env_vars}
+
+            echo "Dump Environment"
+            printenv | sort
+
+  "dump stacktraces": &dump_stacktraces
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${python_binary|python3} ../test/evergreen/print_stack_trace.py
+
+  "upload stacktraces": &upload_stacktraces
+    command: s3.put
+    type: setup
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_files_include_filter:
+        - wiredtiger/cmake_build/*stacktrace.txt
+      bucket: build_external
+      permissions: public-read
+      content_type: text/plain
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
+
+  "upload test/format config":
+    command: s3.put
+    type: setup
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_files_include_filter:
+        - wiredtiger/cmake_build/test/format/RUNDIR*/CONFIG
+      bucket: build_external
+      permissions: public-read
+      content_type: text/plain
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
+      preserve_path: true
+
+  "upload test/model workloads":
+    command: s3.put
+    type: setup
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_files_include_filter:
+        - wiredtiger/cmake_build/test/model/tools/WT_TEST*/*.workload
+      bucket: build_external
+      permissions: public-read
+      content_type: text/plain
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
+      preserve_path: true
+
+  "dump stderr/stdout":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+
+        if [ -d "WT_TEST" ]; then
+          # Dump stderr/stdout contents generated by the C libraries onto console for Python tests
+          find "WT_TEST" -name "std*.txt" ! -empty -exec bash -c "echo 'Contents from {}:'; cat '{}'" \;
+        fi
+
+  "upload stat files":
+    - command: shell.exec
+      type: setup
+      params:
+        working_dir: "wiredtiger/cmake_build"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          mkdir stat_files
+          ${python_binary|python3} ../test/evergreen/collect_stat_files.py -d stat_files
+    - command: archive.targz_pack
+      type: setup
+      params:
+        target: wiredtiger/cmake_build/stat_files.tar.gz
+        source_dir: wiredtiger/cmake_build/stat_files
+        include:
+          - "./**"
+    - command: s3.put
+      type: setup
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: wiredtiger/cmake_build/stat_files.tar.gz
+        bucket: build_external
+        permissions: public-read
+        content_type: application/tar
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/stat_files.tar.gz
+        display_name: "Statistics"
+
+  "upload artifact":
+    - command: archive.targz_pack
+      type: setup
+      params:
+        target: ${upload_filename|wiredtiger.tgz}
+        source_dir: ${upload_source_dir|wiredtiger}
+        include:
+          - "./**"
+    - command: s3.put
+      type: setup
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: ${upload_filename|wiredtiger.tgz}
+        bucket: build_external
+        permissions: public-read
+        content_type: application/tar
+        display_name: ${artifacts_name|Artifacts}
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
+
+  "save wt hang analyzer core/debugger files":
+    - command: archive.targz_pack
+      type: setup
+      params:
+        target: "wt-hang-analyzer.tgz"
+        source_dir: "wiredtiger/cmake_build"
+        include:
+          - "./*core*"
+          - "./debugger*.*"
+    - command: s3.put
+      type: setup
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: wt-hang-analyzer.tgz
+        bucket: build_external
+        optional: true
+        permissions: public-read
+        content_type: application/tar
+        display_name: WT Hang Analyzer Output - Execution ${execution}
+        remote_file: wiredtiger/${build_variant}/${revision}/wt_hang_analyzer/wt-hang-analyzer_${task_name}_${build_id}${postfix|}.tgz
+
+  "run wt hang analyzer":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      shell: bash
+      script: |
+        set -o verbose
+        ${PREPARE_PATH}
+
+        # Dump core (-c) and debugger outputs (-o)
+        wt_hang_analyzer_option="-c -o file -o stdout"
+
+        echo "Calling the wt hang analyzer ..."
+        ${python_binary|python3} ../test/wt_hang_analyzer/wt_hang_analyzer.py $wt_hang_analyzer_option
+
+  "get project":
+    command: git.get_project
+    type: setup
+    params:
+      directory: wiredtiger
+
+  "generate github token": &gen_github_token
+    command: github.generate_token
+    params:
+      owner: wiredtiger
+      repo: automation-scripts
+      expansion_name: generated_token
+      permissions:
+          metadata: read
+          contents: read
+
+  "get automation-scripts": &get_automation_scripts
+    command: shell.exec
+    type: setup
+    params:
+      shell: bash
+      script: |
+        set -o verbose
+        max_attempts=5
+        command="git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git"
+        if ! [ -d "./automation-scripts" ]; then
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Attempt $attempt of $max_attempts cloning automation-scripts'"
+            $command
+            # Check the exit status of the command
+            if [ $? -eq 0 ]; then
+              echo "Clone succeeded on attempt $attempt."
+              exit 0
+            else
+              if [ $attempt -eq $max_attempts ]; then
+                echo "Clone failed after $max_attempts attempts."
+                exit 1
+              fi
+            fi
+            # Delay before reattempting the clone
+            sleep 1
+          done
+        fi
+
+  "configure wiredtiger": &configure_wiredtiger
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger"
+      include_expansions_in_env:
+       - "s3_bucket_tcmalloc"
+       - "s3_access_key"
+       - "s3_secret_key"
+      shell: bash
+      script: |
+        set -o errexit
+        ${PREPARE_PATH}
+        # Not setting verbose mode as we have sensitive keys that could be logged.
+
+        # Define common config flags for the tasks to make it cleaner when configuring the tasks.
+        # Note that the config flags are resolved prior to changing to cmake_build directory.
+        DEFINED_EVERGREEN_CONFIG_FLAGS="${CMAKE_BUILD_TYPE|} \
+          ${CMAKE_INSTALL_PREFIX|-DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL} \
+          ${CMAKE_TOOLCHAIN_FILE|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake} \
+          ${ENABLE_LAZYFS|} \
+          ${NONSTANDALONE|} \
+          ${ENABLE_SHARED|} \
+          ${ENABLE_STATIC|} \
+          ${HAVE_BUILTIN_EXTENSION_KEY_PROVIDER|} \
+          ${HAVE_BUILTIN_EXTENSION_LZ4|} \
+          ${HAVE_BUILTIN_EXTENSION_SNAPPY|} \
+          ${HAVE_BUILTIN_EXTENSION_ZLIB|} \
+          ${HAVE_BUILTIN_EXTENSION_ZSTD|} \
+          ${HAVE_UNITTEST} \
+          ${CODE_COVERAGE_FLAGS} \
+          ${HAVE_DIAGNOSTIC|} \
+          ${WORDS_BIGENDIAN|} \
+          ${GNU_C_VERSION|} \
+          ${GNU_CXX_VERSION|} \
+          ${CLANG_C_VERSION|} \
+          ${CLANG_CXX_VERSION|} \
+          ${ENABLE_AZURE|} \
+          ${ENABLE_CPPSUITE|} \
+          ${ENABLE_GCP|} \
+          ${ENABLE_S3|} \
+          ${IMPORT_AZURE_SDK|} \
+          ${IMPORT_GCP_SDK|} \
+          ${IMPORT_S3_SDK|} \
+          ${SPINLOCK_TYPE|} \
+          ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
+          ${CC_OPTIMIZE_LEVEL|}"
+
+        # The RHEL PPC platform does not have ZSTD. Strip it out.
+        if [ "${build_variant|}" = "rhel8-ppc" ] && [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_ZSTD=1) ]]; then
+          DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
+        fi
+
+        if [[ "${build_variant|}" =~ "macos-14" ]]; then
+          # For mac builds, we want explicitly tell cmake which python to use, as
+          # well as the matching library directory and header files. The find_libpython
+          # module gives us the library.
+          SYSPY=${python_binary}
+          $SYSPY -mvenv venv
+          source venv/bin/activate
+          pip3 install find_libpython==0.4.0
+          SYSPYLIB=`find_libpython`
+          SYSPYINCDEF=
+
+          # We have the shared library to link to, it may be named simply 'Python3' or 'Python'.
+          # If that's the case, use the associated dylib symlink found in an expected relative
+          # location. Also get the location of the header files. We'll give this all to cmake.
+          base=$(basename $SYSPYLIB)
+          if [ "$base" = 'Python3' -o "$base" = 'Python' ]; then
+             SYSPYDIR=$(dirname $SYSPYLIB)
+             NSYSPYLIB=$(ls $SYSPYDIR/lib/libpython*.dylib 2>/dev/null | head -1)
+             if [ -f "$NSYSPYLIB" ]; then
+               SYSPYLIB=$NSYSPYLIB
+             fi
+             if [ -d "$SYSPYDIR/Headers" ]; then
+               SYSPYINCDEF="$SYSPYDIR/Headers"
+             fi
+          fi
+
+          if [ "${build_variant|}" = "macos-14-arm64" ]; then
+            DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPython3_EXECUTABLE=$SYSPY -DPython3_LIBRARY=$SYSPYLIB -DPython3_INCLUDE_DIR=$SYSPYINCDEF"
+          else
+            DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPYTHON_EXECUTABLE:FILEPATH=$SYSPY -DPYTHON_LIBRARY=$SYSPYLIB -DPYTHON_INCLUDE_DIR=$SYSPYINCDEF"
+          fi
+        fi
+
+        if [ "$OS" = "Windows_NT" ]; then
+          # Use the Windows powershell script to configure the CMake build.
+          # We execute it in a powershell environment as its easier to detect and source the Visual Studio
+          # toolchain in a native Windows environment. We can't easily execute the build in a cygwin environment.
+          echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${windows_configure_flags|}"
+          powershell.exe  -NonInteractive '.\test\evergreen\build_windows.ps1' -configure 1 $DEFINED_EVERGREEN_CONFIG_FLAGS ${windows_configure_flags|}
+        else
+          echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
+
+          # Make sure that SWIG v4 is available.
+          source test/evergreen/ensure_swig_version.sh
+
+          if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
+            # Preclude use of tcmalloc with sanitizer builds.
+            if [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (CMAKE_BUILD_TYPE=([AMT]|UB)San) ]]; then
+              echo "tcmalloc incompatible with build variant: ${build_variant} and cmake build type ${CMAKE_BUILD_TYPE}"
+              exit 1
+            fi
+            # Run this script in its own process as it depends on managing
+            # shell options.
+            /bin/bash test/evergreen/tcmalloc_install_or_build.sh ${build_variant}
+          fi
+
+          # Compiling with CMake.
+          echo "Find CMake"
+          . test/evergreen/find_cmake.sh
+          # If we've fetched the wiredtiger artifact from a previous compilation/build, it's best to remove
+          # the previous build directory so we can create a fresh configuration. We can't use the previous
+          # CMake Cache configuration as its likely it will have absolute paths related to the previous build machine.
+          echo "Remove the cmake_build directory, if it already exists"
+          if [ -d cmake_build ]; then rm -r cmake_build; fi
+          echo "Create a new cmake_build directory"
+          mkdir -p cmake_build
+          cd cmake_build
+
+          echo "Calling CMake with command:"
+          echo $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
+          $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
+          echo "Completed CMake"
+        fi
+
+  "make wiredtiger": &make_wiredtiger
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        echo "Starting 'make wiredtiger' step"
+        ${PREPARE_PATH}
+
+        if ! command -v swig >/dev/null 2>&1; then
+            echo "SWIG is not installed. Skipping check ..."
+        else
+            # Make sure that SWIG v4 is available.
+            source test/evergreen/ensure_swig_version.sh
+        fi
+
+        if [ "$OS" = "Windows_NT" ]; then
+          # Use the Windows powershell script to execute Ninja build (can't execute directly in a cygwin environment).
+          powershell.exe '.\test\evergreen\build_windows.ps1 -build 1'
+        else
+          # Compiling with CMake generated Ninja file.
+          cd cmake_build
+          if [ "${cmake_generator|Ninja}" = "Ninja" ]; then
+            # Ninja runs compilation in parallel by default, so there's no need to pass -j.
+            ninja 2>&1
+          else
+            make -j ${num_jobs} 2>&1
+          fi
+        fi
+        echo "Ending 'make wiredtiger' step"
+
+  "compile wiredtiger":
+    - *gen_github_token
+    - *get_automation_scripts
+    - *configure_wiredtiger
+    - *make_wiredtiger
+
+  "fetch artifacts": &fetch_artifacts
+    command: s3.get
+    type: setup
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${dependent_task|compile}_${build_id}${postfix|}.tgz
+      bucket: build_external
+      extract_to: ${destination|wiredtiger}
+
+  "format test disagg":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/format"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        ${additional_san_vars}
+        # Fail, show the configuration file.
+        fail() {
+          echo "======= FAILURE =========="
+          [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG
+          exit 1
+        }
+
+        for i in $(seq ${times}); do
+          echo Iteration $i/${times}
+          rm -rf RUNDIR
+          ./t -c ../../../test/format/CONFIG.disagg ${format_args|} ${extra_arg|} || fail
+          if [ ${reopen|true} = true ]; then
+            ./t -R $format_args ${extra_args|} || fail
+          fi
+        done
+
+  "timestamp abort disagg":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/csuite/timestamp_abort"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        ${additional_san_vars}
+        for i in $(seq ${times|1}); do
+          echo Iteration $i/${times}
+          ./test_timestamp_abort -G -s
+        done
+
+#######################################
+#               Variables             #
+#######################################
+
+variables:
+  - &format-stress-test-disagg-switch
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.mode=switch runs.timer=10:15
+          times: 5
+
+  # FIXME-WT-16113: Consolidate this logic in test/format itself.
+  - &format-stress-test-disagg-switch-data-validation
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # Validate data with a non-layered table.
+          format_args: disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
+          times: 5
+
+  - &format-stress-test-disagg-multi
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000
+          times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
+
+  - &format-stress-test-disagg-multi-data-validation
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # Validate data with a non-layered table.
+          format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 runs.ops=500000:2000000
+          times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
+
+  - &timestamp-abort-test-disagg
+    depends_on:
+        - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "timestamp abort disagg"
+        vars:
+          times: 50
+
+  # Configure flags for builtins.
+  - &configure_flags_with_builtins
+    HAVE_BUILTIN_EXTENSION_LZ4: -DHAVE_BUILTIN_EXTENSION_LZ4=1
+    HAVE_BUILTIN_EXTENSION_SNAPPY: -DHAVE_BUILTIN_EXTENSION_SNAPPY=1
+    HAVE_BUILTIN_EXTENSION_ZLIB: -DHAVE_BUILTIN_EXTENSION_ZLIB=1
+    HAVE_BUILTIN_EXTENSION_ZSTD: -DHAVE_BUILTIN_EXTENSION_ZSTD=1
+
+  # Configure flags for address sanitizer for stable mongodb toolchain clang (include builtins).
+  - &configure_flags_asan_mongodb_stable_clang_with_builtins
+    <<: *configure_flags_with_builtins
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
+    ENABLE_TCMALLOC: 0
+
+#######################################
+#               Tasks                 #
+#######################################
+
+tasks:
+  # Check the python configuration
+  # Base compile task on posix flavors
+  - name: compile
+    tags: ["pull_request"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "upload artifact"
+      - func: "cleanup"
+
+  # FIXME-WT-16394: Enable disagg switch mode on all platforms once failures have been resolved.
+  - <<: *format-stress-test-disagg-switch
+    name: format-stress-test-disagg-switch-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+  - <<: *format-stress-test-disagg-switch
+    name: format-stress-test-disagg-switch-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch
+    name: format-stress-test-disagg-switch-3
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-data-validation
+    name: format-stress-test-disagg-switch-data-validation-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-data-validation
+    name: format-stress-test-disagg-switch-data-validation-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-data-validation
+    name: format-stress-test-disagg-switch-data-validation-3
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi
+    name: format-stress-test-disagg-multi-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+  - <<: *format-stress-test-disagg-multi
+    name: format-stress-test-disagg-multi-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-data-validation
+    name: format-stress-test-disagg-multi-validation-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-data-validation
+    name: format-stress-test-disagg-multi-validation-2
+    tags: ["stress-test-disagg-fail"]
+
+  - <<: *timestamp-abort-test-disagg
+    name: timestamp-abort-test-disagg-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *timestamp-abort-test-disagg
+    name: timestamp-abort-test-disagg-2
+    tags: ["stress-test-disagg-fail"]
+
+#######################################
+#            Buildvariants            #
+#######################################
+
+buildvariants:
+- name: amazon2023-disagg-stress
+  display_name: "[Failure Expected] Amazon2023 ARM64 Disagg Stress tests"
+  run_on:
+  - amazon2023.3-arm64-large
+  expansions:
+    ENABLE_TCMALLOC: 1
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    disagg_run: true
+  tasks:
+    - name: compile
+    - name: ".stress-test-disagg-fail"
+
+- name: amazon2023-disagg-asan-stress
+  display_name: "[Failure Expected] Amazon2023 ARM64 ASAN Disagg Stress tests"
+  run_on:
+  - amazon2023.3-arm64-large
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
+    ENABLE_TCMALLOC: 0
+    additional_env_vars: |
+      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    disagg_run: true
+    <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
+    additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
+  tasks:
+    - name: compile
+    - name: ".stress-test-disagg-san-fail"

@@ -657,6 +657,11 @@ __schema_open_layered(WT_SESSION_IMPL *session)
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE));
 
     /* FIXME-WT-14738: Setup collator information. */
+    WT_RET_NOTFOUND_OK(__wt_config_gets(session, layered_cfg, "collator", &cval));
+    if (cval.len != 0) {
+        __wt_err(session, EINVAL, "layered tables do not support custom collators");
+        return (EINVAL);
+    }
     layered->collator = NULL;
     layered->collator_owned = 0;
 

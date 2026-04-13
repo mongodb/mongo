@@ -75,6 +75,8 @@ ops.pct.modify=0
 ops.bound_cursor=0
 ops.prepare=0
 ops.random_cursor=0
+# FIXME-WT-16483: reserve not supported for layered tables, change back when fixed
+ops.reserve=0
 ops.salvage=0
 ops.throttle=0
 ops.throttle.sleep_us=163109
@@ -198,7 +200,8 @@ table3.btree.memory_page_max=5
 table3.btree.prefix_len=0
 table3.btree.prefix_compression=1
 table3.btree.prefix_compression_min=8
-table3.btree.reverse=1
+# FIXME-WT-14738: custom collators not supported for layered tables, change back when fixed
+table3.btree.reverse=0
 table3.btree.split_pct=74
 table3.btree.value_max=2642
 table3.btree.value_min=17
