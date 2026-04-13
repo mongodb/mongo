@@ -48,7 +48,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/scripting/deadline_monitor.h"
+#include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/unittest/unittest.h"
 
@@ -74,7 +74,9 @@ public:
 
 protected:
     void setUp() override {
-        _bridge = std::make_unique<MozJSWasmBridge>(_s_engineCtx);
+        MozJSWasmBridge::Options opts{};
+        opts.linearMemoryLimitMB = gWasmtimeStoreMemoryLimitMB.load();
+        _bridge = std::make_unique<MozJSWasmBridge>(_s_engineCtx, opts);
         ASSERT_TRUE(initEngine());
     }
 
@@ -86,7 +88,7 @@ protected:
     }
 
     bool initEngine() {
-        return _bridge->initialize({100});
+        return _bridge->initialize();
     }
 
     uint64_t createFunction(std::string_view source) {
@@ -867,96 +869,6 @@ TEST_F(WasmMozJSBridgeTest, CreateFunctionWithInvalidSourceFails) {
     ASSERT_THROWS_CODE(createFunction("this is not valid javascript {{{"),
                        AssertionException,
                        ErrorCodes::JSInterpreterFailure);
-}
-
-TEST_F(WasmMozJSBridgeTest, EngineInitializeOOM) {
-    ASSERT_TRUE(_bridge->isInitialized());
-    _bridge->shutdown();
-    ASSERT_FALSE(_bridge->isInitialized());
-    _bridge->initialize({1});
-
-    auto handle = createFunction(
-        "function() {"
-        "  var x = [];"
-        "  var i = 0;"
-        "  while(i < 1.1 * 2 * 1024 * 1024) {"
-        "    x.push(new Array(1024)); "
-        "    i = i + 1;"
-        "  } "
-        "  return 3;"
-        "}");
-    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()),
-                             AssertionException,
-                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "out of memory"));
-}
-
-// This will OOM the host if run with TSAN.
-#if !__has_feature(thread_sanitizer)
-TEST_F(WasmMozJSBridgeTest, EngineJSHeapOOMRecovery) {
-    ASSERT_TRUE(_bridge->isInitialized());
-    _bridge->shutdown();
-    ASSERT_FALSE(_bridge->isInitialized());
-    _bridge->initialize({1});
-    ASSERT_TRUE(_bridge->isInitialized());
-
-    auto definition =
-        "function() {"
-        "  var x = [];"
-        "  var i = 0;"
-        "  while(i < 100 * 1024 ) {"
-        "    x.push(new Array(1024)); "
-        "    i = i + 1;"
-        "  } "
-        "  return 3;"
-        "}";
-
-    auto handle = createFunction(definition);
-    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()),
-                             AssertionException,
-                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "out of memory"));
-    _bridge->shutdown();
-
-    _bridge->initialize({20});
-    ASSERT_TRUE(_bridge->isInitialized());
-
-    handle = createFunction(definition);
-    ASSERT_DOES_NOT_THROW(invokeFunction(handle, BSONObj()));
-}
-#endif  // !__has_feature(thread_sanitizer)
-
-TEST_F(WasmMozJSBridgeTest, EngineTimeoutSleep) {
-    ASSERT_TRUE(_bridge->isInitialized());
-
-    auto handle = createFunction("function() { sleep(10000); return 3; }");
-
-    // DeadlineMonitor calls kill() -> signalInterrupt() -> increment_epoch().
-    // sleep() is sliced into 1ms intervals so control returns to WASM between
-    // slices, allowing the epoch trap to fire.
-    DeadlineMonitor<MozJSWasmBridge> monitor;
-    monitor.startDeadline(_bridge.get(), 10);
-    ASSERT_THROWS_WITH_CHECK(
-        invokeFunction(handle, BSONObj()),
-        AssertionException,
-        getContainsCheck(ErrorCodes::duplicateCodeForTest(11542340), "interrupt"));
-    monitor.stopDeadline(_bridge.get());
-    // After an epoch trap the component instance is poisoned — drop it so tearDown
-    // doesn't try to call shutdown on it.
-    _bridge.reset();
-}
-
-TEST_F(WasmMozJSBridgeTest, EngineTimeoutWhile) {
-    ASSERT_TRUE(_bridge->isInitialized());
-
-    auto handle = createFunction("function() { while(true) {} }");
-
-    DeadlineMonitor<MozJSWasmBridge> monitor;
-    monitor.startDeadline(_bridge.get(), 10);
-    ASSERT_THROWS_WITH_CHECK(
-        invokeFunction(handle, BSONObj()),
-        AssertionException,
-        getContainsCheck(ErrorCodes::duplicateCodeForTest(11542340), "interrupt"));
-    monitor.stopDeadline(_bridge.get());
-    _bridge.reset();
 }
 
 TEST_F(WasmMozJSBridgeTest, ShutdownAndReinitialize) {
@@ -2490,6 +2402,93 @@ TEST_F(WasmMozJSBridgeTest, MapReduceOomRecoveryAfterDrain) {
         ASSERT_GT(emitted2, 0);
         ASSERT_EQ(emitted, emitted2);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Store limiter tests
+// ---------------------------------------------------------------------------
+
+// Triggers the store limiter OOM path — the WASM module hits the linear memory
+// ceiling, SpiderMonkey aborts inside WASM, and wasmtime catches the resulting trap.
+// The bridge's _callFunc/_callFuncNoArgs methods latch hasTrapped() before re-throwing.
+//
+// Disabled under TSan: when the store limiter denies memory.grow, SpiderMonkey
+// MOZ_CRASHes during GC. Wasmtime catches the SIGABRT via a signal handler that
+// performs allocations (signal-unsafe). TSan intercepts the signal, flags the
+// malloc, and aborts the process before wasmtime can convert it into a trap.
+#if !__has_feature(thread_sanitizer)
+TEST_F(WasmMozJSBridgeTest, StoreLimiterTrapSetsFlag) {
+    _bridge->shutdown();
+    _bridge.reset();
+
+    MozJSWasmBridge::Options opts{};
+    // Use a small explicit JS heap so the minimum store limit stays low.
+    // min store = 50 + max(64, 5) = 114 MB.  This is tight enough that a
+    // large allocation will push total linear-memory usage (heap + runtime
+    // overhead) past the store limit and trigger a wasmtime trap.
+    opts.jsHeapLimitMB = 50;
+    opts.linearMemoryLimitMB = 114;
+    _bridge = std::make_unique<MozJSWasmBridge>(_s_engineCtx, opts);
+    ASSERT_TRUE(initEngine());
+
+    // Each iteration pushes an object with two ints and a 32-char string,
+    // conservatively ~64 bytes per element. With a 50 MB JS heap and 114 MB
+    // store limit, the loop will push total linear-memory usage past the
+    // store limit and trigger a wasmtime trap.
+    auto handle = createFunction(
+        "function() {"
+        "  var big = [];"
+        "  for (var i = 0; i < 2000000; i++) {"
+        "    big.push({x: i, y: i * 2, z: 'padding_string_to_consume_memory'});"
+        "  }"
+        "  return big.length;"
+        "}");
+
+    ASSERT_THROWS((void)_bridge->invokeFunction(handle, BSONObj()), DBException);
+    ASSERT_TRUE(_bridge->hasTrapped());
+    // The store is in a broken state after the trap; discard without calling shutdown.
+    _bridge.reset();
+}
+#endif  // !__has_feature(thread_sanitizer)
+
+TEST_F(WasmMozJSBridgeTest, StoreLimiterAllowsWithinLimit) {
+    // Shut down the default bridge and create one with an explicit memory limit.
+    _bridge->shutdown();
+    _bridge.reset();
+
+    MozJSWasmBridge::Options opts{};
+    opts.jsHeapLimitMB = 50;
+    opts.linearMemoryLimitMB = 256;
+    _bridge = std::make_unique<MozJSWasmBridge>(_s_engineCtx, opts);
+    ASSERT_TRUE(initEngine());
+
+    auto handle = createFunction("function() { return 1 + 2; }");
+    auto result = _bridge->invokeFunction(handle, BSONObj());
+    ASSERT_TRUE(result.isOK());
+}
+
+// ---------------------------------------------------------------------------
+// wasmtimeStoreMemoryLimitMB server parameter tests
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, ServerParam_DefaultIs1210) {
+    // Verify the IDL-declared default value (jsHeapLimitMB=1100 * 1.1 = 1210).
+    ASSERT_EQ(1210, gWasmtimeStoreMemoryLimitMB.load());
+}
+
+TEST_F(WasmMozJSBridgeTest, ServerParam_DefaultLimitAllowsExecution) {
+    // Recreate the bridge using the default server parameter (1210 MB).
+    _bridge->shutdown();
+    _bridge.reset();
+
+    MozJSWasmBridge::Options opts{};
+    opts.linearMemoryLimitMB = gWasmtimeStoreMemoryLimitMB.load();
+    _bridge = std::make_unique<MozJSWasmBridge>(_s_engineCtx, opts);
+    ASSERT_TRUE(initEngine());
+
+    auto handle = createFunction("function() { return 42; }");
+    auto result = _bridge->invokeFunction(handle, BSONObj());
+    ASSERT_TRUE(result.isOK());
 }
 
 }  // namespace

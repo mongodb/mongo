@@ -29,9 +29,8 @@
 
 #pragma once
 
+#include "mongo/platform/atomic.h"
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
-
-#include <atomic>
 
 namespace mongo::mozjs::wasm {
 
@@ -54,6 +53,9 @@ private:
     wc::Component _component;
 };
 
+// Wasmtime trap error code used by MozJSWasmBridge::_callFunc / _callFuncNoArgs.
+constexpr int kWasmtimeTrapErrorCode = 11542340;
+
 class MozJSWasmBridge {
 public:
     MozJSWasmBridge() = delete;
@@ -62,20 +64,26 @@ public:
     MozJSWasmBridge& operator=(MozJSWasmBridge&&) = delete;
     MozJSWasmBridge& operator=(const MozJSWasmBridge&) = delete;
 
-    struct Options {
-        uint32_t heapSizeMB;
+    enum class State {
+        Uninitialized,
+        Initialized,
+        OOM,
+        Trapped,
     };
 
-    explicit MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts = {});
+    struct Options {
+        uint32_t jsHeapLimitMB = 0;
+        uint32_t linearMemoryLimitMB = 0;
+    };
 
-    bool initialize(const Options& options);
+    explicit MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts);
+
+    bool initialize();
     void shutdown();
 
     // Signal that execution should be interrupted via Wasmtime epoch increment.
     // Safe to call from any thread. kill() provides a DeadlineMonitor-compatible interface.
     void kill();
-    // Triggers an epoch increment to interrupt WASM execution.
-    void signalInterrupt();
     bool isKillPending() const;
 
     uint64_t createFunction(std::string_view source);
@@ -95,7 +103,23 @@ public:
     void setupEmit(boost::optional<int64_t> byteLimit);
 
     bool isInitialized() const {
-        return _engineInitialized;
+        return _state.load() == State::Initialized;
+    }
+
+    // True after a wasmtime trap or a fatal WIT error (e-oom, e-internal).
+    // The store is unusable once trapped and the caller should discard the bridge.
+    bool hasTrapped() const {
+        return _state.load() == State::Trapped;
+    }
+
+    // True when the JS heap ran out of memory (e.g. allocation-size-overflow).
+    // For fatal OOM at the wasmtime store level (e-oom), hasTrapped() is true instead.
+    bool hasOomError() const {
+        return _state.load() == State::OOM;
+    }
+
+    State getState() const {
+        return _state.load();
     }
 
     // Returns the last JS function return value as {"__returnValue": val}, preserving array types.
@@ -106,13 +130,43 @@ private:
     BSONObj _extractBSON(const wc::Val& result);
     wc::Func _getFunc(std::string_view funcName);
 
+    // Asserts that the bridge is in a usable state (Initialized). Throws a
+    // user-visible error if the engine has trapped, OOM'd, or was never initialized.
+    void _assertUsable();
+
+    // Triggers an epoch increment to interrupt WASM execution.
+    void _signalInterrupt();
+
+    // Checks the WIT result and latches _trapped when the error code is fatal
+    // (e-oom or e-internal).
+    bool _isResultOk(const wc::Val& result);
+
+    // Calls a WASM function with the given arguments. Latches _state and
+    // uasserts on wasmtime traps so callers don't need explicit trap handling.
+    template <typename... Args>
+    bool _callFunc(wc::Func& func, wc::Val* results, size_t numResults, Args&&... args) {
+        std::array<wc::Val, sizeof...(Args)> argsArr = {std::forward<Args>(args)...};
+        wt::Span<const wc::Val> argsSpan(argsArr.data(), argsArr.size());
+        wt::Span<wc::Val> resultsSpan(results, numResults);
+        wt::Result<std::monostate> callResult = func.call(getContext(), argsSpan, resultsSpan);
+        if (!callResult) {
+            _state.store(State::Trapped);
+            uasserted(kWasmtimeTrapErrorCode, callResult.err().message());
+        }
+        auto postResult = func.post_return(getContext());
+        return static_cast<bool>(postResult);
+    }
+
+    // Calls a WASM function with no arguments. Same trap-latching as _callFunc.
+    bool _callFuncNoArgs(wc::Func& func, wc::Val* results, size_t numResults);
+
     inline wt::Store::Context getContext() {
         return _store->context();
     }
 
-    mongo::Atomic<bool> _killPending{false};
-
-    bool _engineInitialized = false;
+    Atomic<State> _state{State::Uninitialized};
+    Atomic<bool> _killPending{false};
+    uint32_t _jsHeapLimitMB{0};
 
     // The engine and compiled component are shared across bridge instances.
     // Each bridge owns its own _store and _instance for execution isolation.

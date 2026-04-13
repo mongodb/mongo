@@ -119,7 +119,6 @@ private:
     void _drainEmitToCallback();
     void _installHelpers();
     BSONObj _resolveGlobal(const char* field) const;
-    BSONElement _resolveGlobalToElement(const char* field) const;
     NativeFunction _emitCallback = nullptr;
     void* _emitCallbackData = nullptr;
     OperationContext* _opCtx = nullptr;

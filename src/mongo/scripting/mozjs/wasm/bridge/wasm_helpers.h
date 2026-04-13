@@ -48,35 +48,15 @@ namespace wasm_helpers {
 
 std::vector<uint8_t> readWasmFile(const std::string& path);
 
-// Translates errors coming from the wasmtime runtime.
-void translateWasmError(const wt::Error& error);
-
-const wc::Val* findField(std::string_view name, const wc::Record& record);
-
 // Translates errors coming from the MozJS interpreter.
 std::string translateMozJSError(const wc::Val& mozJSError);
+
+const wc::Val* findField(std::string_view name, const wc::Record& record);
 
 wc::Func getMozjsFunc(wc::Instance& instance,
                       wt::Store::Context ctx,
                       std::string_view ifaceName,
                       std::string_view funcName);
-
-template <typename... Args>
-inline bool callFunc(
-    wc::Func& func, wt::Store::Context ctx, wc::Val* results, size_t numResults, Args&&... args) {
-    std::array<wc::Val, sizeof...(Args)> argsArr = {std::forward<Args>(args)...};
-    wt::Span<const wc::Val> argsSpan(argsArr.data(), argsArr.size());
-    wt::Span<wc::Val> resultsSpan(results, numResults);
-    wt::Result<std::monostate> callResult = func.call(ctx, argsSpan, resultsSpan);
-    if (!callResult) {
-        translateWasmError(callResult.err());
-    }
-
-    auto postResult = func.post_return(ctx);
-    return static_cast<bool>(postResult);
-}
-
-bool callFuncNoArgs(wc::Func& func, wt::Store::Context ctx, wc::Val* results, size_t numResults);
 
 wc::List makeListU8(const uint8_t* data, size_t len);
 
@@ -90,5 +70,14 @@ wc::List makeListU8(const BSONObj& obj);
 std::vector<uint8_t> extractListU8(const wc::Val& v);
 
 bool isResultOk(const wc::Val& result);
+
+// Returns true if the WIT error record carries a fatal error code (e-oom or e-internal)
+// that leaves the engine in an unrecoverable state.
+bool isFatalWitError(const wc::Val& witError);
+
+// Returns true if the WIT error record indicates a non-fatal OOM: an e-runtime
+// with an allocation failure message. Fatal OOM (e-oom) is handled by
+// isFatalWitError instead.
+bool isOomWitError(const wc::Val& witError);
 }  // namespace wasm_helpers
 }  // namespace mongo::mozjs::wasm

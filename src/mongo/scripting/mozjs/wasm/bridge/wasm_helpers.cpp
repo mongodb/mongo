@@ -29,8 +29,6 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
-#include "mongo/base/error_codes.h"
-
 namespace mongo::mozjs::wasm::wasm_helpers {
 
 std::vector<uint8_t> readWasmFile(const std::string& path) {
@@ -51,10 +49,6 @@ std::vector<uint8_t> readWasmFile(const std::string& path) {
     return buf;
 }
 
-void translateWasmError(const wt::Error& error) {
-    uasserted(11542340, error.message());
-}
-
 const wc::Val* findField(std::string_view name, const wc::Record& record) {
     for (auto it = record.begin(); it != record.end(); ++it) {
         if (it->name() == name)
@@ -70,6 +64,10 @@ std::string translateMozJSError(const wc::Val& mozJSError) {
 
     const auto& record = mozJSError.get_record();
 
+    auto findField = [&](std::string_view name) -> const wc::Val* {
+        return wasm_helpers::findField(name, record);
+    };
+
     auto optStr = [](const wc::Val* v) -> std::string {
         if (!v || !v->is_option())
             return "none";
@@ -78,14 +76,18 @@ std::string translateMozJSError(const wc::Val& mozJSError) {
     };
 
     std::stringstream ss;
-    ss << "code : '" << findField("code", record)->get_enum() << "', ";
-    ss << "message : '" << optStr(findField("msg", record)) << "', ";
-    ss << "file : '" << optStr(findField("filename", record)) << "', ";
-    ss << "stack : '" << optStr(findField("stack", record)) << "', ";
-    if (auto* line = findField("line", record); line && line->is_u32()) {
+    // Include the WIT error-code enum (e.g. e-compile, e-runtime, e-oom).
+    auto it = record.begin();
+    if (it != record.end() && it->value().is_enum()) {
+        ss << it->value().get_enum() << " ";
+    }
+    ss << "message : '" << optStr(findField("msg")) << "', ";
+    ss << "file : '" << optStr(findField("filename")) << "', ";
+    ss << "stack : '" << optStr(findField("stack")) << "', ";
+    if (auto* line = findField("line"); line && line->is_u32()) {
         ss << "line : " << line->get_u32() << ", ";
     }
-    if (auto* col = findField("column", record); col && col->is_u32()) {
+    if (auto* col = findField("column"); col && col->is_u32()) {
         ss << "column : " << col->get_u32();
     }
     return ss.str();
@@ -103,17 +105,6 @@ wc::Func getMozjsFunc(wc::Instance& instance,
     auto func = instance.get_func(ctx, *funcIdx);
     invariant(func);
     return *func;
-}
-
-bool callFuncNoArgs(wc::Func& func, wt::Store::Context ctx, wc::Val* results, size_t numResults) {
-    const wc::Val* emptyPtr = nullptr;
-    wt::Span<const wc::Val> empty(emptyPtr, size_t{0});
-    wt::Span<wc::Val> resultsSpan(results, numResults);
-    wt::Result<std::monostate> callResult = func.call(ctx, empty, resultsSpan);
-    if (!callResult)
-        translateWasmError(callResult.err());
-    auto postResult = func.post_return(ctx);
-    return static_cast<bool>(postResult);
 }
 
 wc::List makeListU8(const uint8_t* data, size_t len) {
@@ -159,5 +150,50 @@ std::vector<uint8_t> extractListU8(const wc::Val& v) {
 
 bool isResultOk(const wc::Val& result) {
     return result.is_result() && result.get_result().is_ok();
+}
+
+bool isFatalWitError(const wc::Val& witError) {
+    if (!witError.is_record())
+        return false;
+    const auto& record = witError.get_record();
+    // The first field of the WIT wasm-mozjs-error record is the err-code enum.
+    auto it = record.begin();
+    if (it == record.end() || !it->value().is_enum())
+        return false;
+    auto code = it->value().get_enum();
+    return code == std::string_view("e-oom") || code == std::string_view("e-internal");
+}
+
+bool isOomWitError(const wc::Val& witError) {
+    if (!witError.is_record())
+        return false;
+    const auto& record = witError.get_record();
+    auto it = record.begin();
+    if (it == record.end() || !it->value().is_enum())
+        return false;
+    auto code = it->value().get_enum();
+    // e-oom is handled by isFatalWitError (sets Trapped). This function only
+    // detects the non-fatal OOM path: SpiderMonkey reports heap allocation
+    // failures as e-runtime with a message that indicates memory exhaustion.
+    //
+    // NOTE: This relies on SpiderMonkey error message strings, which are set in
+    // js/src/js.msg (JSMSG_ALLOC_OVERFLOW -> "allocation size overflow") and
+    // (JSMSG_OUT_OF_MEMORY -> "out of memory"). If SpiderMonkey changes these
+    // messages, this detection will silently stop matching and the error will
+    // be treated as a generic e-runtime failure rather than OOM.
+    if (code == std::string_view("e-runtime")) {
+        for (auto fi = record.begin(); fi != record.end(); ++fi) {
+            if (fi->name() == std::string_view("msg") && fi->value().is_option()) {
+                auto optVal = fi->value().get_option().value();
+                if (optVal) {
+                    auto msg = optVal->get_string();
+                    if (msg.find("allocation size overflow") != std::string_view::npos ||
+                        msg.find("out of memory") != std::string_view::npos)
+                        return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 }  // namespace mongo::mozjs::wasm::wasm_helpers

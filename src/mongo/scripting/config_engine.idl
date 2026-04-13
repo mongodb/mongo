@@ -54,3 +54,24 @@ server_parameters:
         cpp_varname: gJSUseLegacyMemoryTracking
         default: false
         redact: false
+
+    wasmtimeStoreMemoryLimitMB:
+        description: >-
+            Maximum size in MB that a Wasmtime store's linear memory is allowed
+            to grow to. Each JavaScript execution scope (e.g. every $where,
+            $function, or MapReduce invocation) creates its own store, so this
+            limit applies independently to every concurrent JS evaluation.
+            Must be greater than jsHeapLimitMB because the JS heap lives inside
+            WASM linear memory alongside SpiderMonkey runtime overhead (stack,
+            GC metadata, self-hosted code, malloc arena). The default includes
+            a 10% overhead margin above the default jsHeapLimitMB.
+            Because this parameter is settable at runtime, changes do not
+            affect already-running JS scopes; the new value is picked up the
+            next time a WASM bridge is instantiated.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gWasmtimeStoreMemoryLimitMB
+        default: 1210
+        validator:
+            gt: 0
+        redact: false

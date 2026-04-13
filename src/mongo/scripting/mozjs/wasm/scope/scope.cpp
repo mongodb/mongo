@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/util/str.h"
 
@@ -51,10 +52,11 @@ WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wa
 }
 
 void WasmtimeImplScope::reset() {
-    if (_bridge && _bridge->isInitialized()) {
+    if (_bridge && _bridge->isInitialized() && !_bridge->hasTrapped() && !_bridge->hasOomError() &&
+        !_bridge->isKillPending()) {
         _bridge->shutdown();
-        _bridge = nullptr;
     }
+    _bridge = nullptr;
 
     _cachedFunctions.clear();
 
@@ -70,10 +72,11 @@ void WasmtimeImplScope::init(const BSONObj* data) {
     }
     wasm::MozJSWasmBridge::Options opts{};
     if (_jsHeapLimitMB) {
-        opts.heapSizeMB = static_cast<uint32_t>(*_jsHeapLimitMB);
+        opts.jsHeapLimitMB = static_cast<uint32_t>(*_jsHeapLimitMB);
     }
+    opts.linearMemoryLimitMB = gWasmtimeStoreMemoryLimitMB.load();
     _bridge = std::make_unique<wasm::MozJSWasmBridge>(_wasmEngineCtx, opts);
-    bool initialized = _bridge->initialize(opts);
+    bool initialized = _bridge->initialize();
     uassert(ErrorCodes::BadValue, "MozJS WASM bridge failed to initialize", initialized);
 
     _installHelpers();
@@ -168,10 +171,6 @@ BSONObj WasmtimeImplScope::_resolveGlobal(const char* field) const {
     return _bridge->getGlobal(field);
 }
 
-BSONElement WasmtimeImplScope::_resolveGlobalToElement(const char* field) const {
-    return _resolveGlobal(field)[kReturnValueField];
-}
-
 BSONObj WasmtimeImplScope::getObject(const char* field) {
     BSONObj result = _resolveGlobal(field);
     BSONElement val = result[kReturnValueField];
@@ -186,36 +185,44 @@ BSONObj WasmtimeImplScope::getObject(const char* field) {
 }
 
 std::string WasmtimeImplScope::getString(const char* field) {
-    return _resolveGlobalToElement(field).String();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].String();
 }
 
 bool WasmtimeImplScope::getBoolean(const char* field) {
-    return _resolveGlobalToElement(field).boolean();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].boolean();
 }
 
 double WasmtimeImplScope::getNumber(const char* field) {
-    return _resolveGlobalToElement(field).numberDouble();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].numberDouble();
 }
 
 int WasmtimeImplScope::getNumberInt(const char* field) {
-    return _resolveGlobalToElement(field).numberInt();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].numberInt();
 }
 
 long long WasmtimeImplScope::getNumberLongLong(const char* field) {
-    return _resolveGlobalToElement(field).numberLong();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].numberLong();
 }
 
 Decimal128 WasmtimeImplScope::getNumberDecimal(const char* field) {
-    return _resolveGlobalToElement(field).numberDecimal();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].numberDecimal();
 }
 
 OID WasmtimeImplScope::getOID(const char* field) {
-    return _resolveGlobalToElement(field).OID();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].OID();
 }
 
 void WasmtimeImplScope::getBinData(const char* field,
                                    std::function<void(const BSONBinData&)> withBinData) {
-    auto jsBinData = _resolveGlobalToElement(field);
+    BSONObj obj = _resolveGlobal(field);
+    auto jsBinData = obj[kReturnValueField];
     int len = 0;
     auto binData = jsBinData.binData(len);
     auto subType = jsBinData.binDataType();
@@ -223,11 +230,13 @@ void WasmtimeImplScope::getBinData(const char* field,
 }
 
 Timestamp WasmtimeImplScope::getTimestamp(const char* field) {
-    return _resolveGlobalToElement(field).timestamp();
+    BSONObj obj = _resolveGlobal(field);
+    return obj[kReturnValueField].timestamp();
 }
 
 JSRegEx WasmtimeImplScope::getRegEx(const char* field) {
-    BSONElement elem = _resolveGlobalToElement(field);
+    BSONObj obj = _resolveGlobal(field);
+    BSONElement elem = obj[kReturnValueField];
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "field " << field << " is not a regex",
             elem.type() == BSONType::regEx);
@@ -311,9 +320,9 @@ bool WasmtimeImplScope::isKillPending() const {
     return _bridge->isKillPending();
 }
 
-// TODO (SERVER-116056): Add memory tracking functionality
 bool WasmtimeImplScope::hasOutOfMemoryException() {
-    return false;
+    invariant(_bridge);
+    return _bridge->hasTrapped() || _bridge->hasOomError();
 }
 
 void WasmtimeImplScope::_installHelpers() {

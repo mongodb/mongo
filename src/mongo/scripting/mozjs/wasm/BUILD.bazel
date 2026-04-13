@@ -123,10 +123,12 @@ exports_files([
 mongo_cc_library(
     name = "bridge",
     srcs = [
+        "//src/mongo/scripting:config_engine_gen",
         "//src/mongo/scripting/mozjs/wasm/bridge:bridge.cpp",
         "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.cpp",
     ],
     hdrs = [
+        "//src/mongo/scripting:config_engine_gen",
         "//src/mongo/scripting/mozjs/wasm/bridge:bridge.h",
         "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.h",
     ],
@@ -136,6 +138,7 @@ mongo_cc_library(
     }),
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:server_parameter",
         "@crates//:wasmtime_c",
     ] + select({
         "@platforms//os:windows": ["//bazel/rules_rust:win_allocator_shim"],
@@ -210,11 +213,33 @@ embed_binary_rc(
     target_compatible_with = ["@platforms//os:windows"],
 )
 
+mongo_cc_unit_test(
+    name = "wasm_scope_test",
+    size = "large",
+    timeout = "long",
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/scope:scope_test.cpp",
+    ],
+    auto_header = False,
+    tags = [
+        "mongo_unittest_second_group",
+        "mozjs_wasm_tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":wasmtime_engine",
+        "//src/mongo:base",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
 mongo_cc_library(
     name = "wasmtime_engine",
     srcs = [
         "wasmtime_engine.cpp",
-        "//src/mongo/scripting:config_engine_gen",
         "//src/mongo/scripting/mozjs/wasm/scope:scope.cpp",
     ],
     hdrs = [
