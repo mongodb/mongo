@@ -5,7 +5,7 @@ function getOplog(node) {
     return node.getDB("local").oplog.rs;
 }
 
-export function getSortedCatalogEntries(node, sortField = "ident", extraNorFilters = []) {
+export function getSortedCatalogEntries(node, sortField = "ident") {
     const adminDB = node.getDB("admin");
     const isSystemProfile = {"name": "system.profile"};
     // The collections supporting the query analysis are asynchronously created upon onStepUpComplete() and may not be immediately available.
@@ -13,9 +13,10 @@ export function getSortedCatalogEntries(node, sortField = "ident", extraNorFilte
         "db": "config",
         "name": {$in: ["sampledQueries", "sampledQueriesDiff", "analyzeShardKeySplitPoints"]},
     };
+    // The admin.system.keys collection is asynchronously created and may not be immediately available.
+    const isAdminSystemKeysCollection = {"db": "admin", "name": "system.keys"};
     const isLocal = {"db": "local"};
-    const extraFilters = Array.isArray(extraNorFilters) ? extraNorFilters : [extraNorFilters];
-    const match = {$nor: [isSystemProfile, isLocal, isQueryAnalysisCollection, ...extraFilters]};
+    const match = {$nor: [isSystemProfile, isLocal, isQueryAnalysisCollection, isAdminSystemKeysCollection]};
     return adminDB.aggregate([{$listCatalog: {}}, {$match: match}, {$sort: {[sortField]: 1}}]).toArray();
 }
 /**
