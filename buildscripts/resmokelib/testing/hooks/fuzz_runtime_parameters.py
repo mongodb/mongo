@@ -400,7 +400,11 @@ class _SetParameterThread(threading.Thread):
                         #
                         # AddOrRemoveShardInProgress
                         #   setClusterParameter explicitly clashes with that one too
-                        extra_retryable_error_codes=[117, 414],
+                        #
+                        # Interrupted
+                        #   kill_sessions workloads can interrupt the setClusterParameter operation
+                        #   by killing its session
+                        extra_retryable_error_codes=[117, 414, 11601],
                     )
                 except OperationFailure as exc:
                     # BadValue (code 2) might happen when we do a downgrade and try to set a cluster
