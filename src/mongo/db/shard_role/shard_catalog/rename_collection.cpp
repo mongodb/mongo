@@ -45,6 +45,7 @@
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/batched_write_policy.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -729,7 +730,7 @@ Status copySourceToTemporaryCollectionOnTargetDB(
                                   isGroupedOplogEntries ? WriteUnitOfWork::kGroupForTransaction
                                                         : WriteUnitOfWork::kDontGroup);
 
-            if (!isOplogDisabledForTmpColl && !wunit.isGroupingOplogEntries()) {
+            if (!isOplogDisabledForTmpColl && !BatchedWriteContext::get(opCtx).writesAreBatched()) {
                 if (autoTmpColl->needsCappedLock()) {
                     // We do not expect any concurrency here, we acquire this lock to be
                     // consistent with behavior in other inserts into non-clustered capped

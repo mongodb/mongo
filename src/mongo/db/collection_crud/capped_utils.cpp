@@ -38,6 +38,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -233,7 +234,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
                 // When grouping oplog entries, the op times are allocated in the correct order upon
                 // commit.
-                if (!wunit.isGroupingOplogEntries()) {
+                if (!BatchedWriteContext::get(opCtx).writesAreBatched()) {
                     auto oplogInfo = LocalOplogInfo::get(opCtx);
                     auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
                     insertStmt.oplogSlot = oplogSlots.front();

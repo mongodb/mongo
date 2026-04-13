@@ -38,6 +38,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -422,7 +423,7 @@ int insertBatch(OperationContext* opCtx,
         WriteUnitOfWork wuow(opCtx);
 
         // If grouping, the op times will automatically be reserved together on commit.
-        if (wuow.isGroupingOplogEntries()) {
+        if (BatchedWriteContext::get(opCtx).writesAreBatched()) {
             for (auto&& insert : batch) {
                 numBytes += insert.doc.objsize();
             }

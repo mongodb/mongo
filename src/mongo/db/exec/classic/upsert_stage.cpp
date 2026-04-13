@@ -41,6 +41,7 @@
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/repl/local_oplog_info.h"
@@ -212,7 +213,7 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
                 Lock::ResourceLock heldUntilEndOfWUOW{
                     opCtx(), ResourceId(RESOURCE_METADATA, collectionPtr()->ns()), MODE_X};
             }
-            if (!wunit.isGroupingOplogEntries()) {
+            if (!BatchedWriteContext::get(opCtx()).writesAreBatched()) {
                 auto oplogInfo = LocalOplogInfo::get(opCtx());
                 auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*batchSize=*/1);
                 insertStmt.oplogSlot = oplogSlots.front();

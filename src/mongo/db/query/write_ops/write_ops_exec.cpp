@@ -52,6 +52,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
@@ -379,7 +380,7 @@ void insertDocumentsAtomically(OperationContext* opCtx,
         Lock::ResourceLock heldUntilEndOfWUOW{
             opCtx, ResourceId(RESOURCE_METADATA, collection.getCollectionPtr()->ns()), MODE_X};
     }
-    if (!wuow.isGroupingOplogEntries() && !inTransaction && !oplogDisabled &&
+    if (!BatchedWriteContext::get(opCtx).writesAreBatched() && !inTransaction && !oplogDisabled &&
         collection.getCollectionPtr()->isCapped()) {
         acquireOplogSlotsForInserts(opCtx, collection, begin, end);
     }

@@ -55,6 +55,7 @@
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
@@ -2299,7 +2300,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         insertStmt.oplogSlot = OpTime(op.getTimestamp(), op.getTerm().value());
                     } else if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(
                                    opCtx, collection->ns()) &&
-                               !wuow.isGroupingOplogEntries()) {
+                               !BatchedWriteContext::get(opCtx).writesAreBatched()) {
                         // Primaries processing inserts always pre-allocate timestamps. For parity,
                         // we also pre-allocate timestamps for an `applyOps` of insert oplog
                         // entries. This parity is meaningful for capped collections where the
