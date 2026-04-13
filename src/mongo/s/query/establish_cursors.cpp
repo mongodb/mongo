@@ -43,6 +43,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/util/assert_util.h"
@@ -137,7 +138,11 @@ private:
     boost::optional<Status> _maybeFailure;
     std::vector<RemoteCursor> _remoteCursors;
     std::vector<HostAndPort> _remotesToClean;
+    static logv2::SeveritySuppressor _logSeveritySuppressor;
 };
+
+logv2::SeveritySuppressor CursorEstablisher::_logSeveritySuppressor{
+    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 
 void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                                      const std::vector<std::pair<ShardId, BSONObj>>& remotes,
@@ -244,10 +249,14 @@ void CursorEstablisher::checkForFailedRequests() {
     }
 
     if (!(_maybeFailure->code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod)) {
-        LOGV2(4625501,
-              "Unable to establish remote cursors",
-              "error"_attr = *_maybeFailure,
-              "nRemotes"_attr = _remotesToClean.size());
+        // LOGV2_DEBUG sets the log severity level based on the value defined by
+        // _logSeveritySuppressor().toInt(). This severity level is not restricted to DEBUG and can
+        // be any defined level.
+        LOGV2_DEBUG(4625501,
+                    _logSeveritySuppressor().toInt(),
+                    "Unable to establish remote cursors",
+                    "error"_attr = *_maybeFailure,
+                    "nRemotes"_attr = _remotesToClean.size());
     }
 
     if (_remotesToClean.empty()) {
