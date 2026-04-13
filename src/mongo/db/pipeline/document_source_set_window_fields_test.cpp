@@ -59,13 +59,15 @@ namespace {
 using DocumentSourceSetWindowFieldsTest = AggregationContextFixture;
 
 /**
- * Fixture that also provides storage engine for spilling.
+ * Fixture for testing $setWindowFields spilling behavior. Enables the spill WiredTiger instance
+ * since $setWindowFields spills its partition cache to disk when memory limits are exceeded.
  */
 class DocumentSourceSetWindowFieldsSpillingTest : public AggregationContextFixture {
 public:
     DocumentSourceSetWindowFieldsSpillingTest()
         : AggregationContextFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-              MongoDScopedGlobalServiceContextForTest::Options{}, shouldSetupTL)) {
+              MongoDScopedGlobalServiceContextForTest::Options{}.enableSpillEngine(),
+              shouldSetupTL)) {
         getExpCtx()->setMongoProcessInterface(
             std::make_shared<StandaloneProcessInterface>(nullptr));
     }

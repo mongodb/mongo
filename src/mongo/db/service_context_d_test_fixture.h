@@ -40,6 +40,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -107,6 +108,26 @@ public:
             return std::move(*this);
         }
 
+        // Each unit test spins up and tears down its own WiredTiger instance (main + spill),
+        // so WiredTiger is initialized and destroyed thousands of times across a test run, often
+        // with concurrent initializations on the same machine. This creates contention on OS/disk
+        // resources that does not exist in production, where a mongod opens its main and spill
+        // WiredTiger instances exactly once at startup and keeps them alive for the lifetime of the
+        // process (days or months). The brief contention during that single initialization is a
+        // non-issue.
+        //
+        // An in-memory storage engine for the spill engine was considered to avoid this overhead,
+        // but ruled out because spilling inherently requires disk.
+        //
+        // The spill engine is disabled by default to avoid contention from opening the spill
+        // WiredTiger instance during concurrent unit test runs. Tests that exercise spilling
+        // behavior (e.g., hash aggregation, graph lookup, window functions) must call this
+        // method to opt in.
+        Options enableSpillEngine() {
+            _enableSpillEngine = true;
+            return std::move(*this);
+        }
+
         Options useIndexBuildsCoordinator(
             std::unique_ptr<IndexBuildsCoordinator> indexBuildsCoordinator) {
             _indexBuildsCoordinator = std::move(indexBuildsCoordinator);
@@ -163,6 +184,7 @@ public:
         std::unique_ptr<JournalListener> _journalListener;
         std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoordinator;
         bool _forceDisableTableLogging = false;
+        bool _enableSpillEngine = !TestingProctor::instance().isEnabled();
         bool _createShardingState = true;
         std::vector<std::unique_ptr<ServiceContext::ClientObserver>> _clientObservers;
         std::vector<RAIIServerParameterControllerForTest> _parameters;

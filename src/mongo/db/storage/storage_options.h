@@ -148,6 +148,10 @@ struct StorageGlobalParams {
     // Test-only option. Disables table logging.
     bool forceDisableTableLogging = false;
 
+    // Test-only flag which allows disabling the spill WiredTiger instance. Tests that exercise
+    // spill-to-disk behavior must opt in explicitly (e.g. via Options{}.enableSpillEngine()).
+    bool enableSpillEngine = true;
+
 private:
     void _reset();
 };

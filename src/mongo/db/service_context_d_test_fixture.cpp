@@ -126,6 +126,8 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
         storageGlobalParams.forceDisableTableLogging = true;
     }
 
+    storageGlobalParams.enableSpillEngine = options._enableSpillEngine;
+
     if (options._useReplSettings) {
         repl::ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);

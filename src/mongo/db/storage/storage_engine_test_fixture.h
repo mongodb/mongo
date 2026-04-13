@@ -56,8 +56,10 @@ namespace mongo {
 
 class MONGO_MOD_OPEN StorageEngineTest : public ServiceContextMongoDTest {
 public:
+    // Storage engine tests cover spill table creation and management, requiring the spill
+    // WiredTiger instance.
     explicit StorageEngineTest(Options options = {})
-        : ServiceContextMongoDTest(std::move(options)),
+        : ServiceContextMongoDTest(std::move(options).enableSpillEngine()),
           _storageEngine(getServiceContext()->getStorageEngine()) {}
 
     MDBCatalog::EntryIdentifier createCollection(OperationContext* opCtx,

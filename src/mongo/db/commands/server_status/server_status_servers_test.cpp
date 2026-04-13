@@ -50,6 +50,12 @@ namespace {
 
 class ServerStatusServersTest : public DBCommandTestFixture {
 public:
+    // The spill engine is disabled by default in test fixtures to avoid contention from opening
+    // the spill WiredTiger instance during concurrent unit test runs. This test exercises the
+    // serverStatus command, which includes a SpillWiredTigerServerStatusSection that requires
+    // the spill engine to be initialized.
+    ServerStatusServersTest() : DBCommandTestFixture(Options{}.enableSpillEngine()) {}
+
     void setUp() override {
         DBCommandTestFixture::setUp();
     }
