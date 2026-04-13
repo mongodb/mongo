@@ -368,7 +368,7 @@ PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document& objOut) {
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordId* dlOut) {
-    checkFailPointPlanExecAlwaysFails();
+    checkFailPointPlanExecAlwaysFails(nss());
 
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
@@ -577,7 +577,7 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
         return 0;
     }
 
-    checkFailPointPlanExecAlwaysFails();
+    checkFailPointPlanExecAlwaysFails(nss());
     _checkIfKilled();
 
     const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();

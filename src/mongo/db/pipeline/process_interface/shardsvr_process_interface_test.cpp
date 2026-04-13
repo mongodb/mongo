@@ -239,11 +239,12 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
         return BSON("ok" << 1);
     });
 
-    // Mock the response to $out's "listCollections" request to get the uuid of the temp collection.
+    // Mock the response to $out's "listCollections" request (by UUID) to verify the temp
+    // collection UUID has not changed before renaming.
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_EQ("listCollections", request.cmdObj.firstElement().fieldNameStringData());
         ASSERT_EQ(kOutNss.dbName(), request.dbname);
-        ASSERT_EQ(tempNss.coll(), request.cmdObj["filter"]["name"].valueStringData());
+        ASSERT_EQ(uuid, uassertStatusOK(UUID::parse(request.cmdObj["filter"]["info.uuid"])));
         return CursorResponse(kTestAggregateNss, CursorId{0}, {listCollectionsGetUUIDResponse})
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });

@@ -181,9 +181,10 @@ public:
     static std::string stateToStr(ExecState s);
 
     /**
-     * Throws a user exception if "planExecutorAlwaysFails" is enabled.
+     * Throws a user exception if "planExecutorAlwaysFails" is enabled. When the failpoint data
+     * includes a "namespace" field, only fires when it matches the executor's namespace.
      */
-    static void checkFailPointPlanExecAlwaysFails();
+    static void checkFailPointPlanExecAlwaysFails(const NamespaceString& nss);
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen

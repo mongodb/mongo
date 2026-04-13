@@ -123,6 +123,26 @@ void OutStage::doDispose() {
     }
 }
 
+void OutStage::retrieveTemporaryCollectionUUID() {
+    try {
+        auto collInfo = pExpCtx->getMongoProcessInterface()->getCollectionInfoFromPrimary(
+            pExpCtx->getOperationContext(), _tempNs);
+        uassert(11281693,
+                fmt::format("Found unexpected metadata for $out temporary collection. "
+                            "Collection Namespace: '{}', Collection Info: {}",
+                            _tempNs.toStringForErrorMsg(),
+                            collInfo.toBSON().toString()),
+                collInfo.getInfo() && collInfo.getInfo()->getUuid());
+        _tempNsUUID = collInfo.getInfo()->getUuid();
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+        ex.addContext("Temporary collection disappeared during execution of $out collection");
+        throw;
+    } catch (DBException& ex) {
+        ex.addContext("Error while fetching $out temporary collection UUID");
+        throw;
+    }
+}
+
 void OutStage::createTemporaryCollection() {
     BSONObjBuilder createCommandOptions;
     if (_timeseries) {
@@ -163,6 +183,10 @@ void OutStage::createTemporaryCollection() {
             LOGV2(20901,
                   "Hanging aggregation due to 'outWaitAfterTempCollectionCreation' failpoint");
         });
+
+    // The create command does not return the UUID of the newly created collection thus we need to
+    // explicitly fetch it.
+    retrieveTemporaryCollectionUUID();
 }
 
 void OutStage::initialize() {
@@ -215,14 +239,6 @@ void OutStage::initialize() {
             feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
 
     createTemporaryCollection();
-
-    // Save the collection UUID to detect if it was dropped during execution. Viewful timeseries
-    // will detect this when inserting as it doesn't implicitly create collections on insert.
-    // TODO SERVER-111600 remove this conditional once 9.0 becomes last LTS.
-    if (!_timeseries || _viewlessTimeseriesEnabled) {
-        _tempNsUUID = pExpCtx->getMongoProcessInterface()->fetchCollectionUUIDFromPrimary(
-            pExpCtx->getOperationContext(), _tempNs);
-    }
 
     if (_originalIndexes.empty()) {
         return;
@@ -341,24 +357,49 @@ void OutStage::waitWhileFailPointEnabled() {
         });
 }
 
+void OutStage::checkTemporaryCollectionUUIDNotChanged() {
+    tassert(8085303, "No uuid found for $out temporary namespace", _tempNsUUID);
+    const auto& tempCollEntry = [&] {
+        try {
+            return pExpCtx->getMongoProcessInterface()->getCollectionInfoFromPrimary(
+                pExpCtx->getOperationContext(),
+                NamespaceStringOrUUID(_tempNs.dbName(), *_tempNsUUID));
+        } catch (DBException& ex) {
+            if (ex.code() == ErrorCodes::NamespaceNotFound) {
+                ex.addContext("Temporary collection has been dropped during execution of $out");
+            } else {
+                ex.addContext("Error fetching temporary $out collection information");
+            }
+            throw;
+        }
+    }();
+
+    const auto& resolvedNs =
+        NamespaceStringUtil::deserialize(_tempNs.dbName(), tempCollEntry.getName());
+
+    if (resolvedNs != _tempNs) {
+
+        // TODO SERVER-111600: Remove this function once 9.0 is LTS and all timeseries are viewless
+        if (resolvedNs.isTimeseriesBucketsCollection() || _tempNs.isTimeseriesBucketsCollection()) {
+            uasserted(
+                ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
+                fmt::format("Operation on collection '{}' was interrupted due to a time-series "
+                            "metadata change during FCV transition. Retry the operation.",
+                            _tempNs.toStringForErrorMsg()));
+        }
+        uasserted(11281620,
+                  fmt::format("Temporary collection has been renamed during execution of "
+                              "$out. From '{}' to '{}'",
+                              _tempNs.toStringForErrorMsg(),
+                              resolvedNs.toStringForErrorMsg()));
+    }
+}
+
 void OutStage::renameTemporaryCollection() {
     // If the collection is legacy time-series, we must rename to the "real" buckets collection.
     const NamespaceString& outputNs = makeBucketNsIfLegacyTimeseries(_outputNs);
 
-    // Use the UUID to catch a mismatch if the temp collection was dropped and recreated in case of
-    // stepdown. Viewful timeseries has it's own handling for this case as the dropped temp
-    // collection isn't implicitly recreated.
-    // TODO SERVER-111600 remove this conditional once 9.0 becomes last LTS.
-    if (!_timeseries || _viewlessTimeseriesEnabled) {
-        tassert(8085301, "No uuid found for $out temporary namespace", _tempNsUUID);
-        const UUID currentTempNsUUID =
-            pExpCtx->getMongoProcessInterface()->fetchCollectionUUIDFromPrimary(
-                pExpCtx->getOperationContext(), _tempNs);
-        uassert((CollectionUUIDMismatchInfo{
-                    _tempNs.dbName(), currentTempNsUUID, std::string{_tempNs.coll()}, boost::none}),
-                "$out cannot complete as the temp collection was dropped while executing",
-                currentTempNsUUID == _tempNsUUID);
-    }
+    checkTemporaryCollectionUUIDNotChanged();
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitBeforeTempCollectionRename,

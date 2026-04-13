@@ -358,9 +358,13 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
     OperationContext* opCtx,
     const NamespaceString& nss,
     const RunListCollectionsCommandOptions& opts) {
+
     tassert(9525809, "This method can only run on a sharded cluster", Grid::get(opCtx));
 
     const bool isCollectionless = nss.coll().empty();
+    tassert(12322133,
+            "Received collection name both in namespace and listCollection filter parameter",
+            isCollectionless || !opts.filter.hasField("name"));
 
     const auto appendPrimaryShardIfRequested = [&opts](const std::vector<BSONObj>& collections,
                                                        const ShardId& primary) {
@@ -385,8 +389,13 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
         if (opts.rawData) {
             listCollectionsCmd.setRawData(true);
         }
-        if (!isCollectionless) {
-            listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+        if (!isCollectionless || !opts.filter.isEmpty()) {
+            BSONObjBuilder filterBuilder;
+            if (!isCollectionless) {
+                filterBuilder.append("name", nss.coll());
+            }
+            filterBuilder.appendElements(opts.filter);
+            listCollectionsCmd.setFilter(filterBuilder.obj());
         }
 
         listCollectionsCmd.setReadConcern(std::invoke([opCtx] {

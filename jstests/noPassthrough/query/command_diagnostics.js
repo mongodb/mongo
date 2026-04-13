@@ -207,6 +207,9 @@ const outCmdDescription = `\'opDescription\': { aggregate: \\"command_diagnostic
 }\\" } ]`;
 runTest({
     ...planExecutorAlwaysFails,
+    // Scope the failpoint to the test collection namespace so it doesn't fire during the internal
+    // listCollections command used by OutStage::retrieveTemporaryCollectionUUID.
+    failpointOpts: {"tassert": true, "namespace": `test.${collName}`},
     description: "agg with $out, planExecutor fails",
     command: outCmd,
     expectedDiagnosticInfo: [

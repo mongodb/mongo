@@ -33,11 +33,13 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name_util.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -71,9 +73,12 @@
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/initialize_auto_get_helper.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -92,6 +97,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -110,6 +116,7 @@
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -745,11 +752,42 @@ BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opC
     return getCollectionOptionsLocally(opCtx, nss);
 }
 
-UUID CommonMongodProcessInterface::fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
-                                                                  const NamespaceString& nss) {
-    BSONObj options = getCollectionOptions(opCtx, nss);
-    auto uuid = UUID::parse(options["uuid"_sd]);
-    return uassertStatusOK(uuid);
+BSONObj CommonMongodProcessInterface::runDatabaseCommandOnPrimary(OperationContext* opCtx,
+                                                                  const DatabaseName& dbName,
+                                                                  const BSONObj& cmdBSON) {
+    DBDirectClient client(opCtx);
+    BSONObj result;
+    client.runCommand(dbName, cmdBSON, result);
+    uassertStatusOK(getStatusFromCommandResult(result));
+    return result;
+}
+
+ListCollectionsReplyItem CommonMongodProcessInterface::getCollectionInfoFromPrimary(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
+    auto filter = nsOrUUID.isUUID() ? BSON("info.uuid" << nsOrUUID.uuid())
+                                    : BSON("name" << nsOrUUID.nss().coll());
+    ListCollections listCollectionsCmd;
+    listCollectionsCmd.setDbName(nsOrUUID.dbName());
+    listCollectionsCmd.setFilter(filter);
+    if (!isRawDataOperation(opCtx) &&
+        gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // If we are not already running in a rawData operation, pass the rawData parameter
+        // explicitly to ensure the listCollection output is in raw format.
+        listCollectionsCmd.setRawData(true);
+    }
+
+    const auto result =
+        runDatabaseCommandOnPrimary(opCtx, nsOrUUID.dbName(), listCollectionsCmd.toBSON());
+
+    auto firstBatch = bson::extractElementAtDottedPath(result, "cursor.firstBatch.0");
+    uassert(ErrorCodes::NamespaceNotFound,
+            fmt::format("Collection {} not found in database {}",
+                        nsOrUUID.toStringForErrorMsg(),
+                        nsOrUUID.dbName().toStringForErrorMsg()),
+            firstBatch.ok() && firstBatch.type() == BSONType::object);
+    return ListCollectionsReplyItem::parse(firstBatch.Obj().getOwned());
 }
 
 query_shape::CollectionType CommonMongodProcessInterface::getCollectionTypeLocally(

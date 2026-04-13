@@ -94,6 +94,17 @@ private:
     void createTemporaryCollection();
 
     /**
+     * Fetches the UUID of the temporary collection from the primary and stores it in _tempNsUUID.
+     */
+    void retrieveTemporaryCollectionUUID();
+
+    /**
+     * Verifies that the temporary collection UUID has not changed since it was first stored,
+     * to detect drops or renames during $out execution.
+     */
+    void checkTemporaryCollectionUUIDNotChanged();
+
+    /**
      * Runs a renameCollection from the temporary namespace to the user requested namespace. Returns
      * nothing, but if the function returns, we assume the rename has succeeded and the temporary
      * namespace no longer exists.

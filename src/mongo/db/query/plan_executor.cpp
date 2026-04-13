@@ -30,6 +30,7 @@
 #include "mongo/db/query/plan_executor.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -72,8 +73,13 @@ std::string PlanExecutor::writeTypeToStr(PlanExecWriteType writeType) {
     MONGO_UNREACHABLE;
 }
 
-void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
+void PlanExecutor::checkFailPointPlanExecAlwaysFails(const NamespaceString& nss) {
     if (auto scoped = planExecutorAlwaysFails.scoped(); MONGO_unlikely(scoped.isActive())) {
+        if (scoped.getData().hasField("namespace") &&
+            scoped.getData().getStringField("namespace") !=
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())) {
+            return;
+        }
         if (scoped.getData().hasField("tassert") && scoped.getData().getBoolField("tassert")) {
             tasserted(9028201, "PlanExecutor hit planExecutorAlwaysFails fail point");
         }

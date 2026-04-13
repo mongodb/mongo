@@ -33,17 +33,15 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/executor/remote_command_request.h"
@@ -56,6 +54,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 
 #include <string>
 
@@ -237,20 +236,13 @@ void ReplicaSetNodeProcessInterface::dropCollection(OperationContext* opCtx,
     uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmd.obj()));
 }
 
-UUID ReplicaSetNodeProcessInterface::fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
-                                                                    const NamespaceString& nss) {
-    // Create a listCollections command and run it against the primary to get the UUID.
-    ListCollections listCollectionsCmd;
-    listCollectionsCmd.setDbName(nss.dbName());
-    listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
-
-    auto result = _executeCommandOnPrimary(
-        opCtx, nss, listCollectionsCmd.toBSON(), /* attachWriteConcern */ false);
+BSONObj ReplicaSetNodeProcessInterface::runDatabaseCommandOnPrimary(OperationContext* opCtx,
+                                                                    const DatabaseName& dbName,
+                                                                    const BSONObj& cmdBSON) {
+    auto nss = NamespaceStringUtil::deserialize(dbName, "");
+    auto result = _executeCommandOnPrimary(opCtx, nss, cmdBSON, /* attachWriteConcern */ false);
     uassertStatusOK(result);
-
-    auto uuid =
-        bson::extractElementAtDottedPath(result.getValue(), "cursor.firstBatch.0.info.uuid");
-    return uassertStatusOK(UUID::parse(uuid));
+    return result.getValue();
 }
 
 StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimaryRaw(

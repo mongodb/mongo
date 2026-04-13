@@ -127,8 +127,9 @@ public:
                               const NamespaceString& nss,
                               BSONObjBuilder* builder) const final;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override;
-    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
-                                        const NamespaceString& nss) override;
+    ListCollectionsReplyItem getCollectionInfoFromPrimary(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) override;
+
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) override;
 
@@ -261,6 +262,16 @@ protected:
      */
     virtual boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,
                                                                      const NamespaceString& ns);
+
+    /**
+     * Runs the given command against the primary of the database, returning the raw command result.
+     * The default implementation runs the command locally via DBDirectClient (suitable when this
+     * node is the primary). Subclasses that may not be the primary should override this to route
+     * the command appropriately.
+     */
+    virtual BSONObj runDatabaseCommandOnPrimary(OperationContext* opCtx,
+                                                const DatabaseName& dbName,
+                                                const BSONObj& cmdBSON);
 
 private:
     // Object which contains a JavaScript Scope, used for executing JS in pipeline stages and

@@ -59,6 +59,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
@@ -354,8 +355,12 @@ public:
      */
     virtual BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
-    virtual UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
-                                                const NamespaceString& nss) = 0;
+    /**
+     * Returns the ListCollectionsReplyItem for the collection identified by the given
+     * NamespaceStringOrUUID. Throws NamespaceNotFound if no matching collection exists.
+     */
+    virtual ListCollectionsReplyItem getCollectionInfoFromPrimary(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) = 0;
 
     /**
      * Returns the query shape collection type in the namespace given by 'nss'. This function holds

@@ -136,7 +136,8 @@ public:
 
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
 
-    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx, const NamespaceString& nss) final;
+    ListCollectionsReplyItem getCollectionInfoFromPrimary(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) final;
 
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) final;

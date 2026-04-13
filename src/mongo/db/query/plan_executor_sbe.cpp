@@ -229,7 +229,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document& objOut) {
             "Invalid call to PlanExecutorSBE::getNextDocument() on a disposed executor",
             !_isDisposed);
 
-    checkFailPointPlanExecAlwaysFails();
+    checkFailPointPlanExecAlwaysFails(nss());
 
     return getNextImpl(&objOut, nullptr);
 }
@@ -239,7 +239,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
             "Invalid call to PlanExecutorSBE::getNext() on a disposed executor",
             !_isDisposed);
 
-    checkFailPointPlanExecAlwaysFails();
+    checkFailPointPlanExecAlwaysFails(nss());
 
     BSONObj obj;
     auto result = getNextImpl(&obj, dlOut);
@@ -273,7 +273,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     // produce any documents.
     tassert(9212602, "fetchNextImpl() expects a non-null object pointer", out);
 
-    checkFailPointPlanExecAlwaysFails();
+    checkFailPointPlanExecAlwaysFails(nss());
 
     if (!_stash.empty()) {
         auto&& [doc, recordId] = _stash.front();

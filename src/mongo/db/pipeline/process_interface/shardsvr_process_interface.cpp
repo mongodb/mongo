@@ -49,6 +49,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/ddl/create_indexes_gen.h"
+#include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -330,6 +331,32 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
     return _getCollectionOptions(opCtx, nss);
 }
 
+ListCollectionsReplyItem ShardServerProcessInterface::getCollectionInfoFromPrimary(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
+    auto filter = nsOrUUID.isUUID() ? BSON("info.uuid" << nsOrUUID.uuid())
+                                    : BSON("name" << nsOrUUID.nss().coll());
+    // Use a listCollections command to resolve both namespace and options
+    // in a single round trip to the primary shard.
+    auto nss = NamespaceStringUtil::deserialize(nsOrUUID.dbName(), "");
+    const auto response = _runListCollectionsCommandOnAShardedCluster(
+        opCtx,
+        nss,
+        {.rawData = gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+             VersionContext::getDecoration(opCtx),
+             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+         // Use PrimaryOnly read preference
+         .runOnPrimary = true,
+         .filter = filter});
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            fmt::format("Collection {} not found in database {}",
+                        nsOrUUID.toStringForErrorMsg(),
+                        nsOrUUID.dbName().toStringForErrorMsg()),
+            !response.empty());
+
+    return ListCollectionsReplyItem::parse(response[0].getOwned());
+}
+
 BSONObj ShardServerProcessInterface::_getCollectionOptions(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            bool runOnPrimary) {
@@ -370,13 +397,6 @@ BSONObj ShardServerProcessInterface::_getCollectionOptions(OperationContext* opC
         return optionObj.getOwned();
     }
     return BSONObj{};
-}
-
-UUID ShardServerProcessInterface::fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
-                                                                 const NamespaceString& nss) {
-    const auto options = _getCollectionOptions(opCtx, nss, /*runOnPrimary*/ true);
-    auto uuid = UUID::parse(options["uuid"_sd]);
-    return uassertStatusOK(uuid);
 }
 
 query_shape::CollectionType ShardServerProcessInterface::getCollectionType(

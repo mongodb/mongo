@@ -136,8 +136,9 @@ public:
                                   const WriteConcernOptions& wc,
                                   boost::optional<OID> targetEpoch) override;
 
-    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
-                                        const NamespaceString& nss) override;
+    BSONObj runDatabaseCommandOnPrimary(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const BSONObj& cmdBSON) override;
 
 private:
     /**

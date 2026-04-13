@@ -214,7 +214,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx, const NamespaceString& nss) final {
+    ListCollectionsReplyItem getCollectionInfoFromPrimary(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) final {
         MONGO_UNREACHABLE;
     }
 

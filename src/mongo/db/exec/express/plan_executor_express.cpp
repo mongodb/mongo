@@ -374,7 +374,7 @@ PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordI
     size_t numUnavailabilityYieldsSinceLastSuccess = 0;
     size_t numWriteConflictYieldsSinceLastSuccess = 0;
 
-    checkFailPointPlanExecAlwaysFails();
+    checkFailPointPlanExecAlwaysFails(nss());
 
     express::PlanProgress progress((express::Ready()));
     while (!haveOutput) {
@@ -430,7 +430,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
                                "write contention during express execution"_sd,
                                NamespaceStringOrUUID(_nss));
 
-    // TODO: Is this the desired behavior?
+    // TODO SERVER-123752: Is this the desired behavior?
     _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
         // No-op.
     });
@@ -448,7 +448,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
                                                  "resource contention during express execution"_sd),
                                           numWriteConflictYieldsSinceLastSuccess);
 
-    // TODO: Is this the desired behavior?
+    // TODO SERVER-123752: Is this the desired behavior?
     _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
         // No-op.
     });

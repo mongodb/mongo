@@ -248,6 +248,10 @@ protected:
         bool addPrimaryShard = false;
         // Run the command with primary read preference.
         bool runOnPrimary = false;
+        // Additional filter to apply to the listCollections command. This filter may include
+        // a 'name' field only when 'nss' is collectionless (database-only); otherwise, name
+        // filtering is automatically derived from 'nss'.
+        BSONObj filter;
     };
 
     /**
