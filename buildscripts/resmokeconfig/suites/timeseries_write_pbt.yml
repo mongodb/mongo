@@ -15,6 +15,10 @@ executor:
             numRuns: 75
             minCommands: 1
             maxCommands: 250
+            # Set a timeout for tests, typically this limit should only be reached during
+            # Shrinking, however an interrupted test with only passing runs will succeed.
+            interruptAfterTimeLimit: 1_200_000
+
   hooks:
     - class: ValidateCollections
     - class: CleanEveryN
