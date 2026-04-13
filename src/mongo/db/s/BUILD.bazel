@@ -903,6 +903,7 @@ mongo_cc_unit_test(
     srcs = [
         "//src/mongo/db/s:config_server_op_observer_test.cpp",
         "//src/mongo/db/s:query_analysis_coordinator_test.cpp",
+        "//src/mongo/db/s:query_analysis_op_observer_configsvr_test.cpp",
         "//src/mongo/db/s:sharding_catalog_client_aggregations_test.cpp",
         "//src/mongo/db/s:sharding_ddl_util_test.cpp",
         "//src/mongo/db/s:sharding_util_refresh_test.cpp",
