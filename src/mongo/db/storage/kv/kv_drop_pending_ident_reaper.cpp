@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 
 #include "mongo/bson/timestamp.h"
@@ -234,15 +233,15 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
                 toDrop.push_back({info, dropExecution});
             }
         }
-    }
 
-    if (toDrop.empty()) {
-        LOGV2_DEBUG(8097401,
-                    1,
-                    "No drop-pending idents have expired",
-                    "timestamp"_attr = ts,
-                    "pendingIdentsCount"_attr = _timestampOrderedIdents.size());
-        return;
+        if (toDrop.empty()) {
+            LOGV2_DEBUG(8097401,
+                        1,
+                        "No drop-pending idents have expired",
+                        "timestamp"_attr = ts,
+                        "pendingIdentsCount"_attr = _timestampOrderedIdents.size());
+            return;
+        }
     }
 
     LOGV2(22260,
