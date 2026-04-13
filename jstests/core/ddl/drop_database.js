@@ -11,8 +11,13 @@ function listDatabases(options) {
 }
 
 function assertNamespacesDoNotExist() {
-    assert.eq(0, listDatabases({filter: {name: dbName}}).length);
     assert.eq(0, testDB.getCollectionNames());
+
+    if (!TestData.runningWithBalancer) {
+        // When the balancer is running in the background, concurrent moveCollection operations can
+        // cause the database to be recreated unexpectedly. Therefore, skip this assertion.
+        assert.eq(0, listDatabases({filter: {name: dbName}}).length);
+    }
 }
 
 function assertNamespacesExist() {

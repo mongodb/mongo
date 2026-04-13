@@ -347,7 +347,11 @@ describe("listDatabases shows databases created implicitly via different command
         assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
 
         assert.commandWorked(db.getSiblingDB(testDBs.dropDatabase).dropDatabase());
-        cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.dropDatabase}}));
-        assert.eq(0, cmdRes.databases.length, tojson(cmdRes));
+        if (!TestData.runningWithBalancer) {
+            // When the balancer is running in the background, concurrent moveCollection operations
+            // can cause the database to be recreated unexpectedly. Therefore, skip this assertion.
+            cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: testDBs.dropDatabase}}));
+            assert.eq(0, cmdRes.databases.length, tojson(cmdRes));
+        }
     });
 });
