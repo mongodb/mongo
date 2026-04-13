@@ -437,6 +437,41 @@ TEST(AsioTransportLayer, StopAcceptingSessionsBeforeStart) {
     ASSERT_OK(tla->start());
 }
 
+/**
+ * Verifies that calling stopAcceptingSessions() while the listener thread has been spawned but
+ * has not yet acquired the transport layer mutex does not cause a deadlock.
+ */
+TEST(AsioTransportLayer, StopAcceptingSessionsDuringListenerStartup) {
+    // Pause the listener thread as it begins running, simulating the race window where
+    // shutdown/stopAcceptingSessions can run between thread spawn and _runListener body.
+    auto failPoint =
+        std::make_unique<FailPointEnableBlock>("asioTransportLayerHangAtListenerStart");
+
+    auto transportLayer = std::make_unique<AsioTransportLayer>(
+        defaultTLAOptions(), std::make_unique<test::MockSessionManager>());
+    ASSERT_OK(transportLayer->setup());
+
+    // start() spawns the listener thread and CV-waits for it to become "started".
+    auto startThread = stdx::thread([&] { ASSERT_OK(transportLayer->start()); });
+
+    // Wait until the listener thread is paused at the failpoint.
+    (*failPoint)->waitForTimesEntered(failPoint->initialTimesEntered() + 1);
+
+    // Release the failpoint shortly after stopAcceptingSessions() has had time to  set the listener
+    // state to kShuttingDown. This is necessary as stopAcceptingSessions cannot exit until the
+    // listener has exited, which requires the failpoint to be stopped.
+    auto failPointReset = stdx::thread([&] {
+        sleepFor(Milliseconds{5});
+        failPoint.reset();
+    });
+
+    transportLayer->stopAcceptingSessions();
+
+    failPointReset.join();
+    startThread.join();
+    transportLayer->shutdown();
+}
+
 #ifndef _WIN32
 /**
  * Test that when unixProxySocketPrefix is set, the transport layer creates proxy Unix domain

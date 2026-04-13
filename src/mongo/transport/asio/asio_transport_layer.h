@@ -62,12 +62,15 @@ namespace transport {
 // Simulates reads and writes that always return 1 byte and fail with EAGAIN
 extern FailPoint asioTransportLayerShortOpportunisticReadWrite;
 
-// Cause an asyncConnect to timeout after it's successfully connected to the remote peer
+// Causes an asyncConnect to timeout after it's successfully connected to the remote peer
 extern FailPoint asioTransportLayerAsyncConnectTimesOut;
 
 extern FailPoint asioTransportLayerHangBeforeAcceptCallback;
 
 extern FailPoint asioTransportLayerHangDuringAcceptCallback;
+
+// Causes the listener thread to immediately hang when it is entered.
+extern FailPoint asioTransportLayerHangAtListenerStart;
 
 class AsioNetworkingBaton;
 class AsioReactor;
@@ -393,6 +396,7 @@ private:
     private:
         void _runListener(std::string threadName);
 
+        /** Unconditionally starts listening on all acceptors. */
         void _startListening(WithLock lk);
 
         void _waitForConnections(stdx::unique_lock<stdx::mutex>& lk);
