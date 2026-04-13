@@ -402,8 +402,7 @@ protected:
         return std::make_unique<IndexBuildInterceptor>(&_opCtx,
                                                        indexBuildInfo,
                                                        LazyRecordStore::CreateMode::immediate,
-                                                       entry->descriptor()->unique(),
-                                                       /*generateTableWrites=*/true);
+                                                       entry->descriptor()->unique());
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();

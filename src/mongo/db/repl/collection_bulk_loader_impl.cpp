@@ -151,7 +151,6 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                                              MultiIndexBlock::kNoopOnInitFn,
                                              MultiIndexBlock::InitMode::InitialSync,
                                              /*resumeInfo=*/{},
-                                             /*generateTableWrites=*/true,
                                              maxSecondaryIndexMemoryUsageBytes)
                                       .getStatus();
                     if (!status.isOK()) {
@@ -172,7 +171,6 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                                              MultiIndexBlock::kNoopOnInitFn,
                                              MultiIndexBlock::InitMode::InitialSync,
                                              boost::none,
-                                             /*generateTableWrites=*/true,
                                              maxIdIndexMemoryUsageBytes)
                                       .getStatus();
                     if (!status.isOK()) {

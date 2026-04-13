@@ -878,7 +878,6 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         options.protocol = protocol;
         // All indexes are dropped during repair and should be rebuilt normally.
         options.forRecovery = !storageGlobalParams.repair;
-        options.generateTableWrites = replIndexBuildState->getGenerateTableWrites();
         status = _indexBuildsManager.setUpIndexBuild(
             opCtx, collWriter, indexes, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
         if (!status.isOK()) {
@@ -1009,7 +1008,6 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     IndexBuildsManager::SetupOptions options;
     options.protocol = protocol;
-    options.generateTableWrites = replIndexBuildState->getGenerateTableWrites();
     status = _indexBuildsManager.setUpIndexBuild(opCtx,
                                                  collection,
                                                  mutableIndexes,
@@ -2875,7 +2873,6 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         : IndexBuildsManager::IndexConstraints::kEnforce;
     options.protocol = replState->protocol;
     options.method = indexBuildOptions.indexBuildMethod;
-    options.generateTableWrites = true;
 
     try {
         if (replCoord->canAcceptWritesFor(opCtx, collection->ns()) &&
@@ -2902,10 +2899,6 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                 // case when recovering from the oplog as a standalone. In general, if a timestamp
                 // is provided, it should be used to avoid untimestamped writes.
                 tsBlock.emplace(opCtx, startTimestamp);
-            }
-
-            if (options.method == IndexBuildMethodEnum::kPrimaryDriven) {
-                options.generateTableWrites = false;
             }
 
             uassertStatusOK(_indexBuildsManager.setUpIndexBuild(opCtx,
@@ -3558,8 +3551,6 @@ void IndexBuildsCoordinator::_buildPrimaryDrivenIndex(
         _signalPrimaryForCommitReadiness(opCtx, replState);
         _waitForNextIndexBuildActionAndCommit(opCtx, replState, indexBuildOptions);
     } else {
-        replState->setGenerateTableWrites(/*generateTableWrites=*/false);
-
         // When a replica performs a primary-driven index build, it skips certain steps. Block on a
         // few FailPoints from those steps to make some tests happy.
         for (const auto fpName : {"hangAfterStartingIndexBuild",
@@ -3599,8 +3590,6 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
     const boost::optional<RecordId>& resumeAfterRecordId) {
-    invariant(replState->getGenerateTableWrites());
-
     // Collection scan and insert into index.
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);
@@ -3668,8 +3657,6 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
  */
 void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    invariant(replState->getGenerateTableWrites());
-
     indexBuildsSSS.drainSideWritesTable.addAndFetch(1);
 
     // Perform the first drain while holding an intent lock.
@@ -3764,16 +3751,15 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                             << replState->buildUUID
                             << ", collection UUID: " << replState->collectionUUID);
 
-    if (replState->getGenerateTableWrites()) {
-        indexBuildsSSS.drainSideWritesTableOnCommit.addAndFetch(1);
-        // Perform the third and final drain after releasing a shared lock and reacquiring an
-        // exclusive lock on the collection.
-        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-            opCtx,
-            replState->buildUUID,
-            RecoveryUnit::ReadSource::kNoTimestamp,
-            IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
-    }
+    indexBuildsSSS.drainSideWritesTableOnCommit.addAndFetch(1);
+    // Perform the third and final drain after releasing a shared lock and reacquiring an
+    // exclusive lock on the collection.
+    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+        opCtx,
+        replState->buildUUID,
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
     try {
         failIndexBuildOnCommit.execute(
             [](const BSONObj&) { uasserted(4698903, "index build aborted due to failpoint"); });
@@ -3790,7 +3776,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // Retry indexing records that failed key generation, but only if we are primary.
         // Secondaries rely on the primary's decision to commit as assurance that it has checked all
         // key generation errors on its behalf.
-        if (isPrimary && replState->getGenerateTableWrites()) {
+        if (isPrimary) {
             uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
                 opCtx, replState->buildUUID, collection.get()));
         }
@@ -3800,20 +3786,18 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // Single-phase builds on secondaries don't track duplicates so this call is a no-op. This
         // can be called for two-phase builds in all replication states except during initial sync
         // when this node is not guaranteed to be consistent.
-        if (replState->getGenerateTableWrites()) {
-            indexBuildsSSS.processConstraintsViolationTableOnCommit.addAndFetch(1);
-            bool twoPhaseAndNotInitialSyncing =
-                (IndexBuildProtocol::kTwoPhase == replState->protocol ||
-                 IndexBuildProtocol::kPrimaryDriven == replState->protocol) &&
-                !replCoord->getMemberState().startup2();
-            if (IndexBuildProtocol::kSinglePhase == replState->protocol ||
-                twoPhaseAndNotInitialSyncing) {
-                if (auto status = _indexBuildsManager.checkIndexConstraintViolations(
-                        opCtx, collection.get(), replState->buildUUID);
-                    !status.isOK()) {
-                    indexBuildsSSS.failedDueToDuplicateKeyError.addAndFetch(1);
-                    uassertStatusOK(status);
-                }
+        indexBuildsSSS.processConstraintsViolationTableOnCommit.addAndFetch(1);
+        bool twoPhaseAndNotInitialSyncing =
+            (IndexBuildProtocol::kTwoPhase == replState->protocol ||
+             IndexBuildProtocol::kPrimaryDriven == replState->protocol) &&
+            !replCoord->getMemberState().startup2();
+        if (IndexBuildProtocol::kSinglePhase == replState->protocol ||
+            twoPhaseAndNotInitialSyncing) {
+            if (auto status = _indexBuildsManager.checkIndexConstraintViolations(
+                    opCtx, collection.get(), replState->buildUUID);
+                !status.isOK()) {
+                indexBuildsSSS.failedDueToDuplicateKeyError.addAndFetch(1);
+                uassertStatusOK(status);
             }
         }
 

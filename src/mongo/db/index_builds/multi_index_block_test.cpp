@@ -204,8 +204,7 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll));
@@ -238,8 +237,7 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::InitialSync,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
@@ -276,8 +274,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::InitialSync,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
         operationContext(),
@@ -311,8 +308,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
                                                    {indexBuildInfo1},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(1U, specs.size());
 
     auto isResumable = true;
@@ -345,8 +341,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
                                                    {indexBuildInfo1},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(1U, specs.size());
 
     auto isResumable = true;
@@ -389,8 +384,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
                                                    {indexBuildInfo1},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(1U, specs.size());
 
     auto isResumable = true;
@@ -429,8 +423,7 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
                 {indexBuildInfo},
                 [] { throwWriteConflictException("Throw WriteConflictException in 'OnInitFn'."); },
                 MultiIndexBlock::InitMode::SteadyState,
-                boost::none,
-                /*generateTableWrites=*/true),
+                boost::none),
             DBException,
             ErrorCodes::WriteConflict);
     }
@@ -444,8 +437,7 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
                              {indexBuildInfo},
                              MultiIndexBlock::kNoopOnInitFn,
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true)
+                             boost::none)
                       .getStatus());
         wuow.commit();
     }
@@ -483,8 +475,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                                  {indexBuildInfo1, indexBuildInfo2},
                                  MultiIndexBlock::kNoopOnInitFn,
                                  MultiIndexBlock::InitMode::SteadyState,
-                                 boost::none,
-                                 /*generateTableWrites=*/true)
+                                 boost::none)
                           .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_NE(status, ErrorCodes::IndexBuildAlreadyInProgress);
@@ -499,8 +490,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                              {indexBuildInfo1},
                              MultiIndexBlock::kNoopOnInitFn,
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true)
+                             boost::none)
                       .getStatus());
         wuow.commit();
     }
@@ -516,8 +506,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                              {indexBuildInfo1},
                              MultiIndexBlock::kNoopOnInitFn,
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true)
+                             boost::none)
                       .getStatus(),
                   ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -532,8 +521,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                              {indexBuildInfo1, indexBuildInfo2},
                              MultiIndexBlock::kNoopOnInitFn,
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true)
+                             boost::none)
                       .getStatus(),
                   ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -555,8 +543,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                              {indexBuildInfo3, indexBuildInfo1},
                              MultiIndexBlock::kNoopOnInitFn,
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true)
+                             boost::none)
                       .getStatus(),
                   ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -586,8 +573,7 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
                              {indexBuildInfo},
                              MultiIndexBlock::kNoopOnInitFn,
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true)
+                             boost::none)
                       .getStatus());
         wuow.commit();
     }
@@ -642,8 +628,7 @@ TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
                                  {indexBuildInfo},
                                  MultiIndexBlock::kNoopOnInitFn,
                                  MultiIndexBlock::InitMode::SteadyState,
-                                 boost::none,
-                                 /*generateTableWrites=*/true)
+                                 boost::none)
                           .getStatus());
             wuow.commit();
         }
@@ -703,8 +688,7 @@ TEST_F(MultiIndexBlockTest, CommitDropsTemporaryTables) {
                                                    {indexBuildInfo},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
@@ -747,8 +731,7 @@ TEST_F(MultiIndexBlockTest, AbortDropsTemporaryTables) {
                                                    {indexBuildInfo},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
@@ -786,8 +769,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {
                                                    {indexBuildInfo},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     ASSERT_EQUALS(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
@@ -846,8 +828,7 @@ TEST_F(MultiIndexBlockTest, BasicMetrics) {
                              {spec1, spec2},
                              MultiIndexBlock::kNoopOnInitFn,
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/false)
+                             boost::none)
                       .getStatus());
         wuow.commit();
     }

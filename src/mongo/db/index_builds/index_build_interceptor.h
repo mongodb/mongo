@@ -75,16 +75,7 @@ public:
     IndexBuildInterceptor(OperationContext* opCtx,
                           const IndexBuildInfo& indexBuildInfo,
                           LazyRecordStore::CreateMode createMode,
-                          bool unique,
-                          bool generateTableWrites);
-
-    /**
-     * Returns true if this node is allowed to perform side writes during the ongoing index build.
-     * Side writes are not permitted on a secondary in case of a primary driven index build.
-     */
-    bool sideWritesAllowed() const {
-        return _generateTableWrites;
-    }
+                          bool unique);
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written
@@ -214,13 +205,6 @@ private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
     bool _checkAllWritesApplied(OperationContext* opCtx, bool fatal) const;
-
-    // Indicates whether this node should produce any table writes during the index build. When
-    // this is false, it means that this node is a secondary and is only applying writes received
-    // from the primary via the oplog.
-    // TODO(SERVER-111304): We might be able to remove this field by not creating an instance of
-    // IndexBuildInterceptor on a standby in case of primary driven index builds.
-    bool _generateTableWrites{true};
 
     // This temporary record store records all the index keys that we encounter upon collection
     // scan. We will use the _sorterTable for primary-driven index builds to replicate sorting and

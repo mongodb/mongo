@@ -139,8 +139,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
             MultiIndexBlock::InitMode mode = options.forRecovery
                 ? MultiIndexBlock::InitMode::Recovery
                 : MultiIndexBlock::InitMode::SteadyState;
-            return uassertStatusOK(builder->init(
-                opCtx, collection, indexes, onInit, mode, resumeInfo, options.generateTableWrites));
+            return uassertStatusOK(
+                builder->init(opCtx, collection, indexes, onInit, mode, resumeInfo));
         });
     } catch (const DBException& ex) {
         return ex.toStatus();

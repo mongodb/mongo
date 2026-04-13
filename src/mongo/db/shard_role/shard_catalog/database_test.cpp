@@ -408,8 +408,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             ASSERT_OK(indexBuildBlock.init(opCtx,
                                            collection,
                                            indexBuildInfo,
-                                           /*forRecovery=*/false,
-                                           /*generateTableWrites=*/true));
+                                           /*forRecovery=*/false));
             wuow.commit();
         }
         ON_BLOCK_EXIT([&indexBuildBlock, opCtx, collection] {

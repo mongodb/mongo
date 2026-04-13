@@ -130,7 +130,6 @@ public:
         OnInitFn onInit,
         InitMode initMode,
         const boost::optional<ResumeIndexInfo>& resumeInfo,
-        bool generateTableWrites,
         boost::optional<size_t> maxMemoryUsageBytes = boost::none);
     /**
      * Not all index initializations need an OnInitFn, in particular index builds that do not need

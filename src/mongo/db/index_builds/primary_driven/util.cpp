@@ -102,7 +102,7 @@ Status start(OperationContext* opCtx,
         }
 
         IndexBuildInterceptor interceptor{
-            opCtx, index, LazyRecordStore::CreateMode::immediate, descriptor.unique(), false};
+            opCtx, index, LazyRecordStore::CreateMode::immediate, descriptor.unique()};
 
         CollectionQueryInfo::get(writableColl).rebuildIndexData(opCtx, writableColl);
         CollectionIndexUsageTrackerDecoration::write(writableColl)
@@ -154,11 +154,8 @@ Status commit(OperationContext* opCtx,
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
 
-        IndexBuildInterceptor interceptor{opCtx,
-                                          index,
-                                          LazyRecordStore::CreateMode::openExisting,
-                                          entry->descriptor()->unique(),
-                                          false};
+        IndexBuildInterceptor interceptor{
+            opCtx, index, LazyRecordStore::CreateMode::openExisting, entry->descriptor()->unique()};
         interceptor.dropTemporaryTables(opCtx, Timestamp::min());
 
         writableColl->indexBuildSuccess(opCtx, entry);
@@ -233,11 +230,8 @@ Status abort(OperationContext* opCtx,
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
 
-        IndexBuildInterceptor interceptor{opCtx,
-                                          index,
-                                          LazyRecordStore::CreateMode::openExisting,
-                                          entry->descriptor()->unique(),
-                                          false};
+        IndexBuildInterceptor interceptor{
+            opCtx, index, LazyRecordStore::CreateMode::openExisting, entry->descriptor()->unique()};
         interceptor.dropTemporaryTables(opCtx, Timestamp::min());
 
         auto status = writableColl->getIndexCatalog()->dropIndexEntry(opCtx, writableColl, entry);

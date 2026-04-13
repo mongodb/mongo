@@ -286,8 +286,7 @@ public:
                                                indexes,
                                                MultiIndexBlock::kNoopOnInitFn,
                                                MultiIndexBlock::InitMode::SteadyState,
-                                               boost::none,
-                                               /*generateTableWrites=*/true);
+                                               boost::none);
             uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         });

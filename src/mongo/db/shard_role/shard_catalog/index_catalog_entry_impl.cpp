@@ -171,7 +171,7 @@ void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> a
 }
 
 bool IndexCatalogEntryImpl::sideWritesAllowed() const {
-    return _indexBuildInterceptor != nullptr && _indexBuildInterceptor->sideWritesAllowed();
+    return _indexBuildInterceptor != nullptr;
 }
 
 bool IndexCatalogEntryImpl::isFrozen() const {

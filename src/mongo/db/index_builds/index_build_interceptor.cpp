@@ -83,10 +83,8 @@ auto& sideWritesDeletedCounter = otel::metrics::MetricsService::instance().creat
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              const IndexBuildInfo& indexBuildInfo,
                                              LazyRecordStore::CreateMode createMode,
-                                             bool unique,
-                                             bool generateTableWrites)
-    : _generateTableWrites(generateTableWrites),
-      _sideWritesTracker([&]() {
+                                             bool unique)
+    : _sideWritesTracker([&]() {
           uassert(10709201, "sideWritesIdent is not provided", indexBuildInfo.sideWritesIdent);
           return SideWritesTracker{opCtx, *indexBuildInfo.sideWritesIdent, createMode};
       }()),

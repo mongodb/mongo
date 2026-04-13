@@ -401,8 +401,7 @@ public:
                              {indexBuildInfo},
                              MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll.get()),
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true);
+                             boost::none);
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -2043,8 +2042,7 @@ public:
                              {indexBuildInfo},
                              MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, *autoColl),
                              MultiIndexBlock::InitMode::SteadyState,
-                             boost::none,
-                             /*generateTableWrites=*/true);
+                             boost::none);
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -2707,8 +2705,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
                 {indexBuildInfo},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, collection.get()),
                 MultiIndexBlock::InitMode::SteadyState,
-                boost::none,
-                /*generateTableWrites=*/true);
+                boost::none);
             ASSERT_OK(swSpecs.getStatus());
         }
 

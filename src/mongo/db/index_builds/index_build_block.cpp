@@ -97,8 +97,7 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       Collection* collection,
                                       const IndexBuildInfo& indexBuildInfo,
-                                      IndexBuildPhaseEnum phase,
-                                      bool generateTableWrites) {
+                                      IndexBuildPhaseEnum phase) {
     _indexBuildInfo = indexBuildInfo;
     auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
@@ -130,8 +129,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
         std::make_unique<IndexBuildInterceptor>(opCtx,
                                                 indexBuildInfo,
                                                 LazyRecordStore::CreateMode::openExisting,
-                                                writableEntry->descriptor()->unique(),
-                                                generateTableWrites);
+                                                writableEntry->descriptor()->unique());
     writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);
@@ -142,8 +140,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
 Status IndexBuildBlock::init(OperationContext* opCtx,
                              Collection* collection,
                              const IndexBuildInfo& indexBuildInfo,
-                             bool forRecovery,
-                             bool generateTableWrites) {
+                             bool forRecovery) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -186,12 +183,8 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
         auto indexCatalog = collection->getIndexCatalog();
         auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
             opCtx, getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
-        _indexBuildInterceptor =
-            std::make_unique<IndexBuildInterceptor>(opCtx,
-                                                    *_indexBuildInfo,
-                                                    mode,
-                                                    indexCatalogEntry->descriptor()->unique(),
-                                                    generateTableWrites);
+        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
+            opCtx, *_indexBuildInfo, mode, indexCatalogEntry->descriptor()->unique());
         indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 
@@ -315,8 +308,7 @@ Status IndexBuildBlock::buildEmptyIndex(OperationContext* opCtx,
     if (auto status = indexBuildBlock.init(opCtx,
                                            collection,
                                            indexBuildInfo,
-                                           /*forRecovery=*/false,
-                                           /*generateTableWrites=*/true);
+                                           /*forRecovery=*/false);
         !status.isOK()) {
         return status;
     }

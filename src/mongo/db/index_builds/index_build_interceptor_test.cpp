@@ -110,8 +110,7 @@ protected:
             operationContext(),
             indexBuildInfo,
             createMode,
-            createIndex(indexBuildInfo.spec)->descriptor()->unique(),
-            /*generateTableWrites=*/true);
+            createIndex(indexBuildInfo.spec)->descriptor()->unique());
         wuow.commit();
         return interceptor;
     }
@@ -661,8 +660,7 @@ TEST_F(IndexBuilderInterceptorTest, OpenExistingPreservesExistingData) {
     IndexBuildInterceptor interceptor(operationContext(),
                                       indexBuildInfo,
                                       LazyRecordStore::CreateMode::openExisting,
-                                      getIndexEntry("a_1")->descriptor()->unique(),
-                                      /*generateTableWrites=*/true);
+                                      getIndexEntry("a_1")->descriptor()->unique());
 
     ASSERT_EQ(1, getSideWritesTableContents(indexBuildInfo).size());
     ASSERT_EQ(1, getSkippedRecordsTableContents(indexBuildInfo).size());

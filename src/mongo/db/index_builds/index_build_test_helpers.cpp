@@ -118,8 +118,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
                                     }
                                 },
                                 MultiIndexBlock::InitMode::SteadyState,
-                                boost::none,
-                                /*generateTableWrites=*/true)
+                                boost::none)
                             .getStatus();
         if (status == ErrorCodes::IndexAlreadyExists) {
             return Status::OK();
@@ -174,8 +173,7 @@ Status initializeMultiIndexBlock(OperationContext* opCtx,
               {indexBuildInfo},
               onInit,
               MultiIndexBlock::InitMode::SteadyState,
-              boost::none,
-              /*generateTableWrites=*/true)
+              boost::none)
         .getStatus();
 }
 }  // namespace mongo

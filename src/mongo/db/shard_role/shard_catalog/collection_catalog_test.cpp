@@ -1154,8 +1154,7 @@ public:
         uassertStatusOK(indexBuildBlock->init(opCtx,
                                               writableColl,
                                               indexBuildInfo,
-                                              /*forRecover=*/false,
-                                              /*generateTableWrites=*/true));
+                                              /*forRecover=*/false));
         uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty());
