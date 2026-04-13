@@ -31,18 +31,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/str.h"
 
-#include <algorithm>
-#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <string>
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <absl/strings/string_view.h>
 #include <boost/noncopyable.hpp>
 
 namespace mongo {
@@ -61,57 +56,14 @@ public:
 
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
                              int64_t maxAllowedMemoryUsageBytes,
-                             int64_t chunkSize = 0)
-        : _base(base),
-          _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes),
-          _chunkSize(chunkSize) {}
+                             int64_t chunkSize = 0);
 
-    explicit SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes, int64_t chunkSize = 0)
-        : SimpleMemoryUsageTracker(nullptr, maxAllowedMemoryUsageBytes, chunkSize) {}
+    explicit SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes, int64_t chunkSize = 0);
 
-    SimpleMemoryUsageTracker() : SimpleMemoryUsageTracker(std::numeric_limits<int64_t>::max()) {}
+    SimpleMemoryUsageTracker();
 
-    void add(int64_t diff) {
-        _inUseTrackedMemoryBytes += diff;
-        tassert(6128100,
-                str::stream() << "Underflow in memory tracking, attempting to add " << diff
-                              << " but only " << _inUseTrackedMemoryBytes - diff << " available",
-                _inUseTrackedMemoryBytes >= 0);
-        if (_inUseTrackedMemoryBytes > _peakTrackedMemoryBytes) {
-            _peakTrackedMemoryBytes = _inUseTrackedMemoryBytes;
-        }
-
-        // When chunking is enabled, we report memory usage in discrete chunks (0, chunkSize,
-        // 2*chunkSize, ...) rather than exact values. This reduces update frequency and
-        // provides predictable lower-bound semantics where CurOp's reported value <= actual
-        // usage < reported value + chunkSize.
-        //
-        // This is to avoid performance regressions, but will also result having slightly less
-        // accurate statistics in CurOp.
-        int64_t inUseTrackedMemoryBytes = _inUseTrackedMemoryBytes;
-
-        if (_base) {
-            if (_chunkSize) {
-                int64_t newLowerBound = (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
-
-                if (newLowerBound != _lastReportedLowerBound) {
-                    int64_t chunkedDelta = newLowerBound - _lastReportedLowerBound;
-
-                    _base->add(chunkedDelta);
-                    _lastReportedLowerBound = newLowerBound;
-                    inUseTrackedMemoryBytes = newLowerBound;
-                }
-            } else {
-                _base->add(diff);
-            }
-        } else if (_writeToCurOp) {
-            _writeToCurOp(inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
-        }
-    }
-
-    void set(int64_t total) {
-        add(total - _inUseTrackedMemoryBytes);
-    }
+    void add(int64_t diff);
+    void set(int64_t total);
 
     int64_t inUseTrackedMemoryBytes() const {
         return _inUseTrackedMemoryBytes;
@@ -134,12 +86,7 @@ public:
      * deleted - use this method instead. Note that the members _peakTrackedMemoryBytes and
      * _inUseTrackedMemoryBytes will be initialized to zero.
      */
-    SimpleMemoryUsageTracker makeFreshSimpleMemoryUsageTracker() const {
-        SimpleMemoryUsageTracker memTracker =
-            SimpleMemoryUsageTracker{_base, maxAllowedMemoryUsageBytes(), _chunkSize};
-        memTracker.setWriteToCurOp(_writeToCurOp);
-        return memTracker;
-    }
+    SimpleMemoryUsageTracker makeFreshSimpleMemoryUsageTracker() const;
 
     friend class MemoryUsageTracker;
 
@@ -148,9 +95,7 @@ protected:
      * Provide an extra function that is called whenever add() is invoked. Let it be set via this
      * method instead in the constructor to allow subclasses to capture "this."
      */
-    void setWriteToCurOp(std::function<void(int64_t, int64_t)> writeToCurOp) {
-        _writeToCurOp = std::move(writeToCurOp);
-    }
+    void setWriteToCurOp(std::function<void(int64_t, int64_t)> writeToCurOp);
 
 private:
     SimpleMemoryUsageTracker* _base = nullptr;
@@ -191,7 +136,6 @@ private:
  * Cannot be shallow copied because child memory trackers point to the address of the inline
  * base tracker of the class.
  *
- * TODO SERVER-80007: move implementation to .cpp to save on compilation time.
  * TODO SERVER-113197: Remove streams dependency on this class.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT MemoryUsageTracker {
@@ -205,54 +149,36 @@ public:
     MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
                        bool allowDiskUse = false,
                        int64_t maxMemoryUsageBytes = 0,
-                       int64_t chunkSize = 0)
-        : _allowDiskUse(allowDiskUse), _baseTracker(baseParent, maxMemoryUsageBytes, chunkSize) {}
+                       int64_t chunkSize = 0);
 
-    MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0)
-        : MemoryUsageTracker(nullptr, allowDiskUse, maxMemoryUsageBytes) {}
+    MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0);
 
     /**
      * Sets the new total for 'name', and updates the current total memory usage.
      */
-    void set(StringData name, int64_t total) {
-        (*this)[name].set(total);
-    }
+    void set(StringData name, int64_t total);
 
     /**
      * Resets both the total memory usage as well as the per-function memory usage, but retains the
      * current value for maximum total memory usage.
      */
-    void resetCurrent() {
-        for (auto& [_, funcTracker] : _functionMemoryTracker) {
-            funcTracker.set(0);
-        }
-        _baseTracker.set(0);
-    }
+    void resetCurrent();
 
     /**
      * Clears the child memory trackers map and resets the base tracker memory usage to zero.
      */
-    void clear() {
-        _functionMemoryTracker.clear();
-        resetCurrent();
-    }
+    void clear();
 
     /**
      * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
      */
-    SimpleMemoryUsageTracker& operator[](StringData name) {
-        auto [it, _] = _functionMemoryTracker.try_emplace(
-            _key(name), &_baseTracker, _baseTracker.maxAllowedMemoryUsageBytes());
-        return it->second;
-    }
+    SimpleMemoryUsageTracker& operator[](StringData name);
 
     /**
      * Updates the memory usage for 'name' by adding 'diff' to the current memory usage for
      * that function. Also updates the total memory usage.
      */
-    void add(StringData name, int64_t diff) {
-        (*this)[name].add(diff);
-    }
+    void add(StringData name, int64_t diff);
 
     /**
      * Updates total memory usage.
@@ -268,10 +194,7 @@ public:
         return _baseTracker.peakTrackedMemoryBytes();
     }
 
-    auto peakTrackedMemoryBytes(StringData name) const {
-        const auto it = _functionMemoryTracker.find(_key(name));
-        return it == _functionMemoryTracker.end() ? 0 : it->second.peakTrackedMemoryBytes();
-    }
+    int64_t peakTrackedMemoryBytes(StringData name) const;
 
     bool withinMemoryLimit() const {
         return _baseTracker.withinMemoryLimit();
@@ -290,15 +213,9 @@ public:
      * deleted - use this method instead. Note that the function memory tracker table will be
      * initialized as empty.
      */
-    MemoryUsageTracker makeFreshMemoryUsageTracker() const {
-        return MemoryUsageTracker(_baseTracker._base, allowDiskUse(), maxAllowedMemoryUsageBytes());
-    }
+    MemoryUsageTracker makeFreshMemoryUsageTracker() const;
 
 private:
-    static absl::string_view _key(StringData s) {
-        return {s.data(), s.size()};
-    }
-
     bool _allowDiskUse;
     // Tracks current memory used. This tracker rolls up memory usage from all trackers in the
     // function memory tracker table.
@@ -320,34 +237,9 @@ public:
     DeduplicatorReporter(DeduplicatorReporter&&) noexcept = default;
     DeduplicatorReporter& operator=(DeduplicatorReporter&&) noexcept = default;
 
-    DeduplicatorReporter(std::function<void(int64_t, int64_t)> callback, int64_t chunkSize)
-        : _reportCallback(std::move(callback)), _chunkSize(chunkSize) {
-        tassert(11114200, "Expected positive value for chunkSize", _chunkSize > 0);
-    }
+    DeduplicatorReporter(std::function<void(int64_t, int64_t)> callback, int64_t chunkSize);
 
-    void add(int64_t diff) {
-        _inUseTrackedMemoryBytes += diff;
-        _inUseRecordIdCount++;
-
-        // When chunking is enabled, we report memory usage in discrete chunks (0, chunkSize,
-        // 2*chunkSize, ...) rather than exact values.
-        // This is to avoid performance regressions, but will also result having slightly less
-        // accurate statistics in serverStatus.
-        int64_t newLowerBound = (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
-
-        // Nothing to report, early exit.
-        if (newLowerBound == _lastReportedLowerBound) {
-            return;
-        }
-
-        if (_reportCallback) {
-            int64_t chunkedDelta = newLowerBound - _lastReportedLowerBound;
-            int64_t recordIdDelta = _inUseRecordIdCount - _lastReportedRecordIdCount;
-            _lastReportedLowerBound = newLowerBound;
-            _lastReportedRecordIdCount = _inUseRecordIdCount;
-            _reportCallback(chunkedDelta, recordIdDelta);
-        }
-    }
+    void add(int64_t diff);
 
 private:
     // Tracks the current memory footprint.

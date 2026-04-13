@@ -12,6 +12,7 @@ exports_files(
 mongo_cc_library(
     name = "memory_tracking",
     srcs = [
+        "memory_usage_tracker.cpp",
         "operation_memory_usage_tracker.cpp",
     ],
     deps = [

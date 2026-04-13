@@ -954,6 +954,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe:query_sbe_storage",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/matcher:expressions_mongod_only",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:change_stream_pipeline",
         "//src/mongo/db/pipeline:document_source_internal_apply_oplog_update",

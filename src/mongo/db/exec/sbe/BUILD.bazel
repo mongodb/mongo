@@ -146,6 +146,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/exec:scoped_timer",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/query:plan_yield_policy",
         "//src/mongo/db/query:plan_yield_policy_sbe",

@@ -28,6 +28,7 @@ mongo_cc_library(
         ":spilling_stats",
         "//src/mongo:base",
         "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/storage:spill_table",
         "//src/mongo/db/storage:spill_util",
         "//src/mongo/db/storage/key_string",
