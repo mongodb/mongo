@@ -78,6 +78,8 @@ MONGO_FAIL_POINT_DEFINE(fleCrudHangPreDelete);
 MONGO_FAIL_POINT_DEFINE(fleCrudHangFindAndModify);
 MONGO_FAIL_POINT_DEFINE(fleCrudHangPreFindAndModify);
 
+MONGO_FAIL_POINT_DEFINE(fleCrudPauseNonTxnGetTags);
+
 namespace mongo {
 namespace {
 std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
@@ -1930,12 +1932,15 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
 
     invariant(!_opCtx->inMultiDocumentTransaction());
 
-    // Pop off the current op context so we can get a fresh set of read concern settings
-    auto client = _opCtx->getServiceContext()->makeClient("FLETagNoTXNQuery");
-    AlternativeClientRegion clientRegion(client);
-    auto opCtx = cc().makeOperationContext();
-    auto as = AuthorizationSession::get(cc());
-    as->grantInternalAuthorization(opCtx.get());
+    // Push a fresh set of read concern settings for the getTags command.
+    auto& opCtxReadConcern = repl::ReadConcernArgs::get(_opCtx);
+    auto outerCmdInvocation = CommandInvocation::get(_opCtx);
+
+    ON_BLOCK_EXIT([&, oldRC = opCtxReadConcern, oldCmdInvocation = outerCmdInvocation]() {
+        opCtxReadConcern = oldRC;
+        CommandInvocation::set(_opCtx, oldCmdInvocation);
+    });
+    opCtxReadConcern = repl::ReadConcernArgs{};
 
     GetQueryableEncryptionCountInfo getCountsCmd(nss);
 
@@ -1947,17 +1952,12 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     getCountsCmd.setTokens(toTagSets(tokensSets));
     getCountsCmd.setQueryType(queryTypeTranslation(type));
 
-    DBDirectClient directClient(opCtx.get());
+    fleCrudPauseNonTxnGetTags.pauseWhileSet();
 
-    auto uniqueReply = directClient.runCommand(getCountsCmd.serialize({}));
-
+    auto uniqueReply = DBDirectClient(_opCtx).runCommand(getCountsCmd.serialize({}));
     auto response = uniqueReply->getCommandReply();
 
-    auto status = getStatusFromWriteCommandReply(response);
-    uassertStatusOK(status);
-
-    auto reply = QECountInfosReply::parse(IDLParserContext("reply"), response);
-
-    return toEdgeCounts(reply.getCounts());
+    uassertStatusOK(getStatusFromWriteCommandReply(response));
+    return toEdgeCounts(QECountInfosReply::parse(IDLParserContext("reply"), response).getCounts());
 }
 }  // namespace mongo
