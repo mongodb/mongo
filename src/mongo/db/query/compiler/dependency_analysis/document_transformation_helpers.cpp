@@ -73,28 +73,6 @@ public:
     }
 };
 
-/**
- * A path rename which knows about arrayness.
- */
-class RenamePathWithFixedArrayness final : public RenamePath {
-public:
-    RenamePathWithFixedArrayness(StringData newPath,
-                                 StringData oldPath,
-                                 BSONDepthIndex newPathMaxArrayTraversals,
-                                 BSONDepthIndex oldPathMaxArrayTraversals);
-
-    BSONDepthIndex getNewPathMaxArrayTraversals() const override {
-        return _newPathMaxArrayTraversals;
-    }
-    BSONDepthIndex getOldPathMaxArrayTraversals() const override {
-        return _oldPathMaxArrayTraversals;
-    }
-
-private:
-    const BSONDepthIndex _newPathMaxArrayTraversals;
-    const BSONDepthIndex _oldPathMaxArrayTraversals;
-};
-
 namespace detail {
 
 void describeProjectedPath(DocumentOperationVisitor& visitor, StringData path, bool isInclusion) {
@@ -184,14 +162,12 @@ void describeComputedPath(DocumentOperationVisitor& visitor,
         }
     }
     for (auto&& [newPath, oldPath] : exprComputedPaths.renames) {
-        visitor(document_transformation::RenamePathWithFixedArrayness{newPath, oldPath, depth, 0});
+        visitor(RenamePathWithFixedArrayness{newPath, oldPath, depth, 0});
     }
     for (auto&& [newPath, oldPath] : exprComputedPaths.complexRenames) {
-        visitor(document_transformation::RenamePathWithFixedArrayness{newPath, oldPath, depth, 1});
+        visitor(RenamePathWithFixedArrayness{newPath, oldPath, depth, 1});
     }
 }
-
-}  // namespace detail
 
 RenamePathWithFixedArrayness::RenamePathWithFixedArrayness(StringData newPath,
                                                            StringData oldPath,
@@ -200,6 +176,8 @@ RenamePathWithFixedArrayness::RenamePathWithFixedArrayness(StringData newPath,
     : RenamePath(newPath, oldPath),
       _newPathMaxArrayTraversals(newPathMaxArrayTraversals),
       _oldPathMaxArrayTraversals(oldPathMaxArrayTraversals) {}
+
+}  // namespace detail
 
 void describeGetModPathsReturn(DocumentOperationVisitor& visitor,
                                const GetModPathsReturnType& type,
@@ -234,11 +212,11 @@ void describeGetModPathsReturn(DocumentOperationVisitor& visitor,
     }
     for (const auto& [newPath, oldPath] : renames) {
         // Simple renames means that neither path can be an array.
-        visitor(RenamePathWithFixedArrayness{newPath, oldPath, 0, 0});
+        visitor(detail::RenamePathWithFixedArrayness{newPath, oldPath, 0, 0});
     }
     for (const auto& [newPath, oldPath] : complexRenames) {
         // Complex renames means that oldPath can be an array and the new path cannot be.
-        visitor(RenamePathWithFixedArrayness{newPath, oldPath, 0, 1});
+        visitor(detail::RenamePathWithFixedArrayness{newPath, oldPath, 0, 1});
     }
 }
 

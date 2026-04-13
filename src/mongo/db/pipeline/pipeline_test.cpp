@@ -4490,6 +4490,53 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenMixedArray) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+// SERVER-109703: After $set{x: 1}, x is known non-array, so {a: "$x.y"} is a safe rename.
+// $match should push past $addFields (but not past $set, since $set defines x).
+TEST_F(PipelineOptimizationTest, MatchSwapsPastComplexRenameWhenNonArray) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    std::string inputPipe =
+        "["
+        " {$set: {x: 1}},"
+        " {$addFields: {a: '$x.y'}},"
+        " {$match: {a: 42}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$set: {x: {$const: 1}}},"
+        " {$match: {'x.y': {$eq: 42}}},"
+        " {$addFields: {a: '$x.y'}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$set: {x: {$const: 1}}},"
+        " {$match: {'x.y': {$eq: 42}}},"
+        " {$addFields: {a: '$x.y'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// SERVER-109703: Without proof that 'b' is not an array, $match should NOT push past complex
+// rename.
+TEST_F(PipelineOptimizationTest, ComplexRenameNotPromotedWithoutProof) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    std::string inputPipe =
+        "["
+        " {$addFields: {a: '$b.c'}},"
+        " {$match: {a: 42}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$addFields: {a: '$b.c'}},"
+        " {$match: {a: {$eq: 42}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$addFields: {a: '$b.c'}},"
+        " {$match: {a: 42}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST_F(PipelineOptimizationTest, internalAllCollectionStatsAbsorbsMatchOnNs) {
     std::string inputPipe =
         "["

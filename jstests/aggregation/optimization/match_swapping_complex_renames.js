@@ -1,0 +1,129 @@
+/**
+ * Tests the behavior of $match pushdown over complex renames.
+ *
+ * @tags: [
+ *   do_not_wrap_aggregations_in_facets,
+ *   requires_pipeline_optimization,
+ *   featureFlagImprovedDepsAnalysis,
+ * ]
+ */
+import {describe, it} from "jstests/libs/mochalite.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+
+const coll = db.match_swapping_complex_renames;
+
+function runTest({name, pipeline, positive, negative}) {
+    describe(name, function () {
+        if (positive) {
+            it("pushes down $match", function () {
+                coll.drop();
+                coll.insertMany(positive.docs);
+                coll.createIndex(positive.index);
+                assert.eq(positive.expectedCount, coll.aggregate(pipeline).itcount());
+                const explain = coll.explain().aggregate(pipeline);
+                assert.neq(null, getAggPlanStage(explain, "IXSCAN"), "Expected IXSCAN (pushdown): " + tojson(explain));
+            });
+        }
+
+        if (negative) {
+            it("does not push down $match", function () {
+                coll.drop();
+                coll.insertMany(negative.docs);
+                coll.createIndex(negative.index);
+                assert.eq(negative.expectedCount, coll.aggregate(pipeline).itcount());
+                const explain = coll.explain().aggregate(pipeline);
+                assert.eq(null, getAggPlanStage(explain, "IXSCAN"), "Expected NO IXSCAN: " + tojson(explain));
+            });
+        }
+    });
+}
+
+runTest({
+    name: "$addFields complex rename {a: '$b.c'}",
+    pipeline: [{$addFields: {a: "$b.c"}}, {$match: {a: 42}}],
+    positive: {
+        docs: [
+            {b: {c: 42}, d: 1},
+            {b: {c: 99}, d: 2},
+            {b: {c: 42}, d: 3},
+        ],
+        index: {"b.c": 1},
+        expectedCount: 2,
+    },
+    negative: {
+        docs: [{b: [{c: 42}]}, {b: [{c: 99}]}, {b: [{c: 42}, {c: 1}]}],
+        index: {"b.c": 1},
+        expectedCount: 2,
+    },
+});
+
+runTest({
+    name: "$project complex rename {a: '$b.c'}",
+    pipeline: [{$project: {a: "$b.c", _id: 1}}, {$match: {a: {$gte: 42}}}],
+    positive: {
+        docs: [
+            {b: {c: 42}, d: 1},
+            {b: {c: 99}, d: 2},
+        ],
+        index: {"b.c": 1},
+        expectedCount: 2,
+    },
+    negative: {
+        docs: [{b: [{c: 42}]}, {b: [{c: 99}]}],
+        index: {"b.c": 1},
+        expectedCount: 2,
+    },
+});
+
+runTest({
+    name: "$set complex rename {a: '$b.c'}",
+    pipeline: [{$set: {a: "$b.c"}}, {$match: {a: 42}}],
+    positive: {
+        docs: [{b: {c: 42}}, {b: {c: 99}}, {b: {c: 42}}],
+        index: {"b.c": 1},
+        expectedCount: 2,
+    },
+    negative: {
+        docs: [{b: [{c: 42}]}, {b: [{c: 99}]}],
+        index: {"b.c": 1},
+        expectedCount: 1,
+    },
+});
+
+runTest({
+    name: "$addFields deeper path {a: '$b.c.d'}",
+    pipeline: [{$addFields: {a: "$b.c.d"}}, {$match: {a: 42}}],
+    negative: {
+        docs: [{b: {c: {d: 42}}}, {b: {c: {d: 99}}}],
+        index: {"b.c.d": 1},
+        expectedCount: 1,
+    },
+});
+
+runTest({
+    name: "$group + $set rename chain",
+    pipeline: [
+        {$group: {_id: "$orderDetails"}},
+        {$set: {address: "$_id.postalAddress"}},
+        {$set: {city: "$address.city"}},
+        {$match: {city: "Dublin"}},
+    ],
+    positive: {
+        docs: [
+            {orderDetails: {postalAddress: {city: "Dublin"}, zip: "D01"}},
+            {orderDetails: {postalAddress: {city: "London"}, zip: "SW1"}},
+            {orderDetails: {postalAddress: {city: "Dublin"}, zip: "D02"}},
+        ],
+        index: {"orderDetails.postalAddress.city": 1},
+        expectedCount: 2,
+    },
+    negative: {
+        docs: [
+            {orderDetails: {postalAddress: [{city: "Dublin"}], zip: "D01"}},
+            {orderDetails: {postalAddress: [{city: "London"}], zip: "SW1"}},
+            {orderDetails: {postalAddress: [{city: "Dublin"}], zip: "D02"}},
+        ],
+        index: {"orderDetails.postalAddress.city": 1},
+        expectedCount: 2,
+    },
+});

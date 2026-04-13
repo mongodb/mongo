@@ -30,8 +30,10 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::document_transformation {
 
@@ -131,6 +133,75 @@ GetModPathsReturn toGetModPathsReturn(const DescribesDocumentTransformation auto
     detail::GetModPathsReturnConverter c;
     t.describeTransformation(c);
     return std::move(c).done();
+}
+
+namespace detail {
+/**
+ * A path rename which knows about arrayness.
+ */
+class RenamePathWithFixedArrayness final : public RenamePath {
+public:
+    RenamePathWithFixedArrayness(StringData newPath,
+                                 StringData oldPath,
+                                 BSONDepthIndex newPathMaxArrayTraversals,
+                                 BSONDepthIndex oldPathMaxArrayTraversals);
+
+    BSONDepthIndex getNewPathMaxArrayTraversals() const override {
+        return _newPathMaxArrayTraversals;
+    }
+    BSONDepthIndex getOldPathMaxArrayTraversals() const override {
+        return _oldPathMaxArrayTraversals;
+    }
+
+private:
+    const BSONDepthIndex _newPathMaxArrayTraversals;
+    const BSONDepthIndex _oldPathMaxArrayTraversals;
+};
+
+/**
+ * Creates a DescribesDocumentTransformation that applies 'inner' through a custom visitor
+ * produced by 'makeVisitor(outputVisitor)'. Analogous to DocumentOperationVisitor::create().
+ */
+template <DescribesDocumentTransformation Inner, typename MakeVisitor>
+auto wrapDocumentTransformation(const Inner& inner, MakeVisitor&& makeVisitor) {
+    struct Result {
+        const Inner& inner;
+        std::decay_t<MakeVisitor> makeVisitor;
+        void describeTransformation(DocumentOperationVisitor& visitor) const {
+            document_transformation::describeTransformation(makeVisitor(visitor), inner);
+        }
+    };
+    return Result{inner, std::forward<MakeVisitor>(makeVisitor)};
+}
+}  // namespace detail
+
+/**
+ * Returns a DescribesDocumentTransformation that overrides path renames to
+ * 'RenamePathWithFixedArrayness' when 'canBeArray' says that there are no arrays involved.
+ */
+template <typename T, typename CanPathBeArray>
+auto withArraynessInfo(const T& t, CanPathBeArray&& canPathBeArray) {
+    auto noArraysInvolved = [canPathBeArray = std::forward<CanPathBeArray>(canPathBeArray)](
+                                const RenamePath& op) {
+        // To be done (SERVER-109703): Handle any number of dots on either side.
+        return op.getOldPathMaxArrayTraversals() == 1 && op.getNewPathMaxArrayTraversals() == 0 &&
+            !canPathBeArray(FieldPath::extractFirstFieldFromDottedPath(op.getOldPath()));
+    };
+
+    return detail::wrapDocumentTransformation(
+        t, [noArraysInvolved](DocumentOperationVisitor& visitor) {
+            return OverloadedVisitor{
+                [&](const auto& op) { visitor(op); },
+                [&](const RenamePath& op) {
+                    if (noArraysInvolved(op)) {
+                        visitor(detail::RenamePathWithFixedArrayness{
+                            op.getNewPath(), op.getOldPath(), 0, 0});
+                    } else {
+                        visitor(op);
+                    }
+                },
+            };
+        });
 }
 
 }  // namespace mongo::document_transformation

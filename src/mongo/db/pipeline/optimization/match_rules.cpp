@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -36,6 +37,8 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -175,10 +178,40 @@ bool canSwapWithSubsequentMatch(PipelineRewriteContext& ctx) {
         ctx, &ctx.current(), dynamic_cast<DocumentSourceMatch*>(ctx.nextStage().get()));
 }
 
+DocumentSource::GetModPathsReturn buildModPaths(PipelineRewriteContext& ctx,
+                                                DocumentSource& prev,
+                                                DocumentSource* stageBeforePrev) {
+    using namespace document_transformation;
+
+    if (!feature_flags::gFeatureFlagImprovedDepsAnalysis.checkEnabled()) {
+        return toGetModPathsReturn(prev);
+    }
+
+    auto canPathBeArray = [&](StringData path) {
+        return stageBeforePrev
+            ? ctx.getDependencyGraph().canPathBeArray(stageBeforePrev, path)
+            // If 'prev' is the first stage, look up from the Path Arrayness API directly.
+            : ctx.getPathArrayness().canPathBeArray(FieldRef(path), &ctx.getExpCtx());
+    };
+
+    return toGetModPathsReturn(withArraynessInfo(prev, canPathBeArray));
+}
+
 template <bool shouldAdvance>
 bool pushdownMatch(PipelineRewriteContext& ctx, DocumentSource& prev, DocumentSourceMatch& match) {
+    auto* stageBeforePrev = [&]() -> DocumentSource* {
+        if (shouldAdvance && !ctx.atFirstStage()) {
+            return ctx.prevStage().get();
+        }
+        if (!shouldAdvance && ctx.hasAtLeastNPrevStages<2>()) {
+            return ctx.nthPrevStage<2>().get();
+        }
+        return nullptr;
+    }();
+
     auto [renameableMatchPart, nonRenameableMatchPart] =
-        DocumentSourceMatch::splitMatchByModifiedFields(&match, prev.getModifiedPaths());
+        DocumentSourceMatch::splitMatchByModifiedFields(&match,
+                                                        buildModPaths(ctx, prev, stageBeforePrev));
     tassert(11010400,
             "Both sides can't be null after splitting a $match",
             renameableMatchPart || nonRenameableMatchPart);
