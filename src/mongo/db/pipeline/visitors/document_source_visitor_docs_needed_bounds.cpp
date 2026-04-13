@@ -51,12 +51,14 @@ using NeedAll = docs_needed_bounds::NeedAll;
 using Unknown = docs_needed_bounds::Unknown;
 
 namespace {
-void extractDocsNeededBoundsHelper(const Pipeline& pipeline, DocsNeededBoundsContext* ctx) {
-    ServiceContext* serviceCtx = pipeline.getContext()->getOperationContext()->getServiceContext();
+void extractDocsNeededBoundsHelper(const DocumentSourceContainer& sources,
+                                   const ExpressionContext& expCtx,
+                                   DocsNeededBoundsContext* ctx) {
+    ServiceContext* serviceCtx = expCtx.getOperationContext()->getServiceContext();
     auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
     DocumentSourceWalker walker(reg, ctx);
 
-    walker.reverseWalk(pipeline);
+    walker.reverseWalk(sources);
 
     tassert(8673200,
             "If one of min/max docs needed bounds is NeedAll, they must both be NeedAll.",
@@ -281,7 +283,9 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceFacet& source) {
     for (const auto& facetPipeline : subpipelines) {
         // Compute this subpipeline's constraints applied to the constraints-so-far.
         DocsNeededBoundsContext subpipelineCtx(ctx->minBounds, ctx->maxBounds);
-        extractDocsNeededBoundsHelper(*facetPipeline.pipeline.get(), &subpipelineCtx);
+        extractDocsNeededBoundsHelper(facetPipeline.pipeline->getSources(),
+                                      *facetPipeline.pipeline->getContext(),
+                                      &subpipelineCtx);
 
         mostRestrictiveMinBounds = docs_needed_bounds::chooseStrongerMinConstraint(
             mostRestrictiveMinBounds, subpipelineCtx.minBounds);
@@ -358,9 +362,14 @@ const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{
     }};
 
 
-DocsNeededBounds extractDocsNeededBounds(const Pipeline& pipeline) {
+DocsNeededBounds extractDocsNeededBounds(const DocumentSourceContainer& sources,
+                                         const ExpressionContext& expCtx) {
     DocsNeededBoundsContext ctx;
-    extractDocsNeededBoundsHelper(pipeline, &ctx);
+    extractDocsNeededBoundsHelper(sources, expCtx, &ctx);
     return DocsNeededBounds(ctx.minBounds, ctx.maxBounds);
+}
+
+DocsNeededBounds extractDocsNeededBounds(const Pipeline& pipeline) {
+    return extractDocsNeededBounds(pipeline.getSources(), *pipeline.getContext());
 }
 }  // namespace mongo

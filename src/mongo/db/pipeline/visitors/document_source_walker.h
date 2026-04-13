@@ -51,11 +51,13 @@ public:
      * does not walk $lookup/$unionWith subpipelines).
      */
     void walk(const Pipeline& pipeline);
+    void walk(const DocumentSourceContainer& sources);
 
     /**
      * Same as walk(), but traverses the pipeline in reverse (back-to-front).
      */
     void reverseWalk(const Pipeline& pipeline);
+    void reverseWalk(const DocumentSourceContainer& sources);
 
 private:
     const DocumentSourceVisitorRegistry& _registry;

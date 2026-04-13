@@ -62,8 +62,7 @@ protected:
     }
 
     DocsNeededBounds buildPipelineAndExtractBounds(DocumentSourceContainer sources) {
-        auto pipeline = Pipeline::create(sources, getExpCtx());
-        return extractDocsNeededBounds(*pipeline);
+        return extractDocsNeededBounds(sources, *getExpCtx());
     }
 
     void assertDiscreteAndEq(DocsNeededConstraint bounds, long long expectedValue) {

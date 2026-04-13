@@ -34,8 +34,8 @@
 
 namespace mongo {
 
-void DocumentSourceWalker::walk(const Pipeline& pipeline) {
-    for (auto&& ds : pipeline.getSources()) {
+void DocumentSourceWalker::walk(const DocumentSourceContainer& sources) {
+    for (auto&& ds : sources) {
         // Perform double-dispatch based on the visitor context and document source types by
         // consulting the registry.
         auto func = _registry.getConstVisitorFunc(*_visitorCtx, *ds);
@@ -44,8 +44,7 @@ void DocumentSourceWalker::walk(const Pipeline& pipeline) {
     }
 }
 
-void DocumentSourceWalker::reverseWalk(const Pipeline& pipeline) {
-    auto sources = pipeline.getSources();
+void DocumentSourceWalker::reverseWalk(const DocumentSourceContainer& sources) {
     auto reverseItr = sources.rbegin();
     while (reverseItr != sources.rend()) {
         // Perform double-dispatch based on the visitor context and document source types by
@@ -55,5 +54,13 @@ void DocumentSourceWalker::reverseWalk(const Pipeline& pipeline) {
         func(_visitorCtx, **reverseItr);
         reverseItr++;
     }
+}
+
+void DocumentSourceWalker::walk(const Pipeline& pipeline) {
+    walk(pipeline.getSources());
+}
+
+void DocumentSourceWalker::reverseWalk(const Pipeline& pipeline) {
+    reverseWalk(pipeline.getSources());
 }
 }  // namespace mongo

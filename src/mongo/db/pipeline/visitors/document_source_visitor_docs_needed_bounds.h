@@ -94,5 +94,8 @@ struct MONGO_MOD_PUB DocsNeededBoundsContext : public DocumentSourceVisitorConte
  * define more stage-specific visitors in this file or other
  * document_source_visitor_docs_needed_bounds.cpp files in other modules.
  */
+DocsNeededBounds extractDocsNeededBounds(const DocumentSourceContainer& sources,
+                                         const ExpressionContext& expCtx);
+
 DocsNeededBounds extractDocsNeededBounds(const Pipeline& pipeline);
 }  // namespace mongo
