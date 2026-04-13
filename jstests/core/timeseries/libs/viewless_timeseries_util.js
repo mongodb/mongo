@@ -188,24 +188,33 @@ export function findTimeseriesConfigCollectionsDocument(coll) {
     // We must use snapshot read concern to avoid racing with viewless timeseries upgrade/downgrade,
     // so bypass overrides, which may want to impose a different read concern (e.g. majority).
     return OverrideHelpers.withPreOverrideRunCommand(() => {
-        try {
-            const collEntry = coll
-                .getDB()
-                .getSiblingDB("config")
-                .collections.findOne(
-                    {_id: {$in: [coll.getFullName(), getTimeseriesBucketsColl(coll).getFullName()]}},
-                    {} /* projection */,
-                    {} /* options */,
-                    "snapshot",
-                );
-            return collEntry;
-        } catch (e) {
-            // readConcern "snapshot" is not supported on standalone nodes, but on a sharded cluster
-            // there can be no standalone nodes, so the collection is not sharded.
-            if (e.code === ErrorCodes.NotAReplicaSet) {
-                return null;
+        let retries = 3;
+        while (retries-- > 0) {
+            try {
+                const collEntry = coll
+                    .getDB()
+                    .getSiblingDB("config")
+                    .collections.findOne(
+                        {_id: {$in: [coll.getFullName(), getTimeseriesBucketsColl(coll).getFullName()]}},
+                        {} /* projection */,
+                        {} /* options */,
+                        "snapshot",
+                    );
+                return collEntry;
+            } catch (e) {
+                // readConcern "snapshot" is not supported on standalone nodes, but on a sharded cluster
+                // there can be no standalone nodes, so the collection is not sharded.
+                if (e.code === ErrorCodes.NotAReplicaSet) {
+                    return null;
+                }
+
+                if (e.code === ErrorCodes.HostUnreachable) {
+                    // Retry if the host is not available.
+                    sleep(500);
+                    continue;
+                }
+                throw e;
             }
-            throw e;
         }
     });
 }
