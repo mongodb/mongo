@@ -146,11 +146,16 @@ boost::filesystem::path getOngoingBackupPath() {
         WiredTigerBackup::kOngoingBackupFile;
 }
 
+}  // namespace
+
 // There are a few delicate restore scenarios where untimestamped writes are still required.
 bool allowUntimestampedWrites(bool inStandaloneMode, bool shouldRecoverFromOplogAsStandalone) {
-    // Magic restore may need to perform untimestamped writes on timestamped tables as a part of
-    // the server automated restore procedure.
-    if (storageGlobalParams.magicRestore) {
+    // Classic magic restore may need to perform untimestamped writes on timestamped tables as a
+    // part of the server automated restore procedure. This is not the case in DSC magic restore,
+    // so only allow untimestamped writes in the classic case.
+    auto& provider =
+        rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
+    if (storageGlobalParams.magicRestore && provider.supportsClassicMagicRestore()) {
         return true;
     }
 
@@ -173,8 +178,6 @@ bool allowUntimestampedWrites(bool inStandaloneMode, bool shouldRecoverFromOplog
 
     return false;
 }
-
-}  // namespace
 
 std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
                                  const boost::filesystem::path& identAbsolutePath) {
