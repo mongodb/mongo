@@ -242,12 +242,12 @@ describe("$changeStream v2", function () {
         };
         assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
 
-        // move first collection to shard1 only
+        // Move the chunk currently on shard1 to shard2
         assert.commandWorked(
             db.adminCommand({
                 moveChunk: coll.getFullName(),
-                find: {_id: -1},
-                to: st.shard1.shardName,
+                find: {_id: 1},
+                to: st.shard2.shardName,
                 _waitForDelete: true,
             }),
         );
@@ -256,13 +256,14 @@ describe("$changeStream v2", function () {
             csTest.assertNoChange(csCursor);
         });
 
-        assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
+        assertOpenCursors(st, [st.shard0.shardName, st.shard2.shardName], true, commentFilter);
 
+        // Move the whole collection to shard2. Since the parent database has shard0 as its primary, there will be open cursors on both of them.
         assert.commandWorked(
             db.adminCommand({
                 moveChunk: coll.getFullName(),
-                find: {_id: 1},
-                to: st.shard1.shardName,
+                find: {_id: -1},
+                to: st.shard2.shardName,
                 _waitForDelete: true,
             }),
         );
@@ -274,7 +275,7 @@ describe("$changeStream v2", function () {
         coll.insert([{_id: 2, a: 2}]);
         assert.soon(() => csTest.getOneChange(csCursor), "expected change event for {_id: 2} ");
 
-        assertOpenCursors(st, [st.shard1.shardName], true, commentFilter);
+        assertOpenCursors(st, [st.shard0.shardName, st.shard2.shardName], true, commentFilter);
     });
 
     it("test open cursors in an all databases change stream after movePrimary", function () {
