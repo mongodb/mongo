@@ -254,7 +254,7 @@ const failureModes = {
             assert.commandWorked(primary.adminCommand({replSetStepDown: 60 /* stepDownSecs */, force: true}));
             st.rs0.awaitSecondaryNodes(null, [primary]);
             assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
-            st.rs0.awaitNodesAgreeOnPrimary();
+            st.rs0.awaitNodesAgreeOnWriteablePrimary();
         },
         getCommitCommand: (lsid, txnNumber) => {
             return addTxnFields(makeCommitCommand(), lsid, txnNumber);
@@ -265,7 +265,7 @@ const failureModes = {
             assert.eq(["TransientTransactionError"], res.errorLabels);
         },
         cleanUp: () => {
-            st.rs0.awaitNodesAgreeOnPrimary();
+            st.rs0.awaitNodesAgreeOnWriteablePrimary();
         },
     },
     participantCannotMajorityCommitWritesClientSendsWriteConcernMajority: {
