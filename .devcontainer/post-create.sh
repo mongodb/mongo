@@ -283,6 +283,11 @@ else
     exit 1
 fi
 
+# Setup fzf bindings
+echo "Setting up fzf bindings..."
+echo 'eval "$(fzf --bash)"' >>"${HOME}/.bashrc"
+echo 'source <(fzf --zsh)' >>"${HOME}/.zshrc"
+
 echo ""
 echo "MongoDB development container setup completed successfully!"
 echo "Info: All infrastructure and dependencies are now configured and up to date."
