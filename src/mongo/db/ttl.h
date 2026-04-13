@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/ttl_collection_cache.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -155,6 +156,15 @@ private:
                                     TTLCollectionCache* ttlCollectionCache,
                                     const CollectionPtr& collection);
 
+
+    /**
+     * Schedules an async task that will recover the sharding metadata. It does not wait for the
+     * recovery to complete.
+     */
+    void _scheduleMetadataRecovery(OperationContext* opCtx,
+                                   std::shared_ptr<const StaleConfigInfo> staleInfo);
+
+
     // Protects the state below.
     mutable Mutex _stateMutex = MONGO_MAKE_LATCH("TTLMonitorStateMutex");
 
@@ -167,6 +177,12 @@ private:
 
     bool _shuttingDown = false;
     Seconds _ttlMonitorSleepSecs;
+
+    // Set of namespaces for which a sharding metadata recovery is pending.
+    stdx::unordered_set<NamespaceString> _namespacesRequiringMetadataRefresh;
+
+    // Executor used to schedule sharding metadata recovery tasks.
+    std::shared_ptr<executor::TaskExecutor> _metadataRefreshTaskExecutor;
 };
 
 }  // namespace mongo
