@@ -166,6 +166,44 @@ try {
         ],
         expectedUsedJoinOptimization: true,
     });
+
+    runTestWithUnorderedComparison({
+        description: "Join optimization can handle filter which leads to EOF QSN",
+        coll: baseColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    as: "foreignColl1",
+                },
+            },
+            {$unwind: "$foreignColl1"},
+            {$match: {$alwaysFalse: 1}},
+        ],
+        expectedResults: [],
+        expectedUsedJoinOptimization: true,
+    });
+
+    runTestWithUnorderedComparison({
+        description: "Join optimization can handle filter which leads to EOF QSN in subpipeline",
+        coll: baseColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$match: {$alwaysFalse: 1}}],
+                    as: "foreignColl1",
+                },
+            },
+            {$unwind: "$foreignColl1"},
+        ],
+        expectedResults: [],
+        expectedUsedJoinOptimization: true,
+    });
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
 }

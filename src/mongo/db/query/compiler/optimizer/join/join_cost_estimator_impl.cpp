@@ -284,6 +284,8 @@ JoinCostEstimate JoinCostEstimatorImpl::costBaseCollectionAccess(NodeId baseNode
         return costCollScanFragment(baseNode);
     } else if (it->second->hasNode(STAGE_IXSCAN)) {
         return costIndexScanFragment(baseNode);
+    } else if (it->second->root()->getType() == STAGE_EOF) {
+        return JoinCostEstimate(zeroCost);
     }
     MONGO_UNIMPLEMENTED_TASSERT(11729102);
 }
