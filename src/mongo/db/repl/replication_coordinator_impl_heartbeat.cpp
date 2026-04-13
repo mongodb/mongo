@@ -670,8 +670,14 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
 
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
-              _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
-              _selfIndex < 0);
+                  _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
+                  _selfIndex < 0,
+              str::stream() << "initialized: " << _rsConfig.isInitialized()
+                            << ", old config version and term: "
+                            << _rsConfig.getConfigVersionAndTerm().toString()
+                            << ", new config version and term: "
+                            << newConfig.getConfigVersionAndTerm().toString()
+                            << ", selfIndex: " << _selfIndex);
     _replExecutor
         ->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& cbData) {
             const auto [swConfig, isSplitRecipientConfig] = _resolveConfigToApply(newConfig);
@@ -1032,8 +1038,15 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
-              _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
-              _selfIndex < 0 || isSplitRecipientConfig);
+                  _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
+                  _selfIndex < 0 || isSplitRecipientConfig,
+              str::stream() << "initialized: " << _rsConfig.isInitialized()
+                            << ", old config version and term: "
+                            << _rsConfig.getConfigVersionAndTerm().toString()
+                            << ", new config version and term: "
+                            << newConfig.getConfigVersionAndTerm().toString()
+                            << ", selfIndex: " << _selfIndex
+                            << ", isSplitRecipientConfig: " << isSplitRecipientConfig);
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {

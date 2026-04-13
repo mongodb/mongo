@@ -1428,8 +1428,10 @@ void TopologyCoordinator::setMyLastAppliedOpTimeAndWallTime(OpTimeAndWallTime op
         // timestamp. So, in pv1, its not possible for us to get opTime with higher term and
         // timestamp lesser than or equal to our current lastAppliedOptime.
         invariant(opTime.getTerm() == OpTime::kUninitializedTerm ||
-                  myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
-                  opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp());
+                      myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
+                      opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp(),
+                  str::stream() << "current lastApplied opTime: " << myLastAppliedOpTime.toString()
+                                << ", setting lastApplied opTime to: " << opTime.toString());
     }
 
     myMemberData.setLastAppliedOpTimeAndWallTime(opTimeAndWallTime, now);
@@ -1448,7 +1450,11 @@ void TopologyCoordinator::setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime op
                                                             bool isRollbackAllowed) {
     auto opTime = opTimeAndWallTime.opTime;
     auto& myMemberData = _selfMemberData();
-    invariant(isRollbackAllowed || opTime >= myMemberData.getLastDurableOpTime());
+    invariant(isRollbackAllowed || opTime >= myMemberData.getLastDurableOpTime(),
+              str::stream() << "isRollbackAllowed: " << isRollbackAllowed
+                            << ", current lastDurable opTime: "
+                            << myMemberData.getLastDurableOpTime().toString()
+                            << ", setting lastDurable opTime to: " << opTime.toString());
     myMemberData.setLastDurableOpTimeAndWallTime(opTimeAndWallTime, now);
 }
 

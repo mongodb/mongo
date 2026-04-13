@@ -1250,7 +1250,8 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     }
 
     // On secondaries, max lock timeout must not be set.
-    invariant(!(stashStyle == StashStyle::kSecondary && opCtx->lockState()->hasMaxLockTimeout()));
+    invariant(!(stashStyle == StashStyle::kSecondary && opCtx->lockState()->hasMaxLockTimeout()),
+              str::stream() << "hasMaxLockTimeout: " << opCtx->lockState()->hasMaxLockTimeout());
 
     _recoveryUnit = opCtx->releaseAndReplaceRecoveryUnit();
     // The recovery unit is detached from the OperationContext, but keep the OperationContext in the
@@ -1397,7 +1398,9 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
 
     invariant(!o().txnResourceStash);
     // If this is a prepared transaction, invariant that it does not hold the RSTL lock.
-    invariant(!o().txnState.isPrepared() || !opCtx->lockState()->isRSTLLocked());
+    invariant(!o().txnState.isPrepared() || !opCtx->lockState()->isRSTLLocked(),
+              str::stream() << "transaction is prepared: " << o().txnState.isPrepared()
+                            << ", isRSTLLocked: " << opCtx->lockState()->isRSTLLocked());
     auto stashStyle = opCtx->writesAreReplicated() ? TxnResources::StashStyle::kPrimary
                                                    : TxnResources::StashStyle::kSecondary;
     o(lk).txnResourceStash = TxnResources(lk, opCtx, stashStyle);
@@ -1585,7 +1588,9 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     }
 
     // On secondaries, max lock timeout must not be set.
-    invariant(opCtx->writesAreReplicated() || !opCtx->lockState()->hasMaxLockTimeout());
+    invariant(opCtx->writesAreReplicated() || !opCtx->lockState()->hasMaxLockTimeout(),
+              str::stream() << "writes are replicated: " << opCtx->writesAreReplicated()
+                            << ", hasMaxLockTimeout: " << opCtx->lockState()->hasMaxLockTimeout());
 
     // Storage engine transactions may be started in a lazy manner. By explicitly
     // starting here we ensure that a point-in-time snapshot is established during the
@@ -1807,8 +1812,9 @@ void TransactionParticipant::Participant::addTransactionOperation(
     }
     invariant(o().txnState.isInProgress(), str::stream() << "Current state: " << o().txnState);
 
-    invariant(p().autoCommit && !*p().autoCommit &&
-              o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
+    invariant(p().autoCommit);
+    invariant(!*p().autoCommit);
+    invariant(o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     auto transactionSizeLimitBytes = static_cast<std::size_t>(gTransactionSizeLimitBytes.load());
@@ -2026,7 +2032,9 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
 void TransactionParticipant::Participant::_commitStorageTransaction(OperationContext* opCtx,
                                                                     bool isSplitPreparedTxn) {
     invariant(opCtx->getWriteUnitOfWork());
-    invariant(opCtx->lockState()->isRSTLLocked() || isSplitPreparedTxn);
+    invariant(opCtx->lockState()->isRSTLLocked() || isSplitPreparedTxn,
+              str::stream() << "isRSTLLocked: " << opCtx->lockState()->isRSTLLocked()
+                            << ", is split prepared transaction: " << isSplitPreparedTxn);
     opCtx->getWriteUnitOfWork()->commit();
     opCtx->setWriteUnitOfWork(nullptr);
 
@@ -2162,7 +2170,9 @@ void TransactionParticipant::Participant::setLastWriteOpTime(OperationContext* o
                                                              const repl::OpTime& lastWriteOpTime) {
     stdx::lock_guard<Client> lg(*opCtx->getClient());
     auto& curLastWriteOpTime = o(lg).lastWriteOpTime;
-    invariant(lastWriteOpTime.isNull() || lastWriteOpTime > curLastWriteOpTime);
+    invariant(lastWriteOpTime.isNull() || lastWriteOpTime > curLastWriteOpTime,
+              str::stream() << "current lastWrite opTime: " << curLastWriteOpTime.toString()
+                            << ", setting lastWrite opTime to: " << lastWriteOpTime.toString());
     curLastWriteOpTime = lastWriteOpTime;
 }
 
@@ -2428,7 +2438,11 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
         // 2. We have failed trying to get the initial global lock, in which case we will have
         //    a WriteUnitOfWork but not have allocated the storage transaction.
         invariant(opCtx->lockState()->isRSTLLocked() || isSplitPreparedTxn ||
-                  !opCtx->recoveryUnit()->isActive());
+                      !opCtx->recoveryUnit()->isActive(),
+                  str::stream() << "isRSTLLocked: " << opCtx->lockState()->isRSTLLocked()
+                                << ", is split prepared transaction: " << isSplitPreparedTxn
+                                << ", recovery unit is active: "
+                                << opCtx->recoveryUnit()->isActive());
         opCtx->setWriteUnitOfWork(nullptr);
     }
 
@@ -3333,7 +3347,8 @@ void TransactionParticipant::Participant::_resetRetryableWriteState() {
 
 void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
     stdx::unique_lock<Client>* lk, TransactionState::StateFlag state) {
-    invariant(lk && lk->owns_lock());
+    invariant(lk);
+    invariant(lk->owns_lock());
 
     // If we are transitioning to kNone, we are either starting a new transaction or aborting a
     // prepared transaction for rollback. In the latter case, we will need to relax the

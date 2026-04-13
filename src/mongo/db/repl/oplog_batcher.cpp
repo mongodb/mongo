@@ -283,7 +283,8 @@ void OplogBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     // for us to consume here. Since our postcondition is already met, it is safe to return
     // successfully.
     BSONObj opToPopAndDiscard;
-    invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || _oplogApplier->inShutdown());
+    invariant(oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || _oplogApplier->inShutdown(),
+              str::stream() << "Oplog Applier in shutdown: " << _oplogApplier->inShutdown());
 }
 
 void OplogBatcher::_run(StorageInterface* storageInterface) {

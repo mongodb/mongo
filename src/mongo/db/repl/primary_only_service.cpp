@@ -594,7 +594,12 @@ PrimaryOnlyService::lookupInstance(OperationContext* opCtx, const InstanceID& id
     // If this operation is holding any database locks, then it must have opted into getting
     // interrupted at stepdown to prevent deadlocks.
     invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
-              opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+                  opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites(),
+              str::stream() << "isLocked: " << opCtx->lockState()->isLocked()
+                            << ", interruptibleByStepDownOrUp: "
+                            << opCtx->shouldAlwaysInterruptAtStepDownOrUp()
+                            << ", globalLockConflictingWithWrites: "
+                            << opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     stdx::unique_lock lk(_mutex);
     _waitForStateNotRebuilding(opCtx, lk);
@@ -621,7 +626,12 @@ std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::g
     // If this operation is holding any database locks, then it must have opted into getting
     // interrupted at stepdown to prevent deadlocks.
     invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
-              opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+                  opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites(),
+              str::stream() << "isLocked: " << opCtx->lockState()->isLocked()
+                            << ", interruptibleByStepDownOrUp: "
+                            << opCtx->shouldAlwaysInterruptAtStepDownOrUp()
+                            << ", globalLockConflictingWithWrites: "
+                            << opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> instances;
 

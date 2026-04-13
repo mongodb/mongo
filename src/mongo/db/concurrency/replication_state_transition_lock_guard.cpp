@@ -97,7 +97,9 @@ void ReplicationStateTransitionLockGuard::_unlock() {
     // If ReplicationStateTransitionLockGuard is called in a WriteUnitOfWork, we won't accept
     // any exceptions to be thrown between _enqueueLock and waitForLockUntil because that would
     // delay cleaning up any failed RSTL lock attempt state from lock manager.
-    invariant(!(_result == LOCK_WAITING && _opCtx->lockState()->inAWriteUnitOfWork()));
+    invariant(!(_result == LOCK_WAITING && _opCtx->lockState()->inAWriteUnitOfWork()),
+              str::stream() << "Lock result: " << _result << ". In a write unit of work: "
+                            << _opCtx->lockState()->inAWriteUnitOfWork());
     _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
     _result = LOCK_INVALID;
 }
