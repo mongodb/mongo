@@ -148,9 +148,14 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::UnaryOp& op, bool saveIn
     TypeSignature childType = op.getChild().visit(*this, false);
     switch (op.op()) {
         case abt::Operations::Not: {
-            // The signature of Not is boolean plus Nothing if the operand can be Nothing.
-            return TypeSignature::kBooleanType.include(
-                childType.intersect(TypeSignature::kNothingType));
+            // The 'Not' unary op returns a boolean when given a boolean, or 'Nothing' for any other
+            // input type. Include 'Nothing' in the return type unless the operand's type signature
+            // is exclusively boolean.
+            auto sig = TypeSignature::kBooleanType;
+            if (childType != TypeSignature::kBooleanType) {
+                sig = sig.include(TypeSignature::kNothingType);
+            }
+            return sig;
         } break;
 
         default:

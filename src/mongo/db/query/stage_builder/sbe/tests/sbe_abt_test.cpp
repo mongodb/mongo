@@ -31,6 +31,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
+#include "mongo/db/query/stage_builder/sbe/type_checker.h"
 
 namespace mongo::stage_builder::abt_lower {
 namespace {
@@ -605,6 +606,35 @@ TEST_F(AbtToSbeExpression, LowerNaryMult) {
 
         ASSERT_EQ(sbe::value::TypeTags::NumberInt64, resultTag);
         ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 2953125);
+    }
+}
+
+// Tests that evaluation of a `Not` unary op works as expected when the input is not a boolean, and
+// that the results are the same after running the type checker. This is a regression test for
+// SERVER-123790.
+TEST_F(AbtToSbeExpression, NotOnNonBoolean) {
+    // Construct the tree fillEmpty(not("foo"), "bar"), and optionally call the 'TypeChecker'.
+    auto makeTestTree = [](bool runTypeChecker) {
+        auto tree = make<BinaryOp>(Operations::FillEmpty,
+                                   make<UnaryOp>(Operations::Not, Constant::str("foo")),
+                                   Constant::str("bar"));
+        if (runTypeChecker) {
+            TypeChecker{}.typeCheck(tree);
+        }
+
+        return tree;
+    };
+
+    // Evaluate the example expression twice. The result should always be the string "bar".
+    for (auto&& runTypeChecker : {false, true}) {
+        auto tree = makeTestTree(runTypeChecker);
+
+        auto [resultTag, resultVal] = evalExpr(tree, boost::none);
+        sbe::value::ValueGuard guard(resultTag, resultVal);
+
+        // fillEmpty catches the Nothing from not("foo") and returns "bar".
+        ASSERT_EQ(resultTag, sbe::value::TypeTags::StringSmall);
+        ASSERT_EQ(sbe::value::getStringView(resultTag, resultVal), "bar");
     }
 }
 
