@@ -73,7 +73,6 @@ try {
         testDB.getMongo(),
         "About to abort all index builders running for collections in the given database",
     );
-    IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 
     failPoint.wait();
 

@@ -57,15 +57,13 @@ const awaitDrop = startParallelShell(() => {
     assert.commandWorked(testDB.runCommand({drop: TestData.collName}));
 }, conn.port);
 
-try {
-    checkLog.containsJson(testDB.getMongo(), 23879); // "About to abort all index builders"
-} finally {
-    IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
-}
+checkLog.containsJson(testDB.getMongo(), 23879); // "About to abort all index builders"
 
 awaitFirstIndexBuild();
 awaitSecondIndexBuild();
 awaitDrop();
+
+IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 
 waitForIndexStatusMetrics(
     metricsDir,
