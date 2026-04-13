@@ -208,11 +208,6 @@ public:
         bool writeConcernMajorityShouldJournal) const override;
 
     /**
-     * Attached storage does not need to defer untimestamped drops.
-     */
-    bool shouldDeferUntimestampedDrops() const override;
-
-    /**
      * Attached storage fully supports the level field on the profile command.
      */
     bool supportsProfilingLevel(int profilingLevel) const override;

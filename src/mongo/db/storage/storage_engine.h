@@ -551,34 +551,46 @@ public:
                                       Timestamp timestamp) = 0;
 
     BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
+    struct Immediate {
+        bool operator==(const Immediate&) const = default;
+    };
 
     /**
      * Drops can be either timestamped or untimestamped. A timestamped drop is delayed until the
-     * oldest timestamp has advanced past the drop timestamp, while an untimestamped drop happens as
-     * soon as a checkpoint has been taken. Untimestamped drops are performed by constructing a
-     * DropTime with a CheckpointIteration representing the most recent checkpoint.
+     * oldest timestamp and checkpoint timestamp have advanced past the drop timestamp.
+     * Untimestamped drops can happen either after a checkpoint has been taken (using a
+     * CheckpointIteration obtained from getCheckPointIteration()), or as soon as possible. Note
+     * that Immediate still drops the ident asynchronously.
      */
-    struct DropTime : public std::variant<Timestamp, CheckpointIteration> {
-        using Base = std::variant<Timestamp, CheckpointIteration>;
+    struct DropTime : public std::variant<Timestamp, CheckpointIteration, Immediate> {
+        using Base = std::variant<Timestamp, CheckpointIteration, Immediate>;
         using Base::Base;
 
         BSONObj toBSON() const {
-            return std::visit(OverloadedVisitor{[](Timestamp ts) { return ts.toBSON(); },
-                                                [](CheckpointIteration iter) {
-                                                    return BSON("checkpointIteration"
-                                                                << std::to_string(uint64_t{iter}));
-                                                }},
+            return std::visit(OverloadedVisitor{
+                                  [](Timestamp ts) { return ts.toBSON(); },
+                                  [](CheckpointIteration iter) {
+                                      return BSON("checkpointIteration"
+                                                  << std::to_string(uint64_t{iter}));
+                                  },
+                                  [](Immediate) { return BSON("immediate" << 1); },
+                              },
                               *this);
         }
 
-        // CheckpointIterations are considered less than all Timestamps
+        // Drop times are ordered as Immediate -> CheckpointIteration -> Timestamp
         auto operator<=>(const DropTime& other) const {
             return std::visit(
                 OverloadedVisitor{
-                    [](Timestamp a, Timestamp b) { return a.asULL() <=> b.asULL(); },
+                    [](Immediate, Immediate) { return std::strong_ordering::equal; },
+                    [](Immediate, auto) { return std::strong_ordering::less; },
+                    [](auto, Immediate) { return std::strong_ordering::greater; },
+
                     [](CheckpointIteration a, CheckpointIteration b) { return a <=> b; },
-                    [](Timestamp, CheckpointIteration) { return std::strong_ordering::greater; },
                     [](CheckpointIteration, Timestamp) { return std::strong_ordering::less; },
+                    [](Timestamp, CheckpointIteration) { return std::strong_ordering::greater; },
+
+                    [](Timestamp a, Timestamp b) { return a.asULL() <=> b.asULL(); },
                 },
                 *this,
                 other);

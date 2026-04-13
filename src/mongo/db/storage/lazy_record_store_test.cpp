@@ -76,7 +76,7 @@ TEST_F(LazyRecordStoreTest, DropResetsToUninitialized) {
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
     ASSERT_TRUE(lrs.tableExists());
 
-    lrs.drop(opCtx.get(), Timestamp::min());
+    lrs.drop(opCtx.get(), StorageEngine::Immediate{});
     ASSERT_FALSE(lrs.tableExists());
 }
 
@@ -85,7 +85,7 @@ TEST_F(LazyRecordStoreTest, DropOnDeferredIsNoOp) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
-    lrs.drop(opCtx.get(), Timestamp::min());
+    lrs.drop(opCtx.get(), StorageEngine::Immediate{});
     ASSERT_FALSE(lrs.tableExists());
 }
 

@@ -148,6 +148,12 @@ Status commit(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
+    // TODO(SERVER-122275) Use the drop timestamp from the WUOW. This depends on
+    // schema epochs being fully implemented, as currently it is unsafe to drop
+    // the table until after a checkpoint.
+    StorageEngine::DropTime dropTime(
+        opCtx->getServiceContext()->getStorageEngine()->getCheckpointIteration());
+
     for (size_t i = 0; i < indexes.size(); ++i) {
         auto&& index = indexes[i];
 
@@ -156,7 +162,7 @@ Status commit(OperationContext* opCtx,
 
         IndexBuildInterceptor interceptor{
             opCtx, index, LazyRecordStore::CreateMode::openExisting, entry->descriptor()->unique()};
-        interceptor.dropTemporaryTables(opCtx, Timestamp::min());
+        interceptor.dropTemporaryTables(opCtx, dropTime);
 
         writableColl->indexBuildSuccess(opCtx, entry);
         if (multikey[i]) {
@@ -226,13 +232,19 @@ Status abort(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
+    // TODO(SERVER-122275) Use the drop timestamp from the WUOW. This depends on
+    // schema epochs being fully implemented, as currently it is unsafe to drop
+    // the table until after a checkpoint.
+    StorageEngine::DropTime dropTime(
+        opCtx->getServiceContext()->getStorageEngine()->getCheckpointIteration());
+
     for (auto&& index : indexes) {
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
 
         IndexBuildInterceptor interceptor{
             opCtx, index, LazyRecordStore::CreateMode::openExisting, entry->descriptor()->unique()};
-        interceptor.dropTemporaryTables(opCtx, Timestamp::min());
+        interceptor.dropTemporaryTables(opCtx, dropTime);
 
         auto status = writableColl->getIndexCatalog()->dropIndexEntry(opCtx, writableColl, entry);
         if (!status.isOK()) {

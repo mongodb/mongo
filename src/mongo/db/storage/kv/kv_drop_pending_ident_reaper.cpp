@@ -66,31 +66,27 @@ bool KVDropPendingIdentReaper::CompareByDropTime::operator()(
 bool KVDropPendingIdentReaper::IdentInfo::isExpired(const KVEngine* engine,
                                                     const Timestamp& ts) const {
     return !dropInProgress && dropToken.expired() &&
-        visit(OverloadedVisitor{
-                  [&](Timestamp dropTs) { return dropTs < ts || dropTs == Timestamp::min(); },
-                  [&](StorageEngine::CheckpointIteration iteration) {
-                      return engine->hasDataBeenCheckpointed(iteration);
-                  }},
+        visit(OverloadedVisitor{[](StorageEngine::Immediate) { return true; },
+                                [&](Timestamp dropTs) { return dropTs < ts; },
+                                [&](StorageEngine::CheckpointIteration iteration) {
+                                    return engine->hasDataBeenCheckpointed(iteration);
+                                }},
               dropTime);
 }
 
 KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
 
-void KVDropPendingIdentReaper::enableDeferUntimestampedDrops() {
-    stdx::lock_guard lock(_mutex);
-    _deferUntimestampedDrops = true;
-}
-
 void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime& dropTime,
                                                    std::shared_ptr<Ident> ident,
                                                    StorageEngine::DropIdentCallback&& onDrop) {
+    invariant(dropTime != Timestamp::min());
     stdx::lock_guard lock(_mutex);
 
     // Many tests drop an ident while a RecordStore for that ident is alive, resulting in a
     // second drop when the RS is destroyed. Allow that specific use, but otherwise we should not
     // see idents dropped while they're already drop-pending.
     if (_dropPendingIdents.contains(ident->getIdent())) {
-        invariant(dropTime == Timestamp::min(), ident->getIdent());
+        invariant(std::holds_alternative<StorageEngine::Immediate>(dropTime), ident->getIdent());
         return;
     }
 
@@ -98,13 +94,7 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
     info->identName = ident->getIdent();
     info->dropToken = ident;
     info->onDrop = onDrop;
-
-    if (_deferUntimestampedDrops && dropTime == Timestamp::min()) {
-        info->dropTime = _engine->getCheckpointIteration();
-    } else {
-        // Tables aren't shared across nodes in attached storage, so immediate reaping is safe.
-        info->dropTime = dropTime;
-    }
+    info->dropTime = dropTime;
 
     _timestampOrderedIdents.insert(info);
     _dropPendingIdents.insert(std::make_pair(ident->getIdent(), info));
@@ -128,7 +118,7 @@ void KVDropPendingIdentReaper::dropUnknownIdent(const Timestamp& stableTimestamp
 
         auto info = it->second;
         _timestampOrderedIdents.erase(info);
-        info->dropTime = Timestamp::min();
+        info->dropTime = StorageEngine::Immediate{};
         _timestampOrderedIdents.insert(info);
         return;
     }
@@ -174,6 +164,7 @@ boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() 
         return boost::none;
     }
     return std::visit(OverloadedVisitor{[](Timestamp dropTs) { return dropTs; },
+                                        [](StorageEngine::Immediate) { return Timestamp::min(); },
                                         [](StorageEngine::CheckpointIteration) {
                                             return Timestamp::min();
                                         }},
@@ -223,20 +214,19 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
     {
         stdx::lock_guard lock(_mutex);
         for (auto& info : _timestampOrderedIdents) {
-            if (info->dropTime >= ts && ts > Timestamp::min())
+            if (info->dropTime >= ts)
+                break;
+            bool useReplicatedDrop =
+                usesSchemaEpochs && std::holds_alternative<Timestamp>(info->dropTime);
+            // Skip because only the primary can initiate timestamp ident drops. We can break rather
+            // than continuing because all drops after this point will also be timestamped.
+            if (useReplicatedDrop && !writeIntentGuard)
                 break;
             // This collection/index satisfies the 'ts' requirement to be safe to drop, but we must
             // also check that there are no active operations remaining that still retain a
             // reference by which to access the collection/index data.
             if (info->isExpired(_engine, ts)) {
-                const bool isTimestampedDrop = info->dropTime > Timestamp::min();
-                const bool shouldTimestampThisIdentDrop = isTimestampedDrop && usesSchemaEpochs;
-                if (shouldTimestampThisIdentDrop && !writeIntentGuard) {
-                    // Skip because only the primary can initiate timestamp ident drops.
-                    continue;
-                }
-
-                const DropExecution dropExecution = shouldTimestampThisIdentDrop
+                const DropExecution dropExecution = useReplicatedDrop
                     ? DropExecution{DropAsReplicatedPrimary{}}
                     : DropExecution{DropUnreplicated{}};
 
@@ -315,7 +305,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
         auto it = _dropPendingIdents.find(ident);
         if (it == _dropPendingIdents.end())
             return Status::OK();
-        if (it->second->dropTime > Timestamp::min() && it->second->dropTimeIsExact)
+        if (std::holds_alternative<Timestamp>(it->second->dropTime) && it->second->dropTimeIsExact)
             return Status(ErrorCodes::ObjectIsBusy,
                           "Pending drop is timestamped so ident may still be in use");
     }
@@ -369,11 +359,13 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
 
                     return Status::OK();
                 },
-                [&](StorageEngine::CheckpointIteration) -> Status {
+                [](StorageEngine::CheckpointIteration) -> Status {
                     return Status(ErrorCodes::BadValue,
                                   "immediatelyCompletePendingDropAtTimestamp() cannot be used with "
                                   "a checkpoint-iteration pending drop");
-                }},
+                },
+                [](StorageEngine::Immediate) -> Status { return Status::OK(); },
+            },
             info.dropTime);
 
         if (!readiness.isOK()) {

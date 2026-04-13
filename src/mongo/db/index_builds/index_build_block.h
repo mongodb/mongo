@@ -144,9 +144,9 @@ public:
         }
     }
 
-    void dropTemporaryTables(OperationContext* opCtx, Timestamp timestamp) {
+    void dropTemporaryTables(OperationContext* opCtx, StorageEngine::DropTime dropTime) {
         if (_indexBuildInterceptor) {
-            _indexBuildInterceptor->dropTemporaryTables(opCtx, timestamp);
+            _indexBuildInterceptor->dropTemporaryTables(opCtx, dropTime);
         }
     }
 

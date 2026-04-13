@@ -677,7 +677,7 @@ TEST_F(IndexBuilderInterceptorTest, DropTemporaryTables) {
     ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
     ASSERT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 
-    interceptor->dropTemporaryTables(operationContext(), Timestamp::min());
+    interceptor->dropTemporaryTables(operationContext(), StorageEngine::Immediate{});
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
 
@@ -708,7 +708,8 @@ TEST_F(IndexBuilderInterceptorTest, DropTemporaryTablesOnDeferredTableIsNoOp) {
     ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
 
     // Dropping should not crash even though some tables were never created.
-    ASSERT_NO_THROW(interceptor->dropTemporaryTables(operationContext(), Timestamp::min()));
+    ASSERT_NO_THROW(
+        interceptor->dropTemporaryTables(operationContext(), StorageEngine::Immediate{}));
 
     ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
 }
@@ -722,7 +723,7 @@ TEST_F(IndexBuilderInterceptorTest, GetTableAfterDropReturnsNull) {
 
     ASSERT_TRUE(lrs.tableExists());
 
-    lrs.drop(operationContext(), Timestamp::min());
+    lrs.drop(operationContext(), StorageEngine::Immediate{});
 
     ASSERT_FALSE(lrs.tableExists());
 }

@@ -1067,7 +1067,8 @@ TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithDropPendingIdent) {
 
         WriteUnitOfWork wuow(opCtx);
         ASSERT_OK(mdbCatalog->removeEntry(opCtx, catalogId));
-        storageEngine->addDropPendingIdent(Timestamp(), std::make_shared<Ident>(ident));
+        storageEngine->addDropPendingIdent(StorageEngine::Immediate{},
+                                           std::make_shared<Ident>(ident));
         wuow.commit();
     }
 
@@ -1169,7 +1170,8 @@ TEST_F(DurableCatalogTest, CreateCollectionRemovesPriorDocumentsAfterRecreate) {
     {
         WriteUnitOfWork wuow(opCtx);
         ASSERT_OK(mdbCatalog->removeEntry(opCtx, catalogId));
-        storageEngine->addDropPendingIdent(Timestamp(), std::make_shared<Ident>(ident));
+        storageEngine->addDropPendingIdent(StorageEngine::Immediate{},
+                                           std::make_shared<Ident>(ident));
         wuow.commit();
     }
 

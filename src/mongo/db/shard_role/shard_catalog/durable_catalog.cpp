@@ -290,7 +290,8 @@ Status createStorage(OperationContext* opCtx,
 
     ru.onRollback([ident = std::string(ident)](OperationContext* opCtx) {
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        storageEngine->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
+        storageEngine->addDropPendingIdent(StorageEngine::Immediate{},
+                                           std::make_shared<Ident>(ident));
     });
 
     return status;

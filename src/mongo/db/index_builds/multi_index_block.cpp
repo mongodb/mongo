@@ -302,14 +302,15 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
 
             wunit.commit();
             _buildIsCleanedUp = true;
-            // TODO (SERVER-122275) Use a valid non min timestamp ensure replication of the drop
-            // event.
-            auto timestamp = Timestamp::min();
+            // TODO(SERVER-122275) Use the drop timestamp from the WUOW commit. This requires the
+            // ability to drop based on stable timestamp rather than oldest timestamp to avoid
+            // keeping tables alive too long.
+            StorageEngine::DropTime dropTime = StorageEngine::Immediate{};
             if (_resumeStateTempRecordStore) {
-                _resumeStateTempRecordStore->drop(opCtx, timestamp);
+                _resumeStateTempRecordStore->drop(opCtx, dropTime);
             }
             for (auto& index : _indexes) {
-                index.block->dropTemporaryTables(opCtx, timestamp);
+                index.block->dropTemporaryTables(opCtx, dropTime);
             }
             return;
         } catch (const StorageUnavailableException&) {
@@ -1388,14 +1389,15 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext* opCtx, boost::optional<Timestamp> ts) {
             _buildIsCleanedUp = true;
-            // TODO (SERVER-122275) Use a valid non min timestamp ensure replication of the drop
-            // event.
-            auto timestamp = Timestamp::min();
+            // TODO(SERVER-122275) Use the drop timestamp from the commit. This requires the
+            // ability to drop based on stable timestamp rather than oldest timestamp to avoid
+            // keeping tables alive too long.
+            StorageEngine::DropTime dropTime = StorageEngine::Immediate{};
             if (_resumeStateTempRecordStore) {
-                _resumeStateTempRecordStore->drop(opCtx, timestamp);
+                _resumeStateTempRecordStore->drop(opCtx, dropTime);
             }
             for (auto& index : _indexes) {
-                index.block->dropTemporaryTables(opCtx, timestamp);
+                index.block->dropTemporaryTables(opCtx, dropTime);
             }
         });
 

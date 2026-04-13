@@ -246,12 +246,6 @@ public:
         bool writeConcernMajorityShouldJournal) const = 0;
 
     /**
-     * If true, untimestamped ident drops should be converted to checkpoint-based drops rather than
-     * being reaped immediately.
-     */
-    virtual bool shouldDeferUntimestampedDrops() const = 0;
-
-    /**
      * If true, the provider supports this level on the profile command.
      */
     virtual bool supportsProfilingLevel(int profilingLevel) const = 0;

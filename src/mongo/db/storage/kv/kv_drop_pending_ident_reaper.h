@@ -163,11 +163,6 @@ public:
                                                      StringData ident,
                                                      Timestamp timestamp);
 
-    /**
-     * Enable deferring untimestamped drops until the next checkpoint completes.
-     */
-    void enableDeferUntimestampedDrops();
-
 private:
     // Contains information identifying what collection/index data to drop as well as determining
     // when to do so.
@@ -260,10 +255,6 @@ private:
 
     // Ident to drop timestamp map. Used for efficient lookups into _timestampOrderedIdents.
     StringMap<std::shared_ptr<IdentInfo>> _dropPendingIdents;
-
-    // If true, untimestamped drops are converted to checkpoint-based drops, deferring them until
-    // the next checkpoint completes rather than reaping immediately.
-    bool _deferUntimestampedDrops = false;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

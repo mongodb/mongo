@@ -212,10 +212,6 @@ bool AttachedPersistenceProvider::settingsProvideMajorityWriteJournalDurability(
     return writeConcernMajorityShouldJournal;
 }
 
-bool AttachedPersistenceProvider::shouldDeferUntimestampedDrops() const {
-    return false;
-}
-
 bool AttachedPersistenceProvider::supportsProfilingLevel(int profilingLevel) const {
     return true;
 }

@@ -820,7 +820,7 @@ TEST_F(StorageEngineTimestampMonitorTest, InternalRecordStoreDroppedByCallerEven
     }
 
     // Caller drops the record store manually.
-    _storageEngine->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
+    _storageEngine->addDropPendingIdent(StorageEngine::Immediate{}, std::make_shared<Ident>(ident));
     tempRs.reset();
 
     waitForTimestampMonitorPass();

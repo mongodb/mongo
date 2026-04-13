@@ -115,7 +115,7 @@ public:
      * bound for the drop reaper, ensuring the table will stay alive until the oldest timestamp has
      * advanced past the drop time.
      */
-    void dropTemporaryTable(OperationContext* opCtx, Timestamp dropTime) {
+    void dropTemporaryTable(OperationContext* opCtx, StorageEngine::DropTime dropTime) {
         _table.drop(opCtx, dropTime);
     }
 

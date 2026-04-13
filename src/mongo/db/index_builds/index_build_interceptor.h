@@ -190,15 +190,15 @@ public:
         }
     }
 
-    void dropTemporaryTables(OperationContext* opCtx, Timestamp timestamp) {
+    void dropTemporaryTables(OperationContext* opCtx, StorageEngine::DropTime dropTime) {
         if (_sorterTable) {
-            _sorterTable->drop(opCtx, timestamp);
+            _sorterTable->drop(opCtx, dropTime);
         }
         if (_duplicateKeyTracker) {
-            _duplicateKeyTracker->dropTemporaryTable(opCtx, timestamp);
+            _duplicateKeyTracker->dropTemporaryTable(opCtx, dropTime);
         }
-        _skippedRecordTracker.dropTemporaryTable(opCtx, timestamp);
-        _sideWritesTracker.dropTemporaryTable(opCtx, timestamp);
+        _skippedRecordTracker.dropTemporaryTable(opCtx, dropTime);
+        _sideWritesTracker.dropTemporaryTable(opCtx, dropTime);
     }
 
 private:

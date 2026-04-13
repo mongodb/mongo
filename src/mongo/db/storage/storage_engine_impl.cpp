@@ -135,13 +135,6 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
 
     auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
 
-    // For disaggregated storage, untimestamped drops must be converted to checkpoint-based drops.
-    // This gives standbys time to synchronize via checkpoints before internal tables are removed
-    // from shared storage.
-    if (rss.getPersistenceProvider().shouldDeferUntimestampedDrops()) {
-        _dropPendingIdentReaper.enableDeferUntimestampedDrops();
-    }
-
     if (rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup()) {
         LOGV2(10985326,
               "Skip loading catalog on startup; it will be handled later when WT loads the "
@@ -925,7 +918,7 @@ void StorageEngineImpl::dropIdent(RecoveryUnit& ru, StringData ident) {
         // A concurrent operation, such as a checkpoint could be holding an open data
         // handle on the ident. Handoff the ident drop to the ident reaper to retry
         // later.
-        addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident), nullptr);
+        addDropPendingIdent(Immediate{}, std::make_shared<Ident>(ident), nullptr);
     }
 }
 

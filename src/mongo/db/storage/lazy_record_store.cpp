@@ -50,7 +50,7 @@ std::unique_ptr<RecordStore> createRecordStore(StorageEngine* storageEngine,
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     ru.onRollback([ident = std::string(ident)](OperationContext* rollbackOpCtx) {
         auto se = rollbackOpCtx->getServiceContext()->getStorageEngine();
-        se->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
+        se->addDropPendingIdent(StorageEngine::Immediate{}, std::make_shared<Ident>(ident));
     });
 
     return rs;
@@ -112,11 +112,11 @@ RecordStore& LazyRecordStore::getTableOrThrow() const {
     return **table;
 }
 
-void LazyRecordStore::drop(OperationContext* opCtx, Timestamp timestamp) {
+void LazyRecordStore::drop(OperationContext* opCtx, StorageEngine::DropTime dropTime) {
     if (auto table = std::get_if<std::unique_ptr<RecordStore>>(&_tableOrIdent)) {
         auto identStr = std::string{(*table)->getIdent()};
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        storageEngine->addDropPendingIdent(timestamp, std::make_shared<Ident>(identStr));
+        storageEngine->addDropPendingIdent(dropTime, std::make_shared<Ident>(identStr));
         _tableOrIdent = std::move(identStr);
     }
 }

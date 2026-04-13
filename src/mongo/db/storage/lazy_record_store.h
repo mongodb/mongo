@@ -84,7 +84,7 @@ public:
      * ensuring the table will stay alive until the oldest timestamp has advanced past the drop
      * time.
      */
-    void drop(OperationContext* opCtx, Timestamp dropTime);
+    void drop(OperationContext* opCtx, StorageEngine::DropTime dropTime);
 
 private:
     std::variant<std::string, std::unique_ptr<RecordStore>> _tableOrIdent;

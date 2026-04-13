@@ -234,12 +234,6 @@ public:
                   "not implemented");
     }
 
-    bool shouldDeferUntimestampedDrops() const override {
-        uasserted(
-            mongo::ErrorCodes::NotImplemented,
-            "StubPersistenceProvider::shouldDeferUntimestampedDrops() method not implemented");
-    }
-
     bool supportsProfilingLevel(int profilingLevel) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::supportsProfilingLevel() method not implemented");

@@ -127,10 +127,6 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
         return false;
     }
 
-    bool shouldDeferUntimestampedDrops() const override {
-        return false;
-    }
-
     bool supportsColdCollections() const override {
         return false;
     }
