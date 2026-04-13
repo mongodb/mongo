@@ -601,8 +601,39 @@ buildvariants:
     tasks:
       - name: compile_test_serial_TG
       - name: run_unit_tests_TG
-      - name: .aggfuzzer .common !.feature_flag_guarded !.incompatible_system_allocator
-      - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_system_allocator
+      - name: .aggfuzzer .common !.feature_flag_guarded !.incompatible_system_allocator .multiversion
+      - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_system_allocator .multiversion
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  - name: rhel8-arm64-asan
+    display_name: "~ ASAN RHEL 8 arm64"
+    tags: []
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-arm64-m8g-4xlarge
+    stepback: true
+    expansions:
+      lang_environment: LANG=C
+      san_options: *aubsan_options
+      bazel_compile_flags: >-
+        --opt=on
+        --allocator=system
+        --asan=True
+        --compiler_type=clang
+        --linkstatic=False
+        --build_enterprise=False
+        --separate_debug=False
+      resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under ASAN build.
+      hang_analyzer_dump_core: false
+      test_flags: >-
+        --excludeWithAnyTags=requires_fast_memory,corrupts_data
+        --modules=none
+      compile_variant: rhel8-arm64-asan
+    tasks:
+      - name: compile_test_serial_TG
+      - name: run_unit_tests_TG
+      - name: .aggfuzzer .common !.feature_flag_guarded !.incompatible_system_allocator !.multiversion
+      - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_system_allocator !.multiversion
       - name: generate_buildid_to_debug_symbols_mapping
 
   - name: &rhel8-debug-aubsan-lite_fuzzer-arm64 rhel8-debug-aubsan-lite_fuzzer-arm64
