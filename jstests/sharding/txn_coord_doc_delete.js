@@ -79,6 +79,10 @@ commitThread.start();
 jsTest.log("Wait until the coordinator is about to delete its state doc");
 hangBeforeDeleteFp.wait();
 
+// Wait for all the steps the primary has taken so far, including steps involved
+// in coordinating a cross-shard transaction, to be applied on the secondaries.
+coordinatorRS.awaitReplication();
+
 jsTest.log("Stopping replication on all secondaries of the coordinator replica set");
 stopServerReplication(coordinatorRS.getSecondaries());
 
