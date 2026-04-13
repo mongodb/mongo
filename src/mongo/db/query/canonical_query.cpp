@@ -176,7 +176,11 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         // no user-specified "let" variable. This is to prevent the user-defined variable being
         // optimized out. We will optimize the projection later after we are certain that the query
         // is ineligible for SBE.
+        // When the deferred engine choice path is enabled, it is safe to always optimize because
+        // the SBE plan cache is not used, so there is no risk of caching an optimized-away
+        // variable reference.
         bool shouldOptimizeProj =
+            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled() ||
             expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
             !_findCommand->getLet();
         if (parsedFind->proj->requiresMatchDetails()) {

@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -106,6 +107,35 @@ protected:
         _collections.emplace(acquireCollectionMaybeLockFree(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kRead)));
+    }
+
+    // Creates a CanonicalQuery with a 'let' variable and a constant-foldable projection
+    // expression {$add: [1, 2]}.
+    std::unique_ptr<CanonicalQuery> createCqWithLetAndProjection() {
+        auto findCommand = std::make_unique<FindCommandRequest>(kNss);
+        findCommand->setLet(BSON("x" << 5));
+        findCommand->setProjection(fromjson("{computed: {$add: [1, 2]}}"));
+
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = expCtx(),
+            .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});
+        cq->setSbeCompatible(true);
+        return cq;
+    }
+
+    // Asserts that the projection on the given CanonicalQuery has been optimized, i.e. the
+    // 'computed' field contains {$const: 3} rather than {$add: [1, 2]}.
+    void assertProjectionOptimized(const CanonicalQuery* cq) {
+        ASSERT(cq);
+        const auto* proj = cq->getProj();
+        ASSERT(proj);
+        BSONObj serialized = projection_ast::serialize(*proj->root(), {});
+        ASSERT(serialized["computed"].isABSONObj())
+            << "Expected 'computed' to be an object, got: " << serialized;
+        ASSERT(serialized["computed"].Obj().hasField("$const"))
+            << "Expected projection to contain $const (optimized), but got: " << serialized;
+        ASSERT_EQ(serialized["computed"].Obj()["$const"].numberInt(), 3)
+            << "Expected $const value to be 3, got: " << serialized;
     }
 
     std::unique_ptr<Pipeline> makeSbeEligiblePipeline() {
@@ -225,6 +255,15 @@ TEST_F(DeferredEngineChoiceLoweringTest, BasicScanUsesClassic) {
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                nullptr /*pipeline*/);
     ASSERT(dynamic_cast<PlanExecutorImpl*>(exec.get()));
+}
+
+// Verifies that when featureFlagGetExecutorDeferredEngineChoice is enabled, projection
+// optimization (e.g., constant folding) is performed eagerly during CanonicalQuery construction,
+// even for queries with user-defined 'let' variables. This is safe because the deferred engine
+// choice path does not use the SBE plan cache.
+TEST_F(DeferredEngineChoiceLoweringTest, ProjectionOptimizedWithLetVariables) {
+    auto cq = createCqWithLetAndProjection();
+    assertProjectionOptimized(cq.get());
 }
 
 // A query with an SBE-eligible pipeline should use SBE.
