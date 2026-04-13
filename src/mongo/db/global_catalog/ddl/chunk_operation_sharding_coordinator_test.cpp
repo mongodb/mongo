@@ -126,7 +126,7 @@ protected:
             return ExecutorFuture<void>(**executor);
         }
 
-        bool isInCriticalSection(Phase phase) const {
+        bool isInCriticalSection(Phase phase) const override {
             return false;
         }
     };
