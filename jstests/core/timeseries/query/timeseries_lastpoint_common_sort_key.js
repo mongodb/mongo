@@ -20,7 +20,13 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getEngine, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+
+if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
+    jsTest.log.info("Skipping test because we can not assume canonical timeseries buckets layout in the current suite");
+    quit();
+}
 
 const coll = db[jsTestName()];
 
