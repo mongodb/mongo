@@ -29,6 +29,16 @@ The ticketing system supports operation prioritization through two mechanisms:
 
 When prioritization is enabled, operations can be assigned to either the normal priority or low priority ticket pool. Deprioritized operations will acquire tickets from the low-priority pool, allowing higher-priority work to proceed with less contention.
 
+#### Ticket Queue Ordering
+
+Each ticket pool uses one of two semaphore implementations that differ in how waiting operations are dispatched when a ticket becomes available:
+
+- [**Unordered (competing) semaphore**](../ticketing/unordered_ticket_semaphore.h) — Used by the normal-priority pools. There are no fairness guarantees: any waiting operation may claim a released ticket, including newly-arrived operations that have not yet queued. This gives maximum throughput with minimal overhead under normal conditions.
+
+- [**Ordered semaphore**](../ticketing/ordered_ticket_semaphore.h) — Used by the low-priority pools. Waiting operations are dispatched in ascending order of their _admission count_ (the number of times the operation has acquired a ticket, i.e. the number of times it has yielded execution control). This implements a [Least Attained Service (LAS)](https://www.cs.cmu.edu/~harchol/Papers/Sigmetrics01.pdf) scheduling policy: the operation that has consumed the least service so far is served next. An operation with a lower admission count is considered to have run for a shorter total duration and is therefore served first. This ordering preference for short-running operations prevents a single long-running operation from monopolising the low-priority pool and ensures that brief, newly-deprioritised operations are not starved behind older, high-yield operations.
+
+The queue type is an implementation detail of each pool and is not directly configurable. Choosing to enable or disable deprioritization (see `executionControlDeprioritizationGate` below) determines whether the low-priority pools — and therefore the ordered semaphore — are used at all.
+
 ### Task Types
 
 The deprioritization mechanisms above are governed by task types, classified via
@@ -184,7 +194,10 @@ The following server parameters control the ticketing system:
 
 #### Prioritization Configuration
 
-- `executionControlDeprioritizationGate`: Global toggle that must be enabled for any deprioritization features to work. When set to `false` (default), all deprioritization is disabled regardless of other settings. When set to `true`, deprioritization features can be independently enabled.
+- `executionControlDeprioritizationGate` (bool, default: `false`): Master switch for the entire deprioritization subsystem. When `false` (the default), the low-priority ticket pools are not used and all operations compete for tickets in the normal-priority pools via the unordered semaphore. When `true`, the ordered low-priority pools are activated and operations can be routed to them by heuristic or background-task deprioritization.
+
+  **When to enable**: Consider setting this to `true` only when the server is under heavy sustained load **and** the workload is latency-sensitive for short-running operations (e.g. point lookups, inserts, small updates) that are mixed with long-running or background operations (e.g. large aggregations, index builds, TTL scans). In this scenario, the LAS-ordered low-priority pool causes long-running operations to yield to shorter ones, reducing tail latency for the short operations. In workloads that consist exclusively of uniform-length operations, or that are not meaningfully bounded by execution control concurrency, enabling this flag provides no benefit and adds unnecessary complexity.
+
 - `executionControlHeuristicDeprioritization`: Enables automatic deprioritization of long-running operations. Requires `executionControlDeprioritizationGate` to be `true`.
 - `executionControlHeuristicNumAdmissionsDeprioritizeThreshold`: Number of admissions an operation must perform before being deprioritized.
 - `executionControlBackgroundTasksDeprioritization`: Controls deprioritization for background task operations (index builds, TTL deletions, range deletions). When `true` (default), background tasks always run at low priority. When `false`, background tasks run at normal priority and are immune to heuristic deprioritization.

@@ -32,6 +32,10 @@ as exempt priority is the only one beside normal priority.
 - `kLow`: Designates non-essential or deferrable operations. These tasks are throttled more
   aggressively than `kNormal` operations when the server is under heavy load. This priority is typically used for long-running operations and background processes—such as building a secondary index, data cleanup, or non-critical maintenance—that can be delayed without impacting core system functionality. This priority level is only used by Execution Control and is not recognized by Flow Control.
 
+### Queue Ordering for Deprioritized Operations
+
+When `executionControlDeprioritizationGate` is enabled, operations assigned to the low-priority pool wait in an _ordered_ queue that implements a [Least Attained Service (LAS)](https://www.cs.cmu.edu/~harchol/Papers/Sigmetrics01.pdf) scheduling policy. The operation with the **fewest total admissions** (i.e. the one that has yielded execution control the fewest times, and has therefore consumed the least service so far) is dispatched ahead of operations that have already run longer. This means a short-running operation that was recently deprioritised will be served before a long-running background operation that has been waiting in the same pool. The feature is disabled by default and should only be enabled when the server is under heavy load in workloads where short-running operations coexist with long-running or background ones. See the [Execution Control documentation](execution_control/README.md#ticket-queue-ordering) for details.
+
 # RateLimiter
 
 The `RateLimiter` is not an admission mechanism by itself, but rather a component upon which other admission mechanisms are built. It's implemented as a thin wrapper around [Folly's implementation](https://github.com/mongodb/mongo/blob/e28dc659a386bd80f31bdc01175303c3a043d2c9/src/third_party/folly/dist/folly/TokenBucket.h) of a [Token Bucket](https://en.wikipedia.org/wiki/Token_bucket). In this implementation, the token bucket doesn't actually get "refilled" by a background thread or job. Instead, at each acquisition it atomically calculates whether or not a token is available based on the known refill rate and capacity last time a token was acquired.
@@ -216,7 +220,7 @@ selective logic to determine [when it should be applied][subjectAdmissionFind].
 [initiateCommand]: https://github.com/mongodb/mongo/blob/a86c7f5de2a5de4d2f49e40e8970754ec6a5ba6c/src/mongo/db/service_entry_point_shard_role.cpp#L1588
 [admissionServerParam]: https://github.com/mongodb/mongo/blob/291b72ec4a8364208d7633d881cddc98787832b8/src/mongo/db/service_entry_point_shard_role.cpp#L1804
 [admissionPriority]: https://github.com/mongodb/mongo/blob/291b72ec4a8364208d7633d881cddc98787832b8/src/mongo/db/service_entry_point_shard_role.cpp#L1809
-[tryAcquire]: https://github.com/mongodb/mongo/blob/0ed24f52f011fc16cd968368ace216fe7e747723/src/mongo/util/concurrency/ticketholder.cpp#L130
+[tryAcquire]: https://github.com/mongodb/mongo/blob/9b5d1e9f01ff779277f6cd18219a8dfbd2fc044a/src/mongo/db/admission/ticketing/ticketholder.cpp#L195
 [subjectAdmissionExTrue]: https://github.com/mongodb/mongo/blob/0ed24f52f011fc16cd968368ace216fe7e747723/src/mongo/db/commands/query_cmd/bulk_write.cpp#L1311
 [subjectAdmissionFind]: https://github.com/mongodb/mongo/blob/0ed24f52f011fc16cd968368ace216fe7e747723/src/mongo/db/commands/query_cmd/find_cmd.cpp#L385
 [subjectVirtualFalse]: https://github.com/mongodb/mongo/blob/0ed24f52f011fc16cd968368ace216fe7e747723/src/mongo/db/commands.h#L956
