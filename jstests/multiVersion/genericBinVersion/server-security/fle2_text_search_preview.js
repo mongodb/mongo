@@ -1,6 +1,6 @@
 /**
  * Test downgrade to incompatible versions is blocked if substringPreview,
- * suffixPreview, or prefixPreview query types are being used in a FLE2 collection.
+ * suffix, or prefix query types are being used in a FLE2 collection.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 

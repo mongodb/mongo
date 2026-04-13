@@ -1811,7 +1811,16 @@ EncryptedFieldConfig QETextSearchCrudTest::getEFC() {
     std::vector<QueryTypeConfig> qtcs;
     for (const auto& schema : _schemas) {
         QueryTypeConfig qtc;
-        qtc.setQueryType(schema.type);
+        // Use the deprecated "Preview" query type names when building the EFC that gets
+        // passed to libmongocrypt, since libmongocrypt does not yet recognize the new names.
+        // TODO SERVER-123416 Remove this mapping once libmongocrypt supports "suffix"/"prefix".
+        auto mongocryptType = schema.type;
+        if (mongocryptType == QueryTypeEnum::Suffix) {
+            mongocryptType = QueryTypeEnum::SuffixPreviewDeprecated;
+        } else if (mongocryptType == QueryTypeEnum::Prefix) {
+            mongocryptType = QueryTypeEnum::PrefixPreviewDeprecated;
+        }
+        qtc.setQueryType(mongocryptType);
         if (schema.type == QueryTypeEnum::SubstringPreview) {
             qtc.setStrMaxLength(schema.mlen);
         }
@@ -1842,10 +1851,12 @@ BSONObj QETextSearchCrudTest::generateInsertSpec(BSONElement value) {
             case QueryTypeEnum::SubstringPreview:
                 spec.setSubstringSpec(FLE2SubstringInsertSpec(schema.mlen, schema.ub, schema.lb));
                 break;
-            case QueryTypeEnum::SuffixPreview:
+            case QueryTypeEnum::SuffixPreviewDeprecated:
+            case QueryTypeEnum::Suffix:
                 spec.setSuffixSpec(FLE2SuffixInsertSpec(schema.ub, schema.lb));
                 break;
-            case QueryTypeEnum::PrefixPreview:
+            case QueryTypeEnum::PrefixPreviewDeprecated:
+            case QueryTypeEnum::Prefix:
                 spec.setPrefixSpec(FLE2PrefixInsertSpec(schema.ub, schema.lb));
                 break;
             default:
@@ -1906,12 +1917,14 @@ PrfBlock QETextSearchCrudTest::getTestESCDataToken(BSONElement element,
             return ESCTextSubstringDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
                 .asPrfBlock();
         }
-        case QueryTypeEnum::SuffixPreview: {
+        case QueryTypeEnum::SuffixPreviewDeprecated:
+        case QueryTypeEnum::Suffix: {
             auto escTextToken = ESCTextSuffixToken::deriveFrom(escToken);
             return ESCTextSuffixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
                 .asPrfBlock();
         }
-        case QueryTypeEnum::PrefixPreview: {
+        case QueryTypeEnum::PrefixPreviewDeprecated:
+        case QueryTypeEnum::Prefix: {
             auto escTextToken = ESCTextPrefixToken::deriveFrom(escToken);
             return ESCTextPrefixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
                 .asPrfBlock();
@@ -1936,12 +1949,14 @@ PrfBlock QETextSearchCrudTest::getTestEDCDataToken(BSONElement element,
             return EDCTextSubstringDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
                 .asPrfBlock();
         }
-        case QueryTypeEnum::SuffixPreview: {
+        case QueryTypeEnum::SuffixPreviewDeprecated:
+        case QueryTypeEnum::Suffix: {
             auto edcTextToken = EDCTextSuffixToken::deriveFrom(edcToken);
             return EDCTextSuffixDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
                 .asPrfBlock();
         }
-        case QueryTypeEnum::PrefixPreview: {
+        case QueryTypeEnum::PrefixPreviewDeprecated:
+        case QueryTypeEnum::Prefix: {
             auto edcTextToken = EDCTextPrefixToken::deriveFrom(edcToken);
             return EDCTextPrefixDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
                 .asPrfBlock();
@@ -1969,13 +1984,15 @@ ESCTwiceDerivedTagToken QETextSearchCrudTest::getTestESCTwiceDerivedToken(
                         .asPrfBlock();
                 break;
             }
-            case QueryTypeEnum::SuffixPreview: {
+            case QueryTypeEnum::SuffixPreviewDeprecated:
+            case QueryTypeEnum::Suffix: {
                 cfTokenBlk = ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                                  ESCTextSuffixDerivedFromDataToken{dataTokenBlk}, 0)
                                  .asPrfBlock();
                 break;
             }
-            case QueryTypeEnum::PrefixPreview: {
+            case QueryTypeEnum::PrefixPreviewDeprecated:
+            case QueryTypeEnum::Prefix: {
                 cfTokenBlk = ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                                  ESCTextPrefixDerivedFromDataToken{dataTokenBlk}, 0)
                                  .asPrfBlock();
@@ -2007,13 +2024,15 @@ EDCTwiceDerivedToken QETextSearchCrudTest::getTestEDCTwiceDerivedToken(
                         .asPrfBlock();
                 break;
             }
-            case QueryTypeEnum::SuffixPreview: {
+            case QueryTypeEnum::SuffixPreviewDeprecated:
+            case QueryTypeEnum::Suffix: {
                 cfTokenBlk = EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                                  EDCTextSuffixDerivedFromDataToken{dataTokenBlk}, 0)
                                  .asPrfBlock();
                 break;
             }
-            case QueryTypeEnum::PrefixPreview: {
+            case QueryTypeEnum::PrefixPreviewDeprecated:
+            case QueryTypeEnum::Prefix: {
                 cfTokenBlk = EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                                  EDCTextPrefixDerivedFromDataToken{dataTokenBlk}, 0)
                                  .asPrfBlock();
@@ -2119,9 +2138,11 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
         switch (qt) {
             case QueryTypeEnum::SubstringPreview:
                 return 0;
-            case QueryTypeEnum::SuffixPreview:
+            case QueryTypeEnum::SuffixPreviewDeprecated:
+            case QueryTypeEnum::Suffix:
                 return 1;
-            case QueryTypeEnum::PrefixPreview:
+            case QueryTypeEnum::PrefixPreviewDeprecated:
+            case QueryTypeEnum::Prefix:
                 return 2;
             default:
                 MONGO_UNREACHABLE;
@@ -2146,11 +2167,13 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
                         msizeForSubstring(unfoldedStr.size(), schema.lb, schema.ub, schema.mlen);
                     affixes = getExpectedSubstrings(unicodeFoldedStr, schema.lb, schema.ub);
                     break;
-                case QueryTypeEnum::SuffixPreview:
+                case QueryTypeEnum::SuffixPreviewDeprecated:
+                case QueryTypeEnum::Suffix:
                     msize = msizeForSuffixOrPrefix(unfoldedStr.size(), schema.lb, schema.ub);
                     affixes = getExpectedSuffixes(unicodeFoldedStr, schema.lb, schema.ub);
                     break;
-                case QueryTypeEnum::PrefixPreview:
+                case QueryTypeEnum::PrefixPreviewDeprecated:
+                case QueryTypeEnum::Prefix:
                     msize = msizeForSuffixOrPrefix(unfoldedStr.size(), schema.lb, schema.ub);
                     affixes = getExpectedPrefixes(unicodeFoldedStr, schema.lb, schema.ub);
                     break;
@@ -2172,9 +2195,8 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
         verifyESCEntriesForString(exactStr, count);
     }
 
-    for (auto qt : {QueryTypeEnum::SubstringPreview,
-                    QueryTypeEnum::SuffixPreview,
-                    QueryTypeEnum::PrefixPreview}) {
+    for (auto qt :
+         {QueryTypeEnum::SubstringPreview, QueryTypeEnum::Suffix, QueryTypeEnum::Prefix}) {
         auto qt_index = queryTypeToIndex(qt);
         for (const auto& [exactStr, count] : paddingCounts[qt_index]) {
             verifyESCEntriesForString(exactStr, count, qt, true /*padding*/);
@@ -2212,34 +2234,18 @@ TEST_F(QETextSearchCrudTest, BasicSubstring) {
 }
 
 TEST_F(QETextSearchCrudTest, BasicSuffix) {
-    addSchema({.type = QueryTypeEnum::SuffixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
+    addSchema({.type = QueryTypeEnum::Suffix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
 }
 
 TEST_F(QETextSearchCrudTest, BasicPrefix) {
-    addSchema({.type = QueryTypeEnum::PrefixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
+    addSchema({.type = QueryTypeEnum::Prefix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
 }
 
 TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffix) {
-    addSchema({.type = QueryTypeEnum::SuffixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
-    addSchema({.type = QueryTypeEnum::PrefixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
+    addSchema({.type = QueryTypeEnum::Suffix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
+    addSchema({.type = QueryTypeEnum::Prefix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
 }
 
@@ -2254,7 +2260,7 @@ TEST_F(QETextSearchCrudTest, RepeatingSubstring) {
 }
 
 TEST_F(QETextSearchCrudTest, FoldAsciiSuffix) {
-    addSchema({.type = QueryTypeEnum::SuffixPreview,
+    addSchema({.type = QueryTypeEnum::Suffix,
                .lb = 10,
                .ub = 100,
                .mlen = 1000,
@@ -2302,11 +2308,7 @@ TEST_F(QETextSearchCrudTest, BasicSubstringMultipleInserts) {
 }
 
 TEST_F(QETextSearchCrudTest, BasicSuffixMultipleInserts) {
-    addSchema({.type = QueryTypeEnum::SuffixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
+    addSchema({.type = QueryTypeEnum::Suffix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"},
                                     {"hello to the world", "hello to the world"},
                                     {"goodbye to the world", "goodbye to the world"},
@@ -2316,11 +2318,7 @@ TEST_F(QETextSearchCrudTest, BasicSuffixMultipleInserts) {
 }
 
 TEST_F(QETextSearchCrudTest, BasicPrefixMultipleInserts) {
-    addSchema({.type = QueryTypeEnum::PrefixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
+    addSchema({.type = QueryTypeEnum::Prefix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"},
                                     {"hello to the world", "hello to the world"},
                                     {"goodbye to the world", "goodbye to the world"},
@@ -2330,16 +2328,8 @@ TEST_F(QETextSearchCrudTest, BasicPrefixMultipleInserts) {
 }
 
 TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffixMultipleInserts) {
-    addSchema({.type = QueryTypeEnum::SuffixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
-    addSchema({.type = QueryTypeEnum::PrefixPreview,
-               .lb = 10,
-               .ub = 100,
-               .casef = false,
-               .diacf = false});
+    addSchema({.type = QueryTypeEnum::Suffix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
+    addSchema({.type = QueryTypeEnum::Prefix, .lb = 10, .ub = 100, .casef = false, .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"},
                                     {"hello to the world", "hello to the world"},
                                     {"goodbye to the world", "goodbye to the world"},

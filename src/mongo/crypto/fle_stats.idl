@@ -91,7 +91,13 @@ structs:
             substringPreview:
                 type: exactInt64
                 default: 0
+            suffix:
+                type: exactInt64
+                default: 0
             suffixPreview:
+                type: exactInt64
+                default: 0
+            prefix:
                 type: exactInt64
                 default: 0
             prefixPreview:
