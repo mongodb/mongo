@@ -68,6 +68,15 @@ export class CollectionValidator {
                             if (db == "local") {
                                 return;
                             }
+                            if (
+                                db == "config" &&
+                                (coll == "fast_count_metadata_store" || coll == "fast_count_metadata_store_timestamps")
+                            ) {
+                                // The contents of the fast count store collections can temporarily differ if
+                                // validation is called when the primary has updated entries based on writes it
+                                // observed in the latest checkpoint but a secondary has not yet applied those writes.
+                                return;
+                            }
                             if (!currHashes[db] || !currHashes[db][coll]) {
                                 return;
                             }
