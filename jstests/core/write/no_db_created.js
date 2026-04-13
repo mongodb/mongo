@@ -8,6 +8,8 @@
 //   uses_compact,
 //   # The passthrough creates collections implicitly.
 //   exclude_from_timeseries_crud_passthrough,
+//   # Background resharding operations might create the collection transitively during a retry.
+//   assumes_balancer_off
 // ]
 
 let adminDB = db.getSiblingDB("admin");
