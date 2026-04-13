@@ -88,6 +88,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         builder->append("unauthorizedDirectShardOps", unauthorizedDirectShardOperations.load());
     }
+    builder->append("countHitsOfCompoundWildcardIndexesWithShardKeyPrefix",
+                    countHitsOfCompoundWildcardIndexesWithShardKeyPrefix.loadRelaxed());
 }
 
 }  // namespace mongo
