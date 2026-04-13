@@ -34,6 +34,9 @@ selector:
     # Asserts on output of allPlansExecution. CBR picks a single plan so there is no multiplanning.
     - jstests/core/query/explain/explain_winning_plan.js
 
+    # Tests that the best plan is chosen, and heuristic CE is not accurate enough to ensure this.
+    - jstests/core/query/or/subplanning_plan_quality.js
+
     # TODO SERVER-100417
     - jstests/core/query/explain/explain_multi_plan_count.js
     - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
