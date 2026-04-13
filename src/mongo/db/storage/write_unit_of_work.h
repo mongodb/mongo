@@ -85,13 +85,6 @@ public:
                                                                     RecoveryUnitState ruState);
 
     /**
-     * Whether this WUOW is grouping oplog entries, regardless of the grouping type.
-     */
-    bool isGroupingOplogEntries() const {
-        return _groupOplogEntries != kDontGroup;
-    }
-
-    /**
      * Releases the OperationContext RecoveryUnit and Locker objects from management without
      * changing state. Allows for use of these objects beyond the WriteUnitOfWork lifespan. Prepared
      * units of work are not allowed be released. Returns the state of the RecoveryUnit.
@@ -118,6 +111,13 @@ public:
 
 private:
     WriteUnitOfWork() = default;  // for createForSnapshotResume
+
+    /**
+     * Whether this WUOW is grouping oplog entries, regardless of the grouping type.
+     */
+    bool _isGroupingOplogEntries() const {
+        return _groupOplogEntries != kDontGroup;
+    }
 
     OperationContext* _opCtx;
 

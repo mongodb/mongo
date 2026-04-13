@@ -75,9 +75,9 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType gr
       _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork),
       _groupOplogEntries(getGroupType(opCtx, groupOplogEntries, _toplevel)) {
     // Grouping oplog entries doesn't support WUOW nesting (e.g. multi-doc transactions).
-    invariant(_toplevel || !isGroupingOplogEntries());
+    invariant(_toplevel || !_isGroupingOplogEntries());
 
-    if (isGroupingOplogEntries()) {
+    if (_isGroupingOplogEntries()) {
         const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
         opObserver->onBatchedWriteStart(_opCtx);
@@ -107,7 +107,7 @@ WriteUnitOfWork::~WriteUnitOfWork() {
         shard_role_details::getLocker(_opCtx)->endWriteUnitOfWork();
     }
 
-    if (isGroupingOplogEntries()) {
+    if (_isGroupingOplogEntries()) {
         const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
         opObserver->onBatchedWriteAbort(_opCtx);
@@ -150,7 +150,7 @@ void WriteUnitOfWork::commit() {
     invariant(!_released);
     invariant(_opCtx->_ruState == RecoveryUnitState::kActiveUnitOfWork);
 
-    if (isGroupingOplogEntries()) {
+    if (_isGroupingOplogEntries()) {
         const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
         opObserver->onBatchedWriteCommit(_opCtx, _groupOplogEntries);
