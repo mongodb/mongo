@@ -505,7 +505,7 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
 
     constexpr size_t kInitialRanges = 7;
     constexpr size_t kNumTargetedSpills = 2;
-    constexpr size_t kNumParallelSpills = 3;
+    constexpr size_t kMaxSpillsPerMerge = 3;
     // [1, 2, 3, 4, 5, 6, 7] initial
     // [123, 456, 7]         3 merges
     // [1234567]             1 merge
@@ -526,7 +526,7 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
                          ranges,
                          IWComparator(ASC),
                          kNumTargetedSpills,
-                         kNumParallelSpills);
+                         kMaxSpillsPerMerge);
 
     ASSERT_LTE(ranges.size(), kNumTargetedSpills);
     ASSERT_EQ(sorterStats.mergedSpills(), kExpectedMergedSpills);
@@ -1568,7 +1568,7 @@ TYPED_TEST(SpillerMergeDiskSpaceTest, MergeSpillsRespectsDiskSpaceCheck) {
                                             ranges,
                                             IWComparator(ASC),
                                             /*numTargetedSpills=*/1,
-                                            /*numParallelSpills=*/2),
+                                            /*maxSpillsPerMerge=*/2),
                        DBException,
                        ErrorCodes::OutOfDiskSpace);
 }

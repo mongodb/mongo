@@ -465,18 +465,18 @@ protected:
     /**
      * An implementation of a k-way merge sort.
      *
-     * This method will take a target number of sorted spills (numTargetedSpills) to merge and will
-     * proceed to merge the set of them in batches of at most numParallelSpills until it reaches the
-     * target.
+     * This method takes a target number of sorted spills (numTargetedSpills) and merges the spills
+     * in batches of at most maxSpillsPerMerge (the maximum number of spill ranges merged together
+     * in a single merge batch while still respecting memory limits) until it reaches the target.
      *
-     * To give an example, if we have 7 spills, a target number of 2 and 3 spills can be merged in
-     * parallel the algorithm will do the following:
+     * To give an example, if we have 7 spills, a target of 2 spills after merging and
+     * maxSpillsPerMerge = 3, the algorithm will do the following:
      *
      * {1, 2, 3, 4, 5, 6, 7}
      * {123, 456, 7}
      * {1234567}
      */
-    void _mergeSpills(std::size_t numTargetedSpills, std::size_t numParallelSpills) {
+    void _mergeSpills(std::size_t numTargetedSpills, std::size_t maxSpillsPerMerge) {
         if (numTargetedSpills == 0) {
             numTargetedSpills = 1;
         }
@@ -486,7 +486,7 @@ protected:
                        "Merging spills",
                        "currentNumSpills"_attr = this->_iters.size(),
                        "targetNumSpills"_attr = numTargetedSpills,
-                       "parallelNumSpills"_attr = numParallelSpills);
+                       "maxSpillsPerMerge"_attr = maxSpillsPerMerge);
 
             _spiller->mergeSpills(this->_opts,
                                   this->_settings,
@@ -494,7 +494,7 @@ protected:
                                   this->_iters,
                                   _comp,
                                   numTargetedSpills,
-                                  numParallelSpills);
+                                  maxSpillsPerMerge);
         }
     }
 

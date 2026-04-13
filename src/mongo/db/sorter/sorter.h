@@ -577,7 +577,7 @@ public:
         std::priority_queue<Data, std::vector<Data>, Greater<Key, Value, Comparator>>& heap) = 0;
 
     /**
-     * Merge 'iters' in groups of at most 'numParallelSpills' until at most
+     * Merge 'iters' in groups of at most 'maxSpillsPerMerge' until at most
      * 'numTargetedSpills' remain.
      *
      * 'iters' must be ordered by increasing range start offset and form one contiguous
@@ -589,7 +589,7 @@ public:
                              std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
                              Comparator comp,
                              std::size_t numTargetedSpills,
-                             std::size_t numParallelSpills) = 0;
+                             std::size_t maxSpillsPerMerge) = 0;
 
     virtual SorterStorage<Key, Value>& getStorage() = 0;
 

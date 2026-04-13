@@ -367,12 +367,12 @@ public:
                      std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
                      Comparator comp,
                      std::size_t numTargetedSpills,
-                     std::size_t numParallelSpills) override {
+                     std::size_t maxSpillsPerMerge) override {
         std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>> oldIters;
         while (iters.size() > numTargetedSpills) {
             oldIters.swap(iters);
-            for (size_t i = 0; i < oldIters.size(); i += numParallelSpills) {
-                auto count = std::min(numParallelSpills, oldIters.size() - i);
+            for (size_t i = 0; i < oldIters.size(); i += maxSpillsPerMerge) {
+                auto count = std::min(maxSpillsPerMerge, oldIters.size() - i);
                 auto spillsToMerge = std::span(oldIters).subspan(i, count);
                 validateMergeSpillRanges<Key, Value>(spillsToMerge);
 

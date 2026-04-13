@@ -522,7 +522,7 @@ public:
                      std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
                      Comparator comp,
                      std::size_t numTargetedSpills,
-                     std::size_t numParallelSpills) override;
+                     std::size_t maxSpillsPerMerge) override;
 
     boost::filesystem::path getSpillDir() override;
 
@@ -552,7 +552,7 @@ void FileBasedSorterSpiller<Key, Value, Comparator>::mergeSpills(
     std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
     Comparator comp,
     std::size_t numTargetedSpills,
-    std::size_t numParallelSpills) {
+    std::size_t maxSpillsPerMerge) {
     using File = SorterFile;
 
     std::shared_ptr<File> newSpillsFile =
@@ -570,8 +570,8 @@ void FileBasedSorterSpiller<Key, Value, Comparator>::mergeSpills(
                     "Created new intermediate file for merged spills",
                     "path"_attr = newSpillsFile->path().string());
 
-        for (std::size_t i = 0; i < iterators.size(); i += numParallelSpills) {
-            auto count = std::min(numParallelSpills, iterators.size() - i);
+        for (std::size_t i = 0; i < iterators.size(); i += maxSpillsPerMerge) {
+            auto count = std::min(maxSpillsPerMerge, iterators.size() - i);
             auto spillsToMerge = std::span(iterators).subspan(i, count);
 
             validateMergeSpillRanges<Key, Value>(spillsToMerge);
