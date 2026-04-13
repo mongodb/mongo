@@ -8,7 +8,7 @@ have the following procedure:
 
 - While holding a collection X lock, write a new index entry to the array of indexes included as
   part of a durable catalog entry. This entry has a `ready: false` component. See [Durable
-  Catalog](../catalog/README.md#durable-catalog).
+  Catalog](../shard_role/shard_catalog/README.md#durable-catalog).
 - Downgrade to a collection IX lock.
 - Scan all documents on the collection to be indexed
   - Generate [KeyString](../storage/key_string/README.md) keys for the indexed fields for each
@@ -52,9 +52,9 @@ keys are applied directly to the index in three phases:
 - Drain the side table while holding a collection X lock to block all reads and writes.
 
 See
-[IndexBuildInterceptor::sideWrite](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/index/index_build_interceptor.cpp#L403)
+[IndexBuildInterceptor::sideWrite](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_build_interceptor.cpp#L208)
 and
-[IndexBuildInterceptor::drainWritesIntoIndex](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/index/index_build_interceptor.cpp#L135).
+[IndexBuildInterceptor::drainWritesIntoIndex](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_build_interceptor.cpp#L150).
 
 ### Temporary Table For Duplicate Key Violations
 
@@ -66,11 +66,11 @@ an index build, concurrent writes may introduce and resolve duplicate key confli
 For those reasons, during an index build we temporarily allow duplicate key violations, and record
 any detected violations in a temporary table, the _duplicate key table_. At the conclusion of the
 index build, under a collection X lock, [duplicate keys are
-re-checked](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator.cpp#L2312).
+re-checked](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_builds_coordinator.cpp#L3730).
 If there are still constraint violations, an error is thrown.
 
 See
-[DuplicateKeyTracker](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/index/duplicate_key_tracker.h#L48).
+[DuplicateKeyTracker](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/duplicate_key_tracker.h#L51).
 
 ### Temporary Table For Key Generation Errors
 
@@ -93,7 +93,7 @@ since we may have suppressed valid key generation errors.
 To solve this problem, on secondaries, the records associated with key generation errors are
 skipped and recorded in a temporary table, the _skipped record table_. If a secondary node becomes
 primary and then commits the index build, it re-generates and re-inserts keys for the [skipped
-records](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator.cpp#L2294)
+records](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_builds_coordinator.cpp#L2037)
 under a collection X lock. If there are still constraint violations, an error is thrown and the
 index build aborts. Primaries do not suppress key generation errors, so they do not use the skipped
 record table; they abort immediately when a key generation error occurs. Secondaries that remain
@@ -101,7 +101,7 @@ secondary rely on the primary's decision to commit as assurance that skipped rec
 to be checked.
 
 See
-[SkippedRecordTracker](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/index/skipped_record_tracker.h#L45).
+[SkippedRecordTracker](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/skipped_record_tracker.h#L54).
 
 ## Replica Set Index Builds
 
@@ -113,11 +113,14 @@ nodes will start the index build in the background as soon as they apply that op
 primary is done with its indexing, it will decide to replicate either an `abortIndexBuild` or
 `commitIndexBuild` oplog entry.
 
+Each node independently builds the index by scanning its own collection data. The external sorter
+spills to local unreplicated temporary files under `dbpath/_tmp` when the memory limit is reached.
+
 Simultaneous index builds are resilient to replica set state transitions. The node that starts an
 index build does not need to be the same node that decides to commit it.
 
 See [Index Builds in Replicated Environments - MongoDB
-Manual](https://docs.mongodb.com/master/core/index-creation/#index-builds-in-replicated-environments).
+Manual](https://www.mongodb.com/docs/manual/core/index-creation/#index-builds-in-replicated-environments).
 
 Server 7.1 introduces the following improvements:
 
@@ -136,7 +139,7 @@ entry, will stall oplog application until the local index build can be committed
 delays commit of an index build on the primary node until secondaries are also ready to commit. A
 primary will not commit an index build until a minimum number of data-bearing nodes are ready to
 commit the index build. Index builds can take anywhere from moments to days to complete, so the
-replication lag can be very significant. Note: `commitQuorum` makes no guarantee that indexes on
+replication lag can be significant. Note: `commitQuorum` makes no guarantee that indexes on
 secondaries are ready for use when the command completes, `writeConcern` must still be used for
 that.
 
@@ -160,11 +163,11 @@ Secondaries that were not included in the commit quorum and receive a `commitInd
 will block replication until their index build is complete.
 
 The `commitQuorum` for a running index build may be changed by the user via the
-[`setIndexCommitQuorum`](https://github.com/mongodb/mongo/blob/v6.0/src/mongo/db/commands/commit_quorum/set_index_commit_quorum_command.cpp#L55)
+[`setIndexCommitQuorum`](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/commands/set_index_commit_quorum_command.cpp#L61)
 server command.
 
 See
-[IndexBuildsCoordinator::\_waitForNextIndexBuildActionAndCommit](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator_mongod.cpp#L632).
+[IndexBuildsCoordinator::\_waitForNextIndexBuildActionAndCommit](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_builds_coordinator_mongod.cpp#L936).
 
 ### Voting for Abort
 
@@ -244,6 +247,14 @@ the replica set. Rather, the index is only built on the primary node and all int
 index build are explicitly replicated through the oplog via `ci` and `cd` oplog entries; secondaries
 simply apply oplog to build the index. Thus, the concept of commit quorum does not apply to
 primary-driven index builds.
+
+Both primary-driven and two-phase builds use the same [bulk
+builder](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index/index_access_method.cpp#L920)
+for key insertion, but differ in how sorted keys are spilled. Compared to two-phase builds, which
+spill to local unreplicated temporary files, primary-driven builds spill into a [replicated storage
+engine
+table](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_build_interceptor.h#L221)
+so that sorted keys are propagated to secondaries through the oplog.
 
 ## Single-Phase Index Builds
 
