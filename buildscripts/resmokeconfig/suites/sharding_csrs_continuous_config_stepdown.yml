@@ -194,8 +194,11 @@ selector:
     - jstests/sharding/live_shard_logical_initial_sync_config_server.js
     - jstests/sharding/read_pref_cmd.js
 
-    # On stepdown there is not gurantee that changelog entries have been inserted [SERVER-45655]
+    # On stepdown there is not guarantee that changelog entries have been inserted [SERVER-45655]
     - jstests/sharding/refine_collection_shard_key_changelog.js
+    # moveChunk may retry on stepdown and produce duplicate changelog entries
+    # causing the exact-count assertion to fail.
+    - jstests/sharding/move_chunk_source_error_changelog.js
     # This is expected to fail if the config server steps down during moveChunk.
     - jstests/sharding/index_operations_abort_concurrent_outgoing_migrations.js
     - jstests/sharding/move_chunk_critical_section_non_internal_client_abort.js
