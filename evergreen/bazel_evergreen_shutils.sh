@@ -176,9 +176,9 @@ bazel_evergreen_shutils::timeout_prefix() {
     # Produce the prefix if we have a binary
     if [[ -n "$timeout_bin" ]]; then
         if [[ "$need_timeout" == "explicit" ]]; then
-            echo "$timeout_bin ${build_timeout_seconds}"
+            echo "$timeout_bin -s QUIT ${build_timeout_seconds}"
         elif [[ "$need_timeout" == "fallback" ]]; then
-            echo "$timeout_bin 3600"
+            echo "$timeout_bin -s QUIT 3600"
         else
             echo ""
         fi
@@ -191,7 +191,7 @@ bazel_evergreen_shutils::timeout_prefix() {
 
 bazel_evergreen_shutils::bazel_output_base() {
     local BAZEL_BINARY="$1"
-    "$BAZEL_BINARY" info output_base 2>/dev/null
+    "$BAZEL_BINARY" --batch info output_base 2>/dev/null || "$BAZEL_BINARY" info output_base 2>/dev/null
 }
 
 bazel_evergreen_shutils::bazel_pidfile_path() {
@@ -201,12 +201,20 @@ bazel_evergreen_shutils::bazel_pidfile_path() {
     echo "${ob}/server/server.pid.txt"
 }
 
-bazel_evergreen_shutils::is_bazel_server_running() {
+bazel_evergreen_shutils::bazel_server_pid() {
     local BAZEL_BINARY="$1"
     local pf pid
     pf="$(bazel_evergreen_shutils::bazel_pidfile_path "$BAZEL_BINARY")" || return 1
     [[ -f "$pf" ]] || return 1
     pid="$(cat "$pf" 2>/dev/null || true)"
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+    echo "$pid"
+}
+
+bazel_evergreen_shutils::is_bazel_server_running() {
+    local BAZEL_BINARY="$1"
+    local pid
+    pid="$(bazel_evergreen_shutils::bazel_server_pid "$BAZEL_BINARY" 2>/dev/null || true)"
     [[ -n "$pid" ]] || return 1
     if kill -0 "$pid" 2>/dev/null; then
         return 0
@@ -230,10 +238,259 @@ bazel_evergreen_shutils::print_bazel_server_pid() {
     fi
 }
 
+bazel_evergreen_shutils::fast_bazel_server_pids() {
+    local pid
+    local -a live_pids=()
+    local -A seen_pids=()
+
+    while IFS= read -r pid; do
+        if [[ ! "$pid" =~ ^[0-9]+$ ]] || [[ -n "${seen_pids[$pid]:-}" ]]; then
+            continue
+        fi
+        seen_pids["$pid"]=1
+        if kill -0 "$pid" 2>/dev/null; then
+            live_pids+=("$pid")
+        fi
+    done < <(pgrep -f "java.*bazel" 2>/dev/null || true)
+
+    if [[ ${#live_pids[@]} -eq 0 ]]; then
+        return 1
+    fi
+
+    printf '%s\n' "${live_pids[@]}"
+}
+
+bazel_evergreen_shutils::bazel_server_pids() {
+    local BAZEL_BINARY="$1"
+    local pf pid
+    local -a candidate_pids=()
+    local -a live_pids=()
+    local -A seen_pids=()
+
+    pf="$(bazel_evergreen_shutils::bazel_pidfile_path "$BAZEL_BINARY" 2>/dev/null)" || true
+    if [[ -f "$pf" ]]; then
+        pid="$(cat "$pf" 2>/dev/null || true)"
+        if [[ "$pid" =~ ^[0-9]+$ ]]; then
+            candidate_pids+=("$pid")
+        fi
+    fi
+
+    while IFS= read -r pid; do
+        if [[ "$pid" =~ ^[0-9]+$ ]]; then
+            candidate_pids+=("$pid")
+        fi
+    done < <(pgrep -f "java.*bazel" 2>/dev/null || true)
+
+    for pid in "${candidate_pids[@]}"; do
+        if [[ -n "${seen_pids[$pid]:-}" ]]; then
+            continue
+        fi
+        seen_pids["$pid"]=1
+        if kill -0 "$pid" 2>/dev/null; then
+            live_pids+=("$pid")
+        fi
+    done
+
+    if [[ ${#live_pids[@]} -eq 0 ]]; then
+        return 1
+    fi
+
+    printf '%s\n' "${live_pids[@]}"
+}
+
+bazel_evergreen_shutils::bazel_cache_pidfiles() {
+    local pattern pidfile
+    local -a patterns=(
+        "${HOME}/.cache/bazel/_bazel_*/*/server/server.pid.txt"
+        "/private/var/tmp/_bazel_*/*/server/server.pid.txt"
+        "/var/tmp/_bazel_*/*/server/server.pid.txt"
+    )
+
+    shopt -s nullglob
+    for pattern in "${patterns[@]}"; do
+        for pidfile in $pattern; do
+            [[ -f "$pidfile" ]] && echo "$pidfile"
+        done
+    done
+    shopt -u nullglob
+}
+
+bazel_evergreen_shutils::bazel_pidfile_path_for_pid() {
+    local server_pid="$1"
+    local pidfile candidate_pid
+
+    [[ "$server_pid" =~ ^[0-9]+$ ]] || return 1
+
+    while IFS= read -r pidfile; do
+        candidate_pid="$(cat "$pidfile" 2>/dev/null || true)"
+        if [[ "$candidate_pid" == "$server_pid" ]]; then
+            echo "$pidfile"
+            return 0
+        fi
+    done < <(bazel_evergreen_shutils::bazel_cache_pidfiles)
+
+    return 1
+}
+
+bazel_evergreen_shutils::request_bazel_jvm_dump() {
+    local BAZEL_BINARY="$1"
+    local pid
+    local signaled_pid=0
+
+    echo "Scanning for bazel server processes to signal." >&2
+
+    while IFS= read -r pid; do
+        [[ -z "$pid" ]] && continue
+        echo "Sending SIGQUIT to bazel process ${pid}" >&2
+        if kill -QUIT "$pid" 2>/dev/null; then
+            signaled_pid=1
+        else
+            echo "Failed to send SIGQUIT to bazel process ${pid}" >&2
+        fi
+    done < <(bazel_evergreen_shutils::fast_bazel_server_pids || true)
+
+    if [[ "$signaled_pid" -eq 0 ]]; then
+        echo "No bazel process found to signal." >&2
+        return 1
+    fi
+
+    # Bazel's JVM writes thread dumps asynchronously after SIGQUIT.
+    sleep 5
+}
+
+bazel_evergreen_shutils::bazel_jvm_out_snapshot_dir() {
+    echo "bazel_jvm_outs"
+}
+
+bazel_evergreen_shutils::bazel_jvm_out_path_for_pid() {
+    local server_pid="$1"
+    local pidfile output_base candidate
+
+    pidfile="$(bazel_evergreen_shutils::bazel_pidfile_path_for_pid "$server_pid")" || return 1
+    output_base="$(dirname "$(dirname "$pidfile")")"
+
+    for candidate in "${output_base}/server/jvm.out" "${output_base}/jvm.out"; do
+        if [[ -f "$candidate" ]]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    echo "No bazel jvm.out file found for pid ${server_pid} under ${output_base}" >&2
+    return 1
+}
+
+bazel_evergreen_shutils::bazel_jvm_out_path() {
+    local BAZEL_BINARY="$1"
+    local output_base jvm_out_path=""
+    local candidate
+
+    output_base="$(bazel_evergreen_shutils::bazel_output_base "$BAZEL_BINARY")" || {
+        echo "Unable to determine bazel output_base" >&2
+        return 1
+    }
+
+    for candidate in "${output_base}/server/jvm.out" "${output_base}/jvm.out"; do
+        if [[ -f "$candidate" ]]; then
+            jvm_out_path="$candidate"
+            break
+        fi
+    done
+
+    if [[ -z "$jvm_out_path" ]]; then
+        echo "No bazel jvm.out file found under ${output_base}" >&2
+        return 1
+    fi
+
+    echo "$jvm_out_path"
+}
+
+bazel_evergreen_shutils::capture_bazel_jvm_out() {
+    local BAZEL_BINARY="$1"
+    local server_pid="${2:-}"
+    local jvm_out_path snapshot_dir timestamp output_prefix output_file
+    local capture_index=1
+
+    if [[ -z "$server_pid" ]]; then
+        server_pid="$(bazel_evergreen_shutils::bazel_server_pid "$BAZEL_BINARY" 2>/dev/null || true)"
+    fi
+    if [[ -z "$server_pid" ]]; then
+        while IFS= read -r server_pid; do
+            [[ -n "$server_pid" ]] && break
+        done < <(bazel_evergreen_shutils::fast_bazel_server_pids || true)
+    fi
+
+    if [[ -n "$server_pid" ]]; then
+        jvm_out_path="$(bazel_evergreen_shutils::bazel_jvm_out_path_for_pid "$server_pid" 2>/dev/null || true)"
+    fi
+    if [[ -z "$jvm_out_path" ]]; then
+        jvm_out_path="$(bazel_evergreen_shutils::bazel_jvm_out_path "$BAZEL_BINARY" 2>/dev/null || true)"
+    fi
+    [[ -n "$jvm_out_path" ]] || return 1
+
+    snapshot_dir="$(bazel_evergreen_shutils::bazel_jvm_out_snapshot_dir)"
+    mkdir -p "$snapshot_dir"
+
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    if [[ -n "$server_pid" ]]; then
+        output_prefix="${snapshot_dir}/bazel_jvm_out_pid${server_pid}_${timestamp}"
+    else
+        output_prefix="${snapshot_dir}/bazel_jvm_out_pidunknown_${timestamp}"
+    fi
+
+    output_file="${output_prefix}.txt"
+    while [[ -e "$output_file" ]]; do
+        output_file="${output_prefix}_${capture_index}.txt"
+        ((capture_index++))
+    done
+
+    cp "$jvm_out_path" "$output_file"
+    echo "Captured bazel jvm.out from ${jvm_out_path} to $(pwd)/${output_file}" >&2
+    echo "$output_file"
+}
+
+bazel_evergreen_shutils::package_bazel_jvm_out() {
+    local BAZEL_BINARY="$1"
+    local archive_path="${2:-jvm.out.tar.gz}"
+    local snapshot_dir live_server_pid=""
+    local -a snapshots=()
+
+    snapshot_dir="$(bazel_evergreen_shutils::bazel_jvm_out_snapshot_dir)"
+    mkdir -p "$snapshot_dir"
+
+    shopt -s nullglob
+    snapshots=("${snapshot_dir}"/*)
+    shopt -u nullglob
+
+    while IFS= read -r live_server_pid; do
+        [[ -n "$live_server_pid" ]] && break
+    done < <(bazel_evergreen_shutils::fast_bazel_server_pids || true)
+
+    if [[ -n "$live_server_pid" || ${#snapshots[@]} -eq 0 ]]; then
+        bazel_evergreen_shutils::capture_bazel_jvm_out "$BAZEL_BINARY" "$live_server_pid" >/dev/null || {
+            if [[ ${#snapshots[@]} -eq 0 ]]; then
+                return 1
+            fi
+        }
+        shopt -s nullglob
+        snapshots=("${snapshot_dir}"/*)
+        shopt -u nullglob
+    fi
+
+    if [[ ${#snapshots[@]} -eq 0 ]]; then
+        echo "No captured bazel jvm.out files found under $(pwd)/${snapshot_dir}" >&2
+        return 1
+    fi
+
+    rm -f "$archive_path"
+    tar -czf "$archive_path" -C "$(dirname "$snapshot_dir")" "$(basename "$snapshot_dir")"
+    echo "Archived ${#snapshots[@]} bazel jvm dump file(s) from $(pwd)/${snapshot_dir} to $(pwd)/${archive_path}" >&2
+}
+
 bazel_evergreen_shutils::jstack_bazel() {
     # Find all bazel processes (Java processes with "bazel" in command line)
     local pids
-    pids=$(pgrep -f "java.*bazel" || true)
+    pids=$(bazel_evergreen_shutils::fast_bazel_server_pids || true)
     if [[ -z "$pids" ]]; then
         return 1
     fi
@@ -310,6 +567,9 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
         fi
 
+        local attempt_bazel_server_pid=""
+        attempt_bazel_server_pid="$(bazel_evergreen_shutils::bazel_server_pid "$BAZEL_BINARY" 2>/dev/null || true)"
+
         # Reassemble the caller’s words into a single command string for eval.
         # We deliberately do *not* try to be clever here—this restores legacy behavior
         # where quoted pieces inside variables (e.g., --base_dir="..") are honored by the shell.
@@ -375,6 +635,8 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
         elif [[ $RET -eq 124 ]]; then
             echo "Bazel timed out." >&2
+            bazel_evergreen_shutils::request_bazel_jvm_dump "$BAZEL_BINARY" || true
+            bazel_evergreen_shutils::capture_bazel_jvm_out "$BAZEL_BINARY" "$attempt_bazel_server_pid" >/dev/null || true
             "$BAZEL_BINARY" shutdown || true
         else
             if [[ ${RETRY_ON_FAIL:-0} -eq 1 ]]; then

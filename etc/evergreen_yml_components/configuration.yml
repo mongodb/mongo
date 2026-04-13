@@ -148,6 +148,7 @@ post:
   - func: "generate hang analyzer tasks"
   - func: "attach bazel invocation text"
   - func: "save failed tests"
+  - func: "save bazel jvm dump"
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
@@ -180,6 +181,8 @@ post:
 # Timeout steps
 timeout:
   - func: "f_expansions_write"
+  - func: "signal bazel quit"
+  - func: "save bazel jvm dump"
   - func: "run hang analyzer"
   - func: "wait for resmoke to shutdown"
   - func: "save bazel run logs"

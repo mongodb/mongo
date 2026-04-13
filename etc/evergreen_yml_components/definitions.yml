@@ -3325,6 +3325,16 @@ functions:
         display_name: Bazel Run Logs
         optional: true
 
+  "signal bazel quit":
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "signal bazel quit"
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/collect_bazel_jvm_dump.sh"
+          - "--signal-bazel-quit"
+
   "archive hang analyzer debugger files": &archive_hang_analyzer_debugger_files
     command: s3.put
     display_name: "archive hang analyzer debugger files"
@@ -3420,18 +3430,25 @@ functions:
       display_name: Bazel Header List
 
   "save bazel jvm dump":
-    command: s3.put
-    display_name: "attach bazel jvm dump"
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/jvm.out.tar.gz
-      remote_file: ${project}/${build_variant}/${revision}/jvm.out.${task_id}-${execution}.tar.gz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      display_name: Bazel JVM dump
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "collect bazel jvm dump"
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/collect_bazel_jvm_dump.sh"
+    - command: s3.put
+      display_name: "attach bazel jvm dump"
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/jvm.out.tar.gz
+        remote_file: ${project}/${build_variant}/${revision}/jvm.out.${task_id}-${execution}.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/gzip
+        display_name: Bazel JVM dump
 
   "save bazel exec logs":
     command: s3.put

@@ -102,6 +102,8 @@ variables:
       - func: "cleanup environment"
     timeout:
       - func: "f_expansions_write"
+      - func: "signal bazel quit"
+      - func: "save bazel jvm dump"
       - func: "run hang analyzer"
       - func: "wait for resmoke to shutdown"
       - func: "save bazel run logs"

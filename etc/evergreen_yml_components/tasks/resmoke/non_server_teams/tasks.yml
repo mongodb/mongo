@@ -1166,6 +1166,7 @@ task_groups:
     teardown_task:
       - func: "s3.put bazel build events"
       - func: "collect bazel debug logs"
+      - func: "save bazel jvm dump"
       - func: "debug full disk"
       - func: "attach bazel invocation"
       - func: "save failed tests"
