@@ -74,6 +74,10 @@ source cm/bin/activate
   ```sh
   (cm) python join_start.py
   ```
+  To skip the constant calibration (warm scan, CPU, sequential I/O, random I/O) and only run the join algorithm comparison:
+  ```sh
+  (cm) python join_start.py --join-only
+  ```
 
 **Note:** For CBR calibration, the first time it will take a while since it has to generate the data. Afterwards, as long as you aren't modifying the collections, you can comment out `await generator.populate_collections()` in `start.py` - this will make it a lot faster.
 

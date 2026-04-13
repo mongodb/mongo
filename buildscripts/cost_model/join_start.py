@@ -34,6 +34,7 @@ Assumptions:
   measurements would be invalid.
 """
 
+import argparse
 import asyncio
 import os
 import random
@@ -192,9 +193,13 @@ async def calibrate_sequential_io(
         print(f"  [{i + 1}/{num_runs}] cold scan: {t / 1e6:.3f}ms")
 
     mean_ms = trim_mean(times_ns, proportiontocut=TRIMMED_MEAN_PROPORTION) / 1e6
+
+    # Restart with WT statistics enabled just to read the leaf page count.
+    manager.restart_cold(extra_start_args=["--wiredTigerStatisticsSetting", "all"])
     stats = await manager.database.get_stats("join_coll_1")
     num_leaf_pages = stats["wiredTiger"]["btree"]["row-store leaf pages"]
     mean_per_page_ms = mean_ms / num_leaf_pages
+    manager.stop()
 
     print("\n--- Sequential I/O summary ---")
     print(f"  Mean cold scan: {mean_ms:.3f}ms")
@@ -418,6 +423,15 @@ async def calibrate_join_algorithms(
 
 async def main():
     """Entry point function."""
+    parser = argparse.ArgumentParser(description="Join Cost Model Calibration")
+    parser.add_argument(
+        "--join-only",
+        action="store_true",
+        help="Skip constant calibration (warm scan, CPU, sequential I/O, random I/O) "
+        "and only run the join algorithm comparison.",
+    )
+    args = parser.parse_args()
+
     script_directory = os.path.abspath(os.path.dirname(__file__))
     os.chdir(script_directory)
 
@@ -430,9 +444,6 @@ async def main():
         db_config=join_database,
         dbpath="~/mongo/join_calibration_db",
         extra_args=[
-            # To be able to retrieve the WT "row-store leaf pages" statistic
-            "--wiredTigerStatisticsSetting",
-            "all",
             "--setParameter",
             "internalMeasureQueryExecutionTimeInNanoseconds=true",
             "--setParameter",
@@ -442,23 +453,26 @@ async def main():
         generator = DataGenerator(manager.database, join_data_generator)
         await generator.populate_collections()
 
-        warm_scan_tuple_ms = await measure_warm_scan_time(manager)
-        cpu_tuple_ms = await calibrate_cpu(manager)
-        time_seq_page_ms = await calibrate_sequential_io(
-            manager, warm_scan_ms=warm_scan_tuple_ms * COLLECTION_CARDINALITY
-        )
-        time_rand_page_ms = await calibrate_random_io(manager)
+        if not args.join_only:
+            warm_scan_tuple_ms = await measure_warm_scan_time(manager)
+            cpu_tuple_ms = await calibrate_cpu(manager)
+            time_seq_page_ms = await calibrate_sequential_io(
+                manager, warm_scan_ms=warm_scan_tuple_ms * COLLECTION_CARDINALITY
+            )
+            time_rand_page_ms = await calibrate_random_io(manager)
 
-        print("\n=== Cost Coefficient Ratios ===")
-        print(f"  cpuFactor    = 1.0 ({cpu_tuple_ms:.6f}ms)")
-        print(
-            f"  seqIOFactor  = {time_seq_page_ms / cpu_tuple_ms:.1f}"
-            f"  ({time_seq_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
-        )
-        print(
-            f"  randIOFactor = {time_rand_page_ms / cpu_tuple_ms:.1f}"
-            f"  ({time_rand_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
-        )
+            print("\n=== Cost Coefficient Ratios ===")
+            print(f"  cpuFactor    = 1.0 ({cpu_tuple_ms:.6f}ms)")
+            print(
+                f"  seqIOFactor  = {time_seq_page_ms / cpu_tuple_ms:.1f}"
+                f"  ({time_seq_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
+            )
+            print(
+                f"  randIOFactor = {time_rand_page_ms / cpu_tuple_ms:.1f}"
+                f"  ({time_rand_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
+            )
+        else:
+            print("\n=== Skipping constant calibration (--join-only) ===")
 
         # The ~100MB collections will fit comfortably in the 5GB cache.
         in_cache_results = await calibrate_join_algorithms(
