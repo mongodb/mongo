@@ -116,7 +116,12 @@ export const $config = (function () {
                 );
                 jsTest.log(`${coll.getName()} updateMany: ${tojsononeline(res)}`);
             } catch (e) {
-                const acceptedErrors = [ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade];
+                const acceptedErrors = [
+                    ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade,
+                    // A concurrent FCV transition can cause a partial multi-update to fail with
+                    // QueryPlanKilled (StaleConfig rewritten to prevent unsafe router retry).
+                    ErrorCodes.QueryPlanKilled,
+                ];
                 if (e.code && acceptedErrors.includes(e.code)) {
                     return;
                 }
