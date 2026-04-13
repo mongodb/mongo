@@ -208,6 +208,9 @@ filters:
   - "lite_parsed*":
     approvers:
       - 10gen/query-optimization
+  - "hybrid_search_pipeline_builder*":
+    approvers:
+      - 10gen/query-integration
   - "partition_key_comparator*":
     approvers:
       - 10gen/query-integration-features
@@ -217,9 +220,15 @@ filters:
   - "pipeline_test.cpp":
     approvers:
       - 10gen/query-optimization
+  - "rank_fusion_pipeline_builder*":
+    approvers:
+      - 10gen/query-integration
   - "query_request_conversion*":
     approvers:
       - 10gen/query-optimization
+  - "score_fusion_pipeline_builder*":
+    approvers:
+      - 10gen/query-integration
   - "serverless_aggregation_context_fixture*":
     approvers:
       - 10gen/query-optimization

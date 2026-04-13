@@ -30,6 +30,9 @@
 #include "mongo/db/pipeline/document_source_score_fusion.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -183,129 +186,101 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNone) 
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -338,154 +313,126 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationSigmoi
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$divide": [
-                                             {
-                                                 "$const": {"$numberInt":"1"}
-                                             },
-                                             {
-                                                 "$add": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$exp": [
-                                                             {
-                                                                 "$multiply": [
-                                                                     {
-                                                                         "$const": {"$numberInt":"-1"}
-                                                                     },
-                                                                     {
-                                                                         "$meta": "score"
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             }
-                                         ]
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -518,151 +465,123 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationMinMax
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$_internalSetWindowFields": {
-                         "sortBy": {
-                             "_internal_scoreFusion_internal_fields.name1_score": {"$numberInt":"-1"}
-                         },
-                         "output": {
-                             "_internal_scoreFusion_internal_fields.name1_score": {
-                                 "$minMaxScaler": {
-                                     "input": "$_internal_scoreFusion_internal_fields.name1_score",
-                                     "min": {"$numberInt":"0"},
-                                     "max": {"$numberInt":"1"}
-                                 },
-                                 "window": {
-                                     "documents": [
-                                         "unbounded",
-                                         "unbounded"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "_internal_scoreFusion_internal_fields.name1_score": -1
+                        },
+                        "output": {
+                            "_internal_scoreFusion_internal_fields.name1_score": {
+                                "$minMaxScaler": {
+                                    "input": "$_internal_scoreFusion_internal_fields.name1_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -693,320 +612,286 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$setMetadata": {
-                         "score": "$score_50"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$divide": [
-                                 {
-                                     "$const": {"$numberInt":"1"}
-                                 },
-                                 {
-                                     "$add": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$exp": [
-                                                 {
-                                                     "$multiply": [
-                                                         {
-                                                             "$const": {"$numberInt":"-1"}
-                                                         },
-                                                         {
-                                                             "$meta": "score"
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$_internalSetWindowFields": {
-                         "sortBy": {
-                             "_internal_scoreFusion_internal_fields.name1_score": {"$numberInt":"-1"}
-                         },
-                         "output": {
-                             "_internal_scoreFusion_internal_fields.name1_score": {
-                                 "$minMaxScaler": {
-                                     "input": "$_internal_scoreFusion_internal_fields.name1_score",
-                                     "min": {"$numberInt":"0"},
-                                     "max": {"$numberInt":"1"}
-                                 },
-                                 "window": {
-                                     "documents": [
-                                         "unbounded",
-                                         "unbounded"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$setMetadata": {
-                                     "score": "$score_10"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "internal_raw_score": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$divide": [
-                                             {
-                                                 "$const": {"$numberInt":"1"}
-                                             },
-                                             {
-                                                 "$add": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$exp": [
-                                                             {
-                                                                 "$multiply": [
-                                                                     {
-                                                                         "$const": {"$numberInt":"-1"}
-                                                                     },
-                                                                     {
-                                                                         "$meta": "score"
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             }
-                                         ]
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": "$docs"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$_internalSetWindowFields": {
-                                     "sortBy": {
-                                         "_internal_scoreFusion_internal_fields.name2_score": {"$numberInt":"-1"}
-                                     },
-                                     "output": {
-                                         "_internal_scoreFusion_internal_fields.name2_score": {
-                                             "$minMaxScaler": {
-                                                 "input": "$_internal_scoreFusion_internal_fields.name2_score",
-                                                 "min": {"$numberInt":"0"},
-                                                 "max": {"$numberInt":"1"}
-                                             },
-                                             "window": {
-                                                 "documents": [
-                                                     "unbounded",
-                                                     "unbounded"
-                                                 ]
-                                             }
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score",
-                                 "$_internal_scoreFusion_internal_fields.name2_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": "$score_50"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        {
+                                                            "$meta": "score"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "_internal_scoreFusion_internal_fields.name1_score": -1
+                        },
+                        "output": {
+                            "_internal_scoreFusion_internal_fields.name1_score": {
+                                "$minMaxScaler": {
+                                    "input": "$_internal_scoreFusion_internal_fields.name1_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": "$score_10"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "_internal_scoreFusion_internal_fields.name2_score": -1
+                                    },
+                                    "output": {
+                                        "_internal_scoreFusion_internal_fields.name2_score": {
+                                            "$minMaxScaler": {
+                                                "input": "$_internal_scoreFusion_internal_fields.name2_score",
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score",
+                                "$_internal_scoreFusion_internal_fields.name2_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -1296,190 +1181,156 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score",
-                                 "$_internal_scoreFusion_internal_fields.name2_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score",
+                                "$_internal_scoreFusion_internal_fields.name2_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -1510,326 +1361,292 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$setMetadata": {
-                         "score": "$score_50"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$divide": [
-                                 {
-                                     "$const": {"$numberInt":"1"}
-                                 },
-                                 {
-                                     "$add": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$exp": [
-                                                 {
-                                                     "$multiply": [
-                                                         {
-                                                             "$const": {"$numberInt":"-1"}
-                                                         },
-                                                         {
-                                                             "$meta": "score"
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$divide": [
-                                             {
-                                                 "$const": {"$numberInt":"1"}
-                                             },
-                                             {
-                                                 "$add": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$exp": [
-                                                             {
-                                                                 "$multiply": [
-                                                                     {
-                                                                         "$const": {"$numberInt":"-1"}
-                                                                     },
-                                                                     {
-                                                                         "$meta": "score"
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             }
-                                         ]
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$setMetadata": {
-                                     "score": "$score_10"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "internal_raw_score": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$divide": [
-                                             {
-                                                 "$const": {"$numberInt":"1"}
-                                             },
-                                             {
-                                                 "$add": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$exp": [
-                                                             {
-                                                                 "$multiply": [
-                                                                     {
-                                                                         "$const": {"$numberInt":"-1"}
-                                                                     },
-                                                                     {
-                                                                         "$meta": "score"
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             }
-                                         ]
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": "$docs"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$divide": [
-                                                         {
-                                                             "$const": {"$numberInt":"1"}
-                                                         },
-                                                         {
-                                                             "$add": [
-                                                                 {
-                                                                     "$const": {"$numberInt":"1"}
-                                                                 },
-                                                                 {
-                                                                     "$exp": [
-                                                                         {
-                                                                             "$multiply": [
-                                                                                 {
-                                                                                     "$const": {"$numberInt":"-1"}
-                                                                                 },
-                                                                                 {
-                                                                                     "$meta": "score"
-                                                                                 }
-                                                                             ]
-                                                                         }
-                                                                     ]
-                                                                 }
-                                                             ]
-                                                         }
-                                                     ]
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score",
-                                 "$_internal_scoreFusion_internal_fields.name2_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": "$score_50"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        {
+                                                            "$meta": "score"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": "$score_10"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                {
+                                                                    "$const": 1
+                                                                },
+                                                                {
+                                                                    "$exp": [
+                                                                        {
+                                                                            "$multiply": [
+                                                                                {
+                                                                                    "$const": -1
+                                                                                },
+                                                                                {
+                                                                                    "$meta": "score"
+                                                                                }
+                                                                            ]
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score",
+                                "$_internal_scoreFusion_internal_fields.name2_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -1863,134 +1680,106 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$match": {
-                         "author": "dave"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -2040,308 +1829,268 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$match": {
-                         "author": "Agatha Christie"
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$divide": [
-                                 {
-                                     "$const": {"$numberDouble":"6"}
-                                 },
-                                 {
-                                     "$const": {"$numberDouble":"3"}
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$divide": [
-                                 {
-                                     "$const": {"$numberInt":"1"}
-                                 },
-                                 {
-                                     "$add": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$exp": [
-                                                 {
-                                                     "$multiply": [
-                                                         {
-                                                             "$const": {"$numberInt":"-1"}
-                                                         },
-                                                         {
-                                                             "$meta": "score"
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$search": {
-                                     "mongotQuery": {
-                                         "index": "search_index",
-                                         "text": {
-                                             "query": "mystery",
-                                             "path": "genres"
-                                         }
-                                     },
-                                     "requiresSearchSequenceToken": false,
-                                     "requiresSearchMetaCursor": true
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name3_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name3_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name3_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name3_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     },
-                                     "name3_score": {
-                                         "$max": [
-                                             "$$value.name3_score",
-                                             "$$this.name3_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score",
-                                 "$_internal_scoreFusion_internal_fields.name2_score",
-                                 "$_internal_scoreFusion_internal_fields.name3_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 6
+                                },
+                                {
+                                    "$const": 3
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        {
+                                                            "$meta": "score"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name3_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name3_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name3_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score",
+                                        "name3_score": "$__hs_name3_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score",
+                                "$_internal_scoreFusion_internal_fields.name2_score",
+                                "$_internal_scoreFusion_internal_fields.name3_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -2772,195 +2521,161 @@ TEST_F(DocumentSourceScoreFusionTest, CheckWeightsApplied) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$match": {
-                         "author": "dave"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "matchAuthor_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"5"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$search": {
-                                     "mongotQuery": {
-                                         "index": "search_index",
-                                         "text": {
-                                             "query": "mystery",
-                                             "path": "genres"
-                                         }
-                                     },
-                                     "requiresSearchSequenceToken": false,
-                                     "requiresSearchMetaCursor": true
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "matchGenres_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"3"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "matchAuthor_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchAuthor_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "matchGenres_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchGenres_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "matchAuthor_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "matchGenres_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "matchAuthor_score": {
-                                         "$max": [
-                                             "$$value.matchAuthor_score",
-                                             "$$this.matchAuthor_score"
-                                         ]
-                                     },
-                                     "matchGenres_score": {
-                                         "$max": [
-                                             "$$value.matchGenres_score",
-                                             "$$this.matchGenres_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.matchAuthor_score",
-                                 "$_internal_scoreFusion_internal_fields.matchGenres_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 3
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchAuthor_score": "$__hs_matchAuthor_score",
+                                        "matchGenres_score": "$__hs_matchGenres_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                "$_internal_scoreFusion_internal_fields.matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -3016,195 +2731,161 @@ TEST_F(DocumentSourceScoreFusionTest, CheckWeightsAppliedToCorrectPipeline) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$match": {
-                         "author": "dave"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "matchAuthor_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"5"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$search": {
-                                     "mongotQuery": {
-                                         "index": "search_index",
-                                         "text": {
-                                             "query": "mystery",
-                                             "path": "genres"
-                                         }
-                                     },
-                                     "requiresSearchSequenceToken": false,
-                                     "requiresSearchMetaCursor": true
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "matchGenres_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"3"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "matchAuthor_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchAuthor_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "matchGenres_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchGenres_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "matchAuthor_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "matchGenres_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "matchAuthor_score": {
-                                         "$max": [
-                                             "$$value.matchAuthor_score",
-                                             "$$this.matchAuthor_score"
-                                         ]
-                                     },
-                                     "matchGenres_score": {
-                                         "$max": [
-                                             "$$value.matchGenres_score",
-                                             "$$this.matchGenres_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.matchAuthor_score",
-                                 "$_internal_scoreFusion_internal_fields.matchGenres_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 3
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchAuthor_score": "$__hs_matchAuthor_score",
+                                        "matchGenres_score": "$__hs_matchGenres_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                "$_internal_scoreFusion_internal_fields.matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -3275,344 +2956,298 @@ TEST_F(DocumentSourceScoreFusionTest, CheckWeightsAppliedMultiplePipelines) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$match": {
-                         "author": "dave"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "matchAuthor_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"5"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$geoNear": {
-                                     "near": [
-                                         {
-                                             "$const": {"$numberInt":"20"}
-                                         },
-                                         {
-                                             "$const": {"$numberInt":"40"}
-                                         }
-                                     ],
-                                     "query": {},
-                                     "spherical": false
-                                 }
-                             },
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$meta": "geoNearDistance"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "internal_raw_score": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": "$docs"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "matchDistance_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"0"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$search": {
-                                     "mongotQuery": {
-                                         "index": "search_index",
-                                         "text": {
-                                             "query": "mystery",
-                                             "path": "genres"
-                                         }
-                                     },
-                                     "requiresSearchSequenceToken": false,
-                                     "requiresSearchMetaCursor": true
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "matchGenres_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"3"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "matchPlot_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"0.3"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "matchAuthor_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchAuthor_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "matchDistance_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchDistance_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "matchGenres_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchGenres_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "matchPlot_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchPlot_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "matchAuthor_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "matchDistance_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "matchGenres_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "matchPlot_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "matchAuthor_score": {
-                                         "$max": [
-                                             "$$value.matchAuthor_score",
-                                             "$$this.matchAuthor_score"
-                                         ]
-                                     },
-                                     "matchDistance_score": {
-                                         "$max": [
-                                             "$$value.matchDistance_score",
-                                             "$$this.matchDistance_score"
-                                         ]
-                                     },
-                                     "matchGenres_score": {
-                                         "$max": [
-                                             "$$value.matchGenres_score",
-                                             "$$this.matchGenres_score"
-                                         ]
-                                     },
-                                     "matchPlot_score": {
-                                         "$max": [
-                                             "$$value.matchPlot_score",
-                                             "$$this.matchPlot_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.matchAuthor_score",
-                                 "$_internal_scoreFusion_internal_fields.matchDistance_score",
-                                 "$_internal_scoreFusion_internal_fields.matchGenres_score",
-                                 "$_internal_scoreFusion_internal_fields.matchPlot_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "matchAuthor_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": [
+                                        {
+                                            "$const": 20
+                                        },
+                                        {
+                                            "$const": 40
+                                        }
+                                    ],
+                                    "query": {},
+                                    "spherical": false
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$meta": "geoNearDistance"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchDistance_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 0
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 3
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchPlot_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 0.3
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_matchDistance_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchDistance_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_matchPlot_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchPlot_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchAuthor_score": "$__hs_matchAuthor_score",
+                                        "matchDistance_score": "$__hs_matchDistance_score",
+                                        "matchGenres_score": "$__hs_matchGenres_score",
+                                        "matchPlot_score": "$__hs_matchPlot_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                "$_internal_scoreFusion_internal_fields.matchDistance_score",
+                                "$_internal_scoreFusion_internal_fields.matchGenres_score",
+                                "$_internal_scoreFusion_internal_fields.matchPlot_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -3667,195 +3302,161 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$match": {
-                         "author": "dave"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"5"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"3.2"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score",
-                                 "$_internal_scoreFusion_internal_fields.name2_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 3.2
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score",
+                                "$_internal_scoreFusion_internal_fields.name2_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -4445,46 +4046,20 @@ TEST_F(DocumentSourceScoreFusionTest, QueryShapeDebugString) {
                         "HASH<_internal_scoreFusion_docs>": {
                             "$first": "$HASH<_internal_scoreFusion_docs>"
                         },
-                        "HASH<_internal_scoreFusion_internal_fields>": {
-                            "$push": {
-                                "HASH<matchAuthor_score>": {
-                                    "$ifNull": [
-                                        "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchAuthor_score>",
-                                        "?number"
-                                    ]
-                                },
-                                "HASH<matchDistance_score>": {
-                                    "$ifNull": [
-                                        "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchDistance_score>",
-                                        "?number"
-                                    ]
-                                }
+                        "HASH<__hs_matchAuthor_score>": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchAuthor_score>",
+                                    "?number"
+                                ]
                             }
-                        }
-                    }
-                },
-                {
-                    "$project": {
-                        "HASH<_id>": true,
-                        "HASH<_internal_scoreFusion_docs>": true,
-                        "HASH<_internal_scoreFusion_internal_fields>": {
-                            "$reduce": {
-                                "input": "$HASH<_internal_scoreFusion_internal_fields>",
-                                "initialValue": "?object",
-                                "in": {
-                                    "HASH<matchAuthor_score>": {
-                                        "$max": [
-                                            "$$HASH<value>.HASH<matchAuthor_score>",
-                                            "$$HASH<this>.HASH<matchAuthor_score>"
-                                        ]
-                                    },
-                                    "HASH<matchDistance_score>": {
-                                        "$max": [
-                                            "$$HASH<value>.HASH<matchDistance_score>",
-                                            "$$HASH<this>.HASH<matchDistance_score>"
-                                        ]
-                                    }
-                                }
+                        },
+                        "HASH<__hs_matchDistance_score>": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$HASH<_internal_scoreFusion_internal_fields>.HASH<matchDistance_score>",
+                                    "?number"
+                                ]
                             }
                         }
                     }
@@ -4494,15 +4069,14 @@ TEST_F(DocumentSourceScoreFusionTest, QueryShapeDebugString) {
                         "newRoot": {
                             "$mergeObjects": [
                                 "$HASH<_internal_scoreFusion_docs>",
-                                "$$ROOT"
+                                {
+                                    "HASH<_internal_scoreFusion_internal_fields>": {
+                                        "HASH<matchAuthor_score>": "$HASH<__hs_matchAuthor_score>",
+                                        "HASH<matchDistance_score>": "$HASH<__hs_matchDistance_score>"
+                                    }
+                                }
                             ]
                         }
-                    }
-                },
-                {
-                    "$project": {
-                        "HASH<_internal_scoreFusion_docs>": false,
-                        "HASH<_id>": true
                     }
                 },
                 {
@@ -4734,50 +4308,20 @@ TEST_F(DocumentSourceScoreFusionTest, RepresentativeQueryShape) {
                         "_internal_scoreFusion_docs": {
                             "$first": "$_internal_scoreFusion_docs"
                         },
-                        "_internal_scoreFusion_internal_fields": {
-                            "$push": {
-                                "matchAuthor_score": {
-                                    "$ifNull": [
-                                        "$_internal_scoreFusion_internal_fields.matchAuthor_score",
-                                        1
-                                    ]
-                                },
-                                "matchDistance_score": {
-                                    "$ifNull": [
-                                        "$_internal_scoreFusion_internal_fields.matchDistance_score",
-                                        1
-                                    ]
-                                }
+                        "__hs_matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchAuthor_score",
+                                    1
+                                ]
                             }
-                        }
-                    }
-                },
-                {
-                    "$project": {
-                        "_id": true,
-                        "_internal_scoreFusion_docs": true,
-                        "_internal_scoreFusion_internal_fields": {
-                            "$reduce": {
-                                "input": "$_internal_scoreFusion_internal_fields",
-                                "initialValue": {
-                                    "$const": {
-                                        "?": "?"
-                                    }
-                                },
-                                "in": {
-                                    "matchAuthor_score": {
-                                        "$max": [
-                                            "$$value.matchAuthor_score",
-                                            "$$this.matchAuthor_score"
-                                        ]
-                                    },
-                                    "matchDistance_score": {
-                                        "$max": [
-                                            "$$value.matchDistance_score",
-                                            "$$this.matchDistance_score"
-                                        ]
-                                    }
-                                }
+                        },
+                        "__hs_matchDistance_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchDistance_score",
+                                    1
+                                ]
                             }
                         }
                     }
@@ -4787,15 +4331,14 @@ TEST_F(DocumentSourceScoreFusionTest, RepresentativeQueryShape) {
                         "newRoot": {
                             "$mergeObjects": [
                                 "$_internal_scoreFusion_docs",
-                                "$$ROOT"
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchAuthor_score": "$__hs_matchAuthor_score",
+                                        "matchDistance_score": "$__hs_matchDistance_score"
+                                    }
+                                }
                             ]
                         }
-                    }
-                },
-                {
-                    "$project": {
-                        "_internal_scoreFusion_docs": false,
-                        "_id": true
                     }
                 },
                 {
@@ -4911,259 +4454,225 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$geoNear": {
-                         "near": {
-                             "type": {
-                                 "$const": "Point"
-                             },
-                             "coordinates": [
-                                 {
-                                     "$const": {"$numberDouble":"-73.99279"}
-                                 },
-                                 {
-                                     "$const": {"$numberDouble":"40.719296"}
-                                 }
-                             ]
-                         },
-                         "maxDistance": {"$numberInt":"2"},
-                         "query": {
-                             "category": {
-                                 "$eq": "Parks"
-                             }
-                         },
-                         "spherical": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$meta": "geoNearDistance"
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$divide": [
-                                 {
-                                     "$const": {"$numberInt":"1"}
-                                 },
-                                 {
-                                     "$add": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$exp": [
-                                                 {
-                                                     "$multiply": [
-                                                         {
-                                                             "$const": {"$numberInt":"-1"}
-                                                         },
-                                                         {
-                                                             "$meta": "score"
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "matchDistance_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$search": {
-                                     "mongotQuery": {
-                                         "index": "search_index",
-                                         "text": {
-                                             "query": "mystery",
-                                             "path": "genres"
-                                         }
-                                     },
-                                     "requiresSearchSequenceToken": false,
-                                     "requiresSearchMetaCursor": true
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "matchGenres_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "matchDistance_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchDistance_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "matchGenres_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.matchGenres_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "matchDistance_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "matchGenres_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "matchDistance_score": {
-                                         "$max": [
-                                             "$$value.matchDistance_score",
-                                             "$$this.matchDistance_score"
-                                         ]
-                                     },
-                                     "matchGenres_score": {
-                                         "$max": [
-                                             "$$value.matchGenres_score",
-                                             "$$this.matchGenres_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.matchDistance_score",
-                                 "$_internal_scoreFusion_internal_fields.matchGenres_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$geoNear": {
+                        "near": {
+                            "type": {
+                                "$const": "Point"
+                            },
+                            "coordinates": [
+                                {
+                                    "$const": -73.99279
+                                },
+                                {
+                                    "$const": 40.719296
+                                }
+                            ]
+                        },
+                        "maxDistance": 2,
+                        "query": {
+                            "category": {
+                                "$eq": "Parks"
+                            }
+                        },
+                        "spherical": true
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$meta": "geoNearDistance"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        {
+                                                            "$meta": "score"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "matchDistance_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchGenres_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_matchDistance_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchDistance_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "matchDistance_score": "$__hs_matchDistance_score",
+                                        "matchGenres_score": "$__hs_matchGenres_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.matchDistance_score",
+                                "$_internal_scoreFusion_internal_fields.matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -5247,190 +4756,156 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedAvgMethod) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score",
-                                 "$_internal_scoreFusion_internal_fields.name2_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score",
+                                "$_internal_scoreFusion_internal_fields.name2_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -5574,139 +5049,111 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNoneMe
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "name1": "$_internal_scoreFusion_internal_fields.name1_score"
-                                 },
-                                 "in": {
-                                     "$sum": [
-                                         "$$name1",
-                                         {
-                                             "$const": {"$numberDouble":"5"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$_internal_scoreFusion_internal_fields.name1_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$name1",
+                                        {
+                                            "$const": 5
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -5745,134 +5192,106 @@ TEST_F(DocumentSourceScoreFusionTest,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "name1": "$_internal_scoreFusion_internal_fields.name1_score"
-                                 },
-                                 "in": {
-                                     "$const": {"$numberDouble":"1"}
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$_internal_scoreFusion_internal_fields.name1_score"
+                                },
+                                "in": {
+                                    "$const": 1
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -5925,201 +5344,167 @@ TEST_F(DocumentSourceScoreFusionTest,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "name1": "$_internal_scoreFusion_internal_fields.name1_score",
-                                     "name2": "$_internal_scoreFusion_internal_fields.name2_score"
-                                 },
-                                 "in": {
-                                     "$sum": [
-                                         "$$name1",
-                                         "$$name2",
-                                         {
-                                             "$const": {"$numberDouble":"5"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$_internal_scoreFusion_internal_fields.name1_score",
+                                    "name2": "$_internal_scoreFusion_internal_fields.name2_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$name1",
+                                        "$$name2",
+                                        {
+                                            "$const": 5
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -6172,200 +5557,166 @@ TEST_F(DocumentSourceScoreFusionTest,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "name2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name2_score": {
-                                         "$max": [
-                                             "$$value.name2_score",
-                                             "$$this.name2_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "name1": "$_internal_scoreFusion_internal_fields.name1_score",
-                                     "name2": "$_internal_scoreFusion_internal_fields.name2_score"
-                                 },
-                                 "in": {
-                                     "$sum": [
-                                         "$$name1",
-                                         {
-                                             "$const": {"$numberDouble":"5"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name2_score": "$__hs_name2_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$_internal_scoreFusion_internal_fields.name1_score",
+                                    "name2": "$_internal_scoreFusion_internal_fields.name2_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$name1",
+                                        {
+                                            "$const": 5
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -6457,144 +5808,116 @@ TEST_F(DocumentSourceScoreFusionTest,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "name1": "$_internal_scoreFusion_internal_fields.name1_score"
-                                 },
-                                 "in": {
-                                     "$convert": {
-                                         "input": {
-                                             "$const": {"$numberDouble":"2.5"}
-                                         },
-                                         "to": {
-                                             "$const": "string"
-                                         },
-                                         "format": {
-                                             "$const": "auto"
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$_internal_scoreFusion_internal_fields.name1_score"
+                                },
+                                "in": {
+                                    "$convert": {
+                                        "input": {
+                                            "$const": 2.5
+                                        },
+                                        "to": {
+                                            "$const": "string"
+                                        },
+                                        "format": {
+                                            "$const": "auto"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -6633,146 +5956,118 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNoneMe
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "name1": "$_internal_scoreFusion_internal_fields.name1_score"
-                                 },
-                                 "in": {
-                                     "$let": {
-                                         "vars": {
-                                             "name1": "$name1_score"
-                                         },
-                                         "in": {
-                                             "$sum": [
-                                                 "$$name1",
-                                                 {
-                                                     "$const": {"$numberInt":"5"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$_internal_scoreFusion_internal_fields.name1_score"
+                                },
+                                "in": {
+                                    "$let": {
+                                        "vars": {
+                                            "name1": "$name1_score"
+                                        },
+                                        "in": {
+                                            "$sum": [
+                                                "$$name1",
+                                                {
+                                                    "$const": 5
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -6811,218 +6106,178 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineVectorSearchScoreDetailsDe
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"5"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name1_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name1_scoreDetails": "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name1_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name1_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name1_rawScore": {
-                                         "$max": [
-                                             "$$value.name1_rawScore",
-                                             "$$this.name1_rawScore"
-                                         ]
-                                     },
-                                     "name1_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.name1_scoreDetails",
-                                             "$$this.name1_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "name1"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.name1_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"5"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.name1_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "none"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "average"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 5
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_rawScore": {
+                                "$meta": "score"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_scoreDetails": {
+                                "details": []
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name1_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name1_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name1_rawScore": "$__hs_name1_rawScore",
+                                        "name1_scoreDetails": "$__hs_name1_scoreDetails"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "name1"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.name1_rawScore",
+                                            "weight": {
+                                                "$const": 5
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.name1_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "description": {
+                                "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
+                            },
+                            "normalization": {
+                                "$const": "none"
+                            },
+                            "combination": {
+                                "method": {
+                                    "$const": "average"
+                                }
+                            },
+                            "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -7075,345 +6330,287 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchWithScoreDetailsDesu
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
 
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-             "expectedStages": [)") +
-        std::string(R"({
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"3"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$search": {
-                                     "mongotQuery": {
-                                         "index": "search_index",
-                                         "text": {
-                                             "query": "mystery",
-                                             "path": "genres"
-                                         },
-                                         "scoreDetails": true
-                                     },
-                                     "requiresSearchSequenceToken": false,
-                                     "requiresSearchMetaCursor": true
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "searchPipe_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"2"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "searchPipe_rawScore": {
-                                             "$meta": "score"
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "searchPipe_scoreDetails": {
-                                             "details": {
-                                                 "$meta": "scoreDetails"
-                                             }
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },)") +
-        std::string(R"({
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name1_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name1_scoreDetails": "$_internal_scoreFusion_internal_fields.name1_scoreDetails",
-                                 "searchPipe_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.searchPipe_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "searchPipe_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "searchPipe_scoreDetails": "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name1_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name1_scoreDetails": {
-                                         "$const": {}
-                                     },
-                                     "searchPipe_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "searchPipe_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "searchPipe_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name1_rawScore": {
-                                         "$max": [
-                                             "$$value.name1_rawScore",
-                                             "$$this.name1_rawScore"
-                                         ]
-                                     },
-                                     "name1_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.name1_scoreDetails",
-                                             "$$this.name1_scoreDetails"
-                                         ]
-                                     },
-                                     "searchPipe_score": {
-                                         "$max": [
-                                             "$$value.searchPipe_score",
-                                             "$$this.searchPipe_score"
-                                         ]
-                                     },
-                                     "searchPipe_rawScore": {
-                                         "$max": [
-                                             "$$value.searchPipe_rawScore",
-                                             "$$this.searchPipe_rawScore"
-                                         ]
-                                     },
-                                     "searchPipe_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.searchPipe_scoreDetails",
-                                             "$$this.searchPipe_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.name1_score",
-                                 "$_internal_scoreFusion_internal_fields.searchPipe_score"
-                             ]
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "name1"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.name1_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"3"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.name1_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
-                                     ]
-                                 },
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "searchPipe"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"2"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.searchPipe_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "none"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "average"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 3
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_rawScore": {
+                                "$meta": "score"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_scoreDetails": {
+                                "details": []
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        },
+                                        "scoreDetails": true
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "searchPipe_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 2
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "searchPipe_rawScore": {
+                                            "$meta": "score"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "searchPipe_scoreDetails": {
+                                            "details": {
+                                                "$meta": "scoreDetails"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name1_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name1_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
+                        },
+                        "__hs_searchPipe_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.searchPipe_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_searchPipe_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_searchPipe_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name1_rawScore": "$__hs_name1_rawScore",
+                                        "name1_scoreDetails": "$__hs_name1_scoreDetails",
+                                        "searchPipe_score": "$__hs_searchPipe_score",
+                                        "searchPipe_rawScore": "$__hs_searchPipe_rawScore",
+                                        "searchPipe_scoreDetails": "$__hs_searchPipe_scoreDetails"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.name1_score",
+                                "$_internal_scoreFusion_internal_fields.searchPipe_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "name1"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.name1_rawScore",
+                                            "weight": {
+                                                "$const": 3
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.name1_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "searchPipe"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
+                                            "weight": {
+                                                "$const": 2
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.searchPipe_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "description": {
+                                "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
+                            },
+                            "normalization": {
+                                "$const": "none"
+                            },
+                            "combination": {
+                                "method": {
+                                    "$const": "average"
+                                }
+                            },
+                            "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
+        asOneObj);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesugaring) {
@@ -7466,339 +6663,281 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesuga
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-             "expectedStages": [
-                 {
-                     "$search": {
-                         "mongotQuery": {
-                             "index": "search_index",
-                             "text": {
-                                 "query": "mystery",
-                                 "path": "genres"
-                             }
-                         },
-                         "requiresSearchSequenceToken": false,
-                         "requiresSearchMetaCursor": true
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "search_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"2"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "search_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "search_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$vectorSearch": {
-                                     "queryVector": [
-                                         {"$numberDouble":"1"},
-                                         {"$numberDouble":"2"},
-                                         {"$numberDouble":"3"}
-                                     ],
-                                     "path": "plot_embedding",
-                                     "numCandidates": {"$numberInt":"300"},
-                                     "index": "vector_index",
-                                     "limit": {"$numberInt":"10"}
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "vector_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "vector_rawScore": {
-                                             "$meta": "score"
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "vector_scoreDetails": {
-                                             "details": []
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "search_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.search_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "search_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.search_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "search_scoreDetails": "$_internal_scoreFusion_internal_fields.search_scoreDetails",
-                                 "vector_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.vector_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "vector_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.vector_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "vector_scoreDetails": "$_internal_scoreFusion_internal_fields.vector_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "search_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "search_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "search_scoreDetails": {
-                                         "$const": {}
-                                     },
-                                     "vector_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "vector_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "vector_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "search_score": {
-                                         "$max": [
-                                             "$$value.search_score",
-                                             "$$this.search_score"
-                                         ]
-                                     },
-                                     "search_rawScore": {
-                                         "$max": [
-                                             "$$value.search_rawScore",
-                                             "$$this.search_rawScore"
-                                         ]
-                                     },
-                                     "search_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.search_scoreDetails",
-                                             "$$this.search_scoreDetails"
-                                         ]
-                                     },
-                                     "vector_score": {
-                                         "$max": [
-                                             "$$value.vector_score",
-                                             "$$this.vector_score"
-                                         ]
-                                     },
-                                     "vector_rawScore": {
-                                         "$max": [
-                                             "$$value.vector_rawScore",
-                                             "$$this.vector_rawScore"
-                                         ]
-                                     },
-                                     "vector_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.vector_scoreDetails",
-                                             "$$this.vector_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.search_score",
-                                 "$_internal_scoreFusion_internal_fields.vector_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "search"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.search_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"2"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.search_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.search_scoreDetails"
-                                     ]
-                                 },
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "vector"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.vector_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.vector_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.vector_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "none"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "average"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 }
-             ]
-         })",
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "search_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 2
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "search_rawScore": {
+                                "$meta": "score"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "search_scoreDetails": {
+                                "details": []
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "vector_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "vector_rawScore": {
+                                            "$meta": "score"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "vector_scoreDetails": {
+                                            "details": []
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_search_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.search_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_search_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.search_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_search_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.search_scoreDetails"
+                        },
+                        "__hs_vector_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.vector_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_vector_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.vector_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_vector_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.vector_scoreDetails"
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "search_score": "$__hs_search_score",
+                                        "search_rawScore": "$__hs_search_rawScore",
+                                        "search_scoreDetails": "$__hs_search_scoreDetails",
+                                        "vector_score": "$__hs_vector_score",
+                                        "vector_rawScore": "$__hs_vector_rawScore",
+                                        "vector_scoreDetails": "$__hs_vector_scoreDetails"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.search_score",
+                                "$_internal_scoreFusion_internal_fields.vector_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "search"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.search_rawScore",
+                                            "weight": {
+                                                "$const": 2
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.search_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.search_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "vector"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.vector_rawScore",
+                                            "weight": {
+                                                "$const": 1
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.vector_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.vector_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "description": {
+                                "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
+                            },
+                            "normalization": {
+                                "$const": "none"
+                            },
+                            "combination": {
+                                "method": {
+                                    "$const": "average"
+                                }
+                            },
+                            "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
 }
 
@@ -7849,1811 +6988,300 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineCustomExpressionScoreDetai
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
 
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-         "expectedStages": [)") +
-        std::string(R"({
-                     "$vectorSearch": {
-                         "queryVector": [
-                             {"$numberDouble":"1"},
-                             {"$numberDouble":"2"},
-                             {"$numberDouble":"3"}
-                         ],
-                         "path": "plot_embedding",
-                         "numCandidates": {"$numberInt":"300"},
-                         "index": "vector_index",
-                         "limit": {"$numberInt":"10"}
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "name1_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$search": {
-                                     "mongotQuery": {
-                                         "index": "search_index",
-                                         "text": {
-                                             "query": "mystery",
-                                             "path": "genres"
-                                         },
-                                         "scoreDetails": true
-                                     },
-                                     "requiresSearchSequenceToken": false,
-                                     "requiresSearchMetaCursor": true
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "searchPipe_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "searchPipe_rawScore": {
-                                             "$meta": "score"
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "searchPipe_scoreDetails": {
-                                             "details": {
-                                                 "$meta": "scoreDetails"
-                                             }
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },)") +
-        std::string(R"({
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "name1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name1_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.name1_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "name1_scoreDetails": "$_internal_scoreFusion_internal_fields.name1_scoreDetails",
-                                 "searchPipe_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.searchPipe_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "searchPipe_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "searchPipe_scoreDetails": "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "name1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name1_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "name1_scoreDetails": {
-                                         "$const": {}
-                                     },
-                                     "searchPipe_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "searchPipe_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "searchPipe_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "name1_score": {
-                                         "$max": [
-                                             "$$value.name1_score",
-                                             "$$this.name1_score"
-                                         ]
-                                     },
-                                     "name1_rawScore": {
-                                         "$max": [
-                                             "$$value.name1_rawScore",
-                                             "$$this.name1_rawScore"
-                                         ]
-                                     },
-                                     "name1_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.name1_scoreDetails",
-                                             "$$this.name1_scoreDetails"
-                                         ]
-                                     },
-                                     "searchPipe_score": {
-                                         "$max": [
-                                             "$$value.searchPipe_score",
-                                             "$$this.searchPipe_score"
-                                         ]
-                                     },
-                                     "searchPipe_rawScore": {
-                                         "$max": [
-                                             "$$value.searchPipe_rawScore",
-                                             "$$this.searchPipe_rawScore"
-                                         ]
-                                     },
-                                     "searchPipe_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.searchPipe_scoreDetails",
-                                             "$$this.searchPipe_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "name1": "$_internal_scoreFusion_internal_fields.name1_score",
-                                     "searchPipe": "$_internal_scoreFusion_internal_fields.searchPipe_score"
-                                 },
-                                 "in": {
-                                     "$sum": [
-                                         "$$name1",
-                                         {
-                                             "$const": {"$numberDouble":"5"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "name1"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.name1_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.name1_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
-                                     ]
-                                 },
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "searchPipe"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.searchPipe_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "none"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "custom expression"
-                                 },
-                                 "expression": {
-                                     "$const": "{ string: { $sum: [ '$$name1', 5.0 ] } }"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 })") +
-        std::string(R"(]})");
-
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        expectedStages,
+        R"({
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_rawScore": {
+                                "$meta": "score"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "name1_scoreDetails": {
+                                "details": []
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        },
+                                        "scoreDetails": true
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "searchPipe_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "searchPipe_rawScore": {
+                                            "$meta": "score"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "searchPipe_scoreDetails": {
+                                            "details": {
+                                                "$meta": "scoreDetails"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name1_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.name1_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_name1_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
+                        },
+                        "__hs_searchPipe_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.searchPipe_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_searchPipe_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_searchPipe_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "name1_score": "$__hs_name1_score",
+                                        "name1_rawScore": "$__hs_name1_rawScore",
+                                        "name1_scoreDetails": "$__hs_name1_scoreDetails",
+                                        "searchPipe_score": "$__hs_searchPipe_score",
+                                        "searchPipe_rawScore": "$__hs_searchPipe_rawScore",
+                                        "searchPipe_scoreDetails": "$__hs_searchPipe_scoreDetails"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$_internal_scoreFusion_internal_fields.name1_score",
+                                    "searchPipe": "$_internal_scoreFusion_internal_fields.searchPipe_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$name1",
+                                        {
+                                            "$const": 5
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "name1"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.name1_rawScore",
+                                            "weight": {
+                                                "$const": 1
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.name1_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.name1_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "searchPipe"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.searchPipe_rawScore",
+                                            "weight": {
+                                                "$const": 1
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.searchPipe_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.searchPipe_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "description": {
+                                "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
+                            },
+                            "normalization": {
+                                "$const": "none"
+                            },
+                            "combination": {
+                                "method": {
+                                    "$const": "custom expression"
+                                },
+                                "expression": {
+                                    "$const": "{ string: { $sum: [ '$$name1', 5.0 ] } }"
+                                }
+                            },
+                            "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
         asOneObj);
-}
-
-TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDetailsDesugaring) {
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
-    getExpCtx()->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    auto spec = fromjson(R"({
-         $scoreFusion: {
-             input: {
-                 pipelines: {
-                     scorePipe1: [
-                         { $match : { author : "Agatha Christie" } },
-                         { $score: { score: "$age", normalization: "none" } }
-                     ],
-                     scorePipe2: [
-                         { $score: { score: { $add: [10, 2] }, normalization: "sigmoid" } }
-                     ]
-                 },
-                 normalization: "none"
-             },
-             combination: {
-                 method: "avg"
-             },
-             scoreDetails: true
-         }
-      })");
-
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-         "expectedStages": [)") +
-        std::string(R"({
-                     "$match": {
-                         "author": "Agatha Christie"
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": "$age"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$add": [
-                                             {
-                                                 "$const": {"$numberInt":"10"}
-                                             },
-                                             {
-                                                 "$const": {"$numberInt":"2"}
-                                             }
-                                         ]
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "internal_raw_score": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$divide": [
-                                             {
-                                                 "$const": {"$numberInt":"1"}
-                                             },
-                                             {
-                                                 "$add": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$exp": [
-                                                             {
-                                                                 "$multiply": [
-                                                                     {
-                                                                         "$const": {"$numberInt":"-1"}
-                                                                     },
-                                                                     {
-                                                                         "$meta": "score"
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             }
-                                         ]
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": "$docs"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_rawScore": {
-                                             "$meta": "score"
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_scoreDetails": {
-                                             "details": []
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "scorePipe1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails",
-                                 "scorePipe2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "scorePipe1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$const": {}
-                                     },
-                                     "scorePipe2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "scorePipe1_score": {
-                                         "$max": [
-                                             "$$value.scorePipe1_score",
-                                             "$$this.scorePipe1_score"
-                                         ]
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe1_rawScore",
-                                             "$$this.scorePipe1_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe1_scoreDetails",
-                                             "$$this.scorePipe1_scoreDetails"
-                                         ]
-                                     },
-                                     "scorePipe2_score": {
-                                         "$max": [
-                                             "$$value.scorePipe2_score",
-                                             "$$this.scorePipe2_score"
-                                         ]
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe2_rawScore",
-                                             "$$this.scorePipe2_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe2_scoreDetails",
-                                             "$$this.scorePipe2_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                 "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                             ]
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe1"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
-                                     ]
-                                 },
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe2"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "none"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "average"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        expectedStages,
-        asOneObj);
-}
-
-TEST_F(DocumentSourceScoreFusionTest,
-       CheckTwoPipelineScoreInputPipelineSigmoidScoreDetailsDesugaring) {
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
-    getExpCtx()->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    auto spec = fromjson(R"({
-         $scoreFusion: {
-             input: {
-                 pipelines: {
-                     scorePipe1: [
-                         { $match : { author : "Agatha Christie" } },
-                         { $score: { score: "$age", normalization: "none" } }
-                     ],
-                     scorePipe2: [
-                         { $score: { score: { $add: [10, 2] }, normalization: "none" } }
-                     ]
-                 },
-                 normalization: "sigmoid"
-             },
-             combination: {
-                 method: "avg"
-             },
-             scoreDetails: true
-         }
-      })");
-
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-         "expectedStages": [)") +
-        std::string(R"({
-                     "$match": {
-                         "author": "Agatha Christie"
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": "$age"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$divide": [
-                                             {
-                                                 "$const": {"$numberInt":"1"}
-                                             },
-                                             {
-                                                 "$add": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$exp": [
-                                                             {
-                                                                 "$multiply": [
-                                                                     {
-                                                                         "$const": {"$numberInt":"-1"}
-                                                                     },
-                                                                     {
-                                                                         "$meta": "score"
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             }
-                                         ]
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$add": [
-                                             {
-                                                 "$const": {"$numberInt":"10"}
-                                             },
-                                             {
-                                                 "$const": {"$numberInt":"2"}
-                                             }
-                                         ]
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "internal_raw_score": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": "$docs"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$divide": [
-                                                         {
-                                                             "$const": {"$numberInt":"1"}
-                                                         },
-                                                         {
-                                                             "$add": [
-                                                                 {
-                                                                     "$const": {"$numberInt":"1"}
-                                                                 },
-                                                                 {
-                                                                     "$exp": [
-                                                                         {
-                                                                             "$multiply": [
-                                                                                 {
-                                                                                     "$const": {"$numberInt":"-1"}
-                                                                                 },
-                                                                                 {
-                                                                                     "$meta": "score"
-                                                                                 }
-                                                                             ]
-                                                                         }
-                                                                     ]
-                                                                 }
-                                                             ]
-                                                         }
-                                                     ]
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_rawScore": {
-                                             "$meta": "score"
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_scoreDetails": {
-                                             "details": []
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "scorePipe1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails",
-                                 "scorePipe2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "scorePipe1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$const": {}
-                                     },
-                                     "scorePipe2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "scorePipe1_score": {
-                                         "$max": [
-                                             "$$value.scorePipe1_score",
-                                             "$$this.scorePipe1_score"
-                                         ]
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe1_rawScore",
-                                             "$$this.scorePipe1_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe1_scoreDetails",
-                                             "$$this.scorePipe1_scoreDetails"
-                                         ]
-                                     },
-                                     "scorePipe2_score": {
-                                         "$max": [
-                                             "$$value.scorePipe2_score",
-                                             "$$this.scorePipe2_score"
-                                         ]
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe2_rawScore",
-                                             "$$this.scorePipe2_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe2_scoreDetails",
-                                             "$$this.scorePipe2_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                 "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe1"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
-                                     ]
-                                 },
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe2"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "sigmoid"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "average"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        expectedStages,
-        asOneObj);
-}
-
-TEST_F(DocumentSourceScoreFusionTest,
-       CheckTwoPipelineScoreScoreDetailsInputPipelineScoreDetailsDesugaring) {
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
-    getExpCtx()->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    auto spec = fromjson(R"({
-         $scoreFusion: {
-             input: {
-                 pipelines: {
-                     scorePipe1: [
-                         { $match : { author : "Agatha Christie" } },
-                         { $score: { score: "$age", normalization: "none", scoreDetails: true } }
-                     ],
-                     scorePipe2: [
-                         { $score: {
-                             score: { $add: [10, 2] },
-                             normalization: "sigmoid",
-                             weight: 0.5,
-                             scoreDetails: true }
-                         }
-                     ]
-                 },
-                 normalization: "sigmoid"
-             },
-             combination: {
-                 method: "avg"
-             },
-             scoreDetails: true
-         }
-      })");
-
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-         "expectedStages": [)") +
-        std::string(R"({
-                 "$match": {
-                     "author": "Agatha Christie"
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": "$age"
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "docs": "$$ROOT"
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "internal_raw_score": {
-                         "$meta": "score"
-                     }
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "scoreDetails": {
-                         "value": {
-                             "$meta": "score"
-                         },
-                         "description": {
-                             "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
-                         },
-                         "rawScore": "$internal_raw_score",
-                         "normalization": {
-                             "$const": "none"
-                         },
-                         "weight": {
-                             "$const": {"$numberDouble":"1"}
-                         },
-                         "expression": {
-                             "$const": "{ string: '$age' }"
-                         },
-                         "details": []
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": "$docs"
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "_internal_scoreFusion_docs": "$$ROOT"
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_score": {
-                             "$multiply": [
-                                 {
-                                     "$divide": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$add": [
-                                                 {
-                                                     "$const": {"$numberInt":"1"}
-                                                 },
-                                                 {
-                                                     "$exp": [
-                                                         {
-                                                             "$multiply": [
-                                                                 {
-                                                                     "$const": {"$numberInt":"-1"}
-                                                                 },
-                                                                 {
-                                                                     "$meta": "score"
-                                                                 }
-                                                             ]
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 },
-                                 {
-                                     "$const": {"$numberDouble":"1"}
-                                 }
-                             ]
-                         }
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_rawScore": {
-                             "$meta": "score"
-                         }
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_scoreDetails": {
-                             "details": {
-                                 "$meta": "scoreDetails"
-                             }
-                         }
-                     }
-                 }
-             },)") +
-        std::string(R"({
-                 "$unionWith": {
-                     "coll": "pipeline_test",
-                     "pipeline": [
-                         {
-                             "$setMetadata": {
-                                 "score": {
-                                     "$add": [
-                                         {
-                                             "$const": {"$numberInt":"10"}
-                                         },
-                                         {
-                                             "$const": {"$numberInt":"2"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "internal_raw_score": {
-                                     "$meta": "score"
-                                 }
-                             }
-                         },
-                         {
-                             "$setMetadata": {
-                                 "score": {
-                                     "$divide": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$add": [
-                                                 {
-                                                     "$const": {"$numberInt":"1"}
-                                                 },
-                                                 {
-                                                     "$exp": [
-                                                         {
-                                                             "$multiply": [
-                                                                 {
-                                                                     "$const": {"$numberInt":"-1"}
-                                                                 },
-                                                                 {
-                                                                     "$meta": "score"
-                                                                 }
-                                                             ]
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         {
-                             "$setMetadata": {
-                                 "score": {
-                                     "$multiply": [
-                                         {
-                                             "$meta": "score"
-                                         },
-                                         {
-                                             "$const": {"$numberDouble":"0.5"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         {
-                             "$setMetadata": {
-                                 "scoreDetails": {
-                                     "value": {
-                                         "$meta": "score"
-                                     },
-                                     "description": {
-                                         "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
-                                     },
-                                     "rawScore": "$internal_raw_score",
-                                     "normalization": {
-                                         "$const": "sigmoid"
-                                     },
-                                     "weight": {
-                                         "$const": {"$numberDouble":"0.5"}
-                                     },
-                                     "expression": {
-                                         "$const": "{ string: { $add: [ 10, 2 ] } }"
-                                     },
-                                     "details": []
-                                 }
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": "$docs"
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "_internal_scoreFusion_docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_score": {
-                                         "$multiply": [
-                                             {
-                                                 "$divide": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$add": [
-                                                             {
-                                                                 "$const": {"$numberInt":"1"}
-                                                             },
-                                                             {
-                                                                 "$exp": [
-                                                                     {
-                                                                         "$multiply": [
-                                                                             {
-                                                                                 "$const": {"$numberInt":"-1"}
-                                                                             },
-                                                                             {
-                                                                                 "$meta": "score"
-                                                                             }
-                                                                         ]
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             },
-                                             {
-                                                 "$const": {"$numberDouble":"1"}
-                                             }
-                                         ]
-                                     }
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_rawScore": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_scoreDetails": {
-                                         "details": {
-                                             "$meta": "scoreDetails"
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-                     ]
-                 }
-             },
-             {
-                 "$group": {
-                     "_id": "$_internal_scoreFusion_docs._id",
-                     "_internal_scoreFusion_docs": {
-                         "$first": "$_internal_scoreFusion_docs"
-                     },
-                     "_internal_scoreFusion_internal_fields": {
-                         "$push": {
-                             "scorePipe1_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe1_rawScore": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe1_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails",
-                             "scorePipe2_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe2_rawScore": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe2_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                         }
-                     },
-                     "$willBeMerged": false
-                 }
-             },
-             {
-                 "$project": {
-                     "_id": true,
-                     "_internal_scoreFusion_docs": true,
-                     "_internal_scoreFusion_internal_fields": {
-                         "$reduce": {
-                             "input": "$_internal_scoreFusion_internal_fields",
-                             "initialValue": {
-                                 "scorePipe1_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe1_scoreDetails": {
-                                     "$const": {}
-                                 },
-                                 "scorePipe2_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe2_scoreDetails": {
-                                     "$const": {}
-                                 }
-                             },
-                             "in": {
-                                 "scorePipe1_score": {
-                                     "$max": [
-                                         "$$value.scorePipe1_score",
-                                         "$$this.scorePipe1_score"
-                                     ]
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$max": [
-                                         "$$value.scorePipe1_rawScore",
-                                         "$$this.scorePipe1_rawScore"
-                                     ]
-                                 },
-                                 "scorePipe1_scoreDetails": {
-                                     "$mergeObjects": [
-                                         "$$value.scorePipe1_scoreDetails",
-                                         "$$this.scorePipe1_scoreDetails"
-                                     ]
-                                 },
-                                 "scorePipe2_score": {
-                                     "$max": [
-                                         "$$value.scorePipe2_score",
-                                         "$$this.scorePipe2_score"
-                                     ]
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$max": [
-                                         "$$value.scorePipe2_rawScore",
-                                         "$$this.scorePipe2_rawScore"
-                                     ]
-                                 },
-                                 "scorePipe2_scoreDetails": {
-                                     "$mergeObjects": [
-                                         "$$value.scorePipe2_scoreDetails",
-                                         "$$this.scorePipe2_scoreDetails"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 }
-             },)") +
-        std::string(R"({
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "$mergeObjects": [
-                             "$_internal_scoreFusion_docs",
-                             "$$ROOT"
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_docs": false,
-                     "_id": true
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": {
-                         "$avg": [
-                             "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                             "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "calculatedScoreDetails": [
-                             {
-                                 "$mergeObjects": [
-                                     {
-                                         "inputPipelineName": {
-                                             "$const": "scorePipe1"
-                                         },
-                                         "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                         "weight": {
-                                             "$const": {"$numberDouble":"1"}
-                                         },
-                                         "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
-                                     },
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
-                                 ]
-                             },
-                             {
-                                 "$mergeObjects": [
-                                     {
-                                         "inputPipelineName": {
-                                             "$const": "scorePipe2"
-                                         },
-                                         "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                         "weight": {
-                                             "$const": {"$numberDouble":"1"}
-                                         },
-                                         "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                     },
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                                 ]
-                             }
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "scoreDetails": {
-                         "value": {
-                             "$meta": "score"
-                         },
-                         "description": {
-                             "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                         },
-                         "normalization": {
-                             "$const": "sigmoid"
-                         },
-                         "combination": {
-                             "method": {
-                                 "$const": "average"
-                             }
-                         },
-                         "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                     }
-                 }
-             },
-             {
-                 "$sort": {
-                     "$computed0": {
-                         "$meta": "score"
-                     },
-                     "_id": {"$numberInt":"1"}
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_internal_fields": false,
-                     "_id": true
-                 }
-             })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
 }
 
 TEST_F(DocumentSourceScoreFusionTest,
@@ -9688,1421 +7316,378 @@ TEST_F(DocumentSourceScoreFusionTest,
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
 
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-         "expectedStages": [)") +
-        std::string(R"({
-                     "$match": {
-                         "author": "Agatha Christie"
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": "$age"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$_internalSetWindowFields": {
-                         "sortBy": {
-                             "_internal_scoreFusion_internal_fields.scorePipe1_score": {"$numberInt":"-1"}
-                         },
-                         "output": {
-                             "_internal_scoreFusion_internal_fields.scorePipe1_score": {
-                                 "$minMaxScaler": {
-                                     "input": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                     "min": {"$numberInt":"0"},
-                                     "max": {"$numberInt":"1"}
-                                 },
-                                 "window": {
-                                     "documents": [
-                                         "unbounded",
-                                         "unbounded"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$add": [
-                                             {
-                                                 "$const": {"$numberInt":"10"}
-                                             },
-                                             {
-                                                 "$const": {"$numberInt":"2"}
-                                             }
-                                         ]
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "internal_raw_score": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": "$docs"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_rawScore": {
-                                             "$meta": "score"
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_scoreDetails": {
-                                             "details": []
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$_internalSetWindowFields": {
-                                     "sortBy": {
-                                         "_internal_scoreFusion_internal_fields.scorePipe2_score": {"$numberInt":"-1"}
-                                     },
-                                     "output": {
-                                         "_internal_scoreFusion_internal_fields.scorePipe2_score": {
-                                             "$minMaxScaler": {
-                                                 "input": "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                                 "min": {"$numberInt":"0"},
-                                                 "max": {"$numberInt":"1"}
-                                             },
-                                             "window": {
-                                                 "documents": [
-                                                     "unbounded",
-                                                     "unbounded"
-                                                 ]
-                                             }
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "scorePipe1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails",
-                                 "scorePipe2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "scorePipe1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$const": {}
-                                     },
-                                     "scorePipe2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "scorePipe1_score": {
-                                         "$max": [
-                                             "$$value.scorePipe1_score",
-                                             "$$this.scorePipe1_score"
-                                         ]
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe1_rawScore",
-                                             "$$this.scorePipe1_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe1_scoreDetails",
-                                             "$$this.scorePipe1_scoreDetails"
-                                         ]
-                                     },
-                                     "scorePipe2_score": {
-                                         "$max": [
-                                             "$$value.scorePipe2_score",
-                                             "$$this.scorePipe2_score"
-                                         ]
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe2_rawScore",
-                                             "$$this.scorePipe2_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe2_scoreDetails",
-                                             "$$this.scorePipe2_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$let": {
-                                 "vars": {
-                                     "scorePipe1": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                     "scorePipe2": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                 },
-                                 "in": {
-                                     "$sum": [
-                                         "$$scorePipe1",
-                                         "$$scorePipe2",
-                                         {
-                                             "$const": {"$numberDouble":"5"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe1"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
-                                     ]
-                                 },
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe2"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "minMaxScaler"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "custom expression"
-                                 },
-                                 "expression": {
-                                     "$const": "{ string: { $sum: [ '$$scorePipe1', '$$scorePipe2', 5.0 ] } }"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        expectedStages,
-        asOneObj);
-}
-TEST_F(DocumentSourceScoreFusionTest,
-       CheckTwoPipelineScoreInputPipelineMinMaxScalerUnspecifiedCombinationScoreDetailsDesugaring) {
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
-    getExpCtx()->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    auto spec = fromjson(R"({
-         $scoreFusion: {
-             input: {
-                 pipelines: {
-                     scorePipe1: [
-                         { $match : { author : "Agatha Christie" } },
-                         { $score: { score: "$age", normalization: "none" } }
-                     ],
-                     scorePipe2: [
-                         { $score: { score: { $add: [10, 2] }, normalization: "none" } }
-                     ]
-                 },
-                 normalization: "minMaxScaler"
-             },
-             combination: {},
-             scoreDetails: true
-         }
-      })");
-
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-         "expectedStages": [)") +
-        std::string(R"({
-                     "$match": {
-                         "author": "Agatha Christie"
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": "$age"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "internal_raw_score": {
-                             "$meta": "score"
-                         }
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": "$docs"
-                     }
-                 },
-                 {
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "_internal_scoreFusion_docs": "$$ROOT"
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_score": {
-                                 "$multiply": [
-                                     {
-                                         "$meta": "score"
-                                     },
-                                     {
-                                         "$const": {"$numberDouble":"1"}
-                                     }
-                                 ]
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_rawScore": {
-                                 "$meta": "score"
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "scorePipe1_scoreDetails": {
-                                 "details": []
-                             }
-                         }
-                     }
-                 },
-                 {
-                     "$_internalSetWindowFields": {
-                         "sortBy": {
-                             "_internal_scoreFusion_internal_fields.scorePipe1_score": {"$numberInt":"-1"}
-                         },
-                         "output": {
-                             "_internal_scoreFusion_internal_fields.scorePipe1_score": {
-                                 "$minMaxScaler": {
-                                     "input": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                     "min": {"$numberInt":"0"},
-                                     "max": {"$numberInt":"1"}
-                                 },
-                                 "window": {
-                                     "documents": [
-                                         "unbounded",
-                                         "unbounded"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$unionWith": {
-                         "coll": "pipeline_test",
-                         "pipeline": [
-                             {
-                                 "$setMetadata": {
-                                     "score": {
-                                         "$add": [
-                                             {
-                                                 "$const": {"$numberInt":"10"}
-                                             },
-                                             {
-                                                 "$const": {"$numberInt":"2"}
-                                             }
-                                         ]
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "internal_raw_score": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": "$docs"
-                                 }
-                             },
-                             {
-                                 "$replaceRoot": {
-                                     "newRoot": {
-                                         "_internal_scoreFusion_docs": "$$ROOT"
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_score": {
-                                             "$multiply": [
-                                                 {
-                                                     "$meta": "score"
-                                                 },
-                                                 {
-                                                     "$const": {"$numberDouble":"1"}
-                                                 }
-                                             ]
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_rawScore": {
-                                             "$meta": "score"
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$addFields": {
-                                     "_internal_scoreFusion_internal_fields": {
-                                         "scorePipe2_scoreDetails": {
-                                             "details": []
-                                         }
-                                     }
-                                 }
-                             },
-                             {
-                                 "$_internalSetWindowFields": {
-                                     "sortBy": {
-                                         "_internal_scoreFusion_internal_fields.scorePipe2_score": {"$numberInt":"-1"}
-                                     },
-                                     "output": {
-                                         "_internal_scoreFusion_internal_fields.scorePipe2_score": {
-                                             "$minMaxScaler": {
-                                                 "input": "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                                 "min": {"$numberInt":"0"},
-                                                 "max": {"$numberInt":"1"}
-                                             },
-                                             "window": {
-                                                 "documents": [
-                                                     "unbounded",
-                                                     "unbounded"
-                                                 ]
-                                             }
-                                         }
-                                     }
-                                 }
-                             }
-                         ]
-                     }
-                 },
-                 {
-                     "$group": {
-                         "_id": "$_internal_scoreFusion_docs._id",
-                         "_internal_scoreFusion_docs": {
-                             "$first": "$_internal_scoreFusion_docs"
-                         },
-                         "_internal_scoreFusion_internal_fields": {
-                             "$push": {
-                                 "scorePipe1_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe1_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails",
-                                 "scorePipe2_score": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$ifNull": [
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                         {
-                                             "$const": {"$numberInt":"0"}
-                                         }
-                                     ]
-                                 },
-                                 "scorePipe2_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                             }
-                         },
-                         "$willBeMerged": false
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_id": true,
-                         "_internal_scoreFusion_docs": true,
-                         "_internal_scoreFusion_internal_fields": {
-                             "$reduce": {
-                                 "input": "$_internal_scoreFusion_internal_fields",
-                                 "initialValue": {
-                                     "scorePipe1_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$const": {}
-                                     },
-                                     "scorePipe2_score": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$const": {"$numberInt":"0"}
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$const": {}
-                                     }
-                                 },
-                                 "in": {
-                                     "scorePipe1_score": {
-                                         "$max": [
-                                             "$$value.scorePipe1_score",
-                                             "$$this.scorePipe1_score"
-                                         ]
-                                     },
-                                     "scorePipe1_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe1_rawScore",
-                                             "$$this.scorePipe1_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe1_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe1_scoreDetails",
-                                             "$$this.scorePipe1_scoreDetails"
-                                         ]
-                                     },
-                                     "scorePipe2_score": {
-                                         "$max": [
-                                             "$$value.scorePipe2_score",
-                                             "$$this.scorePipe2_score"
-                                         ]
-                                     },
-                                     "scorePipe2_rawScore": {
-                                         "$max": [
-                                             "$$value.scorePipe2_rawScore",
-                                             "$$this.scorePipe2_rawScore"
-                                         ]
-                                     },
-                                     "scorePipe2_scoreDetails": {
-                                         "$mergeObjects": [
-                                             "$$value.scorePipe2_scoreDetails",
-                                             "$$this.scorePipe2_scoreDetails"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 },)") +
-        std::string(R"({
-                     "$replaceRoot": {
-                         "newRoot": {
-                             "$mergeObjects": [
-                                 "$_internal_scoreFusion_docs",
-                                 "$$ROOT"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_docs": false,
-                         "_id": true
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "score": {
-                             "$avg": [
-                                 "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                 "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$addFields": {
-                         "_internal_scoreFusion_internal_fields": {
-                             "calculatedScoreDetails": [
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe1"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
-                                     ]
-                                 },
-                                 {
-                                     "$mergeObjects": [
-                                         {
-                                             "inputPipelineName": {
-                                                 "$const": "scorePipe2"
-                                             },
-                                             "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                             "weight": {
-                                                 "$const": {"$numberDouble":"1"}
-                                             },
-                                             "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                         },
-                                         "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                                     ]
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 {
-                     "$setMetadata": {
-                         "scoreDetails": {
-                             "value": {
-                                 "$meta": "score"
-                             },
-                             "description": {
-                                 "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                             },
-                             "normalization": {
-                                 "$const": "minMaxScaler"
-                             },
-                             "combination": {
-                                 "method": {
-                                     "$const": "average"
-                                 }
-                             },
-                             "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                         }
-                     }
-                 },
-                 {
-                     "$sort": {
-                         "$computed0": {
-                             "$meta": "score"
-                         },
-                         "_id": {"$numberInt":"1"}
-                     }
-                 },
-                 {
-                     "$project": {
-                         "_internal_scoreFusion_internal_fields": false,
-                         "_id": true
-                     }
-                 })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        expectedStages,
-        asOneObj);
-}
-
-TEST_F(DocumentSourceScoreFusionTest,
-       CheckTwoPipelineScoreWithScoreDetailsInputPipelinesScoreDetailsDesugaring) {
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
-    getExpCtx()->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    auto spec = fromjson(R"({
-         $scoreFusion: {
-             input: {
-                 pipelines: {
-                     scorePipe1: [
-                         { $geoNear : { near : [20, 40] } },
-                         { $score: { score: { $meta: "geoNearDistance"} , normalization: "none", scoreDetails: true } }
-                     ],
-                     scorePipe2: [
-                         { $score: { score: { $add: [10, 2] }, normalization: "none", scoreDetails: true } }
-                     ]
-                 },
-                 normalization: "sigmoid"
-             },
-             combination: {
-                 method: "expression",
-                 expression: { $add: [ { $multiply: [ "$$scorePipe1", 0.5 ] }, "$$scorePipe2"] }
-             },
-             scoreDetails: true
-         }
-      })");
-
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-             "expectedStages": [)") +
-        std::string(R"({
-                 "$geoNear": {
-                     "near": [
-                         {
-                             "$const": {"$numberInt":"20"}
-                         },
-                         {
-                             "$const": {"$numberInt":"40"}
-                         }
-                     ],
-                     "query": {},
-                     "spherical": false
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": {
-                         "$meta": "geoNearDistance"
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "docs": "$$ROOT"
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "internal_raw_score": {
-                         "$meta": "score"
-                     }
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "scoreDetails": {
-                         "value": {
-                             "$meta": "score"
-                         },
-                         "description": {
-                             "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
-                         },
-                         "rawScore": "$internal_raw_score",
-                         "normalization": {
-                             "$const": "none"
-                         },
-                         "weight": {
-                             "$const": {"$numberDouble":"1"}
-                         },
-                         "expression": {
-                             "$const": "{ string: { $meta: 'geoNearDistance' } }"
-                         },
-                         "details": []
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": "$docs"
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "_internal_scoreFusion_docs": "$$ROOT"
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_score": {
-                             "$multiply": [
-                                 {
-                                     "$divide": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$add": [
-                                                 {
-                                                     "$const": {"$numberInt":"1"}
-                                                 },
-                                                 {
-                                                     "$exp": [
-                                                         {
-                                                             "$multiply": [
-                                                                 {
-                                                                     "$const": {"$numberInt":"-1"}
-                                                                 },
-                                                                 {
-                                                                     "$meta": "score"
-                                                                 }
-                                                             ]
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 },
-                                 {
-                                     "$const": {"$numberDouble":"1"}
-                                 }
-                             ]
-                         }
-                     }
-                 }
-             },)") +
-        std::string(R"({
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_rawScore": {
-                             "$meta": "score"
-                         }
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_scoreDetails": {
-                             "details": {
-                                 "$meta": "scoreDetails"
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$unionWith": {
-                     "coll": "pipeline_test",
-                     "pipeline": [
-                         {
-                             "$setMetadata": {
-                                 "score": {
-                                     "$add": [
-                                         {
-                                             "$const": {"$numberInt":"10"}
-                                         },
-                                         {
-                                             "$const": {"$numberInt":"2"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "internal_raw_score": {
-                                     "$meta": "score"
-                                 }
-                             }
-                         },
-                         {
-                             "$setMetadata": {
-                                 "scoreDetails": {
-                                     "value": {
-                                         "$meta": "score"
-                                     },
-                                     "description": {
-                                         "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
-                                     },
-                                     "rawScore": "$internal_raw_score",
-                                     "normalization": {
-                                         "$const": "none"
-                                     },
-                                     "weight": {
-                                         "$const": {"$numberDouble":"1"}
-                                     },
-                                     "expression": {
-                                         "$const": "{ string: { $add: [ 10, 2 ] } }"
-                                     },
-                                     "details": []
-                                 }
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": "$docs"
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "_internal_scoreFusion_docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_score": {
-                                         "$multiply": [
-                                             {
-                                                 "$divide": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$add": [
-                                                             {
-                                                                 "$const": {"$numberInt":"1"}
-                                                             },
-                                                             {
-                                                                 "$exp": [
-                                                                     {
-                                                                         "$multiply": [
-                                                                             {
-                                                                                 "$const": {"$numberInt":"-1"}
-                                                                             },
-                                                                             {
-                                                                                 "$meta": "score"
-                                                                             }
-                                                                         ]
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             },
-                                             {
-                                                 "$const": {"$numberDouble":"1"}
-                                             }
-                                         ]
-                                     }
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_rawScore": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_scoreDetails": {
-                                         "details": {
-                                             "$meta": "scoreDetails"
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-                     ]
-                 }
-             },
-             {
-                 "$group": {
-                     "_id": "$_internal_scoreFusion_docs._id",
-                     "_internal_scoreFusion_docs": {
-                         "$first": "$_internal_scoreFusion_docs"
-                     },
-                     "_internal_scoreFusion_internal_fields": {
-                         "$push": {
-                             "scorePipe1_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe1_rawScore": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe1_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails",
-                             "scorePipe2_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe2_rawScore": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe2_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                         }
-                     },
-                     "$willBeMerged": false
-                 }
-             },)") +
-        std::string(R"({
-                 "$project": {
-                     "_id": true,
-                     "_internal_scoreFusion_docs": true,
-                     "_internal_scoreFusion_internal_fields": {
-                         "$reduce": {
-                             "input": "$_internal_scoreFusion_internal_fields",
-                             "initialValue": {
-                                 "scorePipe1_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe1_scoreDetails": {
-                                     "$const": {}
-                                 },
-                                 "scorePipe2_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe2_scoreDetails": {
-                                     "$const": {}
-                                 }
-                             },
-                             "in": {
-                                 "scorePipe1_score": {
-                                     "$max": [
-                                         "$$value.scorePipe1_score",
-                                         "$$this.scorePipe1_score"
-                                     ]
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$max": [
-                                         "$$value.scorePipe1_rawScore",
-                                         "$$this.scorePipe1_rawScore"
-                                     ]
-                                 },
-                                 "scorePipe1_scoreDetails": {
-                                     "$mergeObjects": [
-                                         "$$value.scorePipe1_scoreDetails",
-                                         "$$this.scorePipe1_scoreDetails"
-                                     ]
-                                 },
-                                 "scorePipe2_score": {
-                                     "$max": [
-                                         "$$value.scorePipe2_score",
-                                         "$$this.scorePipe2_score"
-                                     ]
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$max": [
-                                         "$$value.scorePipe2_rawScore",
-                                         "$$this.scorePipe2_rawScore"
-                                     ]
-                                 },
-                                 "scorePipe2_scoreDetails": {
-                                     "$mergeObjects": [
-                                         "$$value.scorePipe2_scoreDetails",
-                                         "$$this.scorePipe2_scoreDetails"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "$mergeObjects": [
-                             "$_internal_scoreFusion_docs",
-                             "$$ROOT"
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_docs": false,
-                     "_id": true
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": {
-                         "$let": {
-                             "vars": {
-                                 "scorePipe1": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                 "scorePipe2": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                             },
-                             "in": {
-                                 "$add": [
-                                     {
-                                         "$multiply": [
-                                             "$$scorePipe1",
-                                             {
-                                                 "$const": {"$numberDouble":"0.5"}
-                                             }
-                                         ]
-                                     },
-                                     "$$scorePipe2"
-                                 ]
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "calculatedScoreDetails": [
-                             {
-                                 "$mergeObjects": [
-                                     {
-                                         "inputPipelineName": {
-                                             "$const": "scorePipe1"
-                                         },
-                                         "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                         "weight": {
-                                             "$const": {"$numberDouble":"1"}
-                                         },
-                                         "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
-                                     },
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
-                                 ]
-                             },
-                             {
-                                 "$mergeObjects": [
-                                     {
-                                         "inputPipelineName": {
-                                             "$const": "scorePipe2"
-                                         },
-                                         "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                         "weight": {
-                                             "$const": {"$numberDouble":"1"}
-                                         },
-                                         "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                     },
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                                 ]
-                             }
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "scoreDetails": {
-                         "value": {
-                             "$meta": "score"
-                         },
-                         "description": {
-                             "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                         },
-                         "normalization": {
-                             "$const": "sigmoid"
-                         },
-                         "combination": {
-                             "method": {
-                                 "$const": "custom expression"
-                             },
-                             "expression": {
-                                 "$const": "{ string: { $add: [ { $multiply: [ '$$scorePipe1', 0.5 ] }, '$$scorePipe2' ] } }"
-                             }
-                         },
-                         "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                     }
-                 }
-             },
-             {
-                 "$sort": {
-                     "$computed0": {
-                         "$meta": "score"
-                     },
-                     "_id": {"$numberInt":"1"}
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_internal_fields": false,
-                     "_id": true
-                 }
-             })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
+    auto expected = std::string(R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": "$age"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "scorePipe1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "scorePipe1_rawScore": {
+                                "$meta": "score"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "scorePipe1_scoreDetails": {
+                                "details": []
+                            }
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "_internal_scoreFusion_internal_fields.scorePipe1_score": -1
+                        },
+                        "output": {
+                            "_internal_scoreFusion_internal_fields.scorePipe1_score": {
+                                "$minMaxScaler": {
+                                    "input": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$add": [
+                                            {
+                                                "$const": 10
+                                            },
+                                            {
+                                                "$const": 2
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe2_rawScore": {
+                                            "$meta": "score"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe2_scoreDetails": {
+                                            "details": []
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "_internal_scoreFusion_internal_fields.scorePipe2_score": -1
+                                    },
+                                    "output": {
+                                        "_internal_scoreFusion_internal_fields.scorePipe2_score": {
+                                            "$minMaxScaler": {
+                                                "input": "$_internal_scoreFusion_internal_fields.scorePipe2_score",
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+)") + R"(                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_scorePipe1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe1_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe1_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
+                        },
+                        "__hs_scorePipe2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe2_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe2_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe1_score": "$__hs_scorePipe1_score",
+                                        "scorePipe1_rawScore": "$__hs_scorePipe1_rawScore",
+                                        "scorePipe1_scoreDetails": "$__hs_scorePipe1_scoreDetails",
+                                        "scorePipe2_score": "$__hs_scorePipe2_score",
+                                        "scorePipe2_rawScore": "$__hs_scorePipe2_rawScore",
+                                        "scorePipe2_scoreDetails": "$__hs_scorePipe2_scoreDetails"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "scorePipe1": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
+                                    "scorePipe2": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$scorePipe1",
+                                        "$$scorePipe2",
+                                        {
+                                            "$const": 5
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "scorePipe1"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
+                                            "weight": {
+                                                "$const": 1
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "scorePipe2"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
+                                            "weight": {
+                                                "$const": 1
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "description": {
+                                "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
+                            },
+                            "normalization": {
+                                "$const": "minMaxScaler"
+                            },
+                            "combination": {
+                                "method": {
+                                    "$const": "custom expression"
+                                },
+                                "expression": {
+                                    "$const": "{ string: { $sum: [ '$$scorePipe1', '$$scorePipe2', 5.0 ] } }"
+                                }
+                            },
+                            "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        }
+)";  // NOLINT
+    ASSERT_BSONOBJ_EQ(fromjson(expected), asOneObj);
 }
 
 TEST_F(DocumentSourceScoreFusionTest,
@@ -11137,501 +7722,443 @@ TEST_F(DocumentSourceScoreFusionTest,
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
 
-    // The expected desugar is too large for the compiler so we need to split it up.
-    const std::string expectedStages = std::string(R"({
-             "expectedStages": [)") +
-        std::string(R"({
-                 "$geoNear": {
-                     "near": [
-                         {
-                             "$const": {"$numberInt":"20"}
-                         },
-                         {
-                             "$const": {"$numberInt":"40"}
-                         }
-                     ],
-                     "query": {},
-                     "spherical": false
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": {
-                         "$meta": "geoNearDistance"
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "docs": "$$ROOT"
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "internal_raw_score": {
-                         "$meta": "score"
-                     }
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "scoreDetails": {
-                         "value": {
-                             "$meta": "score"
-                         },
-                         "description": {
-                             "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
-                         },
-                         "rawScore": "$internal_raw_score",
-                         "normalization": {
-                             "$const": "none"
-                         },
-                         "weight": {
-                             "$const": {"$numberDouble":"1"}
-                         },
-                         "expression": {
-                             "$const": "{ string: { $meta: 'geoNearDistance' } }"
-                         },
-                         "details": []
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": "$docs"
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "_internal_scoreFusion_docs": "$$ROOT"
-                     }
-                 }
-             },)") +
-        std::string(R"({
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_score": {
-                             "$multiply": [
-                                 {
-                                     "$meta": "score"
-                                 },
-                                 {
-                                     "$const": {"$numberDouble":"1"}
-                                 }
-                             ]
-                         }
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_rawScore": {
-                             "$meta": "score"
-                         }
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "scorePipe1_scoreDetails": {
-                             "details": {
-                                 "$meta": "scoreDetails"
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$_internalSetWindowFields": {
-                     "sortBy": {
-                         "_internal_scoreFusion_internal_fields.scorePipe1_score": {"$numberInt":"-1"}
-                     },
-                     "output": {
-                         "_internal_scoreFusion_internal_fields.scorePipe1_score": {
-                             "$minMaxScaler": {
-                                 "input": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                 "min": {"$numberInt":"0"},
-                                 "max": {"$numberInt":"1"}
-                             },
-                             "window": {
-                                 "documents": [
-                                     "unbounded",
-                                     "unbounded"
-                                 ]
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$unionWith": {
-                     "coll": "pipeline_test",
-                     "pipeline": [
-                         {
-                             "$setMetadata": {
-                                 "score": {
-                                     "$add": [
-                                         {
-                                             "$const": {"$numberInt":"10"}
-                                         },
-                                         {
-                                             "$const": {"$numberInt":"2"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "internal_raw_score": {
-                                     "$meta": "score"
-                                 }
-                             }
-                         },
-                         {
-                             "$setMetadata": {
-                                 "scoreDetails": {
-                                     "value": {
-                                         "$meta": "score"
-                                     },
-                                     "description": {
-                                         "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
-                                     },
-                                     "rawScore": "$internal_raw_score",
-                                     "normalization": {
-                                         "$const": "none"
-                                     },
-                                     "weight": {
-                                         "$const": {"$numberDouble":"1"}
-                                     },
-                                     "expression": {
-                                         "$const": "{ string: { $add: [ 10, 2 ] } }"
-                                     },
-                                     "details": []
-                                 }
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": "$docs"
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "_internal_scoreFusion_docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_score": {
-                                         "$multiply": [
-                                             {
-                                                 "$meta": "score"
-                                             },
-                                             {
-                                                 "$const": {"$numberDouble":"1"}
-                                             }
-                                         ]
-                                     }
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_rawScore": {
-                                         "$meta": "score"
-                                     }
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "scorePipe2_scoreDetails": {
-                                         "details": {
-                                             "$meta": "scoreDetails"
-                                         }
-                                     }
-                                 }
-                             }
-                         },
-                         {
-                             "$_internalSetWindowFields": {
-                                 "sortBy": {
-                                     "_internal_scoreFusion_internal_fields.scorePipe2_score": {"$numberInt":"-1"}
-                                 },
-                                 "output": {
-                                     "_internal_scoreFusion_internal_fields.scorePipe2_score": {
-                                         "$minMaxScaler": {
-                                             "input": "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                             "min": {"$numberInt":"0"},
-                                             "max": {"$numberInt":"1"}
-                                         },
-                                         "window": {
-                                             "documents": [
-                                                 "unbounded",
-                                                 "unbounded"
-                                             ]
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-                     ]
-                 }
-             },)") +
-        std::string(R"({
-                 "$group": {
-                     "_id": "$_internal_scoreFusion_docs._id",
-                     "_internal_scoreFusion_docs": {
-                         "$first": "$_internal_scoreFusion_docs"
-                     },
-                     "_internal_scoreFusion_internal_fields": {
-                         "$push": {
-                             "scorePipe1_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe1_rawScore": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe1_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails",
-                             "scorePipe2_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe2_rawScore": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "scorePipe2_scoreDetails": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                         }
-                     },
-                     "$willBeMerged": false
-                 }
-             },
-             {
-                 "$project": {
-                     "_id": true,
-                     "_internal_scoreFusion_docs": true,
-                     "_internal_scoreFusion_internal_fields": {
-                         "$reduce": {
-                             "input": "$_internal_scoreFusion_internal_fields",
-                             "initialValue": {
-                                 "scorePipe1_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe1_scoreDetails": {
-                                     "$const": {}
-                                 },
-                                 "scorePipe2_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "scorePipe2_scoreDetails": {
-                                     "$const": {}
-                                 }
-                             },
-                             "in": {
-                                 "scorePipe1_score": {
-                                     "$max": [
-                                         "$$value.scorePipe1_score",
-                                         "$$this.scorePipe1_score"
-                                     ]
-                                 },
-                                 "scorePipe1_rawScore": {
-                                     "$max": [
-                                         "$$value.scorePipe1_rawScore",
-                                         "$$this.scorePipe1_rawScore"
-                                     ]
-                                 },
-                                 "scorePipe1_scoreDetails": {
-                                     "$mergeObjects": [
-                                         "$$value.scorePipe1_scoreDetails",
-                                         "$$this.scorePipe1_scoreDetails"
-                                     ]
-                                 },
-                                 "scorePipe2_score": {
-                                     "$max": [
-                                         "$$value.scorePipe2_score",
-                                         "$$this.scorePipe2_score"
-                                     ]
-                                 },
-                                 "scorePipe2_rawScore": {
-                                     "$max": [
-                                         "$$value.scorePipe2_rawScore",
-                                         "$$this.scorePipe2_rawScore"
-                                     ]
-                                 },
-                                 "scorePipe2_scoreDetails": {
-                                     "$mergeObjects": [
-                                         "$$value.scorePipe2_scoreDetails",
-                                         "$$this.scorePipe2_scoreDetails"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "$mergeObjects": [
-                             "$_internal_scoreFusion_docs",
-                             "$$ROOT"
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_docs": false,
-                     "_id": true
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": {
-                         "$let": {
-                             "vars": {
-                                 "scorePipe1": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
-                                 "scorePipe2": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                             },
-                             "in": {
-                                 "$add": [
-                                     {
-                                         "$multiply": [
-                                             "$$scorePipe1",
-                                             {
-                                                 "$const": {"$numberDouble":"0.5"}
-                                             }
-                                         ]
-                                     },
-                                     "$$scorePipe2"
-                                 ]
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "calculatedScoreDetails": [
-                             {
-                                 "$mergeObjects": [
-                                     {
-                                         "inputPipelineName": {
-                                             "$const": "scorePipe1"
-                                         },
-                                         "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
-                                         "weight": {
-                                             "$const": {"$numberDouble":"1"}
-                                         },
-                                         "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
-                                     },
-                                     "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
-                                 ]
-                             },
-                             {
-                                 "$mergeObjects": [
-                                     {
-                                         "inputPipelineName": {
-                                             "$const": "scorePipe2"
-                                         },
-                                         "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
-                                         "weight": {
-                                             "$const": {"$numberDouble":"1"}
-                                         },
-                                         "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
-                                     },
-                                     "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
-                                 ]
-                             }
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "scoreDetails": {
-                         "value": {
-                             "$meta": "score"
-                         },
-                         "description": {
-                             "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
-                         },
-                         "normalization": {
-                             "$const": "minMaxScaler"
-                         },
-                         "combination": {
-                             "method": {
-                                 "$const": "custom expression"
-                             },
-                             "expression": {
-                                 "$const": "{ string: { $add: [ { $multiply: [ '$$scorePipe1', 0.5 ] }, '$$scorePipe2' ] } }"
-                             }
-                         },
-                         "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
-                     }
-                 }
-             },
-             {
-                 "$sort": {
-                     "$computed0": {
-                         "$meta": "score"
-                     },
-                     "_id": {"$numberInt":"1"}
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_internal_fields": false,
-                     "_id": true
-                 }
-             })") +
-        std::string(R"(]})");
-
-    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
+    auto expected = std::string(R"({
+            "expectedStages": [
+                {
+                    "$geoNear": {
+                        "near": [
+                            {
+                                "$const": 20
+                            },
+                            {
+                                "$const": 40
+                            }
+                        ],
+                        "query": {},
+                        "spherical": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$meta": "geoNearDistance"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "description": {
+                                "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
+                            },
+                            "rawScore": "$internal_raw_score",
+                            "normalization": {
+                                "$const": "none"
+                            },
+                            "weight": {
+                                "$const": 1
+                            },
+                            "expression": {
+                                "$const": "{ string: { $meta: 'geoNearDistance' } }"
+                            },
+                            "details": []
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "scorePipe1_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 1
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "scorePipe1_rawScore": {
+                                "$meta": "score"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "scorePipe1_scoreDetails": {
+                                "details": {
+                                    "$meta": "scoreDetails"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "_internal_scoreFusion_internal_fields.scorePipe1_score": -1
+                        },
+                        "output": {
+                            "_internal_scoreFusion_internal_fields.scorePipe1_score": {
+                                "$minMaxScaler": {
+                                    "input": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$add": [
+                                            {
+                                                "$const": 10
+                                            },
+                                            {
+                                                "$const": 2
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "scoreDetails": {
+                                        "value": {
+                                            "$meta": "score"
+                                        },
+                                        "description": {
+                                            "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
+                                        },
+                                        "rawScore": "$internal_raw_score",
+                                        "normalization": {
+                                            "$const": "none"
+                                        },
+                                        "weight": {
+                                            "$const": 1
+                                        },
+                                        "expression": {
+                                            "$const": "{ string: { $add: [ 10, 2 ] } }"
+                                        },
+                                        "details": []
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe2_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe2_rawScore": {
+                                            "$meta": "score"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe2_scoreDetails": {
+                                            "details": {
+                                                "$meta": "scoreDetails"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "_internal_scoreFusion_internal_fields.scorePipe2_score": -1
+                                    },
+                                    "output": {
+                                        "_internal_scoreFusion_internal_fields.scorePipe2_score": {
+                                            "$minMaxScaler": {
+                                                "input": "$_internal_scoreFusion_internal_fields.scorePipe2_score",
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+)") + R"(                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_scorePipe1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe1_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe1_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
+                        },
+                        "__hs_scorePipe2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe2_rawScore": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_scorePipe2_scoreDetails": {
+                            "$mergeObjects": "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "scorePipe1_score": "$__hs_scorePipe1_score",
+                                        "scorePipe1_rawScore": "$__hs_scorePipe1_rawScore",
+                                        "scorePipe1_scoreDetails": "$__hs_scorePipe1_scoreDetails",
+                                        "scorePipe2_score": "$__hs_scorePipe2_score",
+                                        "scorePipe2_rawScore": "$__hs_scorePipe2_rawScore",
+                                        "scorePipe2_scoreDetails": "$__hs_scorePipe2_scoreDetails"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "scorePipe1": "$_internal_scoreFusion_internal_fields.scorePipe1_score",
+                                    "scorePipe2": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
+                                },
+                                "in": {
+                                    "$add": [
+                                        {
+                                            "$multiply": [
+                                                "$$scorePipe1",
+                                                {
+                                                    "$const": 0.5
+                                                }
+                                            ]
+                                        },
+                                        "$$scorePipe2"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "calculatedScoreDetails": [
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "scorePipe1"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe1_rawScore",
+                                            "weight": {
+                                                "$const": 1
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.scorePipe1_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.scorePipe1_scoreDetails"
+                                    ]
+                                },
+                                {
+                                    "$mergeObjects": [
+                                        {
+                                            "inputPipelineName": {
+                                                "$const": "scorePipe2"
+                                            },
+                                            "inputPipelineRawScore": "$_internal_scoreFusion_internal_fields.scorePipe2_rawScore",
+                                            "weight": {
+                                                "$const": 1
+                                            },
+                                            "value": "$_internal_scoreFusion_internal_fields.scorePipe2_score"
+                                        },
+                                        "$_internal_scoreFusion_internal_fields.scorePipe2_scoreDetails"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "description": {
+                                "$const": "the value calculated by combining the scores (either normalized or raw) across input pipelines from which this document is output from:"
+                            },
+                            "normalization": {
+                                "$const": "minMaxScaler"
+                            },
+                            "combination": {
+                                "method": {
+                                    "$const": "custom expression"
+                                },
+                                "expression": {
+                                    "$const": "{ string: { $add: [ { $multiply: [ '$$scorePipe1', 0.5 ] }, '$$scorePipe2' ] } }"
+                                }
+                            },
+                            "details": "$_internal_scoreFusion_internal_fields.calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        }
+)";  // NOLINT
+    ASSERT_BSONOBJ_EQ(fromjson(expected), asOneObj);
 }
 
 TEST_F(DocumentSourceScoreFusionTest,
@@ -11667,316 +8194,283 @@ TEST_F(DocumentSourceScoreFusionTest,
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
 
-    std::string expectedStages = R"({
-     "expectedStages": [
-         {
-             "$setMetadata": {
-                 "score": "$double"
-             }
-         },
-         {
-             "$replaceRoot": {
-                 "newRoot": {
-                     "docs": "$$ROOT"
-                 }
-             }
-         },
-         {
-             "$addFields": {
-                 "internal_raw_score": {
-                     "$meta": "score"
-                 }
-             }
-         },
-         {
-             "$_internalSetWindowFields": {
-                 "sortBy": {
-                     "internal_min_max_scaler_normalization_score": {"$numberInt":"-1"}
-                 },
-                 "output": {
-                     "internal_min_max_scaler_normalization_score": {
-                         "$minMaxScaler": {
-                             "input": {
-                                 "$meta": "score"
-                             },
-                             "min": {"$numberInt":"0"},
-                             "max": {"$numberInt":"1"}
-                         },
-                         "window": {
-                             "documents": [
-                                 "unbounded",
-                                 "unbounded"
-                             ]
-                         }
-                     }
-                 }
-             }
-         },
-         {
-             "$setMetadata": {
-                 "score": "$internal_min_max_scaler_normalization_score"
-             }
-         },
-         {
-             "$replaceRoot": {
-                 "newRoot": "$docs"
-             }
-         },
-         {
-             "$replaceRoot": {
-                 "newRoot": {
-                     "_internal_scoreFusion_docs": "$$ROOT"
-                 }
-             }
-         },
-         {
-             "$addFields": {
-                 "_internal_scoreFusion_internal_fields": {
-                     "double_score": {
-                         "$multiply": [
-                             {
-                                 "$meta": "score"
-                             },
-                             {
-                                 "$const": {"$numberDouble":"2"}
-                             }
-                         ]
-                     }
-                 }
-             }
-         },
-         {
-             "$_internalSetWindowFields": {
-                 "sortBy": {
-                     "_internal_scoreFusion_internal_fields.double_score": {"$numberInt":"-1"}
-                 },
-                 "output": {
-                     "_internal_scoreFusion_internal_fields.double_score": {
-                         "$minMaxScaler": {
-                             "input": "$_internal_scoreFusion_internal_fields.double_score",
-                             "min": {"$numberInt":"0"},
-                             "max": {"$numberInt":"1"}
-                         },
-                         "window": {
-                             "documents": [
-                                 "unbounded",
-                                 "unbounded"
-                             ]
-                         }
-                     }
-                 }
-             }
-         },
-         {
-             "$unionWith": {
-                 "coll": "pipeline_test",
-                 "pipeline": [
-                     {
-                         "$setMetadata": {
-                             "score": "$single"
-                         }
-                     },
-                     {
-                         "$replaceRoot": {
-                             "newRoot": {
-                                 "docs": "$$ROOT"
-                             }
-                         }
-                     },
-                     {
-                         "$addFields": {
-                             "internal_raw_score": {
-                                 "$meta": "score"
-                             }
-                         }
-                     },
-                     {
-                         "$_internalSetWindowFields": {
-                             "sortBy": {
-                                 "internal_min_max_scaler_normalization_score": {"$numberInt":"-1"}
-                             },
-                             "output": {
-                                 "internal_min_max_scaler_normalization_score": {
-                                     "$minMaxScaler": {
-                                         "input": {
-                                             "$meta": "score"
-                                         },
-                                         "min": {"$numberInt":"0"},
-                                         "max": {"$numberInt":"1"}
-                                     },
-                                     "window": {
-                                         "documents": [
-                                             "unbounded",
-                                             "unbounded"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     },
-                     {
-                         "$setMetadata": {
-                             "score": "$internal_min_max_scaler_normalization_score"
-                         }
-                     },
-                     {
-                         "$replaceRoot": {
-                             "newRoot": "$docs"
-                         }
-                     },
-                     {
-                         "$replaceRoot": {
-                             "newRoot": {
-                                 "_internal_scoreFusion_docs": "$$ROOT"
-                             }
-                         }
-                     },
-                     {
-                         "$addFields": {
-                             "_internal_scoreFusion_internal_fields": {
-                                 "single_score": {
-                                     "$multiply": [
-                                         {
-                                             "$meta": "score"
-                                         },
-                                         {
-                                             "$const": {"$numberDouble":"0.5"}
-                                         }
-                                     ]
-                                 }
-                             }
-                         }
-                     },
-                     {
-                         "$_internalSetWindowFields": {
-                             "sortBy": {
-                                 "_internal_scoreFusion_internal_fields.single_score": {"$numberInt":"-1"}
-                             },
-                             "output": {
-                                 "_internal_scoreFusion_internal_fields.single_score": {
-                                     "$minMaxScaler": {
-                                         "input": "$_internal_scoreFusion_internal_fields.single_score",
-                                         "min": {"$numberInt":"0"},
-                                         "max": {"$numberInt":"1"}
-                                     },
-                                     "window": {
-                                         "documents": [
-                                             "unbounded",
-                                             "unbounded"
-                                         ]
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 ]
-             }
-         },
-         {
-             "$group": {
-                 "_id": "$_internal_scoreFusion_docs._id",
-                 "_internal_scoreFusion_docs": {
-                     "$first": "$_internal_scoreFusion_docs"
-                 },
-                 "_internal_scoreFusion_internal_fields": {
-                     "$push": {
-                         "double_score": {
-                             "$ifNull": [
-                                 "$_internal_scoreFusion_internal_fields.double_score",
-                                 {
-                                     "$const": {"$numberInt":"0"}
-                                 }
-                             ]
-                         },
-                         "single_score": {
-                             "$ifNull": [
-                                 "$_internal_scoreFusion_internal_fields.single_score",
-                                 {
-                                     "$const": {"$numberInt":"0"}
-                                 }
-                             ]
-                         }
-                     }
-                 },
-                 "$willBeMerged": false
-             }
-         },
-         {
-             "$project": {
-                 "_id": true,
-                 "_internal_scoreFusion_docs": true,
-                 "_internal_scoreFusion_internal_fields": {
-                     "$reduce": {
-                         "input": "$_internal_scoreFusion_internal_fields",
-                         "initialValue": {
-                             "double_score": {
-                                 "$const": {"$numberInt":"0"}
-                             },
-                             "single_score": {
-                                 "$const": {"$numberInt":"0"}
-                             }
-                         },
-                         "in": {
-                             "double_score": {
-                                 "$max": [
-                                     "$$value.double_score",
-                                     "$$this.double_score"
-                                 ]
-                             },
-                             "single_score": {
-                                 "$max": [
-                                     "$$value.single_score",
-                                     "$$this.single_score"
-                                 ]
-                             }
-                         }
-                     }
-                 }
-             }
-         },
-         {
-             "$replaceRoot": {
-                 "newRoot": {
-                     "$mergeObjects": [
-                         "$_internal_scoreFusion_docs",
-                         "$$ROOT"
-                     ]
-                 }
-             }
-         },
-         {
-             "$project": {
-                 "_internal_scoreFusion_docs": false,
-                 "_id": true
-             }
-         },
-         {
-             "$setMetadata": {
-                 "score": {
-                     "$avg": [
-                         "$_internal_scoreFusion_internal_fields.double_score",
-                         "$_internal_scoreFusion_internal_fields.single_score"
-                     ]
-                 }
-             }
-         },
-         {
-             "$sort": {
-                 "$computed0": {
-                     "$meta": "score"
-                 },
-                 "_id": {"$numberInt":"1"}
-             }
-         },
-         {
-             "$project": {
-                 "_internal_scoreFusion_internal_fields": false,
-                 "_id": true
-             }
-         }
-     ]
- })";
-    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": "$double"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "internal_min_max_scaler_normalization_score": -1
+                        },
+                        "output": {
+                            "internal_min_max_scaler_normalization_score": {
+                                "$minMaxScaler": {
+                                    "input": {
+                                        "$meta": "score"
+                                    },
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": "$internal_min_max_scaler_normalization_score"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "double_score": {
+                                "$multiply": [
+                                    {
+                                        "$meta": "score"
+                                    },
+                                    {
+                                        "$const": 2
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "_internal_scoreFusion_internal_fields.double_score": -1
+                        },
+                        "output": {
+                            "_internal_scoreFusion_internal_fields.double_score": {
+                                "$minMaxScaler": {
+                                    "input": "$_internal_scoreFusion_internal_fields.double_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": "$single"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "internal_min_max_scaler_normalization_score": -1
+                                    },
+                                    "output": {
+                                        "internal_min_max_scaler_normalization_score": {
+                                            "$minMaxScaler": {
+                                                "input": {
+                                                    "$meta": "score"
+                                                },
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": "$internal_min_max_scaler_normalization_score"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "single_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$meta": "score"
+                                                },
+                                                {
+                                                    "$const": 0.5
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "_internal_scoreFusion_internal_fields.single_score": -1
+                                    },
+                                    "output": {
+                                        "_internal_scoreFusion_internal_fields.single_score": {
+                                            "$minMaxScaler": {
+                                                "input": "$_internal_scoreFusion_internal_fields.single_score",
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_double_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.double_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_single_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.single_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "double_score": "$__hs_double_score",
+                                        "single_score": "$__hs_single_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.double_score",
+                                "$_internal_scoreFusion_internal_fields.single_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
+        asOneObj);
 }
 
 TEST_F(DocumentSourceScoreFusionTest,
@@ -12012,328 +8506,401 @@ TEST_F(DocumentSourceScoreFusionTest,
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
 
-    std::string expectedStages = R"({
-         "expectedStages": [
-             {
-                 "$setMetadata": {
-                     "score": "$double"
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "docs": "$$ROOT"
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "internal_raw_score": {
-                         "$meta": "score"
-                     }
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": {
-                         "$divide": [
-                             {
-                                 "$const": {"$numberInt":"1"}
-                             },
-                             {
-                                 "$add": [
-                                     {
-                                         "$const": {"$numberInt":"1"}
-                                     },
-                                     {
-                                         "$exp": [
-                                             {
-                                                 "$multiply": [
-                                                     {
-                                                         "$const": {"$numberInt":"-1"}
-                                                     },
-                                                     {
-                                                         "$meta": "score"
-                                                     }
-                                                 ]
-                                             }
-                                         ]
-                                     }
-                                 ]
-                             }
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": "$docs"
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "_internal_scoreFusion_docs": "$$ROOT"
-                     }
-                 }
-             },
-             {
-                 "$addFields": {
-                     "_internal_scoreFusion_internal_fields": {
-                         "double_score": {
-                             "$multiply": [
-                                 {
-                                     "$divide": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$add": [
-                                                 {
-                                                     "$const": {"$numberInt":"1"}
-                                                 },
-                                                 {
-                                                     "$exp": [
-                                                         {
-                                                             "$multiply": [
-                                                                 {
-                                                                     "$const": {"$numberInt":"-1"}
-                                                                 },
-                                                                 {
-                                                                     "$meta": "score"
-                                                                 }
-                                                             ]
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 },
-                                 {
-                                     "$const": {"$numberDouble":"2"}
-                                 }
-                             ]
-                         }
-                     }
-                 }
-             },
-             {
-                 "$unionWith": {
-                     "coll": "pipeline_test",
-                     "pipeline": [
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": "$double"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        {
+                                                            "$meta": "score"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "_internal_scoreFusion_docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_internal_scoreFusion_internal_fields": {
+                            "double_score": {
+                                "$multiply": [
+                                    {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "$const": 2
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": "$single"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "_internal_scoreFusion_docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "single_score": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$const": 1
+                                                        },
+                                                        {
+                                                            "$add": [
+                                                                {
+                                                                    "$const": 1
+                                                                },
+                                                                {
+                                                                    "$exp": [
+                                                                        {
+                                                                            "$multiply": [
+                                                                                {
+                                                                                    "$const": -1
+                                                                                },
+                                                                                {
+                                                                                    "$meta": "score"
+                                                                                }
+                                                                            ]
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "$const": 0.5
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$_internal_scoreFusion_docs._id",
+                        "_internal_scoreFusion_docs": {
+                            "$first": "$_internal_scoreFusion_docs"
+                        },
+                        "__hs_double_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.double_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "__hs_single_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$_internal_scoreFusion_internal_fields.single_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "$mergeObjects": [
+                                "$_internal_scoreFusion_docs",
+                                {
+                                    "_internal_scoreFusion_internal_fields": {
+                                        "double_score": "$__hs_double_score",
+                                        "single_score": "$__hs_single_score"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$_internal_scoreFusion_internal_fields.double_score",
+                                "$_internal_scoreFusion_internal_fields.single_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$project": {
+                        "_internal_scoreFusion_internal_fields": false,
+                        "_id": true
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+// This test demonstrates what happens to user fields that match our internal names as it goes
+// through the process to get score details.
+TEST_F(DocumentSourceScoreFusionTest, InternalFieldBehaviorThroughGroupAndReshape) {
+    auto spec = fromjson(R"({
+         $scoreFusion: {
+             input: {
+                 pipelines: {
+                     name1: [
                          {
-                             "$setMetadata": {
-                                 "score": "$single"
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "internal_raw_score": {
-                                     "$meta": "score"
-                                 }
-                             }
-                         },
-                         {
-                             "$setMetadata": {
-                                 "score": {
-                                     "$divide": [
-                                         {
-                                             "$const": {"$numberInt":"1"}
-                                         },
-                                         {
-                                             "$add": [
-                                                 {
-                                                     "$const": {"$numberInt":"1"}
-                                                 },
-                                                 {
-                                                     "$exp": [
-                                                         {
-                                                             "$multiply": [
-                                                                 {
-                                                                     "$const": {"$numberInt":"-1"}
-                                                                 },
-                                                                 {
-                                                                     "$meta": "score"
-                                                                 }
-                                                             ]
-                                                         }
-                                                     ]
-                                                 }
-                                             ]
-                                         }
-                                     ]
-                                 }
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": "$docs"
-                             }
-                         },
-                         {
-                             "$replaceRoot": {
-                                 "newRoot": {
-                                     "_internal_scoreFusion_docs": "$$ROOT"
-                                 }
-                             }
-                         },
-                         {
-                             "$addFields": {
-                                 "_internal_scoreFusion_internal_fields": {
-                                     "single_score": {
-                                         "$multiply": [
-                                             {
-                                                 "$divide": [
-                                                     {
-                                                         "$const": {"$numberInt":"1"}
-                                                     },
-                                                     {
-                                                         "$add": [
-                                                             {
-                                                                 "$const": {"$numberInt":"1"}
-                                                             },
-                                                             {
-                                                                 "$exp": [
-                                                                     {
-                                                                         "$multiply": [
-                                                                             {
-                                                                                 "$const": {"$numberInt":"-1"}
-                                                                             },
-                                                                             {
-                                                                                 "$meta": "score"
-                                                                             }
-                                                                         ]
-                                                                     }
-                                                                 ]
-                                                             }
-                                                         ]
-                                                     }
-                                                 ]
-                                             },
-                                             {
-                                                 "$const": {"$numberDouble":"0.5"}
-                                             }
-                                         ]
-                                     }
-                                 }
+                             $vectorSearch: {
+                                 queryVector: [1.0, 2.0, 3.0],
+                                 path: "plot_embedding",
+                                 numCandidates: 300,
+                                 index: "vector_index",
+                                 limit: 10
                              }
                          }
                      ]
-                 }
-             },
-             {
-                 "$group": {
-                     "_id": "$_internal_scoreFusion_docs._id",
-                     "_internal_scoreFusion_docs": {
-                         "$first": "$_internal_scoreFusion_docs"
-                     },
-                     "_internal_scoreFusion_internal_fields": {
-                         "$push": {
-                             "double_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.double_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             },
-                             "single_score": {
-                                 "$ifNull": [
-                                     "$_internal_scoreFusion_internal_fields.single_score",
-                                     {
-                                         "$const": {"$numberInt":"0"}
-                                     }
-                                 ]
-                             }
-                         }
-                     },
-                     "$willBeMerged": false
-                 }
-             },
-             {
-                 "$project": {
-                     "_id": true,
-                     "_internal_scoreFusion_docs": true,
-                     "_internal_scoreFusion_internal_fields": {
-                         "$reduce": {
-                             "input": "$_internal_scoreFusion_internal_fields",
-                             "initialValue": {
-                                 "double_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 },
-                                 "single_score": {
-                                     "$const": {"$numberInt":"0"}
-                                 }
-                             },
-                             "in": {
-                                 "double_score": {
-                                     "$max": [
-                                         "$$value.double_score",
-                                         "$$this.double_score"
-                                     ]
-                                 },
-                                 "single_score": {
-                                     "$max": [
-                                         "$$value.single_score",
-                                         "$$this.single_score"
-                                     ]
-                                 }
-                             }
-                         }
-                     }
-                 }
-             },
-             {
-                 "$replaceRoot": {
-                     "newRoot": {
-                         "$mergeObjects": [
-                             "$_internal_scoreFusion_docs",
-                             "$$ROOT"
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_docs": false,
-                     "_id": true
-                 }
-             },
-             {
-                 "$setMetadata": {
-                     "score": {
-                         "$avg": [
-                             "$_internal_scoreFusion_internal_fields.double_score",
-                             "$_internal_scoreFusion_internal_fields.single_score"
-                         ]
-                     }
-                 }
-             },
-             {
-                 "$sort": {
-                     "$computed0": {
-                         "$meta": "score"
-                     },
-                     "_id": {"$numberInt":"1"}
-                 }
-             },
-             {
-                 "$project": {
-                     "_internal_scoreFusion_internal_fields": false,
-                     "_id": true
-                 }
+                 },
+                 normalization: "none"
              }
-         ]
-     })";
-    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
+         }
+     })");
+
+    // Build the desugared pipeline to extract the $group and subsequent stages.
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+
+    // Find the $group stage and collect it plus all following stages.
+    std::vector<boost::intrusive_ptr<DocumentSource>> postGroupStages;
+    bool foundGroup = false;
+    for (const auto& stage : desugaredList) {
+        if (foundGroup) {
+            postGroupStages.push_back(stage);
+        } else {
+            auto serialized = stage->serialize();
+            auto stageDoc = serialized.getDocument();
+            if (!stageDoc["$group"_sd].missing()) {
+                foundGroup = true;
+                postGroupStages.push_back(stage);
+            }
+        }
+    }
+    ASSERT_TRUE(foundGroup);
+
+    // Mock documents simulating the state entering the $group stage. Each document represents a
+    // single input pipeline's contribution for a given user document. The user document is wrapped
+    // in _internal_scoreFusion_docs and includes:
+    //   - a field with the __hs_ prefix that will survive the pipeline,
+    //   - a field named "_internal_scoreFusion_internal_fields" that collides with the internal
+    //     name and will be lost.
+    auto mock = exec::agg::MockStage::createForTest(
+        {
+            Document{{"_internal_scoreFusion_docs",
+                      Document{{"_id", 1},
+                               {"val", 10},
+                               {"__hs_custom", "alpha"_sd},
+                               {"_internal_scoreFusion_internal_fields", "user_data"_sd}}},
+                     {"_internal_scoreFusion_internal_fields", Document{{"name1_score", 3.0}}}},
+            Document{{"_internal_scoreFusion_docs",
+                      Document{{"_id", 2}, {"val", 20}, {"__hs_custom", "beta"_sd}}},
+                     {"_internal_scoreFusion_internal_fields", Document{{"name1_score", 7.0}}}},
+        },
+        getExpCtx());
+
+    // Build exec stages from the DocumentSource list and chain them together with the mock source.
+    // Keep all intermediate stages alive to prevent use-after-free.
+    std::vector<boost::intrusive_ptr<exec::agg::Stage>> execStages;
+    execStages.push_back(mock);
+    for (auto& ds : postGroupStages) {
+        execStages.push_back(exec::agg::buildStageAndStitch(ds, execStages.back()));
+    }
+    auto& lastStage = execStages.back();
+
+    // Execute and collect results from the last stage.
+    std::vector<Document> results;
+    for (auto next = lastStage->getNext(); next.isAdvanced(); next = lastStage->getNext()) {
+        results.push_back(next.releaseDocument());
+    }
+
+    ASSERT_EQ(results.size(), 2u);
+
+    // Results are sorted by score descending then _id ascending, so doc with score 7 comes first.
+    ASSERT_VALUE_EQ(results[0]["_id"_sd], Value(2));
+    ASSERT_VALUE_EQ(results[1]["_id"_sd], Value(1));
+
+    // Verify user fields with the __hs_ prefix are preserved.
+    ASSERT_VALUE_EQ(results[0]["__hs_custom"_sd], Value("beta"_sd));
+    ASSERT_VALUE_EQ(results[1]["__hs_custom"_sd], Value("alpha"_sd));
+
+    // Verify other user fields are preserved.
+    ASSERT_VALUE_EQ(results[0]["val"_sd], Value(20));
+    ASSERT_VALUE_EQ(results[1]["val"_sd], Value(10));
+
+    // A user field named "_internal_scoreFusion_internal_fields" is lost: $mergeObjects overwrites
+    // it with the repacked internal fields object, and then $project removes it.
+    ASSERT_TRUE(results[0]["_internal_scoreFusion_internal_fields"_sd].missing());
+    ASSERT_TRUE(results[1]["_internal_scoreFusion_internal_fields"_sd].missing());
+
+    // All internal fields are removed from the output.
+    ASSERT_TRUE(results[0]["_internal_scoreFusion_docs"_sd].missing());
+    ASSERT_TRUE(results[1]["_internal_scoreFusion_docs"_sd].missing());
+    ASSERT_TRUE(results[0]["__hs_name1_score"_sd].missing());
+    ASSERT_TRUE(results[1]["__hs_name1_score"_sd].missing());
 }
 }  // namespace
 }  // namespace mongo

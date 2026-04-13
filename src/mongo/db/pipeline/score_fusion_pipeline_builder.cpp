@@ -451,34 +451,6 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
 }
 
 /**
- * Append logic for applying scoreNulls behavior for the "rawScore" field.
- */
-void ScoreFusionPipelineBuilder::groupDocsByIdAcrossInputPipelineScoreDetails(
-    StringData pipelineName, BSONObjBuilder& pushBob) {
-    const std::string rawScoreName = fmt::format("{}_rawScore", pipelineName);
-    pushBob.append(rawScoreName,
-                   BSON("$ifNull" << BSON_ARRAY(
-                            fmt::format("${}",
-                                        hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
-                                            getInternalFieldsName(), rawScoreName))
-                            << 0)));
-}
-
-/**
- * Append logic for determining the max value of the "rawScore" field across documents.
- */
-void ScoreFusionPipelineBuilder::projectReduceInternalFieldsScoreDetails(
-    BSONObjBuilder& bob, StringData pipelineName, const bool forInitialValue) {
-    if (forInitialValue) {
-        bob.append(fmt::format("{}_rawScore", pipelineName), 0);
-    } else {
-        bob.append(fmt::format("{}_rawScore", pipelineName),
-                   BSON("$max" << BSON_ARRAY(fmt::format("$$value.{}_rawScore", pipelineName)
-                                             << fmt::format("$$this.{}_rawScore", pipelineName))));
-    }
-}
-
-/**
  * Append logic for adding the $scoreFusion-specific input pipeline scoreDetails values (rawScore,
  * weight, and value).
  */
@@ -585,4 +557,12 @@ ScoreFusionPipelineBuilder::buildScoreAndMergeStages(
                                {std::move(sort), std::move(removeInternalFieldsProject)});
     return scoreAndMergeStages;
 }
+
+std::string ScoreFusionPipelineBuilder::getScoreDetailsScalarFieldName(
+    StringData pipelineName) const {
+    // The raw (pre-normalization, pre-weighting) score for each input pipeline is the
+    // stage-specific scalar preserved for scoreDetails output.
+    return fmt::format("{}_rawScore", pipelineName);
+}
+
 }  // namespace mongo

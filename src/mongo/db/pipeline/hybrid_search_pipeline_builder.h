@@ -135,165 +135,37 @@ protected:
           _scoreDetailsDescription(scoreDetailsDescription) {}
 
 private:
-    /**
-     * Produces the BSON for a $group spec to group all the input documents across all pipelines by
-     * '_id' and their internal fields (pipeline score, pipeline rank (if $rankFusion)/pipeline
-     * rawScore (if $scoreFusion) and pipeline scoreDetails). If a document is not present in an
-     * input pipeline, its score for that input pipeline is set to 0.
-     *
-     * Note, because every field in a $group is defined by its own accumulator,
-     * to preserve the structure of all our internal fields being encapsulated by in a single
-     * field object, we first in this stage push each document's internal fields in the group
-     * into an array using $push.
-     *
-     * After, the internal fields array is reduced to a single internal fields object
-     * that represents the merger of all the internal fields across all documents across
-     * all input pipelines of a matching '_id'.
-     * Builds a $group like the following
-     * (if scoreDetails included; otherwise omit rank (if $rankFusion) or rawScore (if $scoreFusion)
-     * and scoreDetails internal fields):
-     *
-     * {
-     *     "$group": {
-     *         "_id": "$<INTERNAL_FIELDS_DOCS>._id",
-     *         "<INTERNAL_FIELDS_DOCS>": {
-     *             "$first": "$<INTERNAL_FIELDS_DOCS>"
-     *         },
-     *         "<INTERNAL_FIELDS>": {
-     *             "$push": {
-     *                 "<pipeline1_name>_score": {
-     *                     "$ifNull": [
-     *                         "$<INTERNAL_FIELDS>.<pipeline1_name>_score", 0
-     *                     ]
-     *                 },
-     *                 "<pipeline1_name>_rank": { // or if $scoreFusion: "<pipeline1_name>_rawScore"
-     *                     "$ifNull": [
-     *                         "$<INTERNAL_FIELDS>.<pipeline1_name>_rank", 0
-     *                         // OR "$<INTERNAL_FIELDS>.<pipeline1_name>_rawScore", 0
-     *                     ]
-     *                 },
-     *                 "<pipeline1_name>_scoreDetails":
-     *                    "$<INTERNAL_FIELDS>.<pipeline1_name>_scoreDetails",
-     *                 "<pipeline2_name>_score": {
-     *                     "$ifNull": [
-     *                         "$_<INTERNAL_FIELDS>.<pipeline2_name>_score", 0
-     *                 }
-     *                 "<pipeline2_name>_rank": {  // or if $scoreFusion:
-     * "<pipeline2_name>_rawScore"
-     *                     "$ifNull": [
-     *                         "$<INTERNAL_FIELDS>.<pipeline2_name>_rank", 0
-     *                         // OR "$<INTERNAL_FIELDS>.<pipeline2_name>_rawScore", 0
-     *                     ]
-     *                 },
-     *                 "<pipeline2_name>_scoreDetails":
-     *                    "$<INTERNAL_FIELDS>.<pipeline2_name>_scoreDetails"
-     *           }
-     *        }
-     *     }
-     *  }
-     */
-    BSONObj groupDocsByIdAcrossInputPipeline(const std::vector<std::string>& pipelineNames);
+    // Prefix applied to flat field names in the $group stage output. Because $group cannot
+    // output dotted-path field names, all accumulated per-pipeline values are stored under
+    // "__hs_"-prefixed flat names so they can later be referenced.
+    static constexpr StringData kHsFlatFieldPrefix = "__hs_"_sd;
 
     /**
-     * Produces the BSON spec for a $project stage that reduces the <INTERNAL_FIELD> field array,
-     * produced after the prior $group by '_id', into a single <INTERNAL_FIELD> object that
-     * represents the merged <INTERNAL_FIELD> field objects across all input documents across
-     * all input pipelines that have the same '_id'.
+     * Build a $group and $replaceRoot that aggregate scores across input pipelines and restore
+     * user documents to the top level.
      *
-     * Conceptually, it does the grouping accumulation of the <INTERNAL_FIELDS> sub-fields
-     * of documents of matching '_id's, as $group can not accumulate sub-fields directly.
+     * After all $unionWith branches execute, a document that appears in N input pipelines will
+     * have N rows in the stream, each carrying a real score only for its own pipeline. These
+     * two stages collapse those rows into a single document per _id.
      *
-     * Builds a $project like the following
-     * (if scoreDetails included; otherwise omit rank (if $rankFusion) or rawScore (if $scoreFusion)
-     * and scoreDetails internal fields):
+     * Stage 1 ($group): groups by the user document's _id and uses one accumulator per
+     * pipeline field. Because $group cannot output dotted-path field names, accumulated values
+     * are stored under flat "__hs_"-prefixed names.
      *
-     * {
-     *     "$project": {
-     *         "_id": true,
-     *         "<INTERNAL_FIELDS_DOCS>": true,
-     *         "<INTERNAL_FIELDS>": {
-     *             "$reduce": {
-     *                 "input": "$<INTERNAL_FIELDS_DOCS>",
-     *                 "initialValue": {
-     *                     "<pipeline1_name>_score": 0,
-     *                     "<pipeline1_name>_rank/rawScore": 0,
-     *                     "<pipeline1_name>_scoreDetails": {},
-     *                     "<pipeline2_name>_score": 0,
-     *                     "<pipeline2_name>_rank/rawScore": 0,
-     *                     "<pipeline2_name>_scoreDetails": {}
-     *                 },
-     *                 "in": {
-     *                     "<pipeline1_name>_score": {
-     *                         "$max": [
-     *                             "$$value.<pipeline1_name>_score",
-     *                             "$$this.<pipeline1_name>_score"
-     *                         ]
-     *                     },
-     *                     "<pipeline1_name>_rank/rawScore": {
-     *                         "$max": [
-     *                             "$$value.<pipeline1_name>_rank/rawScore",
-     *                             "$$this.<pipeline1_name>_rank/rawScore"
-     *                         ]
-     *                     },
-     *                     "<pipeline1_name>_scoreDetails": {
-     *                         "$mergeObjects": [
-     *                             "$$value.<pipeline1_name>_scoreDetails",
-     *                             "$$this.<pipeline1_name>_scoreDetails"
-     *                         ]
-     *                     }
-     *                     "<pipeline2_name>_score": {
-     *                         "$max": [
-     *                             "$$value.<pipeline2_name>_score",
-     *                             "$$this.<pipeline2_name>_score"
-     *                         ]
-     *                     },
-     *                     "<pipeline2_name>_rank/rawScore": {
-     *                         "$max": [
-     *                             "$$value.<pipeline2_name>_rank/rawScore",
-     *                             "$$this.<pipeline2_name>_rank/rawScore"
-     *                         ]
-     *                     },
-     *                     "<pipeline2_name>_scoreDetails": {
-     *                         "$mergeObjects": [
-     *                             "$$value.<pipeline2_name>_scoreDetails",
-     *                             "$$this.<pipeline2_name>_scoreDetails"
-     *                         ]
-     *                     }
-     *                 }
-     *             }
-     *         }
-     *     }
-     * }
+     * Stage 2 ($replaceRoot): promotes the stashed user document from <INTERNAL_DOCS> to the
+     * top level, and repacks the flat __hs_* fields into a nested <INTERNAL_FIELDS> object. The
+     * $group output (_id, <INTERNAL_DOCS>, __hs_* fields) is implicitly dropped since $replaceRoot
+     * replaces the entire document.
      *
+     * Output: one document per unique _id with the user's original fields at the top level
+     * and per-pipeline scores nested under <INTERNAL_FIELDS>:
+     * {_id: 1, title: "...", <INTERNAL_FIELDS>: {<p1>_score: 0.5, <p2>_score: 0.8, ...}}
+     *
+     * See the .cpp for the full BSON shapes.
      */
-    BSONObj projectReduceInternalFields(const std::vector<std::string>& pipelineNames);
-
-    /**
-     * Builds the following BSON object, in order to promote the user's documents to the top-level
-     * while still maintaining the internal processing fields.
-     * {
-     *   $replaceRoot: {
-     *     newRoot: {
-     *       $mergeObjects: [
-     *         "$<INTERNAL_DOCS>",
-     *         "$$ROOT"
-     *       ]
-     *     }
-     *   }
-     * }
-     */
-    BSONObj promoteEmbeddedDocsObject();
-
-    /**
-     * Builds the following BSON object, in order to remove the internal docs subobject that hid the
-     * user's documents.
-     * {
-     *   $project: {
-     *      <INTERNAL_DOCS>: 0
-     *   }
-     * }
-     */
-    BSONObj projectRemoveEmbeddedDocsObject();
+    std::list<boost::intrusive_ptr<DocumentSource>> buildGroupAndReplaceRootStages(
+        const std::vector<std::string>& pipelineNames,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Build stages for beginning of input pipeline. For $rankFusion, will preserve rank, weight
@@ -311,7 +183,7 @@ private:
     /**
      * Build the stages that group the documents by _id across all input pipelines, sorts the
      * documents, removes internal processing fields, and calculates the final scoreDetails (if
-     * enabled). final scoreDetails
+     * enabled).
      */
     virtual std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
         const std::vector<std::string>& pipelineNames,
@@ -319,17 +191,10 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
 
     /**
-     * Adds the scoreNulls behavior for stage-specific fields to the $group stage.
+     * Returns the name of the per-pipeline scalar field that carries stage-specific metadata
+     * needed for scoreDetails output. Only called when shouldIncludeScoreDetails() is true.
      */
-    virtual void groupDocsByIdAcrossInputPipelineScoreDetails(StringData pipelineName,
-                                                              BSONObjBuilder& pushBob) = 0;
-
-    /**
-     * Remove the stage-specific internal processing fields.
-     */
-    virtual void projectReduceInternalFieldsScoreDetails(BSONObjBuilder& bob,
-                                                         StringData pipelineName,
-                                                         bool forInitialValue) = 0;
+    virtual std::string getScoreDetailsScalarFieldName(StringData pipelineName) const = 0;
 
     /**
      * Construct the stage-specific fields for each input pipeline to add to the final scoreDetails.

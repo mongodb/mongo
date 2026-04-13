@@ -84,12 +84,7 @@ private:
         const StringMap<double>& weights,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) override;
 
-    void groupDocsByIdAcrossInputPipelineScoreDetails(StringData pipelineName,
-                                                      BSONObjBuilder& pushBob) override;
-
-    void projectReduceInternalFieldsScoreDetails(BSONObjBuilder& bob,
-                                                 StringData pipelineName,
-                                                 bool forInitialValue) override;
+    std::string getScoreDetailsScalarFieldName(StringData pipelineName) const override;
 
     void constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(BSONObjBuilder& bob,
                                                                        StringData pipelineName,

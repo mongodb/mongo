@@ -337,34 +337,6 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
 }
 
 /**
- * Append logic for applying scoreNulls behavior for the "rank" field.
- */
-void RankFusionPipelineBuilder::groupDocsByIdAcrossInputPipelineScoreDetails(
-    StringData pipelineName, BSONObjBuilder& pushBob) {
-    const std::string rankName = fmt::format("{}_rank", pipelineName);
-    pushBob.append(rankName,
-                   BSON("$ifNull" << BSON_ARRAY(
-                            fmt::format("${}",
-                                        hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
-                                            getInternalFieldsName(), rankName))
-                            << 0)));
-}
-
-/**
- * Append logic for determining the max value of the "rank" field across documents.
- */
-void RankFusionPipelineBuilder::projectReduceInternalFieldsScoreDetails(
-    BSONObjBuilder& bob, StringData pipelineName, const bool forInitialValue) {
-    if (forInitialValue) {
-        bob.append(fmt::format("{}_rank", pipelineName), 0);
-    } else {
-        bob.append(fmt::format("{}_rank", pipelineName),
-                   BSON("$max" << BSON_ARRAY(fmt::format("$$value.{}_rank", pipelineName)
-                                             << fmt::format("$$this.{}_rank", pipelineName))));
-    }
-}
-
-/**
  * Append logic for the $rankFusion-specific input pipeline scoreDetails values (rank and weight).
  */
 void RankFusionPipelineBuilder::constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(
@@ -500,5 +472,12 @@ std::list<boost::intrusive_ptr<DocumentSource>> RankFusionPipelineBuilder::build
         scoreAndMergeStages.end(),
         {std::move(addFields), std::move(sort), std::move(removeInternalFieldsProject)});
     return scoreAndMergeStages;
+}
+
+std::string RankFusionPipelineBuilder::getScoreDetailsScalarFieldName(
+    StringData pipelineName) const {
+    // The rank for each input pipeline is the stage-specific scalar preserved for scoreDetails
+    // output (used to display rank and derive the NA sentinel in buildRankAddFieldsStage).
+    return fmt::format("{}_rank", pipelineName);
 }
 }  // namespace mongo

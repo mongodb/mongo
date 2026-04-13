@@ -45,7 +45,7 @@ namespace mongo {
  * This ScoreFusionPipelineBuilder class stores the builder methods to build the desugared stages
  * for any given $scoreFusion input pipeline and the final scoring and merging logic.
  */
-class MONGO_MOD_PRIVATE ScoreFusionPipelineBuilder : public HybridSearchPipelineBuilder {
+class MONGO_MOD_PRIVATE ScoreFusionPipelineBuilder final : public HybridSearchPipelineBuilder {
     // DocumentSourceScoreFusion::createFromBson() creates an instance of this class and calls its
     // inherited constructDesugaredOutput(...) method which calls the derived class' overriden
     // virtual methods to construct the final desugared output.
@@ -80,12 +80,7 @@ private:
         const StringMap<double>& weights,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) override;
 
-    void groupDocsByIdAcrossInputPipelineScoreDetails(StringData pipelineName,
-                                                      BSONObjBuilder& pushBob) override;
-
-    void projectReduceInternalFieldsScoreDetails(BSONObjBuilder& bob,
-                                                 StringData pipelineName,
-                                                 bool forInitialValue) override;
+    std::string getScoreDetailsScalarFieldName(StringData pipelineName) const override;
 
     void constructCalculatedFinalScoreDetailsStageSpecificScoreDetails(BSONObjBuilder& bob,
                                                                        StringData pipelineName,
