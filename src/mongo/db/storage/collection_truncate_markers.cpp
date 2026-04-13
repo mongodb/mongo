@@ -95,27 +95,25 @@ boost::optional<CollectionTruncateMarkers::Marker> CollectionTruncateMarkers::ne
     // reverse cursor so that non-exact matches will give the next older entry, not the next newer
     auto recoveryUnit = shard_role_details::getRecoveryUnit(opCtx);
     auto cursor = recordStore.getCursor(opCtx, *recoveryUnit, /* forward */ false);
-    auto newest = cursor->next();
+    auto record = cursor->next();
+    RecordId newestId = record ? record->id : RecordId();
     RecordId newestUnpinnedId;
     if (!mayTruncateUpTo.isNull()) {
-        auto newestUnpinned =
-            cursor->seek(mayTruncateUpTo, SeekableRecordCursor::BoundInclusion::kInclude);
-        if (newestUnpinned) {
-            newestUnpinnedId = newestUnpinned->id;
-        }
+        record = cursor->seek(mayTruncateUpTo, SeekableRecordCursor::BoundInclusion::kInclude);
+        newestUnpinnedId = record ? record->id : RecordId();
     }
     // it's OK to round off expiry time to the nearest second.
     RecordId seekTo(durationCount<Seconds>(expiryTime.toDurationSinceEpoch()), /* low */ 0);
     if (!mayTruncateUpTo.isNull() && seekTo > mayTruncateUpTo) {
         seekTo = mayTruncateUpTo;
     }
-    auto record = cursor->seek(seekTo, SeekableRecordCursor::BoundInclusion::kInclude);
+    record = cursor->seek(seekTo, SeekableRecordCursor::BoundInclusion::kInclude);
     if (!record) {
         return {};
     }
     // for behavioral compatibility with ASC, don't entirely empty the oplog
     // or remove the last unpinned entry (defined there to *include* the mayTruncateUpTo point)
-    if (record->id == newest->id || record->id == newestUnpinnedId) {
+    if (record->id == newestId || record->id == newestUnpinnedId) {
         // reverse cursor, so one older
         record = cursor->next();
         if (!record) {
