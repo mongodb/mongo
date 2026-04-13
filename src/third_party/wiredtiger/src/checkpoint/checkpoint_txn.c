@@ -2792,7 +2792,8 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
      * this call. Also, marking the btree dirty at this stage will unnecessarily mark the connection
      * as dirty causing checkpoint-skip code to fail.
      */
-    WT_ERR(__wt_page_modify_init(session, btree->root.page));
+    WT_ERR_MSG_CHK(session, __wt_page_modify_init(session, btree->root.page),
+      "checkpoint failed during root page modify init");
     __wt_page_only_modify_set(session, btree->root.page);
 
     /*
@@ -2807,10 +2808,13 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
 
     /* Tell logging that a file checkpoint is starting. */
     if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
-        WT_ERR(__wt_checkpoint_log(session, false, WT_TXN_LOG_CKPT_START, &ckptlsn));
+        WT_ERR_MSG_CHK(session,
+          __wt_checkpoint_log(session, false, WT_TXN_LOG_CKPT_START, &ckptlsn),
+          "checkpoint failed during logging start");
 
     /* Tell the block manager that a file checkpoint is starting. */
-    WT_ERR(bm->checkpoint_start(bm, session));
+    WT_ERR_MSG_CHK(session, bm->checkpoint_start(bm, session),
+      "checkpoint failed to start in the block manager");
     resolve_bm = true;
 
     /* Flush the file from the cache, creating the checkpoint. */
@@ -2819,7 +2823,8 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
 
         if (WT_SESSION_IS_CHECKPOINT(session))
             WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_SYNC_FILE);
-        WT_ERR(__wt_sync_file(session, WT_SYNC_CHECKPOINT));
+        WT_ERR_MSG_CHK(session, __wt_sync_file(session, WT_SYNC_CHECKPOINT),
+          "checkpoint failed during cache flush and reconciliation");
 
         diff_us = WT_CLOCKDIFF_US(__wt_clock(session), start_us);
         WT_STAT_DSRC_INCRV(session, btree_checkpoint_reconcile_duration, diff_us);
@@ -2850,10 +2855,14 @@ fake:
      * and open a checkpoint that isn't yet durable.
      */
     if (WT_IS_METADATA(dhandle) || !F_ISSET(session->txn, WT_TXN_RUNNING))
-        WT_ERR(__wt_checkpoint_sync(session, NULL));
+        WT_ERR_MSG_CHK(
+          session, __wt_checkpoint_sync(session, NULL), "checkpoint failed during file sync");
 
-    WT_ERR(__wt_lsn_string(&ckptlsn, sizeof(ckptlsn_str), ckptlsn_str));
-    WT_ERR(__wt_meta_ckptlist_set(session, dhandle, btree->ckpt, (const char *)ckptlsn_str));
+    WT_ERR_MSG_CHK(session, __wt_lsn_string(&ckptlsn, sizeof(ckptlsn_str), ckptlsn_str),
+      "checkpoint failed during LSN string formatting");
+    WT_ERR_MSG_CHK(session,
+      __wt_meta_ckptlist_set(session, dhandle, btree->ckpt, (const char *)ckptlsn_str),
+      "checkpoint failed during metadata update");
 
     /*
      * If we wrote a checkpoint (rather than faking one), we have to resolve it. Normally, tracking
@@ -2868,18 +2877,34 @@ fake:
         if (WT_SESSION_IS_CHECKPOINT(session))
             WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_RESOLVE);
         if (WT_META_TRACKING(session) && is_checkpoint)
-            WT_ERR(__wt_meta_track_checkpoint(session));
+            WT_ERR_MSG_CHK(session, __wt_meta_track_checkpoint(session),
+              "checkpoint failed during meta tracking");
         else
-            WT_ERR(bm->checkpoint_resolve(bm, session, false));
+            WT_ERR_MSG_CHK(session, bm->checkpoint_resolve(bm, session, false),
+              "checkpoint failed during block manager resolve");
     }
 
     /* Tell logging that the checkpoint is complete. */
     if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
-        WT_ERR(__wt_checkpoint_log(session, false, WT_TXN_LOG_CKPT_STOP, NULL));
+        WT_ERR_MSG_CHK(session, __wt_checkpoint_log(session, false, WT_TXN_LOG_CKPT_STOP, NULL),
+          "checkpoint failed during logging completion");
 
 err:
     /* Resolved the checkpoint for the block manager in the error path. */
     if (resolve_bm) {
+        if (WT_SESSION_IS_CHECKPOINT(session))
+            WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_RESOLVE);
+        /*
+         * In case of a failure, dump recent error log entries before resolving the checkpoint, as
+         * the resolve may overwrite the current error code with a panic.
+         */
+        if (ret != 0)
+#ifdef HAVE_ERROR_LOG
+            __wt_error_log_dump_recent(session, 3);
+#else
+            __wt_verbose_error(session, WT_VERB_CHECKPOINT,
+              "checkpoint failed with error code %d before block manager checkpoint resolve", ret);
+#endif
         WT_TRET(bm->checkpoint_resolve(bm, session, ret != 0));
 
         /*

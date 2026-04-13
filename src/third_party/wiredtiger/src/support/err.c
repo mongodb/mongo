@@ -977,15 +977,44 @@ err:
 }
 
 /*
+ * __wt_error_log_dump_recent --
+ *     Dump up to the last max_entries error log entries to the event handler. Unlike
+ *     __wt_error_log_to_handler, this does not clear the error log.
+ */
+void
+__wt_error_log_dump_recent(WT_SESSION_IMPL *session, int max_entries)
+{
+    WT_ERROR_LOG_ENTRY *entry;
+    int count, i, start;
+
+    if (max_entries <= 0 || error_log.count == 0)
+        return;
+
+    /* Figure out how many entries are available in the ring buffer. */
+    count = error_log.count;
+    if (count > WT_MAX_ERROR_LOG_MAX)
+        count = WT_MAX_ERROR_LOG_MAX;
+    if (count > max_entries)
+        start = (error_log.tail + WT_MAX_ERROR_LOG_MAX - max_entries) % WT_MAX_ERROR_LOG_MAX;
+    else
+        start = error_log.head;
+
+    for (i = start; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
+        entry = &error_log.log[i];
+        __wt_err_func(session, entry->error, entry->func, entry->line, WT_VERB_ERROR_RETURNS,
+          "Error at %s:%d: \"%s\" failed%s%s", __simplify_path(entry->file), entry->line,
+          entry->expr, entry->suberror == WT_NONE ? "" : " with ",
+          entry->suberror == WT_NONE ? "" : __wt_strerror(session, entry->suberror, NULL, 0));
+    }
+}
+
+/*
  * __wt_error_log_to_handler --
  *     Print all entries from the error log to the event handler.
  */
 void
 __wt_error_log_to_handler(WT_SESSION_IMPL *session)
 {
-    WT_ERROR_LOG_ENTRY *entry;
-    int i;
-
     if (session == NULL) {
         wiredtiger_dump_error_log(NULL);
         return;
@@ -994,13 +1023,7 @@ __wt_error_log_to_handler(WT_SESSION_IMPL *session)
     if (error_log.count > WT_MAX_ERROR_LOG_MAX)
         __wt_verbose_warning(session, WT_VERB_ERROR_RETURNS,
           "%d errors occurred, only the last %d are shown", error_log.count, WT_MAX_ERROR_LOG_MAX);
-    for (i = error_log.head; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
-        entry = &error_log.log[i];
-        __wt_err_func(session, entry->error, entry->func, entry->line, WT_VERB_ERROR_RETURNS,
-          "Error at %s:%d: \"%s\" failed%s%s", __simplify_path(entry->file), entry->line,
-          entry->expr, entry->suberror == WT_NONE ? "" : " with ",
-          entry->suberror == WT_NONE ? "" : __wt_strerror(session, entry->suberror, NULL, 0));
-    }
+    __wt_error_log_dump_recent(session, WT_MAX_ERROR_LOG_MAX);
 
     __wt_error_log_clear(); /* Avoid double reporting the same errors. */
 }
