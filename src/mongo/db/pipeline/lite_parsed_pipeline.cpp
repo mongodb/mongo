@@ -155,8 +155,8 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                                   bool performApiVersionChecks) const {
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;
-        // TODO SERVER-101722: Re-implement this validation with a more generic
-        // StageConstraints-like validation.
+        // TODO SERVER-121974 This can be removed once hybrid search views are validated in
+        // LiteParsed using the LiteParsedConstraints.
         uassert(10170100,
                 "$rankFusion/$scoreFusion can only be the first stage of an aggregation pipeline.",
                 !((stage_it != _stageSpecs.begin()) && stage->isHybridSearchStage() &&

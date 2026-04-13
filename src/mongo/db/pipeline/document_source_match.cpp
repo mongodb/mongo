@@ -393,6 +393,14 @@ BSONObj DocumentSourceMatch::redactSafePortion() const {
     return redactSafePortionTopLevel(getQuery()).toBson();
 }
 
+std::unique_ptr<MatchLiteParsed> MatchLiteParsed::parse(const NamespaceString& nss,
+                                                        const BSONElement& spec,
+                                                        const LiteParserOptions& options) {
+    bool isTextQuery =
+        spec.type() == BSONType::object && DocumentSourceMatch::isTextQuery(spec.Obj());
+    return std::make_unique<MatchLiteParsed>(spec, isTextQuery);
+}
+
 bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
     for (auto&& e : query) {
         const StringData fieldName = e.fieldNameStringData();

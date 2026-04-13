@@ -205,6 +205,11 @@ public:
         // bindViewInfo().
         bool hasExtensionSearchStage() const override;
 
+        // Extension stages are unsupported on timeseries collections.
+        Constraints constraints() const override {
+            return {.canRunOnTimeseries = false};
+        }
+
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
             return this->onlyReadConcernLocalSupported(

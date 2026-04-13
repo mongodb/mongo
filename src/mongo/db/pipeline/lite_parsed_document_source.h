@@ -472,6 +472,19 @@ public:
     }
 
     /**
+     * Simple constraints for LiteParsed-level validation, mirroring a subset of
+     * DocumentSource::StageConstraints.
+     */
+    struct Constraints {
+        // If false, this stage cannot run on a timeseries collection.
+        bool canRunOnTimeseries = true;
+    };
+
+    virtual Constraints constraints() const {
+        return {};
+    }
+
+    /**
      * Returns true if this is a search stage ($search, $vectorSearch, $rankFusion, etc.)
      */
     virtual bool isSearchStage() const {
@@ -506,7 +519,8 @@ public:
     /**
      * Returns true if this stage produces output sort key metadata ($sortKey) or is an explicit
      * $sort stage.
-     * TODO SERVER-101722 This can be removed once LPDS has StageConstraints.
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+     * search stage.
      */
     virtual bool isRankedStage() const {
         return false;
@@ -514,7 +528,8 @@ public:
 
     /**
      * Returns true if this stage produces score metadata.
-     * TODO SERVER-101722 This can be removed once LPDS has StageConstraints.
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+     * search stage.
      */
     virtual bool isScoredStage() const {
         return false;
@@ -523,7 +538,8 @@ public:
     /**
      * Returns true if this stage is a selection stage. A selection stage does not modify or
      * transform documents.
-     * TODO SERVER-101722 This can be removed once LPDS has StageConstraints.
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+     * search stage.
      */
     virtual bool isSelectionStage() const {
         return false;
@@ -949,7 +965,7 @@ protected:
 #define DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(stageName) \
     DEFINE_LITE_PARSED_STAGE_DERIVED_IMPL(stageName, LiteParsedDocumentSourceInternal)
 
-#define DEFINE_LITE_PARSED_STAGE_DERIVED_IMPL(stageName, baseType)                      \
+#define DEFINE_LITE_PARSED_STAGE_DERIVED_IMPL(stageName, baseType, ...)                 \
     DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(stageName);                                    \
     class stageName##LiteParsed final : public mongo::baseType<stageName##LiteParsed> { \
     public:                                                                             \
@@ -964,6 +980,15 @@ protected:
         std::unique_ptr<mongo::StageParams> getStageParams() const final {              \
             return std::make_unique<stageName##StageParams>(_originalBson);             \
         }                                                                               \
+        __VA_ARGS__                                                                     \
     };
+
+// Like DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED but sets canRunOnTimeseries = false.
+#define DEFINE_LITE_PARSED_STAGE_NO_TIMESERIES_DERIVED(stageName)  \
+    DEFINE_LITE_PARSED_STAGE_DERIVED_IMPL(                         \
+        stageName,                                                 \
+        LiteParsedDocumentSourceDefault,                           \
+        mongo::LiteParsedDocumentSource::Constraints constraints() \
+            const override { return {.canRunOnTimeseries = false}; })
 
 }  // namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo

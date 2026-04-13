@@ -395,7 +395,7 @@ public:
      */
     void checkStagesAllowedInViewDefinition() const;
 
-    // TODO SERVER-101722: Remove this once the validation is changed.
+    // TODO SERVER-121974: Remove this once we can validate views for hybrid search in LiteParsed.
     bool isRunningAgainstView_ForHybridSearch() const {
         return _isRunningAgainstView_ForHybridSearch;
     }
@@ -468,7 +468,8 @@ private:
 
     // This variable specifies whether the pipeline is running on a view's namespace. This is
     // currently needed for $rankFusion/$scoreFusion positional validation.
-    // TODO SERVER-101722: Remove this once the validation is changed.
+    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // search stage.
     bool _isRunningAgainstView_ForHybridSearch = false;
 
     /**

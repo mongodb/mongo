@@ -116,6 +116,11 @@ public:
             return true;
         }
 
+        // $scoreFusion is unsupported on timeseries collections.
+        Constraints constraints() const override {
+            return {.canRunOnTimeseries = false};
+        }
+
         bool hasExtensionVectorSearchStage() const override {
             return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
                 return pipeline.hasExtensionVectorSearchStage();

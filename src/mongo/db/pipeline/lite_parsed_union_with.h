@@ -79,8 +79,8 @@ public:
     std::vector<BSONObj> pipeline;
     bool hasForeignDB;
 
-    // TODO SERVER-121087 Delete this boolean and all references to it once we can validate against
-    // timeseries collections in LPDS::validate() using the opCtx.
+    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // search stage.
     bool isHybridSearch;
 
     // The desugared LiteParsedPipeline for the subpipeline. Present when the $unionWith spec

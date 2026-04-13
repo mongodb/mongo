@@ -78,6 +78,11 @@ public:
         return true;
     }
 
+    // All search stages are unsupported on timeseries collections.
+    LiteParsedDocumentSource::Constraints constraints() const override {
+        return {.canRunOnTimeseries = false};
+    }
+
 protected:
     // Returns true if the stage spec has returnStoredSource: true, which applies an implicit
     // projection that modifies output fields.

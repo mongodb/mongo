@@ -62,23 +62,41 @@ namespace mongo {
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Match);
 class MatchLiteParsed final : public LiteParsedDocumentSourceDefault<MatchLiteParsed> {
 public:
-    MatchLiteParsed(const BSONElement& originalBson)
-        : LiteParsedDocumentSourceDefault<MatchLiteParsed>(originalBson) {}
+    MatchLiteParsed(const BSONElement& originalBson, bool isTextQuery)
+        : LiteParsedDocumentSourceDefault<MatchLiteParsed>(originalBson),
+          _isTextQuery(isTextQuery) {}
 
+    // Computes _isTextQuery during parse to avoid repeated BSON introspection at callsites.
     static std::unique_ptr<MatchLiteParsed> parse(const NamespaceString& nss,
                                                   const BSONElement& spec,
-                                                  const LiteParserOptions& options) {
-        return std::make_unique<MatchLiteParsed>(spec);
-    }
+                                                  const LiteParserOptions& options);
 
+    // TODO SERVER-123897 Add custom StageParams in order to pass the value of _isTextQuery to the
+    // DocumentSource.
     std::unique_ptr<StageParams> getStageParams() const final {
         return std::make_unique<MatchStageParams>(_originalBson);
+    }
+
+    // $match with $text produces textScore metadata.
+    bool isScoredStage() const final {
+        return _isTextQuery;
+    }
+
+    // $match with $text is not allowed on timeseries collections.
+    Constraints constraints() const override {
+        if (_isTextQuery) {
+            return {.canRunOnTimeseries = false};
+        }
+        return {};
     }
 
     // $match only filters documents without modifying them.
     bool isSelectionStage() const final {
         return true;
     }
+
+private:
+    bool _isTextQuery;
 };
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMatch : public DocumentSource {

@@ -787,5 +787,43 @@ TEST_F(DocumentSourceMatchTest, RedactionWithExprPipeline) {
         redact(*docSource));
 }
 
+// Tests for DocumentSourceMatch::isTextQuery.
+
+TEST(IsTextQueryTest, TopLevelText) {
+    ASSERT_TRUE(DocumentSourceMatch::isTextQuery(fromjson("{$text: {$search: 'hello'}}")));
+}
+
+TEST(IsTextQueryTest, NoText) {
+    ASSERT_FALSE(DocumentSourceMatch::isTextQuery(fromjson("{x: 1, y: 'hello'}")));
+}
+
+TEST(IsTextQueryTest, TextInsideOr) {
+    ASSERT_TRUE(
+        DocumentSourceMatch::isTextQuery(fromjson("{$or: [{$text: {$search: 'hello'}}, {x: 1}]}")));
+}
+
+TEST(IsTextQueryTest, TextInsideAnd) {
+    ASSERT_TRUE(DocumentSourceMatch::isTextQuery(
+        fromjson("{$and: [{$text: {$search: 'hello'}}, {x: 1}]}")));
+}
+
+TEST(IsTextQueryTest, TextInsideNestedOr) {
+    ASSERT_TRUE(DocumentSourceMatch::isTextQuery(
+        fromjson("{$or: [{$or: [{$text: {$search: 'hello'}}]}, {x: 1}]}")));
+}
+
+TEST(IsTextQueryTest, EmptyQuery) {
+    ASSERT_FALSE(DocumentSourceMatch::isTextQuery(fromjson("{}")));
+}
+
+TEST(IsTextQueryTest, NestedObjectNoText) {
+    ASSERT_FALSE(DocumentSourceMatch::isTextQuery(fromjson("{a: {b: 1}}")));
+}
+
+TEST(IsTextQueryTest, TextWithOtherFields) {
+    ASSERT_TRUE(
+        DocumentSourceMatch::isTextQuery(fromjson("{a: 1, $text: {$search: 'hello'}, b: 2}")));
+}
+
 }  // namespace
 }  // namespace mongo

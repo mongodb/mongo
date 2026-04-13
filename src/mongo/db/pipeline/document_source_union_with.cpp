@@ -84,7 +84,8 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                 !expCtx->getInRouter() && !expCtx->getFromRouter());
     }
 
-    // TODO SERVER-121087 Move to LPDS validation.
+    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // search stage.
     if (hybrid_scoring_util::isHybridSearchPipeline(params.pipeline) || params.isHybridSearch) {
         hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.unionNss, expCtx);
     }

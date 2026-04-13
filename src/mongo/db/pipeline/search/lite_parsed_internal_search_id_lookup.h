@@ -79,6 +79,11 @@ public:
         return false;
     }
 
+    // All search stages are unsupported on timeseries collections.
+    Constraints constraints() const override {
+        return {.canRunOnTimeseries = false};
+    }
+
     std::unique_ptr<StageParams> getStageParams() const final {
         return std::make_unique<InternalSearchIdLookupStageParams>(_ownedSpec);
     }

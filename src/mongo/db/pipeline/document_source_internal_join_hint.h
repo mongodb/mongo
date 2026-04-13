@@ -48,7 +48,7 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalJoinHint);
+DEFINE_LITE_PARSED_STAGE_NO_TIMESERIES_DERIVED(InternalJoinHint);
 
 /**
  * An internal stage available for testing. This allows us to specify a join order (or some
