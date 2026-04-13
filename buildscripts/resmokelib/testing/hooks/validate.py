@@ -3,6 +3,7 @@
 import concurrent.futures
 import logging
 import os.path
+import threading
 import time
 
 import pymongo
@@ -66,6 +67,20 @@ class ValidateCollections(jsfile.PerClusterDataConsistencyHook):
 class ValidateCollectionsTestCase(jsfile.DynamicJSTestCase):
     """ValidateCollectionsTestCase class."""
 
+    # Maps fixture id to a Lock, serializing validation across jobs that share the same fixture
+    # (e.g. FSM workload tests with maxTestQueueSize > 1). Keyed by id(fixture) so each physical
+    # cluster gets its own lock regardless of fixture type.
+    _fixture_locks: dict[int, threading.Lock] = {}
+    _fixture_locks_mutex = threading.Lock()
+
+    @classmethod
+    def _get_fixture_lock(cls, fixture) -> threading.Lock:
+        fixture_id = id(fixture)
+        with cls._fixture_locks_mutex:
+            if fixture_id not in cls._fixture_locks:
+                cls._fixture_locks[fixture_id] = threading.Lock()
+            return cls._fixture_locks[fixture_id]
+
     def __init__(
         self,
         logger: logging.Logger,
@@ -92,37 +107,43 @@ class ValidateCollectionsTestCase(jsfile.DynamicJSTestCase):
             super().run_test()
             return
 
-        try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-                futures = []
-                for node in self.fixture._all_mongo_d_s_t():
-                    if not isinstance(node, MongoDFixture) and not isinstance(
-                        node, ExternalFixture
-                    ):
-                        continue
+        # Serialize validation across all jobs that share this fixture. This prevents concurrent
+        # ValidateCollections hooks (e.g. in FSM workload tests with maxTestQueueSize > 1) from
+        # conflicting when they write to the same cluster or interleave read/commit timestamps.
+        with self._get_fixture_lock(self.fixture):
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+                    futures = []
+                    for node in self.fixture._all_mongo_d_s_t():
+                        if not isinstance(node, MongoDFixture) and not isinstance(
+                            node, ExternalFixture
+                        ):
+                            continue
 
-                    if not validate_node(node, self.shell_options, self.logger, executor, futures):
-                        raise RuntimeError(
-                            f"Internal error while trying to validate node: {node.get_driver_connection_url()}"
-                        )
+                        if not validate_node(
+                            node, self.shell_options, self.logger, executor, futures
+                        ):
+                            raise RuntimeError(
+                                f"Internal error while trying to validate node: {node.get_driver_connection_url()}"
+                            )
 
-                for future in concurrent.futures.as_completed(futures):
-                    exception = future.exception()
-                    if exception is not None:
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        raise RuntimeError(
-                            "Collection validation raised an exception."
-                        ) from exception
-                    result = future.result()
-                    if result is not True:
-                        raise RuntimeError("Collection validation failed.")
+                    for future in concurrent.futures.as_completed(futures):
+                        exception = future.exception()
+                        if exception is not None:
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            raise RuntimeError(
+                                "Collection validation raised an exception."
+                            ) from exception
+                        result = future.result()
+                        if not result:
+                            raise RuntimeError("Collection validation failed.")
 
-            # Perform inter-node validation (if the running fixture provides a method to run it).
-            if getattr(self.fixture, "internode_validation", None):
-                self.fixture.internode_validation()
-        except:
-            self.logger.exception("Uncaught exception while validating collections")
-            raise
+                # Perform inter-node validation (if the running fixture provides a method to run it).
+                if getattr(self.fixture, "internode_validation", None):
+                    self.fixture.internode_validation()
+            except:
+                self.logger.exception("Uncaught exception while validating collections")
+                raise
 
 
 def validate_node(
