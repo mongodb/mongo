@@ -888,11 +888,17 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto cmd = getObjWithSanitizedStorageEngineOptions(opCtx, entry.getObject());
           const NamespaceString nss(extractNs(entry.getNss().dbName(), cmd));
 
+          // Check the provider first: if the persistence provider requires replicated RecordIds
+          // (e.g. DSC), allow the field regardless of FCV state. Only fall back to the feature
+          // flag for clusters where the provider does not mandate it.
+          // TODO SERVER-123600: Revisit FCV handling for recordIdsReplicated.
+          const auto& ridsProvider =
+              rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
           uassert(ErrorCodes::CommandNotSupported,
                   "'recordIdsReplicated' field may not be used for 'applyOps' without "
                   "featureFlagRecordIdsReplicated enabled",
                   mode != repl::OplogApplication::Mode::kApplyOpsCmd ||
-                      !cmd["recordIdsReplicated"] ||
+                      !cmd["recordIdsReplicated"] || ridsProvider.shouldUseReplicatedRecordIds() ||
                       gFeatureFlagRecordIdsReplicated.isEnabled(
                           VersionContext::getDecoration(opCtx),
                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));

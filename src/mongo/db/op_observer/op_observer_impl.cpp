@@ -1625,13 +1625,18 @@ void OpObserverImpl::onCreateCollection(
         return;
     }
 
-    bool replicatedRidsFeatureIsEnabled =
+    // Check the provider first: if the persistence provider requires replicated RecordIds (e.g.
+    // DSC), the feature is enabled regardless of FCV state. Only fall back to the feature flag
+    // when the provider does not mandate it, to handle the standard upgrade/downgrade path.
+    // TODO SERVER-123600: Revisit FCV handling for recordIdsReplicated.
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    bool replicatedRidsEnabled = provider.shouldUseReplicatedRecordIds() ||
         gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     boost::optional<bool> useRecordIdsReplicated = boost::none;
-    if (replicatedRidsFeatureIsEnabled) {
+    if (replicatedRidsEnabled) {
         useRecordIdsReplicated = recordIdsReplicated;
     }
 

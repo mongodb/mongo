@@ -55,8 +55,12 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/rss/stub_persistence_provider.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -66,6 +70,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder_impl.h"
 #include "mongo/db/shard_role/shard_catalog/database_impl.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
@@ -76,6 +81,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -795,6 +801,86 @@ TEST_F(DatabaseTest, OpenDbSkipsConflictCheckWhenNotEnforcingConstraints) {
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
     }
+}
+
+// --- Tests for shouldSetRecordIdsReplicated logic ---
+
+// Minimal stub provider whose shouldUseReplicatedRecordIds() returns true.
+class StubPersistenceProviderRequiringReplicatedRecordIds : public rss::StubPersistenceProvider {
+public:
+    std::string name() const override {
+        return "StubPersistenceProviderRequiringReplicatedRecordIds";
+    }
+    bool shouldUseReplicatedRecordIds() const override {
+        return true;
+    }
+    bool shouldUseReplicatedCatalogIdentifiers() const override {
+        return false;
+    }
+    bool supportsTableLogging() const override {
+        return true;
+    }
+    const char* getWTMemoryPageMaxForOplogStrValue() const override {
+        return "10m";
+    }
+    bool supportsUnstableCheckpoints() const override {
+        return true;
+    }
+    bool shouldUseOplogWritesForFlowControlSampling() const override {
+        return true;
+    }
+    bool shouldForceUpdateWithFullDocument() const override {
+        return true;
+    }
+};
+
+class RecordIdsReplicatedDatabaseTest : public DatabaseTest {
+protected:
+    void createTestCollection(OperationContext* opCtx, const NamespaceString& nss) {
+        CreateCommand cmd(nss);
+        uassertStatusOK(createCollection(opCtx, cmd));
+    }
+
+    bool areRecordIdsReplicated(OperationContext* opCtx, const NamespaceString& nss) {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        ASSERT_TRUE(*autoColl) << "Collection " << nss.toStringForErrorMsg() << " not found";
+        return (*autoColl)->areRecordIdsReplicated();
+    }
+
+    const NamespaceString _testNss =
+        NamespaceString::createNamespaceString_forTest("test.recordIdsTest");
+};
+
+// When the persistence provider requires replicated RecordIds, collections must be created with
+// recordIdsReplicated:true regardless of the feature flag state.
+TEST_F(RecordIdsReplicatedDatabaseTest, ProviderRequiresRecordIds_TrueWithoutFeatureFlag) {
+    rss::ReplicatedStorageService::get(getServiceContext())
+        .setPersistenceProvider(
+            std::make_unique<StubPersistenceProviderRequiringReplicatedRecordIds>());
+
+    auto opCtx = _opCtx.get();
+    createTestCollection(opCtx, _testNss);
+    ASSERT_TRUE(areRecordIdsReplicated(opCtx, _testNss));
+}
+
+// When the feature flag is enabled and the provider does not mandate RecordIds replication,
+// collections must still be created with recordIdsReplicated:true.
+TEST_F(RecordIdsReplicatedDatabaseTest, FeatureFlagEnabled_TrueWithoutProvider) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRecordIdsReplicated",
+                                                               true);
+
+    auto opCtx = _opCtx.get();
+    createTestCollection(opCtx, _testNss);
+    ASSERT_TRUE(areRecordIdsReplicated(opCtx, _testNss));
+}
+
+// When neither the provider nor the feature flag requires RecordIds replication, collections
+// must be created with recordIdsReplicated:false.
+TEST_F(RecordIdsReplicatedDatabaseTest, NeitherProviderNorFlag_False) {
+    // Both provider (default attached storage) and feature flag are disabled by default.
+    auto opCtx = _opCtx.get();
+    createTestCollection(opCtx, _testNss);
+    ASSERT_FALSE(areRecordIdsReplicated(opCtx, _testNss));
 }
 
 }  // namespace

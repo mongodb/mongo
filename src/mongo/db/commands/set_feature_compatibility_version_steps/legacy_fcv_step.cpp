@@ -44,6 +44,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -561,6 +562,13 @@ private:
         // recordIds.
         if (gFeatureFlagRecordIdsReplicated.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
+            // On DSC, the persistence provider drives recordIdsReplicated independently of the
+            // feature flag, so stripping it on FCV downgrade is neither correct nor permitted.
+            const auto& provider =
+                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+            if (provider.shouldUseReplicatedRecordIds()) {
+                return;
+            }
             LOGV2(8700500,
                   "Automatically issuing collMod to strip recordIdsReplicated:true field.");
             catalog::modifyAllCollectionsMatching(

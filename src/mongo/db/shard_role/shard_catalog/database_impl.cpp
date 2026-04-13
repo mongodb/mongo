@@ -179,13 +179,7 @@ bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
 
     const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     if (provider.shouldUseReplicatedRecordIds()) {
-        // The provider enforces all compatible collections must be created with replicated
-        // recordIds.
-        tassert(10985561,
-                str::stream() << "Replicated record IDs must be enabled with " << provider.name(),
-                gFeatureFlagRecordIdsReplicated.isEnabledUseLatestFCVWhenUninitialized(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        // TODO SERVER-123600: Revisit FCV handling for recordIdsReplicated.
         LOGV2_DEBUG(10985560,
                     2,
                     "Collection will use recordIdsReplicated:true",

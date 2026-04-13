@@ -79,6 +79,7 @@
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -750,6 +751,113 @@ TEST_F(OpObserverOnCreateCollectionTest, createCollectionRecordIdsReplicatedTrue
     testOnCreateCollRecordIdsReplicated(/*recordIdsReplicated=*/true);
 }
 
+// Minimal stub provider whose shouldUseReplicatedRecordIds() returns true, used to verify that
+// the provider takes precedence over the feature flag in the onCreateCollection oplog path.
+class StubProviderRequiringReplicatedRecordIds : public rss::StubPersistenceProvider {
+public:
+    std::string name() const override {
+        return "StubProviderRequiringReplicatedRecordIds";
+    }
+    bool shouldUseReplicatedRecordIds() const override {
+        return true;
+    }
+    bool shouldUseReplicatedCatalogIdentifiers() const override {
+        return false;
+    }
+    bool supportsTableLogging() const override {
+        return true;
+    }
+    const char* getWTMemoryPageMaxForOplogStrValue() const override {
+        return "10m";
+    }
+    bool supportsUnstableCheckpoints() const override {
+        return true;
+    }
+    bool shouldUseOplogWritesForFlowControlSampling() const override {
+        return true;
+    }
+    bool shouldForceUpdateWithFullDocument() const override {
+        return true;
+    }
+};
+
+// When the provider requires replicated RecordIds, the recordIdsReplicated field must appear in
+// the oplog entry even when the feature flag is disabled.
+TEST_F(OpObserverOnCreateCollectionTest,
+       RecordIdsReplicated_IncludedInOplog_WhenProviderRequiresItWithoutFeatureFlag) {
+    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    // Explicitly leave featureFlagRecordIdsReplicated disabled (default).
+
+    auto opCtxWrapper = cc().makeOperationContext();
+    auto opCtx = opCtxWrapper.get();
+
+    rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+        .setPersistenceProvider(std::make_unique<StubProviderRequiringReplicatedRecordIds>());
+
+    ASSERT_TRUE(nss.isReplicated());
+    auto catalogIdentifier = newCatalogIdentifier(opCtx, nss.dbName(), true);
+    CollectionOptions options{.uuid = uuid};
+
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    {
+        VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        opObserver.onCreateCollection(opCtx,
+                                      nss,
+                                      options,
+                                      BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
+                                               << "_id_"),
+                                      repl::getNextOpTime(opCtx),
+                                      catalogIdentifier,
+                                      false /* fromMigrate */,
+                                      false,
+                                      /*recordIdsReplicated=*/true);
+        wuow.commit();
+    }
+
+    const auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+    ASSERT_TRUE(oplogEntry.getObject().hasField("recordIdsReplicated"));
+    ASSERT_TRUE(oplogEntry.getObject().getBoolField("recordIdsReplicated"));
+}
+
+// When neither the provider nor the feature flag requires RecordIds replication, the
+// recordIdsReplicated field must be absent from the oplog entry.
+TEST_F(OpObserverOnCreateCollectionTest,
+       RecordIdsReplicated_NotIncludedInOplog_WhenNeitherProviderNorFlagEnabled) {
+    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    // Both featureFlagRecordIdsReplicated and provider are at their disabled defaults.
+
+    auto opCtxWrapper = cc().makeOperationContext();
+    auto opCtx = opCtxWrapper.get();
+
+    ASSERT_TRUE(nss.isReplicated());
+    auto catalogIdentifier = newCatalogIdentifier(opCtx, nss.dbName(), true);
+    CollectionOptions options{.uuid = uuid};
+
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    {
+        VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        opObserver.onCreateCollection(opCtx,
+                                      nss,
+                                      options,
+                                      BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
+                                               << "_id_"),
+                                      repl::getNextOpTime(opCtx),
+                                      catalogIdentifier,
+                                      false /* fromMigrate */,
+                                      false,
+                                      /*recordIdsReplicated=*/true);
+        wuow.commit();
+    }
+
+    const auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+    ASSERT_FALSE(oplogEntry.getObject().hasField("recordIdsReplicated"));
+}
 
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersEnabled) {
     testOnCreateCollClustered(true /* catalogReplicationEnabled */);

@@ -40,12 +40,16 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/rss/stub_persistence_provider.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -467,6 +471,106 @@ TEST_F(CreateIndexForApplyOpsTest, MetadataValidation) {
                                               OplogApplication::Mode::kSecondary),
                        AssertionException,
                        ErrorCodes::IDLFailedToParse);
+}
+
+// --- Tests for the recordIdsReplicated guard in the applyOps "create" path ---
+
+// Minimal stub provider that mandates replicated RecordIds.
+class StubProviderRequiringReplicatedRecordIds : public rss::StubPersistenceProvider {
+public:
+    std::string name() const override {
+        return "StubProviderRequiringReplicatedRecordIds";
+    }
+    bool shouldUseReplicatedRecordIds() const override {
+        return true;
+    }
+    bool shouldUseReplicatedCatalogIdentifiers() const override {
+        return false;
+    }
+    bool supportsTableLogging() const override {
+        return true;
+    }
+    const char* getWTMemoryPageMaxForOplogStrValue() const override {
+        return "10m";
+    }
+    bool supportsUnstableCheckpoints() const override {
+        return true;
+    }
+    bool shouldUseOplogWritesForFlowControlSampling() const override {
+        return true;
+    }
+    bool shouldForceUpdateWithFullDocument() const override {
+        return true;
+    }
+};
+
+class ApplyCreateWithRecordIdsReplicatedTest : public OplogTest {
+protected:
+    // Build a minimal oplog-entry BSON for a "create" command.
+    BSONObj makeCreateOplogEntry(const NamespaceString& nss, bool recordIdsReplicated) {
+        return BSON(
+            "op" << "c" << "ns" << nss.getCommandNS().ns_forTest() << "ui" << UUID::gen() << "o"
+                 << BSON("create" << nss.coll() << "recordIdsReplicated" << recordIdsReplicated)
+                 << "ts" << Timestamp(2, 1) << "t" << 1LL << "v" << 2LL << "wall" << Date_t::now());
+    }
+
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("test.applyOpsRids");
+};
+
+// applyOps with recordIdsReplicated must throw CommandNotSupported when neither the persistence
+// provider nor the feature flag enables the feature.
+TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
+       ApplyOpsCreate_ThrowsCommandNotSupported_WhenNeitherProviderNorFlagEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
+
+    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    auto status = applyCommand_inlock(
+        opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kApplyOpsCmd);
+    ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
+}
+
+// applyOps with recordIdsReplicated must be allowed when the persistence provider requires it,
+// even when the feature flag is disabled.
+TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
+       ApplyOpsCreate_Allowed_WhenProviderRequiresItWithoutFeatureFlag) {
+    auto opCtx = cc().makeOperationContext();
+
+    rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+        .setPersistenceProvider(std::make_unique<StubProviderRequiringReplicatedRecordIds>());
+
+    auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
+
+    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    ASSERT_OK(applyCommand_inlock(
+        opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kApplyOpsCmd));
+}
+
+// applyOps with recordIdsReplicated must be allowed when the feature flag is enabled, even
+// when the persistence provider does not mandate it.
+TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
+       ApplyOpsCreate_Allowed_WhenFeatureFlagEnabledWithoutProvider) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRecordIdsReplicated",
+                                                               true);
+    auto opCtx = cc().makeOperationContext();
+    auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
+
+    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    ASSERT_OK(applyCommand_inlock(
+        opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kApplyOpsCmd));
+}
+
+// The guard must not fire for non-applyOps modes (e.g. secondary replication), even when
+// neither the provider nor the feature flag is enabled.
+TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
+       ApplyOpsCreate_NotBlocked_InSecondaryMode_WhenNeitherProviderNorFlagEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
+
+    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    ASSERT_OK(applyCommand_inlock(
+        opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
 }
 
 }  // namespace
