@@ -1183,6 +1183,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
     // Initialize path arrayness in ExpressionContext from the CollectionQueryInfo.
     // Do not invoke if it has been already initialized.
+    // TODO SERVER-123955 Consider moving it to a different location
     const auto& collection = collections.getMainCollection();
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled() &&
         !canonicalQuery->getExpCtx()->hasMainCollPathArrayness() && collection) {
