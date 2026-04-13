@@ -140,6 +140,9 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
         if (coll) {
             uassert(
                 ErrorCodes::InvalidOptions, "can't shard a capped collection", !coll->isCapped());
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't register a temporary collection in the sharding catalog.",
+                    !coll->isTemporary());
             return coll->getDefaultCollator();
         }
 
