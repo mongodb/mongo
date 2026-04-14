@@ -1193,5 +1193,519 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
     }
 }
 
+TEST_F(IndexBuilderInterceptorTest,
+       DrainDuplicateInsertOnUniqueIndexRecordsConstraintViolationPrimaryDriven) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    auto* observerPtr = installContainerOpObserver(operationContext());
+
+    auto indexBuildInfo =
+        buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+    auto indexAccessMethod = entry->accessMethod()->asSortedData();
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+    // Build two key strings with the same index key value (10) but different RecordIds.
+    auto existingKeyString = makeKeyString(10, RecordId{1});
+    auto dupKeyString = makeKeyString(10, RecordId{2});
+
+    // Pre-populate the index with the existing key.
+    {
+        KeyStringSet keySet;
+        keySet.insert(existingKeyString);
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numInserted = 0;
+        ASSERT_OK(indexAccessMethod->insertKeys(operationContext(),
+                                                ru,
+                                                *_coll.get(),
+                                                entry,
+                                                keySet,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                {},
+                                                &numInserted));
+        ASSERT_EQ(numInserted, 1);
+        wuow.commit();
+    }
+
+    // Buffer a side write that inserts a duplicate of the existing key.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
+                                         entry,
+                                         {dupKeyString},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        ASSERT_EQ(1, numKeys);
+        wuow.commit();
+    }
+
+    // Record observer state before drain so we can isolate drain-phase calls.
+    const size_t insertsBefore = observerPtr->inserts.size();
+    const size_t deletesBefore = observerPtr->deletes.size();
+
+    // Drain with TrackDuplicates::kTrack — duplicates should be recorded to the constraint
+    // violations table rather than causing a failure.
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                *_coll.get(),
+                                                entry,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                IndexBuildInterceptor::TrackDuplicates::kTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // Verify the drain produced the expected container operations:
+    //   - 2 inserts: one into the index, one into the constraint violations table
+    //   - 1 delete: removing the consumed side write
+    ASSERT_EQ(observerPtr->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
+    ASSERT_EQ(
+        observerPtr->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore), 1u);
+    ASSERT_EQ(observerPtr->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+
+    // Verify the duplicate was recorded in the constraint violations table.
+    ASSERT_EQ(1, getDuplicateKeyTableContents(indexBuildInfo).size());
+
+    // Verify the side writes table is empty after draining.
+    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+
+    // Verify both keys (original and duplicate) are in the index.
+    auto indexCursor = indexAccessMethod->newCursor(operationContext(), ru);
+    ASSERT(indexCursor->seekForKeyString(ru, existingKeyString.getView()));
+    ASSERT(indexCursor->seekForKeyString(ru, dupKeyString.getView()));
+}
+
+TEST_F(IndexBuilderInterceptorTest,
+       DrainInsertOnUniqueIndexWithNoDuplicateGeneratesNoConstraintViolationPrimaryDriven) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    auto* observer = installContainerOpObserver(operationContext());
+
+    auto indexBuildInfo =
+        buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+
+    auto keyString = makeKeyString(10, RecordId{1});
+
+    // Buffer a side write (insert) — no pre-existing key in the index, so no duplicate.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
+                                         entry,
+                                         {keyString},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        ASSERT_EQ(1, numKeys);
+        wuow.commit();
+    }
+
+    const size_t insertsBefore = observer->inserts.size();
+    const size_t deletesBefore = observer->deletes.size();
+
+    // Drain with kTrack on a unique index — but since there's no duplicate, the constraint
+    // violations table should not be written to.
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                *_coll.get(),
+                                                entry,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                IndexBuildInterceptor::TrackDuplicates::kTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // Same as non-unique: one CI for the index, one CD for the side writes table.
+    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
+    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+
+    // No writes to the constraint violations table.
+    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+              0u);
+
+    ASSERT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
+    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+}
+
+TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOpsPrimaryDriven) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    auto* observer = installContainerOpObserver(operationContext());
+
+    auto indexBuildInfo =
+        buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+    auto indexAccessMethod = entry->accessMethod()->asSortedData();
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+    auto keyString = makeKeyString(10, RecordId{1});
+    KeyStringSet keySet;
+    keySet.insert(keyString);
+
+    // Pre-populate the index with the key so the delete side write has something to remove.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numInserted = 0;
+        ASSERT_OK(indexAccessMethod->insertKeys(operationContext(),
+                                                ru,
+                                                *_coll.get(),
+                                                entry,
+                                                keySet,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                {},
+                                                &numInserted));
+        ASSERT_EQ(numInserted, 1);
+        wuow.commit();
+    }
+
+    // Buffer a side write (delete).
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
+                                         entry,
+                                         {keyString},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kDelete,
+                                         &numKeys));
+        ASSERT_EQ(1, numKeys);
+        wuow.commit();
+    }
+
+    const size_t deletesBefore = observer->deletes.size();
+
+    // Drain with kTrack on a unique index — delete path is unaffected by uniqueness.
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                *_coll.get(),
+                                                entry,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                IndexBuildInterceptor::TrackDuplicates::kTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // Expect two container deletes: one for the index key, one for the side writes table.
+    ASSERT_EQ(observer->countDeletesFor(entry->getIdent(), deletesBefore), 1u);
+    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+
+    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+}
+
+TEST_F(IndexBuilderInterceptorTest,
+       DrainDuplicateInsertOnUniqueIndexWithNoTrackGeneratesNoConstraintViolationPrimaryDriven) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    auto* observer = installContainerOpObserver(operationContext());
+
+    auto indexBuildInfo =
+        buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+    auto indexAccessMethod = entry->accessMethod()->asSortedData();
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+    // Build two key strings with the same index key value but different RecordIds.
+    auto existingKeyString = makeKeyString(10, RecordId{1});
+    auto dupKeyString = makeKeyString(10, RecordId{2});
+
+    // Pre-populate the index with the existing key.
+    {
+        KeyStringSet keySet;
+        keySet.insert(existingKeyString);
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numInserted = 0;
+        ASSERT_OK(indexAccessMethod->insertKeys(operationContext(),
+                                                ru,
+                                                *_coll.get(),
+                                                entry,
+                                                keySet,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                {},
+                                                &numInserted));
+        ASSERT_EQ(numInserted, 1);
+        wuow.commit();
+    }
+
+    // Buffer a side write that inserts a duplicate of the existing key.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
+                                         entry,
+                                         {dupKeyString},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        ASSERT_EQ(1, numKeys);
+        wuow.commit();
+    }
+
+    const size_t insertsBefore = observer->inserts.size();
+    const size_t deletesBefore = observer->deletes.size();
+
+    // Drain with kNoTrack — duplicate is silently swallowed, not recorded to constraint
+    // violations table.
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                *_coll.get(),
+                                                entry,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // The duplicate key is still inserted into the index, but not recorded as a violation.
+    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
+    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+
+    // No writes to the constraint violations table.
+    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+              0u);
+
+    ASSERT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
+    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+}
+
+TEST_F(IndexBuilderInterceptorTest,
+       DrainDuplicateInsertOnPrepareUniqueIndexReturnsErrorPrimaryDriven) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    auto* observer = installContainerOpObserver(operationContext());
+
+    auto indexBuildInfo = buildIndexBuildInfo(
+        fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true, prepareUnique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+    auto indexAccessMethod = entry->accessMethod()->asSortedData();
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+    // Build two key strings with the same index key value but different RecordIds.
+    auto existingKeyString = makeKeyString(10, RecordId{1});
+    auto dupKeyString = makeKeyString(10, RecordId{2});
+
+    // Pre-populate the index with the existing key.
+    {
+        KeyStringSet keySet;
+        keySet.insert(existingKeyString);
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numInserted = 0;
+        ASSERT_OK(indexAccessMethod->insertKeys(operationContext(),
+                                                ru,
+                                                *_coll.get(),
+                                                entry,
+                                                keySet,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                {},
+                                                &numInserted));
+        ASSERT_EQ(numInserted, 1);
+        wuow.commit();
+    }
+
+    // Buffer a side write that inserts a duplicate of the existing key.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
+                                         entry,
+                                         {dupKeyString},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        ASSERT_EQ(1, numKeys);
+        wuow.commit();
+    }
+
+    const size_t insertsBefore = observer->inserts.size();
+    const size_t deletesBefore = observer->deletes.size();
+
+    // Drain with kTrack on a prepareUnique index — duplicate should cause a DuplicateKey error
+    // rather than being recorded to the constraint violations table, because prepareUnique
+    // forces the error path even when options.dupsAllowed is true.
+    auto status =
+        interceptor->drainWritesIntoIndex(operationContext(),
+                                          *_coll.get(),
+                                          entry,
+                                          InsertDeleteOptions{.dupsAllowed = true},
+                                          IndexBuildInterceptor::TrackDuplicates::kTrack,
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
+    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+
+    // No container ops should have been generated for the failed drain — the error is returned
+    // before the container_write::insert() call.
+    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
+    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+              0u);
+    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 0u);
+}
+
+TEST_F(IndexBuilderInterceptorTest,
+       DrainSameKeyAndRecordIdInsertOnUniqueIndexIsIdempotentPrimaryDriven) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    auto* observer = installContainerOpObserver(operationContext());
+
+    auto indexBuildInfo =
+        buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+    auto indexAccessMethod = entry->accessMethod()->asSortedData();
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+    // Use the exact same key value AND RecordId for both the pre-populated key and the side write.
+    auto keyString = makeKeyString(10, RecordId{1});
+
+    // Pre-populate the index with the key.
+    {
+        KeyStringSet keySet;
+        keySet.insert(keyString);
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numInserted = 0;
+        ASSERT_OK(indexAccessMethod->insertKeys(operationContext(),
+                                                ru,
+                                                *_coll.get(),
+                                                entry,
+                                                keySet,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                {},
+                                                &numInserted));
+        ASSERT_EQ(numInserted, 1);
+        wuow.commit();
+    }
+
+    // Buffer a side write that re-inserts the exact same (key, RecordId) pair.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
+                                         entry,
+                                         {keyString},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        ASSERT_EQ(1, numKeys);
+        wuow.commit();
+    }
+
+    const size_t insertsBefore = observer->inserts.size();
+    const size_t deletesBefore = observer->deletes.size();
+
+    // Drain with kTrack — the container_write::insert returns KeyExists because the exact
+    // (key, RecordId) already exists, which is converted to OK. The onDuplicateKey callback
+    // is NOT invoked, so no constraint violation is recorded. This is an idempotent re-insert,
+    // not a true duplicate.
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                *_coll.get(),
+                                                entry,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                IndexBuildInterceptor::TrackDuplicates::kTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // The container_write::insert returns KeyExists (the exact key+RecordId is already present),
+    // which is silently converted to OK. No actual index insert op is generated because the key
+    // was already there. No constraint violation is recorded — this is the key distinction from
+    // the different-RecordId duplicate case.
+    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
+    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+
+    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+              0u);
+
+    ASSERT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
+    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+}
+
+TEST_F(IndexBuilderInterceptorTest,
+       DrainDuplicateInsertOnPrepareUniqueIndexWithNoTrackReturnsErrorPrimaryDriven) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    auto* observer = installContainerOpObserver(operationContext());
+
+    auto indexBuildInfo = buildIndexBuildInfo(
+        fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true, prepareUnique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+    auto indexAccessMethod = entry->accessMethod()->asSortedData();
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+    auto existingKeyString = makeKeyString(10, RecordId{1});
+    auto dupKeyString = makeKeyString(10, RecordId{2});
+
+    // Pre-populate the index with the existing key.
+    {
+        KeyStringSet keySet;
+        keySet.insert(existingKeyString);
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numInserted = 0;
+        ASSERT_OK(indexAccessMethod->insertKeys(operationContext(),
+                                                ru,
+                                                *_coll.get(),
+                                                entry,
+                                                keySet,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                {},
+                                                &numInserted));
+        ASSERT_EQ(numInserted, 1);
+        wuow.commit();
+    }
+
+    // Buffer a side write that inserts a duplicate of the existing key.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
+                                         entry,
+                                         {dupKeyString},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        ASSERT_EQ(1, numKeys);
+        wuow.commit();
+    }
+
+    const size_t insertsBefore = observer->inserts.size();
+    const size_t deletesBefore = observer->deletes.size();
+
+    // Drain with kNoTrack on a prepareUnique index — prepareUnique forces the DuplicateKey error
+    // path regardless of the TrackDuplicates mode.
+    auto status =
+        interceptor->drainWritesIntoIndex(operationContext(),
+                                          *_coll.get(),
+                                          entry,
+                                          InsertDeleteOptions{.dupsAllowed = true},
+                                          IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
+    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+
+    // No container ops — error fires before any writes.
+    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
+    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+              0u);
+    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 0u);
+}
+
 }  // namespace
 }  // namespace mongo
