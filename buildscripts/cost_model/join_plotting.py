@@ -33,15 +33,18 @@ import os
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 
+# We only want to write these fields to the committed CSV file.
+CSV_FIELDS = ["scenario", "join_field", "pred_const", "inlj_time_ms", "hj_time_ms"]
+
 
 def plot_cost_vs_time(csv_rows: list[dict], output_dir: str):
     """Write calibration results to CSV and generate a cost-vs-time scatter plot."""
     os.makedirs(output_dir, exist_ok=True)
 
     scenario = csv_rows[0]["scenario"]
-    csv_path = os.path.join(output_dir, f"cost_vs_time_{scenario}.csv")
+    csv_path = os.path.join(output_dir, f"join_times_{scenario}.csv")
     with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=csv_rows[0].keys())
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(csv_rows)
     print(f"\nResults written to {csv_path}")

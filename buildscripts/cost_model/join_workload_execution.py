@@ -29,6 +29,7 @@
 
 from __future__ import annotations
 
+import csv
 from typing import NamedTuple
 
 from database_instance import DatabaseInstance
@@ -39,6 +40,31 @@ class JoinExplainResult(NamedTuple):
     used_disk: bool | None
     algorithm: str
     cost_estimate: float
+
+
+class CachedExecutionTime(NamedTuple):
+    inlj_time_ms: float | None
+    hj_time_ms: float | None
+
+
+CachedTimes = dict[tuple[str, str, int], CachedExecutionTime]
+
+
+def load_execution_times(csv_paths: list[str]) -> CachedTimes:
+    """
+    Load pre-recorded execution times from CSV files.
+    Returns a dict keyed by (scenario, join_field, pred_const).
+    """
+    cached: CachedTimes = {}
+    for path in csv_paths:
+        with open(path, newline="") as f:
+            for row in csv.DictReader(f):
+                key = (row["scenario"], row["join_field"], int(row["pred_const"]))
+                cached[key] = CachedExecutionTime(
+                    inlj_time_ms=float(row["inlj_time_ms"]) if row["inlj_time_ms"] else None,
+                    hj_time_ms=float(row["hj_time_ms"]) if row["hj_time_ms"] else None,
+                )
+    return cached
 
 
 def abbreviate_stage(stage_name: str) -> str:

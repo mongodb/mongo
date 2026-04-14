@@ -3,4 +3,5 @@ cm
 *.png
 figures/
 parameters.csv
-join_output/
+join_output/*.png
+join_calibration_db/

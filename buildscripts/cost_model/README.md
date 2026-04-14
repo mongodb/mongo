@@ -78,6 +78,10 @@ source cm/bin/activate
   ```sh
   (cm) python join_start.py --join-only
   ```
+  To iterate quickly on cost model changes, reuse pre-recorded execution times from a previous full run. This skips actual query execution, only running `queryPlanner` explains to collect fresh cost estimates:
+  ```sh
+  (cm) python join_start.py --execution-times join_output/join_times_in-cache.csv join_output/join_times_exceeds-cache.csv
+  ```
 
 **Note:** For CBR calibration, the first time it will take a while since it has to generate the data. Afterwards, as long as you aren't modifying the collections, you can comment out `await generator.populate_collections()` in `start.py` - this will make it a lot faster.
 
