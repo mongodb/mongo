@@ -25,45 +25,42 @@ a notice will be included in
 | ---------------------------------------------------- | --------------------------------- | ---------------------------------------- | -------------------- | ------------------------------- |
 | [Abseil Common Libraries (C++)]                      | Apache-2.0                        | 20211102.0                               |                      | ✗                               |
 | [Asio C++ Library]                                   | BSL-1.0                           | 1.12.2                                   |                      | ✗                               |
+| [benchmark]                                          | Apache-2.0                        | 1.5.2                                    |                      |                                 |
 | [Boost C++ Libraries]                                | BSL-1.0                           | 1.79.0                                   |                      | ✗                               |
+| [c-ares]                                             | MIT                               | 1.19.1                                   |                      | ✗                               |
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer   | 2.1.28                                   |                      |                                 |
+| [fmt]                                                | MIT                               | 7.1.3                                    |                      | ✗                               |
+| [folly]                                              | Apache-2.0                        | 2025.04.21.00                            |                      | ✗                               |
+| [gperftools]                                         | BSD-3-Clause                      | 003775aa816cb3fe01215455825245089d423a7c |                      | ✗                               |
+| [gRPC (C++)]                                         | Apache-2.0                        | 1.46.5                                   |                      | ✗                               |
 | [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                       | 57.1                                     | ✗                    | ✗                               |
+| [immer]                                              | BSL-1.0                           | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                      | 2.0.1                                    |                      | ✗                               |
 | [JSON Schema Store]                                  | Apache-2.0                        | 6847cfc3a17a04a7664474212db50c627e1e3408 |                      |                                 |
 | [JSON-Schema-Test-Suite]                             | MIT                               | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
+| [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | 2.0.2                                    |                      | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                         | 1.18.2                                   | ✗                    | ✗                               |
-| [MongoDB C Driver]                                   | Apache-2.0                        | 1.27.6                                   | ✗                    | ✗                               |
+| [libunwind]                                          | MIT                               | 1.6.0-rc1                                |                      | ✗                               |
+| [linenoise]                                          | BSD-2-Clause                      | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
 | [Mozilla Firefox ESR]                                | MPL-2.0                           | 140.7.0esr                               |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                     | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception | 10.40                                    |                      | ✗                               |
 | [Protobuf]                                           | BSD-3-Clause                      | 3.19.5                                   |                      | ✗                               |
-| [S2 Geometry Library]                                | Apache-2.0                        | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
-| [SCons - a Software Construction tool]               | MIT                               | 4.9.1                                    |                      |                                 |
-| [SafeInt]                                            | MIT                               | 3.0.26                                   |                      | ✗                               |
-| [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 1.0.0                                    | ✗                    | ✗                               |
-| [Unicode Character Database]                         | Unicode-DFS-2016                  | 8.0.0                                    | ✗                    | ✗                               |
-| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only      | 11.2.0                                   | ✗                    | ✗                               |
-| [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only      | 1.5.2                                    | ✗                    | ✗                               |
-| [benchmark]                                          | Apache-2.0                        | 1.5.2                                    |                      |                                 |
-| [c-ares]                                             | MIT                               | 1.19.1                                   |                      | ✗                               |
-| [fmt]                                                | MIT                               | 7.1.3                                    |                      | ✗                               |
-| [folly]                                              | Apache-2.0                        | 2025.04.21.00                            |                      | ✗                               |
-| [gRPC (C++)]                                         | Apache-2.0                        | 1.46.6                                   |                      | ✗                               |
-| [gperftools]                                         | BSD-3-Clause                      | 2.9.1                                    |                      | ✗                               |
-| [immer]                                              | BSL-1.0                           | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
-| [libmongocrypt]                                      | Apache-2.0                        | e656245b7ebc742df210c8156b9aac41bdd5d113 | ✗                    | ✗                               |
-| [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | 2.0.2                                    |                      | ✗                               |
-| [libunwind]                                          | MIT                               | 1.6.1                                    |                      | ✗                               |
-| [linenoise]                                          | BSD-2-Clause                      | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                               | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                        | 0.5.0                                    |                      |                                 |
 | [re2]                                                | BSD-3-Clause                      | 2021-09-01                               |                      | ✗                               |
+| [S2 Geometry Library]                                | Apache-2.0                        | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
+| [SafeInt]                                            | MIT                               | 3.0.26                                   |                      | ✗                               |
+| [SCons - a Software Construction tool]               | MIT                               | 4.9.1                                    |                      |                                 |
 | [snappy]                                             | BSD-3-Clause                      | 1.1.7                                    | ✗                    | ✗                               |
+| [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 1.0.0                                    | ✗                    | ✗                               |
 | [timelib]                                            | MIT                               | 2022.10                                  |                      | ✗                               |
+| [Unicode Character Database]                         | Unicode-DFS-2016                  | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                      | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
 | [variant]                                            | BSL-1.0                           | v1.4.0                                   |                      | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |
 | [zlib]                                               | Zlib                              | 1.2.13                                   | ✗                    | ✗                               |
+| [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only      | 1.5.2                                    | ✗                    | ✗                               |
 
 [Abseil Common Libraries (C++)]: https://github.com/abseil/abseil-cpp.git
 [Asio C++ Library]: https://github.com/chriskohlhoff/asio.git
@@ -74,7 +71,6 @@ a notice will be included in
 [JSON Schema Store]: https://github.com/schemastore/schemastore.git
 [JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
 [LibTomCrypt]: https://github.com/libtom/libtomcrypt.git
-[MongoDB C Driver]: https://github.com/mongodb/mongo-c-driver.git
 [Mozilla Firefox ESR]: https://github.com/mozilla-firefox/firefox.git
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [PCRE2 - Perl-Compatible Regular Expressions]: https://github.com/pcre2project/pcre2.git
@@ -84,7 +80,6 @@ a notice will be included in
 [SafeInt]: https://github.com/dcleblanc/safeint.git
 [Snowball Stemming Algorithms (libstemmer)]: http://github.com/snowballstem/snowball.git
 [Unicode Character Database]: https://www.unicode.org/Public/8.0.0/
-[WiredTiger]: https://github.com/wiredtiger/wiredtiger.git
 [Zstandard (zstd)]: https://github.com/facebook/zstd.git
 [benchmark]: https://github.com/google/benchmark.git
 [c-ares]: https://github.com/c-ares/c-ares.git
@@ -93,7 +88,6 @@ a notice will be included in
 [gRPC (C++)]: https://github.com/grpc/grpc.git
 [gperftools]: https://github.com/gperftools/gperftools.git
 [immer]: https://github.com/arximboldi/immer.git
-[libmongocrypt]: https://github.com/mongodb/libmongocrypt.git
 [librdkafka - The Apache Kafka C/C++ library]: https://github.com/confluentinc/librdkafka.git
 [libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
@@ -106,6 +100,21 @@ a notice will be included in
 [variant]: https://github.com/mpark/variant.git
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
+
+## WiredTiger Vendored Test Libraries
+
+The following libraries are transitively included by WiredTiger,
+and are used by that component for testing. They don't appear in
+released binary artifacts.
+
+| Name                           |
+| ------------------------------ |
+| pkg:pypi/concurrencytest@0.1.2 |
+| pkg:pypi/discover@0.4.0        |
+| pkg:pypi/extras@0.0.3          |
+| pkg:pypi/python-subunit@0.0.16 |
+| pkg:pypi/testscenarios@0.4     |
+| pkg:pypi/testtools@0.9.34      |
 
 ## Dynamically Linked Libraries
 

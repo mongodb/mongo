@@ -28,27 +28,47 @@ components_remove = [
     "sparsehash/sparsehash",
     # a transitive dependency of mpark/variant that is not necessary to include
     "xtensor-stack/xtl",
+    # a false match under iceberg-cpp, should be resolved when iceberg-cpp is added to Endor OSS DB
+    "dmlc/xgboost",
+    # mongo-cxx-driver is mismatched to files src/mongo/db/modules/enterprise/src/audit/logger/[encoder.h,rotatable_file_writer_test.cpp]
+    # excluding the path is not preventing the component from being identified erroneously, so compensating with this exclusion in the meantime
+    "mongodb/mongo-cxx-driver",
 ]
 
 for component in components_remove:
     for prefix in prefixes:
         endor_components_remove.append(prefix + component)
 
+# ################ Third-Party Folder Filter ################
+
+# List of folders in src/third_party to exclude from SBOM generation warnings
+third_party_folders_remove = [
+    "src/third_party/scripts",  # this folder contains scripts related to the import process, but does not contain SBOM components itself
+    "src/third_party/private",  # this is not a real third-party folder, but rather a place for MongoDB to store private forks of third-party code. The actual SBOM components in this folder are still included.
+    # "src/third_party/boringssl_replacement",  # this is an alias folder
+    # "src/third_party/wasmtime",  # currently no targets depend on this
+]
+
 # ################ Component Renaming ################
-# Endor does not have syntactically valid PURLs for C/C++ packages.
+# Endor does not always have syntactically valid PURLs for C/C++ packages.
 # e.g.,
-# Invalid: pkg:c/github.com/abseil/abseil-cpp@20250512.1
-# Valid: pkg:github/abseil/abseil-cpp@20250512.1
+#  Invalid: pkg:c/github.com/abseil/abseil-cpp@20250512.1
+#  Valid: pkg:github/abseil/abseil-cpp@20250512.1
 # Run string replacements to correct for this:
 endor_components_rename = [
     ["pkg:c/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
     ["pkg:generic/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
+    ["pkg:generic/zlib", "pkg:github/madler/zlib"],
     ["pkg:generic/zlib.net/zlib", "pkg:github/madler/zlib"],
+    ["pkg:generic/libstemmer", "pkg:github/snowballstem/snowball"],
     ["pkg:generic/tartarus.org/libstemmer", "pkg:github/snowballstem/snowball"],
+    ["pkg:generic/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
     ["pkg:generic/intel.com/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
+    ["pkg:archive/intel.com/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
     ["pkg:c/git.openldap.org/openldap/openldap", "pkg:generic/openldap/openldap"],
-    ["pkg:generic/github.com/", "pkg:github/"],
-    ["pkg:c/github.com/", "pkg:github/"],
+    ["pkg:generic/gitlab.gnome.org/gnome/libxml2", "pkg:generic/gnome/libxml2"],
+    ["pkg:generic/gitlab.com/bzip2/bzip2", "pkg:github/libarchive/bzip2"],
+    ["pkg:generic/gitlab.com/federicomenaquintero/bzip2", "pkg:github/libarchive/bzip2"],
 ]
 
 # ################ Version Transformation ################
@@ -69,7 +89,6 @@ VERSION_PATTERN_REPL = [
     # 'mongodb-8.2.0-alpha2' pkg:github/wiredtiger/wiredtiger
     # 'release-1.12.0' pkg:github/apache/avro
     # 'yaml-cpp-0.6.3' pkg:github/jbeder/yaml-cpp
-    # 'node-v2.6.0' pkg:github/mongodb/libmongocrypt
     [re.compile(rf"^[-a-z]+[-/][vr]?({RE_SEMVER})$"), r"\1"],
     # 'asio-1-34-2' pkg:github/chriskohlhoff/asio
     # 'cares-1_27_0' pkg:github/c-ares/c-ares

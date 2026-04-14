@@ -104,7 +104,7 @@
           "value": "src/third_party/abseil-cpp/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ],
@@ -403,6 +403,13 @@
           "value": "site_scons/mongo/download_windows_sasl.py"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/mongo/db/modules/enterprise/src/sasl"
+          }
+        ]
+      },
       "scope": "optional"
     },
     {
@@ -484,7 +491,7 @@
           "value": "src/third_party/timelib/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ],
@@ -1105,8 +1112,12 @@
           "value": "src/third_party/libmongocrypt/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
         }
       ],
       "evidence": {
@@ -1159,7 +1170,7 @@
           "value": "src/third_party/librdkafka/scripts/librdkafka_get_sources.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ],
@@ -1365,6 +1376,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/libbson/import.sh"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
         }
       ],
       "evidence": {
@@ -2079,6 +2094,10 @@
         },
         {
           "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "mdb_first_party",
           "value": "true"
         }
       ],

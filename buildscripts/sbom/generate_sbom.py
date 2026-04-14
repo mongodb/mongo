@@ -7,27 +7,41 @@ Use 'buildscripts/sbom_linter.py' for validation.
 
 Invoke with ---help or -h for help message.
 """
+# pylint: disable=unsubscriptable-object
+# pylint: disable=unsupported-assignment-operation
 
 import argparse
-import json
 import logging
 import os
 import re
 import subprocess
 import sys
-import urllib.parse
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict, Optional
 
 from config import (
     endor_components_remove,
     endor_components_rename,
     get_semver_from_release_version,
     process_component_special_cases,
+    third_party_folders_remove,
 )
 from endorctl_utils import EndorCtl
 from git import Commit, Repo
+
+from buildscripts.sbom.sbom_utils import (
+    add_component_property,
+    check_metadata_sbom,
+    convert_sbom_to_public,
+    read_sbom_json_file,
+    remove_sbom_component,
+    sbom_components_to_dict,
+    set_component_version,
+    set_dependency_version,
+    write_sbom_json_file,
+)
 
 # region init
 # pylint: disable=W1201,W1203
@@ -63,64 +77,8 @@ script_directory = script_path.parent
 REGEX_COMMIT_SHA = r"^[0-9a-fA-F]{40}$"
 REGEX_GIT_BRANCH = r"^[a-zA-Z0-9_.\-/]+$"
 REGEX_GITHUB_URL = r"^(https://github.com/)([a-zA-Z0-9-]{1,39}/[a-zA-Z0-9-_.]{1,100})(\.git)$"
-REGEX_RELEASE_BRANCH = r"^v\d\.\d$"
+REGEX_RELEASE_BRANCH = r"^v\d\.\d(-staging)?$"
 REGEX_RELEASE_TAG = r"^r\d\.\d.\d(-\w*)?$"
-
-# ################ PURL Validation ################
-REGEX_STR_PURL_OPTIONAL = (  # Optional Version (any chars except ? @ #)
-    r"(?:@[^?@#]*)?"
-    # Optional Qualifiers (any chars except @ #)
-    r"(?:\?[^@#]*)?"
-    # Optional Subpath (any chars)
-    r"(?:#.*)?$")
-
-REGEX_PURL = {
-    # deb PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/deb-definition.md
-    "deb":
-        re.compile(r"^pkg:deb/"  # Scheme and type
-                   # Namespace (organization/user), letters must be lowercase
-                   r"(debian|ubuntu)+"
-                   r"/"
-                   r"[a-z0-9._-]+" + REGEX_STR_PURL_OPTIONAL  # Name
-                   ),
-    # Generic PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/generic-definition.md
-    "generic":
-        re.compile(r"^pkg:generic/"  # Scheme and type
-                   r"([a-zA-Z0-9._-]+/)?"  # Optional namespace segment
-                   r"[a-zA-Z0-9._-]+" + REGEX_STR_PURL_OPTIONAL  # Name (required)
-                   ),
-    # GitHub PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/github-definition.md
-    "github":
-        re.compile(r"^pkg:github/"  # Scheme and type
-                   # Namespace (organization/user), letters must be lowercase
-                   r"[a-z0-9-]+"
-                   r"/"
-                   r"[a-z0-9._-]+" + REGEX_STR_PURL_OPTIONAL  # Name (repository)
-                   ),
-    # PyPI PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/pypi-definition.md
-    "pypi":
-        re.compile(r"^pkg:pypi/"  # Scheme and type
-                   r"[a-z0-9_-]+"  # Name, letters must be lowercase, dashes, underscore
-                   + REGEX_STR_PURL_OPTIONAL),
-}
-
-# Metadata SBOM requirements
-METADATA_FIELDS_REQUIRED = [
-    "type",
-    "bom-ref",
-    "group",
-    "name",
-    "version",
-    "description",
-    "licenses",
-    "copyright",
-    "externalReferences",
-    "scope",
-]
-METADATA_FIELDS_ONE_OF = [
-    ["author", "supplier"],
-    ["purl", "cpe"],
-]
 
 # endregion init
 
@@ -142,7 +100,7 @@ class GitInfo:
                     check=True,
                 ).stdout.strip())
             self._repo = Repo(self.repo_root)
-        except Exception as ex:
+        except (OSError, subprocess.CalledProcessError, AttributeError, TypeError) as ex:
             logger.warning(
                 "Unable to read git repo information. All necessary script arguments must be provided."
             )
@@ -164,7 +122,7 @@ class GitInfo:
                 filtered_tags = [
                     tag for tag in self._repo.tags if re.fullmatch(REGEX_RELEASE_TAG, tag.name)
                 ]
-                logging.info("GIT: Parsing %s release tags for match to commit", len(filtered_tags))
+                logging.info("GIT: Parsing %d release tags for match to commit", len(filtered_tags))
                 for tag in filtered_tags:
                     if tag.commit == self.commit:
                         release_tags.append(tag.name)
@@ -175,7 +133,7 @@ class GitInfo:
                 logging.debug("GitInfo->release_tag(): %s", self.release_tag)
 
                 logging.debug("GitInfo->__init__: %s", self)
-            except Exception as ex:
+            except (AttributeError, IndexError, ValueError, TypeError) as ex:
                 logger.warning("Unable to fully parse git info.")
                 logger.warning(ex)
 
@@ -229,77 +187,6 @@ def extract_repo_from_git_url(git_url: str) -> dict:
     }
 
 
-def is_valid_purl(purl: str) -> bool:
-    """Validate a GitHub or Generic PURL."""
-    for purl_type, regex in REGEX_PURL.items():
-        if regex.match(purl):
-            logger.debug("PURL: %s matched PURL type '%s' regex '%s'", purl, purl_type,
-                         regex.pattern)
-            return True
-    return False
-
-
-def sbom_components_to_dict(sbom: dict, with_version: bool = False) -> dict:
-    """Create a dict of SBOM components with a version-less PURL as the key."""
-    components = sbom["components"]
-    if with_version:
-        components_dict = {
-            urllib.parse.unquote(component["bom-ref"]): component
-            for component in components
-        }
-    else:
-        components_dict = {
-            urllib.parse.unquote(component["bom-ref"]).split("@")[0]: component
-            for component in components
-        }
-    return components_dict
-
-
-def check_metadata_sbom(meta_bom: dict) -> None:
-    """Run checks on SBOM component metadata for expected fields."""
-    for component in meta_bom["components"]:
-        for field in METADATA_FIELDS_REQUIRED:
-            if field not in component:
-                logger.warning("METADATA: '%s' is missing required field '%s'.",
-                               component['bom-ref'] or component['name'], field)
-        for fields in METADATA_FIELDS_ONE_OF:
-            found = False
-            for field in fields:
-                found = found or field in component
-            if not found:
-                logger.warning("METADATA: '%s' is missing one of fields '%s'.", component['bom-ref']
-                               or component['name'], fields)
-
-
-def read_sbom_json_file(file_path: str) -> dict:
-    """Load a JSON SBOM file (schema is not validated)."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as input_json:
-            sbom_json = input_json.read()
-        result = json.loads(sbom_json)
-    except Exception as ex:
-        logger.error("Error loading SBOM file from %s", file_path)
-        logger.error(ex)
-        return {}
-    else:
-        logger.info("SBOM loaded from %s with %s components", file_path, len(result['components']))
-        return result
-
-
-def write_sbom_json_file(sbom_dict: dict, file_path: str) -> None:
-    """Save a JSON SBOM file (schema is not validated)."""
-    try:
-        file_path = os.path.abspath(file_path)
-        with open(file_path, "w", encoding="utf-8") as output_json:
-            formatted_sbom = json.dumps(sbom_dict, indent=2) + "\n"
-            output_json.write(formatted_sbom)
-    except Exception as err:
-        logger.error("Error writing SBOM file to %s", file_path)
-        logger.error(err)
-    else:
-        logger.info("SBOM file saved to %s", file_path)
-
-
 def write_list_to_text_file(str_list: list, file_path: str) -> None:
     """Save a list of strings to a text file."""
     try:
@@ -314,65 +201,42 @@ def write_list_to_text_file(str_list: list, file_path: str) -> None:
         logger.info("Text file saved to %s", file_path)
 
 
-def set_component_version(component: dict, version: str, purl_version: str = "",
-                          cpe_version: str = "") -> None:
-    """Update the appropriate version fields in a component from the metadata SBOM."""
-    if not purl_version:
-        purl_version = version
+def get_subfolders_list(repo_root: str, base_folder_path: str = ".", subfolders=None) -> list:
+    """Get list of all directories in the specified path and subfolders."""
 
-    if not cpe_version:
-        cpe_version = version
+    if subfolders is None:
+        subfolders = set()
+    subfolders.add(
+        "")  # Ensure set includes blank to cover search of base folder without a subfolder
+    folders = []
+    subfolder = ""
 
-    component["bom-ref"] = component["bom-ref"].replace("{{VERSION}}", purl_version)
-    component["version"] = component["version"].replace("{{VERSION}}", version)
-    if component.get("purl"):
-        component["purl"] = component["purl"].replace("{{VERSION}}", purl_version)
-        if not is_valid_purl(component["purl"]):
-            logger.warning("PURL: Invalid PURL (%s)", component['purl'])
-    if component.get("cpe"):
-        component["cpe"] = component["cpe"].replace("{{VERSION}}", cpe_version)
-
-
-def set_dependency_version(dependencies: list, meta_bom_ref: str, purl_version: str) -> None:
-    """Update the appropriate dependency version fields in the metadata SBOM."""
-    ref_count = 0
-    dependson_count = 0
-    for dependency in dependencies:
-        if "{{VERSION}}" in dependency["ref"] and dependency["ref"] == meta_bom_ref:
-            dependency["ref"] = dependency["ref"].replace("{{VERSION}}", purl_version)
-            ref_count += 1
-        for i in range(len(dependency["dependsOn"])):
-            if dependency["dependsOn"][i] == meta_bom_ref:
-                dependency["dependsOn"][i] = dependency["dependsOn"][i].replace(
-                    "{{VERSION}}", purl_version)
-                dependson_count += 1
-
-    logger.debug("set_dependency_version: '%s' updated %s refs and %s dependsOn", meta_bom_ref,
-                 ref_count, dependson_count)
-
-
-def get_subfolders_dict(folder_path: str = ".") -> dict:
-    """Get list of all directories in the specified path."""
-    subfolders = []
     try:
-        # Get all entries (files and directories) in the specified path
-        entries = os.listdir(folder_path)
+        for subfolder in subfolders:
+            folder_path = os.path.join(repo_root, base_folder_path, subfolder)
+            logger.info("Getting subfolders in: %s", folder_path)
+            # Get all entries (files and directories) in the specified path
+            folders.extend([
+                os.path.join(base_folder_path, subfolder, item) for item in os.listdir(folder_path)
+            ])
+            logger.debug("Found folders: %s", folders)
 
         # Filter for directories
-        for entry in entries:
-            full_path = os.path.join(folder_path, entry)
-            if os.path.isdir(full_path):
-                subfolders.append(entry)
+        folders = [folder for folder in folders if os.path.isdir(folder)]
+        folders.sort()
+        return folders
     except FileNotFoundError:
-        logger.error("Error: Directory '%s' not found.", folder_path)
-    except Exception as err:
-        logger.error("An error occurred: %s", err)
+        logger.error("Error: Directory '%s' not found.", os.path.join(base_folder_path, subfolder))
+    except (PermissionError, OSError) as ex:
+        logger.error(
+            "An error occurred while accessing the directory '%s'.",
+            os.path.join(base_folder_path, subfolder),
+        )
+        logger.error(ex)
+    return []
 
-    subfolders.sort()
-    return {key: 0 for key in subfolders}
 
-
-def get_component_import_script_path(component: dict) -> str:
+def get_component_import_script_path(component: dict) -> Optional[str]:
     """Extract the path to a third-party library import script as defined in component 'properties' as 'import_script_path'."""
     import_script_path = [
         p.get("value") for p in component.get("properties", [])
@@ -381,59 +245,75 @@ def get_component_import_script_path(component: dict) -> str:
     if len(import_script_path):
         # There should only be 1 result, if any
         return import_script_path[0]
-    else:
-        return ""
+    return None
 
 
-def get_component_priority_version_source(component: dict) -> str:
+def get_component_priority_version_source(component: dict) -> Optional[str]:
     """Get the priority version source, if defined in metadata file."""
     priority_version_source = [
         p.get("value") for p in component.get("properties", [])
-        if p.get("name") == "generate_sbom:priority_version_source"
+        if p.get("name") == "internal:generate_sbom:priority_version_source"
     ]
     if len(priority_version_source):
         # There should only be 1 result, if any
         return priority_version_source[0]
-    else:
-        return ""
+    return None
 
 
-def del_component_priority_version_source(component: dict) -> None:
-    """Delete all priority version source properties."""
+def get_import_script_variable_name(component: dict) -> Optional[str]:
+    """Get the variable name used in the import script, if defined in metadata file."""
+    import_script_variable_name = [
+        p.get("value") for p in component.get("properties", [])
+        if p.get("name") == "internal:generate_sbom:import_script_variable_name"
+    ]
+    if len(import_script_variable_name):
+        # There should only be 1 result, if any
+        return import_script_variable_name[0]
+    return None
 
-    # Reverse iterate properties list to safely modify in situ
-    if "properties" in component:
-        for i in range(len(component["properties"]) - 1, -1, -1):
-            if component["properties"][i].get("name") == "generate_sbom:priority_version_source":
-                logger.debug(
-                    "PRIORITY VERSION SOURCE: %s: Removing priority version source from SBOM metadata.",
-                    component['bom-ref'])
-                del component["properties"][i]
 
-
-def get_version_from_import_script(file_path: str) -> str:
-    """A rudimentary parse of a shell script file to extract the static value defined for the VERSION variable."""
+def get_version_from_import_script(file_path: str, variable_name: str) -> Optional[str]:
+    """A rudimentary parse of a shell or python script file to extract the static value defined for the VERSION variable."""
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             for line in file:
-                if line.strip().startswith("VERSION="):
+                if line.strip().startswith(f"{variable_name}="):
                     return re.sub(
-                        r"^VERSION=(?P<quote>[\"']?)(?P<content>\S+)(?P=quote).*$",
+                        rf"^{variable_name}=(?P<quote>[\"']?)(?P<content>\S+)(?P=quote).*$",
                         r"\g<content>",
                         line.strip(),
                     )
-    except Exception as ex:
+                elif line.strip().startswith(f"{variable_name} = "):
+                    return re.sub(
+                        rf"^{variable_name}\s=\s(?P<quote>[\"']?)(?P<content>\S+)(?P=quote).*$",
+                        r"\g<content>",
+                        line.strip(),
+                    )
+    except OSError as ex:
         logger.warning("Unable to load %s", file_path)
         logger.warning(ex)
-        return ""
-    else:
-        return ""
+    return None
+
+
+def deduplicate_list_of_dicts(list_of_dicts):
+    """Deduplicate a list of dicts while preserving order. Dicts must be hashable (i.e., contain only hashable types)."""
+    seen = set()
+    unique_list = []
+    for dct in list_of_dicts:
+        # Convert dict items to frozenset for hashability
+        frozenset_items = frozenset(dct.items())
+        if frozenset_items not in seen:
+            seen.add(frozenset_items)
+            unique_list.append(dct)
+    return unique_list
 
 
 # endregion functions and classes
 
 
 def main() -> None:
+    """Main function to generate SBOM."""
+
     # region define args
 
     parser = argparse.ArgumentParser(
@@ -465,7 +345,7 @@ def main() -> None:
         help=
         "Target for generated SBOM. Commit: results from running/completed PR scan, Branch: results from latest monitoring scan, Project: results from latest monitoring scan of the 'default' branch (default: commit)",
         choices=["commit", "branch", "project"],
-        default="commit",
+        default="project",
         type=str,
     )
     endor.add_argument(
@@ -498,14 +378,26 @@ def main() -> None:
     )
     files.add_argument(
         "--sbom-in",
-        help="Input path for previous SBOM file (Default: './sbom.json')",
+        help="Input path for previous SBOM file (Default: './sbom.private.json')",
+        default="./sbom.private.json",
+        type=str,
+    )
+    files.add_argument(
+        "--sbom-out-public",
+        help="Output path for public SBOM file (Default: './sbom.json')",
         default="./sbom.json",
         type=str,
     )
     files.add_argument(
-        "--sbom-out",
-        help="Output path for SBOM file (Default: './sbom.json')",
-        default="./sbom.json",
+        "--sbom-out-internal",
+        help="Output path for internal SBOM file (Default: './sbom.private.json')",
+        default="./sbom.private.json",
+        type=str,
+    )
+    parser.add_argument(
+        "--branch-filter",
+        help="Run only if Git repo branch matches regex (Default: '.*')",
+        default=".*",
         type=str,
     )
     parser.add_argument(
@@ -569,8 +461,16 @@ def main() -> None:
             )
         git_info.branch = args.branch
 
+    # Check if branch matches the branch filter regex
+    if not re.fullmatch(args.branch_filter, git_info.branch):
+        print(
+            f"Branch '{git_info.branch}' does not match branch filter '{args.branch_filter}'. Terminating as successful."
+        )
+        sys.exit(0)
+
     # files
-    sbom_out_path = args.sbom_out
+    sbom_out_public_path = args.sbom_out_public
+    sbom_out_internal_path = args.sbom_out_internal
     sbom_in_path = args.sbom_in
     sbom_metadata_path = args.sbom_metadata
     save_warnings = args.save_warnings
@@ -588,16 +488,14 @@ def main() -> None:
 
     print_banner(f"Exporting Endor Labs SBOM for {target} {getattr(git_info, target)}")
     endorctl = EndorCtl(namespace, retry_limit, sleep_duration, endorctl_path, config_path)
-
-    endor_bom = {}
     if target == "commit":
-        endor_bom = endorctl.get_sbom_for_commit(git_info.project, git_info.commit)
+        endor_bom: Optional[dict] = endorctl.get_sbom_for_commit(git_info.project, git_info.commit)
     elif target == "branch":
-        endor_bom = endorctl.get_sbom_for_branch(git_info.project, git_info.branch)
+        endor_bom: Optional[dict] = endorctl.get_sbom_for_branch(git_info.project, git_info.branch)
     elif target == "project":
-        endor_bom = endorctl.get_sbom_for_project(git_info.project)
+        endor_bom: Optional[dict] = endorctl.get_sbom_for_main(git_info.project)
     else:
-        endor_bom = None
+        endor_bom: Optional[dict] = {}
 
     if not endor_bom:
         logger.error("Empty result for Endor SBOM!")
@@ -630,10 +528,26 @@ def main() -> None:
             for rename in endor_components_rename:
                 old = rename[0]
                 new = rename[1]
-                component["bom-ref"] = component["bom-ref"].replace(old, new)
-                component["purl"] = component["purl"].replace(old, new)
+                if component["bom-ref"].startswith(old):
+                    # property
+                    logger.info(
+                        "ENDOR SBOM PRE-PROCESS: replacing start of bom-ref '%s' with '%s'",
+                        component["bom-ref"],
+                        new,
+                    )
+                    add_component_property(component, "internal:endor_labs_bom-ref",
+                                           component["bom-ref"])
+                    component["bom-ref"] = component["bom-ref"].replace(old, new)
+                if component["purl"].startswith(old):
+                    logger.info(
+                        "ENDOR SBOM PRE-PROCESS: replacing start of purl '%s' with '%s'",
+                        component["purl"],
+                        new,
+                    )
+                    # add_component_property(component, "Endor Labs purl", component["purl"])
+                    component["purl"] = component["purl"].replace(old, new)
 
-    logger.info("Endor Labs SBOM pre-processed with %s components", len(endor_bom['components']))
+    logger.info("Endor Labs SBOM pre-processed with %s components", len(endor_bom["components"]))
 
     # endregion Pre-process Endor Labs SBOM
 
@@ -641,15 +555,17 @@ def main() -> None:
 
     print_banner("Loading metadata SBOM and previous SBOM")
 
-    meta_bom = read_sbom_json_file(sbom_metadata_path)
-    if not meta_bom:
-        logger.error("No SBOM metadata. This is fatal.")
+    meta_bom = read_sbom_json_file(sbom_metadata_path) if os.path.exists(
+        sbom_metadata_path) else None
+    if meta_bom is None:
+        logger.error("No SBOM metadata file at '%s'. This is fatal.", sbom_metadata_path)
         sys.exit(1)
 
-    prev_bom = read_sbom_json_file(sbom_in_path)
-    if not prev_bom:
+    prev_bom = read_sbom_json_file(sbom_in_path) if os.path.exists(sbom_in_path) else None
+    if prev_bom is None:
         logger.warning(
-            "Unable to load previous SBOM data. The new SBOM will be generated without any previous context. This is unexpected, but not fatal."
+            "PREVIOUS SBOM: No previous SBOM file at `%s`. The new SBOM will be generated without any previous context. This is unexpected, but not fatal.",
+            sbom_in_path,
         )
         # Create empty prev_bom to avoid downstream processing errors
         prev_bom = {
@@ -684,9 +600,12 @@ def main() -> None:
     # region MongoDB primary component
 
     # Attempt to determine the MongoDB Version being scanned
-    logger.debug("Available MongoDB version options, tag: %s, branch: %s, previous SBOM: %s",
-                 git_info.release_tag, git_info.branch,
-                 prev_bom['metadata']['component']['version'])
+    logger.debug(
+        "Available MongoDB version options, tag: %s, branch: %s, previous SBOM: %s",
+        git_info.release_tag,
+        git_info.branch,
+        prev_bom["metadata"]["component"]["version"],
+    )
     meta_bom_ref = meta_bom["metadata"]["component"]["bom-ref"]
 
     # Project scan always set to 'master' or if using 'master' branch
@@ -705,11 +624,11 @@ def main() -> None:
 
     # Release branch e.g., v7.0 or v8.2
     elif target == "branch" and re.fullmatch(REGEX_RELEASE_BRANCH, git_info.branch):
-        version = git_info.branch
-        purl_version = git_info.branch
+        version = git_info.branch.replace("-staging", "")
+        purl_version = version
         # remove leading 'v', add wildcard. e.g. 8.2.*
         cpe_version = version[1:] + ".*"
-        logger.info("Using release branch '%s' as MongoDB version", git_info.branch)
+        logger.info("Using release branch '%s' as MongoDB version", version)
 
     # Previous SBOM app version, if all needed specifiers exist
     elif (prev_bom.get("metadata", {}).get("component", {}).get("version")
@@ -728,7 +647,8 @@ def main() -> None:
         cpe_version = version
         logger.warning(
             "Using SBOM version '%s' from Endor Labs scan. This is unlikely to be accurate and may specify a PR #.",
-            version)
+            version,
+        )
 
     # Set main component version
     set_component_version(meta_bom["metadata"]["component"], version, purl_version, cpe_version)
@@ -741,19 +661,34 @@ def main() -> None:
 
     # region Parse metadata SBOM components
 
-    third_party_folders = get_subfolders_dict(git_info.repo_root.as_posix() + "/src/third_party")
-    # pre-exclude 'scripts' folder
-    del third_party_folders["scripts"]
+    third_party_folders = get_subfolders_list(git_info.repo_root.as_posix(), "src/third_party",
+                                              {"private"})
+    logger.debug("Initial list of 'src/third_party' subfolders: %s", third_party_folders)
+
+    # Convert to a dictionary to count instances folders found in SBOM locations
+    third_party_folders = dict.fromkeys(third_party_folders, 0)
+
+    # exclude folders specified in config.py
+    for folder in third_party_folders_remove:
+        if folder in third_party_folders:
+            del third_party_folders[folder]
+        else:
+            logger.warning(
+                "THIRD_PARTY FOLDERS: folder '%s' specified for removal in config.py not found in 'src/third_party' folders list. Consider updating config.py.",
+                folder,
+            )
 
     for component in meta_bom["components"]:
-        versions = {
-            "endor": "",
-            "import_script": "",
-            "metadata": "",
-            "priority_version_source": "",
+        versions: Dict[str, Optional[str]] = {
+            "endor": None,
+            "import_script": None,
+            "metadata": None,
+            "priority_version_source": None,
         }
 
         component_key = component["bom-ref"].split("@")[0]
+        if "properties" not in component:
+            component["properties"] = []
 
         print_banner("Component: " + component_key)
 
@@ -762,17 +697,24 @@ def main() -> None:
         priority_version_source = get_component_priority_version_source(component)
         if priority_version_source:
             versions["priority_version_source"] = priority_version_source
-            logger.info("PRIORITY VERSION SOURCE: %s: Set priority version source to '%s'",
-                        component_key, priority_version_source)
-            del_component_priority_version_source(component)
+            logger.info(
+                "PRIORITY VERSION SOURCE: %s: Set priority version source to '%s'",
+                component_key,
+                priority_version_source,
+            )
 
         ################ Endor Labs ################
         if component_key in endor_components:
             # Pop component from dict so we are left with only unmatched components
             endor_component = endor_components.pop(component_key)
+            # Preserve Endor Labs component properties, if any
+            component["properties"].extend(endor_component.get("properties", []))
             versions["endor"] = endor_component.get("version")
-            logger.debug("VERSION ENDOR: %s: Found version '%s' in Endor Labs results",
-                         component_key, versions['endor'])
+            logger.debug(
+                "VERSION ENDOR: %s: Found version '%s' in Endor Labs results",
+                component_key,
+                versions["endor"],
+            )
 
         ############## Import Script ###############
         # Import script version, if exists
@@ -780,16 +722,24 @@ def main() -> None:
         if import_script_path:
             import_script = Path(import_script_path)
             if import_script.exists():
-                versions["import_script"] = get_version_from_import_script(import_script_path)
-                if "import_script" in versions:
+                versions["import_script"] = get_version_from_import_script(
+                    import_script_path,
+                    get_import_script_variable_name(component) or "VERSION")
+                if versions["import_script"]:
                     versions["import_script"] = versions["import_script"].replace("release-", "")
                 if versions["import_script"]:
                     logger.debug(
                         "VERSION IMPORT SCRIPT: %s: Found version '%s' in import script '%s'",
-                        component_key, versions['import_script'], import_script_path)
+                        component_key,
+                        versions["import_script"],
+                        import_script_path,
+                    )
             else:
-                logger.debug("VERSION IMPORT SCRIPT: %s: Import script not found! '%s'",
-                             component_key, import_script_path)
+                logger.debug(
+                    "VERSION IMPORT SCRIPT: %s: Import script not found! '%s'",
+                    component_key,
+                    import_script_path,
+                )
 
         ############## Metadata ###############
         # Hard-coded metadata version, if exists
@@ -818,7 +768,11 @@ def main() -> None:
                 str(versions["priority_version_source"]),
             ]))
             logger.warning(
-                f"VERSION MISMATCH: {component_key}: Endor version {versions['endor']} does not match import script version {versions['import_script']}. 'priority_version_source' from metadata: {versions['priority_version_source']}"
+                "VERSION MISMATCH: %s: Endor version %s; Import script version %s. 'priority_version_source' from metadata: %s",
+                component_key,
+                versions["endor"],
+                versions["import_script"],
+                versions["priority_version_source"],
             )
 
         # For the standard workflow, we favor the pre-set priority version source,
@@ -826,7 +780,9 @@ def main() -> None:
         if versions["priority_version_source"] and versions["priority_version_source"] in versions:
             version = versions[versions["priority_version_source"]]
             logger.info(
-                f"VERSION: {component_key}: Using priority_version_source '{priority_version_source}' from metadata file."
+                "VERSION: %s: Using priority_version_source '%s' from metadata file.",
+                component_key,
+                priority_version_source,
             )
         else:
             version = versions["endor"] or versions["import_script"] or versions["metadata"]
@@ -845,36 +801,54 @@ def main() -> None:
 
             set_dependency_version(meta_bom["dependencies"], meta_bom_ref, version)
 
-            # check against third_party folders
+            # check against third_party folders and log codeowners if location is defined in evidence occurrences
             component_defines_location = False
             for occurrence in component.get("evidence", {}).get("occurrences", []):
                 location = occurrence.get("location")
                 if location:
                     component_defines_location = True
                 if location.startswith("src/third_party/"):
-                    location = location.replace("src/third_party/", "")
                     if location in third_party_folders:
                         third_party_folders[location] += 1
                         logger.debug(
-                            f"THIRD_PARTY FOLDER: {component_key} matched folder {location} specified in SBOM"
+                            "THIRD_PARTY FOLDER: %s matched folder %s specified in SBOM",
+                            component_key,
+                            location,
+                        )
+                    elif os.path.isdir(git_info.repo_root.as_posix() + "/" + location):
+                        logger.debug(
+                            "THIRD_PARTY FOLDER: %s folder %s specified in SBOM exists",
+                            component_key,
+                            location,
                         )
                     else:
                         logger.warning(
-                            f"THIRD_PARTY FOLDER: {component_key} lists third-party location folder as {location}, which does not exist!"
+                            "THIRD_PARTY FOLDER: %s lists third-party location folder as %s, which does not exist!",
+                            component_key,
+                            location,
                         )
                 else:
                     logger.warning(
-                        f"THIRD_PARTY FOLDER: {component_key} lists a location as '{location}'. Ideally, all third-party components are located under 'src/third_party/'."
+                        "THIRD_PARTY FOLDER: %s lists a location as '%s'. Ideally, all third-party components are located under 'src/third_party/'.",
+                        component_key,
+                        location,
                     )
             if not component_defines_location:
                 logger.warning(
-                    f"THIRD_PARTY FOLDER: {component_key} does not define a location in '.evidence.occurrences[]'"
+                    "THIRD_PARTY FOLDER: %s does not define a location in '.evidence.occurrences[]'",
+                    component_key,
                 )
+
+            # Deduplicate properties list
+            component["properties"] = deduplicate_list_of_dicts(component.get("properties", []))
+
         else:
             logger.warning(
-                f"VERSION NOT FOUND: Could not find a version for {component_key}! Removing from SBOM. Component may need to be removed from the {sbom_metadata_path} file."
+                "VERSION NOT FOUND: Could not find version information for '%s'! Removing from SBOM. Component may need to be removed from the %s file.",
+                component_key,
+                sbom_metadata_path,
             )
-            del component
+            remove_sbom_component(meta_bom, component_key)
 
     print_banner("Third Party Folders")
     third_party_folders_missed = {
@@ -883,8 +857,9 @@ def main() -> None:
     }
     if third_party_folders_missed:
         logger.warning(
-            "THIRD_PARTY FOLDERS: 'src/third_party' folders not matched with a component: " +
-            ",".join(third_party_folders_missed.keys()))
+            "THIRD_PARTY FOLDERS: 'src/third_party' folders not matched with a component: %s",
+            ",".join(third_party_folders_missed.keys()),
+        )
     else:
         logger.info(
             "THIRD_PARTY FOLDERS: All 'src/third_party' folders successfully matched with one or more components."
@@ -901,15 +876,29 @@ def main() -> None:
     print_banner("New Endor Labs components")
     if endor_components:
         logger.info(
-            f"ENDOR SBOM: There are {len(endor_components)} unmatched components in the Endor Labs SBOM. Adding as-is. The applicable metadata should be added to the metadata SBOM for the next run."
+            "ENDOR SBOM: There are %d unmatched components in the Endor Labs SBOM. Adding as-is. The applicable metadata should be added to the metadata SBOM for the next run.",
+            len(endor_components),
         )
         for component in endor_components:
             # set scope to excluded by default until the component is evaluated
             endor_components[component]["scope"] = "excluded"
+
+            # Add blank object for missing fields to avoid issues for downstream processing expecting those fields to exist
+            if "licenses" not in endor_components[component]:
+                endor_components[component]["licenses"] = []
+                logger.warning(
+                    "LICENSES: %s does not have a 'licenses' field. Adding empty list to component.",
+                    endor_components[component]["bom-ref"],
+                )
+            add_component_property(endor_components[component], "internal:as-is_component", "true")
             meta_bom["components"].append(endor_components[component])
-            meta_bom["dependencies"].append(
-                {"ref": endor_components[component]["bom-ref"], "dependsOn": []})
-            logger.info(f"SBOM AS-IS COMPONENT: Added {component}")
+
+            meta_bom["dependencies"].extend([
+                d for d in endor_bom["dependencies"]
+                if d.get("ref") == endor_components[component]["bom-ref"]
+            ])
+            if component.startswith(("pkg:github/", "pkg:generic/")):
+                logger.warning("SBOM AS-IS COMPONENT: Added %s", component)
 
     # endregion Parse unmatched Endor Labs components
 
@@ -918,14 +907,17 @@ def main() -> None:
     # Have the SBOM app version changed?
     sbom_app_version_changed = (prev_bom["metadata"]["component"]["version"] !=
                                 meta_bom["metadata"]["component"]["version"])
-    logger.info(f"SUMMARY: MongoDB version changed: {sbom_app_version_changed}")
+    logger.info("SUMMARY: MongoDB version changed: %s", sbom_app_version_changed)
 
     # Have the components changed?
     prev_components = sbom_components_to_dict(prev_bom, with_version=True)
     meta_components = sbom_components_to_dict(meta_bom, with_version=True)
     sbom_components_changed = prev_components.keys() != meta_components.keys()
     logger.info(
-        f"SBOM_DIFF: SBOM components changed (added, removed, or version): {sbom_components_changed}. Previous SBOM has {len(prev_components)} components; New SBOM has {len(meta_components)} components"
+        "SBOM_DIFF: SBOM components changed (added, removed, or version): %s. Previous SBOM has %d components; New SBOM has %d components",
+        sbom_components_changed,
+        len(prev_components),
+        len(meta_components),
     )
 
     # Components in prev SBOM but not in generated SBOM
@@ -933,14 +925,18 @@ def main() -> None:
     meta_components = sbom_components_to_dict(meta_bom, with_version=False)
     prev_components_diff = list(set(prev_components.keys()) - set(meta_components.keys()))
     if prev_components_diff:
-        logger.info("SBOM_DIFF: Components in previous SBOM and not in generated SBOM: " +
-                    ",".join(prev_components_diff))
+        logger.info(
+            "SBOM_DIFF: Components in previous SBOM and not in generated SBOM: %s",
+            ",".join(prev_components_diff),
+        )
 
     # Components in generated SBOM but not in prev SBOM
     meta_components_diff = list(set(meta_components.keys()) - set(prev_components.keys()))
     if meta_components_diff:
-        logger.info("SBOM_DIFF: Components in generated SBOM and not in previous SBOM: " +
-                    ",".join(meta_components_diff))
+        logger.info(
+            "SBOM_DIFF: Components in generated SBOM and not in previous SBOM: %s",
+            ",".join(meta_components_diff),
+        )
 
     # serialNumber https://cyclonedx.org/docs/1.5/json/#serialNumber
     # version (SBOM version) https://cyclonedx.org/docs/1.5/json/#version
@@ -967,13 +963,17 @@ def main() -> None:
     # metadata.tools https://cyclonedx.org/docs/1.5/json/#metadata_tools
     meta_bom["metadata"]["tools"] = endor_bom["metadata"]["tools"]
 
-    write_sbom_json_file(meta_bom, sbom_out_path)
+    write_sbom_json_file(meta_bom, sbom_out_internal_path)
+
+    convert_sbom_to_public(meta_bom)
+    write_sbom_json_file(meta_bom, sbom_out_public_path)
 
     # Access the collected warnings
     print_banner("CONSOLIDATED WARNINGS")
     warnings = []
     for record in warning_handler.warnings:
-        warnings.append(record.getMessage())
+        warnings.append("- " + record.getMessage())
+    warnings.sort()
 
     print("\n".join(warnings))
 

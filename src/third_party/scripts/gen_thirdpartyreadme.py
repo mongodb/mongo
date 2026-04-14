@@ -2,13 +2,14 @@ import bisect
 import json
 import logging
 import os
+import re
 import sys
 import warnings
+from typing import List
 
 warnings.filterwarnings("ignore", message="\nYou don't have the C version of NameMapper installed")
 
 from Cheetah.Template import Template
-from typing import List
 
 SBOM_PATH = "sbom.json"
 TEMPLATE_PATH = "src/third_party/scripts/README.third_party.md.template"
@@ -27,9 +28,14 @@ def main():
 
     component_links_string = sbom_to_component_links_string(sbom)
 
+    wiredtiger_chart = folders_to_wiredtiger_chart()
+    right_pad_chart_values(wiredtiger_chart)
+    wiredtiger_chart_string = chart_to_string(wiredtiger_chart)
+
     template_data = {
         "component_chart": component_chart_string,
         "component_links": component_links_string,
+        "wiredtiger_chart": wiredtiger_chart_string,
     }
     create_markdown_with_template(template_data)
 
@@ -57,19 +63,21 @@ def sbom_to_component_chart(sbom: dict) -> List[List[str]]:
     component_chart = []
 
     for component in components:
+        if is_first_party(component):
+            continue
         check_component_validity(component)
         name = component["name"]
-        license_string = []
+        license_parts: List[str] = []
         for lic in component["licenses"]:
             if "license" in lic:
                 for key in ["id", "name"]:
                     if key in lic["license"]:
-                        license_string.append(lic["license"][key])
+                        license_parts.append(lic["license"][key])
             elif "expression" in lic:
-                license_string.append(lic["expression"])
-        license_string = ", ".join(license_string)
+                license_parts.append(lic["expression"])
+        license_string = ", ".join(license_parts)
         version = component["version"]
-        if component.get("scope") == "excluded":
+        if component["scope"] == "excluded":
             emits_persisted_data = ""
         else:
             emits_persisted_data = "unknown"
@@ -77,8 +85,8 @@ def sbom_to_component_chart(sbom: dict) -> List[List[str]]:
             for prop in component["properties"]:
                 k, v = prop["name"], prop["value"]
                 if k == "emits_persisted_data":
-                    emits_persisted_data = ("", "✗")[v == "true"]
-        distributed_in_release_binaries = ("", "✗")[component.get("scope") == "required"]
+                    emits_persisted_data = "✗" if v == "true" else ""
+        distributed_in_release_binaries = "✗" if component["scope"] == "required" else ""
 
         row = [
             item.replace("|", "")
@@ -90,11 +98,9 @@ def sbom_to_component_chart(sbom: dict) -> List[List[str]]:
                 distributed_in_release_binaries,
             ]
         ]
-        bisect.insort(component_chart, row)
-        
-    for component in component_chart:
-        component = component[0].lower()
+        component_chart.append(row)
 
+    component_chart.sort(key=lambda c: c[0].lower())
     component_chart.insert(
         0,
         [
@@ -108,16 +114,46 @@ def sbom_to_component_chart(sbom: dict) -> List[List[str]]:
     return component_chart
 
 
-def sbom_to_component_links_string(sbom: dict) -> List[List[str]]:
+def sbom_to_component_links_string(sbom: dict) -> str:
     components = sbom["components"]
     link_list = []
 
     for component in components:
+        if is_first_party(component):
+            continue
         check_component_validity(component)
         info_link = get_component_info_link(component)
         bisect.insort(link_list, f"[{component['name'].replace('|', '')}]: {info_link}")
 
     return "\n".join(link_list)
+
+
+WIREDTIGER_3RDPARTY_PATH = "src/third_party/wiredtiger/test/3rdparty"
+_WIREDTIGER_FOLDER_RE = re.compile(r"(.*-\d+\.\d+(\.\d+)?).*")
+
+
+def folders_to_wiredtiger_chart() -> List[List[str]]:
+    wiredtiger_chart = [["Name"]]
+
+    try:
+        folder_names = os.listdir(WIREDTIGER_3RDPARTY_PATH)
+    except FileNotFoundError:
+        logging.warning("Warning: %s does not exist. Skipping wiredtiger chart.", WIREDTIGER_3RDPARTY_PATH)
+        return wiredtiger_chart
+
+    for folder in folder_names:
+        m = _WIREDTIGER_FOLDER_RE.fullmatch(folder)
+        if m:
+            name, version = m.group(1).rsplit("-", 1)
+            bisect.insort(wiredtiger_chart, [f"pkg:pypi/{name}@{version}"])
+
+    return wiredtiger_chart
+
+def is_first_party(component: dict) -> bool:
+    for prop in component.get("properties", []):
+        if prop.get("name") == "mdb_first_party" and prop.get("value") == "true":
+            return True
+    return False
 
 
 def check_component_validity(component) -> None:
@@ -148,8 +184,8 @@ def get_component_info_link(component) -> str:
                 logging.warning(" ".join(links))
                 logging.warning("Using first link only.")
             else:
-                logging.warning("Falling back to `purl` value: %s", component.get("purl"))
-                links.append(component.get("purl"))
+                logging.warning("Falling back to `purl` value: %s", component["purl"])
+                links.append(component["purl"])
         return links[0]
     else:
         return ""
@@ -161,7 +197,7 @@ def get_component_locations(component) -> List[str]:
     return [occurence["location"] for occurence in component["evidence"]["occurrences"]]
 
 
-def right_pad_chart_values(chart: List[List[str]]) -> List[List[str]]:
+def right_pad_chart_values(chart: List[List[str]]) -> None:
     h, w = len(chart), len(chart[0])
     max_lens = [3 for _ in range(w)]
     for row in chart:
@@ -175,9 +211,8 @@ def right_pad_chart_values(chart: List[List[str]]) -> List[List[str]]:
 
 
 def chart_to_string(chart: List[List[str]]) -> str:
-    chart = [" | ".join(row) for row in chart]
-    chart = "\n".join(["| " + row + " |" for row in chart])
-    return chart
+    rows = [" | ".join(row) for row in chart]
+    return "\n".join(["| " + row + " |" for row in rows])
 
 
 def create_markdown_with_template(data):
