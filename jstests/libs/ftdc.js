@@ -153,3 +153,22 @@ export function waitFailedToStart(pid, exitCode) {
 
     assert.eq(exitCode, checkProgram(pid).exitCode, `Failed to wait for ${pid} to die with exit code ${exitCode}`);
 }
+
+/**
+ * Returns the next FTDC sample that is written.
+ */
+export function getNextSample(adminDb) {
+    let originalSample = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
+    let currData;
+    assert.soon(
+        () => {
+            currData = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
+            // Only return once a new sample has been written.
+            return currData.start > originalSample.start;
+        },
+        "Timeout waiting for next FTDC sample",
+        30 * 1000,
+    );
+
+    return currData;
+}

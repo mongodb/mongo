@@ -2,7 +2,7 @@
  * Tests that async FTDC parameters behave properly.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {verifyGetDiagnosticData, getNextSample} from "jstests/libs/ftdc.js";
 
 const kDefaultPeriod = 1000;
 const kDefaultTimeout = 166;
@@ -33,24 +33,9 @@ function resetParameters() {
     setParameter("diagnosticDataCollectionMaxThreads", kDefaultMaxThreads);
 }
 
-function getNextSample() {
-    let originalSample = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
-    let currData;
-    assert.soon(
-        () => {
-            currData = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
-            return currData.start > originalSample.start;
-        },
-        "Timeout waiting for next FTDC sample",
-        30 * 1000,
-    );
-
-    return currData;
-}
-
-function configureFailPointAndWaitUntilHit(delay) {
-    let fp = configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay", {sleepTimeMillis: delay});
-    fp.waitWithTimeout(2000);
+function configureFailPointAndWaitUntilHit() {
+    let fp = configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay");
+    fp.waitWithTimeout(kDefaultPeriod * 2);
 
     return fp;
 }
@@ -72,43 +57,58 @@ function waitUntilNormalOperation() {
 function testSampleTimeout() {
     jsTestLog("Running sample timeout test");
 
+    // First test that we can't set the timeout too high.
     let invalidTimeoutCmd = {
         setParameter: 1,
         diagnosticDataCollectionSampleTimeoutMillis: kDefaultPeriod,
     };
     assert.commandFailedWithCode(adminDb.runCommand(invalidTimeoutCmd), ErrorCodes.InvalidOptions);
 
-    let fp = configureFailPointAndWaitUntilHit(200);
-    getNextSample();
-
+    // Set failpoint to block server status collection and wait until we can get a sample. This
+    // sample should have a collection that timed out.
+    let fp = configureFailPointAndWaitUntilHit();
+    getNextSample(adminDb);
     const mongoOutput = rawMongoProgramOutput(".*");
     let logMatcher = /Collection timed out on collector/;
     assert(logMatcher.test(mongoOutput));
 
-    setParameter("diagnosticDataCollectionSampleTimeoutMillis", 100);
+    // Disable the failpoint to stop FTDC from timing out. It's still possible that the next
+    // collection can timeout if the time it takes to run the server code after the failpoint puts
+    // the collection over the timeout threshold. This is why we get the next sample before clearing
+    // logs and making the assertion.
+    fp.off();
+    getNextSample(adminDb);
 
+    // By this point, we can safely clear the logs and check that the next sample completed with no
+    // timeouts.
     clearRawMongoProgramOutput();
-    getNextSample();
-
+    getNextSample(adminDb);
     const moreMongoOutput = rawMongoProgramOutput(".*");
     assert(!logMatcher.test(moreMongoOutput));
-
-    fp.off();
 }
 
 function testMinThreads() {
     jsTestLog("Running min threads test");
 
+    // First test that min threads can't be higher than max threads.
+    const currentMax = adminDb.runCommand({
+        getParameter: 1,
+        diagnosticDataCollectionMaxThreads: 1,
+    }).diagnosticDataCollectionMaxThreads;
     assert.commandFailedWithCode(
-        adminDb.runCommand({setParameter: 1, diagnosticDataCollectionMinThreads: 2}),
+        adminDb.runCommand({setParameter: 1, diagnosticDataCollectionMinThreads: currentMax + 1}),
         ErrorCodes.BadValue,
     );
 
     setParameter("diagnosticDataCollectionMaxThreads", 4);
     setParameter("diagnosticDataCollectionMinThreads", 2);
-    let fp = configureFailPointAndWaitUntilHit(5000);
 
-    let data = getNextSample();
+    // Setting this failpoint blocks the serverStatus collector. Because we configured the minimum
+    // thread count to 2, FTDC should spawn a new thread to continue collecting data instead of
+    // blocking indefinitely. As a result, the next sample should contain data, but it will not
+    // include serverStatus.
+    let fp = configureFailPointAndWaitUntilHit();
+    let data = getNextSample(adminDb);
     assert(data.hasOwnProperty("transportLayerStats"));
     assert(!data.hasOwnProperty("serverStatus"));
 
@@ -118,23 +118,29 @@ function testMinThreads() {
 function testMaxThreads() {
     jsTestLog("Running max threads test");
 
+    // First test that max threads can't be lower than min threads.
+    const currentMin = adminDb.runCommand({
+        getParameter: 1,
+        diagnosticDataCollectionMinThreads: 1,
+    }).diagnosticDataCollectionMinThreads;
     assert.commandFailedWithCode(
-        adminDb.runCommand({setParameter: 1, diagnosticDataCollectionMaxThreads: 0}),
+        adminDb.runCommand({setParameter: 1, diagnosticDataCollectionMaxThreads: currentMin - 1}),
         ErrorCodes.BadValue,
     );
 
-    const newPeriod = 500;
-    setParameter("diagnosticDataCollectionPeriodMillis", newPeriod);
-    let fp = configureFailPointAndWaitUntilHit(5000);
+    let fp = configureFailPointAndWaitUntilHit();
 
-    // Need to wait an additional sample in case transportLayer collector runs before serverStatus.
-    getNextSample();
-    let data = getNextSample();
+    // With the failpoint set, we expect that ftdc should completely block since only one thread is in use.
+    let data = getNextSample(adminDb);
     assert(!data.hasOwnProperty("transportLayerStats"));
 
+    // Updating max threads will drain all ftdc collection work so we have to temporarily disable fp.
+    fp.off();
     setParameter("diagnosticDataCollectionMaxThreads", 2);
+    fp = configureFailPointAndWaitUntilHit();
 
-    let moreData = getNextSample();
+    // Now with extra threads, ftdc collection can complete even with a blocking collection.
+    let moreData = getNextSample(adminDb);
     assert(moreData.hasOwnProperty("transportLayerStats"));
 
     fp.off();

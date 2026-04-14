@@ -351,11 +351,7 @@ public:
             }
         }
 
-        if (MONGO_unlikely(injectFTDCServerStatusCollectionDelay.shouldFail())) {
-            injectFTDCServerStatusCollectionDelay.execute([&](const BSONObj& data) {
-                sleepFor(Milliseconds(data["sleepTimeMillis"].numberInt()));
-            });
-        }
+        injectFTDCServerStatusCollectionDelay.pauseWhileSet();
 
         builder.appendElements(result);
     }
