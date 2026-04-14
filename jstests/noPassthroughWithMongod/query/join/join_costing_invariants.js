@@ -1,7 +1,8 @@
 // Test basic join costing invariants that are expected to hold regardless of the
 // actual coefficients that are used or any future calibration work.
 // @tags: [
-//   requires_sbe
+//   requires_sbe,
+//   featureFlagPathArrayness
 // ]
 
 import {describe, it} from "jstests/libs/mochalite.js";
@@ -34,13 +35,19 @@ function populate() {
     db.many_rows.createIndex({i_idx: 1});
     db.many_rows.createIndex({c_idx: 1});
     db.many_rows.createIndex({d_idx: 1});
+    // Add index for multikeyness info for path arrayness.
+    db.many_rows.createIndex({dummy: 1, a: 1, i_idx: 1, i_noidx: 1, c_idx: 1, d_idx: 1});
 
     // An empty collection
     db.no_rows.createIndex({i_idx: 1});
+    // Add index for multikeyness info for path arrayness.
+    db.no_rows.createIndex({dummy: 1, a: 1, i_idx: 1});
 
     // Collection with a single row
     db.one_row.insert({i_idx: 1});
     db.one_row.createIndex({i_idx: 1});
+    // Add index for multikeyness info for path arrayness.
+    db.one_row.createIndex({dummy: 1, a: 1, i_idx: 1});
 }
 
 function getValueByPath(obj, path) {

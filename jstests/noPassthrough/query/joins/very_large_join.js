@@ -1,7 +1,7 @@
 /**
  * Tests that the join optimizer can handle a number of joins larger then the join graph can store.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -20,6 +20,7 @@ const config = {
         internalJoinReorderMode: "random",
         internalRandomJoinOrderSeed: 42,
         internalMaxNodesInJoinGraph: kMaxNodesInJoin,
+        featureFlagPathArrayness: true,
     },
 };
 
@@ -29,6 +30,8 @@ const db = conn.getDB(jsTestName());
 
 db.coll.drop();
 assert.commandWorked(db.coll.insertMany(docs));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(db.coll.createIndex({dummy: 1, a: 1, b: 1}));
 
 const pipeline = [];
 let prevCollName = null;
@@ -37,6 +40,8 @@ for (let i = 0; i < numberOfJoins; ++i) {
     const coll = db[from];
     coll.drop();
     assert.commandWorked(coll.insertMany(docs));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1}));
 
     const localField = prevCollName == null ? "a" : `${prevCollName}.a`;
     const foreignField = "b";

@@ -1,7 +1,7 @@
 /**
  * Verifies that we correcly process overrding local fields by foreign documents.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -16,6 +16,7 @@ const docs = [
 const config = {
     setParameter: {
         internalEnableJoinOptimization: true,
+        featureFlagPathArrayness: true,
     },
 };
 
@@ -25,6 +26,8 @@ const db = conn.getDB(jsTestName());
 
 db.coll.drop();
 assert.commandWorked(db.coll.insertMany(docs));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(db.coll.createIndex({dummy: 1, a: 1, b: 1}));
 
 const pipeline = [
     {$lookup: {from: "coll", localField: "_id", foreignField: "_id", as: "_id"}},

@@ -2,7 +2,7 @@
  * Ensures that the join optimizer correctly reports index stats for the single table access plans
  * for all involved collections. Regression test for SERVER-114567.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -16,7 +16,7 @@ function getUsageCount(indexName, collection) {
     }
     return res[0].accesses.ops;
 }
-let conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
 const db = conn.getDB("test");
 
@@ -39,6 +39,10 @@ function dropAndRecreateColls() {
 
     assert.commandWorked(coll1.createIndex({a: 1}));
     assert.commandWorked(coll2.createIndex({b: 1}));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(coll1.createIndex({dummy: 1, a: 1, b: 1, c: 1}));
+    assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1, c: 1}));
+    assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1, c: 1}));
 }
 
 const pipeline = [

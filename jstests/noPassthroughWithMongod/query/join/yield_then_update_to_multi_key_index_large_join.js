@@ -8,8 +8,9 @@
  * The test then continues execution to ensure the unexpected array value doesn't put the server
  * in an unrecoverable state.
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 
@@ -38,12 +39,16 @@ function resetCollections(db, localColl) {
         {a: 8, b: 8, c: 8, d: 8, e: 8, f: 8, g: 8, h: 8},
     ];
     assert.commandWorked(localColl.insertMany(docs));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(localColl.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1, h: 1}));
     /* Iterate over A through H of the alphabet */
     for (const joinField of charRange("a", "h")) {
         const from = `coll${joinField.toUpperCase()}`;
         const coll = db[from];
         coll.drop();
         assert.commandWorked(coll.insertMany(docs));
+        // Add index for multikeyness info for path arrayness.
+        assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1, h: 1}));
 
         const key = {[joinField]: 1};
         assert.commandWorked(coll.createIndex(key));

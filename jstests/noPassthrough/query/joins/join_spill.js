@@ -2,7 +2,7 @@
  * Ensures that the HashJoinStage correctly spills to disk when memory limits are exceeded
  * in join optimizer queries.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_getmore,
  *   requires_sbe,
  * ]
@@ -50,7 +50,7 @@ function verifySpillingStats(hashJoinStages, shouldSpill) {
     }
 }
 
-const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
+const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true, featureFlagPathArrayness: true}});
 const db = conn.getDB(jsTestName());
 
 const coll1 = db[jsTestName() + "_1"];
@@ -65,6 +65,8 @@ function dropAndInsertData(coll, numDocs) {
         docs.push({_id: i, a: i, b: i, data: "x".repeat(100)});
     }
     assert.commandWorked(coll.insertMany(docs));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1, data: 1}));
 }
 
 dropAndInsertData(coll1, 100);

@@ -4,14 +4,14 @@
  * infeasible method (e.g., INLJ without indexes) results in an error.
  *
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
 
 import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(jsTestName());
 
 const coll = db[jsTestName()];
@@ -29,6 +29,8 @@ assert.commandWorked(
         {_id: 2, a: 2, b: "foo"},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1}));
 
 assert.commandWorked(
     foreign1.insertMany([
@@ -36,6 +38,8 @@ assert.commandWorked(
         {_id: 1, a: 2, c: "y"},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(foreign1.createIndex({dummy: 1, a: 1, c: 1}));
 
 assert.commandWorked(
     foreign2.insertMany([
@@ -43,6 +47,8 @@ assert.commandWorked(
         {_id: 1, b: "bar", d: 20},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(foreign2.createIndex({dummy: 1, b: 1, d: 1}));
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
 

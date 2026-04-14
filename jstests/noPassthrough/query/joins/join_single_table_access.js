@@ -2,14 +2,14 @@
  * Ensures that the join optimizer chooses a single table access plan for all involved collections
  * based on those collections' indexes and cardinalities. Regression test for SERVER-114340.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
 
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
-let conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
 const db = conn.getDB("test");
 
@@ -24,11 +24,15 @@ for (let i = 0; i < 10; i++) {
 }
 assert.commandWorked(coll1.insertMany(docs));
 assert.commandWorked(coll1.createIndexes([{a: 1}, {b: 1}]));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll1.createIndex({dummy: 1, a: 1, b: 1, c: 1}));
 
 for (let i = 10; i < 100; i++) {
     docs.push({_id: i, a: 1, b: i, c: i});
 }
 assert.commandWorked(coll2.insertMany(docs));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1, c: 1}));
 
 const pipeline = [
     {

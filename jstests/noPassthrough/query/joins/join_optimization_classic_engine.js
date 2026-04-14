@@ -3,12 +3,12 @@
  * same lookup + unwind pipeline twice and ensures the join optimization was used during the first run with
  * trySbeEngine but not during the second invocation with forceClassicEngine.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  * ]
  */
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
-let conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB("test");
 const coll = db[jsTestName()];
 coll.drop();
@@ -20,6 +20,8 @@ assert.commandWorked(
         {_id: 2, a: 2, b: "bar"},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1}));
 
 const foreignColl1 = db[jsTestName() + "_foreign1"];
 foreignColl1.drop();
@@ -30,6 +32,8 @@ assert.commandWorked(
         {_id: 2, a: 2, c: "x", d: 3},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(foreignColl1.createIndex({dummy: 1, a: 1, c: 1, d: 1}));
 
 const foreignColl2 = db[jsTestName() + "_foreign2"];
 foreignColl2.drop();
@@ -39,6 +43,8 @@ assert.commandWorked(
         {_id: 1, b: "bar", d: 6},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(foreignColl2.createIndex({dummy: 1, b: 1, d: 1}));
 
 let pipeline = [
     {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},

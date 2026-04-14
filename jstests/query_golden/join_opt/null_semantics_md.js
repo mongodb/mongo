@@ -2,8 +2,9 @@
  * Run basic tests that validate join reordering preserves null semantics.
  *
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 import {normalizeArray} from "jstests/libs/golden_test.js";
@@ -23,14 +24,20 @@ const testDocs = [
 const coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(coll.insertMany(testDocs));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, "key.foo": 1}));
 
 const otherColl = db[jsTestName() + "_other"];
 otherColl.drop();
 assert.commandWorked(otherColl.insertMany(testDocs));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(otherColl.createIndex({dummy: 1, "key.foo": 1}));
 
 const thirdColl = db[jsTestName() + "_third"];
 thirdColl.drop();
 assert.commandWorked(thirdColl.insertMany(testDocs));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(thirdColl.createIndex({dummy: 1, "key.foo": 1}));
 
 const testCases = [
     {
@@ -224,10 +231,14 @@ joinTestWrapper(db, () => {
     const fourthColl = db[jsTestName() + "_fourth"];
     fourthColl.drop();
     assert.commandWorked(fourthColl.insertMany(testDocs));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(fourthColl.createIndex({dummy: 1, "key.foo": 1}));
 
     const fifthColl = db[jsTestName() + "_fifth"];
     fifthColl.drop();
     assert.commandWorked(fifthColl.insertMany(testDocs));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(fifthColl.createIndex({dummy: 1, "key.foo": 1}));
 
     section("Large implicit cycle (5 nodes)");
     /**

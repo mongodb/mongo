@@ -2,7 +2,8 @@
 // Validate that join optimization does not run into issues for collectionless aggregations.
 //
 // @tags: [
-//   requires_fcv_83,
+//   requires_fcv_90,
+//   featureFlagPathArrayness,
 // ]
 //
 
@@ -31,14 +32,20 @@ try {
     // Create the base coll.
     const doc = {a: 1, b: 1};
     assert.commandWorked(baseColl.insertOne(doc));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(baseColl.createIndex({dummy: 1, a: 1, b: 1}));
     assertNDocsReturned(0);
 
     // Create the second coll.
     assert.commandWorked(coll1.insertOne(doc));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(coll1.createIndex({dummy: 1, a: 1, b: 1}));
     assertNDocsReturned(0);
 
     // Create the last coll- now this should return one doc.
     assert.commandWorked(coll2.insertOne(doc));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1}));
     assertNDocsReturned(1);
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));

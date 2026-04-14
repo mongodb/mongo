@@ -14,7 +14,7 @@ import {
 } from "jstests/libs/query/analyze_plan.js";
 import {plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
 
-let conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
 const db = conn.getDB("test");
 
@@ -34,6 +34,10 @@ assert.commandWorked(coll1.insertMany(docs));
 assert.commandWorked(coll2.insertMany(docs));
 assert.commandWorked(coll3.insertMany(docs));
 assert.commandWorked(coll3.createIndex({d: 1}));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll1.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
+assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
+assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
 
 // Runs the pipeline, and asserts that the join optimizer was used and that estimate information is
 // present in the explain output.

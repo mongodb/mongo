@@ -2,8 +2,9 @@
  * Run basic tests that validate we enter join ordering logic.
  *
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 import {code, section, subSection} from "jstests/libs/query/pretty_md.js";
@@ -22,6 +23,8 @@ assert.commandWorked(
         {_id: 4, b: "bar"},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, a: -1, b: 1}));
 
 const foreignColl1 = db[jsTestName() + "_foreign1"];
 foreignColl1.drop();
@@ -35,6 +38,8 @@ assert.commandWorked(
         {_id: 4, c: "x", d: 5},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(foreignColl1.createIndex({dummy: 1, a: -1, b: 1, c: -1, d: 1}));
 
 const foreignColl2 = db[jsTestName() + "_foreign2"];
 foreignColl2.drop();
@@ -45,6 +50,8 @@ assert.commandWorked(
         {_id: 2, b: "baz", d: 7},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(foreignColl2.createIndex({dummy: 1, a: -1, b: 1, d: 1}));
 
 function runBasicJoinTest(pipeline) {
     subSection("No join opt");
@@ -263,6 +270,8 @@ joinTestWrapper(db, () => {
             {_id: 2, a: 2, c: "x", d: 3},
         ]),
     );
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(foreignColl3.createIndex({dummy: -1, a: -1, c: -1, d: -1}));
 
     section("Basic example with referencing field from previous lookup");
     runBasicJoinTest([
@@ -381,6 +390,7 @@ joinTestWrapper(db, () => {
         },
         {$unwind: "$coll13"},
     ]);
+
     section("Projection on ambiguous field");
     runBasicJoinTest([
         {$lookup: {from: foreignColl2.getName(), as: "x", localField: "a", foreignField: "d"}},

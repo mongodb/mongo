@@ -4,8 +4,9 @@
  * field is facilitated by updating an existing index to multi-key while the query is yielding during
  * query execution.
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";
@@ -19,6 +20,9 @@ function resetCollections(foreignColl, localColl) {
     assert(localColl.drop());
     assert.commandWorked(foreignColl.insert(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, b: i}))));
     assert.commandWorked(localColl.insert(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, b: i}))));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(foreignColl.createIndex({dummy: 1, a: 1, b: 1}));
+    assert.commandWorked(localColl.createIndex({dummy: 1, a: 1, b: 1}));
 }
 
 function runPipelineThroughAllJoinMethods({pipeline, localColl, foreignColl}) {

@@ -2,8 +2,9 @@
  * Tests base collection reordering.
  *
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 import {linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
@@ -21,6 +22,8 @@ assert.commandWorked(
         {base: 3, a: 2, b: 3},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, base: -1, a: 1, b: 1}));
 
 const a = db[jsTestName() + "_a"];
 a.drop();
@@ -32,6 +35,8 @@ assert.commandWorked(
         {base: 28, a: -4, b: -1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(a.createIndex({dummy: 1, base: -1, a: 1, b: 1}));
 
 const b = db[jsTestName() + "_b"];
 b.drop();
@@ -44,6 +49,8 @@ assert.commandWorked(
         {base: 25, a: 3, b: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(b.createIndex({dummy: 1, base: -1, a: 1, b: 1}));
 
 function runSingleTest(subtitle, pipeline, seen = undefined) {
     let joinOrder = undefined;

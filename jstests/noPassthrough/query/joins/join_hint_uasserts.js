@@ -2,11 +2,11 @@
  * Tests that join hinting uasserts for invalid cases.
  *
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe,
  * ]
  */
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB("test");
 
 const a = db[jsTestName() + "_a"];
@@ -22,6 +22,8 @@ for (const coll of [a, b, c]) {
     coll.drop();
     assert.commandWorked(coll.insertMany(docs));
     assert.commandWorked(coll.createIndexes([{x: 1}, {y: 1}]));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(coll.createIndex({dummy: 1, x: 1, y: 1}));
 }
 
 const pipeline = [

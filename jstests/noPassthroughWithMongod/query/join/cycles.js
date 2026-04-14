@@ -2,8 +2,9 @@
  * Tests that join optimization correctly handles cycles in the join graph.
  *
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 
@@ -25,24 +26,32 @@ assert.commandWorked(
         {_id: 1, joinField1: 1, joinField2: 1, joinField3: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(collA.createIndex({dummy: 1, joinField1: 1, joinField2: 1, joinField3: 1}));
 assert.commandWorked(
     collB.insertMany([
         {_id: 0, joinField1: 0, joinField2: 0},
         {_id: 1, joinField1: 1, joinField2: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(collB.createIndex({dummy: 1, joinField1: 1, joinField2: 1}));
 assert.commandWorked(
     collC.insertMany([
         {_id: 0, joinField1: 0, joinField2: 1, joinField3: 0},
         {_id: 1, joinField1: 1, joinField2: 0, joinField3: 0},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(collC.createIndex({dummy: 1, joinField1: 1, joinField2: 1, joinField3: 1}));
 assert.commandWorked(
     collD.insertMany([
         {_id: 0, joinField1: 0, joinField2: 0},
         {_id: 1, joinField1: 1, joinField2: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(collD.createIndex({dummy: 1, joinField1: 1, joinField2: 1}));
 
 //
 // Some data to mimic TPC-H.
@@ -61,6 +70,8 @@ assert.commandWorked(
         {c_custkey: 3, c_nationkey: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(customerColl.createIndex({dummy: 1, c_custkey: 1, c_nationkey: 1}));
 assert.commandWorked(
     ordersColl.insertMany([
         {o_orderkey: 1, o_custkey: 1},
@@ -68,6 +79,8 @@ assert.commandWorked(
         {o_orderkey: 3, o_custkey: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(ordersColl.createIndex({dummy: 1, o_orderkey: 1, o_custkey: 1}));
 assert.commandWorked(
     lineitemColl.insertMany([
         {l_orderkey: 1, l_suppkey: 1},
@@ -77,6 +90,8 @@ assert.commandWorked(
         {l_orderkey: 3, l_suppkey: 2},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(lineitemColl.createIndex({dummy: 1, l_orderkey: 1, l_suppkey: 1}));
 assert.commandWorked(
     supplierColl.insertMany([
         {s_suppkey: 1, s_nationkey: 1},
@@ -84,6 +99,8 @@ assert.commandWorked(
         {s_suppkey: 3, s_nationkey: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(supplierColl.createIndex({dummy: 1, s_suppkey: 1, s_nationkey: 1}));
 assert.commandWorked(
     nationColl.insertMany([
         {n_nationkey: 1, n_regionkey: 1},
@@ -91,7 +108,11 @@ assert.commandWorked(
         {n_nationkey: 3, n_regionkey: 1},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(nationColl.createIndex({dummy: 1, n_nationkey: 1, n_regionkey: 1}));
 assert.commandWorked(regionColl.insertMany([{r_regionkey: 1}, {r_regionkey: 2}]));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(regionColl.createIndex({dummy: 1, r_regionkey: 1}));
 
 function runAllTestCases(additionalJoinParams = {}) {
     // Query with implicit cycle of length 3, specified with join predicates A -- B, B -- C on the same

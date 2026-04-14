@@ -2,7 +2,7 @@
  * This test demonstrates that the join optimizer is capable of using index metadata during join
  * cardinality estimation to improve cardinality estimation.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -10,7 +10,7 @@
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
-let conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB("test");
 const coll1 = db[jsTestName()];
 const coll2 = db[jsTestName() + "_2"];
@@ -20,10 +20,14 @@ coll2.drop();
 // coll1 is our large base collection with a "foreign key" to coll2 on field "b".
 let docs1 = Array.from({length: 1000}, (_, i) => ({_id: i, b: i % 100}));
 assert.commandWorked(coll1.insertMany(docs1));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll1.createIndex({dummy: 1, b: 1}));
 
 let docs2 = Array.from({length: 100}, (_, i) => ({_id: i, b: i}));
 assert.commandWorked(coll2.insertMany(docs2));
 assert.commandWorked(coll2.createIndex({b: 1}, {unique: true}));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll2.createIndex({dummy: 1, b: 1}));
 
 const pipeline = [
     {

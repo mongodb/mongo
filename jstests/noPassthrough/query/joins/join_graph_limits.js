@@ -2,7 +2,7 @@
  * Validate join graph limits.
  *
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -10,7 +10,7 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(`${jsTestName()}_db`);
 
 const docs = [
@@ -42,6 +42,8 @@ const coll = db[collName];
 
 coll.drop();
 assert.commandWorked(coll.insertMany(docs));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1}));
 
 const pipeline = [];
 let prevCollName = null;
@@ -50,6 +52,8 @@ for (let i = 0; i < numberOfJoins; ++i) {
     const coll = db[from];
     coll.drop();
     assert.commandWorked(coll.insertMany(docs));
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1}));
 
     const localField = prevCollName == null ? "a" : `${prevCollName}.a`;
     const foreignField = "b";

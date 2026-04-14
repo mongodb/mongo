@@ -2,8 +2,9 @@
  * End to end test for join optimization with compound join predicates.
  *
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 
@@ -24,6 +25,8 @@ try {
             {a: 2, b: 2, d: 2},
         ]),
     );
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(baseColl.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
 
     assert.commandWorked(
         foreignColl1.insertMany([
@@ -33,6 +36,8 @@ try {
             {a: 2, c: "qux", d: 2},
         ]),
     );
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(foreignColl1.createIndex({dummy: 1, a: 1, c: 1, d: 1}));
 
     runTestWithUnorderedComparison({
         db,

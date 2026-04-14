@@ -2,13 +2,13 @@
  * This test ensures that the explain output for express queries correctly indicates that join optimization was not applied.
  *  @tags: [
  *   requires_sbe,
- *   requires_fcv_83
+ *   requires_fcv_90
  * ]
  */
 import {isExpress} from "jstests/libs/query/analyze_plan.js";
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(`${jsTestName()}_db`);
 const coll = db[jsTestName()];
 coll.drop();
@@ -19,6 +19,8 @@ assert.commandWorked(
         {_id: 2, a: 2, b: "bar"},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, a: 1, b: 1}));
 
 const foreignColl1 = db[jsTestName() + "_foreign1"];
 foreignColl1.drop();
@@ -30,6 +32,8 @@ assert.commandWorked(
         {_id: 2, a: 2, c: "x", d: 3},
     ]),
 );
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(foreignColl1.createIndex({dummy: 1, a: 1, c: 1, d: 1}));
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
 

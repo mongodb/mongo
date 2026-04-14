@@ -2,8 +2,9 @@
  * Test explain output (especially 'rejectedPlans') for join optimization.
  *
  * @tags: [
- *   requires_fcv_83,
- *   requires_sbe
+ *   requires_fcv_90,
+ *   requires_sbe,
+ *   featureFlagPathArrayness
  * ]
  */
 
@@ -21,6 +22,8 @@ import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
 const coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(coll.insertMany([{_id: 0, a: 1}]));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll.createIndex({dummy: 1, a: 1}));
 
 // Create a fully-connected 4-node join (after implicit edges are added in).
 const pipeline = [

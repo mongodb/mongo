@@ -1,14 +1,14 @@
 /**
  * Tests that join optimization falls back gracefully in cases when it is not supported.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
 import {joinOptUsed, plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
 import {getWinningPlanFromExplain, getAllPlanStages, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 
-let conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
 // Test that cross-DB joins are not accepted by the join optimizer.
 const db1 = "test";
@@ -32,6 +32,12 @@ assert.commandWorked(coll12.insertOne({a: 1, b: 1, c: 1, d: "foo"}));
 assert.commandWorked(coll13.insertOne({a: 1, b: 1, d: "foo"}));
 assert.commandWorked(coll2.insertOne({a: 1, b: 1}));
 assert.commandWorked(coll3.insertOne({a: 1, b: 1}));
+// Add index for multikeyness info for path arrayness.
+assert.commandWorked(coll1.createIndex({dummy: 1, a: 1, b: 1, "x.c": 1}));
+assert.commandWorked(coll12.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
+assert.commandWorked(coll13.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
+assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1}));
+assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1}));
 
 function assertSameResultsWithJoinOptToggled(pipeline, expectedCount) {
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
