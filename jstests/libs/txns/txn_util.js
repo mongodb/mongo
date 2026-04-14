@@ -29,6 +29,7 @@ export var TxnUtil = (function () {
         return (
             (!("explain" in cmdObj) && OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj)) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithListCatalog(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithListClusterCatalog(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithInternalListCollections(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithQuerySettings(cmdName, cmdObj)

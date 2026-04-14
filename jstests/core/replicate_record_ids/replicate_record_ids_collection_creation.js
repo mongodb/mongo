@@ -6,10 +6,6 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   expects_explicit_underscore_id_index,
  *   featureFlagRecordIdsReplicated,
- *   # hasRecordIdsReplicated uses $_internalListCollections which requires the __system role.
- *   auth_incompatible,
- *   # hasRecordIdsReplicated uses $_internalListCollections which only supports local read concern.
- *   assumes_read_concern_unchanged,
  * ]
  */
 

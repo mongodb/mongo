@@ -13,10 +13,6 @@
  *   # TODO (SERVER-118693): Check if this tag can be removed.
  *   # Unsetting 'recordIdsReplicated' option with the collMod command can create a test-only race condition during initial sync.
  *   incompatible_with_initial_sync,
- *   # hasRecordIdsReplicated uses $_internalListCollections which requires the __system role.
- *   auth_incompatible,
- *   # hasRecordIdsReplicated uses $_internalListCollections which only supports local read concern.
- *   assumes_read_concern_unchanged,
  * ]
  */
 

@@ -11,6 +11,7 @@
 
 import {
     getRidForDoc,
+    hasRecordIdsReplicated,
     mapFieldToMatchingDocRid,
 } from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -146,8 +147,10 @@ function runMoveChunkReplicaRecordIDsTest(collName, keyDoc, useBounds, splitChun
     );
 
     // Ensure collection option 'recordIdsReplicated' is preserved on destination shard.
-    const collInfo = shard1.getCollection(ns).exists();
-    assert(collInfo.info.recordIdsReplicated, tojson(collInfo));
+    assert(
+        hasRecordIdsReplicated(shard1.getDB(dbName), collName),
+        "shard1 should have recordIdsReplicated set after moveChunk",
+    );
 }
 
 const st = new ShardingTest({mongos: 1, shards: 2});

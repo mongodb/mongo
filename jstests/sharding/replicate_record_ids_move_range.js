@@ -9,7 +9,10 @@
  * ]
  */
 
-import {mapFieldToMatchingDocRid} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
+import {
+    hasRecordIdsReplicated,
+    mapFieldToMatchingDocRid,
+} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -112,8 +115,10 @@ function runMoveRangeReplicaRecordIDsTest(collName, keyDoc) {
     assertRecordIdsNEQ(collRecordIdsBeforeMoveRange, collRecordIdsAfterMoveRange, docsAfterMoveRange);
 
     // Ensure collection option 'recordIdsReplicated' is preserved on destination shard.
-    const collInfoShard1 = shard1.getCollection(ns).exists();
-    assert(collInfoShard1.info.recordIdsReplicated, tojson(collInfoShard1));
+    assert(
+        hasRecordIdsReplicated(shard1.getDB(dbName), collName),
+        "shard1 should have recordIdsReplicated set after moveRange",
+    );
 
     // Second move: shard1 to shard0.
 
@@ -130,8 +135,10 @@ function runMoveRangeReplicaRecordIDsTest(collName, keyDoc) {
     assertRecordIdsNEQ(collRecordIdsBeforeMoveRange, collRecordIdsMovedBack, docsMovedBack);
 
     // Ensure collection option 'recordIdsReplicated' is still present.
-    const collInfoShard0 = shard0.getCollection(ns).exists();
-    assert(collInfoShard0.info.recordIdsReplicated, tojson(collInfoShard0));
+    assert(
+        hasRecordIdsReplicated(shard0.getDB(dbName), collName),
+        "shard0 should have recordIdsReplicated set after moveRange back",
+    );
 }
 
 const st = new ShardingTest({mongos: 1, shards: 2});

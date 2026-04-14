@@ -118,6 +118,7 @@ export const OverrideHelpers = (function () {
         isAggregationWithChangeStreamStage: makeIsAggregationWithFirstStage("$changeStream"),
         isAggregationWithPlanCacheStatsStage: makeIsAggregationWithFirstStage("$planCacheStats"),
         isAggregationWithInternalListCollections: makeIsAggregationWithFirstStage("$_internalListCollections"),
+        isAggregationWithListCatalog: makeIsAggregationWithFirstStage("$listCatalog"),
         isAggregationWithListClusterCatalog: makeIsAggregationWithFirstStage("$listClusterCatalog"),
         isAggregationWithQuerySettings: makeIsAggregationWithFirstStage("$querySettings"),
         isMapReduceWithInlineOutput: isMapReduceWithInlineOutput,

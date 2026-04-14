@@ -537,10 +537,15 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
     // The database is read only when using standalone recovery options like --queryableBackupMode,
     // so we can assume that the database is not read-only when running a sharded cluster.
     const isDbReadOnly = !FixtureHelpers.isMongos(db) && db.serverStatus().storageEngine.readOnly;
-    // Skip checking the persistence provider when test commands are disabled, as this requires test commands.
+    // Ignore the 'recordIdsReplicated' comparison when:
+    // - Test commands are disabled, as PersistenceProviderUtil requires them.
+    // - The provider requires replicated record IDs: listCollections
+    //   intentionally omits the field in that case, so the comparison is not meaningful.
+    // TODO (SERVER-122753): Revisit this for ASC.
+    // TODO (SERVER-91702): Remove this exclusion once the race with downgrade is fixed.
     const ignoreRecordIdsReplicatedOption =
         !TestData.enableTestCommands ||
-        !PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
 
     const originalHideImplicitlyCreatedIndexesFromListIndexes = TestData.hideImplicitlyCreatedIndexesFromListIndexes;
     try {
@@ -640,10 +645,15 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             }),
         ).storageEngine.readOnly;
 
-    // Skip checking the persistence provider when test commands are disabled, as this requires test commands.
+    // Ignore the 'recordIdsReplicated' comparison when:
+    // - Test commands are disabled, as PersistenceProviderUtil requires them.
+    // - The provider requires replicated record IDs: listCollections
+    //   intentionally omits the field in that case, so the comparison is not meaningful.
+    // TODO (SERVER-122753): Revisit this for ASC.
+    // TODO (SERVER-91702): Remove this exclusion once the race with downgrade is fixed.
     const ignoreRecordIdsReplicatedOption =
         !TestData.enableTestCommands ||
-        !PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
 
     // Don't check these DBs on mongos since it will mirror them from the config server for
     // listCollections & listIndexes, but will return the data from the shards on $listCatalog.

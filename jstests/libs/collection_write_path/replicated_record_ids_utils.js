@@ -6,17 +6,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
  * Returns true if the collection named 'collName' in 'db' has the 'recordIdsReplicated' field
  * set in its catalog entry, false otherwise.
  *
- * Uses $_internalListCollections (info.recordIdsReplicated) rather than listCollections because
- * listCollections scrubs 'recordIdsReplicated' from the 'info' sub-document on mongos routers.
- *
- * NOTE: $_internalListCollections requires the __system role and only supports local read concern.
- * Tests that call this function must be tagged 'auth_incompatible' and
- * 'assumes_read_concern_unchanged'.
+ * Uses $listCatalog (md.recordIdsReplicated) to read directly from the catalog.
  */
 export function hasRecordIdsReplicated(db, collName) {
-    const ns = db.getName() + "." + collName;
-    const results = db.aggregate([{$_internalListCollections: {}}, {$match: {ns: ns}}]).toArray();
-    return results.length > 0 && !!results[0].info && !!results[0].info.recordIdsReplicated;
+    // TODO (SERVER-120586): In sharded clusters, different shards may have different values of
+    // recordIdsReplicated. We only check the first shard here, which is sufficient for current
+    // testing scenarios.
+    const results = db[collName].aggregate([{$listCatalog: {}}]).toArray();
+    return results.length > 0 && !!results[0].md && !!results[0].md.recordIdsReplicated;
 }
 
 export function getShowRecordIdsCursor(node, dbName, replicatedCollName) {

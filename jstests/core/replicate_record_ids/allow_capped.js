@@ -12,6 +12,8 @@
  * ]
  */
 
+import {hasRecordIdsReplicated} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
+
 const collName = jsTestName() + "_coll";
 const cappedCollName = collName + "_capped";
 const createdAsCappedCollName = collName + "_created_as_capped_coll";
@@ -26,7 +28,10 @@ jsTestLog("Cloning as capped should work with replicatedRecordIds and preserve t
 assert.commandWorked(db.runCommand({cloneCollectionAsCapped: collName, toCollection: cappedCollName, size: 2000}));
 let collectionOptions = db[cappedCollName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
-assert(collectionOptions.info.recordIdsReplicated, collectionOptions);
+assert(
+    hasRecordIdsReplicated(db, cappedCollName),
+    "capped collection should have recordIdsReplicated set after cloneCollectionAsCapped",
+);
 let indexes = db[cappedCollName].getIndexes();
 assert.eq(indexes.length, 1, indexes);
 indexes = db[collName].getIndexes();
@@ -36,7 +41,7 @@ jsTestLog("Converting to capped should work with recordIdsReplicated.");
 assert.commandWorked(db.runCommand({convertToCapped: collName, size: 2000}));
 collectionOptions = db[collName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
-assert(collectionOptions.info.recordIdsReplicated, collectionOptions);
+assert(hasRecordIdsReplicated(db, collName), "collection should have recordIdsReplicated set after convertToCapped");
 indexes = db[collName].getIndexes();
 assert.eq(indexes.length, 1, indexes);
 
@@ -44,4 +49,7 @@ jsTestLog("Creating collection with capped:true and recordIdsReplicated:true sho
 assert.commandWorked(db.runCommand({create: createdAsCappedCollName, capped: true, size: 2000}));
 collectionOptions = db[createdAsCappedCollName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
-assert(collectionOptions.info.recordIdsReplicated, collectionOptions);
+assert(
+    hasRecordIdsReplicated(db, createdAsCappedCollName),
+    "capped collection should have recordIdsReplicated set after creation",
+);
