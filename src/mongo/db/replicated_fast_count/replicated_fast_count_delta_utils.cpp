@@ -212,14 +212,17 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
     }
 
     // The 'm' field in the oplog entry contains the replicated size delta.  The collection count
-    // delta must be inferred from the operation type. Throw if the operation type is not supported
-    // for size/count tracking.
+    // delta must be inferred from the operation type. Log a warning if the operation type is not
+    // supported for size/count tracking.
     const auto& opType = oplogEntry.getOpType();
-    massert(12115900,
-            str::stream() << "Unexpected input: Operation type '" << idl::serialize(opType)
-                          << "' incompatible with top level 'm' field: "
-                          << redact(oplogEntry.toBSONForLogging()),
-            isSupportedOpType(opType));
+    if (!isSupportedOpType(opType)) {
+        LOGV2_WARNING(12115900,
+                      "Unexpected input: Operation type {oplogType} incompatible with top level "
+                      "'m' field for entry {oplogEntry}",
+                      "oplogType"_attr = idl::serialize(opType),
+                      "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
+        return boost::none;
+    }
 
     massert(12116001,
             str::stream() << "Unexpected input: Missing 'ui' field for operation '"

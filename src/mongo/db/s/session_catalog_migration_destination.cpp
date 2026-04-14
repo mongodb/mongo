@@ -417,6 +417,12 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
 
     auto oplogEntry = parseOplog(oplogBSON);
 
+    // The oplog entry we are creating only stores session information and does not actually
+    // represent a change in the size/count of a collection.
+    if (oplogEntry.getSizeMetadata()) {
+        oplogEntry.setSizeMetadata(boost::none);
+    }
+
     ProcessOplogResult result;
     result.sessionId = *oplogEntry.getSessionId();
     result.txnNum = *oplogEntry.getTxnNumber();

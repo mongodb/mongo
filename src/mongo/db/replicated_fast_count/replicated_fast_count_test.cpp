@@ -1182,8 +1182,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnUnsupportedOpTy
 
     // Size metadata is only supported for 'insert', 'delete', and 'update' operations. All other
     // operations are incompatible with a top-level 'm' field.
-    ASSERT_THROWS_CODE(
-        replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), DBException, 12115900);
+    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), boost::none);
 }
 
 TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnNonEligibleNss) {
