@@ -2010,22 +2010,6 @@ public:
     Value evaluate(const Document& root, Variables* variables) const override;
     Value serialize(const SerializationOptions& options = {}) const final;
 
-    /*
-      Create a field path expression using old semantics (rooted off of CURRENT).
-
-      // NOTE: this method is deprecated and only used by tests
-      // TODO remove this method in favor of parse()
-
-      Evaluation will extract the value associated with the given field
-      path from the source document.
-
-      @param fieldPath the field path string, without any leading document
-        indicator
-      @returns the newly created field path expression
-     */
-    static boost::intrusive_ptr<ExpressionFieldPath> deprecatedCreate(ExpressionContext* expCtx,
-                                                                      const std::string& fieldPath);
-
     // Parse from the raw std::string from the user with the "$" prefixes.
     static boost::intrusive_ptr<ExpressionFieldPath> parse(ExpressionContext* expCtx,
                                                            const std::string& raw,

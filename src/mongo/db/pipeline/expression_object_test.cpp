@@ -202,7 +202,9 @@ TEST(ExpressionObjectDependencies, ConstantValuesShouldNotBeAddedToDependencies)
 TEST(ExpressionObjectDependencies, FieldPathsShouldBeAddedToDependencies) {
     auto expCtx = ExpressionContextForTest{};
     auto object = ExpressionObject::create(
-        &expCtx, {{"x", ExpressionFieldPath::deprecatedCreate(&expCtx, "c.d")}});
+        &expCtx,
+        {{"x",
+          ExpressionFieldPath::createPathFromString(&expCtx, "c.d", expCtx.variablesParseState)}});
     DepsTracker deps;
     expression::addDependencies(object.get(), &deps);
     ASSERT_EQ(deps.fields.size(), 1UL);

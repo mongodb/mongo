@@ -75,7 +75,8 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) 
         "results",
         "from",
         "to",
-        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        ExpressionFieldPath::createPathFromString(
+            expCtx.get(), "startPoint", expCtx->variablesParseState),
         boost::none,
         boost::none,
         boost::none,
@@ -102,7 +103,8 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbs
         "results",
         "from",
         "to",
-        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        ExpressionFieldPath::createPathFromString(
+            expCtx.get(), "startPoint", expCtx->variablesParseState),
         boost::none,
         boost::none,
         boost::none,
@@ -249,7 +251,8 @@ TEST_F(DocumentSourceGraphLookUpTest, RedactionWithAbsorbedUnwind) {
         "results",
         "from",
         "to",
-        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        ExpressionFieldPath::createPathFromString(
+            expCtx.get(), "startPoint", expCtx->variablesParseState),
         boost::none,
         boost::none,
         boost::none,

@@ -540,13 +540,7 @@ intrusive_ptr<Expression> ExpressionAnd::optimize() {
         return pFinal;
     }
 
-    /*
-      Remove the final "true" value, and return the new expression.
-
-      CW TODO:
-      Note that because of any implicit conversions, we may need to
-      apply an implicit boolean conversion.
-    */
+    // Remove the final "true" value, and return the new expression.
     pAnd->_children.resize(n - 1);
     return pE;
 }
@@ -1674,12 +1668,6 @@ Expression::ComputedPaths ExpressionObject::getComputedPaths(const std::string& 
 }
 
 /* --------------------- ExpressionFieldPath --------------------------- */
-
-// this is the old deprecated version only used by tests not using variables
-intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::deprecatedCreate(
-    ExpressionContext* const expCtx, const string& fieldPath) {
-    return new ExpressionFieldPath(expCtx, "CURRENT." + fieldPath, Variables::kRootId);
-}
 
 // this is the new version that supports every syntax
 intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext* const expCtx,

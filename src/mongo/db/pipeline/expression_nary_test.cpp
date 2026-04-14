@@ -203,7 +203,7 @@ TEST_F(ExpressionNaryTest, AddedConstantOperandIsSerialized) {
 
 TEST_F(ExpressionNaryTest, AddedFieldPathOperandIsSerialized) {
     _notAssociativeNorCommutative->addOperand(
-        ExpressionFieldPath::deprecatedCreate(&expCtx, "ab.c"));
+        ExpressionFieldPath::createPathFromString(&expCtx, "ab.c", expCtx.variablesParseState));
     assertContents(_notAssociativeNorCommutative, BSON_ARRAY("$ab.c"));
 }
 
@@ -218,7 +218,7 @@ TEST_F(ExpressionNaryTest, ValidateConstantExpressionDependency) {
 
 TEST_F(ExpressionNaryTest, ValidateFieldPathExpressionDependency) {
     _notAssociativeNorCommutative->addOperand(
-        ExpressionFieldPath::deprecatedCreate(&expCtx, "ab.c"));
+        ExpressionFieldPath::createPathFromString(&expCtx, "ab.c", expCtx.variablesParseState));
     assertDependencies(_notAssociativeNorCommutative, BSON_ARRAY("ab.c"));
 }
 

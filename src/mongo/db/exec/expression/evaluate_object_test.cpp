@@ -73,11 +73,12 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
 
 TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
     auto expCtx = ExpressionContextForTest{};
-    auto object =
-        ExpressionObject::create(&expCtx,
-                                 {{"a", ExpressionFieldPath::deprecatedCreate(&expCtx, "a")},
-                                  {"b", ExpressionFieldPath::deprecatedCreate(&expCtx, "b")},
-                                  {"c", ExpressionFieldPath::deprecatedCreate(&expCtx, "c")}});
+    auto object = ExpressionObject::create(
+        &expCtx,
+        {{"a", ExpressionFieldPath::createPathFromString(&expCtx, "a", expCtx.variablesParseState)},
+         {"b", ExpressionFieldPath::createPathFromString(&expCtx, "b", expCtx.variablesParseState)},
+         {"c",
+          ExpressionFieldPath::createPathFromString(&expCtx, "c", expCtx.variablesParseState)}});
     ASSERT_VALUE_EQ(
         Value(Document{{"a", "A"_sd}, {"b", "B"_sd}, {"c", "C"_sd}}),
         object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}},
@@ -88,8 +89,11 @@ TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
     auto expCtx = ExpressionContextForTest{};
     auto object = ExpressionObject::create(
         &expCtx,
-        {{"a", ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b")},
-         {"b", ExpressionFieldPath::deprecatedCreate(&expCtx, "missing")}});
+        {{"a",
+          ExpressionFieldPath::createPathFromString(&expCtx, "a.b", expCtx.variablesParseState)},
+         {"b",
+          ExpressionFieldPath::createPathFromString(
+              &expCtx, "missing", expCtx.variablesParseState)}});
     ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
     ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
 }
@@ -99,10 +103,11 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
     auto object = ExpressionObject::create(
         &expCtx,
         {{"a",
-          ExpressionObject::create(
-              &expCtx,
-              {{"b", ExpressionConstant::create(&expCtx, Value{1})},
-               {"c", ExpressionFieldPath::deprecatedCreate(&expCtx, "_id")}})}});
+          ExpressionObject::create(&expCtx,
+                                   {{"b", ExpressionConstant::create(&expCtx, Value{1})},
+                                    {"c",
+                                     ExpressionFieldPath::createPathFromString(
+                                         &expCtx, "_id", expCtx.variablesParseState)}})}});
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}),
                     object->evaluate(Document(), &(expCtx.variables)));
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"_sd}}}}),
@@ -111,8 +116,10 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {
     auto expCtx = ExpressionContextForTest{};
-    auto object = ExpressionObject::create(
-        &expCtx, {{"a", ExpressionFieldPath::deprecatedCreate(&expCtx, "missing")}});
+    auto object = ExpressionObject::create(&expCtx,
+                                           {{"a",
+                                             ExpressionFieldPath::createPathFromString(
+                                                 &expCtx, "missing", expCtx.variablesParseState)}});
     ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
 
     auto objectWithNestedObject = ExpressionObject::create(&expCtx, {{"nested", object}});

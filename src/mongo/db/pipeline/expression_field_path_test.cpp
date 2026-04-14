@@ -83,7 +83,9 @@ class Invalid {
 public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
-        ASSERT_THROWS(ExpressionFieldPath::deprecatedCreate(&expCtx, ""), AssertionException);
+        ASSERT_THROWS(
+            ExpressionFieldPath::createPathFromString(&expCtx, "", expCtx.variablesParseState),
+            AssertionException);
     }
 };
 
@@ -119,7 +121,8 @@ TEST(FieldPath, RemoveOptimizesToMissingValue) {
 
 TEST(FieldPath, NoOptimizationOnNormalPath) {
     auto expCtx = ExpressionContextForTest{};
-    intrusive_ptr<Expression> expression = ExpressionFieldPath::deprecatedCreate(&expCtx, "a");
+    intrusive_ptr<Expression> expression =
+        ExpressionFieldPath::createPathFromString(&expCtx, "a", expCtx.variablesParseState);
     // An attempt to optimize returns the Expression itself.
     ASSERT_EQUALS(expression, expression->optimize());
 }
@@ -316,7 +319,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+            ExpressionFieldPath::createPathFromString(&expCtx, "a.b", expCtx.variablesParseState);
         DepsTracker dependencies;
         expression::addDependencies(expression.get(), &dependencies);
         ASSERT_EQUALS(1U, dependencies.fields.size());
@@ -332,7 +335,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
+            ExpressionFieldPath::createPathFromString(&expCtx, "a.b.c", expCtx.variablesParseState);
         ASSERT_BSONOBJ_BINARY_EQ(BSON("foo" << "$a.b.c"), BSON("foo" << expression->serialize()));
     }
 };
@@ -343,7 +346,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
+            ExpressionFieldPath::createPathFromString(&expCtx, "a.b.c", expCtx.variablesParseState);
         BSONArrayBuilder bab;
         bab << expression->serialize();
         ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY("$a.b.c"), bab.arr());
