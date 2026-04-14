@@ -5,10 +5,12 @@ import {
     newlineBeforeEachStage,
     trimPlanToStagesAndIndexes,
 } from "jstests/query_golden/libs/pretty_printers.js";
+import {resultsetChecksum} from "jstests/query_golden/libs/checksum_utils.js";
 
 export const ResultsetRepresentation = Object.freeze({
-    ROW_COUNT: 0,
-    FULL: 1,
+    ROW_COUNT: 1 << 0,
+    FULL: 1 << 1,
+    CHECKSUM: 1 << 2,
 });
 
 export function padNumber(num, width = 6) {
@@ -292,7 +294,11 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
  * Produce the output for plan stability golden tests that target Join Optimization
  */
 
-export function runPlanStabilityCommands(db, commands, resultsetRepresentation = ResultsetRepresentation.ROW_COUNT) {
+export function runPlanStabilityCommands(
+    db,
+    commands,
+    resultsetRepresentation = ResultsetRepresentation.ROW_COUNT | ResultsetRepresentation.CHECKSUM,
+) {
     let totalKeys = 0;
     let totalDocs = 0;
     let totalRows = 0;
@@ -307,7 +313,9 @@ export function runPlanStabilityCommands(db, commands, resultsetRepresentation =
      *                 "winningPlan": <winningPlan>,
      *                 "keys"       : <totalKeysExamined>,
      *                 "docs"       : <totalDocsExamined>,
-     *                 "rows"       : <nReturned>
+     *                 "rows"       : <nReturned>,        // if ResultsetRepresentation.ROW_COUNT is set
+     *                 "result"     : <result>,           // if ResultsetRepresentation.FULL is set
+     *                 "csum"       : "<16 hex digits>"   // if ResultsetRepresentation.CHECKSUM is set
      *         },
      *         ...
      *     ],
@@ -350,6 +358,20 @@ export function runPlanStabilityCommands(db, commands, resultsetRepresentation =
         const nReturned = getNReturned(explain);
         totalRows += nReturned;
 
+        assert(
+            resultsetRepresentation !== 0,
+            "resultsetRepresentation must include at least one ResultsetRepresentation flag",
+        );
+
+        const showRows = (resultsetRepresentation & ResultsetRepresentation.ROW_COUNT) !== 0;
+        const showFull = (resultsetRepresentation & ResultsetRepresentation.FULL) !== 0;
+        const showChecksum = (resultsetRepresentation & ResultsetRepresentation.CHECKSUM) !== 0;
+
+        let result;
+        if (showFull || showChecksum) {
+            result = db[command["aggregate"]].aggregate(command["pipeline"]).toArray();
+        }
+
         // Fish for the query plan that we want to dump
         const queryPlanner =
             explain.queryPlanner !== undefined ? explain.queryPlanner : explain.stages[0]["$cursor"].queryPlanner;
@@ -374,18 +396,22 @@ export function runPlanStabilityCommands(db, commands, resultsetRepresentation =
         print(`    "keys" : ${padNumber(keys, 9)},`);
         print(`    "docs" : ${padNumber(docs, 9)},`);
 
-        switch (resultsetRepresentation) {
-            case ResultsetRepresentation.ROW_COUNT: {
-                print(`    "rows" : ${padNumber(nReturned, 9)}}${separator}`);
-                break;
-            }
-            case ResultsetRepresentation.FULL: {
-                const result = db[command["aggregate"]].aggregate(command["pipeline"]).toArray();
-                print(`    "result" :`);
-                printjson(sortJsonStringify(result));
-                print(`}${separator}`);
-                break;
-            }
+        if (showRows) {
+            // JSON does not allow trailing commas, so we need to check if there are more fields after the "rows" field
+            const hasMoreAfterRows = showFull || showChecksum;
+            print(`    "rows" : ${padNumber(nReturned, 9)}${hasMoreAfterRows ? "," : `}${separator}`}`);
+        }
+
+        if (showFull) {
+            print(`    "result" :`);
+            // JSON does not allow trailing commas, so we need to check if there are more fields after the "result" field
+            const hasMoreAfterResult = showChecksum;
+            printjson(sortJsonStringify(result));
+            print(hasMoreAfterResult ? "," : `}${separator}`);
+        }
+
+        if (showChecksum) {
+            print(`    "csum" : "${resultsetChecksum(result)}"}${separator}`);
         }
         print();
     });

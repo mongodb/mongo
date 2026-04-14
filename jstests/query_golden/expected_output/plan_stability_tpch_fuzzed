@@ -35,7 +35,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.region r_regionkey_1"],
     "keys" :       132,
     "docs" :     20132,
-    "rows" :         3},
+    "rows" :         3,
+    "csum" : "3faef6da4d2dd39c"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -54,7 +55,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       402,
     "docs" :      1427,
-    "rows" :       204},
+    "rows" :       204,
+    "csum" : "a1eb16358635eb4f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -82,7 +84,8 @@
 "$match"],
     "keys" :       114,
     "docs" :      1114,
-    "rows" :        33},
+    "rows" :        33,
+    "csum" : "e87b0a8e7c22e70c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -114,7 +117,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.part p_partkey_1"],
     "keys" :        88,
     "docs" :      1113,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "eb22551c5e7f99c2"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -148,7 +152,8 @@
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :     16053,
     "docs" :     36058,
-    "rows" :         7},
+    "rows" :         7,
+    "csum" : "4255d95b31a15571"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -168,7 +173,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
     "keys" :        39,
     "docs" :        69,
-    "rows" :        13},
+    "rows" :        13,
+    "csum" : "40f995fb0231d2e5"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -199,7 +205,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_type':{'$regex':'^ECONOMY'}}"],
     "keys" :      1840,
     "docs" :     22870,
-    "rows" :       193},
+    "rows" :       193,
+    "csum" : "102870b47782f330"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -218,7 +225,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'s_name':{'$not':{'$eq':'Supplier#000000785'}}}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :       708},
+    "rows" :       708,
+    "csum" : "5106734abbc4ce1e"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -242,7 +250,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :        19,
     "docs" :     80019,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "e7893b170ddd0922"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -268,7 +277,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :     52574,
     "docs" :     52574,
-    "rows" :        80},
+    "rows" :        80,
+    "csum" : "76337b00d439430c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -298,7 +308,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_name':{'$regex':'^d'}}"],
     "keys" :      3645,
     "docs" :     23675,
-    "rows" :        66},
+    "rows" :        66,
+    "csum" : "c54513aa70219efe"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -319,7 +330,8 @@
 "$match"],
     "keys" :         1,
     "docs" :      1026,
-    "rows" :       194},
+    "rows" :       194,
+    "csum" : "2e1355bc79c1cb89"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -336,7 +348,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       796,
     "docs" :      1821,
-    "rows" :       392},
+    "rows" :       392,
+    "csum" : "518c1d1d80d55942"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -366,7 +379,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_orderkey_1"],
     "keys" :       628,
     "docs" :    150628,
-    "rows" :        24},
+    "rows" :        24,
+    "csum" : "9045cab0b9db3c59"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -397,7 +411,8 @@
 "$match"],
     "keys" :         0,
     "docs" :    101030,
-    "rows" :       135},
+    "rows" :       135,
+    "csum" : "96d5ff5f658062ff"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -416,7 +431,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
     "keys" :        90,
     "docs" :       120,
-    "rows" :        90},
+    "rows" :        90,
+    "csum" : "272216e71a03eaed"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -445,7 +461,8 @@
 "$match"],
     "keys" :         0,
     "docs" :    101030,
-    "rows" :       746},
+    "rows" :       746,
+    "csum" : "b910534f14515629"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -476,7 +493,8 @@
 "$match"],
     "keys" :     15521,
     "docs" :     36546,
-    "rows" :        38},
+    "rows" :        38,
+    "csum" : "eb251083816ca6ab"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -493,7 +511,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       730,
     "docs" :      1755,
-    "rows" :       148},
+    "rows" :       148,
+    "csum" : "4bf4dd258a4db8a1"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -528,7 +547,8 @@
 "$match"],
     "keys" :      2154,
     "docs" :      2159,
-    "rows" :        35},
+    "rows" :        35,
+    "csum" : "ada84f4d8e7808af"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -548,7 +568,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       168,
     "docs" :       193,
-    "rows" :        84},
+    "rows" :        84,
+    "csum" : "2cdea366daf14977"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -569,7 +590,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_container':{'$in':['JUMBO BAG','LG CASE','MED PACK','SM CAN']}}"],
     "keys" :      5680,
     "docs" :     26680,
-    "rows" :        69},
+    "rows" :        69,
+    "csum" : "991cf7b14e5ae15a"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -594,7 +616,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :      8340,
     "docs" :     23340,
-    "rows" :       882},
+    "rows" :       882,
+    "csum" : "0a9ef0ca04d4f75f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -626,7 +649,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.part p_partkey_1"],
     "keys" :     12310,
     "docs" :     13315,
-    "rows" :        50},
+    "rows" :        50,
+    "csum" : "9839249906b7c7c5"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -645,7 +669,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :        40,
     "docs" :      1065,
-    "rows" :        40},
+    "rows" :        40,
+    "csum" : "f13d1ba1a3b88b18"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -668,7 +693,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      6720,
     "docs" :      7745,
-    "rows" :        80},
+    "rows" :        80,
+    "csum" : "784f2d6b6e456a00"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -689,7 +715,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_partkey_1"],
     "keys" :      6762,
     "docs" :     26762,
-    "rows" :       358},
+    "rows" :       358,
+    "csum" : "91687c68d731b3b3"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -708,7 +735,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'s_acctbal':{'$gt':8724.42}}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :        62},
+    "rows" :        62,
+    "csum" : "6c9cd789b14b414c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -727,7 +755,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :     53292,
     "docs" :    153292,
-    "rows" :       925},
+    "rows" :       925,
+    "csum" : "52613dc99a5815d1"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -759,7 +788,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_container':{'$in':['MED BOX','MED PACK']}}"],
     "keys" :       480,
     "docs" :     21510,
-    "rows" :        10},
+    "rows" :        10,
+    "csum" : "d52da19426404450"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -785,7 +815,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :       928,
     "docs" :       953,
-    "rows" :        11},
+    "rows" :        11,
+    "csum" : "dd2566c247c4e610"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -802,7 +833,8 @@
 "$lookup lineitem l_partkey_1_l_suppkey_1"],
     "keys" :       253,
     "docs" :    100253,
-    "rows" :        39},
+    "rows" :        39,
+    "csum" : "62515fc5699c3f0f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -819,7 +851,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :      8710,
     "docs" :    108710,
-    "rows" :        16},
+    "rows" :        16,
+    "csum" : "b02e1a64ed45546f"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -836,7 +869,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       971,
     "docs" :      1996,
-    "rows" :       746},
+    "rows" :       746,
+    "csum" : "7151fcab0a07b3df"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -864,7 +898,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :       362,
     "docs" :       367,
-    "rows" :        33},
+    "rows" :        33,
+    "csum" : "a86f18ab05ee13f8"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -887,7 +922,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      8342,
     "docs" :     29342,
-    "rows" :       205},
+    "rows" :       205,
+    "csum" : "824034bfe3df4c70"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -914,7 +950,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       374,
     "docs" :    100374,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "a6acee783c03587e"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -933,7 +970,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.partsupp {'ps_comment':{'$regex':'^th'}}"],
     "keys" :         0,
     "docs" :     81025,
-    "rows" :       285},
+    "rows" :       285,
+    "csum" : "377ad8e48b15c1c3"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -956,7 +994,8 @@
 "$match"],
     "keys" :        40,
     "docs" :        40,
-    "rows" :        34},
+    "rows" :        34,
+    "csum" : "c6df35bf17149eed"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -976,7 +1015,8 @@
 "$match"],
     "keys" :      3120,
     "docs" :     24120,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "420a686e1364aa2d"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -999,7 +1039,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      1837,
     "docs" :    101837,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "7b6e4a5e1c2e852f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1020,7 +1061,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_size':{'$lt':8}}"],
     "keys" :       197,
     "docs" :     20197,
-    "rows" :        25},
+    "rows" :        25,
+    "csum" : "a68d643502d1a3ba"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1040,7 +1082,8 @@
 "$match"],
     "keys" :         0,
     "docs" :     81025,
-    "rows" :       192},
+    "rows" :       192,
+    "csum" : "370f31332f473ae6"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -1058,7 +1101,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :        94,
     "docs" :       119,
-    "rows" :        47},
+    "rows" :        47,
+    "csum" : "ddc7fd95470ad65e"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1083,7 +1127,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      3993,
     "docs" :     24993,
-    "rows" :       365},
+    "rows" :       365,
+    "csum" : "52a2495159cbd5ad"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1118,7 +1163,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.part p_partkey_1"],
     "keys" :      1961,
     "docs" :      1991,
-    "rows" :        39},
+    "rows" :        39,
+    "csum" : "1065743ec9359731"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1145,7 +1191,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      4182,
     "docs" :      4182,
-    "rows" :         5},
+    "rows" :         5,
+    "csum" : "0051f6bfd722a6ce"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1169,7 +1216,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :     15841,
     "docs" :     96866,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "06e8982615140584"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1198,7 +1246,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       644,
     "docs" :    101644,
-    "rows" :        58},
+    "rows" :        58,
+    "csum" : "9bfbb401e52d085f"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -1226,7 +1275,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_orderkey_1"],
     "keys" :      1199,
     "docs" :      2199,
-    "rows" :        14},
+    "rows" :        14,
+    "csum" : "d9202cd3406d626c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1253,7 +1303,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      1868,
     "docs" :    101868,
-    "rows" :        64},
+    "rows" :        64,
+    "csum" : "c020c16981e82b17"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1272,7 +1323,8 @@
 "$lookup lineitem l_partkey_1_l_suppkey_1"],
     "keys" :       104,
     "docs" :    100104,
-    "rows" :        13},
+    "rows" :        13,
+    "csum" : "74665be439830ee7"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1297,7 +1349,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'$nor':[{'p_container':{'$not':{'$in':['LG PACK','WRAP BOX']}}}]}"],
     "keys" :       240,
     "docs" :     21265,
-    "rows" :         5},
+    "rows" :         5,
+    "csum" : "93ac795e4f7ba211"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1318,7 +1371,8 @@
 "$lookup lineitem l_partkey_1_l_suppkey_1"],
     "keys" :        86,
     "docs" :    100086,
-    "rows" :        32},
+    "rows" :        32,
+    "csum" : "cfdcd1c75de85b84"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1337,7 +1391,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :     22400,
     "docs" :     23400,
-    "rows" :       560},
+    "rows" :       560,
+    "csum" : "8b420cc6846132c1"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1361,7 +1416,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :      1520,
     "docs" :      2550,
-    "rows" :        24},
+    "rows" :        24,
+    "csum" : "c7276510279f3443"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1380,7 +1436,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'$nor':[{'p_comment':{'$regex':'^ '}},{'p_container':{'$not':{'$in':['LG BAG','MED DRUM']}}}]}"],
     "keys" :       240,
     "docs" :     21240,
-    "rows" :         4},
+    "rows" :         4,
+    "csum" : "dac39a6fb263c228"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1406,7 +1463,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_type':{'$not':{'$eq':'SMALL BRUSHED NICKEL'}}}"],
     "keys" :        80,
     "docs" :     21105,
-    "rows" :        59},
+    "rows" :        59,
+    "csum" : "4196cb6b6a10038c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1429,7 +1487,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :       511,
     "docs" :     80511,
-    "rows" :        23},
+    "rows" :        23,
+    "csum" : "fc5da8d9962698e6"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1453,7 +1512,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       239,
     "docs" :     81239,
-    "rows" :        38},
+    "rows" :        38,
+    "csum" : "6dc8ac9a51904c1f"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -1472,7 +1532,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'s_acctbal':{'$not':{'$lt':-256.13}}}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :       396},
+    "rows" :       396,
+    "csum" : "efcfd9faa6ea5a56"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1493,7 +1554,8 @@
 "$match"],
     "keys" :       154,
     "docs" :      1154,
-    "rows" :        74},
+    "rows" :        74,
+    "csum" : "d9f0d11bbf4cc47a"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1519,7 +1581,8 @@
 "$match"],
     "keys" :     15520,
     "docs" :     36545,
-    "rows" :        39},
+    "rows" :        39,
+    "csum" : "bf1441cb7461d500"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1548,7 +1611,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :      1393,
     "docs" :      1398,
-    "rows" :       828},
+    "rows" :       828,
+    "csum" : "f335af29108d34e5"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1570,7 +1634,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :     10900,
     "docs" :    110900,
-    "rows" :       395},
+    "rows" :       395,
+    "csum" : "d4f53e7a50de0393"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1592,7 +1657,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      2556,
     "docs" :    102556,
-    "rows" :       386},
+    "rows" :       386,
+    "csum" : "918d310108270334"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -1609,7 +1675,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       266,
     "docs" :      1291,
-    "rows" :        40},
+    "rows" :        40,
+    "csum" : "f13d1ba1a3b88b18"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1628,7 +1695,8 @@
 "$match"],
     "keys" :         0,
     "docs" :    101000,
-    "rows" :       902},
+    "rows" :       902,
+    "csum" : "0f902a1d136a019e"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -1645,7 +1713,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       110,
     "docs" :      1135,
-    "rows" :        61},
+    "rows" :        61,
+    "csum" : "1a0eda288cb5d5f7"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1674,7 +1743,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      5918,
     "docs" :    106918,
-    "rows" :       358},
+    "rows" :       358,
+    "csum" : "493d9c7cad945fd5"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1707,7 +1777,8 @@
 "$match"],
     "keys" :       720,
     "docs" :     21750,
-    "rows" :       570},
+    "rows" :       570,
+    "csum" : "496e921496902881"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1733,7 +1804,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      3461,
     "docs" :    103461,
-    "rows" :       499},
+    "rows" :       499,
+    "csum" : "ae5227a467f05a6e"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1760,7 +1832,8 @@
 "$match"],
     "keys" :      6318,
     "docs" :     26343,
-    "rows" :        31},
+    "rows" :        31,
+    "csum" : "846ad4434d5783a1"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1777,7 +1850,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :       181,
     "docs" :    100181,
-    "rows" :       173},
+    "rows" :       173,
+    "csum" : "a53b5119ae47866f"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1802,7 +1876,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      1803,
     "docs" :      2828,
-    "rows" :       220},
+    "rows" :       220,
+    "csum" : "d939deaff9d60c28"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -1827,7 +1902,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.partsupp {'ps_comment':{'$regex':'^req'}}"],
     "keys" :         0,
     "docs" :     81030,
-    "rows" :        68},
+    "rows" :        68,
+    "csum" : "a7755f6f557608a3"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1858,7 +1934,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      8003,
     "docs" :      9003,
-    "rows" :         6},
+    "rows" :         6,
+    "csum" : "d5151374bbc944dd"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1885,7 +1962,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       231,
     "docs" :    100231,
-    "rows" :         4},
+    "rows" :         4,
+    "csum" : "d0a58de578fa99d7"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -1913,7 +1991,8 @@
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.orders o_custkey_1"],
     "keys" :     16477,
     "docs" :     16477,
-    "rows" :       387},
+    "rows" :       387,
+    "csum" : "ce696e04feaf23e7"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -1944,7 +2023,8 @@
 "      -> [nation_s] COLLSCAN: plan_stability_tpch_fuzzed.nation {'n_name':{'$not':{'$in':['FRANCE','RUSSIA']}}}"],
     "keys" :       440,
     "docs" :     21470,
-    "rows" :         3},
+    "rows" :         3,
+    "csum" : "a774a901e5e0ce41"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -1962,7 +2042,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       156,
     "docs" :       181,
-    "rows" :        43},
+    "rows" :        43,
+    "csum" : "1b80082d3d66b2d4"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -1984,7 +2065,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :      7547,
     "docs" :    758119,
-    "rows" :       468},
+    "rows" :       468,
+    "csum" : "769e571e8c5c292e"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2011,7 +2093,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      4072,
     "docs" :    104072,
-    "rows" :       202},
+    "rows" :       202,
+    "csum" : "edc6846fb21719c9"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -2040,7 +2123,8 @@
 "$match"],
     "keys" :      3846,
     "docs" :      4846,
-    "rows" :       428},
+    "rows" :       428,
+    "csum" : "6685bd11d5538747"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -2063,7 +2147,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.partsupp {'ps_comment':{'$regex':'^y '}}"],
     "keys" :         0,
     "docs" :     81030,
-    "rows" :       659},
+    "rows" :       659,
+    "csum" : "32fafd421291d276"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2092,7 +2177,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       955,
     "docs" :    100955,
-    "rows" :        47},
+    "rows" :        47,
+    "csum" : "6bc027ae767c1426"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2109,7 +2195,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :      1983,
     "docs" :    101983,
-    "rows" :        74},
+    "rows" :        74,
+    "csum" : "ce93d82cebd9d1e8"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2129,7 +2216,8 @@
 "$match"],
     "keys" :        20,
     "docs" :      1025,
-    "rows" :       204},
+    "rows" :       204,
+    "csum" : "a1eb16358635eb4f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2150,7 +2238,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_partkey_1"],
     "keys" :      1145,
     "docs" :     21145,
-    "rows" :       384},
+    "rows" :       384,
+    "csum" : "c75f5746f075b44d"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2168,7 +2257,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :     11513,
     "docs" :    111513,
-    "rows" :       708},
+    "rows" :       708,
+    "csum" : "bd207476ea8f724c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2187,7 +2277,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_size':{'$not':{'$lte':28}}}"],
     "keys" :      2720,
     "docs" :     23720,
-    "rows" :       773},
+    "rows" :       773,
+    "csum" : "5c0ffe9d569d457b"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -2206,7 +2297,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      7040,
     "docs" :      8040,
-    "rows" :       240},
+    "rows" :       240,
+    "csum" : "ffcb1d969f91013b"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2237,7 +2329,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      6000,
     "docs" :     27025,
-    "rows" :       321},
+    "rows" :       321,
+    "csum" : "b2db29f3b3f55d16"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2268,7 +2361,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_mfgr':{'$not':{'$in':['Manufacturer#1','Manufacturer#2','Manufacturer#3']}}}"],
     "keys" :     12340,
     "docs" :     33345,
-    "rows" :       665},
+    "rows" :       665,
+    "csum" : "70b49a2cc5bf99ef"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2286,7 +2380,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :      5116,
     "docs" :    105116,
-    "rows" :       198},
+    "rows" :       198,
+    "csum" : "d09e2547638ec285"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2305,7 +2400,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :        78,
     "docs" :       103,
-    "rows" :        39},
+    "rows" :        39,
+    "csum" : "6f088139b28212af"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2328,7 +2424,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      2410,
     "docs" :    103410,
-    "rows" :       131},
+    "rows" :       131,
+    "csum" : "c36a3697a6c7b5bf"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2346,7 +2443,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'s_acctbal':{'$gt':8924.02}}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :        29},
+    "rows" :        29,
+    "csum" : "13b0dc41869a67c8"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2372,7 +2470,8 @@
 "  -> [nation_s] COLLSCAN: plan_stability_tpch_fuzzed.nation {'n_regionkey':{'$in':[2,3]}}"],
     "keys" :       157,
     "docs" :     20182,
-    "rows" :         3},
+    "rows" :         3,
+    "csum" : "7a1996204e941541"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2396,7 +2495,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_mfgr':{'$not':{'$eq':'Manufacturer#1'}}}"],
     "keys" :         0,
     "docs" :    101025,
-    "rows" :       359},
+    "rows" :       359,
+    "csum" : "981fec45aa14ab76"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2414,7 +2514,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :         1,
     "docs" :      1026,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "ed55073af4362be2"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2432,7 +2533,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :       124,
     "docs" :    100124,
-    "rows" :        21},
+    "rows" :        21,
+    "csum" : "934c614d3ae49d67"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2449,7 +2551,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :     17723,
     "docs" :    117723,
-    "rows" :       449},
+    "rows" :       449,
+    "csum" : "c7296ef3da0d1f36"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2480,7 +2583,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       283,
     "docs" :      1283,
-    "rows" :        62},
+    "rows" :        62,
+    "csum" : "ce22fcf964dea8a6"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2509,7 +2613,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      9470,
     "docs" :    110495,
-    "rows" :       835},
+    "rows" :       835,
+    "csum" : "39b3f8120ea43d73"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2529,7 +2634,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'$nor':[{'p_type':{'$eq':'ECONOMY BRUSHED COPPER'}},{'p_comment':{'$regex':'^s'}}]}"],
     "keys" :       320,
     "docs" :     21320,
-    "rows" :       199},
+    "rows" :       199,
+    "csum" : "73fd57f3b8dddb5f"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -2554,7 +2660,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :      1876,
     "docs" :      1906,
-    "rows" :        13},
+    "rows" :        13,
+    "csum" : "072992462d8d04f5"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2573,7 +2680,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :      3035,
     "docs" :     83035,
-    "rows" :       842},
+    "rows" :       842,
+    "csum" : "0d3cf082ebb567dd"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -2600,7 +2708,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :      1229,
     "docs" :      1234,
-    "rows" :       566},
+    "rows" :       566,
+    "csum" : "be211d57436f1d68"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2623,7 +2732,8 @@
 "$match"],
     "keys" :        73,
     "docs" :       103,
-    "rows" :        47},
+    "rows" :        47,
+    "csum" : "16a2f32288789c78"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2642,7 +2752,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :    272273,
     "docs" :    372273,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "41a7f9e3043dfbdc"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -2664,7 +2775,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :     33549,
     "docs" :    784121,
-    "rows" :       246},
+    "rows" :       246,
+    "csum" : "c808deac987362db"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2690,7 +2802,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      3911,
     "docs" :     24911,
-    "rows" :        27},
+    "rows" :        27,
+    "csum" : "dc1f3b07353cf277"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2722,7 +2835,8 @@
 "$match"],
     "keys" :      5140,
     "docs" :     26145,
-    "rows" :       477},
+    "rows" :       477,
+    "csum" : "4b4ac66249cebbfc"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2739,7 +2853,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       136,
     "docs" :      1161,
-    "rows" :        28},
+    "rows" :        28,
+    "csum" : "f3d541e35ca69d69"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2766,7 +2881,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_brand':{'$not':{'$in':['Brand#24','Brand#31','Brand#44']}}}"],
     "keys" :       198,
     "docs" :     20223,
-    "rows" :       139},
+    "rows" :       139,
+    "csum" : "57b04d19f726b164"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2797,7 +2913,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.part p_partkey_1"],
     "keys" :        80,
     "docs" :     81110,
-    "rows" :        80},
+    "rows" :        80,
+    "csum" : "8a2a5a4633f75a6b"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2815,7 +2932,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :        94,
     "docs" :       119,
-    "rows" :        47},
+    "rows" :        47,
+    "csum" : "ddc7fd95470ad65e"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2835,7 +2953,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
     "keys" :        28,
     "docs" :        58,
-    "rows" :        13},
+    "rows" :        13,
+    "csum" : "92e9ae7c6b65f3ca"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2861,7 +2980,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_name':{'$regex':'^co'}}"],
     "keys" :     10000,
     "docs" :     31025,
-    "rows" :         6},
+    "rows" :         6,
+    "csum" : "1e97d9da254aee3f"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2880,7 +3000,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       134,
     "docs" :       159,
-    "rows" :        28},
+    "rows" :        28,
+    "csum" : "7ca3609aa596e5ac"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2898,7 +3019,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'$or':[{'s_name':{'$eq':'Supplier#000000676'}},{'s_acctbal':{'$gte':8797.4}}]}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :        26},
+    "rows" :        26,
+    "csum" : "e5eb71d7398e6a49"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2915,7 +3037,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :       341,
     "docs" :    100341,
-    "rows" :       257},
+    "rows" :       257,
+    "csum" : "e3eab48a4346849d"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -2937,7 +3060,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :     35994,
     "docs" :    786566,
-    "rows" :        23},
+    "rows" :        23,
+    "csum" : "79e5e0964d7cdf3a"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2955,7 +3079,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :       668,
     "docs" :    100668,
-    "rows" :        27},
+    "rows" :        27,
+    "csum" : "537fb90ab5d61049"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -2974,7 +3099,8 @@
 "      -> [nation_s] COLLSCAN: plan_stability_tpch_fuzzed.nation {'$and':[{'$nor':[{'n_name':{'$eq':'ARGENTINA'}},{'n_regionkey':{'$eq':4}}]},{'$nor':[{'n_name':{'$eq':'EGYPT'}},{'n_regionkey':{'$eq':2}},{'n_regionkey':{'$eq':4}}]}]}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "07edc1fcba75f237"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -2992,7 +3118,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :     89422,
     "docs" :    189422,
-    "rows" :         3},
+    "rows" :         3,
+    "csum" : "d509c46020b8ddb5"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3010,7 +3137,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :     11840,
     "docs" :     12840,
-    "rows" :       400},
+    "rows" :       400,
+    "csum" : "d896b7f8a3678ff5"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3032,7 +3160,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_partkey_1"],
     "keys" :       835,
     "docs" :     20835,
-    "rows" :        20},
+    "rows" :        20,
+    "csum" : "cff18cf6d1145590"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3052,7 +3181,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :       183,
     "docs" :    100183,
-    "rows" :       177},
+    "rows" :       177,
+    "csum" : "5e1707c7e786473d"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3073,7 +3203,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :       974,
     "docs" :    100974,
-    "rows" :       346},
+    "rows" :       346,
+    "csum" : "97a71a6f76f72c8c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3092,7 +3223,8 @@
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_partkey_1"],
     "keys" :       476,
     "docs" :     21476,
-    "rows" :        74},
+    "rows" :        74,
+    "csum" : "3a7cd595fb58003e"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3111,7 +3243,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :       516,
     "docs" :    100516,
-    "rows" :         6},
+    "rows" :         6,
+    "csum" : "a6667daea65d8ebb"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3141,7 +3274,8 @@
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :      2400,
     "docs" :     23430,
-    "rows" :         5},
+    "rows" :         5,
+    "csum" : "d7995bc077b14aa6"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3164,7 +3298,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :     13835,
     "docs" :    113835,
-    "rows" :       243},
+    "rows" :       243,
+    "csum" : "267627988ce3c1d9"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3182,7 +3317,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_size':{'$not':{'$eq':15}}}"],
     "keys" :         0,
     "docs" :    101000,
-    "rows" :       222},
+    "rows" :       222,
+    "csum" : "7f626bfad645a6db"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3203,7 +3339,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      3733,
     "docs" :    103733,
-    "rows" :         3},
+    "rows" :         3,
+    "csum" : "96b8eaaaf4556f38"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3232,7 +3369,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      3643,
     "docs" :    104643,
-    "rows" :       495},
+    "rows" :       495,
+    "csum" : "225df9211332b40a"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3258,7 +3396,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :     13315,
     "docs" :     14315,
-    "rows" :         7},
+    "rows" :         7,
+    "csum" : "ada045d5e8ca4ecb"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3276,7 +3415,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :       916,
     "docs" :    100916,
-    "rows" :       264},
+    "rows" :       264,
+    "csum" : "a0c920609209c6dd"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3298,7 +3438,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :       684,
     "docs" :    100684,
-    "rows" :        20},
+    "rows" :        20,
+    "csum" : "514b9993e6a0fd6c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3322,7 +3463,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :     12952,
     "docs" :     33952,
-    "rows" :       239},
+    "rows" :       239,
+    "csum" : "6257a65b8addd1c8"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3346,7 +3488,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      1122,
     "docs" :      2122,
-    "rows" :       241},
+    "rows" :       241,
+    "csum" : "e930376456577d57"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3364,7 +3507,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :      1060,
     "docs" :     81060,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "d7d7ac4a85345c61"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3387,7 +3531,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      4122,
     "docs" :    104122,
-    "rows" :       239},
+    "rows" :       239,
+    "csum" : "448203a7ee63eda9"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3404,7 +3549,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      2755,
     "docs" :     83755,
-    "rows" :       412},
+    "rows" :       412,
+    "csum" : "f7955749570197c7"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3431,7 +3577,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :     14672,
     "docs" :    115672,
-    "rows" :       676},
+    "rows" :       676,
+    "csum" : "196bbe699797de56"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3458,7 +3605,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       264,
     "docs" :    101289,
-    "rows" :       200},
+    "rows" :       200,
+    "csum" : "506a6d941e387a08"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3482,7 +3630,8 @@
 "      -> [supplier] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'$and':[{'s_acctbal':{'$gte':1050.66}},{'s_acctbal':{'$gte':1050.66}}]}"],
     "keys" :       592,
     "docs" :     21617,
-    "rows" :       285},
+    "rows" :       285,
+    "csum" : "f3e2fedd29b6051a"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -3500,7 +3649,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'s_name':{'$not':{'$eq':'Supplier#000000454'}}}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :       198},
+    "rows" :       198,
+    "csum" : "74424f3f0e137694"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3523,7 +3673,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :     17526,
     "docs" :     18551,
-    "rows" :       769},
+    "rows" :       769,
+    "csum" : "e5e54cae9005f1a9"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3550,7 +3701,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      8705,
     "docs" :    108705,
-    "rows" :         9},
+    "rows" :         9,
+    "csum" : "73246ea5c60137b6"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3569,7 +3721,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :      1040,
     "docs" :      2065,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "2cdd1bcd366008e1"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3597,7 +3750,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       682,
     "docs" :    101707,
-    "rows" :       330},
+    "rows" :       330,
+    "csum" : "f3070128eb6a057b"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3618,7 +3772,8 @@
 "$match"],
     "keys" :      2916,
     "docs" :      2941,
-    "rows" :         7},
+    "rows" :         7,
+    "csum" : "677040dc8764ac7f"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3636,7 +3791,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      1336,
     "docs" :     82336,
-    "rows" :       258},
+    "rows" :       258,
+    "csum" : "0368ce643b7f175b"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3657,7 +3813,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       848,
     "docs" :     81848,
-    "rows" :        86},
+    "rows" :        86,
+    "csum" : "4599975814c6be72"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3678,7 +3835,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :        49,
     "docs" :    100049,
-    "rows" :         4},
+    "rows" :         4,
+    "csum" : "2d370a0f4d21a191"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3700,7 +3858,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       880,
     "docs" :      1880,
-    "rows" :        80},
+    "rows" :        80,
+    "csum" : "ec0b2453361b31ca"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3727,7 +3886,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       651,
     "docs" :    101651,
-    "rows" :        20},
+    "rows" :        20,
+    "csum" : "7abf903e8dad65a5"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3747,7 +3907,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      6085,
     "docs" :      7085,
-    "rows" :       902},
+    "rows" :       902,
+    "csum" : "cdb85649d2ba834e"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3767,7 +3928,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :       640,
     "docs" :      1640,
-    "rows" :       320},
+    "rows" :       320,
+    "csum" : "1fb87f6df82d96de"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3791,7 +3953,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      2064,
     "docs" :    102064,
-    "rows" :       346},
+    "rows" :       346,
+    "csum" : "9edc28ac75f41697"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3810,7 +3973,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :      6028,
     "docs" :    106028,
-    "rows" :       508},
+    "rows" :       508,
+    "csum" : "ee9b468374a1e068"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3835,7 +3999,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      6654,
     "docs" :      7654,
-    "rows" :       791},
+    "rows" :       791,
+    "csum" : "ac5c8e25bd0f964b"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3862,7 +4027,8 @@
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :      1920,
     "docs" :     22945,
-    "rows" :         4},
+    "rows" :         4,
+    "csum" : "8e0997036eeff185"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3884,7 +4050,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      1156,
     "docs" :     82181,
-    "rows" :       355},
+    "rows" :       355,
+    "csum" : "509fbf9552de2e70"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3901,7 +4068,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :       585,
     "docs" :     81585,
-    "rows" :        18},
+    "rows" :        18,
+    "csum" : "3e89d4dba6c4df5c"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3929,7 +4097,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      1529,
     "docs" :    102554,
-    "rows" :       309},
+    "rows" :       309,
+    "csum" : "e85c4752823bdb3c"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -3948,7 +4117,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      2059,
     "docs" :      3059,
-    "rows" :       136},
+    "rows" :       136,
+    "csum" : "1467b90c08ba6459"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -3980,7 +4150,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       141,
     "docs" :      1166,
-    "rows" :         9},
+    "rows" :         9,
+    "csum" : "4e49e200a7760e55"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4007,7 +4178,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      3721,
     "docs" :     24721,
-    "rows" :       256},
+    "rows" :       256,
+    "csum" : "1fa64b054b81bb4f"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4026,7 +4198,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       252,
     "docs" :      1277,
-    "rows" :        28},
+    "rows" :        28,
+    "csum" : "7ca3609aa596e5ac"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4044,7 +4217,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :        83,
     "docs" :     81083,
-    "rows" :         6},
+    "rows" :         6,
+    "csum" : "61df0f2b4503913f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4061,7 +4235,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :       201,
     "docs" :    100201,
-    "rows" :        24},
+    "rows" :        24,
+    "csum" : "ad5c18281a9806e5"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4085,7 +4260,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      4154,
     "docs" :      5154,
-    "rows" :       159},
+    "rows" :       159,
+    "csum" : "e498ac3540545c0d"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4109,7 +4285,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :         9,
     "docs" :    100009,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "42c1007fbc546a20"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4127,7 +4304,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'s_acctbal':{'$not':{'$gte':-686.97}}}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :         9},
+    "rows" :         9,
+    "csum" : "ddb8cd2ae24f8e38"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4146,7 +4324,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'$nor':[{'s_name':{'$eq':'Supplier#000000783'}},{'s_acctbal':{'$gt':-685.94}}]}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :        12},
+    "rows" :        12,
+    "csum" : "b987e5909b0ebd05"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4164,7 +4343,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       223,
     "docs" :       248,
-    "rows" :        29},
+    "rows" :        29,
+    "csum" : "100212002b2c98cd"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4183,7 +4363,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      5280,
     "docs" :      6280,
-    "rows" :       640},
+    "rows" :       640,
+    "csum" : "42b87f0574a51bb8"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4214,7 +4395,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      2742,
     "docs" :     22767,
-    "rows" :        22},
+    "rows" :        22,
+    "csum" : "693a4151579cdd1b"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4231,7 +4413,8 @@
 "$lookup lineitem l_partkey_1,l_partkey_1_l_suppkey_1"],
     "keys" :       156,
     "docs" :    100156,
-    "rows" :       113},
+    "rows" :       113,
+    "csum" : "6b2456288ae68c59"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4256,7 +4439,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :       853,
     "docs" :     21853,
-    "rows" :        75},
+    "rows" :        75,
+    "csum" : "43012d9e4d8d3d92"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4275,7 +4459,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       107,
     "docs" :       132,
-    "rows" :        12},
+    "rows" :        12,
+    "csum" : "4dd6ed601878d13b"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4293,7 +4478,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :        91,
     "docs" :       116,
-    "rows" :         3},
+    "rows" :         3,
+    "csum" : "9fbc723c6c8d587d"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4312,7 +4498,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :        89,
     "docs" :       114,
-    "rows" :         5},
+    "rows" :         5,
+    "csum" : "f7c46d929f9ba8e5"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4336,7 +4523,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      2594,
     "docs" :    103594,
-    "rows" :       121},
+    "rows" :       121,
+    "csum" : "e6444f667bb5a89a"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4354,7 +4542,8 @@
 "$lookup supplier s_suppkey_1"],
     "keys" :       250,
     "docs" :     20250,
-    "rows" :        16},
+    "rows" :        16,
+    "csum" : "2ec7491e806f4a0f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4374,7 +4563,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :       613,
     "docs" :     20613,
-    "rows" :         2},
+    "rows" :         2,
+    "csum" : "45c9d461f45d757e"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4398,7 +4588,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :      5630,
     "docs" :      6655,
-    "rows" :        19},
+    "rows" :        19,
+    "csum" : "9bf2758b71d5bc28"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4418,7 +4609,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'s_name':{'$not':{'$eq':'Supplier#000000788'}}}"],
     "keys" :         0,
     "docs" :      1030,
-    "rows" :       259},
+    "rows" :       259,
+    "csum" : "f63717dedfb7d54a"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4435,7 +4627,8 @@
 "$lookup lineitem l_partkey_1"],
     "keys" :     70614,
     "docs" :    170614,
-    "rows" :       149},
+    "rows" :       149,
+    "csum" : "c9d568b24a2b78f6"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4456,7 +4649,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :       393,
     "docs" :     81393,
-    "rows" :        54},
+    "rows" :        54,
+    "csum" : "f1e8c6634bbcc632"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4485,7 +4679,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :     13165,
     "docs" :     34165,
-    "rows" :        37},
+    "rows" :        37,
+    "csum" : "4e581945978ce9e5"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4507,7 +4702,8 @@
 "$lookup region r_regionkey_1"],
     "keys" :        16,
     "docs" :     81016,
-    "rows" :         2},
+    "rows" :         2,
+    "csum" : "b9e08cc6ec69c21d"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4525,7 +4721,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :        57,
     "docs" :     81057,
-    "rows" :         2},
+    "rows" :         2,
+    "csum" : "eed8f0a55cf4f79f"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4542,7 +4739,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :        11,
     "docs" :     81011,
-    "rows" :         2},
+    "rows" :         2,
+    "csum" : "c51ccb11eaea319e"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4570,7 +4768,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      1735,
     "docs" :     21735,
-    "rows" :       214},
+    "rows" :       214,
+    "csum" : "947fa562231eb5e6"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4592,7 +4791,8 @@
 "$match"],
     "keys" :        38,
     "docs" :        68,
-    "rows" :        38},
+    "rows" :        38,
+    "csum" : "7521f7d5df9783eb"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4611,7 +4811,8 @@
 "$match"],
     "keys" :         0,
     "docs" :    700572,
-    "rows" :        57},
+    "rows" :        57,
+    "csum" : "ae6fe09c53b24286"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4632,7 +4833,8 @@
 "$match"],
     "keys" :         0,
     "docs" :    700572,
-    "rows" :       709},
+    "rows" :       709,
+    "csum" : "4f5cf14487d776c4"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4652,7 +4854,8 @@
 "  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'$or':[{'p_size':{'$lt':24}},{'p_size':{'$gt':42}}]}"],
     "keys" :      9072,
     "docs" :     29072,
-    "rows" :        24},
+    "rows" :        24,
+    "csum" : "d63262d20e250959"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -4679,7 +4882,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :     18103,
     "docs" :     18102,
-    "rows" :        90},
+    "rows" :        90,
+    "csum" : "511c2249dd4223ae"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4699,7 +4903,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
     "keys" :        41,
     "docs" :        71,
-    "rows" :         9},
+    "rows" :         9,
+    "csum" : "e0a8289386c26cb0"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -4728,7 +4933,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
     "keys" :     35081,
     "docs" :     35081,
-    "rows" :       159},
+    "rows" :       159,
+    "csum" : "81d79f7f00653521"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4761,7 +4967,8 @@
 "      -> [nation_s] COLLSCAN: plan_stability_tpch_fuzzed.nation {'$and':[{'n_name':{'$not':{'$eq':'UNITED KINGDOM'}}},{'n_regionkey':{'$not':{'$eq':2}}}]}"],
     "keys" :       462,
     "docs" :     20492,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "34e7a1e45da00ce9"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4781,7 +4988,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
     "keys" :        40,
     "docs" :        70,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "5c6c0f10c9768c2e"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -4808,7 +5016,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :     60141,
     "docs" :     75141,
-    "rows" :        41},
+    "rows" :        41,
+    "csum" : "e06b80027d26d021"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -4833,7 +5042,8 @@
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_orderkey_1"],
     "keys" :       519,
     "docs" :     16518,
-    "rows" :       495},
+    "rows" :       495,
+    "csum" : "e88fe4386864dbad"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -4861,7 +5071,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
     "keys" :       167,
     "docs" :       197,
-    "rows" :        80},
+    "rows" :        80,
+    "csum" : "29f763ecb2bd93e4"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4883,7 +5094,8 @@
 "$match"],
     "keys" :       786,
     "docs" :     80786,
-    "rows" :        10},
+    "rows" :        10,
+    "csum" : "c87526cf563db0b1"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4903,7 +5115,8 @@
 "      -> IXSCAN: plan_stability_tpch_fuzzed.lineitem l_shipdate_1 {'l_shipdate':['[new Date(-9223372036854775808), new Date(737337600000))']}"],
     "keys" :    108907,
     "docs" :    208907,
-    "rows" :         1},
+    "rows" :         1,
+    "csum" : "da15757b8d3a41c6"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4923,7 +5136,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_partkey_1"],
     "keys" :       267,
     "docs" :     20267,
-    "rows" :        24},
+    "rows" :        24,
+    "csum" : "0678e24668b10113"},
 
 {">>>command": {"aggregate":"supplier","pipeline":[
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","pipeline":[
@@ -4942,7 +5156,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
     "keys" :        33,
     "docs" :        63,
-    "rows" :        33},
+    "rows" :        33,
+    "csum" : "16046136239b345f"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4962,7 +5177,8 @@
 "$match"],
     "keys" :       610,
     "docs" :    100610,
-    "rows" :        21},
+    "rows" :        21,
+    "csum" : "77514153c7b6ff24"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -4984,7 +5200,8 @@
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_partkey_1"],
     "keys" :       257,
     "docs" :     20257,
-    "rows" :        13},
+    "rows" :        13,
+    "csum" : "fe56b54b668a111b"},
 
 {">>>command": {"aggregate":"part","pipeline":[
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","pipeline":[
@@ -5003,7 +5220,8 @@
 "  -> [partsupp] COLLSCAN: plan_stability_tpch_fuzzed.partsupp {'ps_supplycost':{'$gte':587.19}}"],
     "keys" :      1283,
     "docs" :    101283,
-    "rows" :       708},
+    "rows" :       708,
+    "csum" : "b67c669ebcaa7fe6"},
 
 {">>>command": {"aggregate":"partsupp","pipeline":[
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","pipeline":[
@@ -5024,7 +5242,8 @@
 "$lookup nation n_nationkey_1"],
     "keys" :      7666,
     "docs" :      7666,
-    "rows" :       847},
+    "rows" :       847,
+    "csum" : "951425982e4779ac"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -5051,7 +5270,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :      3109,
     "docs" :      3108,
-    "rows" :       470},
+    "rows" :       470,
+    "csum" : "5a921344b3552625"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -5074,7 +5294,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :     72676,
     "docs" :    673248,
-    "rows" :       364},
+    "rows" :       364,
+    "csum" : "35aee2a84e230a57"},
 
 {">>>command": {"aggregate":"lineitem","pipeline":[
 {"$lookup":{"from":"orders","localField":"l_orderkey","foreignField":"o_orderkey","pipeline":[
@@ -5099,7 +5320,8 @@
 "$lookup supplier s_nationkey_1"],
     "keys" :     43106,
     "docs" :     43105,
-    "rows" :        15}
+    "rows" :        15,
+    "csum" : "ca7f0bfcb0e88d85"}
 
 ],
 ">>>totals": {"commands": 222, "keys":   1526391, "docs":  14668159, "rows":     41006}
