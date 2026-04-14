@@ -55,20 +55,6 @@ This parameter is only available at startup. To set the
 parameter, use the \fBsetParameter\f1\f1 setting.
 .RE
 .PP
-\fBuseInternalAuthzForX509\f1
-.RS
-.PP
-Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
-.PP
-\fIDefault\f1: false
-.PP
-A boolean flag that, if set to true, causes clients that authenticate with X.509 certificates to always use
-internal authorization, even when LDAP authorization is configured for X.509 users.
-.PP
-This parameter only affects X.509 authentication, and is only available at startup. To set the
-parameter, use the \fBsetParameter\f1\f1 setting.
-.RE
-.PP
 \fBauthenticationMechanisms\f1
 .RS
 .PP
@@ -117,7 +103,7 @@ MongoDB TLS/SSL certificate authentication.
 \fBGSSAPI\f1 (Kerberos)
 .IP \(bu 4
 External authentication using Kerberos. This mechanism is
-available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 .RE
 .IP \(bu 2
 .RS
@@ -127,7 +113,7 @@ available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-e
 External authentication using LDAP. You can also use \fBPLAIN\f1
 for authenticating in\-database users. \fBPLAIN\f1 transmits
 passwords in plain text. This mechanism is available only in
-MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 .RE
 .IP \(bu 2
 .RS
@@ -135,9 +121,21 @@ MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advance
 \fBMONGODB\-OIDC\f1
 .IP \(bu 4
 OpenID Connect is an authentication layer built on top of OAuth2. This mechanism
-is available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+is available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 .RE
 .RE
+.PP
+Starting in MongoDB 8.3, you cannot specify \fBSCRAM\-SHA\-1\f1 for
+\fBauthenticationMechanisms\f1\f1 while also specifying
+\fBmongod \-\-tlsFIPSMode\f1\f1 or \fBmongos \-\-tlsFIPSMode\f1\f1\&.
+.PP
+If you try to specify \fBSCRAM\-SHA\-1\f1 for \fBauthenticationMechanisms\f1 while
+also specifying \fB\-\-tlsFIPSMode\f1, the server throws an error and
+logs a message similar to the following:
+.PP
+.EX
+  SCRAM\-SHA\-1 is not allowed in FIPS mode.
+.EE
 .PP
 This parameter is only available at startup. To set the
 parameter, use the \fBsetParameter\f1\f1 setting.
@@ -213,7 +211,7 @@ membership authentication\f1
 to minimize downtime.
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 This parameter is only available at runtime. To set the
@@ -227,7 +225,7 @@ parameter, use the \fBsetParameter\f1\f1 command.
 \fBenableLocalhostAuthBypass\f1
 .RS
 .PP
-Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+Available for \fBmongod\f1\f1 only.
 .PP
 \fIDefault\f1: \fBtrue\f1
 .PP
@@ -397,7 +395,7 @@ start\-up, and cannot change this setting during run time with the
 \fBldapForceMultiThreadMode\f1
 .RS
 .PP
-Available for \fBmongod\f1\f1 only.
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIDefault\f1: false
 .PP
@@ -506,7 +504,7 @@ the following disables
 \fBldapUseConnectionPool\f1
 .RS
 .PP
-Available for \fBmongod\f1\f1 only.
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 Specifies whether MongoDB should use connection pooling when
 connecting to the LDAP server for authentication/authorization.
@@ -747,18 +745,18 @@ stapled OCSP responses.
 .PP
 Available for \fBmongod\f1\f1 only.
 .PP
-Use this parameter to specify identity provider (IDP) configurations when
+Use this parameter to specify IdP (Identity Provider) configurations when
 using \fBOpenID Connect Authentication\f1\&.
 .PP
-\fBoidcIdentityProviders\f1 accepts an array of zero or more identity provider
-(IDP) configurations. An empty array (default) indicates no OpenID Connect
+\fBoidcIdentityProviders\f1 accepts an array of zero or more IdP
+configurations. An empty array (default) indicates no OpenID Connect
 support is enabled.
 .PP
-When more than one IDP is defined, \fBoidcIdentityProviders\f1 uses the
-\fBmatchPattern\f1 field to select an IDP. Array order determines the priority
-and the first IDP is always selected.
+When more than one IdP is defined, \fBoidcIdentityProviders\f1 uses the
+\fBmatchPattern\f1 field to select an IdP\&. Array order determines the priority
+and the first IdP is always selected.
 .PP
-Starting in MongoDB 8.0, when multiple identity providers (IDP) are
+Starting in MongoDB 8.0, when multiple IdPs are
 defined, the \fBoidcIdentityProviders\f1\f1 parameter accepts duplicate
 \fBissuer\f1 values as long as the \fBaudience\f1 value is unique for each
 issuer. This is also available in versions 7.3 and 7.0.
@@ -784,10 +782,10 @@ Required
 .IP \(bu 4
 string
 .IP \(bu 4
-The issuer URI of the IDP that the server should accept tokens from. This
+The issuer URI of the IdP (Identity Provider) that the server should accept tokens from. This
 must match the \fBiss\f1 field in any JWT used for authentication.
 .IP
-Starting in MongoDB 8.0, when multiple identity providers (IDP) are
+Starting in MongoDB 8.0, when multiple IdPs are
 defined, the \fBoidcIdentityProviders\f1\f1 parameter accepts duplicate
 \fBissuer\f1 values as long as the \fBaudience\f1 value is unique for each
 issuer. This is also available in versions 7.3 and 7.0.
@@ -835,9 +833,9 @@ Conditional
 .IP \(bu 4
 string
 .IP \(bu 4
-Regex pattern used to determine which IDP should be used. \fBmatchPattern\f1
+Regex pattern used to determine which IdP should be used. \fBmatchPattern\f1
 matches against usernames. Array order determines the priority and the
-first IDP is always selected.
+first IdP is always selected.
 .IP
 \fBmatchPattern\f1 is required in some configurations, depending on
 how the user sets \fBsupportsHumanFlows\f1:
@@ -854,7 +852,7 @@ is set to \fBfalse\f1\&.
 .RE
 .IP
 This is not a security mechanism. \fBmatchPattern\f1 serves only as an advisory
-to clients. MongoDB accepts tokens issued by the IDP whose principal
+to clients. MongoDB accepts tokens issued by the IdP whose principal
 names do not match this pattern.
 .RE
 .IP \(bu 2
@@ -866,7 +864,7 @@ Conditional
 .IP \(bu 4
 string
 .IP \(bu 4
-ID provided by the IDP to identify the client that receives the access tokens.
+ID provided by the IdP to identify the client that receives the access tokens.
 .IP
 Required when \fBsupportsHumanFlows\f1 is set to \fBtrue\f1 (the default).
 .RE
@@ -885,7 +883,7 @@ Starting in MongoDB 7.0, only one \fBaudience\f1 oidcIdentityProviders
 field can be specified for OIDC access tokens. \fBaudience\f1 fields
 with empty arrays or arrays of multiple strings are invalid.
 .IP
-When more than one IDP is defined, this must be a unique value for
+When more than one IdP is defined, this must be a unique value for
 each configuration that shares an \fBissuer\f1\&.
 .RE
 .IP \(bu 2
@@ -897,7 +895,13 @@ Optional
 .IP \(bu 4
 array[ string ]
 .IP \(bu 4
-Permissions and access levels that MongoDB requests from the IDP.
+Permissions and access levels that MongoDB requests from the IdP\&.
+.IP
+IMPORTANT: By default, clients such as Compass (https://www.mongodb.com/docs/compass/current/) and
+\fBmongosh\f1\f1 request the \fBoidc\f1 and \fBoffline_access\f1 scopes
+from the IdP\&. If the IdP supports neither \fBoidc\f1 nor \fBoffline_access\f1,
+the client doesn\(aqt request them. If the IdP supports \fBoidc\f1 but not
+\fBoffline_access\f1, you must re\-authenticate frequently.
 .RE
 .IP \(bu 2
 .RS
@@ -926,7 +930,7 @@ Determines if the \fBauthorizationClaim\f1 is required. The default value is
 \fBtrue\f1\&.
 .IP
 If the \fBuseAuthorizationClaim\f1 field is set to \fBtrue\f1, the server requires
-an \fBauthorizationClaim\f1 for the identity provider\(aqs config. This is the
+an \fBauthorizationClaim\f1 for the IdP\(aqs config. This is the
 default behavior.
 .IP
 If the \fBuseAuthorizationClaim\f1 field is set to \fBfalse\f1, the
@@ -990,10 +994,10 @@ Optional
 .IP \(bu 4
 integer
 .IP \(bu 4
-Frequency, in seconds, to request an updated JSON Web Key Set (JWKS) from the IDP.
+Frequency, in seconds, to request an updated JSON Web Key Set (JWKS) from the IdP\&.
 A setting of 0 disables polling.
 .IP
-When more than one IDP is defined, this must be the same value for
+When more than one IdP is defined, this must be the same value for
 each configuration that shares an \fBissuer\f1\&.
 .RE
 .IP \(bu 2
@@ -1009,7 +1013,7 @@ Whether the OIDC provider supports human or machine workflows.  This
 affects the \fBclientId\f1 and \fBmatchPattern\f1 fields.
 .IP
 You may find it useful to set this field to \fBfalse\f1 with machine workload
-IdP\(aqs to allow them to omit the \fBclientId\f1 when it\(aqs unneeded.
+IdPs to allow them to omit the \fBclientId\f1 when it\(aqs unneeded.
 .IP
 Default: \fBtrue\f1\&.
 .RE
@@ -1309,7 +1313,7 @@ Set the \fBnet.ssl.mode\f1 to either \fBpreferSSL\f1 or
 \fBrequireSSL\f1\&. Useful during \fBrolling upgrade to TLS/SSL\f1 to minimize downtime.
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 This parameter is only available at runtime. To set the
@@ -1380,7 +1384,7 @@ parameter, use the \fBsetParameter\f1\f1 command.
 .EE
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 \fBsslMode\f1\f1
@@ -1485,7 +1489,7 @@ For example, to set \fBtlsUseSystemCA\f1 to \fBtrue\f1:
 .EE
 .PP
 For more information about TLS/SSL and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1559,7 +1563,7 @@ To set the parameter at startup, use the
 .PP
 You can use this parameter for a rolling update of certificates to
 new certificates that contain a new \fBDN\f1 value. See
-\fBRotate X.509 Certificates without clusterAuthX509 Attributes on Self\-Managed Clusters\f1\&.
+\fBRotate Certificates on Self\-Managed Clusters without clusterAuthX509\f1\&.
 .PP
 For more information about membership certificate requirements, see
 \fBMember Certificate Requirements\f1 for details.
@@ -1632,13 +1636,9 @@ Available for \fBmongod\f1\f1 only.
 .PP
 \fIDefault\f1: True
 .PP
-Starting in MongoDB 6.0, pipeline stages that require more than 100
-megabytes of memory to execute write temporary files to disk by
-default. These temporary files last for the duration of the pipeline
-execution and can influence storage space on your instance. In earlier
-versions of MongoDB, you must pass  \fB{ allowDiskUse: true }\f1 to
-individual \fBfind\f1 and \fBaggregate\f1 commands to enable this
-behavior.
+Pipeline stages that require more than 100 megabytes of memory to execute write
+temporary files to disk by default. These temporary files last for the duration
+of the pipeline execution and can influence storage space on your instance.
 .PP
 Individual \fBfind\f1 and \fBaggregate\f1 commands can override the
 \fBallowDiskUseByDefault\f1\f1 parameter by either:
@@ -1679,6 +1679,30 @@ server is running:
         allowDiskUseByDefault: false
     }
   )
+.EE
+.RE
+.PP
+\fBcapMemoryConsumptionForPreAuthBuffers\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: Int
+.PP
+\fIDefault\f1: 20
+.PP
+Specifies the maximum percentage of total memory to allocate to pre\-auth
+buffers for connections. Setting the parameter to \fB100\f1 disables this
+limitation.
+.PP
+This parameter is only available at startup. To set the
+parameter, use the \fBsetParameter\f1\f1 setting.
+.PP
+The following operation sets \fBcapMemoryConsumptionForPreAuthBuffers\f1
+to \fB30\f1:
+.PP
+.EX
+  mongod \-\-setParameter capMemoryConsumptionForPreAuthBuffers=30
 .EE
 .RE
 .PP
@@ -1782,6 +1806,76 @@ the \fBcursorTimeoutMillis\f1 value. To handle long idle periods,
 use \fBMongo.startSession()\f1\f1 and refresh the session using the
 \fBrefreshSessions\f1\f1 command. For details, see
 \fBRefresh a Cursor with refreshSessions\f1\f1\&.
+.RE
+.PP
+\fBdefaultClientBaseBackoffMillis\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+Default: 100
+.PP
+Base delay in milliseconds for the default retry strategy
+used in internal server\-side connections, such as
+\fBmongos\f1\f1 and \fBmongod\f1\f1\&. The server uses this
+value as the initial delay for exponential backoff between
+retries on operations that fail due to overload.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
+\fBdefaultClientMaxBackoffMillis\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+Default: 10,000
+.PP
+Maximum delay in milliseconds for the default retry strategy
+used by internal server\-side client connections, such as
+\fBmongos\f1\f1 and \fBmongod\f1\f1\&.  The server uses
+this value as the maximum wait time between retries of
+operations that fail due to overload.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
+\fBdefaultClientRetryAttempts\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+Default: 3
+.PP
+Maximum number of times the server retries an operation for
+internal server\-side client connections, such as
+\fBmongos\f1\f1 and \fBmongod\f1\f1\&.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
 .RE
 .PP
 \fBfassertOnLockTimeoutForStepUpDown\f1
@@ -1950,6 +2044,229 @@ unless directed by MongoDB engineers. This setting has major
 implications across both WiredTiger and MongoDB.
 .RE
 .PP
+\fBingressConnectionEstablishmentRateLimiterEnabled\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: boolean
+.PP
+\fIDefault\f1: \fBfalse\f1
+.PP
+Determines whether rate limiting for new connection establishment is enabled.
+When enabled, MongoDB applies rate limiting to control the
+number of new connections that can be established per second.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
+\fBingressConnectionEstablishmentRatePerSec\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: int32
+.PP
+\fIDefault\f1: disabled
+.PP
+\fIMinimum\f1: 1
+.PP
+Specifies the maximum number of new connections that can be established per second
+when rate limiting is enabled.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
+\fBingressConnectionEstablishmentBurstCapacitySecs\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: double
+.PP
+\fIDefault\f1: disabled
+.PP
+\fIMinimum\f1: 1
+.PP
+Describes how many seconds worth of connection establishments that the server can admit
+before rate limiting begins. This allows the server to handle temporary bursts of
+connection requests that exceed the rate limit specified by
+\fBingressConnectionEstablishmentRatePerSec\f1\f1\&.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
+\fBingressConnectionEstablishmentMaxQueueDepth\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: int32
+.PP
+\fIDefault\f1: \fB0\f1 (disabled)
+.PP
+Specifies the maximum number of connection attempts in the connection
+establishment queue. After the queue reaches this number of connection
+attempts, the server rejects new connection attempts.
+.PP
+The default value of \fB0\f1 means that the server rejects all
+connections that will queue for establishment.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
+\fBingressConnectionEstablishmentRateLimiterBypass\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: string array
+.PP
+\fIDefault\f1: \fB[]\f1
+.PP
+Provides a list of IP addresses and CIDR ranges that the server must exempt from the
+connection establishment rate limits. This allows specific trusted clients to
+bypass rate limiting restrictions.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
+\fBingressRequestRateLimiterApplicationExemptions\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: Document containing an array of strings given by the key \fBappNames\f1
+.PP
+\fIDefault\f1: \fB{ appnames: [] }\f1
+.PP
+The \fBingressRequestRateLimiterApplicationExemptions\f1 parameter lets you
+specify applications to exempt from ingress request rate limiting.
+\fBingressRequestRateLimiterApplicationExemptions\f1 accepts a document
+containing an array of application names to exempt from ingress request rate
+limiting as input.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following command exempts the connections with the application name (https://github.com/mongodb/specifications/blob/master/source/mongodb\-handshake/handshake.md#clientapplicationname)
+"MongoDB Internal Client" at startup:
+.PP
+.EX
+  db.adminCommand( {
+     setParameter: 1,
+     ingressRequestRateLimiterApplicationExemptions: {
+        appNames: ["MongoDB Internal Client"],
+     }
+  } )
+.EE
+.PP
+The following command exempts connections with the application name "MongoDB
+Internal Client" during run time:
+.PP
+.EX
+  mongod \
+    \-\-setParameter "ingressRequestRateLimiterApplicationExemptions={\"appNames\":[\"MongoDB Internal Client\"]}"
+.EE
+.RE
+.PP
+\fBoverloadAwareServerSelectionEnabled\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: boolean
+.PP
+\fIDefault\f1: \fBfalse\f1
+.PP
+This parameter controls whether overload\-induced retries against
+other servers in the cluster avoid servers that recently returned an
+error labeled \fBSystemOverloadedError\f1\&. It affects operations that
+perform remote targeting, for example when \fBmongos\f1 retries
+requests against shard members or when \fBmongod\f1 performs remote
+reads during aggregation.
+.PP
+When you set this parameter to \fBtrue\f1, retry logic for remote
+targeting prefers non\-overloaded members for operations that fail
+with \fBSystemOverloadedError\f1\&. For example, when \fBmongos\f1 retries
+reads:
+.RS
+.IP \(bu 2
+With the \fBprimaryPreferred\f1 read preference, \fBmongos\f1 can
+route a retried read to a secondary if the primary indicates
+overload, even if the primary remains reachable.
+.IP \(bu 2
+With the \fBsecondaryPreferred\f1 read preference, \fBmongos\f1 can
+route a retried read to the primary if secondaries indicate
+overload.
+.RE
+.PP
+When you set this parameter to \fBfalse\f1, retries do not avoid
+members that signal overload. If a member continues to return
+\fBSystemOverloadedError\f1, retries may continue targeting that member.
+.PP
+This parameter affects only operations retried after
+\fBSystemOverloadedError\f1 errors that can occur when you enable ingress
+request rate limiting or other overload mechanisms on shard nodes.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
 \fBmaxIndexBuildMemoryUsageMegabytes\f1
 .RS
 .PP
@@ -1959,10 +2276,12 @@ Limits the amount of memory that simultaneous \fBindex builds\f1
 on one collection may consume for their duration. The specified amount of
 memory is shared between all indexes built using a single
 \fBcreateIndexes\f1\f1 command or its shell helper
-\fBdb.collection.createIndexes()\f1\f1\&. Increasing the limit improves
-sorting performance when the index build process generates and sorts index
-keys. The memory consumed by an index build is separate from the
-WiredTiger cache memory (see \fBcacheSizeGB\f1\f1).
+\fBdb.collection.createIndexes()\f1\f1\&. Increasing the limit may avoid negative
+performance impacts in some cases, such as when building numerous indexes
+simultaneously with a single \fBcreateIndexes\f1\f1 command and/or when
+working with index key data set sizes that exceed 500GB. The memory consumed
+by an index build is separate from the WiredTiger cache memory
+(see \fBcacheSizeGB\f1\f1).
 .RS
 .IP \(bu 2
 Set this value to 0\-0.8 to limit builds to a percentage of
@@ -1996,9 +2315,48 @@ Available for \fBmongod\f1\f1 only.
 .PP
 \fIDefault\f1: 3
 .PP
-Sets the maximum number of concurrent index builds allowed on the
-\fBprimary\f1\&. This is a global limit that applies across all
-collections.
+Sets the maximum number of index build requests that MongoDB can
+perform concurrently. \fBmaxNumActiveUserIndexBuilds\f1 is a global
+limit that applies for all collections.
+.PP
+The following table shows the default values for
+\fBmaxNumActiveUserIndexBuilds\f1 based on Atlas tiers:
+.RS
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBAtlas Tiers\f1
+.IP \(bu 4
+\fBmaxNumActiveUserIndexBuilds Default\f1
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Small M tiers (\fBM10\f1, \fBM20\f1, \fBM30\f1, \fBM40\f1)
+.IP \(bu 4
+\fB1\f1
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Medium M tiers (\fBM50\f1, \fBM60\f1)
+.IP \(bu 4
+\fB2\f1
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Large M tiers (\fBM80\f1 and higher, including NMVe variants)
+.IP \(bu 4
+\fB3\f1
+.RE
+.RE
+.PP
+These defaults also apply to the corresponding low\-CPU \fBR\f1 tiers.
+.PP
+The \fBcreateIndexes\f1\f1 command builds indexes. Even if the
+\fBcreateIndexes\f1 command builds multiple indexes at once, the
+command execution only adds \fB1\f1 to \fBmaxNumActiveUserIndexBuilds\f1\&.
 .PP
 Increasing the value of \fBmaxNumActiveUserIndexBuilds\f1 allows
 additional concurrent index builds at the cost of increased pressure
@@ -2041,6 +2399,29 @@ See also:
 .IP \(bu 2
 \fBIndex Builds on Populated Collections\f1
 .RE
+.RE
+.PP
+\fBmessageSizeErrorRateSec\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: Int
+.PP
+\fIDefault\f1: 5
+.PP
+Specifies the rate, in seconds, at which the server logs message size errors
+at the Info level.
+.PP
+This parameter is only available at startup. To set the
+parameter, use the \fBsetParameter\f1\f1 setting.
+.PP
+The following operation sets \fBmessageSizeErrorRateSec\f1
+to \fB6\f1:
+.PP
+.EX
+  mongod \-\-setParameter messageSizeErrorRateSec=6
+.EE
 .RE
 .PP
 \fBnotablescan\f1
@@ -2086,6 +2467,43 @@ To set the parameter at startup, use the
 \fBnotablescan\f1 does not allow unbounded queries that use a
 clustered index because the queries require a full collection
 scan. For more information, see \fBCollection Scans\f1\&.
+.RE
+.PP
+\fBpreAuthMaximumMessageSizeBytes\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIType\f1: Int
+.PP
+\fIDefault\f1: 16384 (16 KiB)
+.PP
+The maximum size of a message in bytes that you can send before the session
+authenticates.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+For example, the following sets the maximum size of the message to
+1700 bytes:
+.PP
+.EX
+  mongod \-\-setParameter preAuthMaximumMessageSizeBytes=1700
+.EE
+.PP
+During run time, you can also set the parameter with the
+\fBsetParameter\f1\f1 command:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, preAuthMaximumMessageSizeBytes: 1700 } )
+.EE
 .RE
 .PP
 \fBreportOpWriteConcernCountersInServerStatus\f1
@@ -2236,7 +2654,7 @@ You can also set \fBtcmallocReleaseRate\f1\f1 at startup time;
 for example:
 .PP
 .EX
-  mongod \-\-setParameter "tcmallocReleaseRate=5.0"
+  mongod \-\-setParameter "tcmallocReleaseRate=2097152"
 .EE
 .RE
 .PP
@@ -3132,18 +3550,17 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIType\f1: integer
 .PP
-\fIDefault\f1: \fB250\f1 (\fB500\f1 in sharded clusters)
+\fIDefault\f1: \fB500\f1
 .PP
 Specifies the maximum size, in megabytes, of the \fBdiagnostic.data\f1
 directory. If directory size exceeds this number, the oldest
 diagnostic files in the directory are automatically deleted based on
 the timestamp in the file name.
 .PP
-\fBdiagnosticDataCollectionDirectorySizeMB\f1 has a default
-value of 400 MB for \fBmongos\f1\f1 and \fBmongod\f1\f1
-instances used in sharded clusters. \fBmongod\f1 instances used
-in replica set or as standalone servers have a default value
-of 200 MB.
+The minimum value for \fBdiagnosticDataCollectionDirectorySizeMB\f1 is
+\fB10\f1 megabytes. \fBdiagnosticDataCollectionDirectorySizeMB\f1 must
+be greater than maximum diagnostic file size
+\fBdiagnosticDataCollectionFileSizeMB\f1\f1\&.
 .PP
 This parameter is available both at runtime and at startup:
 .RS
@@ -3156,17 +3573,18 @@ To set the parameter at startup, use the
 .RE
 .PP
 For example, the following sets the maximum size of the directory to
-\fB250\f1 megabytes:
+\fB650\f1 megabytes:
 .PP
 .EX
-  mongod \-\-setParameter diagnosticDataCollectionDirectorySizeMB=250
+  mongod \-\-setParameter diagnosticDataCollectionDirectorySizeMB=650
 .EE
 .PP
-The minimum value for
-\fBdiagnosticDataCollectionDirectorySizeMB\f1\f1 is \fB10\f1
-megabytes. \fBdiagnosticDataCollectionDirectorySizeMB\f1\f1 must
-be greater than maximum diagnostic file size
-\fBdiagnosticDataCollectionFileSizeMB\f1\f1\&.
+During run time, you can also set the parameter with the
+\fBsetParameter\f1\f1 command:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, diagnosticDataCollectionDirectorySizeMB: 650 } )
+.EE
 .RE
 .PP
 \fBdiagnosticDataCollectionEnabled\f1
@@ -3465,7 +3883,7 @@ For example, to set the
 \fBflowControlTargetLagSeconds\f1
 .RS
 .PP
-Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+Available for \fBmongod\f1\f1 only.
 .PP
 \fIType\f1: integer
 .PP
@@ -3672,6 +4090,14 @@ members.
 .PP
 This parameter is only available at startup. To set the
 parameter, use the \fBsetParameter\f1\f1 setting.
+.PP
+If the \fBinitialSyncMethod\f1\f1 parameter for the cluster is
+\fBfileCopyBased\f1, then there is no impact on change stream listeners.
+.PP
+If \fBinitialSyncMethod\f1 is \fBlogical\f1 and a change stream is opened on
+a newly synchronized node and reads events from a point in time earlier
+than the completion of the logical initial sync, the pre\- and
+post\-images may be missing.
 .RE
 .PP
 \fBinitialSyncSourceReadPreference\f1
@@ -3949,31 +4375,27 @@ the primary mirrors reads to each electable secondary at the
 specified sampling rate.
 .IP
 Valid values are:
+.IP
+\fB0.0\f1\f1
 .RS
-.IP \(bu 6
-.RS
-.IP \(bu 8
-\fB0.0\f1
-.IP \(bu 8
+.IP
 Turns off mirroring.
 .RE
-.IP \(bu 6
+.IP
+\fB1.0\f1\f1
 .RS
-.IP \(bu 8
-\fB1.0\f1
-.IP \(bu 8
-The primary mirrors all \fBoperations that supports
-mirroring\f1 to
-each electable secondary.
+.IP
+The primary mirrors all \fBoperations that
+support mirroring\f1 to each
+electable secondary.
 .RE
-.IP \(bu 6
+.IP
+\fBNumber between 0.0\f1 and 1.0\f1 (exclusive)\f1
 .RS
-.IP \(bu 8
-Number between \fB0.0\f1 and \fB1.0\f1 (exclusive)
-.IP \(bu 8
-The primary randomly samples each electable secondary
-at the specified rate to be sent mirrored reads.
-.RE
+.IP
+The primary randomly samples each electable
+secondary at the specified rate to be sent mirrored
+reads.
 .RE
 .IP
 For example, given a replica set with a primary and two
@@ -4010,47 +4432,48 @@ cache warming. For more information on targeted
 mirroring, see \fBTargeted Mirrored Reads\f1\&.
 .IP
 Includes the following fields:
-.RS
-.IP \(bu 6
-.RS
-.IP \(bu 8
-\fBtag\f1
-.IP \(bu 8
-Defaults to an empty \fBBSONObj\f1\&. The
-\fBreplica set tag\f1
-that you can use to target nodes for mirroring. You can
-configure a node for targeted mirroring using the following syntax:
 .IP
-\fBtag: { "<tag1>": "<string1>" }\f1
+\fBtag\f1\f1
+.RS
+.IP
+Defaults to an empty \fBBSONObj\f1\&. The \fBreplica
+set tag\f1 that
+you can use to target nodes for mirroring. You can
+configure a node for targeted mirroring using the
+following syntax:
+.IP
+.EX
+  tag: { "<tag1>": "<string1>" }
+.EE
 .IP
 You can only supply one tag. All nodes within the same
 replica set that have these tags are targeted.
 .RE
-.IP \(bu 6
+.IP
+\fBsamplingRate\f1\f1
 .RS
-.IP \(bu 8
-\fBsamplingRate\f1
-.IP \(bu 8
+.IP
 \fIType\f1: Float
 .IP
 \fIRange\f1: \fB0.0\f1 to \fB1.0\f1 (inclusive)
 .IP
-The rate at which targeted reads are mirrored to the host or hosts.
-A rate of \fB0.0\f1 means no reads are mirrored, and a rate of
-\fB1.0\f1 means all reads are mirrored. Although \fBsamplingRate\f1 defaults
-to \fB0.01\f1, the \fBtargetedMirroring\f1 feature is off by default,
-since the \fBtag\f1 field defaults to empty.
+The rate at which targeted reads are mirrored to
+the host or hosts. A rate of \fB0.0\f1 means no reads
+are mirrored, and a rate of \fB1.0\f1 means all reads
+are mirrored. Although \fBsamplingRate\f1 defaults to
+\fB0.01\f1, the \fBtargetedMirroring\f1 feature is off
+by default, since the \fBtag\f1 field defaults to
+empty.
 .RE
-.IP \(bu 6
+.IP
+\fBmaxTimeMS\f1\f1
 .RS
-.IP \(bu 8
-\fBmaxTimeMS\f1
-.IP \(bu 8
+.IP
 \fIType\f1: int
 .IP
-The maximum time in milliseconds before the mirrored read times out.
-The minumum value for \fBmaxTimeMS\f1 is \fB0\f1\&. Defaults to \fB1000\f1\&.
-.RE
+The maximum time in milliseconds before the
+mirrored read times out. The minimum value for
+\fBmaxTimeMS\f1 is \fB0\f1\&. Defaults to \fB1000\f1\&.
 .RE
 .RE
 .RE
@@ -4585,6 +5008,42 @@ During run time, you can set or modify the parameter with the
 .EE
 .RE
 .PP
+\fBanalyzeShardKeyNumSamplesPerRange\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: Non\-negative integer
+.PP
+\fIDefault\f1: 10
+.PP
+The number of documents to sample per shard key \fBrange\f1\&.
+Must be a value greater than zero and less than or equal to \fB10000\f1\&.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+This example sets \fBanalyzeShardKeyNumSamplesPerRange\f1 to \fB50\f1 at startup:
+.PP
+.EX
+  mongod \-\-setParameter analyzeShardKeyNumSamplesPerRange=50
+.EE
+.PP
+During run time, you can set or modify the parameter with the
+\fBsetParameter\f1\f1 command:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, analyzeShardKeyNumSamplesPerRange: 50 } )
+.EE
+.RE
+.PP
 \fBautoMergerIntervalSecs\f1
 .RS
 .PP
@@ -4775,6 +5234,35 @@ During run time, you can also set the parameter with the
 .EE
 .RE
 .PP
+\fBdirectConnectionChecksWithSingleShard\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: boolean
+.PP
+\fIDefault\f1: true starting in MongoDB 8.0.10
+.PP
+When set on a sharded cluster with a single shard, enables direct connection
+warnings. If a user connects directly to the single\-shard cluster, \fBmongod\f1
+logs a warning every hour and
+updates \fBshardingStatstics.unauthorizedDirectShardOps\f1\f1 with
+unauthorized direct shard operations.
+.PP
+To avoid this, users should connect to single\-shard clusters through a
+router, like \fBmongos\f1\&.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.RE
+.PP
 \fBdisableResumableRangeDeleter\f1
 .RS
 .PP
@@ -4806,7 +5294,7 @@ the shard\(aqs replica set. In the event of a failover, this
 setting\(aqs value on the new primary dictates the behavior of the
 range deleter.
 .PP
-Starting in MongoDB 8.2, you can set \fBdisableResumableRangeDeleter\f1 during
+Starting in MongoDB 8.0, you can set \fBdisableResumableRangeDeleter\f1 during
 both startup and run time.
 .PP
 To set \fBdisableResumableRangeDeleter\f1 at startup, use the following command:
@@ -4933,6 +5421,43 @@ To set the parameter at startup, use the
 .RE
 .RE
 .PP
+\fBfindShardsOnConfigTimeoutMS\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+Type: Non\-negative integer
+.PP
+\fIDefault\f1: 20000 milliseconds
+.PP
+The timeout in milliseconds for \fBfind\f1 operations against the
+\fBconfig.shards\f1 namespace.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following example sets \fBfindShardsOnConfigTimeoutMS\f1 to
+\fB30000\f1 milliseconds during runtime:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, findShardsOnConfigTimeoutMS: 30000 } )
+.EE
+.PP
+The following example sets \fBfindShardsOnConfigTimeoutMS\f1 to
+\fB30000\f1 milliseconds at startup:
+.PP
+.EX
+  mongos \-\-setParameter findShardsOnConfigTimeoutMS=30000
+.EE
+.RE
+.PP
 \fBloadRoutingTableOnStartup\f1
 .RS
 .PP
@@ -5003,8 +5528,6 @@ set the parameter during runtime with the
 .EX
   db.adminCommand( { setParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: 20} )
 .EE
-.PP
-Live Migration Protocol (https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/README.md#the\-live\-migration\-protocol)
 .RE
 .PP
 \fBmaxTimeMSForHedgedReads\f1
@@ -5318,7 +5841,7 @@ Default: 1000
 .PP
 To route and serve operations, shards must know the routing and
 ownership information associated with their collections. This
-information propogates from a shard\(aqs primary node to its
+information propagates from a shard\(aqs primary node to its
 secondary nodes through the replication of the internal cache
 collections \fBconfig.cache.collections\f1 and
 \fBconfig.cache.chunks.<collectionName>\f1\&.
@@ -5838,6 +6361,45 @@ pools, where \fBn\f1 is the number of cores. See
 \fBtaskExecutorPoolSize\f1\f1\&.
 .PP
 \fBShardingTaskExecutorPoolMinSize\f1\f1
+.RE
+.PP
+\fBShardingTaskExecutorPoolMaxQueueDepth\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+Type: Non\-negative integer
+.PP
+Default: 0
+.PP
+The maximum number of connection requests that an executor
+queues before it begins rejecting additional requests.
+.PP
+A value of \fB0\f1 means there is no limit to the size of the queue.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following example sets \fBShardingTaskExecutorPoolMaxQueueDepth\f1
+to \fB10\f1 during startup:
+.PP
+.EX
+  mongos \-\-setParameter ShardingTaskExecutorPoolMaxQueueDepth=10
+.EE
+.PP
+During run time, you can also set the parameter with the
+\fBsetParameter\f1\f1 command:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, ShardingTaskExecutorPoolMaxQueueDepth: 10 } )
+.EE
 .RE
 .PP
 \fBShardingTaskExecutorPoolMaxSizeForConfigServers\f1
@@ -6409,10 +6971,16 @@ When a read operation terminates due to \fBterminateSecondaryReadsOnOrphanCleanu
 MongoDB returns the following error:
 .PP
 .EX
-  {code: 175, name: QueryPlanKilled, categories: [CursorInvalidatedError], errmsg: "Read has been invalidated due to an orphan cleanup"}
+  {
+    code: 175, 
+    name: QueryPlanKilled, 
+    categories: [CursorInvalidatedError], 
+    errmsg: "Read has been terminated due to orphan range cleanup"
+  }
 .EE
 .PP
-This error is not retryable by design.
+This error is not retryable by design. To learn more about handling these
+errors, see \fBLong\-Running Secondary Reads in Sharded Clusters\f1\&.
 .RE
 .PP
 \fBwarmMinConnectionsInShardingTaskExecutorPoolOnStartup\f1
@@ -7010,6 +7578,23 @@ settings for the owner:
 \fBprocessUmask\f1\f1 is not available on Windows systems.
 .RE
 .PP
+\fBspillPath\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIDefault\f1: The value of the \fBdbPath\f1\f1 setting.
+.PP
+\fIType\f1: string
+.PP
+Path used by the spill engine when it writes to disk. You may
+find this useful when there is a risk of disk spill operations
+reducing the IOPS for concurrent queries.
+.PP
+This parameter is only available at startup. To set the
+parameter, use the \fBsetParameter\f1\f1 setting.
+.RE
+.PP
 \fBstorageEngineConcurrentReadTransactions\f1
 .RS
 .PP
@@ -7410,7 +7995,7 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIDefault\f1: false
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .PP
 Enables the \fBauditing\f1 of authorization
@@ -7479,7 +8064,7 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIType\f1: string
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .PP
@@ -7509,7 +8094,7 @@ Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
 .PP
 \fIDefault\f1: false
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .PP
@@ -7572,6 +8157,42 @@ You can also set this parameter during startup. For example:
 .PP
 .EX
   mongod \-\-setParameter AbortExpiredTransactionsSessionCheckoutTimeout=120
+.EE
+.RE
+.PP
+\fBcachePressureQueryPeriodMilliseconds\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: integer
+.PP
+\fIDefault\f1: 1000 milliseconds
+.PP
+The time interval MongoDB waits between checks for storage engine cache pressure.
+If the storage engine is under cache pressure, MongoDB aborts the oldest transaction.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following example sets
+\fBcachePressureQueryPeriodMilliseconds\f1 to \fB3000\f1 milliseconds at runtime:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, cachePressureQueryPeriodMilliseconds: 3000 } )
+.EE
+.PP
+You can also set this parameter at startup. For example:
+.PP
+.EX
+  mongod \-\-setParameter cachePressureQueryPeriodMilliseconds=3000
 .EE
 .RE
 .PP
@@ -7907,5 +8528,85 @@ MongoDB Shell (https://www.mongodb.com/docs/mongodb\-shell/):
 .PP
 .EX
   db.adminCommand( { setParameter: 1, planCacheSize: "80MB" } )
+.EE
+.RE
+.SS DATABASE PROFILER PARAMETERS
+.PP
+\fBinternalQueryGlobalProfilingLockDeadlineMs\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: Integer
+.PP
+\fIDefault\f1: 1
+.PP
+The maximum number of milliseconds to wait for a lock acquisition before
+performing writes to \fBprofile\f1\f1 collections.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following command sets \fBinternalQueryGlobalProfilingLockDeadlineMs\f1
+to \fB100\f1 milliseconds at runtime:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 100 } )
+.EE
+.PP
+The following command sets \fBinternalQueryGlobalProfilingLockDeadlineMs\f1
+to \fB100\f1 milliseconds at startup:
+.PP
+.EX
+  mongod \-\-setParameter internalQueryGlobalProfilingLockDeadlineMs=100
+.EE
+.RE
+.PP
+\fBinternalProfilingMaxAbandonedWritesPerSecondPerDb\f1
+.RS
+.PP
+Available for \fBmongod\f1\f1 only.
+.PP
+\fIType\f1: Integer
+.PP
+\fIDefault\f1: 1000
+.PP
+Specifies the maximum number of lock timeouts per second when trying to write
+to \fBprofile\f1\f1 collections. Once this threshold is
+reached, profiling is disabled for this database. This setting lasts until
+you manually re\-enable profiling.
+.PP
+The value can be \fB0\f1, which means a single lock timeout disables profiling
+for the database.
+.PP
+This parameter is available both at runtime and at startup:
+.RS
+.IP \(bu 2
+To set the parameter at runtime, use the
+\fBsetParameter\f1\f1 command.
+.IP \(bu 2
+To set the parameter at startup, use the
+\fBsetParameter\f1\f1 setting.
+.RE
+.PP
+The following command sets \fBinternalProfilingMaxAbandonedWritesPerSecondPerDb\f1
+to \fB2000\f1 at runtime:
+.PP
+.EX
+  db.adminCommand( { setParameter: 1, internalProfilingMaxAbandonedWritesPerSecondPerDb: 2000 } )
+.EE
+.PP
+The following command sets \fBinternalProfilingMaxAbandonedWritesPerSecondPerDb\f1
+to \fB2000\f1 at startup:
+.PP
+.EX
+  mongod \-\-setParameter internalProfilingMaxAbandonedWritesPerSecondPerDb=2000
 .EE
 .RE
