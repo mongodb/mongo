@@ -64,7 +64,6 @@ public:
 
     ~AsioNetworkingBaton() override {
         invariant(!_opCtx);
-        invariant(!_lazyDisconnectSession);
         invariant(_sessions.empty());
         invariant(_scheduled.empty());
         invariant(_timers.empty());
@@ -166,7 +165,6 @@ private:
         stdx::unique_lock<stdx::mutex>&, ClockSource*);
 
     Future<void> _addSession(Session& session, short events);
-    Future<void> _addSession(stdx::unique_lock<stdx::mutex>& lk, Session& session, short events);
 
     void detachImpl() override;
 
@@ -245,11 +243,6 @@ private:
      */
     absl::flat_hash_map<SessionId, TransportSession> _sessions;
     absl::flat_hash_map<SessionId, TransportSession> _pendingSessions;
-
-    // Deferred POLLRDHUP registration — set by markKillOnClientDisconnect(), materialized
-    // in _poll(), discarded in detachImpl(). Avoids promise/future and hash map overhead
-    // for operations that complete without polling. Only accessed by the owning thread.
-    Session* _lazyDisconnectSession = nullptr;
 
     /**
      * We use three structures to maintain timers:

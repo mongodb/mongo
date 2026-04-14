@@ -250,7 +250,11 @@ void AsioNetworkingBaton::markKillOnClientDisconnect() {
     auto client = _opCtx->getClient();
     invariant(client);
     if (auto session = client->session()) {
-        _lazyDisconnectSession = session.get();
+        auto code = client->getDisconnectErrorCode();
+        _addSession(*session, POLLRDHUP).getAsync([this, code](Status status) {
+            if (status.isOK())
+                _opCtx->markKilled(code);
+        });
     }
 }
 
@@ -457,18 +461,6 @@ void AsioNetworkingBaton::_safeExecuteNoThrow(stdx::unique_lock<stdx::mutex> lk,
 
 std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBaton::_poll(
     stdx::unique_lock<stdx::mutex>& lk, ClockSource* clkSource) {
-
-    // Materialize deferred POLLRDHUP registration before polling.
-    if (_lazyDisconnectSession) {
-        Session* session = _lazyDisconnectSession;
-        _lazyDisconnectSession = nullptr;
-        auto code = _opCtx->getClient()->getDisconnectErrorCode();
-        _addSession(lk, *session, POLLRDHUP).getAsync([this, code](Status status) {
-            if (status.isOK())
-                _opCtx->markKilled(code);
-        });
-    }
-
     const auto now = clkSource->now();
 
     // If we have a timer, then use it to enforce a timeout for polling.
@@ -601,21 +593,14 @@ std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBato
 }
 
 Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) try {
-    stdx::unique_lock lk(_mutex);
-    return _addSession(lk, session, events);
-} catch (const DBException& ex) {
-    return ex.toStatus();
-}
-
-Future<void> AsioNetworkingBaton::_addSession(stdx::unique_lock<stdx::mutex>& lk,
-                                              Session& session,
-                                              short events) {
     auto pf = makePromiseFuture<void>();
     TransportSession ts{checked_cast<AsioSession&>(session).getSocket().native_handle(),
                         events,
                         false,
                         std::move(pf.promise)};
     SessionId id = session.id();
+
+    stdx::unique_lock lk(_mutex);
 
     // The session could exist in _sessions, and we need to assert that it's canceled if so.
     auto it = _sessions.find(id);
@@ -628,7 +613,6 @@ Future<void> AsioNetworkingBaton::_addSession(stdx::unique_lock<stdx::mutex>& lk
               "Tried to add an already existing session");
 
     // _safeExecute moving the session from _pendingSessions to _sessions.
-    // _safeExecute consumes the lock, so re-acquire it before returning.
     _safeExecute(std::move(lk), [this, id](stdx::unique_lock<stdx::mutex> lk) {
         auto it = _pendingSessions.find(id);
         if (it == _pendingSessions.end()) {
@@ -656,8 +640,9 @@ Future<void> AsioNetworkingBaton::_addSession(stdx::unique_lock<stdx::mutex>& lk
             promise->setError(getCanceledError());
     });
 
-    lk = stdx::unique_lock<stdx::mutex>(_mutex);
     return std::move(pf.future);
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 void AsioNetworkingBaton::detachImpl() {
@@ -668,9 +653,6 @@ void AsioNetworkingBaton::detachImpl() {
     _opCtx->setBaton(nullptr);
 
     _opCtx = nullptr;
-
-    // Discard any unmaterialized lazy disconnect registration.
-    _lazyDisconnectSession = nullptr;
 
     if (MONGO_likely(_scheduled.empty() && _sessions.empty() && _pendingSessions.empty() &&
                      _timers.empty() && _pendingTimers.empty()))
