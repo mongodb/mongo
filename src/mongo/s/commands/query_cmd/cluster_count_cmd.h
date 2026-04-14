@@ -475,7 +475,6 @@ public:
                     // Transform the nss, routingCtx and cmdObj if the 'rawData' field is enabled
                     // and the collection is timeseries.
                     auto countRequestForShard = originalCountRequest;
-                    // TODO SERVER-120493: Remove cmdObj local var.
                     const auto& cmdObj = unparsedRequest().body;
                     auto nss = originalNss;
                     const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
@@ -591,8 +590,8 @@ public:
 
                     long long millisElapsed = timer.millis();
 
-                    const char* mongosStageName =
-                        ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
+                    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(
+                        shardResponses.size(), countRequestForShard);
 
                     return ClusterExplain::buildExplainResult(expCtx,
                                                               shardResponses,

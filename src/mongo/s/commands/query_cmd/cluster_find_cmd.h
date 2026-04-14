@@ -300,7 +300,7 @@ public:
                     long long millisElapsed = timer.millis();
 
                     const char* mongosStageName = ClusterExplain::getStageNameForReadOp(
-                        shardResponses.size(), unparsedRequest().body);
+                        shardResponses.size(), *cmdRequestForShards);
 
                     auto bodyBuilder = result->getBodyBuilder();
                     uassertStatusOK(ClusterExplain::buildExplainResult(query->getExpCtx(),

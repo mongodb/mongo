@@ -493,8 +493,8 @@ public:
 
                     long long millisElapsed = timer.millis();
 
-                    const char* mongosStageName =
-                        ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
+                    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(
+                        shardResponses.size(), distinctRequest);
 
                     return ClusterExplain::buildExplainResult(
                         makeBlankExpressionContext(opCtx, nss),

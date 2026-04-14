@@ -65,8 +65,20 @@ public:
      * Determines the kind of "execution stage" that mongos would use in order to collect the
      * responses from the shards, assuming that the command being explained is a read operation
      * such as find or count.
+     *
+     * Accepts the parsed command request object (e.g. FindCommandRequest, CountCommandRequest).
      */
-    static const char* getStageNameForReadOp(size_t numShards, const BSONObj& explainObj);
+    template <typename RequestType>
+    static const char* getStageNameForReadOp(size_t numShards, const RequestType& request) {
+        if (numShards == 1) {
+            return kSingleShard;
+        } else if constexpr (requires { request.getSort(); }) {
+            if (!request.getSort().isEmpty()) {
+                return kMergeSortFromShards;
+            }
+        }
+        return kMergeFromShards;
+    }
 
     /**
      * When a database is not found, use this method to construct an EOF plan explain() response.
