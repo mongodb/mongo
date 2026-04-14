@@ -16,8 +16,10 @@ export class Mongorestore {
         nsFrom = undefined,
         nsTo = undefined,
         drop = true,
-        maintainInsertionOrder = true,
         gzip = true,
+        maintainInsertionOrder = true,
+        numParallelCollections = 1,
+        numInsertionWorkersPerCollection = 1,
     } = {}) {
         if (archive === undefined) {
             throw new Error("Archive must be provided to Mongorestore.execute()");
@@ -39,6 +41,14 @@ export class Mongorestore {
 
         if (maintainInsertionOrder) {
             args.push("--maintainInsertionOrder");
+        }
+
+        if (numParallelCollections) {
+            args.push(`--numParallelCollections=${numParallelCollections}`);
+        }
+
+        if (numInsertionWorkersPerCollection) {
+            args.push(`--numInsertionWorkersPerCollection=${numInsertionWorkersPerCollection}`);
         }
 
         if (gzip) {

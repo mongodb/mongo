@@ -23,11 +23,27 @@ export function populateTPCHDataset(scale) {
         nsFrom: "tpch.*",
         nsTo: `${dbName}.*`,
         drop: true,
-        maintainInsertionOrder: true,
         gzip: true,
+        // Remove as much concurrency as possible in order to reduce
+        // the non-determinism in the final on-disk and memory representations.
+        maintainInsertionOrder: true,
+        numParallelCollections: 1,
+        numInsertionWorkersPerCollection: 1,
     });
+
+    const tpchDb = db.getMongo().getDB(dbName);
+
+    // Compact each collection to further reduce the potential for non-determinism
+    tpchDb.getCollectionNames().forEach(function (collName) {
+        assert.commandWorked(tpchDb.runCommand({compact: collName}));
+    });
+
+    // Increase determinism in the WT on-disk files (which have an effect on join costing)
+    // by preventing further writes.
+    assert.commandWorked(tpchDb.adminCommand({setParameter: 1, syncdelay: 0}));
+    assert.commandWorked(tpchDb.adminCommand({fsync: 1, lock: true}));
 
     checkPauseAfterPopulate();
 
-    return db.getMongo().getDB(dbName);
+    return tpchDb;
 }

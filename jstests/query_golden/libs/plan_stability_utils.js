@@ -400,4 +400,7 @@ export function runPlanStabilityCommands(db, commands, resultsetRepresentation =
     );
 
     print("}");
+
+    // Unlock the database in case it was locked just after populating the data
+    assert.commandWorked(db.getMongo().getDB("admin").fsyncUnlock());
 }

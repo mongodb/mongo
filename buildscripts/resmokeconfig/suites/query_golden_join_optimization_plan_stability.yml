@@ -25,3 +25,16 @@ executor:
         # Deterministic sampling is required in order to get
         # deterministic query plans in plan stability tests
         internalQuerySamplingBySequentialScan: true
+        # Concurrent index builds can also cause non-determinism
+        # in the in-memory or on-disk representations.
+        maxNumActiveUserIndexBuilds: 1
+      # Costs are sensitive to the size of the WT cache size,
+      # which is computed dynamically. Set it to a fixed value to
+      # ensure determinism.
+      wiredTigerCacheSizeGB: 1
+      # Prevent extending the WT files dynamically, as this may introduce
+      # non-determinism in their sizes
+      wiredTigerEngineConfigString: "file_extend=(data=0,log=0)"
+      # Disable compression, as for some reason it also causes non-determinism on certain platforms
+      wiredTigerCollectionBlockCompressor: none
+      wiredTigerJournalCompressor: none
