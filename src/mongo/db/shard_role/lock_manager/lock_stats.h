@@ -218,7 +218,7 @@ public:
         }
     }
 
-    void report(BSONObjBuilder* builder) const;
+    void report(BSONObjBuilder* builder, bool reportZeroMetrics = false) const;
     void reset();
     int64_t getCumulativeWaitTimeMicros() const;
 
@@ -236,7 +236,8 @@ private:
 
     void _report(BSONObjBuilder* builder,
                  const char* resourceTypeName,
-                 const PerModeLockStatCounters& stat) const;
+                 const PerModeLockStatCounters& stat,
+                 bool reportZeroMetrics = false) const;
 
     int64_t _getWaitTime(const PerModeLockStatCounters& stat) const;
 

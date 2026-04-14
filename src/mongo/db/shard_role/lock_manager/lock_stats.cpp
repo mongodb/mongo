@@ -41,26 +41,29 @@ template <typename CounterType>
 LockStats<CounterType>::LockStats() = default;
 
 template <typename CounterType>
-void LockStats<CounterType>::report(BSONObjBuilder* builder) const {
+void LockStats<CounterType>::report(BSONObjBuilder* builder, bool reportZeroMetrics) const {
     for (uint8_t i = 0; i < static_cast<uint8_t>(ResourceGlobalId::kNumIds); ++i) {
         _report(builder,
                 resourceGlobalIdName(static_cast<ResourceGlobalId>(i)),
-                _resourceGlobalStats[i]);
+                _resourceGlobalStats[i],
+                reportZeroMetrics);
     }
 
     // Index starting from offset 2 because position 0 is a sentinel value for invalid resource/no
     // lock, and position 1 is the global resource which was already reported above.
     for (int i = 2; i < ResourceTypesCount; i++) {
-        _report(builder, resourceTypeName(static_cast<ResourceType>(i)), _stats[i]);
+        _report(
+            builder, resourceTypeName(static_cast<ResourceType>(i)), _stats[i], reportZeroMetrics);
     }
 
-    _report(builder, "oplog", _oplogStats);
+    _report(builder, "oplog", _oplogStats, reportZeroMetrics);
 }
 
 template <typename CounterType>
 void LockStats<CounterType>::_report(BSONObjBuilder* builder,
                                      const char* resourceTypeName,
-                                     const PerModeLockStatCounters& stat) const {
+                                     const PerModeLockStatCounters& stat,
+                                     bool reportZeroMetrics) const {
     std::unique_ptr<BSONObjBuilder> section;
 
     // All indexing below starts from offset 1, because we do not want to report/account
@@ -71,8 +74,7 @@ void LockStats<CounterType>::_report(BSONObjBuilder* builder,
         std::unique_ptr<BSONObjBuilder> numAcquires;
         for (int mode = 1; mode < LockModesCount; mode++) {
             long long value = counter_ops::get(stat.modeStats[mode].numAcquisitions);
-
-            if (value > 0) {
+            if (value > 0 || reportZeroMetrics) {
                 if (!numAcquires) {
                     if (!section) {
                         section.reset(new BSONObjBuilder(builder->subobjStart(resourceTypeName)));
@@ -90,7 +92,7 @@ void LockStats<CounterType>::_report(BSONObjBuilder* builder,
         std::unique_ptr<BSONObjBuilder> numWaits;
         for (int mode = 1; mode < LockModesCount; mode++) {
             long long value = counter_ops::get(stat.modeStats[mode].numWaits);
-            if (value > 0) {
+            if (value > 0 || reportZeroMetrics) {
                 if (!numWaits) {
                     if (!section) {
                         section.reset(new BSONObjBuilder(builder->subobjStart(resourceTypeName)));
@@ -108,7 +110,7 @@ void LockStats<CounterType>::_report(BSONObjBuilder* builder,
         std::unique_ptr<BSONObjBuilder> timeAcquiring;
         for (int mode = 1; mode < LockModesCount; mode++) {
             long long value = counter_ops::get(stat.modeStats[mode].combinedWaitTimeMicros);
-            if (value > 0) {
+            if (value > 0 || reportZeroMetrics) {
                 if (!timeAcquiring) {
                     if (!section) {
                         section.reset(new BSONObjBuilder(builder->subobjStart(resourceTypeName)));

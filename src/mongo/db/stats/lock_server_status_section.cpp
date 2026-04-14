@@ -128,7 +128,7 @@ public:
         SingleThreadedLockStats stats;
         reportGlobalLockingStats(&stats);
 
-        stats.report(&ret);
+        stats.report(&ret, true);
 
         return ret.obj();
     }

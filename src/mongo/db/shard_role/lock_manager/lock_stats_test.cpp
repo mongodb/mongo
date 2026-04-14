@@ -231,17 +231,52 @@ TEST_F(LockStatsTest, GlobalRetrievableSeparately) {
     assertGlobalAcquisitionStats(opCtx.get(), resourceIdReplicationStateTransitionLock);
 }
 
+TEST_F(LockStatsTest, NoLocksReport) {
+    resetGlobalLockStats_forTest();
+
+    // If there are no locks
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
+
+    // no metrics should be reported
+    BSONObjBuilder builder;
+    stats.report(&builder);
+    auto lockingStats = builder.done();
+    ASSERT_TRUE(lockingStats.isEmpty());
+
+    // if the reportZeroMetrics parameters is on, report all zero values, for better FTDC retention
+    BSONObjBuilder builder2;
+    stats.report(&builder2, true);
+    lockingStats = builder2.done();
+    std::string resourceTypes[] = {"Global",
+                                   "Tenant",
+                                   "Database",
+                                   "Collection",
+                                   "Metadata",
+                                   "DDLDatabase",
+                                   "DDLCollection",
+                                   "Mutex",
+                                   "MultiDocumentTransactionsBarrier",
+                                   "oplog"};
+    std::string metrics[] = {"acquireCount", "acquireWaitCount", "timeAcquiringMicros"};
+    std::string lockModes[] = {"R", "W", "r", "w"};
+    for (auto& resourceType : resourceTypes) {
+        for (auto& metric : metrics) {
+            for (auto& lockMode : lockModes) {
+                ASSERT_EQUALS(0,
+                              lockingStats.getObjectField(resourceType)
+                                  .getObjectField(metric)
+                                  .getIntField(lockMode));
+            }
+        }
+    }
+}
+
 TEST_F(LockStatsTest, ServerStatus) {
     resetGlobalLockStats_forTest();
 
-    // If there are no locks, nothing is reported.
-    SingleThreadedLockStats stats;
-    reportGlobalLockingStats(&stats);
-    BSONObjBuilder builder;
-    stats.report(&builder);
-    ASSERT_EQUALS(0, builder.done().nFields());
-
     // Take the global and RSTL locks in MODE_IX to create acquisition stats for them.
+    SingleThreadedLockStats stats;
     auto opCtx = makeOperationContext();
     Locker locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), LockMode::MODE_IX);
@@ -252,9 +287,9 @@ TEST_F(LockStatsTest, ServerStatus) {
 
     // Now the MODE_IX lock acquisitions should be reported, separately for each lock type.
     reportGlobalLockingStats(&stats);
-    BSONObjBuilder builder2;
-    stats.report(&builder2);
-    auto lockingStats = builder2.done();
+    BSONObjBuilder builder;
+    stats.report(&builder);
+    auto lockingStats = builder.done();
     ASSERT_EQUALS(
         1, lockingStats.getObjectField("Global").getObjectField("acquireCount").getIntField("w"));
     ASSERT_EQUALS(1,
