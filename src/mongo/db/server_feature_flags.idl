@@ -308,6 +308,11 @@ feature_flags:
         default: true
         fcv_gated: true
         version: 9.0
+    featureFlagDSCLinearizableReadConcern:
+        description: "Enable linearizable read concern for dsc."
+        cpp_varname: gFeatureFlagDSCLinearizableReadConcern
+        default: false
+        fcv_gated: false
 
 server_parameters:
     allowDirectSystemBucketsAccess:
