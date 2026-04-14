@@ -38,11 +38,33 @@ function getOptions(useAdminThreads) {
     return {opts: opts, hosts: host, proxyServer: proxyServer};
 }
 
+/**
+ * MongoRunner may connect as soon as the main port listens, but the priority listener can bind
+ * later during startup. Wait until the priority address accepts connections before running the
+ * test (see BF-42425).
+ */
+function waitForPriorityPortReady(hosts) {
+    assert.soon(
+        () => {
+            try {
+                const c = new Mongo(hosts.admin);
+                c.close();
+                return true;
+            } catch (unusedErr) {
+                return false;
+            }
+        },
+        "Timed out waiting for priority port to accept connections",
+        60000,
+    );
+}
+
 function setupTestReplicaSet(useAdminThreads) {
     let args = getOptions(useAdminThreads);
     const m = MongoRunner.runMongod(args.opts);
     args.conn = m;
     args.shutdown = () => MongoRunner.stopMongod(m);
+    waitForPriorityPortReady(args.hosts);
     return args;
 }
 
@@ -51,6 +73,7 @@ function setupTestSharded(useAdminThreads) {
     const s = new ShardingTest({mongos: [args.opts], config: 1, shards: 1, useHostname: false});
     args.conn = s.s0;
     args.shutdown = () => s.stop();
+    waitForPriorityPortReady(args.hosts);
     return args;
 }
 
