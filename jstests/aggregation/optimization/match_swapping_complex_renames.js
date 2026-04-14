@@ -5,6 +5,8 @@
  *   do_not_wrap_aggregations_in_facets,
  *   requires_pipeline_optimization,
  *   featureFlagImprovedDepsAnalysis,
+ *   # The test asserts on explain output.
+ *   assumes_unsharded_collection,
  * ]
  */
 import {describe, it} from "jstests/libs/mochalite.js";
