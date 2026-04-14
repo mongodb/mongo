@@ -558,7 +558,8 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // If the pipeline is modified by desugaring, a reparse will be required. Otherwise, we can
     // optimize out the reparse.
     auto clonedLPP = liteParsedPipeline.clone();
-    const auto wasDesugaredHere = !alreadyDesugared && LiteParsedDesugarer::desugar(&clonedLPP);
+    const auto wasDesugaredHere =
+        !alreadyDesugared && LiteParsedDesugarer::desugar(&clonedLPP, ifrContext);
 
     // Parse the user's original pipeline pre-desugar to capture query stats. Passing through
     // wasDesugaredHere will determine whether a StubMongoProcessInterface will be attached to this

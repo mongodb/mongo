@@ -42,7 +42,8 @@ MONGO_INITIALIZER(RegisterViewPipelineDesugarer)(InitializerContext*) {
     ResolvedNamespace::setViewPipelineDesugarer(&LiteParsedDesugarer::desugar);
 }
 
-bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline) {
+bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
+                                  std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     const auto& stages = pipeline->getStages();
     bool modified = false;
     size_t i = 0;
@@ -55,10 +56,11 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline) {
         // from LPP - stages with subpipelines should pass the desugared LP subpipelines through
         // StageParams.
         // TODO SERVER-120179 Remove the feature flag guard when the feature flag is enabled.
+        // TODO SERVER-121320 Check the value of the hybrid search field using the IFR context.
         if (feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
             auto& subpipelines = stage.getMutableSubPipelines();
             for (auto& subpipelineLpp : subpipelines) {
-                modified |= LiteParsedDesugarer::desugar(&subpipelineLpp);
+                modified |= LiteParsedDesugarer::desugar(&subpipelineLpp, ifrContext);
             }
         }
 

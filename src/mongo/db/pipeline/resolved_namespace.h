@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/modules.h"
@@ -84,7 +85,8 @@ public:
     // ResolvedNamespace lives in the lite_parsed_document_source target while the desugarer lives
     // in its own target that depends on lite_parsed_document_source. A direct call would create a
     // circular dependency, so the desugarer registers itself at startup via a MONGO_INITIALIZER.
-    using ViewPipelineDesugarer = std::function<bool(LiteParsedPipeline*)>;
+    using ViewPipelineDesugarer =
+        std::function<bool(LiteParsedPipeline*, std::shared_ptr<IncrementalFeatureRolloutContext>)>;
 
     // Registers the desugarer callback. Called once at startup from a MONGO_INITIALIZER in
     // lite_parsed_desugarer.cpp.

@@ -96,6 +96,8 @@ public:
 
 }  // namespace
 
+// TODO SERVER-121320 Define an IFR context for each test and replace the nullptr callsites in
+// LiteParsedDesugarer::desugar() with it.
 class LiteParsedDesugarerTest : public AggregationContextFixture {
 public:
     LiteParsedDesugarerTest() : LiteParsedDesugarerTest(_nss) {}
@@ -208,7 +210,7 @@ TEST_F(LiteParsedDesugarerTest, NoopOnEmptyPipeline) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 0);
 
-    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     ASSERT_EQ(lpp.getStages().size(), 0);
 }
@@ -221,7 +223,7 @@ TEST_F(LiteParsedDesugarerTest, NoopOnNonExpandableStages) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 2);
 
-    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 2);
@@ -243,7 +245,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 1);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
         auto& stages = lpp.getStages();
         ASSERT_EQ(stages.size(), 1);
@@ -260,7 +262,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 3);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
         // Expect: [$project, $match, $project].
         auto& stages = lpp.getStages();
@@ -280,7 +282,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 2);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
         // Expect: [$match, $project].
         auto& stages = lpp.getStages();
@@ -299,7 +301,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 2);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
         // Expect: [$project, $match].
         auto& stages = lpp.getStages();
@@ -324,7 +326,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandToExtAst) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 1);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
         auto& stages = lpp.getStages();
         ASSERT_EQ(stages.size(), 1);
@@ -362,11 +364,11 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandToExtAst) {
         };
 
         // First desugar pass.
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
         checkLiteParsedPipelineShape(lpp);
 
         // Second desugar pass should be a no-op.
-        ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp));
+        ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
         checkLiteParsedPipelineShape(lpp);
     }
 }
@@ -383,7 +385,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsSingleExpandToExtParseOnly) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 1);
@@ -407,7 +409,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsRecursiveTopToLeaves) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 4);
@@ -445,7 +447,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMixedToMultipleStagesSplicingIntoPipeline
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 3);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Expect [$project, extNoOp, extNoOp, $match, $idLookup, $project].
     auto& stages = lpp.getStages();
@@ -484,7 +486,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMultipleExpandablesSequentially) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 2);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Expect [LeafC, LeafD, LeafA, LeafB].
     auto& stages = lpp.getStages();
@@ -522,7 +524,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
     LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON(extStageName << BSONObj())})});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Main pipeline unchanged: [$lookup].
     auto& stages = lpp.getStages();
@@ -548,7 +550,7 @@ TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenFeatureFlagDisable
     ASSERT_EQ(lpp.getStages().size(), 1);
 
     // desugar returns false - no top-level expandable stage, and subpipelines are skipped.
-    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Subpipeline unchanged: still [$expandToHostParse] (not desugared to [$match]).
     auto& subpipelines = lpp.getStages()[0]->getSubPipelines();
@@ -568,7 +570,7 @@ TEST_F(LiteParsedDesugarerTest, NoopOnLookupSubpipelineWithNonExpandableStages) 
     LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON("$match" << BSON("a" << 1))})});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Subpipeline unchanged: [$match].
     assertSubpipelineStageIsMatch(lpp.getStages()[0].get(), 0, 0);
@@ -588,7 +590,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineAndTopLevelExpandableStage) {
                             BSON(extStageName << BSONObj())});
     ASSERT_EQ(lpp.getStages().size(), 2);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Main pipeline: [$lookup, $match] (expandToHostParse expanded to $match).
     auto& stages = lpp.getStages();
@@ -616,7 +618,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsAllSubpipelinesInFacetStage) {
                                                            << BSON_ARRAY(expandStage)))});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Main pipeline unchanged: [$facet].
     auto& stages = lpp.getStages();
@@ -646,7 +648,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
                                           << "pipeline" << BSON_ARRAY(lookupStage)))});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Main pipeline unchanged: [$unionWith].
     auto& stages = lpp.getStages();
@@ -685,7 +687,7 @@ TEST_F(LiteParsedDesugarerTest, DesugaringOrderInnermostFirst) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
 
     ASSERT_EQ(lpp.getStages().size(), 1);
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // The lift stage was replaced with its subpipeline contents. With innermost-first ordering,
     // those contents were desugared before the lift, so we get [$match] not [$expandToHostParse].

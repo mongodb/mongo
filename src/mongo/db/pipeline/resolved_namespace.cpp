@@ -189,7 +189,8 @@ void ResolvedNamespace::desugarViewPipeline() {
     // _viewPipelineDesugarer is registered at startup by lite_parsed_desugarer.cpp. See the
     // ViewPipelineDesugarer typedef comment in resolved_namespace.h for why this is a callback.
     if (_parsedPipeline && _viewPipelineDesugarer) {
-        _viewPipelineDesugarer(_parsedPipeline.get());
+        auto ifrContext = _lpOptions ? _lpOptions->ifrContext : nullptr;
+        _viewPipelineDesugarer(_parsedPipeline.get(), std::move(ifrContext));
     }
 }
 

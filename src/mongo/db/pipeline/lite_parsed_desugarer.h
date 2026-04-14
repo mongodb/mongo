@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #pragma once
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
@@ -40,7 +41,8 @@ public:
         std::function<size_t(LiteParsedPipeline*, size_t index, LiteParsedDocumentSource&)>;
 
     // Desugars the LiteParsedPipeline and returns whether the pipeline was modified or not.
-    static bool desugar(LiteParsedPipeline* pipeline);
+    static bool desugar(LiteParsedPipeline* pipeline,
+                        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
 
     static void registerStageExpander(StageParams::Id id, StageExpander stageExpander) {
         _stageExpanders[id] = std::move(stageExpander);

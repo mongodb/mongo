@@ -52,9 +52,11 @@ LiteParsedPipeline makeLiteParsedPipeline(const boost::intrusive_ptr<ExpressionC
                               LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
 }
 
-void desugarIfNecessary(LiteParsedPipeline& liteParsedPipeline, const MakePipelineOptions& opts) {
+void desugarIfNecessary(LiteParsedPipeline& liteParsedPipeline,
+                        const MakePipelineOptions& opts,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (opts.desugar) {
-        LiteParsedDesugarer::desugar(&liteParsedPipeline);
+        LiteParsedDesugarer::desugar(&liteParsedPipeline, expCtx->getIfrContext());
     }
 }
 
@@ -65,7 +67,7 @@ std::unique_ptr<Pipeline> parseAndDesugarPipeline(
 
     LiteParsedPipeline liteParsedPipeline = makeLiteParsedPipeline(expCtx, rawPipeline);
 
-    desugarIfNecessary(liteParsedPipeline, opts);
+    desugarIfNecessary(liteParsedPipeline, opts, expCtx);
 
     return Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
 }
@@ -227,7 +229,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     // Create a LiteParsedPipeline for the user pipeline and apply view handling via bindViewInfo().
     LiteParsedPipeline userLiteParsedPipeline(
         makeLiteParsedPipeline(subPipelineExpCtx, currentPipeline));
-    desugarIfNecessary(userLiteParsedPipeline, opts);
+    desugarIfNecessary(userLiteParsedPipeline, opts, subPipelineExpCtx);
 
     // Apply the view to the user pipeline.
     const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};

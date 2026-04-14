@@ -698,7 +698,7 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineFromLPPWithMaybe
 
     // TODO SERVER-117882 Remove this call once $lookup forwards its desugared LPP subpipeline in
     // StageParams.
-    LiteParsedDesugarer::desugar(&desugaredPipeline);
+    LiteParsedDesugarer::desugar(&desugaredPipeline, expCtx->getIfrContext());
 
     if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
         isRawDataOperation(expCtx->getOperationContext())) {
