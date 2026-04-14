@@ -228,6 +228,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/scripting:scripting_server",
         "//src/third_party/benchmark",
     ],
 )

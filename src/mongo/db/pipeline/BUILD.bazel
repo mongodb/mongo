@@ -1154,13 +1154,14 @@ mongo_cc_unit_test(
         "monotonic_expression_test.cpp",
     ],
     srcs_select = [{
-        "//bazel/config:js_engine_mozjs": [
+        "//bazel/config:js_engine_use_legacy": [
             "accumulator_js_test.cpp",
             "expression_javascript_test.cpp",
         ],
+        "//bazel/config:js_engine_wasm_supported": [
+        ],
         "//bazel/config:js_engine_none": [
         ],
-        "//bazel/config:js_engine_wasm": [],
     }],
     tags = [
         "code_coverage_quarantine",
@@ -1174,6 +1175,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/scripting:scripting_server",
         "//src/mongo/unittest",
     ],
 )

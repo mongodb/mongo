@@ -129,7 +129,7 @@ mongo_cc_binary(
         "//src/mongo/db/shard_role/shard_catalog:indexcatalogtests.cpp",
     ],
     srcs_select = [{
-        "//bazel/config:js_engine_mozjs": [
+        "//bazel/config:js_engine_use_legacy": [
             "jstests.cpp",
             "matchertests.cpp",
         ],

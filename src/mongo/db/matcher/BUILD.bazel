@@ -33,7 +33,6 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/shard_role",
-        "//src/mongo/scripting:scripting_server",
     ],
 )
 

@@ -1645,7 +1645,8 @@ def windows_rc(name, src, manifest_in = None, icon = None):
                 "MONGO_VERSION": "$(MONGO_VERSION)",
                 "GIT_COMMIT_HASH": "$(GIT_COMMIT_HASH)",
             } | select({
-                "//bazel/config:js_engine_mozjs": {"js_engine_ver": "mozjs"},
+                "//bazel/config:js_engine_wasm_supported": {"js_engine_ver": "mozjs-wasm"},
+                "//bazel/config:js_engine_use_legacy": {"js_engine_ver": "mozjs"},
                 "//conditions:default": {"js_engine_ver": "none"},
             }) | select({
                 "//bazel/config:tcmalloc_google_enabled": {"MONGO_ALLOCATOR": "tcmalloc-google"},

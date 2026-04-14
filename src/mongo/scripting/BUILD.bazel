@@ -87,8 +87,7 @@ mongo_cc_library(
         "//bazel/config:js_engine_none": [
             "scripting_none.cpp",
         ],
-        "//bazel/config:js_engine_mozjs": [],
-        "//bazel/config:js_engine_wasm": [],
+        "//conditions:default": [],
     }],
     deps = [
         ":scripting_common",
@@ -97,7 +96,7 @@ mongo_cc_library(
         "//bazel/config:js_engine_none": [
             ":scripting_none",
         ],
-        "//bazel/config:js_engine_mozjs": [
+        "//conditions:default": [
             "//src/mongo/client:clientdriver_network",
             "//src/mongo/db:service_context",
             "//src/mongo/db/auth:security_token_auth",
@@ -105,9 +104,6 @@ mongo_cc_library(
             "//src/mongo/scripting/mozjs/shell:mozjs_shell",
             "//src/mongo/util/concurrency:spin_lock",
             "//src/third_party/mozjs",
-        ],
-        "//bazel/config:js_engine_wasm": [
-            ":scripting_wasm",
         ],
     }),
 )
@@ -127,6 +123,7 @@ mongo_cc_library(
     deps = [
         ":scripting_common",
         "//src/mongo/scripting/mozjs/wasm:wasmtime_engine",
+        "//src/mongo/util:buildinfo",
     ],
 )
 
@@ -136,8 +133,9 @@ mongo_cc_library(
         "scripting_server.cpp",
     ],
     deps = select({
-        "//bazel/config:server_js_enabled": ["scripting"],
-        "//conditions:default": ["scripting_none"],
+        "//bazel/config:js_engine_wasm_supported": [":scripting_wasm"],
+        "//bazel/config:js_engine_use_legacy": [":scripting"],
+        "//conditions:default": [":scripting_none"],
     }),
 )
 
@@ -173,7 +171,7 @@ mongo_cc_unit_test(
     }),
     tags = ["mongo_unittest_sixth_group"],
     target_compatible_with = select({
-        "//bazel/config:js_engine_mozjs": [],
+        "//bazel/config:js_engine_use_legacy": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
@@ -198,24 +196,23 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     srcs_select = [{
-        "//bazel/config:js_engine_mozjs": [
+        "//bazel/config:js_engine_wasm_supported": [
+            "//src/mongo/scripting/mozjs/wasm/scope:scope_test.cpp",
+        ],
+        "//bazel/config:js_engine_use_legacy": [
             "//src/mongo/scripting/mozjs:jscustomallocator_test.cpp",
             "//src/mongo/scripting/mozjs/shell:asan_handles_test.cpp",
             "//src/mongo/scripting/mozjs/shell:implscope_test.cpp",
             "//src/mongo/scripting/mozjs/shell:module_loader_test.cpp",
         ],
-        "//bazel/config:js_engine_wasm": [
-            "//src/mongo/scripting/mozjs/wasm/scope:scope_test.cpp",
-        ],
     }],
     tags = ["mongo_unittest_eighth_group"],
     target_compatible_with = select({
-        "//bazel/config:js_engine_mozjs": [],
-        "//bazel/config:js_engine_wasm": ["//bazel/config:not_ppc"],
-        "//conditions:default": ["@platforms//:incompatible"],
+        "//bazel/config:js_engine_none": ["@platforms//:incompatible"],
+        "//conditions:default": [],
     }),
     deps = [
         ":bson_template_evaluator",
-        ":scripting",
+        ":scripting_server",
     ],
 )

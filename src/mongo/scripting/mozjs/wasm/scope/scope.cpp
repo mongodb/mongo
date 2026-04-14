@@ -128,7 +128,7 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
         return 0;
     }
 
-    // TODO SERVER-119539 have invokeFunction return the value directly.
+    // Consider having invokeFunction return the value directly.
     // This would eliminate the extra round trip to the engine.
     auto result = _bridge->invokeFunction(func, args ? *args : BSONObj(), ignoreReturn);
     uassertStatusOK(result.getStatus());

@@ -1008,7 +1008,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
         "//src/mongo/db/update:update_driver",
-        "//src/mongo/scripting",
+        "//src/mongo/scripting:scripting_common",
         "//src/mongo/util:background_job",
         "//src/mongo/util:elapsed_tracker",
         "//src/third_party/s2",
@@ -1866,6 +1866,7 @@ mongo_cc_library(
         "//src/mongo/db/geo:geoparser",
         "//src/mongo/db/matcher:path",
         "//src/mongo/db/pipeline:aggregation_request_helper",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
         "//src/mongo/db/pipeline:variable_validation",
         "//src/mongo/db/query:query_knob_configuration",
         "//src/mongo/db/query:query_knobs",
@@ -1880,7 +1881,6 @@ mongo_cc_library(
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/update:pattern_cmp",
         "//src/mongo/rpc:metadata_impersonated_user",
-        "//src/mongo/scripting",
         "//src/mongo/scripting:scripting_common",
         "//src/mongo/util:elapsed_tracker",
         "//src/mongo/util:pcre_util",
@@ -2474,7 +2474,6 @@ mongo_cc_library(
         "//src/mongo/s/commands:cluster_commands",
         "//src/mongo/s/commands:sharded_cluster_commands",
         "//src/mongo/s/commands:sharded_cluster_sharding_commands",
-        "//src/mongo/scripting:scripting_server",
         "//src/mongo/transport:message_compressor_options_server",
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_manager",
@@ -2662,6 +2661,11 @@ mongo_cc_library(
             "//src/mongo/db/modules/atlas/src/disagg_storage/encryption:sls_log_encryption_manager",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:server_js_enabled": [
+            "//src/mongo/scripting:scripting_server",
+        ],
+        "//conditions:default": ["//src/mongo/scripting:scripting_none"],
     }),
 )
 
@@ -2689,7 +2693,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:sessions_collection_sharded",
         "//src/mongo/db/sharding_environment:sharding_initialization",
         "//src/mongo/s:startup_initialization",
-        "//src/mongo/scripting",
+        "//src/mongo/scripting:scripting_common",
         "//src/mongo/transport:ingress_handshake_metrics",
         "//src/mongo/transport:service_executor",
         "//src/mongo/transport:session_manager",

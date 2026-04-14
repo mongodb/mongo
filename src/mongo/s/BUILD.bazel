@@ -565,6 +565,11 @@ mongo_cc_library(
             "//src/mongo/db/modules/enterprise/src/kmip:kmip_configuration",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:server_js_enabled": [
+            "//src/mongo/scripting:scripting_server",
+        ],
+        "//conditions:default": ["//src/mongo/scripting:scripting_none"],
     }),
 )
 

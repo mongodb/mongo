@@ -1119,8 +1119,8 @@ mongo_cc_unit_test(
     ],
     srcs_select = [{
         "//bazel/config:js_engine_none": [],
-        "//bazel/config:js_engine_wasm": [],
-        "//bazel/config:js_engine_mozjs": [
+        "//bazel/config:js_engine_wasm_supported": [],
+        "//bazel/config:js_engine_use_legacy": [
             "//src/mongo/db/commands/query_cmd:mr_test.cpp",
         ],
     }],
@@ -1170,6 +1170,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/idl:idl_parser",
         "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/scripting:scripting_server",
         "//src/mongo/shell:kms_idl",
         "//src/mongo/util:version_impl",
     ],

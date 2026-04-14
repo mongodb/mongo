@@ -31,6 +31,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/pipeline:aggregation_request_helper",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_options",
     ],

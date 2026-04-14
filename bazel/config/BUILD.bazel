@@ -2686,6 +2686,38 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "js_engine_wasm_supported",
+    match_all = [
+        ":js_engine_wasm",
+        ":not_ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "js_engine_wasm_unsupported",
+    match_all = [
+        ":js_engine_wasm",
+        "@platforms//cpu:ppc64le",
+    ],
+)
+
+selects.config_setting_group(
+    name = "js_engine_use_legacy",
+    match_any = [
+        ":js_engine_mozjs",
+        ":js_engine_wasm_unsupported",
+    ],
+)
+
+selects.config_setting_group(
+    name = "js_engine_enabled",
+    match_any = [
+        ":js_engine_use_legacy",
+        ":js_engine_wasm_supported",
+    ],
+)
+
 # --------------------------------------
 # enterprise_features options
 # --------------------------------------
@@ -2780,7 +2812,7 @@ selects.config_setting_group(
     name = "enterprise_feature_fle_and_js_engine_enabled",
     match_all = [
         ":enterprise_feature_fle_enabled",
-        ":js_engine_mozjs",
+        ":js_engine_enabled",
     ],
 )
 
