@@ -461,6 +461,73 @@ buildvariants:
           - name: bazel_result_tasks_gen
             variant: generate-tasks-for-version
 
+  # This task is responsible for creating a TSAN AL2023 x86 server binary candidate for
+  # disagg-storage-services.
+  - name: enterprise-amazon2023-linux-x86-debug-tsan
+    display_name: "* TSAN Enterprise Amazon 2023 Linux x86 disagg-storage-services DEBUG"
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - amazon2023.3-large
+    activate: false
+    patchable: true
+    expansions:
+      docker_arch: "linux-x86-64"
+      large_distro_name: amazon2023.3-xlarge
+      compile_variant: enterprise-amazon2023-linux-x86-debug-tsan
+      build_mongot: true
+      download_mongot_release: true
+      bazel_compile_flags: >-
+        --config=dbg_tsan
+        --opt=on
+        --fission=no
+        --jobs=800
+        --define=MONGO_DISTMOD=amazon2023
+        --build_atlas
+      test_flags: --excludeWithAnyTags=tsan_incompatbible,incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+      has_packages: false
+      repo_edition: enterprise
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - amazon2023.3-xlarge
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023.3-xlarge
+      - name: package_supplementary_data
+      - name: push_mongod_to_ecr
+      - name: .requires_extra_system_deps .mongot_e2e_tests !.requires_large_host
+      - name: .requires_extra_system_deps .mongot_e2e_tests .requires_large_host
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .requires_extra_system_deps .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .development_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .release_critical !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .requires_extra_system_deps .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .release_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .default !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .requires_extra_system_deps .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .default .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .non_deterministic !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .requires_extra_system_deps .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .non_deterministic .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023.3-xlarge
+
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: linux-debug-aubsan-lite-all-feature-flags-required
     display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Enterprise DEBUG (all feature flags)"
