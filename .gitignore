@@ -347,10 +347,11 @@ etc/evaluated_evergreen_nightly.yml
 etc/evaluated_system_perf.yml
 etc/trimmed_system_perf.yml
 
-# evergreen files to ignore when detecting patch changes
+# evergreen files to ignore
 /version_expansions.yml
 /engflow.*
 /.bazelrc.evergreen
+/.evergreen.yml
 
 # Generated Typescript type declarations from IDLs
 src/mongo/shell/*_gen.d.ts
