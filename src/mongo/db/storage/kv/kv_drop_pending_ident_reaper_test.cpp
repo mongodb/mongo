@@ -428,14 +428,6 @@ DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest, TimestampedDropAfterUnknownD
     reaper.addDropPendingIdent(Timestamp(1, 0), std::make_shared<Ident>(identName));
 }
 
-TEST_F(KVDropPendingIdentReaperTest, UntimestampedDropCanFollowUnknownDrop) {
-    const std::string identName = "ident";
-    KVDropPendingIdentReaper reaper(nullptr);
-    auto ident = std::make_shared<Ident>(identName);
-    reaper.dropUnknownIdent(Timestamp(1, 0), identName);
-    reaper.addDropPendingIdent(StorageEngine::Immediate{}, ident);
-}
-
 TEST_F(KVDropPendingIdentReaperTest, GetEarliestDropTimestampReturnsBoostNoneOnEmptyIdents) {
     KVDropPendingIdentReaper reaper(nullptr);
     ASSERT_FALSE(reaper.getEarliestDropTimestamp());

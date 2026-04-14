@@ -80,14 +80,7 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
                                                    StorageEngine::DropIdentCallback&& onDrop) {
     invariant(dropTime != Timestamp::min());
     stdx::lock_guard lock(_mutex);
-
-    // Many tests drop an ident while a RecordStore for that ident is alive, resulting in a
-    // second drop when the RS is destroyed. Allow that specific use, but otherwise we should not
-    // see idents dropped while they're already drop-pending.
-    if (_dropPendingIdents.contains(ident->getIdent())) {
-        invariant(std::holds_alternative<StorageEngine::Immediate>(dropTime), ident->getIdent());
-        return;
-    }
+    invariant(!_dropPendingIdents.contains(ident->getIdent()), ident->getIdent());
 
     auto info = std::make_shared<IdentInfo>();
     info->identName = ident->getIdent();
