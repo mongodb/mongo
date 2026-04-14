@@ -60,7 +60,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
           NoOpBound{},
           (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled())
               ? std::make_shared<
-                    sorter::FileBasedSorterSpiller<SorterKey, SorterValue, SorterKeyComparator>>(
+                    sorter::FileBasedSpiller<SorterKey, SorterValue, SorterKeyComparator>>(
                     expCtx->getTempDir(),
                     &_sorterFileStats,
                     /*dbName=*/boost::none,

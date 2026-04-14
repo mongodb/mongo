@@ -42,7 +42,7 @@ std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
         opts,
         Comparator(_sortPattern),
         _diskUseAllowed
-            ? std::make_shared<sorter::FileBasedSorterSpiller<Value, T, Comparator>>(
+            ? std::make_shared<sorter::FileBasedSpiller<Value, T, Comparator>>(
                   _tempDir,
                   _sorterFileStats.get(),
                   /*dbName=*/boost::none,

@@ -517,7 +517,7 @@ private:
 // And also, 'Comparator' compares Keys, but std::priority_queue calls its comparator
 // on whole elements.
 //
-// Used for the BoundedSorter and spillWithHeap in the SorterSpiller class.
+// Used for the BoundedSorter and spillWithHeap in the sorter::Spiller class.
 template <typename Key, typename Value, typename Comparator>
 struct MONGO_MOD_PRIVATE Greater {
 
@@ -551,27 +551,29 @@ void validateMergeSpillRanges(
     }
 }
 
+namespace sorter {
+
 /**
  * A class where we declare how to spill depending on the underlying storage the sorter is using.
  */
 template <typename Key, typename Value, typename Comparator>
-class SorterSpiller {
+class Spiller {
 public:
-    typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
     typedef std::pair<Key, Value> Data;
 
-    virtual std::shared_ptr<Iterator> spill(const SortOptions& opts,
-                                            const Settings& settings,
-                                            std::span<std::pair<Key, Value>> data) = 0;
+    virtual std::shared_ptr<Iterator<Key, Value>> spill(const SortOptions& opts,
+                                                        const Settings& settings,
+                                                        std::span<std::pair<Key, Value>> data) = 0;
 
-    virtual std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
-                                                  const Settings& settings,
-                                                  std::span<std::pair<Key, Value>> data) = 0;
+    virtual std::unique_ptr<Iterator<Key, Value>> spillUnique(
+        const SortOptions& opts,
+        const Settings& settings,
+        std::span<std::pair<Key, Value>> data) = 0;
 
-    virtual std::shared_ptr<Iterator> spillWithHeap(
+    virtual std::shared_ptr<Iterator<Key, Value>> spillWithHeap(
         const SortOptions& opts,
         const Settings& settings,
         std::priority_queue<Data, std::vector<Data>, Greater<Key, Value, Comparator>>& heap) = 0;
@@ -586,7 +588,7 @@ public:
     virtual void mergeSpills(const SortOptions& opts,
                              const Settings& settings,
                              SorterStats& stats,
-                             std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
+                             std::vector<std::shared_ptr<Iterator<Key, Value>>>& iters,
                              Comparator comp,
                              std::size_t numTargetedSpills,
                              std::size_t maxSpillsPerMerge) = 0;
@@ -598,34 +600,34 @@ public:
      */
     virtual boost::filesystem::path getSpillDir() = 0;
 
-    virtual ~SorterSpiller() = default;
+    virtual ~Spiller() = default;
 };
 
 template <typename Key, typename Value, typename Comparator>
-class SorterSpillerBase : public SorterSpiller<Key, Value, Comparator> {
+class SpillerBase : public Spiller<Key, Value, Comparator> {
 public:
-    typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<Key, Value> Data;
-    using Settings = SorterSpiller<Key, Value, Comparator>::Settings;
+    using Settings = Spiller<Key, Value, Comparator>::Settings;
 
-    SorterSpillerBase(std::unique_ptr<SorterStorage<Key, Value>> storage,
-                      int64_t minAvailableDiskBytesToSpill)
+    SpillerBase(std::unique_ptr<SorterStorage<Key, Value>> storage,
+                int64_t minAvailableDiskBytesToSpill)
         : _storage(std::move(storage)),
           _minAvailableDiskBytesToSpill(minAvailableDiskBytesToSpill) {}
 
-    std::shared_ptr<Iterator> spill(const SortOptions& opts,
-                                    const Settings& settings,
-                                    std::span<std::pair<Key, Value>> data) override {
+    std::shared_ptr<Iterator<Key, Value>> spill(const SortOptions& opts,
+                                                const Settings& settings,
+                                                std::span<std::pair<Key, Value>> data) override {
         return _spill(opts, settings, data)->done();
     }
 
-    std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
-                                          const Settings& settings,
-                                          std::span<std::pair<Key, Value>> data) override {
+    std::unique_ptr<Iterator<Key, Value>> spillUnique(
+        const SortOptions& opts,
+        const Settings& settings,
+        std::span<std::pair<Key, Value>> data) override {
         return _spill(opts, settings, data)->doneUnique();
     }
 
-    std::shared_ptr<Iterator> spillWithHeap(
+    std::shared_ptr<Iterator<Key, Value>> spillWithHeap(
         const SortOptions& opts,
         const Settings& settings,
         std::priority_queue<Data, std::vector<Data>, Greater<Key, Value, Comparator>>& heap)
@@ -654,9 +656,11 @@ private:
         std::span<std::pair<Key, Value>> data) = 0;
 };
 
+}  // namespace sorter
+
 /**
  * Each instance of this class accepts (Key, Value) pairs and, depending on its
- * SortOptions and the configured SorterSpiller/SorterStorage, may keep them
+ * SortOptions and the configured Spiller/SorterStorage, may keep them
  * in memory or spill sorted ranges to an external storage.
  *
  * Ownership and cleanup of any spill storage are handled by the underlying
@@ -694,7 +698,7 @@ public:
     static std::unique_ptr<Sorter> make(
         const SortOptions& opts,
         const Comparator& comp,
-        std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+        std::shared_ptr<sorter::Spiller<Key, Value, Comparator>> spiller,
         const Settings& settings);
 
     template <typename Comparator>
@@ -703,7 +707,7 @@ public:
         const std::vector<SorterRange>& ranges,
         const SortOptions& opts,
         const Comparator& comp,
-        std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+        std::shared_ptr<sorter::Spiller<Key, Value, Comparator>> spiller,
         const Settings& settings);
 
     virtual void add(const Key&, const Value&) = 0;
@@ -839,12 +843,12 @@ public:
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 class BoundedSorter final : public BoundedSorterInterface<Key, Value> {
 public:
-    using Settings = SorterSpiller<Key, Value, Comparator>::Settings;
+    using Settings = sorter::Spiller<Key, Value, Comparator>::Settings;
 
     BoundedSorter(const SortOptions& opts,
                   Comparator comp,
                   BoundMaker makeBound,
-                  std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+                  std::shared_ptr<sorter::Spiller<Key, Value, Comparator>> spiller,
                   bool checkInput = true);
 
     BoundedSorter(const BoundedSorter&) = delete;
@@ -898,7 +902,7 @@ public:
     const BoundMaker makeBound;
 
 protected:
-    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> _spiller;
+    std::shared_ptr<sorter::Spiller<Key, Value, Comparator>> _spiller;
 
 private:
     using SpillIterator = sorter::Iterator<Key, Value>;

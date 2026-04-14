@@ -341,7 +341,7 @@ private:
 };
 
 template <typename Key, typename Value, typename Comparator>
-class ContainerBasedSpiller : public SorterSpillerBase<Key, Value, Comparator> {
+class ContainerBasedSpiller : public SpillerBase<Key, Value, Comparator> {
 public:
     ContainerBasedSpiller(OperationContext& opCtx,
                           RecoveryUnit& ru,
@@ -352,7 +352,7 @@ public:
                           int64_t batchSize,
                           int64_t batchBytes,
                           int64_t minAvailableDiskBytesToSpill)
-        : SorterSpillerBase<Key, Value, Comparator>(
+        : SpillerBase<Key, Value, Comparator>(
               std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
                   opCtx, ru, container, stats, 1, std::move(dbName), checksumVersion),
               minAvailableDiskBytesToSpill),
@@ -362,7 +362,7 @@ public:
           _batchBytes(batchBytes) {}
 
     void mergeSpills(const SortOptions& opts,
-                     const SorterSpillerBase<Key, Value, Comparator>::Settings& settings,
+                     const SpillerBase<Key, Value, Comparator>::Settings& settings,
                      SorterStats& stats,
                      std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
                      Comparator comp,
@@ -441,7 +441,7 @@ private:
 
     std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
         const SortOptions& opts,
-        const SorterSpillerBase<Key, Value, Comparator>::Settings& settings,
+        const SpillerBase<Key, Value, Comparator>::Settings& settings,
         std::span<std::pair<Key, Value>> data) override {
         auto writer = this->_storage->makeWriter(opts, settings);
 

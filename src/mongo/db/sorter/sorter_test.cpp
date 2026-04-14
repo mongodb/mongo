@@ -71,7 +71,7 @@ unittest::TempDir makeSpillDir() {
 using InMemIterTest = unittest::Test;
 using test::ContainerTraits;
 using test::FileTraits;
-using test::makeFileSorterSpiller;
+using test::makeFileSpiller;
 
 TEST_F(InMemIterTest, Empty) {
     EmptyIterator empty;
@@ -133,8 +133,8 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     SorterTracker sorterTracker;
     SorterFileStats sorterFileStats(&sorterTracker);
     const SortOptions opts = SortOptions().Tracker(&sorterTracker);
-    std::shared_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>> spiller =
-        std::make_shared<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
+    std::shared_ptr<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>> spiller =
+        std::make_shared<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>>(
             spillDir.path(),
             &sorterFileStats,
             /*dbName=*/boost::none,
@@ -168,12 +168,12 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
 class MakeFromExistingRangesFixture : public ServiceContextMongoDTest {
 public:
     static std::vector<SorterRange> makeSampleRanges();
-    static std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>
-    makeSorterSpiller(const SortOptions& opts,
-                      const boost::filesystem::path& path,
-                      SorterFileStats* fileStats,
-                      SorterChecksumVersion = sorter::kLatestChecksumVersion,
-                      std::string storageIdentifier = "");
+    static std::unique_ptr<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>> makeSpiller(
+        const SortOptions& opts,
+        const boost::filesystem::path& path,
+        SorterFileStats* fileStats,
+        SorterChecksumVersion = sorter::kLatestChecksumVersion,
+        std::string storageIdentifier = "");
 };
 
 // static
@@ -185,13 +185,13 @@ std::vector<SorterRange> MakeFromExistingRangesFixture::makeSampleRanges() {
 }
 
 // static
-std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>
-MakeFromExistingRangesFixture::makeSorterSpiller(const SortOptions& opts,
-                                                 const boost::filesystem::path& spillDir,
-                                                 SorterFileStats* fileStats,
-                                                 const SorterChecksumVersion checksumVersion,
-                                                 std::string storageIdentifier) {
-    return makeFileSorterSpiller(
+std::unique_ptr<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>>
+MakeFromExistingRangesFixture::makeSpiller(const SortOptions& opts,
+                                           const boost::filesystem::path& spillDir,
+                                           SorterFileStats* fileStats,
+                                           const SorterChecksumVersion checksumVersion,
+                                           std::string storageIdentifier) {
+    return makeFileSpiller(
         opts, spillDir, fileStats, checksumVersion, std::move(storageIdentifier));
 }
 
@@ -251,7 +251,7 @@ DEATH_TEST_F(
         {},
         opts,
         IWComparator(ASC),
-        makeSorterSpiller(opts, spillDir.path(), /*fileStats=*/nullptr),
+        makeSpiller(opts, spillDir.path(), /*fileStats=*/nullptr),
         /*settings=*/{});
 }
 
@@ -266,15 +266,15 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest,
         {},
         opts,
         IWComparator(ASC),
-        makeSorterSpiller(opts,
-                          spillDir.path(),
-                          /*fileStats=*/nullptr,
-                          sorter::kLatestChecksumVersion,
-                          storageIdentifier),
+        makeSpiller(opts,
+                    spillDir.path(),
+                    /*fileStats=*/nullptr,
+                    sorter::kLatestChecksumVersion,
+                    storageIdentifier),
         /*settings=*/{});
 }
 
-DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spiller != nullptr") {
+DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSpiller, "this->_spiller != nullptr") {
     unittest::TempDir spillDir = makeSpillDir();
     SorterTracker sorterTracker;
 
@@ -285,13 +285,13 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spiller
 
     // This test uses two sorters. The first sorter is used to persist data to disk in a shutdown
     // scenario. On startup, we will fail to restore the original state due to having a nullptr
-    // SorterSpiller.
+    // Spiller.
     IWSorter::PersistedState state;
     {
         auto sorterBeforeShutdown = IWSorter::template make<IWComparator>(
             opts,
             IWComparator(ASC),
-            makeSorterSpiller(opts, spillDir.path(), /*fileStats=*/nullptr),
+            makeSpiller(opts, spillDir.path(), /*fileStats=*/nullptr),
             /*settings=*/{});
         sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
                                   pairInsertedBeforeShutdown.second);
@@ -302,13 +302,13 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spiller
     }
 
     // On restart, reconstruct sorter from persisted state.
-    // We should fail because we are using a nullptr as the SorterSpiller.
+    // We should fail because we are using a nullptr as the Spiller.
     IWSorter::template makeFromExistingRanges<IWComparator>(
         state.storageIdentifier,
         state.ranges,
         opts,
         IWComparator(ASC),
-        std::shared_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(nullptr),
+        std::shared_ptr<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>>(nullptr),
         /*settings=*/{});
 }
 
@@ -681,11 +681,11 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest,
                   state.ranges,
                   state.opts,
                   state.comp,
-                  makeSorterSpiller(state.opts,
-                                    spillDir.path(),
-                                    /*fileStats=*/nullptr,
-                                    sorter::kLatestChecksumVersion,
-                                    state.storageIdentifier),
+                  makeSpiller(state.opts,
+                              spillDir.path(),
+                              /*fileStats=*/nullptr,
+                              sorter::kLatestChecksumVersion,
+                              state.storageIdentifier),
                   /*settings=*/{})
                   ->done();
     ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
@@ -801,21 +801,21 @@ public:
 
     std::unique_ptr<S> makeAsc(
         SortOptions options,
-        std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller = nullptr,
+        std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller = nullptr,
         bool checkInput = true) {
         return std::make_unique<SAsc>(
             options, ComparatorAsc{}, BoundMakerAsc{}, spiller, checkInput);
     }
     std::unique_ptr<S> makeAscNoBound(
         SortOptions options,
-        std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller = nullptr,
+        std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller = nullptr,
         bool checkInput = true) {
         return std::make_unique<SAscNoBound>(
             options, ComparatorAsc{}, NoBoundAsc{}, spiller, checkInput);
     }
     std::unique_ptr<S> makeDesc(
         SortOptions options,
-        std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorDesc>> spiller = nullptr,
+        std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorDesc>> spiller = nullptr,
         bool checkInput = true) {
         return std::make_unique<SDesc>(
             options, ComparatorDesc{}, BoundMakerDesc{}, spiller, checkInput);
@@ -935,8 +935,8 @@ TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
 TEST_F(BoundedSorterTest, SpillSorted) {
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -963,8 +963,8 @@ TEST_F(BoundedSorterTest, SpillSorted) {
 TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().MaxMemoryUsageBytes(16);
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -992,8 +992,8 @@ TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
 TEST_F(BoundedSorterTest, SpillAlmostSorted) {
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -1037,8 +1037,8 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
         {16},
     };
 
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller1 =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller1 =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -1060,8 +1060,8 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
     ASSERT_EQ(sorter->stats().spilledRanges(), 2);
 
 
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller2 =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller2 =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -1076,8 +1076,8 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
 TEST_F(BoundedSorterTest, LimitNoSpill) {
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().MaxMemoryUsageBytes(40).Tracker(&sorterTracker).Limit(2);
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -1111,8 +1111,8 @@ TEST_F(BoundedSorterTest, LimitNoSpill) {
 TEST_F(BoundedSorterTest, LimitSpill) {
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().MaxMemoryUsageBytes(40).Tracker(&sorterTracker).Limit(3);
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -1149,8 +1149,8 @@ TEST_F(BoundedSorterTest, ForceSpill) {
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().MaxMemoryUsageBytes(100 * 1024 * 1024).Tracker(&sorterTracker);
 
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             &fileStats,
             /*dbName=*/boost::none,
@@ -1452,8 +1452,8 @@ TEST_F(BoundedSorterTest, CompoundLimit) {
 TEST_F(BoundedSorterTest, CompoundSpill) {
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().Tracker(&sorterTracker).MaxMemoryUsageBytes(40);
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
@@ -1508,8 +1508,8 @@ TEST_F(BoundedSorterTest, LargeSpill) {
 
     unittest::TempDir spillDir = makeSpillDir();
     auto options = SortOptions().MaxMemoryUsageBytes(kMemoryLimit);
-    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
             spillDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,

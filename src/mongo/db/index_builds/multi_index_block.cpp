@@ -190,7 +190,7 @@ bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collec
     return !isPrimary;
 }
 
-std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
+std::shared_ptr<sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
 makeSpiller(OperationContext* opCtx,
             const CollectionPtr& collection,
             const IndexCatalogEntry* entry,
@@ -215,8 +215,8 @@ makeSpiller(OperationContext* opCtx,
             static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
     }
 
-    using FileBasedSpiller = sorter::
-        FileBasedSorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
+    using FileBasedSpiller =
+        sorter::FileBasedSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
     boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
     auto fileName = stateInfo ? stateInfo->getStorageIdentifier() : boost::none;
     return fileName

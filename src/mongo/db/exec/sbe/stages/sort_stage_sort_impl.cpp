@@ -259,8 +259,7 @@ private:
             opts,
             Comparator(_stage._dirs),
             (_stage._allowDiskUse)
-                ? std::make_shared<
-                      mongo::sorter::FileBasedSorterSpiller<KeyRow, ValueRow, Comparator>>(
+                ? std::make_shared<mongo::sorter::FileBasedSpiller<KeyRow, ValueRow, Comparator>>(
                       boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp",
                       _sorterFileStats.get(),
                       /*dbName=*/boost::none,

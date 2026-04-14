@@ -401,7 +401,7 @@ auto makeSorter(const ExpressionContext& expCtx,
         BoundMaker{boundOffset},
         expCtx.getAllowDiskUse()
             ? std::make_shared<
-                  sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document, Comp>>(
+                  sorter::FileBasedSpiller<DocumentSourceSort::SortableDate, Document, Comp>>(
                   expCtx.getTempDir(),
                   ds._sortExecutor->getSorterFileStats(),
                   /*dbName=*/boost::none,

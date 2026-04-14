@@ -484,19 +484,19 @@ std::string FileBasedSorterStorage<Key, Value>::getStorageIdentifier() {
  * How we merge spills when we use a file as the underlying storage for the sorter.
  */
 template <typename Key, typename Value, typename Comparator>
-class FileBasedSorterSpiller : public mongo::SorterSpillerBase<Key, Value, Comparator> {
+class FileBasedSpiller : public SpillerBase<Key, Value, Comparator> {
 public:
     typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
 
-    FileBasedSorterSpiller(boost::filesystem::path spillDir,
-                           SorterFileStats* fileStats,
-                           boost::optional<DatabaseName> dbName,
-                           SorterChecksumVersion checksumVersion,
-                           int64_t minAvailableDiskBytesToSpill)
-        : SorterSpillerBase<Key, Value, Comparator>(
+    FileBasedSpiller(boost::filesystem::path spillDir,
+                     SorterFileStats* fileStats,
+                     boost::optional<DatabaseName> dbName,
+                     SorterChecksumVersion checksumVersion,
+                     int64_t minAvailableDiskBytesToSpill)
+        : SpillerBase<Key, Value, Comparator>(
               std::make_unique<FileBasedSorterStorage<Key, Value>>(
                   std::make_shared<SorterFile>(sorter::nextFileName(spillDir), fileStats),
                   dbName,
@@ -505,12 +505,12 @@ public:
           _fileStats(fileStats),
           _spillDir(spillDir) {}
 
-    FileBasedSorterSpiller(std::shared_ptr<SorterFile> file,
-                           boost::filesystem::path spillDir,
-                           boost::optional<DatabaseName> dbName,
-                           SorterChecksumVersion checksumVersion,
-                           int64_t minAvailableDiskBytesToSpill)
-        : SorterSpillerBase<Key, Value, Comparator>(
+    FileBasedSpiller(std::shared_ptr<SorterFile> file,
+                     boost::filesystem::path spillDir,
+                     boost::optional<DatabaseName> dbName,
+                     SorterChecksumVersion checksumVersion,
+                     int64_t minAvailableDiskBytesToSpill)
+        : SpillerBase<Key, Value, Comparator>(
               std::make_unique<FileBasedSorterStorage<Key, Value>>(file, dbName, checksumVersion),
               minAvailableDiskBytesToSpill),
           _fileStats(file->getFileStats()),
@@ -545,7 +545,7 @@ private:
 };
 
 template <typename Key, typename Value, typename Comparator>
-void FileBasedSorterSpiller<Key, Value, Comparator>::mergeSpills(
+void FileBasedSpiller<Key, Value, Comparator>::mergeSpills(
     const SortOptions& opts,
     const Settings& settings,
     SorterStats& sorterStats,
@@ -621,7 +621,7 @@ void FileBasedSorterSpiller<Key, Value, Comparator>::mergeSpills(
 }
 
 template <typename Key, typename Value, typename Comparator>
-boost::filesystem::path FileBasedSorterSpiller<Key, Value, Comparator>::getSpillDir() {
+boost::filesystem::path FileBasedSpiller<Key, Value, Comparator>::getSpillDir() {
     return _spillDir;
 }
 

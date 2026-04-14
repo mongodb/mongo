@@ -935,7 +935,7 @@ public:
     using YieldFn = IndexAccessMethod::YieldFn;
     using Sorter = mongo::Sorter<key_string::Value, mongo::NullValue>;
     using Spiller =
-        mongo::SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
+        sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
 
     BulkBuilderImpl(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
@@ -1428,8 +1428,8 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexCatalogEntry* entry,
-    std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
-        spiller,
+    std::shared_ptr<
+        sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>> spiller,
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
     const DatabaseName& dbName,

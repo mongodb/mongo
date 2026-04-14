@@ -129,22 +129,22 @@ public:
     typedef std::pair<Key, Value> Data;
 
     /// No data to iterate
-    explicit InMemIterator(std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller = nullptr)
+    explicit InMemIterator(std::shared_ptr<Spiller<Key, Value, Comparator>> spiller = nullptr)
         : _spiller(spiller) {}
 
     /// Only a single value
     explicit InMemIterator(const Data& singleValue,
-                           std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller = nullptr)
+                           std::shared_ptr<Spiller<Key, Value, Comparator>> spiller = nullptr)
         : _data(1, singleValue), _spiller(spiller) {}
 
     /// Any number of values
     template <typename Container>
     explicit InMemIterator(const Container& input,
-                           std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller = nullptr)
+                           std::shared_ptr<Spiller<Key, Value, Comparator>> spiller = nullptr)
         : _data(input.begin(), input.end()), _spiller(spiller) {}
 
     explicit InMemIterator(std::vector<Data> data,
-                           std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller = nullptr)
+                           std::shared_ptr<Spiller<Key, Value, Comparator>> spiller = nullptr)
         : _data(std::move(data)), _spiller(spiller) {}
 
     bool more() override {
@@ -204,7 +204,7 @@ public:
 
 private:
     std::vector<Data> _data;
-    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> _spiller;
+    std::shared_ptr<Spiller<Key, Value, Comparator>> _spiller;
     uint32_t _index{0};
 };
 
@@ -443,7 +443,7 @@ public:
 
     MergeableSorter(const SortOptions& opts,
                     const Comparator& comp,
-                    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+                    std::shared_ptr<Spiller<Key, Value, Comparator>> spiller,
                     const Settings& settings)
         : Sorter<Key, Value>(opts), _comp(comp), _settings(settings), _spiller(std::move(spiller)) {
         setMaxMemoryUsageBytes();
@@ -452,7 +452,7 @@ public:
     MergeableSorter(const SortOptions& opts,
                     const std::string& storageIdentifier,
                     const Comparator& comp,
-                    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+                    std::shared_ptr<Spiller<Key, Value, Comparator>> spiller,
                     const Settings& settings)
         : Sorter<Key, Value>(opts, storageIdentifier),
           _comp(comp),
@@ -506,7 +506,7 @@ protected:
     const Comparator _comp;
     const Settings _settings;
 
-    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> _spiller;
+    std::shared_ptr<Spiller<Key, Value, Comparator>> _spiller;
     /**
      * The size of the iterator for the underlying storage used by the spiller.
      * Only set if spiller != nullptr.
@@ -571,7 +571,7 @@ public:
 
     NoLimitSorter(const SortOptions& opts,
                   const Comparator& comp,
-                  std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+                  std::shared_ptr<Spiller<Key, Value, Comparator>> spiller,
                   const Settings& settings)
         : MergeableSorter<Key, Value, Comparator>(opts, comp, std::move(spiller), settings) {
         invariant(opts.limit == 0);
@@ -581,7 +581,7 @@ public:
                   const std::vector<SorterRange>& ranges,
                   const SortOptions& opts,
                   const Comparator& comp,
-                  std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+                  std::shared_ptr<Spiller<Key, Value, Comparator>> spiller,
                   const Settings& settings)
         : MergeableSorter<Key, Value, Comparator>(
               opts, storageIdentifier, comp, std::move(spiller), settings) {
@@ -849,7 +849,7 @@ public:
 
     TopKSorter(const SortOptions& opts,
                const Comparator& comp,
-               std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+               std::shared_ptr<Spiller<Key, Value, Comparator>> spiller,
                const Settings& settings)
         : MergeableSorter<Key, Value, Comparator>(opts, comp, std::move(spiller), settings),
           _haveCutoff(false),
@@ -1334,7 +1334,7 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(
     const SortOptions& opts,
     Comparator comp,
     BoundMaker makeBound,
-    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+    std::shared_ptr<sorter::Spiller<Key, Value, Comparator>> spiller,
     bool checkInput)
     : BoundedSorterInterface<Key, Value>(opts),
       compare(comp),
@@ -1535,7 +1535,7 @@ template <typename Comparator>
 std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(
     const SortOptions& opts,
     const Comparator& comp,
-    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+    std::shared_ptr<sorter::Spiller<Key, Value, Comparator>> spiller,
     const Settings& settings) {
     sorter::checkNoExternalSortOnMongos(spiller != nullptr);
     switch (opts.limit) {
@@ -1557,7 +1557,7 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::makeFromExistingRanges(
     const std::vector<SorterRange>& ranges,
     const SortOptions& opts,
     const Comparator& comp,
-    std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
+    std::shared_ptr<sorter::Spiller<Key, Value, Comparator>> spiller,
     const Settings& settings) {
     sorter::checkNoExternalSortOnMongos(spiller != nullptr);
 

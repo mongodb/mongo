@@ -281,12 +281,12 @@ void _assertIteratorsEquivalentForNSteps(It1& it1, It2& it2, int maxSteps, int l
 template <int N>
 std::shared_ptr<IWIterator> makeInMemIterator(
     const int (&array)[N],
-    std::shared_ptr<SorterSpillerBase<IntWrapper, IntWrapper, IWComparator>> spiller = nullptr);
+    std::shared_ptr<SpillerBase<IntWrapper, IntWrapper, IWComparator>> spiller = nullptr);
 
 template <int N>
 std::shared_ptr<IWIterator> makeInMemIterator(
     const int (&array)[N],
-    std::shared_ptr<SorterSpillerBase<IntWrapper, IntWrapper, IWComparator>> spiller) {
+    std::shared_ptr<SpillerBase<IntWrapper, IntWrapper, IWComparator>> spiller) {
     std::vector<IWPair> vec;
     for (int i = 0; i < N; i++)
         vec.push_back(IWPair(array[i], -array[i]));

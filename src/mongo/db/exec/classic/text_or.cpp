@@ -462,8 +462,7 @@ void TextOrStage::initSorter() {
     _sorter = Sorter<RecordId, TextRecordDataForSorter>::template make<Comparator>(
         opts,
         Comparator(),
-        std::make_shared<
-            sorter::FileBasedSorterSpiller<RecordId, TextRecordDataForSorter, Comparator>>(
+        std::make_shared<sorter::FileBasedSpiller<RecordId, TextRecordDataForSorter, Comparator>>(
             expCtx()->getTempDir(),
             _sorterStats.get(),
             /*dbName=*/boost::none,

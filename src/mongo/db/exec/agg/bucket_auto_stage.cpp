@@ -103,7 +103,7 @@ GetNextResult BucketAutoStage::populateSorter() {
             opts,
             Comparator(pExpCtx->getValueComparator()),
             (pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter())
-                ? std::make_shared<sorter::FileBasedSorterSpiller<Value, Document, Comparator>>(
+                ? std::make_shared<sorter::FileBasedSpiller<Value, Document, Comparator>>(
                       pExpCtx->getTempDir(),
                       &_sorterFileStats,
                       /*dbName=*/boost::none,

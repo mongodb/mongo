@@ -321,7 +321,7 @@ public:
         const CollectionPtr& collection,
         const IndexCatalogEntry* entry,
         std::shared_ptr<
-            SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
+            sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
             spiller,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
@@ -687,7 +687,7 @@ public:
         const CollectionPtr& collection,
         const IndexCatalogEntry* entry,
         std::shared_ptr<
-            SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
+            sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
             spiller,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
