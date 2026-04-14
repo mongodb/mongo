@@ -37,6 +37,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <memory>
 #include <string>
 
 #ifdef MONGO_CONFIG_OTEL
@@ -85,9 +86,6 @@ public:
 
 /**
  * A lock free (non-decreasing) counter with attribute support.
- *
- * TODO SERVER-117025: Update this to be safe when supplying view-type attributes (e.g. StringData,
- * spans)
  */
 template <typename T, typename... AttributeTs>
 class CounterImpl : public Counter<T, AttributeTs...> {
@@ -110,6 +108,7 @@ public:
 
 private:
     std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
+    OwnedAttributeValueLists<AttributeTs...> _ownedValueLists;
     AttributesMap<Attributes, std::unique_ptr<Atomic<T>>> _counters;
 };
 
@@ -119,10 +118,12 @@ private:
 
 template <typename T, typename... AttributeTs>
 CounterImpl<T, AttributeTs...>::CounterImpl(const AttributeDefinition<AttributeTs>&... defs)
-    : _attributeNames{defs.name...} {
-    for (Attributes attributes : safeMakeAttributeTuples(defs.values...)) {
-        _counters[std::move(attributes)] = std::make_unique<Atomic<T>>(0);
-    }
+    : _attributeNames{defs.name...}, _ownedValueLists(makeOwnedAttributeValueLists(defs...)) {
+    // The Attributes tuples produced by safeMakeAttributeTuples contain view values (StringData,
+    // span) that point into _ownedValueLists, so the keys inserted into _counters remain valid.
+    for (Attributes t : safeMakeAttributeTuples(_ownedValueLists))
+        _counters[t] = std::make_unique<Atomic<T>>(0);
+
     massert(ErrorCodes::BadValue,
             "Attribute names are duplicated",
             !containsDuplicates(_attributeNames));

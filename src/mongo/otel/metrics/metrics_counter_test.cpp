@@ -189,6 +189,46 @@ TYPED_TEST(CounterImplTest, ValuesSkipsZeroAttributes) {
                     ElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true}), 5)));
 }
 
+TYPED_TEST(CounterImplTest, StringDataAttributeValueIsCopied) {
+    // If the source strings are destroyed after counter creation, the counter must have its own
+    // copies and remain valid. Sanitizer builds will catch use-after-free if it does not.
+    auto sourceValues = std::make_unique<std::vector<std::string>>(
+        std::initializer_list<std::string>{"foo", "bar"});
+    CounterImpl<TypeParam, StringData> counter(
+        {.name = "temperature", .values = {(*sourceValues)[0], (*sourceValues)[1]}});
+    sourceValues = nullptr;
+
+    counter.add(5, {"foo"_sd});
+    EXPECT_EQ(counter.value(), 5);
+}
+
+TYPED_TEST(CounterImplTest, SpanAttributeValueIsCopied) {
+    // If the source span data is destroyed after counter creation, the counter must have its own
+    // copies and remain valid. Sanitizer builds will catch use-after-free if it does not.
+    auto sourceIntData = std::make_unique<std::vector<std::vector<int32_t>>>(
+        std::vector<std::vector<int32_t>>{{1, 2}, {3, 4}});
+    auto string1 = std::make_unique<std::string>("a");
+    auto string2 = std::make_unique<std::string>("b");
+    auto sourceStringData = std::make_unique<std::vector<std::vector<StringData>>>(
+        std::vector<std::vector<StringData>>{{*string1}, {*string1, *string2}});
+    CounterImpl<TypeParam, std::span<int32_t>, std::span<StringData>> counter(
+        {.name = "intData",
+         .values = {std::span<int32_t>((*sourceIntData)[0]),
+                    std::span<int32_t>((*sourceIntData)[1])}},
+        {.name = "stringData",
+         .values = {std::span<StringData>((*sourceStringData)[0]),
+                    std::span<StringData>((*sourceStringData)[1])}});
+    sourceIntData = nullptr;
+    string1 = nullptr;
+    string2 = nullptr;
+    sourceStringData = nullptr;
+
+    std::vector<int32_t> intInput{1, 2};
+    std::vector<StringData> stringInput{"a"_sd, "b"_sd};
+    counter.add(5, {std::span<int32_t>(intInput), std::span<StringData>(stringInput)});
+    EXPECT_EQ(counter.value(), 5);
+}
+
 TEST(DoubleCounterImplTest, AddsFractionalValues) {
     CounterImpl<double, bool> counter({.name = "is_cool", .values = {true, false}});
 

@@ -39,8 +39,10 @@
 namespace mongo::otel::metrics {
 
 using testing::ElementsAre;
+using testing::FieldsAre;
 using testing::IsEmpty;
 using testing::Pair;
+using testing::Pointee;
 using testing::UnorderedElementsAre;
 
 TEST(SafeMakeAttributeTuplesTest, NoArgs) {
@@ -127,6 +129,92 @@ TEST(SafeMakeAttributeTuplesTest, ThrowsExceptionWhenResultIsTooBig) {
                                                std::vector{true, false}),
                        DBException,
                        ErrorCodes::BadValue);
+}
+
+TEST(MakeOwnedAttributeValueListsTest, ScalarAttribute) {
+    OwnedAttributeValueLists<int32_t> owned = makeOwnedAttributeValueLists(
+        AttributeDefinition<int32_t>{.name = "n", .values = {1, 2, 3}});
+    EXPECT_THAT(owned.lists, FieldsAre(UnorderedElementsAre(Pointee(1), Pointee(2), Pointee(3))));
+}
+
+TEST(MakeOwnedAttributeValueListsTest, StringDataAttributeOwned) {
+    // If source strings are destroyed, owned must have its own copies.
+    auto source = std::make_unique<std::vector<std::string>>(
+        std::initializer_list<std::string>{"foo", "bar"});
+    OwnedAttributeValueLists<StringData> owned = makeOwnedAttributeValueLists(
+        AttributeDefinition<StringData>{.name = "s", .values = {(*source)[0], (*source)[1]}});
+    source = nullptr;  // Sanitizers catch use-after-free if copies weren't made.
+    EXPECT_THAT(owned.lists, FieldsAre(UnorderedElementsAre(Pointee("foo"_sd), Pointee("bar"_sd))));
+}
+
+TEST(MakeOwnedAttributeValueListsTest, SpanAttributeOwned) {
+    // If source span data is destroyed, owned must have its own copies.
+    auto source = std::make_unique<std::vector<std::vector<int32_t>>>(
+        std::initializer_list<std::vector<int32_t>>{{1, 2}, {3, 4}});
+    OwnedAttributeValueLists<std::span<int32_t>> owned =
+        makeOwnedAttributeValueLists(AttributeDefinition<std::span<int32_t>>{
+            .name = "data",
+            .values = {std::span<int32_t>((*source)[0]), std::span<int32_t>((*source)[1])}});
+    source = nullptr;
+    EXPECT_THAT(
+        owned.lists,
+        FieldsAre(UnorderedElementsAre(Pointee(ElementsAre(1, 2)), Pointee(ElementsAre(3, 4)))));
+}
+
+TEST(MakeOwnedAttributeValueListsTest, MultipleAttributeTypes) {
+    OwnedAttributeValueLists<StringData, bool> owned = makeOwnedAttributeValueLists(
+        AttributeDefinition<StringData>{.name = "s", .values = {"a"_sd, "b"_sd}},
+        AttributeDefinition<bool>{.name = "flag", .values = {true, false}});
+    EXPECT_THAT(owned.lists,
+                FieldsAre(UnorderedElementsAre(Pointee("a"_sd), Pointee("b"_sd)),
+                          UnorderedElementsAre(Pointee(true), Pointee(false))));
+}
+
+TEST(SafeMakeAttributeTuplesOwnedTest, SpanOfBoolAttribute) {
+    // std::vector<bool> is bit-packed and lacks data(), so span<bool> needs a separate owned type.
+    // Source storage must be contiguous (array, not vector<bool>) to form span<bool>.
+    std::array<bool, 2> bools1{true, false};
+    std::array<bool, 2> bools2{false, true};
+    OwnedAttributeValueLists<std::span<bool>> owned =
+        makeOwnedAttributeValueLists(AttributeDefinition<std::span<bool>>{
+            .name = "flags", .values = {std::span<bool>(bools1), std::span<bool>(bools2)}});
+    EXPECT_THAT(safeMakeAttributeTuples(owned),
+                UnorderedElementsAre(IsAttributesTuple(std::make_tuple(std::span<bool>{bools1})),
+                                     IsAttributesTuple(std::make_tuple(std::span<bool>{bools2}))));
+}
+
+TEST(SafeMakeAttributeTuplesOwnedTest, NoAttributes) {
+    OwnedAttributeValueLists<> owned = makeOwnedAttributeValueLists();
+    EXPECT_THAT(safeMakeAttributeTuples(owned), ElementsAre(std::tuple<>{}));
+}
+
+TEST(SafeMakeAttributeTuplesOwnedTest, SingleAttribute) {
+    OwnedAttributeValueLists<int32_t> owned = makeOwnedAttributeValueLists(
+        AttributeDefinition<int32_t>{.name = "n", .values = {1, 2, 3}});
+    EXPECT_THAT(safeMakeAttributeTuples(owned),
+                UnorderedElementsAre(std::make_tuple(int32_t{1}),
+                                     std::make_tuple(int32_t{2}),
+                                     std::make_tuple(int32_t{3})));
+}
+
+TEST(SafeMakeAttributeTuplesOwnedTest, MultipleAttributes) {
+    std::array<bool, 2> boolArr1{true, false};
+    std::array<bool, 2> boolArr2{false, true};
+    OwnedAttributeValueLists<StringData, std::span<bool>> owned = makeOwnedAttributeValueLists(
+        AttributeDefinition<StringData>{.name = "s", .values = {"a"_sd, "b"_sd}},
+        AttributeDefinition<std::span<bool>>{.name = "flag", .values = {boolArr1, boolArr2}});
+    EXPECT_THAT(safeMakeAttributeTuples(owned),
+                UnorderedElementsAre(
+                    IsAttributesTuple(std::make_tuple("a"_sd, std::span<bool>{boolArr1})),
+                    IsAttributesTuple(std::make_tuple("a"_sd, std::span<bool>{boolArr2})),
+                    IsAttributesTuple(std::make_tuple("b"_sd, std::span<bool>{boolArr1})),
+                    IsAttributesTuple(std::make_tuple("b"_sd, std::span<bool>{boolArr2}))));
+}
+
+TEST(SafeMakeAttributeTuplesOwnedTest, ThrowsOnDuplicateValues) {
+    OwnedAttributeValueLists<int32_t> owned =
+        makeOwnedAttributeValueLists(AttributeDefinition<int32_t>{.name = "n", .values = {1, 1}});
+    ASSERT_THROWS_CODE(safeMakeAttributeTuples(owned), DBException, ErrorCodes::BadValue);
 }
 
 TEST(ContainsDuplicates, ReturnsFalseOnEmpty) {

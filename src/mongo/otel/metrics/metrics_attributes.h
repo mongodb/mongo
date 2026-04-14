@@ -37,7 +37,9 @@
 #include "mongo/util/modules.h"
 
 #include <algorithm>
+#include <memory>
 #include <span>
+#include <tuple>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -137,6 +139,64 @@ template <typename KeyT, typename ValueT>
 using AttributesMap = absl::flat_hash_map<KeyT, ValueT, AttributesHasher, AttributesEq>;
 
 /**
+ * Maps view attribute types to their owned equivalents for safe internal storage.
+ * Non-view types are unchanged.
+ */
+template <typename T>
+struct AttributeOwnership {
+    using OwnedType = T;
+};
+template <>
+struct AttributeOwnership<StringData> {
+    using OwnedType = std::string;
+};
+template <>
+struct AttributeOwnership<std::span<StringData>> {
+    struct OwnedType {
+        std::vector<std::string> strings;
+        std::vector<StringData> stringDatas;
+    };
+};
+template <typename T>
+struct AttributeOwnership<std::span<T>> {
+    using OwnedType = std::vector<T>;
+};
+/**
+ * std::vector<bool> is a special case in C++ that packs booleans as individual bits, so it lacks a
+ * data() method and cannot back a std::span<bool>. This specialization uses a unique_ptr<bool[]>
+ * for contiguous storage instead.
+ */
+template <>
+struct AttributeOwnership<std::span<bool>> {
+    struct OwnedType {
+        size_t size;
+        std::unique_ptr<bool[]> storage;
+    };
+};
+
+/**
+ * Per-attribute owned storage for view-type values (StringData → std::string,
+ * std::span<T> → std::vector<T>). Each value is heap-allocated via unique_ptr so its address
+ * is stable: StringData/span views into this storage remain valid even if the owning object moves.
+ *
+ * A named struct (rather than a type alias for std::tuple) so that template argument deduction
+ * works when passing it to safeMakeAttributeTuples.
+ */
+template <AttributeType... AttributeTs>
+struct OwnedAttributeValueLists {
+    std::tuple<std::vector<std::unique_ptr<typename AttributeOwnership<AttributeTs>::OwnedType>>...>
+        lists;
+};
+
+/**
+ * Builds an OwnedAttributeValueLists from a set of AttributeDefinitions, heap-allocating owned
+ * copies of each attribute value.
+ */
+template <AttributeType... AttributeTs>
+OwnedAttributeValueLists<AttributeTs...> makeOwnedAttributeValueLists(
+    const AttributeDefinition<AttributeTs>&... defs);
+
+/**
  * Safely creates tuples that are the cartesian product of the provided values. This is "safe"
  * in that it throws BadValue exceptions if
  * - the number of resulting tuples is more than kMaxAttributeCombinationsPerMetric
@@ -153,6 +213,14 @@ using AttributesMap = absl::flat_hash_map<KeyT, ValueT, AttributesHasher, Attrib
  */
 template <typename... Ts>
 std::vector<std::tuple<Ts...>> safeMakeAttributeTuples(const std::vector<Ts>&... values);
+
+/**
+ * Overload of safeMakeAttributeTuples that accepts an OwnedAttributeValueLists and converts each
+ * owned value to its view type before computing the cartesian product.
+ */
+template <AttributeType... AttributeTs>
+std::vector<std::tuple<AttributeTs...>> safeMakeAttributeTuples(
+    const OwnedAttributeValueLists<AttributeTs...>& ownedLists);
 
 /**
  * Returns true if `values` contains duplicates.
@@ -233,7 +301,7 @@ struct AttributesEq {
 
 /**
  * Turns an attribute value into a string. This is needed because fmt::format doesn't support
- * std::span. This is only used for reporting errors.
+ * std::span.
  */
 template <AttributeType T>
 std::string formatAttributeValue(const T& v) {
@@ -290,6 +358,88 @@ std::vector<std::tuple<Ts...>> safeMakeAttributeTuples(const std::vector<Ts>&...
                     kMaxAttributeCombinationsPerMetric),
         result.size() <= kMaxAttributeCombinationsPerMetric);
     return result;
+}
+
+/** Converts an owned attribute value back to its view type. */
+template <AttributeType T>
+MONGO_MOD_FILE_PRIVATE T toView(const T& owned) {
+    return owned;
+}
+MONGO_MOD_FILE_PRIVATE inline StringData toView(const std::string& owned) {
+    return owned;
+}
+// const_cast is safe: the data is owned and non-const; const is an artifact of the parameter.
+MONGO_MOD_FILE_PRIVATE inline std::span<StringData> toView(
+    const AttributeOwnership<std::span<StringData>>::OwnedType& owned) {
+    return {const_cast<StringData*>(owned.stringDatas.data()), owned.stringDatas.size()};
+}
+// const_cast is safe: the data is owned and non-const; const is an artifact of map iteration.
+template <typename T>
+MONGO_MOD_FILE_PRIVATE std::span<T> toView(const std::vector<T>& owned) {
+    return {const_cast<T*>(owned.data()), owned.size()};
+}
+MONGO_MOD_FILE_PRIVATE inline std::span<bool> toView(
+    const AttributeOwnership<std::span<bool>>::OwnedType& owned) {
+    return {owned.storage.get(), owned.size};
+}
+
+/** Converts a list of heap-allocated owned values to a vector of their view types. */
+template <AttributeType ViewT>
+MONGO_MOD_FILE_PRIVATE std::vector<ViewT> viewsOf(
+    const std::vector<std::unique_ptr<typename AttributeOwnership<ViewT>::OwnedType>>& owned) {
+    std::vector<ViewT> views;
+    views.reserve(owned.size());
+    for (const auto& ptr : owned)
+        views.push_back(toView(*ptr));
+    return views;
+}
+
+/** Converts a view attribute value to its owned equivalent. */
+template <AttributeType T>
+MONGO_MOD_FILE_PRIVATE T toOwned(const T& val) {
+    return val;
+}
+MONGO_MOD_FILE_PRIVATE inline std::string toOwned(StringData val) {
+    return std::string(val);
+}
+template <typename T>
+MONGO_MOD_FILE_PRIVATE std::vector<T> toOwned(std::span<T> val) {
+    return {val.begin(), val.end()};
+}
+MONGO_MOD_FILE_PRIVATE inline AttributeOwnership<std::span<StringData>>::OwnedType toOwned(
+    const std::span<StringData>& val) {
+    AttributeOwnership<std::span<StringData>>::OwnedType result{
+        .strings = std::vector<std::string>(val.begin(), val.end())};
+    result.stringDatas = std::vector<StringData>(result.strings.begin(), result.strings.end());
+    return result;
+}
+MONGO_MOD_FILE_PRIVATE inline AttributeOwnership<std::span<bool>>::OwnedType toOwned(
+    std::span<bool> val) {
+    auto storage = std::make_unique<bool[]>(val.size());
+    std::copy(val.begin(), val.end(), storage.get());
+    return {.size = val.size(), .storage = std::move(storage)};
+}
+
+template <AttributeType... AttributeTs>
+OwnedAttributeValueLists<AttributeTs...> makeOwnedAttributeValueLists(
+    const AttributeDefinition<AttributeTs>&... defs) {
+    return {.lists = std::make_tuple([](const auto& values) {
+                using ViewT = std::decay_t<decltype(*values.begin())>;
+                using OwnedT = typename AttributeOwnership<ViewT>::OwnedType;
+                std::vector<std::unique_ptr<OwnedT>> ptrs;
+                ptrs.reserve(values.size());
+                for (const auto& val : values)
+                    ptrs.push_back(std::make_unique<OwnedT>(toOwned(val)));
+                return ptrs;
+            }(defs.values)...)};
+}
+
+template <AttributeType... AttributeTs>
+std::vector<std::tuple<AttributeTs...>> safeMakeAttributeTuples(
+    const OwnedAttributeValueLists<AttributeTs...>& ownedLists) {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return safeMakeAttributeTuples(viewsOf<AttributeTs>(std::get<Is>(ownedLists.lists))...);
+    }(std::index_sequence_for<AttributeTs...>{});
 }
 
 }  // namespace mongo::otel::metrics
