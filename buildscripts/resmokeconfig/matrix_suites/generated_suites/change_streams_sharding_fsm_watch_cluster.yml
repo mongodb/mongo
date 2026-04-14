@@ -32,6 +32,7 @@ executor:
           migrationRetryExtraDDLErrors:
             - ReshardCollectionInterruptedDueToFCVChange
             - Interrupted
+          migrationRetryJitterMS: 2000
           migrationRetryMatchFCVErrors: true
           threadOverrides:
             - jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js

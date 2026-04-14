@@ -28,6 +28,7 @@ const MigrationRetryConfig = {
     ]),
     queryErrors: new Set([ErrorCodes.QueryPlanKilled]),
     matchFCVErrors: TestData.migrationRetryMatchFCVErrors || false,
+    retryJitterMS: TestData.migrationRetryJitterMS || 0,
 };
 
 function _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs) {
@@ -107,6 +108,10 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
 
     let commandResponse;
     let attempt = 0;
+    let interval;
+    if (MigrationRetryConfig.retryJitterMS) {
+        interval = 500 + Math.floor(Math.random() * MigrationRetryConfig.retryJitterMS);
+    }
 
     assert.soon(
         () => {
@@ -144,6 +149,8 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
             return kNoRetry;
         },
         () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " + tojson(commandResponse),
+        undefined,
+        interval,
     );
 
     return commandResponse;

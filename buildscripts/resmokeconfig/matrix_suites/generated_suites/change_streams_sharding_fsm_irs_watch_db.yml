@@ -35,6 +35,7 @@ executor:
           migrationRetryExtraDDLErrors:
             - ReshardCollectionInterruptedDueToFCVChange
             - Interrupted
+          migrationRetryJitterMS: 2000
           migrationRetryMatchFCVErrors: true
           skipCheckOrphans: true
           threadOverrides:

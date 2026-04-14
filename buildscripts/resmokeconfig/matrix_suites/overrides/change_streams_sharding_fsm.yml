@@ -85,6 +85,7 @@
           global_vars:
             TestData:
               enableBgMutator: true
+              migrationRetryJitterMS: 2000
               migrationRetryExtraDDLCommands:
                 - "drop"
                 - "dropDatabase"
