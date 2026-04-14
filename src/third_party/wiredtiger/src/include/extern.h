@@ -1754,6 +1754,10 @@ extern void __wt_errx_func(WT_SESSION_IMPL *session, const char *func, int line,
   WT_VERBOSE_CATEGORY category, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((cold))
   WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 5, 6)))
     WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
+extern void __wt_errx_func_id(WT_SESSION_IMPL *session, uint32_t log_id, const char *func, int line,
+  WT_VERBOSE_CATEGORY category, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((cold))
+  WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 6, 7)))
+    WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler);
 extern void __wt_ext_scr_free(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, void *p);
 extern void __wt_ext_spin_destroy(WT_EXTENSION_API *wt_api, WT_EXTENSION_SPINLOCK *ext_spinlock);

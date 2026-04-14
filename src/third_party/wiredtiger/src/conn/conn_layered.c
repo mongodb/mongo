@@ -217,11 +217,11 @@ __disagg_save_checkpoint_meta_local(
     WT_DECL_ITEM(metadata_cfg);
     WT_DECL_ITEM(old_uri_buf);
     WT_DECL_RET;
-    char *cfg_new;
+    char *cfg_current_copy, *cfg_new;
     const char *cfg[3], *checkpoint_name, *cfg_current, *metadata_key;
     bool discard;
 
-    cfg_new = NULL;
+    cfg_current_copy = cfg_new = NULL;
     checkpoint_name = NULL;
     discard = false;
     metadata_key = WT_DISAGG_METADATA_URI;
@@ -230,13 +230,15 @@ __disagg_save_checkpoint_meta_local(
     md_cursor->set_key(md_cursor, metadata_key);
     WT_ERR(md_cursor->search(md_cursor));
     WT_ERR(md_cursor->get_value(md_cursor, &cfg_current));
+    /* Copy the value since we don't own the memory after calling get_value(). */
+    WT_ERR(__wt_strdup(session, cfg_current, &cfg_current_copy));
 
     /* Create the new checkpoint config string. */
     WT_ERR(__wt_scr_alloc(session, 0, &metadata_cfg));
     WT_ERR(__wt_buf_fmt(session, metadata_cfg, "checkpoint=%.*s", (int)metadata->checkpoint_len,
       metadata->checkpoint));
 
-    cfg[0] = cfg_current;
+    cfg[0] = cfg_current_copy;
     cfg[1] = metadata_cfg->data;
     cfg[2] = NULL;
     WT_ERR(__wt_config_collapse(session, cfg, &cfg_new));
@@ -250,7 +252,7 @@ __disagg_save_checkpoint_meta_local(
 
     /* Throw away any references to the old disaggregated metadata table checkpoint. */
     WT_ERR(__disagg_discard_old_checkpoint_check(
-      session, cfg_current, cfg_new, &checkpoint_name, &discard));
+      session, cfg_current_copy, cfg_new, &checkpoint_name, &discard));
     if (discard) {
         WT_ERR(__wt_scr_alloc(session, 0, &old_uri_buf));
         WT_ERR(__wt_buf_fmt(session, old_uri_buf, "%s/%s", metadata_key, checkpoint_name));
@@ -259,6 +261,7 @@ __disagg_save_checkpoint_meta_local(
           (const char *)old_uri_buf->data);
     }
 err:
+    __wt_free(session, cfg_current_copy);
     __wt_free(session, cfg_new);
     __wt_free(session, checkpoint_name);
     __wt_scr_free(session, &metadata_cfg);
@@ -281,7 +284,7 @@ __disagg_apply_checkpoint_meta(
     WT_DECL_ITEM(old_uri_buf);
     WT_DECL_RET;
     uint32_t existing_tables, new_tables, new_ingest;
-    char *layered_ingest_uri, *cfg_ret;
+    char *current_value_copy, *layered_ingest_uri, *cfg_ret;
     const char *cfg[3], *checkpoint_name, *current_value, *metadata_checkpoint_name, *metadata_key,
       *metadata_value;
     bool discard;
@@ -289,7 +292,7 @@ __disagg_apply_checkpoint_meta(
     cursor = NULL;
     discard = false;
     checkpoint_name = metadata_checkpoint_name = NULL;
-    layered_ingest_uri = cfg_ret = NULL;
+    current_value_copy = layered_ingest_uri = cfg_ret = NULL;
     existing_tables = new_tables = new_ingest = 0;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
@@ -335,7 +338,10 @@ __disagg_apply_checkpoint_meta(
 
             /* Merge the new checkpoint metadata into the current table metadata. */
             WT_ERR(md_cursor->get_value(md_cursor, &current_value));
-            cfg[0] = current_value;
+            /* Copy the value since we don't own the memory after calling get_value(). */
+            WT_ERR(__wt_strdup(session, current_value, &current_value_copy));
+
+            cfg[0] = current_value_copy;
             cfg[1] = metadata_cfg->data;
             cfg[2] = NULL;
             WT_ERR(__wt_config_collapse(session, cfg, &cfg_ret));
@@ -359,7 +365,7 @@ __disagg_apply_checkpoint_meta(
              * different nodes.
              */
             WT_ERR(__disagg_discard_old_checkpoint_check(
-              session, current_value, cfg_ret, &checkpoint_name, &discard));
+              session, current_value_copy, cfg_ret, &checkpoint_name, &discard));
             if (discard) {
                 WT_ERR(__wt_buf_fmt(session, old_uri_buf, "%s/%s", metadata_key, checkpoint_name));
                 WT_WITHOUT_DHANDLE(
@@ -377,6 +383,7 @@ __disagg_apply_checkpoint_meta(
             WT_WITHOUT_DHANDLE(session, ret = __wti_conn_dhandle_outdated(session, metadata_key));
             WT_ERR_MSG_CHK(session, ret, "Marking data handles outdated failed: \"%s\"",
               (const char *)metadata_key);
+            __wt_free(session, current_value_copy);
             __wt_free(session, cfg_ret);
             __wt_free(session, checkpoint_name);
         } else if (ret == WT_NOTFOUND) {
@@ -426,6 +433,7 @@ __disagg_apply_checkpoint_meta(
 
 done:
 err:
+    __wt_free(session, current_value_copy);
     __wt_free(session, cfg_ret);
     __wt_free(session, checkpoint_name);
     __wt_free(session, metadata_checkpoint_name);
@@ -580,10 +588,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     /* Update our local metadata with the new checkpoint entry. */
     WT_ERR(__disagg_save_checkpoint_meta_local(session, md_cursor, &metadata));
 
-    /*
-     * Part 2: Apply the metadata for other tables from the shared metadata table. FIXME-WT-16528
-     * Investigate whether we need a separate internal session to pick up the new checkpoint.
-     */
+    /* Part 2: Apply the metadata for other tables from the shared metadata table. */
     WT_WITH_SCHEMA_LOCK(
       session, ret = __disagg_apply_checkpoint_meta(session, md_cursor, ckpt_meta));
     WT_ERR(ret);
@@ -728,10 +733,6 @@ __disagg_pick_up_checkpoint_meta(
     /* Parse and validate version and compatible_version fields. */
     WT_ERR(__disagg_check_meta_version(session, meta_str, &ckpt_meta));
 
-    /*
-     * FIXME-WT-16528: Investigate why a separate internal session is necessary here pick up a new
-     * checkpoint.
-     */
     WT_ERR(__wt_open_internal_session(
       S2C(session), "checkpoint-pick-up", false, 0, 0, &internal_session));
     /* Now actually pick up the checkpoint. */
@@ -1833,22 +1834,15 @@ __wt_disagg_advance_checkpoint(WT_SESSION_IMPL *session, bool ckpt_success)
           ",version=%d,compatible_version=%d",
           meta_lsn, meta_checksum, conn->disaggregated_storage.database_size,
           WT_DISAGG_CHECKPOINT_META_VERSION, WT_DISAGG_CHECKPOINT_META_COMPATIBLE_VERSION));
-        /*
-         * FIXME-WT-16821: Remove the if branch keep non-ext version only.
-         */
-        if (disagg->npage_log->page_log->pl_complete_checkpoint != NULL) {
-            complete_args.checkpoint_id = 0;
-            complete_args.checkpoint_timestamp = checkpoint_timestamp;
-            complete_args.checkpoint_metadata = meta;
-            complete_args.checkpoint_oldest_timestamp =
-              conn->disaggregated_storage.last_checkpoint_oldest_timestamp;
-            complete_args.lsn = 0;
-            WT_ERR(disagg->npage_log->page_log->pl_complete_checkpoint(
-              disagg->npage_log->page_log, &session->iface, &complete_args));
-        } else
-            WT_ERR(
-              disagg->npage_log->page_log->pl_complete_checkpoint_ext(disagg->npage_log->page_log,
-                &session->iface, 0, (uint64_t)checkpoint_timestamp, meta, NULL));
+
+        complete_args.checkpoint_id = 0;
+        complete_args.checkpoint_timestamp = checkpoint_timestamp;
+        complete_args.checkpoint_metadata = meta;
+        complete_args.checkpoint_oldest_timestamp =
+          conn->disaggregated_storage.last_checkpoint_oldest_timestamp;
+        complete_args.lsn = 0;
+        WT_ERR(disagg->npage_log->page_log->pl_complete_checkpoint(
+          disagg->npage_log->page_log, &session->iface, &complete_args));
 
         __wt_atomic_store_uint64_release(
           &conn->disaggregated_storage.last_checkpoint_timestamp, checkpoint_timestamp);

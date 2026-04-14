@@ -19,6 +19,23 @@ type aspell > /dev/null 2>&1 || {
     exit 0
 }
 
+# run_aspell_for:
+#    Run aspell with the correct mode for a given file type.
+run_aspell_for() {
+    case "$1" in
+    *.yml|*.yaml)
+        # aspell's built-in --mode=comment is broken
+        # (see https://github.com/GNUAspell/aspell/issues/505). This combines the
+        # workaround from that issue with the filters defined in comment.amf to
+        # replicate the comment filter.
+        aspell --clear-filter --add-filter=url --add-filter=context \
+            --clear-context-delimiters --add-context-delimiters='# \0' \
+            --lang=en_US list;;
+    *)
+        aspell --mode=ccpp --lang=en_US list;;
+    esac
+}
+
 # replace:
 #    Create a replacement list of spelling words. This is here because the
 # words we ignore changes over time and it's worth periodically collapsing
@@ -26,7 +43,7 @@ type aspell > /dev/null 2>&1 || {
 # catalogs and generating a shorter list on any single system will break other
 # systems.
 replace() {
-    aspell --mode=ccpp --lang=en_US list < ../$1 |
+    run_aspell_for $1 < ../$1 |
     sort -u |
     comm -12 /dev/stdin $custom_words
 }
@@ -38,12 +55,12 @@ check() {
     # Strip out double quote char literals ('"'), they confuse aspell.
     # Strip out calls to __wt_getopt so the option lists don't have to be spelling words.
     # Strip out C-style hex constants.
-    sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' ../$2 |
-    aspell --lang=en_US $1 list |
+    sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' ../$1 |
+    run_aspell_for $1 |
     sort -u |
     comm -23 /dev/stdin $custom_words > $t
     test -s $t && {
-        echo "==== $2"
+        echo "==== $1"
         cat $t
     }
 }
@@ -107,7 +124,7 @@ fi
 
 # Check source files.
 for f in $l; do
-    check "--mode=ccpp" $f
+    check $f
 done
 
 exit $exit_val

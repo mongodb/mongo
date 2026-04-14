@@ -524,6 +524,28 @@ __wt_err_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
 }
 
 /*
+ * __wt_errx_func_id --
+ *     Report an error with no error code and a unique log ID.
+ */
+void
+__wt_errx_func_id(WT_SESSION_IMPL *session, uint32_t log_id, const char *func, int line,
+  WT_VERBOSE_CATEGORY category, const char *fmt, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
+  WT_GCC_FUNC_ATTRIBUTE((format(printf, 6, 7))) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    va_list ap;
+
+    /*
+     * Ignore error returns from underlying event handlers, we already have an error value to
+     * return.
+     */
+    va_start(ap, fmt);
+    WT_IGNORE_RET(__eventv(session,
+      session ? FLD_ISSET(S2C(session)->json_output, WT_JSON_OUTPUT_ERROR) : false, 0, log_id, func,
+      line, category, WT_VERBOSE_ERROR, fmt, ap));
+    va_end(ap);
+}
+
+/*
  * __wt_errx_func --
  *     Report an error with no error code.
  */

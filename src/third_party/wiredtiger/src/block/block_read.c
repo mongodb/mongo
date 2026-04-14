@@ -313,13 +313,13 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
 
     if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)) {
         if (full_checksum_mismatch)
-            __wt_errx(session,
+            __wt_errx_id(session, 1538000,
               "%s: potential hardware corruption, read checksum error for %" PRIu32
               "B block at offset %" PRIuMAX ": calculated block checksum of %#" PRIx32
               " doesn't match expected checksum of %#" PRIx32,
               block->name, size, (uintmax_t)offset, __wt_checksum(buf->mem, check_size), checksum);
         else
-            __wt_errx(session,
+            __wt_errx_id(session, 1538001,
               "%s: potential hardware corruption, read checksum error for %" PRIu32
               "B block at offset %" PRIuMAX ": block header checksum of %#" PRIx32
               " doesn't match expected checksum of %#" PRIx32,

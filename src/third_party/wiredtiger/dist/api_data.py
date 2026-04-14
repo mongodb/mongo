@@ -759,7 +759,8 @@ connection_runtime_config = [
             Config('threads_max', '8', r'''
                 maximum number of threads WiredTiger will start to help evict pages from cache. The
                 number of threads started will vary depending on the current eviction load. Each
-                eviction worker thread uses a session from the configured session_max''',
+                eviction worker thread uses a session from a reserved pool of WT_EVICT_MAX_WORKERS
+                (64) sessions''',
                 min=1, max=64), # !!! Must match WT_EVICT_MAX_WORKERS
             Config('threads_min', '1', r'''
                 minimum number of threads WiredTiger will start to help evict pages from

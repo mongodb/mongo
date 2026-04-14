@@ -328,13 +328,13 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     WT_PAGE *page;
     uint64_t page_size;
     uint8_t stats_flags;
-    bool clean_page, closing, ebusy_only, inmem_split, is_dirty, tree_dead;
+    bool evict_clean, closing, ebusy_only, inmem_split, is_dirty, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
     stats_flags = 0;
-    clean_page = ebusy_only = is_dirty = false;
+    evict_clean = ebusy_only = is_dirty = false;
 
     __wt_verbose_debug3(
       session, WT_VERB_EVICTION, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
@@ -462,14 +462,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
 
     /* Figure out whether reconciliation was done on the page */
     if (__wt_page_evict_clean(page)) {
-        clean_page = true;
+        evict_clean = true;
         FLD_SET(stats_flags, WT_EVICT_STATS_CLEAN);
     }
 
     /* Update the reference and discard the page. */
     if (__wt_ref_is_root(ref))
         __wt_ref_out(session, ref);
-    else if ((clean_page && !F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY)) || tree_dead)
+    else if ((evict_clean && !F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY)) || tree_dead)
         /*
          * Pages that belong to dead trees never write back to disk and can't support page splits.
          */

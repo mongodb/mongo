@@ -95,7 +95,7 @@ class ConnStat(Stat):
 class CursorErrorStat(Stat):
     prefix = 'cursor'
     def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CursorStat.prefix, desc, flags)
+        Stat.__init__(self, name, CursorErrorStat.prefix, desc, flags)
 class CursorStat(Stat):
     prefix = 'cursor'
     def __init__(self, name, desc, flags=''):
@@ -103,7 +103,7 @@ class CursorStat(Stat):
 class CursorSweepStat(Stat):
     prefix = 'cursor'
     def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CursorStat.prefix, desc, flags)
+        Stat.__init__(self, name, CursorSweepStat.prefix, desc, flags)
 class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
@@ -160,7 +160,7 @@ class SessionOpStat(Stat):
 class StorageStat(Stat):
     prefix = 'tiered-storage'
     def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, SessionOpStat.prefix, desc, flags)
+        Stat.__init__(self, name, StorageStat.prefix, desc, flags)
 class ThreadStat(Stat):
     prefix = 'thread-state'
     def __init__(self, name, desc, flags=''):

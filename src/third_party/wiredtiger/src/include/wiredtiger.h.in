@@ -2315,12 +2315,12 @@ struct __wt_connection {
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;
      * threads_max, maximum number of threads WiredTiger will start to help evict pages from cache.
      * The number of threads started will vary depending on the current eviction load.  Each
-     * eviction worker thread uses a session from the configured session_max., an integer between \c
-     * 1 and \c 64; default \c 8.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of
-     * threads WiredTiger will start to help evict pages from cache.  The number of threads
-     * currently running will vary depending on the current eviction load., an integer between \c 1
-     * and \c 64; default \c 1.}
+     * eviction worker thread uses a session from a reserved pool of WT_EVICT_MAX_WORKERS (64)
+     * sessions., an integer between \c 1 and \c 64; default \c 8.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+     * threads_min, minimum number of threads WiredTiger will start to help evict pages from cache.
+     * The number of threads currently running will vary depending on the current eviction load., an
+     * integer between \c 1 and \c 64; default \c 1.}
      * @config{ ),,}
      * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring
      * the dirty content in cache to this level.  It is a percentage of the cache size if the value
@@ -3265,12 +3265,11 @@ struct __wt_connection {
  * \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger will
  * start to help evict pages from cache.  The number of threads started will vary depending on the
- * current eviction load.  Each eviction worker thread uses a session from the configured
- * session_max., an integer between \c 1 and \c 64; default \c 8.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * threads_min, minimum number of threads WiredTiger will start to help evict pages from cache.  The
- * number of threads currently running will vary depending on the current eviction load., an integer
- * between \c 1 and \c 64; default \c 1.}
+ * current eviction load.  Each eviction worker thread uses a session from a reserved pool of
+ * WT_EVICT_MAX_WORKERS (64) sessions., an integer between \c 1 and \c 64; default \c 8.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads WiredTiger will start to
+ * help evict pages from cache.  The number of threads currently running will vary depending on the
+ * current eviction load., an integer between \c 1 and \c 64; default \c 1.}
  * @config{ ),,}
  * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring the
  * dirty content in cache to this level.  It is a percentage of the cache size if the value is
@@ -5653,25 +5652,6 @@ struct __wt_page_log {
         WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args);
 
     /*!
-     * FIXME-WT-16821: Remove pl_complete_checkpoint_ext.
-     * Complete checkpointing using the given checkpoint_id. This implies that other
-     * nodes can now use the given checkpoint_id.
-     *
-     * @errors
-     *
-     * @param page_log the WT_PAGE_LOG
-     * @param session the current WiredTiger session
-     * @param checkpoint_id the checkpoint id to use. Must be greater than any other
-     *        checkpoint_id used with this call.
-     * @param checkpoint_timestamp the stable timestamp associated with the checkpoint
-     * @param checkpoint_metadata the buffer with checkpoint metadata
-     * @param lsnp an optional output argument for the checkpoint completion record's LSN
-     */
-    int (*pl_complete_checkpoint_ext)(WT_PAGE_LOG *page_log, WT_SESSION *session,
-        uint64_t checkpoint_id, uint64_t checkpoint_timestamp, const WT_ITEM *checkpoint_metadata,
-        uint64_t *lsnp);
-
-    /*!
      * Get the most recent completed checkpoint number.
      *
      * @errors
@@ -5883,8 +5863,7 @@ typedef enum {
 #define WT_PAGE_LOG_COLD 0x8u
 
 /*!
- * FIXME-WT-16821: Remove _ext.
- * WT_PAGE_LOG::pl_complete_checkpoint(_ext) interface.
+ * WT_PAGE_LOG::pl_complete_checkpoint interface.
  */
 struct __wt_page_log_complete_checkpoint_args {
         /*
@@ -8599,151 +8578,154 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1874
 /*! reconciliation: writes skipped in disaggregated storage */
 #define	WT_STAT_CONN_REC_SKIP_WRITE			1875
-/*! session: attempts to remove a local object and the object is in use */
-#define	WT_STAT_CONN_LOCAL_OBJECTS_INUSE		1876
-/*! session: flush_tier failed calls */
-#define	WT_STAT_CONN_FLUSH_TIER_FAIL			1877
-/*! session: flush_tier operation calls */
-#define	WT_STAT_CONN_FLUSH_TIER				1878
-/*! session: flush_tier tables skipped due to no checkpoint */
-#define	WT_STAT_CONN_FLUSH_TIER_SKIPPED			1879
-/*! session: flush_tier tables switched */
-#define	WT_STAT_CONN_FLUSH_TIER_SWITCHED		1880
-/*! session: local objects removed */
-#define	WT_STAT_CONN_LOCAL_OBJECTS_REMOVED		1881
 /*! session: open session count */
-#define	WT_STAT_CONN_SESSION_OPEN			1882
+#define	WT_STAT_CONN_SESSION_OPEN			1876
 /*! session: session query timestamp calls */
-#define	WT_STAT_CONN_SESSION_QUERY_TS			1883
+#define	WT_STAT_CONN_SESSION_QUERY_TS			1877
 /*! session: table alter failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_FAIL		1884
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_FAIL		1878
 /*! session: table alter successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SUCCESS	1885
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SUCCESS	1879
 /*! session: table alter triggering checkpoint calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_TRIGGER_CHECKPOINT	1886
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_TRIGGER_CHECKPOINT	1880
 /*! session: table alter unchanged and skipped */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SKIP		1887
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SKIP		1881
 /*! session: table compact conflicted with checkpoint */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_CONFLICTING_CHECKPOINT	1888
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_CONFLICTING_CHECKPOINT	1882
 /*! session: table compact dhandle successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_DHANDLE_SUCCESS	1889
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_DHANDLE_SUCCESS	1883
 /*! session: table compact failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1890
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1884
 /*! session: table compact failed calls due to cache pressure */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL_CACHE_PRESSURE	1891
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL_CACHE_PRESSURE	1885
 /*! session: table compact passes */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_PASSES	1892
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_PASSES	1886
 /*! session: table compact pulled into eviction */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_EVICTION	1893
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_EVICTION	1887
 /*! session: table compact running */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_RUNNING	1894
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_RUNNING	1888
 /*! session: table compact skipped as process would not reduce file size */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SKIPPED	1895
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SKIPPED	1889
 /*! session: table compact successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1896
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1890
 /*! session: table compact timeout */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_TIMEOUT	1897
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_TIMEOUT	1891
 /*! session: table create failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1898
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1892
 /*! session: table create successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1899
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1893
 /*! session: table create with import failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_FAIL	1900
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_FAIL	1894
 /*! session: table create with import repair calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_REPAIR	1901
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_REPAIR	1895
 /*! session: table create with import successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_SUCCESS	1902
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_SUCCESS	1896
 /*! session: table drop failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1903
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1897
 /*! session: table drop successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1904
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1898
 /*! session: table salvage failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1905
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1899
 /*! session: table salvage successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1906
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1900
 /*! session: table truncate failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1907
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1901
 /*! session: table truncate successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1908
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1902
 /*! session: table verify failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1909
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1903
 /*! session: table verify successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1910
-/*! session: tiered operations dequeued and processed */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_DEQUEUED		1911
-/*! session: tiered operations removed without processing */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_REMOVED		1912
-/*! session: tiered operations scheduled */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_CREATED		1913
-/*! session: tiered storage local retention time (secs) */
-#define	WT_STAT_CONN_TIERED_RETENTION			1914
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1904
 /*! thread-state: active filesystem fsync calls */
-#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1915
+#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1905
 /*! thread-state: active filesystem read calls */
-#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1916
+#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1906
 /*! thread-state: active filesystem write calls */
-#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1917
+#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1907
 /*! thread-yield: application thread operations waiting for cache */
-#define	WT_STAT_CONN_APPLICATION_CACHE_OPS		1918
+#define	WT_STAT_CONN_APPLICATION_CACHE_OPS		1908
 /*!
  * thread-yield: application thread operations waiting for interruptible
  * cache eviction
  */
-#define	WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_OPS	1919
+#define	WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_OPS	1909
 /*!
  * thread-yield: application thread operations waiting for mandatory
  * cache eviction
  */
-#define	WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_OPS	1920
+#define	WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_OPS	1910
 /*! thread-yield: application thread snapshot refreshed for eviction */
-#define	WT_STAT_CONN_APPLICATION_EVICT_SNAPSHOT_REFRESHED	1921
+#define	WT_STAT_CONN_APPLICATION_EVICT_SNAPSHOT_REFRESHED	1911
 /*! thread-yield: application thread time waiting for cache (usecs) */
-#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1922
+#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1912
 /*!
  * thread-yield: application thread time waiting for interruptible cache
  * eviction (usecs)
  */
-#define	WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_TIME	1923
+#define	WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_TIME	1913
 /*!
  * thread-yield: application thread time waiting for mandatory cache
  * eviction (usecs)
  */
-#define	WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_TIME	1924
+#define	WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_TIME	1914
 /*!
  * thread-yield: connection close blocked waiting for transaction state
  * stabilization
  */
-#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1925
+#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1915
 /*! thread-yield: data handle lock yielded */
-#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1926
+#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1916
 /*!
  * thread-yield: get reference for page index and slot time sleeping
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1927
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1917
 /*! thread-yield: page access yielded due to prepare state change */
-#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1928
+#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1918
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1929
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1919
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1930
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1920
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1931
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1921
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1932
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1922
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1933
+#define	WT_STAT_CONN_PAGE_SLEEP				1923
 /*!
  * thread-yield: page delete rollback time sleeping for state change
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1934
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1924
 /*! thread-yield: page reconciliation yielded due to child modification */
-#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1935
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1925
 /*! thread-yield: page split and restart read */
-#define	WT_STAT_CONN_PAGE_SPLIT_RESTART			1936
+#define	WT_STAT_CONN_PAGE_SPLIT_RESTART			1926
 /*! thread-yield: pages skipped during read due to deleted state */
-#define	WT_STAT_CONN_PAGE_READ_SKIP_DELETED		1937
+#define	WT_STAT_CONN_PAGE_READ_SKIP_DELETED		1927
+/*!
+ * tiered-storage: attempts to remove a local object and the object is in
+ * use
+ */
+#define	WT_STAT_CONN_LOCAL_OBJECTS_INUSE		1928
+/*! tiered-storage: flush_tier failed calls */
+#define	WT_STAT_CONN_FLUSH_TIER_FAIL			1929
+/*! tiered-storage: flush_tier operation calls */
+#define	WT_STAT_CONN_FLUSH_TIER				1930
+/*! tiered-storage: flush_tier tables skipped due to no checkpoint */
+#define	WT_STAT_CONN_FLUSH_TIER_SKIPPED			1931
+/*! tiered-storage: flush_tier tables switched */
+#define	WT_STAT_CONN_FLUSH_TIER_SWITCHED		1932
+/*! tiered-storage: local objects removed */
+#define	WT_STAT_CONN_LOCAL_OBJECTS_REMOVED		1933
+/*! tiered-storage: tiered operations dequeued and processed */
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_DEQUEUED		1934
+/*! tiered-storage: tiered operations removed without processing */
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_REMOVED		1935
+/*! tiered-storage: tiered operations scheduled */
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_CREATED		1936
+/*! tiered-storage: tiered storage local retention time (secs) */
+#define	WT_STAT_CONN_TIERED_RETENTION			1937
 /*! transaction: Number of prepared updates */
 #define	WT_STAT_CONN_TXN_PREPARED_UPDATES		1938
 /*! transaction: Number of prepared updates committed */

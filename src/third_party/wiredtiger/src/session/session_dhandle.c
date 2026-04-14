@@ -966,7 +966,16 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
              * the schema lock.
              */
             bool checkpoint_lock_needed = false;
-            if (__wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader) {
+            if (__wt_conn_is_disagg(session)) {
+                /*
+                 * When reading checkpointed dhandles, we must hold the checkpoint lock. On
+                 * followers, this is required for the stable constituent of a layered table.
+                 *
+                 * For leaders, this is generally unnecessary. However, leaders are currently
+                 * allowed to read checkpoints during startup for internal testing. In cases where a
+                 * leader reads a checkpoint from shared metadata, it must also acquire the
+                 * checkpoint lock.
+                 */
                 const char *suffix = strstr(uri, ".wt_stable/");
                 if (suffix != NULL)
                     checkpoint_lock_needed = true;

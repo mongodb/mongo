@@ -56,7 +56,13 @@ class test_disagg01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         page_log = self.conn.get_page_log('palite')
 
         page_log.pl_begin_checkpoint(session, 1)
-        page_log.pl_complete_checkpoint_ext(session, 1, 0, 'Checkpoint')
+        ckpt_complete_args = wiredtiger.PageLogCompleteCheckpointArgs()
+        ckpt_complete_args.checkpoint_id = 1
+        ckpt_complete_args.checkpoint_timestamp = 0
+        ckpt_complete_args.checkpoint_metadata = 'Checkpoint'
+        ckpt_complete_args.lsn = 0
+        ckpt_complete_args.checkpoint_oldest_timestamp = 0
+        page_log.pl_complete_checkpoint(session, ckpt_complete_args)
 
         page_log.pl_begin_checkpoint(session, 2)
         handle = page_log.pl_open_handle(session, 1)

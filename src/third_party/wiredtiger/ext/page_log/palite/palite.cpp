@@ -2365,7 +2365,7 @@ public:
     }
 
     int
-    complete_checkpoint_ext(uint64_t checkpoint_id, uint64_t checkpoint_timestamp,
+    complete_checkpoint(uint64_t checkpoint_id, uint64_t checkpoint_timestamp,
       const WT_ITEM *checkpoint_metadata, uint64_t *lsnp)
     {
         const uint64_t lsn = storage.make_next_lsn();
@@ -2498,11 +2498,11 @@ palite_begin_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *sess, uint64_t checkp
 }
 
 static int
-palite_complete_checkpoint_ext(WT_PAGE_LOG *page_log, WT_SESSION *sess, uint64_t checkpoint_id,
-  uint64_t checkpoint_timestamp, const WT_ITEM *checkpoint_metadata, uint64_t *lsnp)
+palite_complete_checkpoint(
+  WT_PAGE_LOG *page_log, WT_SESSION *sess, WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args)
 {
-    return safe_call<Palite>(sess, page_log, &Palite::complete_checkpoint_ext, checkpoint_id,
-      checkpoint_timestamp, checkpoint_metadata, lsnp);
+    return safe_call<Palite>(sess, page_log, &Palite::complete_checkpoint, args->checkpoint_id,
+      args->checkpoint_timestamp, args->checkpoint_metadata, &args->lsn);
 }
 
 static int
@@ -2553,10 +2553,7 @@ Palite::initialize_interface()
     pl_add_reference = palite_add_reference;
     pl_abandon_checkpoint = palite_abandon_checkpoint;
     pl_begin_checkpoint = palite_begin_checkpoint;
-    pl_complete_checkpoint_ext = palite_complete_checkpoint_ext;
-    /*
-     * FIXME-WT-16821: palite_get_complete_checkpoint_ext will be deprecated.
-     */
+    pl_complete_checkpoint = palite_complete_checkpoint;
     pl_get_complete_checkpoint_ext = palite_get_complete_checkpoint_ext;
     pl_get_last_lsn = palite_get_last_lsn;
     pl_open_handle = palite_open_handle;

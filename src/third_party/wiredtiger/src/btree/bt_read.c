@@ -528,7 +528,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
     if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_AGGRESSIVE_STASH_FREE))
         __wt_stash_discard(session);
 
-    for (evict_skip = read_from_disk = stalled = wont_need = false, force_attempts = 0,
+    for (evict_skip = read_from_disk = wont_need = false, force_attempts = 0,
         sleep_usecs = yield_cnt = 0;
          ;) {
         switch (current_state = WT_REF_GET_STATE(ref)) {
@@ -610,6 +610,13 @@ read:
             WT_RET(__wt_hazard_set_func(session, ref, &busy));
 #endif
             if (busy) {
+                /*
+                 * Treat a busy page-in as a stall so we skip the yield loop and proceed directly to
+                 * eviction assistance or adaptive backoff. The page is busy because it's being
+                 * evicted; yielding won't help and wastes CPU spinning when the thread could be
+                 * doing useful eviction work instead.
+                 */
+                stalled = true;
                 WT_STAT_CONN_INCR(session, page_busy_blocked);
                 break;
             }
