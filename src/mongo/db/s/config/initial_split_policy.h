@@ -152,8 +152,6 @@ public:
      * Constructor used when generating split points for a hashed-prefix shard key.
      */
     SplitPointsBasedSplitPolicy(
-        const ShardKeyPattern& shardKeyPattern,
-        size_t numShards,
         boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,

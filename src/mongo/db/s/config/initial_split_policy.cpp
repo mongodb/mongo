@@ -429,10 +429,15 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnShardSplitPolicy::createF
 }
 
 SplitPointsBasedSplitPolicy::SplitPointsBasedSplitPolicy(
-    const ShardKeyPattern& shardKeyPattern,
-    size_t numShards,
     boost::optional<std::vector<ShardId>> availableShardIds)
-    : _availableShardIds(std::move(availableShardIds)) {
+    : _availableShardIds(std::move(availableShardIds)) {}
+
+InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
+    OperationContext* opCtx,
+    const ShardKeyPattern& shardKeyPattern,
+    const SplitPolicyParams& params) {
+    auto availableShardIds =
+        _availableShardIds ? *_availableShardIds : getAllNonDrainingShardIdsShuffled(opCtx);
 
     size_t numInitialChunksPerShard = 1;
     // TODO SERVER-81884: update once 8.0 becomes last LTS.
@@ -442,21 +447,12 @@ SplitPointsBasedSplitPolicy::SplitPointsBasedSplitPolicy(
     }
 
     _splitPoints = calculateHashedSplitPoints(
-        shardKeyPattern, BSONObj(), numShards * numInitialChunksPerShard);
-}
+        shardKeyPattern, BSONObj(), availableShardIds.size() * numInitialChunksPerShard);
 
-InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
-    OperationContext* opCtx,
-    const ShardKeyPattern& shardKeyPattern,
-    const SplitPolicyParams& params) {
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
     return generateShardCollectionInitialChunks(
-        params,
-        shardKeyPattern,
-        validAfter,
-        _splitPoints,
-        _availableShardIds ? *_availableShardIds : getAllNonDrainingShardIdsShuffled(opCtx));
+        params, shardKeyPattern, validAfter, _splitPoints, availableShardIds);
 }
 
 AbstractTagsBasedSplitPolicy::AbstractTagsBasedSplitPolicy(

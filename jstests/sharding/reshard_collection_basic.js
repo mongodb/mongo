@@ -7,6 +7,7 @@
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
@@ -94,7 +95,6 @@ jsTest.log("Fail if zone provided is invalid for storage.");
 assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: ns,
     key: {"_id": "hashed"},
-    numInitialChunks: 1,
     zones: [{min: {"_id": {"$minKey": 1}}, max: {"_id": {"$maxKey": 1}}, zone: "Namezone"}]
 }),
                              ErrorCodes.BadValue);
@@ -102,8 +102,6 @@ assert.commandFailedWithCode(mongos.adminCommand({
 jsTestLog("Fail if splitting collection into multiple chunks while it is still empty.");
 assert.commandFailedWithCode(
     mongos.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}), 4952606);
-assert.commandFailedWithCode(
-    st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 2}), 4952606);
 
 jsTest.log(
     "Fail if authoritative tags exist in config.tags collection and zones are not provided.");
@@ -248,13 +246,35 @@ reshardCmdTest.assertReshardCollOk({
 },
                                    3);
 
-jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
-assert.commandWorked(
-    mongos.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));
-assert.commandWorked(mongos.getCollection(ns).insert(
-    Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()}))));
-assert.commandWorked(
-    st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 5}));
+// TODO SERVER-81884: update once 8.0 becomes last LTS.
+if (FeatureFlagUtil.isPresentAndEnabled(mongos,
+                                        "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+    jsTestLog("Succeed if hashed shard key without hashed prefix and numInitialChunks is respected.");
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1, newKey: "hashed"}, numInitialChunks: 5}, 5);
+
+    jsTest.log("Succeed reshard to hashed shard key with one chunk per shard.");
+    assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
+    assert.commandWorked(mongos.getCollection(ns).insert(
+        Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()}))));
+    assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {b: "hashed"}}));
+
+    // Make sure that there is one chunk dedicated for each inserted document.
+    var configDB = mongos.getDB('config');
+    let shardNames = [st.shard0.shardName, st.shard1.shardName];
+    shardNames.forEach(shardName => {
+        let chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: shardName});
+        assert.eq(chunks.itcount(), 1);
+    });
+} else {
+    jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
+    assert.commandWorked(
+        mongos.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));
+    assert.commandWorked(mongos.getCollection(ns).insert(
+        Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()}))));
+    assert.commandWorked(
+        st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 5}));
+}
 mongos.getDB(kDbName)[collName].drop();
 
 st.stop();
