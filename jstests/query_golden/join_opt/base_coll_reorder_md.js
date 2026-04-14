@@ -7,9 +7,8 @@
  * ]
  */
 import {linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
-import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {prettyPrintWinningPlan, getWinningJoinOrderOneLine} from "jstests/query_golden/libs/pretty_plan.js";
-import {joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
+import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
 
 const coll = db[jsTestName() + "_base"];
 coll.drop();
@@ -88,7 +87,7 @@ function runRandomReorderTests(pipeline) {
     linebreak();
 }
 
-joinTestWrapper(() => {
+joinTestWrapper(db, () => {
     // A - BASE - B
     section("3-Node graph, base node fully connected");
     runRandomReorderTests([

@@ -35,6 +35,7 @@ try {
     );
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization should be used with compound equality predicates",
         coll: baseColl,
         pipeline: [
@@ -56,9 +57,11 @@ try {
             {a: 2, b: 2, d: 2, foreignColl1: {a: 2, c: "qux", d: 2}},
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 1,
     });
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization should be used with mix of local/foreignField and pipeline",
         coll: baseColl,
         pipeline: [
@@ -82,9 +85,11 @@ try {
             {a: 2, b: 2, d: 2, foreignColl1: {a: 2, c: "qux", d: 2}},
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 1,
     });
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization should work with $$ROOT",
         coll: baseColl,
         pipeline: [
@@ -118,6 +123,7 @@ try {
             {a: 2, b: 2, d: 2, foreignColl1: {a: 2, c: "qux", d: 2}},
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 1,
     });
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));

@@ -7,12 +7,14 @@ import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_
 // Runs the given test case with join optimization enabled and disabled, verifies that the results
 // match expectedResults with UNORDERED comparison, and checks whether the join optimizer was used as expected.
 export function runTestWithUnorderedComparison({
+    db,
     description,
     coll,
     pipeline,
     expectedResults,
     expectedUsedJoinOptimization,
     additionalJoinParams = {},
+    expectedNumJoinStages = -1,
 }) {
     print(`Running test: ${description} with additional join params ${additionalJoinParams}`);
 
@@ -37,6 +39,20 @@ export function runTestWithUnorderedComparison({
         ? winningPlan.usedJoinOptimization
         : false;
     assert.eq(expectedUsedJoinOptimization, usedJoinOptimization, winningPlan);
+
+    const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+    if (expectedUsedJoinOptimization) {
+        assert.gt(joinStages.length, 0, `Expected to find some join opt stages, found none: ` + tojson(explain));
+        if (expectedNumJoinStages > 0) {
+            assert.eq(
+                joinStages.length,
+                expectedNumJoinStages,
+                `Expected ${expectedNumJoinStages} join opt stages: ` + tojson(explain),
+            );
+        }
+    } else {
+        assert.eq(joinStages.length, 0, `Expected no join opt stages: ` + tojson(explain));
+    }
 }
 
 /**
@@ -119,5 +135,36 @@ export function assertAllJoinsUseMethod(explain, expectedMethod) {
             expectedMethod,
             `Expected all joins to be ${expectedMethod}, but found ${stage.stage}`,
         );
+    }
+}
+
+/**
+ * Restores join-opt parameters to state before test.
+ */
+export function joinTestWrapper(db, testFun) {
+    const params = assert.commandWorked(
+        db.adminCommand({
+            getParameter: 1,
+            internalEnableJoinOptimization: 1,
+            internalJoinReorderMode: 1,
+            internalJoinPlanTreeShape: 1,
+            internalMaxNodesInJoinGraph: 1,
+            internalMaxEdgesInJoinGraph: 1,
+            internalMaxNumberNodesConsideredForImplicitEdges: 1,
+            internalJoinPlanSamplingSize: 1,
+            internalJoinEnumerateCollScanPlans: 1,
+            internalMinAllPlansEnumerationSubsetLevel: 1,
+            internalMaxAllPlansEnumerationSubsetLevel: 1,
+            internalJoinOptimizationSamplingCEMethod: 1,
+            internalJoinMethod: 1,
+        }),
+    );
+    delete params.ok;
+    delete params.operationTime;
+
+    try {
+        testFun();
+    } finally {
+        assert.commandWorked(db.adminCommand({setParameter: 1, ...params}));
     }
 }

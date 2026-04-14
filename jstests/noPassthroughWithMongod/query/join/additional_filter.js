@@ -44,6 +44,7 @@ try {
     );
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization should not be used with local/foreignField syntax and additional filter",
         coll: baseColl,
         pipeline: [
@@ -68,6 +69,7 @@ try {
 
     // Same as above, without project.
     runTestWithUnorderedComparison({
+        db,
         description:
             "Join optimization should not be used with local/foreignField syntax and additional filter without project",
         coll: baseColl,
@@ -91,6 +93,7 @@ try {
     });
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization should not be used with let/pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
@@ -114,6 +117,7 @@ try {
     });
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization should not be used with field syntax and pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
@@ -136,6 +140,7 @@ try {
     });
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization can be used on a prefix even when the suffix has absorbed an additional filter",
         coll: baseColl,
         pipeline: [
@@ -165,9 +170,11 @@ try {
             {a: 1, b: 2, d: 2, foreignColl1: {a: 1, c: "bar", d: 2}, foreignColl2: {b: 1, e: "bar", f: 2}},
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 1,
     });
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization can handle filter which leads to EOF QSN",
         coll: baseColl,
         pipeline: [
@@ -187,6 +194,7 @@ try {
     });
 
     runTestWithUnorderedComparison({
+        db,
         description: "Join optimization can handle filter which leads to EOF QSN in subpipeline",
         coll: baseColl,
         pipeline: [

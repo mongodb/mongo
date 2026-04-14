@@ -7,9 +7,9 @@
  * ]
  */
 import {code, section, subSection} from "jstests/libs/query/pretty_md.js";
-import {runJoinTestAndCompare, joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
+import {runJoinTestAndCompare} from "jstests/query_golden/libs/join_opt.js";
 import {normalizeArray} from "jstests/libs/golden_test.js";
-import {joinOptUsed} from "jstests/libs/query/join_utils.js";
+import {joinTestWrapper, joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -122,7 +122,7 @@ function runBasicJoinTest(pipeline) {
     assert.commandWorked(foreignColl2.dropIndex({b: 1}));
 }
 
-joinTestWrapper(() => {
+joinTestWrapper(db, () => {
     section("Basic example where $lookup subpipeline contains multiple $match stages");
     runBasicJoinTest([
         {

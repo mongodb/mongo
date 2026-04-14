@@ -97,6 +97,7 @@ function runAllTestCases(additionalJoinParams = {}) {
     // Query with implicit cycle of length 3, specified with join predicates A -- B, B -- C on the same
     // field (joinField1). The inferred cycle is A -- B -- C.
     runTestWithUnorderedComparison({
+        db,
         description: "Implicit cycle of length 3 on joinField1",
         coll: collA,
         additionalJoinParams,
@@ -136,12 +137,14 @@ function runAllTestCases(additionalJoinParams = {}) {
             },
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 2,
     });
 
     // Query with implicit cycle of length 4. Similar to above, but with more collections. Also, the
     // cycle inference required is different. Here, the query specified A -- B, A -- C, and A--D,
     // so the largest cycle inferred is A -- B -- C -- D.
     runTestWithUnorderedComparison({
+        db,
         description: "Implicit cycle of length 4 on joinField1",
         coll: collA,
         additionalJoinParams,
@@ -191,12 +194,14 @@ function runAllTestCases(additionalJoinParams = {}) {
             },
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 3,
     });
 
     // Query with explicit cycle, specified with join predicates A -- B, B -- C, C--A on the same field
     // (joinField1). The cycle is A -- B -- C. This time, we use a mix of pipeline syntax and
     // local/foreignField syntax.
     runTestWithUnorderedComparison({
+        db,
         description: "Explicit cycle on joinField1",
         coll: collA,
         additionalJoinParams,
@@ -238,11 +243,13 @@ function runAllTestCases(additionalJoinParams = {}) {
             },
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 2,
     });
 
     // Query with a pseudo-cycle. The join predicates are A -- B on joinField1, B -- C on joinField2,
     // and A -- C on joinField3. This does _not_ form a true cycle.
     runTestWithUnorderedComparison({
+        db,
         description: "Pseudo-cycle",
         coll: collA,
         additionalJoinParams,
@@ -284,6 +291,7 @@ function runAllTestCases(additionalJoinParams = {}) {
             },
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 2,
     });
 
     // Query with a mix of true cycles and pseudo-cycles. This query is based on TPC-H Q5. Here, the
@@ -294,6 +302,7 @@ function runAllTestCases(additionalJoinParams = {}) {
     // Through an inferred edge, there is a true cycle between N -- C -- S on nationkey. There is also
     // a pseudo-cycle between C -- O -- L -- S.
     runTestWithUnorderedComparison({
+        db,
         description: "Mix of true cycles and pseudo-cycles",
         coll: customerColl,
         additionalJoinParams,
@@ -371,6 +380,7 @@ function runAllTestCases(additionalJoinParams = {}) {
             },
         ],
         expectedUsedJoinOptimization: true,
+        expectedNumJoinStages: 5,
     });
 }
 

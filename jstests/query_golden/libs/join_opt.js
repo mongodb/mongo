@@ -46,34 +46,3 @@ export function runJoinTestAndCompare(desc, coll, pipeline, params, expected, as
         }
     }
 }
-
-/**
- * Restores join-opt parameters to state before test.
- */
-export function joinTestWrapper(testFun) {
-    const params = assert.commandWorked(
-        db.adminCommand({
-            getParameter: 1,
-            internalEnableJoinOptimization: 1,
-            internalJoinReorderMode: 1,
-            internalJoinPlanTreeShape: 1,
-            internalMaxNodesInJoinGraph: 1,
-            internalMaxEdgesInJoinGraph: 1,
-            internalMaxNumberNodesConsideredForImplicitEdges: 1,
-            internalJoinPlanSamplingSize: 1,
-            internalJoinEnumerateCollScanPlans: 1,
-            internalMinAllPlansEnumerationSubsetLevel: 1,
-            internalMaxAllPlansEnumerationSubsetLevel: 1,
-            internalJoinOptimizationSamplingCEMethod: 1,
-            internalJoinMethod: 1,
-        }),
-    );
-    delete params.ok;
-    delete params.operationTime;
-
-    try {
-        testFun();
-    } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, ...params}));
-    }
-}

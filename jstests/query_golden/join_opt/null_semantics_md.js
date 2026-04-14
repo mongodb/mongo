@@ -8,8 +8,8 @@
  */
 import {normalizeArray} from "jstests/libs/golden_test.js";
 import {code, section, subSection} from "jstests/libs/query/pretty_md.js";
-import {runJoinTestAndCompare, joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
-import {joinOptUsed} from "jstests/libs/query/join_utils.js";
+import {runJoinTestAndCompare} from "jstests/query_golden/libs/join_opt.js";
+import {joinOptUsed, joinTestWrapper} from "jstests/libs/query/join_utils.js";
 
 const testDocs = [
     {_id: 0},
@@ -75,7 +75,7 @@ function runNullSemanticsTest(pipeline, extraParams = {}) {
     }
 }
 
-joinTestWrapper(() => {
+joinTestWrapper(db, () => {
     section("Simple local-foreign field join");
     runNullSemanticsTest([
         {

@@ -15,11 +15,8 @@ import {
     prettyPrintRejectedPlans,
     getWinningJoinOrderOneLine,
 } from "jstests/query_golden/libs/pretty_plan.js";
-import {
-    joinTestWrapper,
-    getJoinTestResultsAndExplain,
-    verifyExplainOutput,
-} from "jstests/query_golden/libs/join_opt.js";
+import {getJoinTestResultsAndExplain, verifyExplainOutput} from "jstests/query_golden/libs/join_opt.js";
+import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -65,7 +62,7 @@ function testAllPlans(desc, baseRes, minLevel, maxLevel) {
     linebreak();
 }
 
-joinTestWrapper(() => {
+joinTestWrapper(db, () => {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
     const baseRes = coll.aggregate(pipeline).toArray();
 
