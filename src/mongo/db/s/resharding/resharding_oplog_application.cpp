@@ -581,10 +581,8 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
             ParsedDelete parsedDelete(opCtx, &request, stashColl.getCollectionPtr());
             uassertStatusOK(parsedDelete.parseRequest());
 
-            auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),
-                                                          stashColl,
-                                                          &parsedDelete,
-                                                          boost::none /* verbosity */));
+            auto exec = uassertStatusOK(getExecutorDelete(
+                &CurOp::get(opCtx)->debug(), stashColl, parsedDelete, boost::none /* verbosity */));
             BSONObj res;
             auto state = exec->getNext(&res, nullptr);
 

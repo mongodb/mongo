@@ -79,11 +79,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdate(
     OperationContext* opCtx,
     CollectionAcquisition collection,
-    CanonicalUpdate* canonicalUpdate,
+    CanonicalUpdate& canonicalUpdate,
     bool returnOwnedBson);
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelete(
-    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete* parsedDelete);
+    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete& parsedDelete);
 
 /**
  * Tries to find an index suitable for use in the express equality path. Excludes indexes which

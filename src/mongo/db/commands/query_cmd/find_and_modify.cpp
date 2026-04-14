@@ -410,7 +410,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         uassertStatusOK(parsedDelete.parseRequest());
 
         const auto exec =
-            uassertStatusOK(getExecutorDelete(opDebug, collection, &parsedDelete, verbosity));
+            uassertStatusOK(getExecutorDelete(opDebug, collection, parsedDelete, verbosity));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
@@ -457,8 +457,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                                                      collection.getCollectionPtr(),
                                                                      isTimeseriesLogicalRequest));
 
-        const auto exec = uassertStatusOK(
-            getExecutorUpdate(opDebug, collection, canonicalUpdate.get(), verbosity));
+        const auto exec =
+            uassertStatusOK(getExecutorUpdate(opDebug, collection, *canonicalUpdate, verbosity));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(

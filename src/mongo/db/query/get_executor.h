@@ -191,7 +191,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    ParsedDelete* parsedDelete,
+    ParsedDelete& parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
@@ -217,7 +217,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
 MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    CanonicalUpdate* canonicalUpdate,
+    CanonicalUpdate& canonicalUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**

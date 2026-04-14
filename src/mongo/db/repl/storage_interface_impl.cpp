@@ -1061,7 +1061,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         }
 
         auto planExecutorResult = mongo::getExecutorUpdate(
-            nullptr, collection, canonicalUpdate.get(), boost::none /* verbosity */);
+            nullptr, collection, *canonicalUpdate, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1261,7 +1261,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
         }
 
         auto planExecutorResult = mongo::getExecutorDelete(
-            nullptr, collection, &parsedDelete, boost::none /* verbosity */);
+            nullptr, collection, parsedDelete, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }

@@ -60,7 +60,7 @@ long long deleteObjects(OperationContext* opCtx,
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, parsedDelete, boost::none /* verbosity */));
 
     return exec->executeDelete();
 }
@@ -72,7 +72,7 @@ DeleteResult deleteObject(OperationContext* opCtx,
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, parsedDelete, boost::none /* verbosity */));
 
     if (!request.getReturnDeleted()) {
         return {exec->executeDelete(), boost::none};

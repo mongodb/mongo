@@ -430,7 +430,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
                                "write contention during express execution"_sd,
                                NamespaceStringOrUUID(_nss));
 
-    // TODO SERVER-123752: Is this the desired behavior?
+    // TODO SERVER-116168: Is this the desired behavior?
     _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
         // No-op.
     });
@@ -448,7 +448,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
                                                  "resource contention during express execution"_sd),
                                           numWriteConflictYieldsSinceLastSuccess);
 
-    // TODO SERVER-123752: Is this the desired behavior?
+    // TODO SERVER-116168: Is this the desired behavior?
     _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
         // No-op.
     });
@@ -681,10 +681,10 @@ const express::ExceptionRecoveryPolicy* getExpressRecoveryPolicy(
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdate(
     OperationContext* opCtx,
     CollectionAcquisition collection,
-    CanonicalUpdate* canonicalUpdate,
+    CanonicalUpdate& canonicalUpdate,
     bool returnOwnedBson) {
 
-    const UpdateRequest* request = canonicalUpdate->getRequest();
+    const UpdateRequest* request = canonicalUpdate.getRequest();
 
     using Iterator =
         std::variant<express::IdLookupViaIndex, express::IdLookupOnClusteredCollection>;
@@ -708,11 +708,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
 
     bool isUserInitiatedWrite = opCtx->writesAreReplicated() &&
         !(request->isFromOplogApplication() ||
-          canonicalUpdate->getDriver()->type() == UpdateDriver::UpdateType::kDelta ||
+          canonicalUpdate.getDriver()->type() == UpdateDriver::UpdateType::kDelta ||
           request->source() == OperationSource::kFromMigrate);
 
     auto writeOperation =
-        express::UpdateOperation(canonicalUpdate->getDriver(), isUserInitiatedWrite, request);
+        express::UpdateOperation(canonicalUpdate.getDriver(), isUserInitiatedWrite, request);
 
     using ShardFilter = std::variant<express::NoShardFilter, write_stage_common::PreWriteFilter>;
     auto shardFilter = [&]() -> ShardFilter {
@@ -724,7 +724,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
     }();
 
     fastPathQueryCounters.incrementExpressQueryCounter();
-    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, canonicalUpdate->yieldPolicy());
+    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, canonicalUpdate.yieldPolicy());
 
     return std::visit(
         [&](auto chosenIterator,
@@ -743,8 +743,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelete(
-    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete* parsedDelete) {
-    const DeleteRequest* request = parsedDelete->getRequest();
+    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete& parsedDelete) {
+    const DeleteRequest* request = parsedDelete.getRequest();
 
     using Iterator =
         std::variant<express::IdLookupViaIndex, express::IdLookupOnClusteredCollection>;
@@ -792,7 +792,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
     }();
 
     fastPathQueryCounters.incrementExpressQueryCounter();
-    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, parsedDelete->yieldPolicy());
+    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, parsedDelete.yieldPolicy());
 
     return std::visit(
         [&](auto chosenIterator,

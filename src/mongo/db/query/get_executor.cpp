@@ -1405,13 +1405,13 @@ auto makePlannerFactory(OperationContext* opCtx,
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    ParsedDelete* parsedDelete,
+    ParsedDelete& parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
 
-    auto expCtx = parsedDelete->expCtx();
+    auto expCtx = parsedDelete.expCtx();
     OperationContext* opCtx = expCtx->getOperationContext();
-    const DeleteRequest* request = parsedDelete->getRequest();
+    const DeleteRequest* request = parsedDelete.getRequest();
 
     const NamespaceString& nss(request->getNsString());
 
@@ -1459,12 +1459,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             std::make_unique<WorkingSet>(),
             std::make_unique<EOFStage>(expCtx.get(), eof_node::EOFType::NonExistentNamespace),
             coll,
-            parsedDelete->yieldPolicy(),
+            parsedDelete.yieldPolicy(),
             false, /* whether we must return owned data */
             nss);
     }
 
-    if (!parsedDelete->hasParsedQuery()) {
+    if (!parsedDelete.hasParsedQuery()) {
 
         // Only consider using the idhack if no hint was provided.
         if (request->getHint().isEmpty()) {
@@ -1500,16 +1500,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
         // the idhack fast path. We need to force canonicalization now.
-        Status cqStatus = parsedDelete->parseQueryToCQ();
+        Status cqStatus = parsedDelete.parseQueryToCQ();
         if (!cqStatus.isOK()) {
             return cqStatus;
         }
     }
 
     // This is the regular path for when we have a CanonicalQuery.
-    std::unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
+    std::unique_ptr<CanonicalQuery> cq(parsedDelete.releaseParsedQuery());
 
-    const auto policy = parsedDelete->yieldPolicy();
+    const auto policy = parsedDelete.yieldPolicy();
 
     DeleteStageParams deleteStageParams;
     deleteStageParams.isMulti = request->getMulti();
@@ -1520,8 +1520,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams.opDebug = opDebug;
     deleteStageParams.stmtId = request->getStmtId();
 
-    if (parsedDelete->isRequestToTimeseries() &&
-        !parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
+    if (parsedDelete.isRequestToTimeseries() &&
+        !parsedDelete.isEligibleForArbitraryTimeseriesDelete()) {
         deleteStageParams.numStatsForDoc = timeseries::numMeasurementsForBucketCounter(
             collectionPtr->getTimeseriesOptions()->getTimeField());
     }
@@ -1578,15 +1578,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    CanonicalUpdate* canonicalUpdate,
+    CanonicalUpdate& canonicalUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
 
-    auto expCtx = canonicalUpdate->expCtx();
+    auto expCtx = canonicalUpdate.expCtx();
     OperationContext* opCtx = expCtx->getOperationContext();
 
-    const UpdateRequest* request = canonicalUpdate->getRequest();
-    UpdateDriver* driver = canonicalUpdate->getDriver();
+    const UpdateRequest* request = canonicalUpdate.getRequest();
+    UpdateDriver* driver = canonicalUpdate.getDriver();
 
     const NamespaceString& nss = request->getNamespaceString();
 
@@ -1610,11 +1610,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                     << nss.toStringForErrorMsg());
     }
 
-    const auto policy = canonicalUpdate->yieldPolicy();
+    const auto policy = canonicalUpdate.yieldPolicy();
 
     auto documentCounter = [&] {
-        if (canonicalUpdate->isRequestToTimeseries() &&
-            !canonicalUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
+        if (canonicalUpdate.isRequestToTimeseries() &&
+            !canonicalUpdate.isEligibleForArbitraryTimeseriesUpdate()) {
             return timeseries::numMeasurementsForBucketCounter(
                 collectionPtr->getTimeseriesOptions()->getTimeField());
         }
@@ -1647,9 +1647,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             nss);
     }
 
-    if (!canonicalUpdate->hasParsedQuery()) {
+    if (!canonicalUpdate.hasParsedQuery()) {
         // Only consider using the idhack if no hint was provided.
-        if (!canonicalUpdate->isEligibleForArbitraryTimeseriesUpdate() &&
+        if (!canonicalUpdate.isEligibleForArbitraryTimeseriesUpdate() &&
             request->getHint().isEmpty()) {
             // This is the idhack fast-path for getting a PlanExecutor without doing the work
             // to create a CanonicalQuery.
@@ -1687,7 +1687,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
         // the idhack fast path. We need to force canonicalization now.
-        Status cqStatus = canonicalUpdate->parseQueryToCQ();
+        Status cqStatus = canonicalUpdate.parseQueryToCQ();
         if (!cqStatus.isOK()) {
             return cqStatus;
         }
@@ -1695,7 +1695,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // This is the regular path for when we have a CanonicalQuery.
     UpdateStageParams updateStageParams(request, driver, opDebug, std::move(documentCounter));
-    std::unique_ptr<CanonicalQuery> cq(canonicalUpdate->releaseParsedQuery());
+    std::unique_ptr<CanonicalQuery> cq(canonicalUpdate.releaseParsedQuery());
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {

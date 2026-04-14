@@ -962,7 +962,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
     }
 
     const auto exec = uassertStatusOK(
-        getExecutorUpdate(&curOp->debug(), collection, canonicalUpdate.get(), boost::none /* verbosity
+        getExecutorUpdate(&curOp->debug(), collection, *canonicalUpdate, boost::none /* verbosity
         */));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
@@ -1102,7 +1102,7 @@ long long performDelete(OperationContext* opCtx,
     assertCanWrite_inlock(opCtx, nsString);
 
     const auto exec = uassertStatusOK(
-        getExecutorDelete(&curOp->debug(), collection, &parsedDelete, boost::none /* verbosity
+        getExecutorDelete(&curOp->debug(), collection, parsedDelete, boost::none /* verbosity
         */));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
@@ -1454,7 +1454,7 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
                                                       CanonicalUpdate& canonicalUpdate,
                                                       bool* containsDotsAndDollarsField) {
     auto exec = uassertStatusOK(getExecutorUpdate(
-        &curOp.debug(), collection, &canonicalUpdate, boost::none /* verbosity */));
+        &curOp.debug(), collection, canonicalUpdate, boost::none /* verbosity */));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -2169,7 +2169,7 @@ static SingleWriteResult performSingleDeleteOp(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
     auto exec = uassertStatusOK(
-        getExecutorDelete(&curOp.debug(), collection, &parsedDelete, boost::none /* verbosity */));
+        getExecutorDelete(&curOp.debug(), collection, parsedDelete, boost::none /* verbosity */));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -2546,8 +2546,8 @@ void explainUpdate(OperationContext* opCtx,
     auto canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(
         expCtx, std::move(parsedUpdate), collection.getCollectionPtr(), isTimeseriesViewRequest));
 
-    auto exec = uassertStatusOK(getExecutorUpdate(
-        &CurOp::get(opCtx)->debug(), collection, canonicalUpdate.get(), verbosity));
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(&CurOp::get(opCtx)->debug(), collection, *canonicalUpdate, verbosity));
     auto bodyBuilder = result->getBodyBuilder();
 
     // Capture diagnostics to be logged in the case of a failure.
@@ -2593,7 +2593,7 @@ void explainDelete(OperationContext* opCtx,
 
     // Explain the plan tree.
     auto exec = uassertStatusOK(
-        getExecutorDelete(&CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
+        getExecutorDelete(&CurOp::get(opCtx)->debug(), collection, parsedDelete, verbosity));
     auto bodyBuilder = result->getBodyBuilder();
 
     // Capture diagnostics to be logged in the case of a failure.

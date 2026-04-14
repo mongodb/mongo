@@ -63,13 +63,13 @@ public:
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform deletes.
      */
-    void addDeleteStage(ParsedDelete* parsedDelete,
+    void addDeleteStage(ParsedDelete& parsedDelete,
                         projection_ast::Projection* projection,
                         DeleteStageParams deleteStageParams);
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform updates.
      */
-    void addUpdateStage(CanonicalUpdate* canonicalUpdate,
+    void addUpdateStage(CanonicalUpdate& canonicalUpdate,
                         projection_ast::Projection* projection,
                         UpdateStageParams updateStageParams);
     /**
