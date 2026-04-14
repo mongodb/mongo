@@ -21,3 +21,6 @@ filters:
   - "filemd5.js":
     approvers:
       - 10gen/query-execution
+  - "validate_db_metadata_command.js":
+    approvers:
+      - 10gen/query-optimization

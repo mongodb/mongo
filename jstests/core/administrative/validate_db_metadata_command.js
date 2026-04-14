@@ -55,6 +55,7 @@ function validate({dbName, coll, apiStrict, error}) {
             }
         }
     }
+    return true;
 }
 
 //
@@ -63,38 +64,23 @@ function validate({dbName, coll, apiStrict, error}) {
 assert.commandWorked(coll1.createIndex({p: "text"}));
 
 // All dbs but different collection name.
-validate({coll: coll2.getName(), apiStrict: true});
+assert.soonNoExcept(() => validate({coll: coll2.getName(), apiStrict: true}));
 
 // Different db, and collection which has unstable index should not error.
-validate({dbName: "new", coll: coll1.getName(), apiStrict: true});
-validate({
-    dbName: "new",
-    apiStrict: true,
-});
+assert.soonNoExcept(() => validate({dbName: "new", coll: coll1.getName(), apiStrict: true}));
+assert.soonNoExcept(() =>
+    validate({
+        dbName: "new",
+        apiStrict: true,
+    }),
+);
 
 //
 // Cases where the command returns an error.
 //
 
-const assertValidateError = (cb) => {
-    assert.soon(() => {
-        try {
-            // Run validate command callback.
-            // If it does not throw, then the validation failed as expected, and there
-            // is no need to retry..
-            cb();
-            return true;
-        } catch (err) {
-            // The callback threw, so the validate command did not report an error as expected.
-            // This means we need to try again until the validation eventually fails.
-            return false;
-        }
-    });
-};
-
-assertValidateError(() => validate({coll: coll1.getName(), apiStrict: true, error: true}));
-
-assertValidateError(() =>
+assert.soonNoExcept(() => validate({coll: coll1.getName(), apiStrict: true, error: true}));
+assert.soonNoExcept(() =>
     validate({
         dbName: testDB.getName(),
         coll: coll1.getName(),
@@ -103,38 +89,38 @@ assertValidateError(() =>
     }),
 );
 
-assertValidateError(() => validate({dbName: testDB.getName(), apiStrict: true, error: true}));
+assert.soonNoExcept(() => validate({dbName: testDB.getName(), apiStrict: true, error: true}));
 
 // Validation fails because text indexes are not supported in the stable API version 1.
 // The error message we'll get here is:
 // "The index with name p_text is not allowed in API version 1".
 // The text index in question is created earlier in this test.
-assertValidateError(() => validate({apiStrict: true, error: true}));
+assert.soonNoExcept(() => validate({apiStrict: true, error: true}));
 
 //
 // Tests for views.
 //
 assert.commandWorked(coll1.dropIndexes());
-validate({coll: coll1.getName(), apiStrict: true});
+assert.soonNoExcept(() => validate({coll: coll1.getName(), apiStrict: true}));
 
 // Create a view which uses unstable expression and verify that validateDBMetadata commands throws
 // an assertion.
 const viewName = jsTestName() + "view1";
 const view = testDB.createView(viewName, coll2.getName(), [{$project: {v: {$_testApiVersion: {unstable: true}}}}]);
 
-assertValidateError(() => validate({coll: viewName, apiStrict: true, error: true}));
-assertValidateError(() => validate({dbName: dbName, apiStrict: true, error: true}));
+assert.soonNoExcept(() => validate({coll: viewName, apiStrict: true, error: true}));
+assert.soonNoExcept(() => validate({dbName: dbName, apiStrict: true, error: true}));
 
-validate({dbName: "otherDB", apiStrict: true});
-validate({dbName: dbName, coll: coll1.getName(), apiStrict: true});
+assert.soonNoExcept(() => validate({dbName: "otherDB", apiStrict: true}));
+assert.soonNoExcept(() => validate({dbName: dbName, coll: coll1.getName(), apiStrict: true}));
 
 // With view name in the input.
-assertValidateError(() => validate({coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}}));
-assertValidateError(() =>
+assert.soonNoExcept(() => validate({coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}}));
+assert.soonNoExcept(() =>
     validate({dbName: dbName, coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}}),
 );
 
-validate({dbName: "new", coll: viewName, apiStrict: true});
+assert.soonNoExcept(() => validate({dbName: "new", coll: viewName, apiStrict: true}));
 
 //
 // Tests for validator.
@@ -146,7 +132,7 @@ assert.commandWorked(
     testDB.createCollection(validatorCollName, {validator: {$expr: {$_testApiVersion: {unstable: true}}}}),
 );
 
-validate({dbName: testDB.getName(), apiStrict: true, error: true});
+assert.soonNoExcept(() => validate({dbName: testDB.getName(), apiStrict: true, error: true}));
 
 // Drop the collection with validation rules. By not using the 'coll.drop()' shell helper, we can
 // avoid implicit collection creation in certain passthrough suites. This should increase the
@@ -160,7 +146,7 @@ assert.commandWorked(testDB.runCommand({drop: validatorCollName}));
 (function maybeValidateWithTimeseriesCollection() {
     const coll = "timeseriesCollectionMetaDataValidation";
     assert.commandWorked(testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "tag"}}));
-    validate({dbName: testDB.getName(), apiStrict: true});
+    assert.soonNoExcept(() => validate({dbName: testDB.getName(), apiStrict: true}));
 })();
 
 // Clean up all the data for next run.
