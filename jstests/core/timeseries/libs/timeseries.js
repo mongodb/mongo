@@ -459,19 +459,22 @@ export var TimeseriesTest = class {
             return false;
         }
 
+        // TODO(SERVER-100328): remove after 9.0 is branched.
         if (
             TestData.isRunningFCVUpgradeDowngradeSuite &&
             TestData.sessionOptions &&
             TestData.sessionOptions.retryWrites
         ) {
-            // TODO SERVER-119937 FCV upgrade/downgrade and retriable writes causes more buckets to be created
-            // (even in suites that do not perform viewful <-> viewless timeseries conversions)
+            // FCV upgrade/downgrade + retriable writes can cause more buckets to be created or re-opened,
+            // (even in suites that do not perform viewful <-> viewless timeseries conversions),
+            // due to the issue described by SERVER-119937.
             return false;
         }
 
+        // TODO(SERVER-101609): remove once 9.0 becomes last LTS.
         if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
-            // FCV transitions between viewful and viewless timeseries can cause retries that
-            // produce extra buckets, or cause buckets to not be re-opened (SERVER-122949).
+            // FCV transitions between viewful and viewless timeseries can cause candidate buckets to not be re-opened,
+            // or cause retries that produce extra buckets, due to the issues described by SERVER-119937 and SERVER-122949.
             return false;
         }
 
