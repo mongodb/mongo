@@ -1,12 +1,10 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {checkSbeStatus, kSbeDisabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
+import {getEngine} from "jstests/libs/query/analyze_plan.js";
 
-// TODO SERVER-117707 remove this check once CBR supports lowering to SBE.
-if (isDeferredGetExecutorEnabled(db)) {
-    jsTest.log.info("Exiting early as deferred engine selection is not supported yet");
-    quit();
-}
+// TODO SERVER-117707 after this ticket, we should always expect that CBR is supported for SBE-targeted queries.
+const cbrSupportedForSbeQueries = isDeferredGetExecutorEnabled(db);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -33,37 +31,52 @@ function sbeEligibleGroupDistinctScanTest() {
     assert(resultsEq(results, [{_id: 0}]));
 }
 
-function sbeEligibleQueriesDoNotUseFallbackCode() {
-    // Regardless of the featureFlagCostBasedRanker, a query that is going to be executed
-    // with SBE should not go down the CBR fallback codepath. Instead it should be planned
-    // as if the feature flag was disabled. We check this by looking at the rejected
-    // plans - if the query was planned via the CBR fallback codepath then the rejected
-    // plans in the explain output would not be populated because the SBE plan explainer
-    // has not yet been fixed to work with plans going down the fallback route (SERVER-92589).
+function assertSbeWithCbrFallbackBehavior() {
+    // Verify that SBE-eligible queries interact correctly with CBR. When CBR is enabled for SBE
+    // queries, we expect costed rejected plans; when it is not, the query should be planned via
+    // standard multiplanning without CBR influence.
     // TODO SERVER-117707: Modify/delete this test.
-    jsTest.log.info("Test Case: sbeEligibleQueriesDoNotUseFallbackCode");
-
+    jsTest.log.info("Test Case: assertSbeWithCbrFallbackBehavior");
     // The assertions below only make sense when the queries are eligible for SBE, i.e.
     // when the query framework control is trySbeEngine or higher.
     if (checkSbeStatus(db) == kSbeDisabled) {
         return;
     }
 
+    const config = getCBRConfig(db);
+    const cbrEnabled = config.featureFlagCostBasedRanker;
+    const mpWithCbrFallbackEnabled =
+        cbrEnabled && config.automaticCEPlanRankingStrategy === "CBRForNoMultiplanningResults";
+
     const pipelines = [
-        // Queries that would not fallback to CBR if we allowed SBE plans to be planned via the fallback.
-        [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: "$a"}}], // distinct
-        [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: null}}], // non-distinct
-        // Queries that would fallback to CBR if we allowed SBE plans to be planned via the fallback.
-        [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: "$a"}}], // distinct
-        [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: null}}], // non-distinct
+        // Queries that return results during the multiplanning trial period (no CBR fallback).
+        {queryReturnsNoResults: false, pipeline: [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: "$a"}}]}, // distinct
+        {queryReturnsNoResults: false, pipeline: [{$match: {a: 20000, b: 20000, c: 1}}, {$group: {_id: null}}]}, // non-distinct
+        // Queries that return no results during the multiplanning trial period (may trigger CBR fallback).
+        {queryReturnsNoResults: true, pipeline: [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: "$a"}}]}, // distinct
+        {queryReturnsNoResults: true, pipeline: [{$match: {a: {$gte: 1}, b: {$gte: 1}, c: 1}}, {$group: {_id: null}}]}, // non-distinct
     ];
 
-    for (const pipeline of pipelines) {
+    for (const {queryReturnsNoResults, pipeline} of pipelines) {
         jsTest.log.info("Pipeline: " + tojson(pipeline));
-
         const explain = cbrQueryColl.explain().aggregate(pipeline);
-        // Observing the rejected plan means we used pure multiplanning for the query.
-        assert.eq(explain.queryPlanner.rejectedPlans.length, 1, tojson(explain));
+        assert.eq(getEngine(explain), "sbe", explain);
+
+        const rejectedPlans = explain.queryPlanner.rejectedPlans;
+        const queryShouldUseCbr = cbrEnabled && cbrSupportedForSbeQueries && queryReturnsNoResults;
+        if (queryShouldUseCbr) {
+            // If CBR is used, at least one of the rejected plans should have costs. This doesn't apply to
+            // all rejected plans because when MP with CBR fallback is enabled, half of the plans will have
+            // costs and the other half won't.
+            assert(
+                rejectedPlans.some((rejectedPlan) => isPlanCosted(rejectedPlan)),
+                rejectedPlans,
+            );
+        }
+
+        // If MP with CBR fallback is enabled for SBE-targeted queries, we should see 2 plans. Otherwise, we should just see 1.
+        const expectedNumPlans = mpWithCbrFallbackEnabled && queryShouldUseCbr ? 2 : 1;
+        assert.eq(rejectedPlans.length, expectedNumPlans, tojson(explain));
 
         // Run the query 3 times to ensure that when we extract the plan from the plan cache we do not error.
         for (let i = 0; i < 3; i++) {
@@ -78,7 +91,7 @@ function sbeEligibleQueriesDoNotUseFallbackCode() {
 
 function runTests() {
     sbeEligibleGroupDistinctScanTest();
-    sbeEligibleQueriesDoNotUseFallbackCode();
+    assertSbeWithCbrFallbackBehavior();
 }
 
 // TODO SERVER-117672: Improve handling of query knob setting and re-setting.
