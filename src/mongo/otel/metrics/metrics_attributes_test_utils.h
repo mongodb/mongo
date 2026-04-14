@@ -47,4 +47,18 @@ MATCHER_P2(IsAttributesAndValue, attrsMatcher, valueMatcher, "") {
     return testing::ExplainMatchResult(attrsMatcher, arg.attributes, result_listener) &&
         testing::ExplainMatchResult(valueMatcher, arg.value, result_listener);
 }
+
+/**
+ * Matches an attribute tuple using AttributesEq, which handles element types like std::span that
+ * lack operator==. Use in place of plain equality when matching Attributes.
+ *
+ * Example:
+ *   EXPECT_THAT(map, UnorderedElementsAre(
+ *       Pair(IsAttributesTuple(std::make_tuple(std::span<int32_t>(data))), 42)));
+ */
+template <typename TupleT>
+auto IsAttributesTuple(TupleT expected) {
+    return testing::Truly(
+        [expected](const TupleT& actual) { return AttributesEq{}(actual, expected); });
+}
 }  // namespace mongo::otel::metrics

@@ -36,9 +36,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <algorithm>
+#include <span>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
+#include <absl/types/span.h>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
 
 namespace mongo::otel::metrics {
@@ -123,6 +129,12 @@ struct AttributesAndValue {
 template <typename T>
 using AttributesAndValues = std::vector<AttributesAndValue<T>>;
 
+/** Hash and equals for absl hash containers for tuples of attribute values. */
+struct AttributesHasher;
+struct AttributesEq;
+/** Map keyed by a tuple of attribute values. */
+template <typename KeyT, typename ValueT>
+using AttributesMap = absl::flat_hash_map<KeyT, ValueT, AttributesHasher, AttributesEq>;
 
 /**
  * Safely creates tuples that are the cartesian product of the provided values. This is "safe"
@@ -147,9 +159,90 @@ std::vector<std::tuple<Ts...>> safeMakeAttributeTuples(const std::vector<Ts>&...
  */
 bool containsDuplicates(std::span<const std::string> values);
 
+/* Returns true if two attribute values are logically equal. */
+template <AttributeType T>
+bool attributeValuesEqual(const T& a, const T& b);
+
 ///////////////////////////////////////////////////////////////////////////////
 // Implementation details
 ///////////////////////////////////////////////////////////////////////////////
+
+template <AttributeType T>
+bool attributeValuesEqual(const T& a, const T& b) {
+    return a == b;
+}
+// std::span is not equality-comparable in C++20, so it requires a special case.
+template <AttributeType T>
+bool attributeValuesEqual(std::span<T> a, std::span<T> b) {
+    return std::ranges::equal(a, b);
+}
+
+/** A small trait to detect std::span at compile-time */
+template <typename T>
+struct is_std_span : std::false_type {};
+
+template <typename T, std::size_t Extent>
+struct is_std_span<std::span<T, Extent>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_std_span_v = is_std_span<std::decay_t<T>>::value;
+/** Wraps a single attribute value for use with absl::HashOf, converting std::span to absl::Span. */
+template <AttributeType T>
+MONGO_MOD_FILE_PRIVATE auto wrapForAbslHash(const T& v) {
+    if constexpr (is_std_span_v<T>) {
+        return absl::Span(v.data(), v.size());
+    } else {
+        return v;
+    }
+}
+
+/** Hashes a single attribute value, with special handling for std::span. */
+struct AttributeHasher {
+    template <AttributeType T>
+    size_t operator()(const T& v) const {
+        return absl::HashOf(wrapForAbslHash(v));
+    }
+};
+
+/** Equality for a single attribute value. */
+struct AttributeEq {
+    template <AttributeType T>
+    bool operator()(const T& lhs, const T& rhs) const {
+        return attributeValuesEqual(lhs, rhs);
+    }
+};
+
+/** Hashes a tuple of attribute values. */
+struct AttributesHasher {
+    template <typename... Ts>
+    size_t operator()(const std::tuple<Ts...>& t) const {
+        return std::apply(
+            [](const auto&... args) { return absl::HashOf(wrapForAbslHash(args)...); }, t);
+    }
+};
+
+/** Equality for tuples of attribute values. */
+struct AttributesEq {
+    template <typename... Ts>
+    bool operator()(const std::tuple<Ts...>& lhs, const std::tuple<Ts...>& rhs) const {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (AttributeEq{}(std::get<Is>(lhs), std::get<Is>(rhs)) && ...);
+        }(std::index_sequence_for<Ts...>{});
+    }
+};
+
+/**
+ * Turns an attribute value into a string. This is needed because fmt::format doesn't support
+ * std::span. This is only used for reporting errors.
+ */
+template <AttributeType T>
+std::string formatAttributeValue(const T& v) {
+    if constexpr (requires { fmt::format("{}", v); }) {
+        return fmt::format("{}", v);
+    } else {
+        return fmt::format("[{}]", fmt::join(v, ", "));
+    }
+}
 
 /**
  * Creates tuples that are the cartesian product of the provided values. Throws an error if any list
@@ -175,10 +268,10 @@ MONGO_MOD_FILE_PRIVATE std::vector<std::tuple<T, Ts...>> cartesianProduct(
     std::vector<std::tuple<T, Ts...>> result;
     result.reserve(values.size() * currentProduct.size());
 
-    absl::flat_hash_set<T> seenValues;
+    absl::flat_hash_set<T, AttributeHasher, AttributeEq> seenValues;
     for (const T& value : values) {
         massert(ErrorCodes::BadValue,
-                fmt::format("Duplicate attribute value detected: {}", value),
+                fmt::format("Duplicate attribute value detected: {}", formatAttributeValue(value)),
                 seenValues.insert(value).second);
         for (const std::tuple<Ts...>& currentTuple : currentProduct) {
             result.push_back(std::tuple_cat(std::make_tuple(value), currentTuple));

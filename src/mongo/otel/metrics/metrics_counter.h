@@ -110,7 +110,7 @@ public:
 
 private:
     std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
-    absl::flat_hash_map<Attributes, std::unique_ptr<Atomic<T>>> _counters;
+    AttributesMap<Attributes, std::unique_ptr<Atomic<T>>> _counters;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

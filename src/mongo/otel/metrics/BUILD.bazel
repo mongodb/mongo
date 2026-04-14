@@ -190,7 +190,10 @@ mongo_cc_unit_test(
         "metrics_attributes_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
-    deps = [":metrics_attributes"],
+    deps = [
+        ":metrics_attributes",
+        ":metrics_attributes_test_utils",
+    ],
 )
 
 mongo_cc_library(

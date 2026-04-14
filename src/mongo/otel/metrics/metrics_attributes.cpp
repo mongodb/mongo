@@ -28,6 +28,8 @@
  */
 #include "mongo/otel/metrics/metrics_attributes.h"
 
+#include <absl/container/flat_hash_set.h>
+
 namespace mongo::otel::metrics {
 
 bool containsDuplicates(std::span<const std::string> values) {

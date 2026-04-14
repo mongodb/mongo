@@ -36,11 +36,7 @@ bool attributeValueEquals(const AnyAttributeType& lhs, const AnyAttributeType& r
         [&rhs](const auto& lhsVal) -> bool {
             using T = std::decay_t<decltype(lhsVal)>;
             const auto& rhsVal = std::get<T>(rhs);
-            if constexpr (requires { lhsVal == rhsVal; }) {
-                return lhsVal == rhsVal;
-            } else {
-                return std::equal(lhsVal.begin(), lhsVal.end(), rhsVal.begin(), rhsVal.end());
-            }
+            return attributeValuesEqual(lhsVal, rhsVal);
         },
         lhs);
 }
