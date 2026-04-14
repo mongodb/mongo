@@ -76,3 +76,6 @@ filters:
   - "kill_primary.yml":
     approvers:
       - 10gen/server-replication-reviewers
+  - "minimum_batch_size.yml":
+    approvers:
+      - 10gen/query-execution

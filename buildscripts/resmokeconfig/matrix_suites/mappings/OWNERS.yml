@@ -31,6 +31,9 @@ filters:
   - "change_streams*":
     approvers:
       - 10gen/query-execution-change-streams
+  - "core_minimum_batch_size.yml":
+    approvers:
+      - 10gen/query-execution
   - "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml":
     approvers:
       - 10gen/query-optimization
