@@ -533,6 +533,12 @@ void saveStatsOnConflict(PlanExecutor* exec, CurOp* curOp) {
     curOp->debug().setPlanSummaryMetrics(std::move(partialStats));
 }
 
+[[noreturn]] void throwUnsupportedUpdateOnColdCollection(const NamespaceString& nss) {
+    uasserted(ErrorCodes::IllegalOperation,
+              str::stream() << "Updates are not supported on cold collection '"
+                            << nss.toStringForErrorMsg() << "'");
+}
+
 }  // namespace
 
 bool handleError(OperationContext* opCtx,
@@ -884,6 +890,12 @@ UpdateResult performUpdate(OperationContext* opCtx,
         DatabaseProfileSettings::get(opCtx->getServiceContext()).getDatabaseProfileLevel(dbName));
 
     assertCanWrite_inlock(opCtx, nsString);
+
+    if (!remove && collection.exists() &&
+        collection.getCollectionPtr()->getRecordStore()->isColdCollection()) {
+        // Updates on cold collections are not allowed.
+        throwUnsupportedUpdateOnColdCollection(collection.nss());
+    }
 
     if (!collection.exists() && upsert) {
         CollectionWriter collectionWriter(opCtx, &collection);
@@ -1577,6 +1589,12 @@ static SingleWriteResult performSingleUpdateOp(
         }
     }();
 
+    if (collection.exists() &&
+        collection.getCollectionPtr()->getRecordStore()->isColdCollection()) {
+        // Updates on cold collections are not allowed.
+        throwUnsupportedUpdateOnColdCollection(collection.nss());
+    }
+
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.
     ScopedDebugInfo shardKeyDiagnostics(
@@ -1946,7 +1964,7 @@ WriteResult performUpdates(
             }
         }
 
-        // TODO (SERVER-123862): don't create nested CurOp for legacy writes.
+        // TODO (SERVER-123796): don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
         const Command* cmd = parentCurOp.getCommand();
@@ -2265,7 +2283,7 @@ WriteResult performDeletes(
             continue;
         }
 
-        // TODO (SERVER-123862): don't create nested CurOp for legacy writes.
+        // TODO (SERVER-123796): don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
         const Command* cmd = parentCurOp.getCommand();
