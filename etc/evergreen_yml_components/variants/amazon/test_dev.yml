@@ -281,7 +281,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --linkstatic=False
-        --remote_execution_priority=2
+        --remote_execution_priority=4
         --build_atlas=True
         --dtlto=False
         --pgo_profile_use=False
