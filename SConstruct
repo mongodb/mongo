@@ -2104,7 +2104,17 @@ else:
 if has_option("cache"):
     if has_option("gcov"):
         env.FatalError("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
-    env.CacheDir(str(env.Dir(cacheDir)))
+    try_count = 3
+    # try to cache 3 times before throwing exception
+    while try_count > 0:
+        try_count = try_count - 1
+        try:
+            env.CacheDir(str(env.Dir(cacheDir)))
+            break
+        except Exception as _:
+            if try_count == 0:
+                raise exc
+            time.sleep(3)  # sleep 3 seconds before trying again
 
 # Normalize the link model. If it is auto, then for now both developer and release builds
 # use the "static" mode. Someday later, we probably want to make the developer build default
