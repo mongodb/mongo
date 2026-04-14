@@ -426,7 +426,7 @@ constexpr uint64_t CanonicalizedNaNSignificand = 0x8000000000000;
 #endif
 
 #if defined(JS_RUNTIME_CANONICAL_NAN)
-extern uint64_t CanonicalizedNaNBits;
+extern JS_PUBLIC_API uint64_t CanonicalizedNaNBits;
 #else
 constexpr uint64_t CanonicalizedNaNBits =
     mozilla::SpecificNaNBits<double, detail::CanonicalizedNaNSignBit,

@@ -2266,36 +2266,15 @@ ResizableArrayBufferObject::createBufferAndData(
   size_t sourceByteLength = source->byteLength();
   size_t newMaxByteLength = source->maxByteLength();
 
-  if (newByteLength > sourceByteLength) {
-    // Copy into a larger buffer.
-    AutoSetNewObjectMetadata metadata(cx);
-    auto [buffer, toFill] = createBufferAndData<FillContents::Zero>(
-        cx, newByteLength, newMaxByteLength, metadata, nullptr);
-    if (!buffer) {
-      return nullptr;
-    }
-
-    // The `createBufferAndData()` call first zero-initializes the complete
-    // buffer and then we copy over |sourceByteLength| bytes from |source|. It
-    // seems prudent to only zero-initialize the trailing bytes of |toFill|
-    // to avoid writing twice to `toFill[0..newByteLength]`. We don't yet
-    // implement this optimization, because this method is only called for
-    // small, inline buffers, so any write optimizations probably won't make
-    // much of a difference.
-    std::copy_n(source->dataPointer(), sourceByteLength, toFill);
-
-    return buffer;
-  }
-
-  // Copy into a smaller or same size buffer.
   AutoSetNewObjectMetadata metadata(cx);
-  auto [buffer, toFill] = createBufferAndData<FillContents::Uninitialized>(
+  auto [buffer, toFill] = createBufferAndData<FillContents::Zero>(
       cx, newByteLength, newMaxByteLength, metadata, nullptr);
   if (!buffer) {
     return nullptr;
   }
 
-  std::uninitialized_copy_n(source->dataPointer(), newByteLength, toFill);
+  size_t nbytes = std::min(newByteLength, sourceByteLength);
+  std::copy_n(source->dataPointer(), nbytes, toFill);
 
   return buffer;
 }

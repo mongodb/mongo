@@ -599,9 +599,14 @@ void CodeGeneratorShared::encodeAllocation(LSnapshot* snapshot,
       if (payload->isGeneralReg()) {
         alloc = RValueAllocation::Int64(ToRegister(payload));
       } else if (payload->isStackSlot()) {
-        MOZ_ASSERT(payload->toStackSlot()->width() ==
-                   LStackSlot::width(LDefinition::GENERAL));
-        alloc = RValueAllocation::Int64(ToStackIndex(payload));
+        LStackSlot::Width width = payload->toStackSlot()->width();
+        MOZ_ASSERT(width == LStackSlot::width(LDefinition::GENERAL) ||
+                   width == LStackSlot::width(LDefinition::INT32));
+        if (width == LStackSlot::width(LDefinition::GENERAL)) {
+          alloc = RValueAllocation::Int64(ToStackIndex(payload));
+        } else {
+          alloc = RValueAllocation::Int64Int32(ToStackIndex(payload));
+        }
       } else {
         MOZ_CRASH("Unexpected payload type.");
       }
