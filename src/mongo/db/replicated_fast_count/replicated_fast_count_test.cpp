@@ -453,8 +453,8 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
              /*expectedCount=*/boost::none,
              /*expectedSize=*/newExpectedSizeColl1},
             {_uuid2,
-             replicated_fast_count_test_helpers::FastCountOpType::kInsert,
-             /*expectedCount=*/numDocsColl2,
+             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
+             /*expectedCount=*/boost::none,
              /*expectedSize=*/numDocsColl2 * sampleDocForInsert.objsize()},
         });
 }
@@ -1601,13 +1601,13 @@ void assertExpectedAggregateDelta(const AggregateDeltaExpectation& expected,
     // Deltas across UUIDs.
     const auto deltas = aggregateSizeCountDeltasInOplog(oplogCursor, seekAfterTS);
     ASSERT_TRUE(deltas.deltas.contains(uuid));
-    EXPECT_EQ(deltas.deltas.at(uuid), expected.delta);
+    EXPECT_EQ(deltas.deltas.at(uuid).sizeCount, expected.delta);
     EXPECT_EQ(deltas.lastTimestamp, expected.lastTimestamp);
 
     // Also correct when filtered explicitly by 'uuid'
     const auto filteredDeltas = aggregateSizeCountDeltasInOplog(oplogCursor, seekAfterTS, uuid);
     ASSERT_TRUE(filteredDeltas.deltas.contains(uuid));
-    ASSERT_EQ(expected.delta, filteredDeltas.deltas.at(uuid));
+    ASSERT_EQ(expected.delta, filteredDeltas.deltas.at(uuid).sizeCount);
     EXPECT_EQ(filteredDeltas.lastTimestamp, expected.lastTimestamp);
 }
 
@@ -1838,8 +1838,8 @@ TEST_F(AggregateSizeCountFromOplogTest, ForwardCursorRespectsOplogVisibilityTime
     // Only the ts1 entry was visible; ts2 must not appear in the deltas.
     ASSERT_EQ(result.deltas.size(), 1u);
     ASSERT_TRUE(result.deltas.count(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).size, 10);
-    EXPECT_EQ(result.deltas.at(collA.uuid).count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 10);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
     ASSERT_TRUE(result.lastTimestamp.has_value());
     EXPECT_EQ(result.lastTimestamp.value(), ts1);
 }
@@ -1961,6 +1961,65 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateTruncateRangeMixedWithCRUD) {
         oplogCursor);
 }
 
+TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationMarksStateCreated) {
+    const Timestamp ts1{1, 1};
+    std::list<repl::OplogEntry> entries{test_helpers::makeCreateOplogEntry(ts1, collA)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 0);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 0);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, CollectionDropMarksStateDropped) {
+    const Timestamp ts1{1, 1};
+    std::list<repl::OplogEntry> entries{test_helpers::makeDropOplogEntry(ts1, collA)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDropped);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationThenInsertsMarkedCreated) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeCreateOplogEntry(ts1, collA),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 10),
+        test_helpers::makeOplogEntry(ts3, collA, repl::OpTypeEnum::kInsert, 20),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 30);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 2);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, InsertAndDropMarkedDropped) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 10),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 20),
+        test_helpers::makeDropOplogEntry(ts3, collA),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDropped);
+}
 }  // namespace
 }  // namespace replicated_fast_count
 }  // namespace mongo

@@ -127,5 +127,85 @@ TEST_F(SizeCountStoreTest, WriterUpdateToOneOfTwoEntries) {
     EXPECT_EQ(entry1, *result1);
 }
 
+TEST_F(SizeCountStoreTest, InsertAddsEntry) {
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+
+    auto opCtx = operationContext();
+
+    WriteUnitOfWork wuow{opCtx};
+    store.insert(operationContext(), uuid, entry);
+    wuow.commit();
+
+    const auto result = store.read(operationContext(), uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(entry, *result);
+}
+
+TEST_F(SizeCountStoreTest, DoubleInsertFails) {
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+
+    auto opCtx = operationContext();
+    {
+        WriteUnitOfWork wuow{opCtx};
+        store.insert(operationContext(), uuid, entry);
+        wuow.commit();
+    }
+
+    {
+        WriteUnitOfWork wuow{opCtx};
+        ASSERT_THROWS(store.insert(operationContext(), uuid, entry), DBException);
+    }
+    // Initial entry should be unchanged.
+    const auto result = store.read(operationContext(), uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(entry, *result);
+}
+
+TEST_F(SizeCountStoreTest, RemoveRemovesEntry) {
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+
+    auto opCtx = operationContext();
+
+    {
+        WriteUnitOfWork wuow{opCtx};
+        store.insert(operationContext(), uuid, entry);
+        wuow.commit();
+    }
+
+    const auto result = store.read(operationContext(), uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(entry, *result);
+
+    {
+        WriteUnitOfWork wuow{opCtx};
+        store.remove(operationContext(), uuid);
+        wuow.commit();
+    }
+
+    EXPECT_FALSE(store.read(operationContext(), uuid).has_value());
+}
+
+TEST_F(SizeCountStoreTest, RemoveNonExistentEntryIsNoOp) {
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
+    const UUID uuid = UUID::gen();
+
+    auto opCtx = operationContext();
+    {
+        WriteUnitOfWork wuow{opCtx};
+        store.remove(operationContext(), uuid);
+        wuow.commit();
+    }
+    EXPECT_FALSE(store.read(operationContext(), uuid).has_value());
+}
 }  // namespace
 }  // namespace mongo::replicated_fast_count

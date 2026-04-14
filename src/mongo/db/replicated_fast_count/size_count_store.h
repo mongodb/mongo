@@ -64,6 +64,18 @@ public:
      * overwrite any pre-existing document for `uuid`.
      */
     void write(OperationContext* opCtx, UUID uuid, const Entry& entry);
+
+    /**
+     * Inserts `entry` into the `config.fast_count_metadata_store` store. If an entry for `uuid`
+     * already exists, this operation will throw a DBException.
+     */
+    void insert(OperationContext* opCtx, UUID uuid, const Entry& entry);
+
+    /**
+     * Removes the entry for `uuid` from the `config.fast_count_metadata_store` store if one exists,
+     * otherwise does nothing.
+     */
+    void remove(OperationContext* opCtx, UUID uuid);
 };
 
 inline std::ostream& operator<<(std::ostream& os, const SizeCountStore::Entry& e) {

@@ -49,6 +49,14 @@ inline constexpr StringData kCountKey = "ct"_sd;
 inline constexpr StringData kValidAsOfKey = "valid-as-of"_sd;
 
 /**
+ * Data structure mapping collection UUIDs to their size and count deltas.
+ *
+ * Useful for tracking changes to collections' size and count while scanning the oplog during
+ * both checkpoints and size/count lookups.
+ */
+using SizeCountDeltas = absl::flat_hash_map<UUID, SizeCountDelta>;
+
+/**
  * Returns the size and count delta extracted from the oplog entry's size metadata ('m' field), if
  * present.
  *
@@ -66,10 +74,9 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::Oplo
  * The OplogEntry provided must be of type 'repl::OplogEntry::CommandType::kApplyOps'; otherwise,
  * the method throws and terminates the current operation.
  */
-void extractSizeCountDeltasForApplyOps(
-    const repl::OplogEntry& applyOpsEntry,
-    const boost::optional<UUID>& uuidFilter,
-    absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut);
+void extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
+                                       const boost::optional<UUID>& uuidFilter,
+                                       SizeCountDeltas& sizeCountDeltasOut);
 
 /**
  * The result of scanning the oplog for size and count deltas.
@@ -82,7 +89,7 @@ void extractSizeCountDeltasForApplyOps(
  * (i.e. the seek landed past the end of the oplog).
  */
 struct OplogScanResult {
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
+    SizeCountDeltas deltas;
     boost::optional<Timestamp> lastTimestamp;
 };
 
@@ -115,8 +122,7 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
  * on-disk fast count collection and adds the persisted values to the entry's size and count
  * in place. If a UUID has no on-disk entry, its delta is left unchanged.
  */
-void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                absl::flat_hash_map<UUID, CollectionSizeCount>& deltas);
+void readAndIncrementSizeCounts(OperationContext* opCtx, SizeCountDeltas& deltas);
 }  // namespace replicated_fast_count
 
 

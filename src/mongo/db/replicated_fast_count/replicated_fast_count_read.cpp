@@ -59,8 +59,8 @@ CollectionSizeCount readLatest(OperationContext* opCtx,
         return CollectionSizeCount{.size = entry->size, .count = entry->count};
     }
 
-    return CollectionSizeCount{.size = entry->size + deltas.at(uuid).size,
-                               .count = entry->count + deltas.at(uuid).count};
+    return CollectionSizeCount{.size = entry->size + deltas.at(uuid).sizeCount.size,
+                               .count = entry->count + deltas.at(uuid).sizeCount.count};
 }
 
 [[nodiscard]] CollectionSizeCount readPersisted(OperationContext* opCtx,

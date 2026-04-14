@@ -45,15 +45,15 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     SizeCountStore store;
 
     const UUID uuid = UUID::gen();
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
-    deltas[uuid] = CollectionSizeCount{0, 0};
+    SizeCountDeltas deltas;
+    deltas[uuid] = SizeCountDelta{.sizeCount = {0, 0}, .state = DDLState::kNone};
 
     // Read before the document exists.
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
-    EXPECT_EQ(deltas[uuid].size, 0);
-    EXPECT_EQ(deltas[uuid].count, 0);
+    EXPECT_EQ(deltas[uuid].sizeCount.size, 0);
+    EXPECT_EQ(deltas[uuid].sizeCount.count, 0);
 
     test_helpers::insertSizeCountEntry(
         operationContext(), store, uuid, {.timestamp = Timestamp(1, 1), .size = 0, .count = 0});
@@ -62,8 +62,8 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
-    EXPECT_EQ(deltas[uuid].size, 0);
-    EXPECT_EQ(deltas[uuid].count, 0);
+    EXPECT_EQ(deltas[uuid].sizeCount.size, 0);
+    EXPECT_EQ(deltas[uuid].sizeCount.count, 0);
 }
 
 TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
@@ -74,14 +74,15 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
     test_helpers::insertSizeCountEntry(
         operationContext(), store, uuid, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
-    deltas[uuid] = CollectionSizeCount{-400, -20};
+    SizeCountDeltas deltas;
+    deltas[uuid] =
+        SizeCountDelta{.sizeCount = {.size = -400, .count = -20}, .state = DDLState::kNone};
 
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
-    EXPECT_EQ(deltas[uuid].size, -200);
-    EXPECT_EQ(deltas[uuid].count, -10);
+    EXPECT_EQ(deltas[uuid].sizeCount.size, -200);
+    EXPECT_EQ(deltas[uuid].sizeCount.count, -10);
 }
 
 /**
@@ -101,7 +102,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
     test_helpers::insertSizeCountEntry(
         operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
+    SizeCountDeltas deltas;
 
     readAndIncrementSizeCounts(operationContext(), deltas);
 
@@ -125,17 +126,17 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
     test_helpers::insertSizeCountEntry(
         operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
-    deltas[uuid1] = CollectionSizeCount{5, 1};
-    deltas[uuid2] = CollectionSizeCount{50, 10};
+    SizeCountDeltas deltas;
+    deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
+    deltas[uuid2] = SizeCountDelta{.sizeCount = {50, 10}, .state = DDLState::kNone};
 
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 2);
-    EXPECT_EQ(deltas[uuid1].size, 205);
-    EXPECT_EQ(deltas[uuid1].count, 11);
-    EXPECT_EQ(deltas[uuid2].size, 150);
-    EXPECT_EQ(deltas[uuid2].count, 15);
+    EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
+    EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
+    EXPECT_EQ(deltas[uuid2].sizeCount.size, 150);
+    EXPECT_EQ(deltas[uuid2].sizeCount.count, 15);
 }
 
 /**
@@ -155,14 +156,14 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
     test_helpers::insertSizeCountEntry(
         operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
-    deltas[uuid1] = CollectionSizeCount{5, 1};
+    SizeCountDeltas deltas;
+    deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
 
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
-    EXPECT_EQ(deltas[uuid1].size, 205);
-    EXPECT_EQ(deltas[uuid1].count, 11);
+    EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
+    EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
 }
 
 /**
@@ -179,17 +180,17 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
         operationContext(), store, uuid1, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
-    deltas[uuid1] = CollectionSizeCount{5, 1};
-    deltas[uuid2] = CollectionSizeCount{50, 10};
+    SizeCountDeltas deltas;
+    deltas[uuid1] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
+    deltas[uuid2] = SizeCountDelta{.sizeCount = {50, 10}, .state = DDLState::kNone};
 
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 2);
-    EXPECT_EQ(deltas[uuid1].size, 205);
-    EXPECT_EQ(deltas[uuid1].count, 11);
-    EXPECT_EQ(deltas[uuid2].size, 50);
-    EXPECT_EQ(deltas[uuid2].count, 10);
+    EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
+    EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
+    EXPECT_EQ(deltas[uuid2].sizeCount.size, 50);
+    EXPECT_EQ(deltas[uuid2].sizeCount.count, 10);
 }
 
 /**
@@ -210,14 +211,14 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
         operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
     const UUID uuid3 = UUID::gen();
-    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
-    deltas[uuid3] = CollectionSizeCount{5, 1};
+    SizeCountDeltas deltas;
+    deltas[uuid3] = SizeCountDelta{.sizeCount = {5, 1}, .state = DDLState::kNone};
 
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
-    EXPECT_EQ(deltas[uuid3].size, 5);
-    EXPECT_EQ(deltas[uuid3].count, 1);
+    EXPECT_EQ(deltas[uuid3].sizeCount.size, 5);
+    EXPECT_EQ(deltas[uuid3].sizeCount.count, 1);
 }
 }  // namespace
 }  // namespace mongo::replicated_fast_count

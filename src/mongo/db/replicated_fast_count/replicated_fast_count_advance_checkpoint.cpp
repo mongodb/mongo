@@ -37,7 +37,7 @@ namespace {
 struct SizeCountCheckpoint {
     // Absolute size and count totals ready to persist, for each collection modified since the
     // last checkpoint.
-    absl::flat_hash_map<UUID, CollectionSizeCount> updatedCollections;
+    SizeCountDeltas updatedCollections;
     Timestamp validAsOf;
 };
 
@@ -67,12 +67,31 @@ void persistCheckpoint(OperationContext* opCtx,
                        const SizeCountCheckpoint& checkpoint,
                        SizeCountStore& sizeCountStore,
                        SizeCountTimestampStore& timestampStore) {
-    for (const auto& [uuid, sizeCount] : checkpoint.updatedCollections) {
-        sizeCountStore.write(opCtx,
-                             uuid,
-                             SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
-                                                   .size = sizeCount.size,
-                                                   .count = sizeCount.count});
+    for (const auto& [uuid, entry] : checkpoint.updatedCollections) {
+        switch (entry.state) {
+            case DDLState::kCreated: {
+                sizeCountStore.insert(opCtx,
+                                      uuid,
+                                      SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                                            .size = entry.sizeCount.size,
+                                                            .count = entry.sizeCount.count});
+                break;
+            }
+            case DDLState::kDropped: {
+                sizeCountStore.remove(opCtx, uuid);
+                break;
+            }
+            case DDLState::kNone: {
+                sizeCountStore.write(opCtx,
+                                     uuid,
+                                     SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                                           .size = entry.sizeCount.size,
+                                                           .count = entry.sizeCount.count});
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
     // Advance the timestamp in `config.fast_count_metadata_store_timestamps` to the new checkpoint
     // timestamp. This moves the global valid-as-of forward so that future checkpoint passes this

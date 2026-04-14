@@ -394,6 +394,123 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     ASSERT_EQ(userWriteTs, *tsAfterSecondAdvance);
 }
 
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CollectionCreationAddsEntry) {
+    const Timestamp ts1{1, 1};
+    test_helpers::writeToOplog(opCtx, test_helpers::makeCreateOplogEntry(ts1, collA));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->size, 0);
+    EXPECT_EQ(entry->count, 0);
+    EXPECT_EQ(timestampStore.read(opCtx), ts1);
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndInsertSameCheckpoint) {
+    test_helpers::writeToOplog(opCtx, test_helpers::makeCreateOplogEntry(Timestamp(1, 1), collA));
+    test_helpers::writeToOplog(
+        opCtx, test_helpers::makeOplogEntry(Timestamp(1, 2), collA, repl::OpTypeEnum::kInsert, 10));
+    test_helpers::writeToOplog(
+        opCtx, test_helpers::makeOplogEntry(Timestamp(1, 3), collA, repl::OpTypeEnum::kInsert, 20));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->size, 30);
+    EXPECT_EQ(entry->count, 2);
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, DropCollectionRemovesEntry) {
+    {
+        WriteUnitOfWork wuow(opCtx);
+        sizeCountStore.write(
+            opCtx, collA.uuid, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
+        timestampStore.write(opCtx, Timestamp(1, 1));
+        wuow.commit();
+    }
+
+    const Timestamp ts2{1, 2};
+    test_helpers::writeToOplog(opCtx, test_helpers::makeDropOplogEntry(ts2, collA));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    EXPECT_FALSE(sizeCountStore.read(opCtx, collA.uuid).has_value());
+    EXPECT_EQ(timestampStore.read(opCtx), ts2);
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndDropSameCheckpoint) {
+    const Timestamp ts2{1, 2};
+    test_helpers::writeToOplog(opCtx, test_helpers::makeCreateOplogEntry(Timestamp(1, 1), collA));
+    test_helpers::writeToOplog(opCtx, test_helpers::makeDropOplogEntry(ts2, collA));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    // Create and drop cancel each other out, so there is no entry in collA, but we should still
+    // have advanced the timestamp store.
+    EXPECT_FALSE(sizeCountStore.read(opCtx, collA.uuid).has_value());
+    EXPECT_EQ(timestampStore.read(opCtx), ts2);
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateInApplyOpsUsesApplyOpsTimestamp) {
+    const Timestamp ts1{1, 1};
+
+    BSONArrayBuilder innerOpsBuilder;
+    innerOpsBuilder.append(BSON("op" << "c"
+                                     << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
+                                     << collA.uuid << "o" << BSON("create" << collA.nss.coll())));
+    const repl::OplogEntry applyOpsEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts1, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::createNamespaceString_forTest("admin", "$cmd"),
+        .oField = BSON("applyOps" << innerOpsBuilder.arr()),
+        .wallClockTime = Date_t::now(),
+    }};
+    test_helpers::writeToOplog(opCtx, applyOpsEntry);
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->size, 0);
+    EXPECT_EQ(entry->count, 0);
+    EXPECT_EQ(entry->timestamp, ts1);
+    EXPECT_EQ(timestampStore.read(opCtx), ts1);
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndInsertsInApplyOps) {
+    const Timestamp ts1{1, 1};
+
+    BSONArrayBuilder innerOpsBuilder;
+    innerOpsBuilder.append(BSON("op" << "c"
+                                     << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
+                                     << collA.uuid << "o" << BSON("create" << collA.nss.coll())));
+    innerOpsBuilder.append(BSON("op" << "i"
+                                     << "ns" << collA.nss.ns_forTest() << "ui" << collA.uuid << "o"
+                                     << BSON("_id" << 1) << "m" << BSON("sz" << 10)));
+    innerOpsBuilder.append(BSON("op" << "i"
+                                     << "ns" << collA.nss.ns_forTest() << "ui" << collA.uuid << "o"
+                                     << BSON("_id" << 2) << "m" << BSON("sz" << 20)));
+
+    const repl::OplogEntry applyOpsEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts1, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::createNamespaceString_forTest("admin", "$cmd"),
+        .oField = BSON("applyOps" << innerOpsBuilder.arr()),
+        .wallClockTime = Date_t::now(),
+    }};
+    test_helpers::writeToOplog(opCtx, applyOpsEntry);
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->size, 30);
+    EXPECT_EQ(entry->count, 2);
+    EXPECT_EQ(entry->timestamp, ts1);
+    EXPECT_EQ(timestampStore.read(opCtx), ts1);
+}
 
 // Test: A truncateRange oplog entry correctly applies negative size/count deltas.
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDelta) {

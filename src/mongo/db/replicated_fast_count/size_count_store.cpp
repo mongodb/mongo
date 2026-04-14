@@ -36,6 +36,8 @@
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 namespace mongo::replicated_fast_count {
 
 boost::optional<SizeCountStore::Entry> SizeCountStore::read(OperationContext* opCtx,
@@ -90,5 +92,42 @@ void SizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entr
         massertStatusOK(collection_internal::insertDocument(
             opCtx, coll, InsertStatement(newDoc), /*opDebug=*/nullptr));
     }
+}
+
+void SizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+    const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
+    const CollectionPtr& coll = acquisition.getCollectionPtr();
+
+    const BSONObj newDoc = BSON("_id" << uuid << kValidAsOfKey << entry.timestamp << kMetadataKey
+                                      << BSON(kCountKey << entry.count << kSizeKey << entry.size));
+
+    massertStatusOK(collection_internal::insertDocument(
+        opCtx, coll, InsertStatement(newDoc), /*opDebug=*/nullptr));
+}
+
+void SizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
+    const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
+    const RecordId rid =
+        record_id_helpers::keyForDoc(BSON("_id" << uuid),
+                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
+                                     /*collator=*/nullptr)
+            .getValue();
+
+    Snapshotted<BSONObj> docToDelete;
+
+    if (!acquisition.getCollectionPtr()->findDoc(opCtx, rid, &docToDelete)) {
+        LOGV2_WARNING(12054101,
+                      "Attempted to delete an entry for uuid {uuid} from the fast count store, but "
+                      "no such entry exists.",
+                      "uuid"_attr = uuid.toString());
+        return;
+    }
+
+    collection_internal::deleteDocument(opCtx,
+                                        acquisition.getCollectionPtr(),
+                                        docToDelete,
+                                        kUninitializedStmtId,
+                                        rid,
+                                        /*opDebug=*/nullptr);
 }
 }  // namespace mongo::replicated_fast_count

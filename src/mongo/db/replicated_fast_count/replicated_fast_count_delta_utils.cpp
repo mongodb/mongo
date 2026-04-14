@@ -29,6 +29,7 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 
+#include "mongo/db/commands.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -88,14 +89,34 @@ CollectionSizeCount extractSizeCountDeltaForTruncateRange(const repl::OplogEntry
 }
 
 // Updates the 'sizeCountDeltasOut' to track the new 'sizeCountDelta' for 'uuid'.
-void recordCollectionSizeCountDelta(
-    const UUID& uuid,
-    const CollectionSizeCount& sizeCountDelta,
-    absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
-    auto [it, inserted] = sizeCountDeltasOut.try_emplace(uuid, sizeCountDelta);
+void recordCollectionSizeCountDelta(const UUID& uuid,
+                                    const CollectionSizeCount& sizeCountDelta,
+                                    SizeCountDeltas& sizeCountDeltasOut) {
+    auto [it, inserted] =
+        sizeCountDeltasOut.try_emplace(uuid, SizeCountDelta{sizeCountDelta, DDLState::kNone});
     if (!inserted) {
         // Entry exists, so update as needed.
-        it->second = it->second + sizeCountDelta;
+        it->second.sizeCount = it->second.sizeCount + sizeCountDelta;
+    }
+}
+
+void recordCollectionCreate(const UUID& uuid, SizeCountDeltas& sizeCountDeltasOut) {
+    auto [it, inserted] = sizeCountDeltasOut.try_emplace(
+        uuid, SizeCountDelta{CollectionSizeCount{.size = 0, .count = 0}, DDLState::kCreated});
+    massert(12054100, "Encountered writes to a collection before it was created", inserted);
+}
+
+void recordCollectionDrop(const UUID& uuid, SizeCountDeltas& sizeCountDeltasOut) {
+    auto [it, inserted] = sizeCountDeltasOut.try_emplace(
+        uuid, SizeCountDelta{CollectionSizeCount{.size = 0, .count = 0}, DDLState::kDropped});
+    if (!inserted) {
+        if (it->second.state == DDLState::kCreated) {
+            // If we had a creation and a drop in the same checkpoint, we can remove the entry since
+            // they would cancel each other out.
+            sizeCountDeltasOut.erase(it);
+        } else {
+            it->second.state = DDLState::kDropped;
+        }
     }
 }
 
@@ -110,6 +131,18 @@ bool operationsOnFastCountCollections(const NamespaceString& nss,
 
     if (nss == fastCountStoreNss || nss == fastCountTimestampNss) {
         return true;
+    }
+
+    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kCreate ||
+        oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kDrop) {
+        // kCreate/kDrop entries use the $cmd namespace (e.g. config.$cmd), not the target
+        // collection's namespace. Use CommandHelpers::parseNsCollectionRequired to extract the
+        // actual target NSS from the first field of the command object (o.create / o.drop).
+        const auto targetNss =
+            CommandHelpers::parseNsCollectionRequired(nss.dbName(), oplogEntry.getObject());
+        if (targetNss == fastCountStoreNss || targetNss == fastCountTimestampNss) {
+            return true;
+        }
     }
 
     if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
@@ -133,7 +166,7 @@ bool operationsOnFastCountCollections(const NamespaceString& nss,
 // 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, and CRUD operations.
 void processOplogEntry(const repl::OplogEntry& entry,
                        const boost::optional<UUID>& uuidFilter,
-                       absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
+                       SizeCountDeltas& sizeCountDeltasOut) {
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
         extractSizeCountDeltasForApplyOps(entry, uuidFilter, sizeCountDeltasOut);
         return;
@@ -145,6 +178,14 @@ void processOplogEntry(const repl::OplogEntry& entry,
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kTruncateRange) {
         const auto delta = extractSizeCountDeltaForTruncateRange(entry);
         recordCollectionSizeCountDelta(*entryUuid, delta, sizeCountDeltasOut);
+        return;
+    }
+    if (entry.getCommandType() == repl::OplogEntry::CommandType::kCreate) {
+        recordCollectionCreate(*entryUuid, sizeCountDeltasOut);
+        return;
+    }
+    if (entry.getCommandType() == repl::OplogEntry::CommandType::kDrop) {
+        recordCollectionDrop(*entryUuid, sizeCountDeltasOut);
         return;
     }
     if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
@@ -191,10 +232,9 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
     return CollectionSizeCount{.size = sizeDelta, .count = countDelta};
 }
 
-void extractSizeCountDeltasForApplyOps(
-    const repl::OplogEntry& applyOpsEntry,
-    const boost::optional<UUID>& uuidFilter,
-    absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
+void extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
+                                       const boost::optional<UUID>& uuidFilter,
+                                       SizeCountDeltas& sizeCountDeltasOut) {
     massert(12116000,
             str::stream() << "Unexpected input: Expected applyOps oplog entry for extracting size "
                              "metadata, instead received entry of command type '"
@@ -268,8 +308,7 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
     return boost::none;
 }
 
-void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                absl::flat_hash_map<UUID, CollectionSizeCount>& deltas) {
+void readAndIncrementSizeCounts(OperationContext* opCtx, SizeCountDeltas& deltas) {
     const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
     const CollectionPtr& coll = acquisition.getCollectionPtr();
 
@@ -282,8 +321,8 @@ void readAndIncrementSizeCounts(OperationContext* opCtx,
         Snapshotted<BSONObj> doc;
         if (coll->findDoc(opCtx, rid, &doc)) {
             const BSONObj& data = doc.value();
-            delta.count += data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
-            delta.size += data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
+            delta.sizeCount.count += data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
+            delta.sizeCount.size += data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
         }
     }
 }

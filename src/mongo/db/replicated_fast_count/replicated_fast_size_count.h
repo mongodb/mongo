@@ -62,4 +62,26 @@ inline std::ostream& operator<<(std::ostream& s, const CollectionSizeCount& coll
     return (s << collectionSizeCount.toString());
 }
 
+/**
+ * Indicates whether a collection had been created or dropped since the last checkpoint.
+ */
+enum class DDLState { kCreated, kDropped, kNone };
+
+/**
+ * Stores the size and count values for a collection along with state indicating whether the
+ * collection had been created or dropped.
+ */
+struct SizeCountDelta {
+    CollectionSizeCount sizeCount{0, 0};
+    DDLState state{DDLState::kNone};
+
+    std::string toString() const {
+        return fmt::format("sizeCount: {}, state: {}",
+                           sizeCount.toString(),
+                           (state == DDLState::kCreated
+                                ? "created"
+                                : (state == DDLState::kDropped ? "dropped" : "none")));
+    }
+};
+
 }  // namespace mongo
