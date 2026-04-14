@@ -226,15 +226,16 @@ public:
                                                      .isNewTransition = true};
                 }
 
-                // TODO(SERVER-119479): Persist phase in the FCV document instead of guessing.
-                // - If we got interrupted during kStart/kPrepare then isCleaningServerMetadata
-                //   is not set. Pessimisically resume from kStart.
-                // - If isCleaningServerMetadata is set, we were at least on kComplete.
+                // The start phase is now the one saved in the FCV document
+                auto fcvPhase = fcvDoc.getPhase();
+                // This should not fire. Nonetheless, we prefer to safe-guard it
+                tassert(11947901,
+                        "Empty phase reached while resolving transition",
+                        fcvPhase.is_initialized());
+                SetFCVPhaseEnum startPhase = fcvPhase.value();
                 return RequestedTransitionOrigin{
                     .originalVersion = transitionInfo.from,
-                    .startPhase = fcvDoc.getIsCleaningServerMetadata().value_or(false)
-                        ? SetFCVPhaseEnum::kComplete
-                        : SetFCVPhaseEnum::kStart,
+                    .startPhase = startPhase,
                     .isNewTransition = false,
                 };
             }
@@ -490,6 +491,7 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
 void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     OperationContext* opCtx,
     FCV version,
+    boost::optional<SetFCVPhaseEnum> phase,
     boost::optional<Timestamp> changeTimestamp,
     boost::optional<bool> setIsCleaningServerMetadata) {
 
@@ -500,6 +502,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     FeatureCompatibilityVersionDocument newFCVDoc = fcvTransitions.getFCVDocument(version);
 
     newFCVDoc.setChangeTimestamp(changeTimestamp);
+    newFCVDoc.setPhase(phase);
 
     // The setIsCleaningServerMetadata parameter can either be true, false, or boost::none.
     // True indicates we want to set the isCleaningServerMetadata FCV document field to true.

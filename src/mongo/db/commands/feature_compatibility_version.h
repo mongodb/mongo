@@ -120,6 +120,7 @@ public:
     static void updateFeatureCompatibilityVersionDocument(
         OperationContext* opCtx,
         multiversion::FeatureCompatibilityVersion version,
+        boost::optional<SetFCVPhaseEnum> phase,
         boost::optional<Timestamp> timestamp,
         boost::optional<bool> setIsCleaningServerMetadata);
 

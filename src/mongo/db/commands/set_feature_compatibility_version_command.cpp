@@ -697,6 +697,7 @@ public:
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     resolvedTransition.transitionalVersion,
+                    SetFCVPhaseEnum::kStart,
                     changeTimestamp,
                     boost::none /* setIsCleaningServerMetadata */);
 
@@ -721,12 +722,6 @@ public:
                 // We do not expect any other feature-specific work to be done in the 'start' phase.
                 _shardServerPhase1Tasks(opCtx, requestedVersion);
             }
-        }
-
-        // ---------- kPrepare phase (Feasibility Check) ----------
-        if (resolvedTransition.shouldRun(SetFCVPhaseEnum::kPrepare)) {
-            invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
-                          .isUpgradingOrDowngrading());
 
             if (role && role->has(ClusterRole::ConfigServer)) {
                 uassert(ErrorCodes::Error(6794600),
@@ -748,6 +743,19 @@ public:
                 // state even if this throws.
                 _shardServerPhase1Tasks(opCtx, requestedVersion);
             }
+        }
+
+        // ---------- kPrepare phase (Feasibility Check) ----------
+        if (resolvedTransition.shouldRun(SetFCVPhaseEnum::kPrepare)) {
+            invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                          .isUpgradingOrDowngrading());
+
+            FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                opCtx,
+                resolvedTransition.transitionalVersion,
+                SetFCVPhaseEnum::kPrepare,
+                changeTimestamp,
+                boost::none /* setIsCleaningServerMetadata*/);
 
             uassert(ErrorCodes::Error(7555202),
                     "Failing downgrade due to "
@@ -791,6 +799,7 @@ public:
                     FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                         opCtx,
                         resolvedTransition.transitionalVersion,
+                        SetFCVPhaseEnum::kComplete,
                         changeTimestamp,
                         true /* setIsCleaningServerMetadata*/);
                 }
@@ -826,6 +835,7 @@ public:
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     requestedVersion,
+                    boost::none, /* phase */
                     changeTimestamp,
                     false /* setIsCleaningServerMetadata */);
             }

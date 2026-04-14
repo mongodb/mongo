@@ -113,6 +113,19 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers, adm
  * Each server type is tested with upgrade and downgrade with the two mentioned failpoints on/off.
  */
 function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
+    // TODO: SERVER-123632 Investigate how the test should behave on symmetricFCV.
+    // For now, we are skipping the test if symmetricFCV is enabled.
+
+    const isSymmetricFCV = FeatureFlagUtil.isEnabled(adminDB, "SymmetricFCV");
+    if (isSymmetricFCV) {
+        // we don't support this yet on symmetricFCV so we exit
+
+        jsTest.log.info(
+            "Symmetric FCV is enabled, skipping assertLogsWithFailpoints because we don't support logging for symmetricFCV yet.",
+        );
+        return;
+    }
+
     clearRawMongoProgramOutput(); // Clears output for next logging.
 
     /* 1. Testing logging for downgrade */

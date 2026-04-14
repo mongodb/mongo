@@ -71,6 +71,24 @@ structs:
                     cleaning up internal server metadata."
                 type: bool
                 optional: true
+            phase:
+                description: "An enum that indicates the current phase of the upgrade or downgrade process."
+                type: SetFCVPhase
+                optional: true
+
+enums:
+    SetFCVPhase:
+        description: "Enum that defines the phases of the 3-phase setFCV protocol."
+        type: string
+        values:
+            # Tells shards to transition to kUpgrading/kDowngrading FCV.
+            kStart: "start"
+            # Tells shards to perform upgrade-ability/downgrade-ability checks and any actions needed
+            # before transitioning to the fully upgraded/downgraded state.
+            kPrepare: "prepare"
+            # Tells shards to execute possibly metadata-changing upgrade/downgrade actions and
+            # transition to the fully upgraded/downgraded FCV.
+            kComplete: "complete"
 
 feature_flags:
     featureFlagSymmetricFCV:

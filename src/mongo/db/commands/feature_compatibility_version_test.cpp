@@ -74,141 +74,126 @@ DEATH_TEST_F(FeatureCompatibilityVersionTestFixtureDeathTest, NotInitialized, "i
     FeatureCompatibilityVersion::fassertInitializedAfterStartup(operationContext());
 }
 
-TEST_F(FeatureCompatibilityVersionTestFixture, ReplicaSetCleanStartup) {
-    serverGlobalParams.clusterRole = ClusterRole::None;
+struct StartupFCVSequenceTestParams {
+    ClusterRole clusterRole;
+    FCV minimumRequiredFCV;
+    FCV currentFCV;
+    std::string label;
+};
 
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+class StartupFCVSequenceTestFixture
+    : public FeatureCompatibilityVersionTestFixture,
+      public testing::WithParamInterface<StartupFCVSequenceTestParams> {};
 
-    // Replica sets prefer to start on latest.
+INSTANTIATE_TEST_SUITE_P(
+    StartupFCVSequenceTests,
+    StartupFCVSequenceTestFixture,
+    testing::ValuesIn({
+        StartupFCVSequenceTestParams{ClusterRole::None,
+                                     multiversion::GenericFCV::kLastLTS,
+                                     multiversion::GenericFCV::kLatest,
+                                     "replica_set_prefer_to_start_on_latest"},
+        StartupFCVSequenceTestParams{{ClusterRole::ShardServer},
+                                     multiversion::GenericFCV::kLastLTS,
+                                     multiversion::GenericFCV::kLastLTS,
+                                     "shard_server_prefer_to_start_on_last_lts"},
+        StartupFCVSequenceTestParams{{ClusterRole::ShardServer, ClusterRole::ConfigServer},
+                                     multiversion::GenericFCV::kLastLTS,
+                                     multiversion::GenericFCV::kLatest,
+                                     "config_server_prefer_to_start_on_latest"},
+        StartupFCVSequenceTestParams{{ClusterRole::ShardServer},
+                                     multiversion::GenericFCV::kLatest,
+                                     multiversion::GenericFCV::kLatest,
+                                     "shard_server_minimum_latest_starts_on_latest"},
+    }),
+    [](const testing::TestParamInfo<StartupFCVSequenceTestParams>& info) {
+        return info.param.label;
+    });
+
+TEST_P(StartupFCVSequenceTestFixture, StartupFCVSequence) {
+    const auto& params = GetParam();
+    serverGlobalParams.clusterRole = params.clusterRole;
+
+    doStartupFCVSequence(params.minimumRequiredFCV);
+
     const auto currentFcv =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLatest);
+    ASSERT_EQ(currentFcv, params.currentFCV);
 }
 
-TEST_F(FeatureCompatibilityVersionTestFixture, ShardServerCleanStartupMinimumLastLTS) {
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer};
+struct StartupFCVSequenceTestParamsWithDefault {
+    ClusterRole clusterRole;
+    FCV defaultStartupFCV;
+    FCV minimumRequiredFCV;
+    FCV currentFCV;
+    std::string label;
+};
 
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+class StartupFCVSequenceTestFixtureWithDefaultStartupFCV
+    : public FeatureCompatibilityVersionTestFixture,
+      public testing::WithParamInterface<StartupFCVSequenceTestParamsWithDefault> {};
 
-    // ShardServers prefer to start on lastLTS.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLastLTS);
-}
+INSTANTIATE_TEST_SUITE_P(
+    StartupFCVSequenceTestsWithDefaultStartupFCV,
+    StartupFCVSequenceTestFixtureWithDefaultStartupFCV,
+    testing::ValuesIn(
+        {StartupFCVSequenceTestParamsWithDefault{
+             ClusterRole::None,
+             multiversion::GenericFCV::kLastLTS,
+             multiversion::GenericFCV::kLastLTS,
+             multiversion::GenericFCV::kLastLTS,
+             "replica_set_prefer_to_start_on_latest_but_default_startup_fcv_last"},
+         StartupFCVSequenceTestParamsWithDefault{
+             {ClusterRole::None},
+             multiversion::GenericFCV::kLatest,
+             multiversion::GenericFCV::kLatest,
+             multiversion::GenericFCV::kLatest,
+             "default_startup_fcv_latest_overrides_minimum_fcv_last_lts"},
+         StartupFCVSequenceTestParamsWithDefault{
+             {ClusterRole::None},
+             multiversion::GenericFCV::kLastContinuous,
+             multiversion::GenericFCV::kLastLTS,
+             multiversion::GenericFCV::kLastContinuous,
+             "rs_prefer_to_start_on_latest_but_default_startup_fcv_last_continuous"},
+         StartupFCVSequenceTestParamsWithDefault{
+             {ClusterRole::None},
+             multiversion::GenericFCV::kLastLTS,
+             multiversion::GenericFCV::kLatest,
+             multiversion::GenericFCV::kLatest,
+             "default_startup_fcv_last_lts_ignored_if_minimum_fcv_latest"},
+         StartupFCVSequenceTestParamsWithDefault{
+             {ClusterRole::ShardServer},
+             multiversion::GenericFCV::kLastContinuous,
+             multiversion::GenericFCV::kLastLTS,
+             multiversion::GenericFCV::kLastContinuous,
+             "shard_server_prefer_to_start_on_last_lts_but_default_startup_fcv_last_continuous"},
+         StartupFCVSequenceTestParamsWithDefault{
+             {ClusterRole::ShardServer},
+             multiversion::GenericFCV::kLastLTS,
+             multiversion::GenericFCV::kLatest,
+             multiversion::GenericFCV::kLatest,
+             "shard_server_with_default_startup_fcv_last_lts_ignored_if_minimum_fcv_latest"}}),
+    [](const testing::TestParamInfo<StartupFCVSequenceTestParamsWithDefault>& info) {
+        return info.param.label;
+    });
 
-TEST_F(FeatureCompatibilityVersionTestFixture, ConfigServerCleanStartupMinimumLastLTS) {
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
-
-    // ConfigServer's prefer to start on latest.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLatest);
-}
-
-TEST_F(FeatureCompatibilityVersionTestFixture, ShardServerCleanStartupMinimumLatest) {
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer};
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLatest);
-
-    // ShardServers prefer to start on lastLTS, but we specified minimum latest.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLatest);
-}
-
-TEST_F(FeatureCompatibilityVersionTestFixture,
+TEST_P(StartupFCVSequenceTestFixtureWithDefaultStartupFCV,
        ReplicaSetCleanStartupDefaultStartupFCVParameterLastLTS) {
-    RAIIServerParameterControllerForTest defaultStartupFCV{
-        "defaultStartupFCV", toString(multiversion::GenericFCV::kLastLTS)};
+    const auto& params = GetParam();
 
-    serverGlobalParams.clusterRole = ClusterRole::None;
+    RAIIServerParameterControllerForTest defaultStartupFCV{"defaultStartupFCV",
+                                                           toString(params.defaultStartupFCV)};
 
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+    serverGlobalParams.clusterRole = params.clusterRole;
 
-    // Replica sets prefer to start on latest, but defaultStartupFCV specified lastLTS.
+    doStartupFCVSequence(params.minimumRequiredFCV);
+
     const auto currentFcv =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLastLTS);
+    ASSERT_EQ(currentFcv, params.currentFCV);
 }
 
-TEST_F(FeatureCompatibilityVersionTestFixture,
-       ReplicaSetCleanStartupDefaultStartupFCVParameterLatest) {
-    RAIIServerParameterControllerForTest defaultStartupFCV{
-        "defaultStartupFCV", toString(multiversion::GenericFCV::kLatest)};
-
-    serverGlobalParams.clusterRole = ClusterRole::None;
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
-
-    // defaultStartupFCV specified latest which overrides the minimum FCV of lastLTS.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLatest);
-}
-
-TEST_F(FeatureCompatibilityVersionTestFixture,
-       ReplicaSetCleanStartupDefaultStartupFCVParameterLastContinuous) {
-    RAIIServerParameterControllerForTest defaultStartupFCV{
-        "defaultStartupFCV", toString(multiversion::GenericFCV::kLastContinuous)};
-
-    serverGlobalParams.clusterRole = ClusterRole::None;
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
-
-    // Replica sets prefer to start on latest, but defaultStartupFCV specified lastContinuous.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLastContinuous);
-}
-
-TEST_F(FeatureCompatibilityVersionTestFixture,
-       ReplicaSetCleanStartupDefaultStartupFCVParameterWithHigherMinimumFCV) {
-    // defaultStartupFCV should be ignored if there's a higher required minimum FCV.
-    RAIIServerParameterControllerForTest defaultStartupFCV{
-        "defaultStartupFCV", toString(multiversion::GenericFCV::kLastLTS)};
-
-    serverGlobalParams.clusterRole = ClusterRole::None;
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLatest);
-
-    // defaultStartupFCV specified lastLTS, but minimum was latest.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLatest);
-}
-
-TEST_F(FeatureCompatibilityVersionTestFixture, ShardServerCleanStartupDefaultStartupFCVParameter) {
-    // ShardServers prefer lastLTS, but can be overriden.
-    RAIIServerParameterControllerForTest defaultStartupFCV{
-        "defaultStartupFCV", toString(multiversion::GenericFCV::kLastContinuous)};
-
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
-
-    // ShardServers prefer to start on lastLTS, but defaultStartupFCV specified lastContinuous.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLastContinuous);
-}
-
-TEST_F(FeatureCompatibilityVersionTestFixture,
-       ShardServerCleanStartupDefaultStartupFCVParameterWithHigherMinimumFCV) {
-    // defaultStartupFCV should be ignored if there's a higher required minimum FCV.
-    RAIIServerParameterControllerForTest defaultStartupFCV{
-        "defaultStartupFCV", toString(multiversion::GenericFCV::kLastLTS)};
-
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLatest);
-
-    // ShardServers with defaultStartupFCV set to lastLTS, but a minimum FCV of latest.
-    const auto currentFcv =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLatest);
-}
 
 TEST_F(FeatureCompatibilityVersionTestFixture, ResolveStartNewUpgrade) {
     const Timestamp lastChangeTimestamp =
@@ -219,6 +204,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveStartNewUpgrade) {
     FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         operationContext(),
         multiversion::GenericFCV::kLastLTS,
+        boost::none,
         lastChangeTimestamp,
         false /* isCleaningServerMetadata */);
 
@@ -232,51 +218,6 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveStartNewUpgrade) {
     ASSERT_GT(result.changeTimestamp, lastChangeTimestamp);
 }
 
-TEST_F(FeatureCompatibilityVersionTestFixture, ResolveResumeInterruptedUpgradeBeforeCommit) {
-    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
-    const Timestamp lastChangeTimestamp =
-        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
-    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-        operationContext(),
-        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
-        lastChangeTimestamp,
-        false /* isCleaningServerMetadata */);
-
-    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
-    auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
-        operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-
-    ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-    ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kStart);
-    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
-    ASSERT_EQ(result.changeTimestamp, lastChangeTimestamp);
-}
-
-TEST_F(FeatureCompatibilityVersionTestFixture, ResolveResumeInterruptedUpgradeDuringCommit) {
-    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
-    const Timestamp lastChangeTimestamp =
-        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-
-    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
-    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-        operationContext(),
-        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
-        lastChangeTimestamp,
-        true /* isCleaningServerMetadata */);
-
-    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
-    auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
-        operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-
-    ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-    ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kComplete);
-    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
-    ASSERT_EQ(result.changeTimestamp, lastChangeTimestamp);
-}
 
 TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVBeforeCommitSucceeds) {
     const Timestamp lastChangeTimestamp =
@@ -287,6 +228,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVBeforeC
     FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         operationContext(),
         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        SetFCVPhaseEnum::kStart,
         lastChangeTimestamp,
         false /* isCleaningServerMetadata */);
 
@@ -308,6 +250,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVDuringC
     FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         operationContext(),
         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        SetFCVPhaseEnum::kStart,
         Timestamp(10, 10),
         true /* isCleaningServerMetadata */);
 
@@ -318,6 +261,49 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVDuringC
         DBException,
         10778001);
 }
+
+struct FCVTestParams {
+    SetFCVPhaseEnum phase;
+    bool isCleaningServerMetadata;
+};
+
+class SetFeatureCompatibilityVersionParamTestFixture
+    : public FeatureCompatibilityVersionTestFixture,
+      public testing::WithParamInterface<FCVTestParams> {};
+
+INSTANTIATE_TEST_SUITE_P(UpgradingFromDifferentStartingPhases,
+                         SetFeatureCompatibilityVersionParamTestFixture,
+                         testing::ValuesIn({
+                             FCVTestParams{SetFCVPhaseEnum::kStart, false},
+                             FCVTestParams{SetFCVPhaseEnum::kPrepare, false},
+                             FCVTestParams{SetFCVPhaseEnum::kComplete, true},
+                         }));
+
+TEST_P(SetFeatureCompatibilityVersionParamTestFixture, ResolveResumeInterruptedUpgrade) {
+    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    const Timestamp lastChangeTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    const auto& params = GetParam();
+
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        params.phase,
+        lastChangeTimestamp,
+        params.isCleaningServerMetadata /* isCleaningServerMetadata */);
+
+    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
+    auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+        operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+    ASSERT_EQ(result.startPhase, params.phase);
+    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_EQ(result.changeTimestamp, lastChangeTimestamp);
+}
+
 
 }  // namespace
 }  // namespace mongo

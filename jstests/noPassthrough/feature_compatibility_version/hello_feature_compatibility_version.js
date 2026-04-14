@@ -3,6 +3,9 @@
 // ensures that an older version mongod/mongos will fail to connect to the node when it is upgraded,
 // upgrading, or downgrading.
 //
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+
 const conn = MongoRunner.runMongod();
 const adminDB = conn.getDB("admin");
 
@@ -35,37 +38,56 @@ assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
 res = cmdAsInternalClient("isMaster");
 assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
 
+// Runs bodyFn while conn is paused at failPointName with a background thread executing an FCV
+// transition to fcvVersion. Guarantees fp.off() and thread.join() even if bodyFn throws.
+function withFCVFailPoint(conn, failPointName, fcvVersion, bodyFn) {
+    const fp = configureFailPoint(conn, failPointName);
+    const thread = new Thread(
+        function (host, version) {
+            const connThread = new Mongo(host);
+            assert.commandWorked(connThread.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}));
+        },
+        conn.host,
+        fcvVersion,
+    );
+    thread.start();
+    fp.wait();
+    try {
+        bodyFn();
+    } finally {
+        fp.off();
+        thread.join();
+    }
+}
+
 // Test wire version for upgrade/downgrade.
 function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
-    // When the featureCompatibilityVersion is upgrading, running hello/isMaster with internalClient
-    // returns a response with minWireVersion == maxWireVersion.
-    assert.commandWorked(
-        adminDB.system.version.update(
-            {_id: "featureCompatibilityVersion"},
-            {$set: {version: downgradeFCV, targetVersion: latestFCV}},
-        ),
-    );
-    let res = cmdAsInternalClient(cmd);
-    assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
-    assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
+    // Set the FCV to the downgrade version, then pause right after transitioning to upgrading.
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    withFCVFailPoint(conn, "hangWhileUpgrading", latestFCV, () => {
+        // When the featureCompatibilityVersion is upgrading, running hello/isMaster with
+        // internalClient returns a response with minWireVersion == maxWireVersion.
+        let res = cmdAsInternalClient(cmd);
+        assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
+        assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
+    });
+    // Safe re-assertion that the FCV is fully upgraded before proceeding.
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
-    // When the featureCompatibilityVersion is downgrading, running hello/isMaster with
-    // internalClient returns a response with minWireVersion == maxWireVersion.
-    assert.commandWorked(
-        adminDB.system.version.update(
-            {_id: "featureCompatibilityVersion"},
-            {$set: {version: downgradeFCV, targetVersion: downgradeFCV, previousVersion: latestFCV}},
-        ),
-    );
-    res = cmdAsInternalClient(cmd);
-    assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
-    assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
+    // Pause right after transitioning to downgrading.
+    withFCVFailPoint(conn, "hangBeforeTransitioningToDowngraded", downgradeFCV, () => {
+        // When the featureCompatibilityVersion is downgrading, running hello/isMaster with
+        // internalClient returns a response with minWireVersion == maxWireVersion.
+        let res = cmdAsInternalClient(cmd);
+        assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
+        assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
+    });
 
     // When the featureCompatibilityVersion is equal to the downgrade version, running
     // hello/isMaster with internalClient returns a response with minWireVersion + 1 ==
     // maxWireVersion.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
-    res = cmdAsInternalClient(cmd);
+    let res = cmdAsInternalClient(cmd);
     assert.eq(downgradeWireVersion, res.minWireVersion, tojson(res));
     assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
 

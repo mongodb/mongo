@@ -54,6 +54,7 @@ idl_generator(
     src = "set_feature_compatibility_version.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:feature_compatibility_version_document_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
