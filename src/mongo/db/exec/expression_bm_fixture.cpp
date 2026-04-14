@@ -2626,4 +2626,157 @@ void ExpressionBenchmarkFixture::benchmarkSimilarityEuclideanBinData(benchmark::
                         std::vector<Document>(1, makeFloat32BinDataVectorDocument(random, dims)));
 }
 
+namespace {
+/**
+ * Builds a Document with fields "v1" and "v2", each an INT8 BinData vector of 'dims' random
+ * int8 values drawn uniformly from [-128, 127].
+ */
+Document makeInt8BinDataVectorDocument(PseudoRandom& rng, int dims) {
+    auto makeVec = [&]() {
+        std::vector<char> data;
+        data.reserve(2 + dims);
+        data.push_back(0x03);  // INT8 dtype byte
+        data.push_back(0x00);  // padding = 0
+        for (int i = 0; i < dims; ++i) {
+            data.push_back(static_cast<int8_t>(rng.nextInt32()));
+        }
+        return Value(BSONBinData(data.data(), static_cast<int>(data.size()), BinDataType::Vector));
+    };
+    return Document{{"v1"_sd, makeVec()}, {"v2"_sd, makeVec()}};
+}
+
+/**
+ * Builds a Document with fields "v1" and "v2", each a PACKED_BIT BinData vector of 'dims'
+ * random bits packed MSB-first.
+ */
+Document makePackedBitBinDataVectorDocument(PseudoRandom& rng, int dims) {
+    auto makeVec = [&]() {
+        int numBytes = (dims + 7) / 8;
+        char padding = static_cast<char>((8 - (dims % 8)) % 8);
+        std::vector<char> data;
+        data.reserve(2 + numBytes);
+        data.push_back(0x10);  // PACKED_BIT dtype byte
+        data.push_back(padding);
+        for (int i = 0; i < numBytes; ++i) {
+            char byte = 0;
+            for (int bit = 7; bit >= 0; --bit) {
+                int bitIdx = i * 8 + (7 - bit);
+                if (bitIdx < dims && rng.nextInt32() % 2) {
+                    byte |= (1 << bit);
+                }
+            }
+            data.push_back(byte);
+        }
+        return Value(BSONBinData(data.data(), static_cast<int>(data.size()), BinDataType::Vector));
+    };
+    return Document{{"v1"_sd, makeVec()}, {"v2"_sd, makeVec()}};
+}
+/**
+ * Builds a Document with "v1" as a FLOAT32 BinData vector and "v2" as an INT8 BinData vector
+ * of the same logical dimension count. Exercises the mixed-dtype fallback path in similarity
+ * operators.
+ */
+Document makeMixedDtypeBinDataVectorDocument(PseudoRandom& rng, int dims) {
+    auto makeFloat32 = [&]() {
+        std::vector<char> data;
+        data.reserve(2 + dims * sizeof(float));
+        data.push_back(0x27);  // FLOAT32 dtype byte
+        data.push_back(0x00);  // padding = 0
+        for (int i = 0; i < dims; ++i) {
+            float v = static_cast<float>(rng.nextCanonicalDouble() * 2.0 - 1.0);
+            char bytes[sizeof(float)];
+            std::memcpy(bytes, &v, sizeof(float));
+            data.insert(data.end(), bytes, bytes + sizeof(float));
+        }
+        return Value(BSONBinData(data.data(), static_cast<int>(data.size()), BinDataType::Vector));
+    };
+    auto makeInt8 = [&]() {
+        std::vector<char> data;
+        data.reserve(2 + dims);
+        data.push_back(0x03);  // INT8 dtype byte
+        data.push_back(0x00);  // padding = 0
+        for (int i = 0; i < dims; ++i) {
+            data.push_back(static_cast<int8_t>(rng.nextInt32()));
+        }
+        return Value(BSONBinData(data.data(), static_cast<int>(data.size()), BinDataType::Vector));
+    };
+    return Document{{"v1"_sd, makeFloat32()}, {"v2"_sd, makeInt8()}};
+}
+}  // namespace
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityDotProductBinDataMixedDtype(
+    benchmark::State& state, int dims) {
+    registerExpressionForBenchmark("$similarityDotProduct", ExpressionSimilarityDotProduct::parse);
+    benchmarkExpression(
+        BSON("$similarityDotProduct" << BSON_ARRAY("$v1" << "$v2")),
+        state,
+        std::vector<Document>(1, makeMixedDtypeBinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityCosineBinDataMixedDtype(benchmark::State& state,
+                                                                            int dims) {
+    registerExpressionForBenchmark("$similarityCosine", ExpressionSimilarityCosine::parse);
+    benchmarkExpression(
+        BSON("$similarityCosine" << BSON_ARRAY("$v1" << "$v2")),
+        state,
+        std::vector<Document>(1, makeMixedDtypeBinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityEuclideanBinDataMixedDtype(
+    benchmark::State& state, int dims) {
+    registerExpressionForBenchmark("$similarityEuclidean", ExpressionSimilarityEuclidean::parse);
+    benchmarkExpression(
+        BSON("$similarityEuclidean" << BSON_ARRAY("$v1" << "$v2")),
+        state,
+        std::vector<Document>(1, makeMixedDtypeBinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityDotProductBinDataInt8(benchmark::State& state,
+                                                                          int dims) {
+    registerExpressionForBenchmark("$similarityDotProduct", ExpressionSimilarityDotProduct::parse);
+    benchmarkExpression(BSON("$similarityDotProduct" << BSON_ARRAY("$v1" << "$v2")),
+                        state,
+                        std::vector<Document>(1, makeInt8BinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityCosineBinDataInt8(benchmark::State& state,
+                                                                      int dims) {
+    registerExpressionForBenchmark("$similarityCosine", ExpressionSimilarityCosine::parse);
+    benchmarkExpression(BSON("$similarityCosine" << BSON_ARRAY("$v1" << "$v2")),
+                        state,
+                        std::vector<Document>(1, makeInt8BinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityEuclideanBinDataInt8(benchmark::State& state,
+                                                                         int dims) {
+    registerExpressionForBenchmark("$similarityEuclidean", ExpressionSimilarityEuclidean::parse);
+    benchmarkExpression(BSON("$similarityEuclidean" << BSON_ARRAY("$v1" << "$v2")),
+                        state,
+                        std::vector<Document>(1, makeInt8BinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityDotProductBinDataPackedBit(
+    benchmark::State& state, int dims) {
+    registerExpressionForBenchmark("$similarityDotProduct", ExpressionSimilarityDotProduct::parse);
+    benchmarkExpression(BSON("$similarityDotProduct" << BSON_ARRAY("$v1" << "$v2")),
+                        state,
+                        std::vector<Document>(1, makePackedBitBinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityCosineBinDataPackedBit(benchmark::State& state,
+                                                                           int dims) {
+    registerExpressionForBenchmark("$similarityCosine", ExpressionSimilarityCosine::parse);
+    benchmarkExpression(BSON("$similarityCosine" << BSON_ARRAY("$v1" << "$v2")),
+                        state,
+                        std::vector<Document>(1, makePackedBitBinDataVectorDocument(random, dims)));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSimilarityEuclideanBinDataPackedBit(
+    benchmark::State& state, int dims) {
+    registerExpressionForBenchmark("$similarityEuclidean", ExpressionSimilarityEuclidean::parse);
+    benchmarkExpression(BSON("$similarityEuclidean" << BSON_ARRAY("$v1" << "$v2")),
+                        state,
+                        std::vector<Document>(1, makePackedBitBinDataVectorDocument(random, dims)));
+}
+
 }  // namespace mongo

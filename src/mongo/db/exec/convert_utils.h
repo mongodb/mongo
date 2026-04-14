@@ -68,6 +68,25 @@ constexpr std::byte kInt8DataTypeByte{0x03};
 constexpr std::byte kFloat32DataTypeByte{0x27};
 
 /**
+ * Lightweight view over a BinData vector's raw bytes, avoiding Value allocations.
+ * Returned by parseBinDataVector().
+ */
+struct BinDataVectorView {
+    dType dtype;
+    int padding;            // 0 for FLOAT32/INT8, 0-7 for PACKED_BIT
+    const std::byte* data;  // pointer past the 2-byte header
+    int dataLength;         // number of raw bytes of element data
+    size_t elementCount;    // number of logical elements
+};
+
+/**
+ * Parse a BinData vector's header and return a view over the raw data.
+ * Returns boost::none for zero-length bindata (no header). Returns a view with
+ * elementCount == 0 for header-only vectors (dtype + padding, no data bytes).
+ */
+boost::optional<BinDataVectorView> parseBinDataVector(const BSONBinData& binData);
+
+/**
  * Convert a binData vector Value to a std::vector<Value>.
  * The input must be a binData with BinDataType::Vector subtype.
  */

@@ -238,14 +238,12 @@ Value parseJson(StringData data, boost::optional<BSONType> expectedType) {
     return result;
 }
 
-std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEndian) {
-    auto binData = val.getBinData();
-    tassert(11300101, "Expected binData with vector subtype", binData.type == BinDataType::Vector);
-
+boost::optional<BinDataVectorView> parseBinDataVector(const BSONBinData& binData) {
     if (binData.length == 0) {
-        // If bindata is empty, we return an empty array.
-        return {};
+        return boost::none;
     }
+
+    uassert(12325706, "binData must have vector subtype", binData.type == BinDataType::Vector);
 
     // If the binData isn't empty, it must contain a dType and a padding byte.
     uassert(10506601, "binData length invalid", binData.length >= 2);
@@ -272,24 +270,55 @@ std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEn
             "Padding must be between 0 and 7 for PACKED_BIT vectors, or 0 otherwise",
             padding == 0 || (dTypeCur == dType::PACKED_BIT && padding <= 7));
 
+    int dataLength = binData.length - 2;
+    if (dataLength == 0) {
+        return BinDataVectorView{dTypeCur, padding, dataPointer + 2, 0, 0};
+    }
+
+    size_t elementCount;
+    switch (dTypeCur) {
+        case dType::FLOAT32:
+            uassert(10506602,
+                    "BinData vector of type FLOAT32 has a length that is not a multiple of 4",
+                    dataLength % sizeof(float) == 0);
+            elementCount = dataLength / sizeof(float);
+            break;
+        case dType::INT8:
+            elementCount = dataLength;
+            break;
+        case dType::PACKED_BIT:
+            elementCount = dataLength * 8 - padding;
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    return BinDataVectorView{dTypeCur, padding, dataPointer + 2, dataLength, elementCount};
+}
+
+std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEndian) {
+    auto binData = val.getBinData();
+    tassert(11300101, "Expected binData with vector subtype", binData.type == BinDataType::Vector);
+
+    auto view = parseBinDataVector(binData);
+    if (!view) {
+        // If bindata is empty, we return an empty array.
+        return {};
+    }
+
     // The rest of the binData vector is the elements.
     std::vector<Value> results;
-    int i = 2;
-    while (i < binData.length) {
-        uassert(10506602,
-                "BinData vector of type FLOAT32 was malformed - expected to have at least four "
-                "bytes left to read a FLOAT32 array element.",
-                (dTypeCur != dType::FLOAT32) ||
-                    (i <= (binData.length - static_cast<int>(sizeof(float)))));
+    const std::byte* dataPointer = view->data;
 
-        // Padding only applies if this is the last element and we're in PACKED_BIT.
+    for (int i = 0; i < view->dataLength;) {
+        // Padding only applies if this is the last byte and we're in PACKED_BIT.
         int thisPadding = 0;
-        if (dTypeCur == dType::PACKED_BIT && i == binData.length - 1) {
-            thisPadding = padding;  // Number of least-significant bits that should be discarded at
-                                    // the end of the byte.
+        if (view->dtype == dType::PACKED_BIT && i == view->dataLength - 1) {
+            thisPadding = view->padding;  // Number of least-significant bits that should be
+                                          // discarded at the end of the byte.
         }
 
-        switch (dTypeCur) {
+        switch (view->dtype) {
             case dType::PACKED_BIT: {
                 std::byte thisByte = dataPointer[i];
                 std::byte comparisonByte{0b10000000};

@@ -28,9 +28,15 @@
  */
 
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
+
+#include <bit>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -764,6 +770,202 @@ const std::vector<Value>& toArray(const Value& val, std::vector<Value>& buf, Str
                             << typeName(val.getType()));
 }
 
+using convert_utils::BinDataVectorView;
+using convert_utils::dType;
+using convert_utils::parseBinDataVector;
+
+/*
+ * Apply the padding mask to the last byte of a PACKED_BIT vector.
+ */
+inline uint8_t maskedByte(const BinDataVectorView& v, int i) {
+    auto b = static_cast<uint8_t>(v.data[i]);
+    if (i == v.dataLength - 1 && v.padding > 0) {
+        b &= static_cast<uint8_t>(0xFF << v.padding);
+    }
+    return b;
+}
+
+/*
+ * Algorithms for the dispatcher.
+ */
+enum class SimilarityAlgorithm { DotProduct, Euclidean, Cosine };
+
+/*
+ * Dot product on raw BinData bytes, templated by dtype.
+ */
+template <dType D>
+double calculateDotProductBinData(const BinDataVectorView& v1, const BinDataVectorView& v2) {
+    double sum = 0;
+    if constexpr (D == dType::FLOAT32) {
+        const char* p1 = reinterpret_cast<const char*>(v1.data);
+        const char* p2 = reinterpret_cast<const char*>(v2.data);
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            double f1 = ConstDataView(p1 + i * sizeof(float)).read<LittleEndian<float>>();
+            double f2 = ConstDataView(p2 + i * sizeof(float)).read<LittleEndian<float>>();
+            sum += f1 * f2;
+        }
+    } else if constexpr (D == dType::INT8) {
+        const int8_t* p1 = reinterpret_cast<const int8_t*>(v1.data);
+        const int8_t* p2 = reinterpret_cast<const int8_t*>(v2.data);
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            sum += static_cast<double>(p1[i]) * static_cast<double>(p2[i]);
+        }
+    } else {
+        static_assert(D == dType::PACKED_BIT);
+        for (int i = 0; i < v1.dataLength; ++i) {
+            sum += std::popcount(static_cast<uint8_t>(maskedByte(v1, i) & maskedByte(v2, i)));
+        }
+    }
+    return sum;
+}
+
+/*
+ * Euclidean distance on raw BinData bytes, templated by dtype.
+ */
+template <dType D>
+double calculateEuclideanDistanceBinData(const BinDataVectorView& v1, const BinDataVectorView& v2) {
+    double sum = 0;
+    if constexpr (D == dType::FLOAT32) {
+        const char* p1 = reinterpret_cast<const char*>(v1.data);
+        const char* p2 = reinterpret_cast<const char*>(v2.data);
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            double f1 = ConstDataView(p1 + i * sizeof(float)).read<LittleEndian<float>>();
+            double f2 = ConstDataView(p2 + i * sizeof(float)).read<LittleEndian<float>>();
+            double diff = f1 - f2;
+            sum += diff * diff;
+        }
+    } else if constexpr (D == dType::INT8) {
+        const int8_t* p1 = reinterpret_cast<const int8_t*>(v1.data);
+        const int8_t* p2 = reinterpret_cast<const int8_t*>(v2.data);
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            double diff = static_cast<double>(p1[i]) - static_cast<double>(p2[i]);
+            sum += diff * diff;
+        }
+    } else {
+        static_assert(D == dType::PACKED_BIT);
+        for (int i = 0; i < v1.dataLength; ++i) {
+            sum += std::popcount(static_cast<uint8_t>(maskedByte(v1, i) ^ maskedByte(v2, i)));
+        }
+    }
+    return std::sqrt(sum);
+}
+
+/*
+ * Cosine similarity on raw BinData bytes, templated by dtype.
+ * Single-pass: accumulates dot, mag1, mag2 simultaneously.
+ */
+template <dType D>
+double calculateCosineSimilarityBinData(const BinDataVectorView& v1, const BinDataVectorView& v2) {
+    double dot = 0, mag1 = 0, mag2 = 0;
+    if constexpr (D == dType::FLOAT32) {
+        const char* p1 = reinterpret_cast<const char*>(v1.data);
+        const char* p2 = reinterpret_cast<const char*>(v2.data);
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            double f1 = ConstDataView(p1 + i * sizeof(float)).read<LittleEndian<float>>();
+            double f2 = ConstDataView(p2 + i * sizeof(float)).read<LittleEndian<float>>();
+            dot += f1 * f2;
+            mag1 += f1 * f1;
+            mag2 += f2 * f2;
+        }
+    } else if constexpr (D == dType::INT8) {
+        const int8_t* p1 = reinterpret_cast<const int8_t*>(v1.data);
+        const int8_t* p2 = reinterpret_cast<const int8_t*>(v2.data);
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            double d1 = static_cast<double>(p1[i]);
+            double d2 = static_cast<double>(p2[i]);
+            dot += d1 * d2;
+            mag1 += d1 * d1;
+            mag2 += d2 * d2;
+        }
+    } else {
+        static_assert(D == dType::PACKED_BIT);
+        for (int i = 0; i < v1.dataLength; ++i) {
+            auto b1 = maskedByte(v1, i);
+            auto b2 = maskedByte(v2, i);
+            dot += std::popcount(static_cast<uint8_t>(b1 & b2));
+            mag1 += std::popcount(b1);
+            mag2 += std::popcount(b2);
+        }
+    }
+    double magnitudeProduct = std::sqrt(mag1) * std::sqrt(mag2);
+    if (magnitudeProduct == 0) {
+        return 0;
+    }
+    return dot / magnitudeProduct;
+}
+
+/*
+ * Compute the similarity for a given algorithm and dtype.
+ */
+template <SimilarityAlgorithm Algo, dType D>
+double computeSimilarity(const BinDataVectorView& v1, const BinDataVectorView& v2) {
+    if constexpr (Algo == SimilarityAlgorithm::DotProduct)
+        return calculateDotProductBinData<D>(v1, v2);
+    else if constexpr (Algo == SimilarityAlgorithm::Euclidean)
+        return calculateEuclideanDistanceBinData<D>(v1, v2);
+    else if constexpr (Algo == SimilarityAlgorithm::Cosine)
+        return calculateCosineSimilarityBinData<D>(v1, v2);
+    MONGO_UNREACHABLE;
+}
+
+/*
+ * Try to compute similarity directly on BinData vectors without conversion to Value arrays.
+ * Returns boost::none if the fast path is not applicable (not both BinData vectors, or
+ * different dtypes), signaling the caller to fall back to the existing conversion path.
+ */
+template <SimilarityAlgorithm Algo>
+boost::optional<double> tryBinDataSimilarity(const Value& val1,
+                                             const Value& val2,
+                                             StringData opName) {
+    if (val1.getType() != BSONType::binData || val2.getType() != BSONType::binData) {
+        return boost::none;
+    }
+    auto bd1 = val1.getBinData();
+    auto bd2 = val2.getBinData();
+    if (bd1.type != BinDataType::Vector || bd2.type != BinDataType::Vector) {
+        return boost::none;
+    }
+
+    auto view1 = parseBinDataVector(bd1);
+    auto view2 = parseBinDataVector(bd2);
+
+    // Empty vectors: dot product = 0, euclidean distance = 0, cosine = 0.
+    if (!view1 && !view2) {
+        return 0.0;
+    }
+    // One empty, one non-empty: size mismatch.
+    if (!view1 || !view2) {
+        uasserted(12325704,
+                  str::stream() << "Arguments to " << opName
+                                << " must be the same size, but the first is of size "
+                                << (view1 ? view1->elementCount : 0)
+                                << " and the second is of size "
+                                << (view2 ? view2->elementCount : 0));
+    }
+
+    // Different dtypes: fall back to conversion path.
+    if (view1->dtype != view2->dtype) {
+        return boost::none;
+    }
+
+    uassert(12325705,
+            str::stream() << "Arguments to " << opName
+                          << " must be the same size, but the first is of size "
+                          << view1->elementCount << " and the second is of size "
+                          << view2->elementCount,
+            view1->elementCount == view2->elementCount);
+
+    switch (view1->dtype) {
+        case dType::FLOAT32:
+            return computeSimilarity<Algo, dType::FLOAT32>(*view1, *view2);
+        case dType::INT8:
+            return computeSimilarity<Algo, dType::INT8>(*view1, *view2);
+        case dType::PACKED_BIT:
+            return computeSimilarity<Algo, dType::PACKED_BIT>(*view1, *view2);
+    }
+    MONGO_UNREACHABLE;
+}
+
 /*
  * Ensure both arguments to a vector similarity algorithm are arrays or binData vectors
  * of numeric or boolean values of the same size.
@@ -858,28 +1060,59 @@ double calculateCosineSimilarity(const std::vector<Value>& array1,
     return calculateDotProduct(array1, array2) / magnitudeProduct;
 }
 
-Value evaluateSimilarity(
-    const ExpressionVectorSimilarity& expr,
-    const Document& root,
-    Variables* variables,
-    std::function<double(const std::vector<Value>&, const std::vector<Value>&)> calculateSimilarity,
-    std::function<double(double)> normalize) {
-    const auto& children = expr.getChildren();
-    const Value arrayVal1 = children[0]->evaluate(root, variables);
-    const Value arrayVal2 = children[1]->evaluate(root, variables);
+template <SimilarityAlgorithm Algo>
+double calculateSimilaritySlowPath(const std::vector<Value>& a, const std::vector<Value>& b) {
+    if constexpr (Algo == SimilarityAlgorithm::DotProduct)
+        return calculateDotProduct(a, b);
+    else if constexpr (Algo == SimilarityAlgorithm::Euclidean)
+        return calculateEuclideanDistance(a, b);
+    else if constexpr (Algo == SimilarityAlgorithm::Cosine)
+        return calculateCosineSimilarity(a, b);
+    MONGO_UNREACHABLE;
+}
 
-    if (arrayVal1.nullish() || arrayVal2.nullish()) {
+template <SimilarityAlgorithm Algo>
+double normalize(double v) {
+    if constexpr (Algo == SimilarityAlgorithm::DotProduct)
+        return (1 + v) / 2;
+    else if constexpr (Algo == SimilarityAlgorithm::Euclidean)
+        return 1 / (1 + v);
+    else if constexpr (Algo == SimilarityAlgorithm::Cosine)
+        return (1 + v) / 2;
+    MONGO_UNREACHABLE;
+}
+
+/*
+ * Evaluate a vector similarity expression. Tries the BinData fast path first; falls back
+ * to the conversion-based slow path when the fast path is not applicable.
+ */
+template <SimilarityAlgorithm Algo>
+Value evaluateSimilarity(const ExpressionVectorSimilarity& expr,
+                         const Document& root,
+                         Variables* variables) {
+    const auto& children = expr.getChildren();
+    const Value val1 = children[0]->evaluate(root, variables);
+    const Value val2 = children[1]->evaluate(root, variables);
+
+    if (val1.nullish() || val2.nullish()) {
         return Value(BSONNULL);
     }
 
-    std::vector<Value> buf1, buf2;
     const auto opName = expr.getOpName();
-    const std::vector<Value>& array1 = toArray(arrayVal1, buf1, opName);
-    const std::vector<Value>& array2 = toArray(arrayVal2, buf2, opName);
-    validate(array1, array2, opName);
-    const auto similarity = calculateSimilarity(array1, array2);
 
-    return Value(expr.isScore() ? normalize(similarity) : similarity);
+    // Try the BinData fast path first.
+    if (auto result = tryBinDataSimilarity<Algo>(val1, val2, opName)) {
+        return Value(expr.isScore() ? normalize<Algo>(*result) : *result);
+    }
+
+    // Slow path: convert to arrays.
+    std::vector<Value> buf1, buf2;
+    const std::vector<Value>& array1 = toArray(val1, buf1, opName);
+    const std::vector<Value>& array2 = toArray(val2, buf2, opName);
+    validate(array1, array2, opName);
+    const auto similarity = calculateSimilaritySlowPath<Algo>(array1, array2);
+
+    return Value(expr.isScore() ? normalize<Algo>(similarity) : similarity);
 }
 
 }  // namespace
@@ -887,38 +1120,17 @@ Value evaluateSimilarity(
 Value evaluate(const ExpressionSimilarityDotProduct& expr,
                const Document& root,
                Variables* variables) {
-    // Normalize according to the corresponding formula defined in the Atlas documentation at the
-    // link below.
-    // https://www.mongodb.com/docs/atlas/atlas-vector-search/vector-search-stage/#atlas-vector-search-score
-    const auto normalizeDotProduct = [](double dotProduct) {
-        return (1 + dotProduct) / 2;
-    };
-
-    return evaluateSimilarity(expr, root, variables, calculateDotProduct, normalizeDotProduct);
+    return evaluateSimilarity<SimilarityAlgorithm::DotProduct>(expr, root, variables);
 }
 
 Value evaluate(const ExpressionSimilarityCosine& expr, const Document& root, Variables* variables) {
-    // Normalize according to the corresponding formula defined in the Atlas documentation at the
-    // link below.
-    // https://www.mongodb.com/docs/atlas/atlas-vector-search/vector-search-stage/#atlas-vector-search-score
-    const auto normalizeCosine = [](double cosine) {
-        return (1 + cosine) / 2;
-    };
-
-    return evaluateSimilarity(expr, root, variables, calculateCosineSimilarity, normalizeCosine);
+    return evaluateSimilarity<SimilarityAlgorithm::Cosine>(expr, root, variables);
 }
 
 Value evaluate(const ExpressionSimilarityEuclidean& expr,
                const Document& root,
                Variables* variables) {
-    // Normalize according to the corresponding formula defined in the Atlas documentation at the
-    // link below.
-    // https://www.mongodb.com/docs/atlas/atlas-vector-search/vector-search-stage/#atlas-vector-search-score
-    const auto normalizeDistance = [](double dist) {
-        return 1 / (1 + dist);
-    };
-
-    return evaluateSimilarity(expr, root, variables, calculateEuclideanDistance, normalizeDistance);
+    return evaluateSimilarity<SimilarityAlgorithm::Euclidean>(expr, root, variables);
 }
 
 Value evaluate(const ExpressionSlice& expr, const Document& root, Variables* variables) {

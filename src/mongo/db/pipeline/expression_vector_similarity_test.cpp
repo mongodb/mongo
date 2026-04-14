@@ -544,6 +544,29 @@ TEST_F(ExpressionVectorSimilarityTest, EvaluateDotProductEmptyBinDataVectors) {
     ASSERT_VALUE_EQ(result, Value(0.0));
 }
 
+// Tests that one empty and one non-empty BinData vector throws a size mismatch error.
+TEST_F(ExpressionVectorSimilarityTest, BinDataVectorEmptyAndNonEmptyThrows) {
+    auto expCtx = getExpCtx();
+    Value emptyVec(BSONBinData(nullptr, 0, BinDataType::Vector));
+    auto nonEmptyVec = createInt8BinDataVector({1, 2, 3});
+
+    // Empty first, non-empty second.
+    auto expr1 = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$similarityDotProduct" << BSON_ARRAY(emptyVec << nonEmptyVec)),
+        expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(
+        expr1->evaluate(Document{}, &expCtx->variables), AssertionException, 12325704);
+
+    // Non-empty first, empty second.
+    auto expr2 = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$similarityDotProduct" << BSON_ARRAY(nonEmptyVec << emptyVec)),
+        expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(
+        expr2->evaluate(Document{}, &expCtx->variables), AssertionException, 12325704);
+}
+
 // Tests that binData vectors of different sizes throws an error.
 TEST_F(ExpressionVectorSimilarityTest, BinDataVectorsDifferentSizesThrows) {
     auto expCtx = getExpCtx();
@@ -555,6 +578,252 @@ TEST_F(ExpressionVectorSimilarityTest, BinDataVectorsDifferentSizesThrows) {
                                     BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
                                     expCtx->variablesParseState);
     ASSERT_THROWS_CODE(
-        expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413202);
+        expr->evaluate(Document{}, &expCtx->variables), AssertionException, 12325705);
+}
+
+// Tests that mixed BinData dtypes (FLOAT32 + INT8) fall back correctly.
+TEST_F(ExpressionVectorSimilarityTest, MixedBinDataDtypesFallback) {
+    auto expCtx = getExpCtx();
+    auto vecFloat = createFloat32BinDataVector({1.0f, 2.0f, 3.0f});
+    auto vecInt = createInt8BinDataVector({4, 5, 6});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecFloat << vecInt)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // 1*4 + 2*5 + 3*6 = 32
+    ASSERT_VALUE_EQ(result, Value(32.0));
+}
+
+// Tests that mixed input types (array + BinData) fall back correctly.
+TEST_F(ExpressionVectorSimilarityTest, MixedArrayAndBinDataFallback) {
+    auto expCtx = getExpCtx();
+    auto vecBin = createInt8BinDataVector({4, 5, 6});
+
+    auto expr = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$similarityDotProduct" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << vecBin)),
+        expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_VALUE_EQ(result, Value(32.0));
+}
+
+// Tests larger FLOAT32 BinData vectors for accumulation correctness.
+TEST_F(ExpressionVectorSimilarityTest, LargerFloat32BinDataDotProduct) {
+    auto expCtx = getExpCtx();
+    std::vector<float> v1(128, 1.0f);
+    std::vector<float> v2(128, 2.0f);
+    auto vec1 = createFloat32BinDataVector(v1);
+    auto vec2 = createFloat32BinDataVector(v2);
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // 128 * (1.0 * 2.0) = 256.0
+    ASSERT_VALUE_EQ(result, Value(256.0));
+}
+
+// Tests larger INT8 BinData vectors for accumulation correctness.
+TEST_F(ExpressionVectorSimilarityTest, LargerInt8BinDataEuclidean) {
+    auto expCtx = getExpCtx();
+    std::vector<int8_t> v1(100, 10);
+    std::vector<int8_t> v2(100, 7);
+    auto vec1 = createInt8BinDataVector(v1);
+    auto vec2 = createInt8BinDataVector(v2);
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityEuclidean" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // sqrt(100 * 9) = 30
+    ASSERT_VALUE_EQ(result, Value(30.0));
+}
+
+// Tests PACKED_BIT with non-zero padding (5 bits = 1 byte, padding = 3).
+TEST_F(ExpressionVectorSimilarityTest, PackedBitPadding5Bits) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createPackedBitBinDataVector({true, true, false, true, false});
+    auto vec2 = createPackedBitBinDataVector({true, false, true, true, true});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // Matching 1-bits at positions 0 and 3 => 2.0
+    ASSERT_VALUE_EQ(result, Value(2.0));
+}
+
+// Tests PACKED_BIT with exactly 8 bits (no padding).
+TEST_F(ExpressionVectorSimilarityTest, PackedBitExactly8Bits) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createPackedBitBinDataVector({true, true, true, true, false, false, false, false});
+    auto vec2 = createPackedBitBinDataVector({true, false, true, false, true, false, true, false});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // Matching 1-bits at positions 0 and 2 => 2.0
+    ASSERT_VALUE_EQ(result, Value(2.0));
+}
+
+// Tests PACKED_BIT with 9 bits (2 bytes, padding = 7).
+TEST_F(ExpressionVectorSimilarityTest, PackedBitNineBits) {
+    auto expCtx = getExpCtx();
+    auto vec1 =
+        createPackedBitBinDataVector({true, false, true, false, true, false, true, false, true});
+    auto vec2 =
+        createPackedBitBinDataVector({false, true, false, true, false, true, false, true, true});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // Only the 9th bit (index 8) is 1 in both => 1.0
+    ASSERT_VALUE_EQ(result, Value(1.0));
+}
+
+// Tests PACKED_BIT euclidean with padding (5 bits, padding = 3).
+TEST_F(ExpressionVectorSimilarityTest, PackedBitPaddingEuclidean) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createPackedBitBinDataVector({true, false, true, false, true});
+    auto vec2 = createPackedBitBinDataVector({false, true, false, true, false});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityEuclidean" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // All 5 bits differ => sqrt(5)
+    ASSERT_APPROX_EQUAL(result.coerceToDouble(), std::sqrt(5.0), 0.0001);
+}
+
+// Tests PACKED_BIT cosine with padding (5 bits, padding = 3).
+TEST_F(ExpressionVectorSimilarityTest, PackedBitPaddingCosine) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createPackedBitBinDataVector({true, true, false, true, false});
+    auto vec2 = createPackedBitBinDataVector({true, false, true, true, true});
+
+    auto expr = Expression::parseExpression(expCtx.get(),
+                                            BSON("$similarityCosine" << BSON_ARRAY(vec1 << vec2)),
+                                            expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // dot = popcount(AND) = 2 (bits 0 and 3), mag1 = sqrt(3), mag2 = sqrt(4) = 2
+    // cosine = 2 / (sqrt(3) * 2)
+    ASSERT_APPROX_EQUAL(result.coerceToDouble(), 2.0 / (std::sqrt(3.0) * 2.0), 0.0001);
+}
+
+// Tests score normalization with BinData inputs for each operator.
+TEST_F(ExpressionVectorSimilarityTest, ScoreNormalizationWithBinData) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createFloat32BinDataVector({1.0f, 0.0f, 0.0f});
+    auto vec2 = createFloat32BinDataVector({0.0f, 1.0f, 0.0f});
+
+    // DotProduct score: (1 + 0) / 2 = 0.5
+    {
+        auto expr = Expression::parseExpression(
+            expCtx.get(),
+            BSON("$similarityDotProduct"
+                 << BSON("vectors" << BSON_ARRAY(vec1 << vec2) << "score" << true)),
+            expCtx->variablesParseState);
+        auto result = expr->evaluate(Document{}, &expCtx->variables);
+        ASSERT_APPROX_EQUAL(result.coerceToDouble(), 0.5, 0.0001);
+    }
+
+    // Cosine score: (1 + 0) / 2 = 0.5
+    {
+        auto expr = Expression::parseExpression(
+            expCtx.get(),
+            BSON("$similarityCosine"
+                 << BSON("vectors" << BSON_ARRAY(vec1 << vec2) << "score" << true)),
+            expCtx->variablesParseState);
+        auto result = expr->evaluate(Document{}, &expCtx->variables);
+        ASSERT_APPROX_EQUAL(result.coerceToDouble(), 0.5, 0.0001);
+    }
+
+    // Euclidean score: 1 / (1 + sqrt(2)) ≈ 0.4142
+    {
+        auto expr = Expression::parseExpression(
+            expCtx.get(),
+            BSON("$similarityEuclidean"
+                 << BSON("vectors" << BSON_ARRAY(vec1 << vec2) << "score" << true)),
+            expCtx->variablesParseState);
+        auto result = expr->evaluate(Document{}, &expCtx->variables);
+        ASSERT_APPROX_EQUAL(result.coerceToDouble(), 1.0 / (1.0 + std::sqrt(2.0)), 0.0001);
+    }
+}
+
+// Tests empty BinData with dtype header (2 bytes, 0 data bytes) for each dtype.
+TEST_F(ExpressionVectorSimilarityTest, EmptyBinDataWithDtypeHeader) {
+    auto expCtx = getExpCtx();
+
+    auto makeHeaderOnly = [](char dtypeByte) {
+        std::vector<char> data = {dtypeByte, 0x00};
+        return Value(BSONBinData(data.data(), data.size(), BinDataType::Vector));
+    };
+
+    // FLOAT32 header-only.
+    {
+        auto vec = makeHeaderOnly(0x27);
+        auto expr =
+            Expression::parseExpression(expCtx.get(),
+                                        BSON("$similarityDotProduct" << BSON_ARRAY(vec << vec)),
+                                        expCtx->variablesParseState);
+        auto result = expr->evaluate(Document{}, &expCtx->variables);
+        ASSERT_VALUE_EQ(result, Value(0.0));
+    }
+
+    // INT8 header-only.
+    {
+        auto vec = makeHeaderOnly(0x03);
+        auto expr =
+            Expression::parseExpression(expCtx.get(),
+                                        BSON("$similarityDotProduct" << BSON_ARRAY(vec << vec)),
+                                        expCtx->variablesParseState);
+        auto result = expr->evaluate(Document{}, &expCtx->variables);
+        ASSERT_VALUE_EQ(result, Value(0.0));
+    }
+
+    // PACKED_BIT header-only.
+    {
+        auto vec = makeHeaderOnly(0x10);
+        auto expr =
+            Expression::parseExpression(expCtx.get(),
+                                        BSON("$similarityDotProduct" << BSON_ARRAY(vec << vec)),
+                                        expCtx->variablesParseState);
+        auto result = expr->evaluate(Document{}, &expCtx->variables);
+        ASSERT_VALUE_EQ(result, Value(0.0));
+    }
+}
+
+// Tests that one header-only empty BinData and one non-empty BinData throws a size mismatch error.
+TEST_F(ExpressionVectorSimilarityTest, BinDataHeaderOnlyAndNonEmptyThrows) {
+    auto expCtx = getExpCtx();
+    std::vector<char> headerOnly = {0x03, 0x00};  // INT8 header, no data bytes.
+    Value emptyVec(BSONBinData(headerOnly.data(), headerOnly.size(), BinDataType::Vector));
+    auto nonEmptyVec = createInt8BinDataVector({1, 2, 3});
+
+    // Header-only first, non-empty second.
+    auto expr1 = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$similarityDotProduct" << BSON_ARRAY(emptyVec << nonEmptyVec)),
+        expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(
+        expr1->evaluate(Document{}, &expCtx->variables), AssertionException, 12325705);
+
+    // Non-empty first, header-only second.
+    auto expr2 = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$similarityDotProduct" << BSON_ARRAY(nonEmptyVec << emptyVec)),
+        expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(
+        expr2->evaluate(Document{}, &expCtx->variables), AssertionException, 12325705);
 }
 }  // namespace mongo
