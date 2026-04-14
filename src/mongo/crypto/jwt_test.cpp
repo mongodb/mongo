@@ -220,19 +220,42 @@ TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
     // load.
     jwksFetcher()->setKeys(getPartialTestJWKSet());
     getClock()->advance(Seconds{3});
+    ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
     ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
     ASSERT_NOT_OK(jwkManager()->getValidator("ec-prime256v1"_sd));
     ASSERT_NOT_OK(jwkManager()->getValidator("ec-secp384r1"_sd));
     ASSERT_EQ(jwkManager()->size(), 1);
 
-    // Add second key at time < quiesce period. Fetcher should not update.
+    // Add remaining keys at time < quiesce period. Fetcher should not update.
     jwksFetcher()->setKeys(getCompleteTestJWKSet());
     getClock()->advance(Seconds{3});
     ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
     ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
     ASSERT_EQ(jwkManager()->size(), 1);
 
-    // Advance clock further, keys will now be JIT loaded.
+    // Advance clock further, but imagine that the JWKS endpoint goes down, Fetcher should
+    // attempt a JIT and fail for all of the new keys.
+    getClock()->advance(Seconds{3});
+    jwksFetcher()->setShouldFail(true /* shouldFail */);
+    ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("ec-prime256v1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("ec-secp384r1"_sd));
+    ASSERT_EQ(jwkManager()->size(), 1);
+
+    // Advance clock for less than the quiesce period. The JWKS endpoint is back up now,
+    // but the fetcher should refuse to perform another JIT since the quiesce period is now
+    // in effect from the last, failed, JIT refresh.
+    getClock()->advance(Seconds{3});
+    jwksFetcher()->setShouldFail(false /* shouldFail */);
+    ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("ec-prime256v1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("ec-secp384r1"_sd));
+    ASSERT_EQ(jwkManager()->size(), 1);
+
+    // Advance clock past the quiesce period. The JWKS endpoint is still up, so
+    // the JIT should finally succeed and all validators should be available.
     getClock()->advance(Seconds{3});
     ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
     ASSERT_OK(jwkManager()->getValidator("custom-key-2"_sd));
