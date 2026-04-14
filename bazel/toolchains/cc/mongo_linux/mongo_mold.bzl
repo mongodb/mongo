@@ -1,19 +1,19 @@
 # Mold linker
 MOLD_MAP = {
     "aarch64": {
-        "sha": "0c161124747d6ea0dba6f1b8b96d382fd51cad5345252606c9b32cb675d29a1c",
-        "url": "https://github.com/rui314/mold/releases/download/v2.37.1/mold-2.37.1-aarch64-linux.tar.gz",
+        "sha": "946de2774b06a71346bd59b55fddba610b65b8d93c3a4a1559cc84e103472710",
+        "url": "https://github.com/rui314/mold/releases/download/v2.41.0/mold-2.41.0-aarch64-linux.tar.gz",
     },
     "x86_64": {
-        "sha": "cfdb6e82b5c906840e66304216b1b6e15766e4a7eac03893bbf2b41010f0a927",
-        "url": "https://github.com/rui314/mold/releases/download/v2.37.1/mold-2.37.1-x86_64-linux.tar.gz",
+        "sha": "a3696680d99e692970590a178bc3a33d78d60d1c6dc9db7a11b557b02b751f5d",
+        "url": "https://github.com/rui314/mold/releases/download/v2.41.0/mold-2.41.0-x86_64-linux.tar.gz",
     },
     "s390x": {
-        "sha": "a452f377a580dbafe4bc2db111b659b7148017958b34f2e46381339aba915cfa",
-        "url": "https://github.com/rui314/mold/releases/download/v2.37.1/mold-2.37.1-s390x-linux.tar.gz",
+        "sha": "e5e42a2685967ad209d7568e29a0b2ea86ec9d462cbf5d4aa7398a8087ee1a9d",
+        "url": "https://github.com/rui314/mold/releases/download/v2.41.0/mold-2.41.0-s390x-linux.tar.gz",
     },
     "ppc64le": {
-        "sha": "8fc25480637bd550fb07fa6b4325a90b2e8efa3f4eec9ba5d056017a2837e24d",
-        "url": "https://github.com/rui314/mold/releases/download/v2.37.1/mold-2.37.1-ppc64le-linux.tar.gz",
+        "sha": "b1a045d9dcbdb1af523518beca9da38f3ee0f208964851831a0664cafaf9bc70",
+        "url": "https://github.com/rui314/mold/releases/download/v2.41.0/mold-2.41.0-ppc64le-linux.tar.gz",
     },
 }

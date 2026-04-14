@@ -61,7 +61,7 @@ LINKER_LINKFLAGS = select(
     {
         "@//bazel/config:linker_default": [],
         "@//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
-        "@//bazel/config:linker_mold_valid_settings": ["-fuse-ld=mold", "-B./external/mongo_toolchain_{version}/mold-2.37.1-{arch}-linux/bin/"],
+        "@//bazel/config:linker_mold_valid_settings": ["-fuse-ld=mold", "-B./external/mongo_toolchain_{version}/mold-2.41.0-{arch}-linux/bin/"],
     },
     no_match_error = LINKER_ERROR_MESSAGE,
 )

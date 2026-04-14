@@ -858,11 +858,21 @@ selects.config_setting_group(
     match_all = [
         ":_linker_auto",
         "@platforms//os:linux",
+        ":compiler_type_clang",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_linker_mold_set_by_auto",
+    match_all = [
+        ":_linker_auto",
+        "@platforms//os:linux",
+        ":compiler_type_gcc",
     ],
 )
 
 # Final setting intended for external use.
-#   linker == lld || (linker == auto && cpu == not_s390x)
+#   linker == lld || (linker == auto && clang && linux)
 selects.config_setting_group(
     name = "linker_lld",
     match_any = [
@@ -882,8 +892,20 @@ selects.config_setting_group(
 selects.config_setting_group(
     name = "linker_mold_valid_settings",
     match_all = [
-        ":_linker_mold",
+        ":_linker_mold_or_gcc_auto",
         ":not_macos",
+    ],
+)
+
+# mold is selected explicitly or auto-selected for gcc
+# This is because gcc needs dwarf64, and only mold supports
+# linking both 32 and 64 bit debug symbols which we have
+# due to the rust toolchain.
+selects.config_setting_group(
+    name = "_linker_mold_or_gcc_auto",
+    match_any = [
+        ":_linker_mold",
+        ":_linker_mold_set_by_auto",
     ],
 )
 

@@ -667,7 +667,7 @@ def _impl(ctx):
     # gdb crashes with -gsplit-dwarf and -gdwarf64
     dwarf64_feature = feature(
         name = "dwarf64",
-        enabled = not ctx.attr.fission and not ctx.attr.distro == "suse15",
+        enabled = not ctx.attr.fission and not ctx.attr.distro == "suse15" and not ctx.attr.compiler == COMPILERS.CLANG,
         implies = ["per_object_debug_info"],
         flag_sets = [
             flag_set(
@@ -991,7 +991,7 @@ def _impl(ctx):
 
     clang_fno_limit_debug_info_feature = feature(
         name = "clang_fno_limit_debug_info",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
+        enabled = False,
         flag_sets = [
             flag_set(
                 actions = all_compile_actions,
@@ -999,6 +999,7 @@ def _impl(ctx):
                     # We add this flag to make clang emit debug info for c++ stl types so
                     # that our pretty printers will work with newer clang's which omit this
                     # debug info. This does increase the overall debug info size.
+                    # This will triple the debug info size.
                     "-fno-limit-debug-info",
                 ])],
             ),
