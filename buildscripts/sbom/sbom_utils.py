@@ -113,6 +113,10 @@ def convert_sbom_to_public(sbom_dict: dict):
             occurence.get("location", "").startswith("src/third_party/private")
             for occurence in c.get("evidence", {}).get("occurrences", [])
         )
+        or any(
+            property.get("name", "") == "internal:as-is_component"
+            for property in c.get("properties", [])
+        )
     ]
 
     # Remove internal components and any dependencies on them from the SBOM
@@ -227,6 +231,33 @@ def set_dependency_version(dependencies: list, meta_bom_ref: str, purl_version: 
 
     logger.debug(
         "set_dependency_version: '%s' updated %d refs and %d dependsOn", meta_bom_ref, r, d
+    )
+
+
+def add_component_dependsOn(dependencies: list, component_ref: str, depends_on_ref: str) -> None:
+    """Add a dependsOn reference to a component in the SBOM dependencies"""
+    for dependency in dependencies:
+        if dependency["ref"] == component_ref:
+            if depends_on_ref not in dependency["dependsOn"]:
+                dependency["dependsOn"].append(depends_on_ref)
+                logger.debug(
+                    "Added dependsOn reference '%s' to component '%s'",
+                    depends_on_ref,
+                    component_ref,
+                )
+            else:
+                logger.debug(
+                    "Component '%s' already has dependsOn reference '%s'",
+                    component_ref,
+                    depends_on_ref,
+                )
+            return
+    # ref missing from .dependencies[]
+    dependencies.append({"ref": component_ref, "dependsOn": [depends_on_ref]})
+    logger.debug(
+        "Added new dependency ref for component '%s' with dependsOn reference '%s'",
+        component_ref,
+        depends_on_ref,
     )
 
 

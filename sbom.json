@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:71d980f0-95c5-4dfa-8987-307eb8880ce2",
-  "version": 5,
+  "serialNumber": "urn:uuid:7f691d0b-ee37-4e49-9bf2-b8f19ec04144",
+  "version": 1,
   "metadata": {
-    "timestamp": "2026-03-25T17:21:56Z",
+    "timestamp": "2026-04-01T06:29:09Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -13,7 +13,7 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "pkg:github/mongodb/mongo@master",
+      "bom-ref": "pkg:github/mongodb/mongo@v8.3",
       "supplier": {
         "name": "MongoDB, Inc.",
         "url": [
@@ -24,9 +24,9 @@
       "publisher": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "mongodb/mongo",
-      "version": "master",
-      "cpe": "cpe:2.3:a:mongodb:mongodb:master:*:*:*:*:*:*:*",
-      "purl": "pkg:github/mongodb/mongo@master",
+      "version": "v8.3",
+      "cpe": "cpe:2.3:a:mongodb:mongodb:8.3.*:*:*:*:*:*:*:*",
+      "purl": "pkg:github/mongodb/mongo@v8.3",
       "externalReferences": [
         {
           "url": "https://raw.githubusercontent.com/mongodb/mongo/refs/heads/master/LICENSE-Community.txt",
@@ -2555,7 +2555,7 @@
       ]
     },
     {
-      "ref": "pkg:github/mongodb/mongo@master",
+      "ref": "pkg:github/mongodb/mongo@v8.3",
       "dependsOn": [
         "pkg:deb/debian/firefox-esr@140.9.0esr-1?arch=source",
         "pkg:generic/intel/IntelRDFPMathLib@2.0.1",

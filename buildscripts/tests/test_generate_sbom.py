@@ -32,7 +32,7 @@ class TestEndorctl(unittest.TestCase):
         logger.setLevel(logging.INFO)
 
         e = EndorCtl(namespace="mongodb.10gen", endorctl_path="this_path_does_not_exist")
-        result = e.get_sbom_for_project("https://github.com/10gen/mongo.git")
+        result = e.get_sbom("https://github.com/10gen/mongo.git")
         self.assertRaises(FileNotFoundError)
         self.assertIsNone(result, None)
 
