@@ -89,5 +89,13 @@ TEST_F(ReplicatedFastCountInitTest,
 
     EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
 }
+
+TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
+    const int numIterations = 100;
+    for (int i = 0; i < numIterations; ++i) {
+        setUpReplicatedFastCount(_opCtx);
+        _fastCountManager->shutdown(_opCtx);
+    }
+}
 }  // namespace
 }  // namespace mongo
