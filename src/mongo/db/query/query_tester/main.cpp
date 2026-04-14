@@ -239,61 +239,67 @@ void printHelpString() {
     static const auto kHelpMap = std::map<std::string, std::string>{
         // Long-options come before short-options. Sorted in lexicographical order.
         {"--diff",
-         // Default to word-based diff here to make output on ANSI supported terminals (i.e. the
-         // human user case) easier.
-         "[plain, word]. Use colored word-based diff or uncolored line based diff when displaying "
-         "result set differences. "
-         "Defaults to word-based diff if not specified. Humans using terminals that support ANSI "
-         "color codes are recommended to use the default --diff word for easier-to-read output."},
+         "[plain, word]. Controls how result differences are displayed. `word` (default) shows "
+         "colored word-level diffs — recommended for ANSI-capable terminals. `plain` shows "
+         "uncolored line-level diffs."},
         {"--drop",
-         "Drop the collections before loading them. Should be "
-         "specified with the load argument or "
-         "no documents will exist in the test collections."},
+         "Drop the test collections before loading them. Almost always paired with --load; "
+         "without it the collections will be empty after the drop."},
         {"--extractFeatures",
-         "Extracts syntax, query planner, and execution stats metadata for failed queries for an "
-         "enriched debugging experience."},
-        {"--ignore-index-failures", "Creates indices while ignoring index creation failures."},
+         "For each failed query, extract syntax, query planner, and execution stats metadata to "
+         "aid debugging. Requires -v and --mode compare. The feature-extractor tool must be "
+         "present in the user's home directory."},
+        {"--ignore-index-failures",
+         "Suppress errors from index creation failures and continue loading. Useful when running "
+         "against a server version that does not support all index types in the test collection."},
         {"--load",
-         "Load all collections specified in relevant test files. If "
-         "not specified will assume data "
-         "has already been loaded."},
+         "Insert documents and build indexes for all collections referenced by the test files. "
+         "If omitted, the collections are assumed to already contain the correct data."},
         {"--minimal-index",
-         "Only create the minimal set of indices necessary, currently just geospatial and text "
-         "indices."},
+         "Skip non-essential index creation and only build indexes required for queries to run "
+         "at all (currently: geospatial and text indexes). Speeds up collection loading at the "
+         "cost of missing index coverage."},
         {"--mode",
-         "[run, compare, normalize]. Specify whether to just run and record "
-         "results; expect all test files to specify results (default); or ensure that "
-         "output results are correctly normalized."},
+         "[run, compare, normalize]. `compare` (default): run each test and fail if results "
+         "differ from the .results file. `run`: execute tests and optionally write output via "
+         "--out — tests only fail on execution errors. `normalize`: validate that existing "
+         ".results files are in canonical form without connecting to a server."},
         {"--opt-off",
-         "Disables optimizations and pushing down to the find layer if queries don't require an "
-         "index to be run."},
+         "Disable query optimizations and find-layer pushdown. Used to generate a baseline "
+         "results file for differential/multiversion testing. Requires "
+         "--enableTestCommands=true on the mongod."},
         {"--out",
-         "[result, oneline]. Write out results for each test file after running "
-         "tests in run or normalize mode. Results files end in `.results` "
-         "and will overwrite an existing file if it exists. "
-         "`result` will write out multiline results, "
-         "`oneline` will write out single-line results. "
-         "Not available in compare mode."},
-        {"--populateAndExit", "Only drop and load data. No tests are run."},
+         "[result, oneline]. Write results to a .results file after running. `result` formats "
+         "each document on its own line; `oneline` puts the entire result set on one line. "
+         "Overwrites existing .results files. Not available with --mode compare or when using "
+         "-n or -r."},
+        {"--populateAndExit",
+         "Drop and reload collection data, then exit without running any tests. Implicitly "
+         "applies --drop and --load. Accepts exactly one -t argument."},
         {"--uri",
-         "Follow with the mongo URI string to connect to a running "
-         "mongo cluster. Required"},
+         "MongoDB connection URI. Defaults to mongodb://localhost:27017 if not specified. "
+         "Not used in --mode normalize."},
         // Short options second. Sorted in lexicographical order.
-        {"-h", "Print this help string"},
+        {"-h", "Print this help string."},
         {"-n",
-         "Run a specific test in the test file that immediately preceded "
-         "this argument. This "
-         "should be followed by an integer"},
+         "Run only the test at position <int> (0-indexed) in the immediately preceding -t file. "
+         "For example, '-t foo.test -n 2' runs the third test in foo.test. "
+         "Must immediately follow a -t argument. Incompatible with -r and --out."},
         {"-r",
-         "Run a specific range of tests in the test file immediately "
-         "before this argument. "
-         "Should "
-         "be followed by two integers in ascending order"},
+         "Run only tests numbered <start> through <end> (inclusive) from the immediately "
+         "preceding -t file. <start> must be <= <end>. Must immediately follow a -t argument. "
+         "Incompatible with -n and --out."},
         {"-t",
-         "Test. This should be followed by a test name. This can appear "
-         "multiple times to run multiple tests."},
-        {"-v (verbose)", "Appends a summary of failing queries to an unsuccessful test file run."},
-        {"--override", "Follow with the test type override. Optional"}};
+         "Path to a .test file to run. Can be specified multiple times to run several test "
+         "files in sequence."},
+        {"-v (verbose)",
+         "Print a summary of failing queries after an unsuccessful run. Requires --mode compare. "
+         "Combine with --extractFeatures for richer per-failure diagnostics."},
+        {"--override",
+         "[queryShapeHash]. Override the test type for the run. Currently the only supported "
+         "value is `queryShapeHash`, which runs explain on each query and asserts that the "
+         "extracted query shape hash matches the expected value in a .queryShapeHash.results "
+         "file."}};
     for (const auto& [key, val] : kHelpMap) {
         std::cout << key << ": " << val << std::endl;
     }
@@ -356,7 +362,9 @@ int queryTesterMain(const int argc, const char** const argv) {
             std::exit(0);
         } else if (parsedArgs[argNum] == "-n") {
             if (expectingNumAt != argNum) {
-                exitWithError(1, "-n must follow the -t test it modifies");
+                exitWithError(1,
+                              "-n must immediately follow the -t it modifies and cannot be "
+                              "combined with -r for the same test file");
             }
             runningPartialFile = true;
             assertNextArgExists(parsedArgs, argNum, "-n");
@@ -365,7 +373,9 @@ int queryTesterMain(const int argc, const char** const argv) {
             ++argNum;
         } else if (parsedArgs[argNum] == "-r") {
             if (expectingNumAt != argNum) {
-                exitWithError(1, "-r must follow the -t test it modifies");
+                exitWithError(1,
+                              "-r must immediately follow the -t it modifies and cannot be "
+                              "combined with -n for the same test file");
             }
             runningPartialFile = true;
             assertNextArgExists(parsedArgs, argNum, "-r");
