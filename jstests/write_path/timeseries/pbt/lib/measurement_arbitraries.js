@@ -4,6 +4,7 @@
 
 import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
+import {normalDistRealArb} from "jstests/write_path/timeseries/pbt/lib/arb_utils.js";
 import {
     makeMetricArb,
     makeSensorDateMetricStreamArb,
@@ -11,6 +12,138 @@ import {
     makeMixedTypeMetricStreamArb,
     makeRunnyMetricStreamArb,
 } from "jstests/write_path/timeseries/pbt/lib/metric_arbitraries.js";
+
+// Rollover-condition constants
+
+// Matches server-side gTimeseriesBucketMaxCount (timeseries.idl).
+// When countRollover is enabled, streams are sized to exceed this limit.
+export const kBucketMaxCount = 1000;
+
+// Field name injected into documents when sizeRolloverChance fires.
+// The double-underscore prefix and length (>8 chars) guarantee it never collides
+// with the 1-8 char names produced by the default fieldNameArb.
+export const kSizeRolloverFieldName = "__largePayloadField";
+
+// Per-document payload size (bytes) used for size-rollover injection.
+// Chosen to exceed gTimeseriesBucketMaxSize (128 000 B) on its own, so that a single
+// injected document triggers the size check regardless of prior bucket contents.
+// The value stays well below kLargeMeasurementsMaxBucketSize (12 MB)
+// so the document is absorbed rather than causing a kSize/kCachePressure rollover.
+const kSizeRolloverFieldBytes = 130_000;
+
+// Pre-built once at module load; reused across every injected document.
+const kSizeRolloverLargeValue = "x".repeat(kSizeRolloverFieldBytes);
+
+/**
+ * Build a time stream where some inter-document gaps are forced to exceed
+ * `bucketSpanSeconds`, triggering a kTimeForward bucket rollover.
+ *
+ * For each gap between consecutive timestamps the caller decides (via `chance`)
+ * whether to widen it to > bucketSpanMs.  Widening is cumulative so the
+ * resulting stream stays monotonically non-decreasing.
+ *
+ * @param {number} docCount
+ * @param {Date} dateMin
+ * @param {Date} dateMax
+ * @param {number} bucketSpanSeconds
+ * @param {string|object} timeBucketing - forwarded to makeSensorDateMetricStreamArb
+ * @param {number} chance - probability per gap of injecting a forward jump [0, 1]
+ * @returns {fc.Arbitrary<Date[]>}
+ */
+function makeTimeForwardStreamArb(docCount, dateMin, dateMax, bucketSpanSeconds, timeBucketing, chance) {
+    const bucketSpanMs = bucketSpanSeconds * 1_000;
+    const baseArb = makeSensorDateMetricStreamArb(
+        docCount,
+        docCount,
+        {dateRange: {min: dateMin, max: dateMax}},
+        timeBucketing,
+    );
+
+    if (docCount <= 1) return baseArb;
+
+    const numGaps = docCount - 1;
+    const decisionsArb = fc.array(fc.double({min: 0, max: 1, noNaN: true}), {
+        minLength: numGaps,
+        maxLength: numGaps,
+    });
+    // Extra milliseconds added on top of the minimum needed to cross the boundary.
+    const extraJumpArb = fc.array(fc.integer({min: 0, max: bucketSpanMs * 2}), {
+        minLength: numGaps,
+        maxLength: numGaps,
+    });
+
+    return fc.tuple(baseArb, decisionsArb, extraJumpArb).map(([stream, decisions, extras]) => {
+        const result = [stream[0]];
+        let cumulativeOffset = 0;
+
+        for (let i = 1; i < docCount; i++) {
+            const gap = stream[i].getTime() - stream[i - 1].getTime();
+            if (decisions[i - 1] < chance) {
+                // Force this gap to exceed the bucket span.
+                cumulativeOffset += Math.max(0, bucketSpanMs + 1 - gap) + extras[i - 1];
+            }
+            const newMs = Math.min(stream[i].getTime() + cumulativeOffset, dateMax.getTime());
+            result.push(new Date(newMs));
+        }
+        return result;
+    });
+}
+
+/**
+ * Post-process a docs array to inject:
+ *   - kTimeBackward: replace some timestamps with values before the stream minimum
+ *   - kSize:         add a large field to some documents
+ *
+ * Returns an fc.Arbitrary so that the random selections participate in
+ * fast-check's shrinking.
+ *
+ * @param {Object[]} docs
+ * @param {string} timeFieldname
+ * @param {number} timeBackwardChance - per-doc probability [0, 1]
+ * @param {number} sizeRolloverChance - per-doc probability [0, 1]
+ * @param {Date} dateMin
+ * @returns {fc.Arbitrary<Object[]>}
+ */
+function applyRolloverInjections(docs, timeFieldname, timeBackwardChance, sizeRolloverChance, dateMin) {
+    if (docs.length === 0 || (timeBackwardChance <= 0 && sizeRolloverChance <= 0)) {
+        return fc.constant(docs);
+    }
+
+    const n = docs.length;
+    const minTimestampMs = docs.reduce((min, d) => Math.min(min, d[timeFieldname].getTime()), Infinity);
+
+    // Backward-timestamp decisions + offset magnitudes.
+    const backDecisionsArb =
+        timeBackwardChance > 0
+            ? fc.array(normalDistRealArb(0, 1), {minLength: n, maxLength: n})
+            : fc.constant(new Array(n).fill(1.0));
+    const backOffsetArb =
+        timeBackwardChance > 0
+            ? fc.array(fc.integer({min: 3_600_000, max: 86_400_000 * 7}), {minLength: n, maxLength: n})
+            : fc.constant(new Array(n).fill(0));
+
+    // Size-field decisions.
+    const sizeDecisionsArb =
+        sizeRolloverChance > 0
+            ? fc.array(fc.double({min: 0, max: 1, noNaN: true}), {minLength: n, maxLength: n})
+            : fc.constant(new Array(n).fill(1.0));
+
+    return fc
+        .tuple(backDecisionsArb, backOffsetArb, sizeDecisionsArb)
+        .map(([backDecisions, backOffsets, sizeDecisions]) => {
+            return docs.map((doc, i) => {
+                const result = {...doc};
+                if (backDecisions[i] < timeBackwardChance) {
+                    const backMs = Math.max(dateMin.getTime(), minTimestampMs - backOffsets[i]);
+                    result[timeFieldname] = new Date(backMs);
+                }
+                if (sizeDecisions[i] < sizeRolloverChance) {
+                    result[kSizeRolloverFieldName] = kSizeRolloverLargeValue;
+                }
+                return result;
+            });
+        });
+}
 
 /**
  * Make a single measurement document arbitrary.
@@ -156,6 +289,24 @@ export function makeMeasurementDocArb(
  * @param {number} [options.mixedSchemaChance=0.0]  // chance that a given field will have a mixed schema across the stream
  * @param {number} [options.newFieldFrequency=0.1]   // per-doc probability that a new field is added to the schema going forward
  * @param {fc.Arbitrary<string>} [options.ranges.fieldNameArb]
+ * @param {Object} [options.rolloverConditions]  // composable bucket-rollover injections
+ * @param {number} [options.rolloverConditions.timeForwardChance=0.0]
+ *   Per-step probability [0,1] of injecting a gap that exceeds bucketSpanSeconds,
+ *   triggering a kTimeForward bucket rollover.
+ * @param {number} [options.rolloverConditions.timeBackwardChance=0.0]
+ *   Per-doc probability [0,1] of replacing a timestamp with one earlier than the
+ *   stream minimum, triggering a kTimeBackward bucket rollover.
+ * @param {boolean} [options.rolloverConditions.countRollover=false]
+ *   When true, forces minDocs >= kBucketMaxCount+1 (1001) so that each batch
+ *   is large enough to trigger a kCount bucket rollover.
+ * @param {number} [options.rolloverConditions.sizeRolloverChance=0.0]
+ *   Per-doc probability [0,1] of adding a ~25 KB field, causing accumulated
+ *   bucket size to exceed gTimeseriesBucketMaxSize (kSize rollover).
+ *   NOTE: kCachePressure rollover depends on server-side memory state and cannot
+ *   be injected at the document level; it is not represented here.
+ * @param {number} [options.bucketSpanSeconds=3600]
+ *   Bucket time span used when computing time-forward jump sizes. Should match
+ *   the collection's bucketMaxSpanSeconds (default granularity = hours = 3600 s).
  *
  * @returns {fc.Arbitrary<Object[]>}
  */
@@ -170,6 +321,23 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
     const mixedSchemaChance = options.mixedSchemaChance ?? 0.0;
     if (typeof mixedSchemaChance !== "number" || mixedSchemaChance < 0 || mixedSchemaChance > 1) {
         throw new Error("makeMeasurementDocStreamArb: mixedSchemaChance must be a number in [0, 1]");
+    }
+
+    const rolloverConditions = options.rolloverConditions ?? {};
+    const timeForwardChance = rolloverConditions.timeForwardChance ?? 0.0;
+    const timeBackwardChance = rolloverConditions.timeBackwardChance ?? 0.0;
+    const countRollover = rolloverConditions.countRollover ?? false;
+    const sizeRolloverChance = rolloverConditions.sizeRolloverChance ?? 0.0;
+    const bucketSpanSeconds = options.bucketSpanSeconds ?? 3600;
+
+    for (const [key, val] of [
+        ["timeForwardChance", timeForwardChance],
+        ["timeBackwardChance", timeBackwardChance],
+        ["sizeRolloverChance", sizeRolloverChance],
+    ]) {
+        if (typeof val !== "number" || val < 0 || val > 1) {
+            throw new Error(`makeMeasurementDocStreamArb: rolloverConditions.${key} must be a number in [0, 1]`);
+        }
     }
 
     const {
@@ -196,8 +364,16 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
     const dateMin = dateRange?.min ?? defaultDateMin;
     const dateMax = dateRange?.max ?? defaultDateMax;
 
+    // Exclude the size-rollover field name so generated names never collide with it.
     const baseFieldNameArb = fieldNameArb.filter(
-        (name) => !["_id", timeFieldname, metaFieldname, ...Object.keys(explicitArbitraries)].includes(name),
+        (name) =>
+            ![
+                "_id",
+                timeFieldname,
+                metaFieldname,
+                kSizeRolloverFieldName,
+                ...Object.keys(explicitArbitraries),
+            ].includes(name),
     );
 
     const fieldNamesArb = fc.array(baseFieldNameArb, {
@@ -205,7 +381,11 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         maxLength: maxFields,
     });
 
-    const docCountArb = fc.integer({min: minDocs, max: maxDocs});
+    // countRollover: ensure the batch is large enough to trigger a kCount rollover.
+    const effectiveMinDocs = countRollover ? Math.max(minDocs, kBucketMaxCount + 1) : minDocs;
+    const effectiveMaxDocs = countRollover ? Math.max(maxDocs, kBucketMaxCount + 10) : maxDocs;
+
+    const docCountArb = fc.integer({min: effectiveMinDocs, max: effectiveMaxDocs});
 
     // Parent metric arb for meta (when not fixed) and extra fields
     const parentMetricArb = makeMetricArb(options.types, {
@@ -227,13 +407,24 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
             return fc.constant([]);
         }
 
-        // Sensor-like increasing time stream to create meaningful bucket boundaries.
-        const timeStreamArb = makeSensorDateMetricStreamArb(
-            docCount,
-            docCount,
-            {dateRange: {min: dateMin, max: dateMax}},
-            timeBucketing,
-        );
+        // Time stream: use forward-jump injection when timeForwardChance > 0,
+        // otherwise fall back to the standard sensor-like stream.
+        const timeStreamArb =
+            timeForwardChance > 0
+                ? makeTimeForwardStreamArb(
+                      docCount,
+                      dateMin,
+                      dateMax,
+                      bucketSpanSeconds,
+                      timeBucketing,
+                      timeForwardChance,
+                  )
+                : makeSensorDateMetricStreamArb(
+                      docCount,
+                      docCount,
+                      {dateRange: {min: dateMin, max: dateMax}},
+                      timeBucketing,
+                  );
 
         const metaStreamArb = fc.array(fc.constant(chosenMetaValue), {minLength: docCount, maxLength: docCount});
 
@@ -318,7 +509,12 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
                         }
 
                         return docs;
-                    }),
+                    })
+                    // Apply time-backward and size-rollover injections as a chain so that
+                    // the random decisions participate in fast-check's shrinking.
+                    .chain((docs) =>
+                        applyRolloverInjections(docs, timeFieldname, timeBackwardChance, sizeRolloverChance, dateMin),
+                    ),
             );
         });
     });

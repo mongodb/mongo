@@ -75,7 +75,7 @@ export class InsertCommand {
     run(model, real) {
         const {tsColl, ctrlColl} = real;
 
-        const {resTs, resCtrl} = [tsColl, ctrlColl].map((coll) => {
+        const [resTs, resCtrl] = [tsColl, ctrlColl].map((coll) => {
             try {
                 return coll.insertOne(this.doc);
             } catch (e) {
@@ -123,7 +123,7 @@ export class BatchInsertCommand {
         if (!this.docs || this.docs.length === 0) {
             return;
         }
-        const {resTs, resCtrl} = [tsColl, ctrlColl].map((coll) => {
+        const [resTs, resCtrl] = [tsColl, ctrlColl].map((coll) => {
             try {
                 return coll.insertMany(this.docs);
             } catch (e) {

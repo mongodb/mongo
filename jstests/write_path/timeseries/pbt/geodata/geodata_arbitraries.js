@@ -4,24 +4,12 @@
 
 import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
+import {normalDistRealArb} from "jstests/write_path/timeseries/pbt/lib/arb_utils.js";
+
 const defaultLatitudeMin = -90;
 const defaultLatitudeMax = 90;
 const defaultLongitudeMin = -180;
 const defaultLongitudeMax = 180;
-
-/**
- * Function for producing realistic values for floating point data.  fc.double has a tendency
- * to cluster values at extremes.
- *
- * @param {number} min minimum value
- * @param {number} max maximum value
- * @param {number} [resolution] number of steps to break integers down into
- */
-const normalDistRealArb = (min, max, resolution = 1000.0) => {
-    return fc
-        .integer({min: min * resolution, max: max * resolution})
-        .map((x) => Math.min(Math.max(x / resolution, min), max));
-};
 
 /**
  * Make a GeoData Point arbitrary.
