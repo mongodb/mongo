@@ -31,12 +31,10 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -89,12 +87,10 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -147,12 +143,10 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -206,12 +200,10 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -270,11 +262,9 @@
 					"y" : [ ],
 					"z" : [ ]
 				},
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			},
-			"stage" : "FETCH",
-			"usedJoinOptimization" : false
+			"stage" : "FETCH"
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -332,11 +322,9 @@
 					"y" : [ ],
 					"z" : [ ]
 				},
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			},
-			"stage" : "FETCH",
-			"usedJoinOptimization" : false
+			"stage" : "FETCH"
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -410,12 +398,10 @@
 					"a" : [ ],
 					"b" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -488,12 +474,10 @@
 					"a" : [ ],
 					"b" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -571,12 +555,10 @@
 					"b" : [ ],
 					"c" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -652,12 +634,10 @@
 					"b" : [ ],
 					"c" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -734,12 +714,10 @@
 					"b" : [ ],
 					"c" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -815,12 +793,10 @@
 					"b" : [ ],
 					"c" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -896,12 +872,10 @@
 					"b" : [ ],
 					"c" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -977,12 +951,10 @@
 					"b" : [ ],
 					"c" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : { },
-			"usedJoinOptimization" : false
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {

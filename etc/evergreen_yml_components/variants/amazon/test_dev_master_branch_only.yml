@@ -315,8 +315,10 @@ buildvariants:
       tss_enabled: false
       large_distro_name: amazon2023-arm64-atlas-latest-m8g-4xlarge
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
+      # This variant needs to explicitly set featureFlagGetExecutorDeferredEngineChoice=false, since the SBE plan cache is not enabled when the flag is on.
       test_flags: >-
         --additionalFeatureFlags "featureFlagSbeFull"
+        --disableFeatureFlags=featureFlagGetExecutorDeferredEngineChoice
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.multiversion !.suggested_excluding_required__for_devprod_mitigation_only

@@ -55,8 +55,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -88,8 +87,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"c" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -99,8 +97,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -132,8 +129,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"d" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -144,8 +140,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -172,8 +167,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -246,8 +240,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -274,8 +267,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -286,8 +278,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "backward",
@@ -314,8 +305,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -388,8 +378,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -421,8 +410,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"c" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -432,8 +420,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -465,8 +452,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"d" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -477,8 +463,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -505,8 +490,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -598,8 +582,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -633,8 +616,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"d" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -646,8 +628,7 @@ Execution Engine: classic
 							"a" : 1,
 							"b" : 1,
 							"c" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -679,8 +660,7 @@ Execution Engine: classic
 							"b" : [ ],
 							"c" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -772,8 +752,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -807,8 +786,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"d" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -820,8 +798,7 @@ Execution Engine: classic
 							"a" : 1,
 							"b" : 1,
 							"c" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -853,8 +830,7 @@ Execution Engine: classic
 							"b" : [ ],
 							"c" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -946,8 +922,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -977,8 +952,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1057,8 +1031,7 @@ Execution Engine: classic
 						"keyPattern" : {
 							"_id" : 1
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1131,8 +1104,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "backward",
@@ -1159,8 +1131,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -1171,8 +1142,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -1199,8 +1169,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1273,8 +1242,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -1301,8 +1269,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -1313,8 +1280,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "backward",
@@ -1341,8 +1307,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1409,8 +1374,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -1437,8 +1401,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1510,8 +1473,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"c" : 1,
 							"d" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "backward",
@@ -1538,8 +1500,7 @@ Execution Engine: classic
 							"c" : [ ],
 							"d" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1611,8 +1572,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"c" : 1,
 							"d" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "backward",
@@ -1639,8 +1599,7 @@ Execution Engine: classic
 							"c" : [ ],
 							"d" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1717,8 +1676,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -1745,8 +1703,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1823,8 +1780,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -1856,8 +1812,7 @@ Execution Engine: classic
 							"b" : [ ],
 							"c" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -1928,8 +1883,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -1956,8 +1910,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -2053,8 +2006,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -2150,8 +2102,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -2208,8 +2159,7 @@ Execution Engine: classic
 						"transformBy" : {
 							"_id" : 0,
 							"a" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -2231,8 +2181,7 @@ Execution Engine: classic
 						"multiKeyPaths" : {
 							"a" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -2306,8 +2255,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -2339,8 +2287,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"c" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -2350,8 +2297,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "backward",
@@ -2384,8 +2330,7 @@ Execution Engine: classic
 								]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						}
 					]
 				],
@@ -2396,8 +2341,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -2424,8 +2368,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -2498,8 +2441,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "backward",
@@ -2531,8 +2473,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"c" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -2542,8 +2483,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "backward",
@@ -2577,8 +2517,7 @@ Execution Engine: classic
 									"d"
 								]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -2589,8 +2528,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "backward",
@@ -2617,8 +2555,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -2858,8 +2795,7 @@ Execution Engine: classic
 						"transformBy" : {
 							"_id" : 0,
 							"a" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -2881,8 +2817,7 @@ Execution Engine: classic
 						"multiKeyPaths" : {
 							"a" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -2953,8 +2888,7 @@ Execution Engine: classic
 							"a" : 1,
 							"b" : 1,
 							"c" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -2986,8 +2920,7 @@ Execution Engine: classic
 							"b" : [ ],
 							"c" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -3076,8 +3009,7 @@ Execution Engine: classic
 						"multiKeyPaths" : {
 							"a" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -3160,8 +3092,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -3189,8 +3120,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -3199,8 +3129,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -3228,8 +3157,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -3238,8 +3166,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -3267,8 +3194,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -3277,8 +3203,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -3311,8 +3236,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"c" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -3321,8 +3245,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -3357,8 +3280,7 @@ Execution Engine: classic
 									"d"
 								]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -3367,12 +3289,10 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
-							"stage" : "OR",
-							"usedJoinOptimization" : false
+							"stage" : "OR"
 						},
 						{
 							"direction" : "forward",
@@ -3398,8 +3318,7 @@ Execution Engine: classic
 								"b" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						},
 						{
 							"direction" : "forward",
@@ -3420,8 +3339,7 @@ Execution Engine: classic
 								"a" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						}
 					],
 					[
@@ -3430,12 +3348,10 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
-							"stage" : "OR",
-							"usedJoinOptimization" : false
+							"stage" : "OR"
 						},
 						{
 							"direction" : "forward",
@@ -3461,8 +3377,7 @@ Execution Engine: classic
 								"b" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						},
 						{
 							"direction" : "forward",
@@ -3483,8 +3398,7 @@ Execution Engine: classic
 								"a" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						}
 					],
 					[
@@ -3493,12 +3407,10 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
-							"stage" : "OR",
-							"usedJoinOptimization" : false
+							"stage" : "OR"
 						},
 						{
 							"direction" : "forward",
@@ -3524,8 +3436,7 @@ Execution Engine: classic
 								"b" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						},
 						{
 							"direction" : "forward",
@@ -3546,8 +3457,7 @@ Execution Engine: classic
 								"a" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						}
 					],
 					[
@@ -3556,12 +3466,10 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
-							"stage" : "OR",
-							"usedJoinOptimization" : false
+							"stage" : "OR"
 						},
 						{
 							"direction" : "forward",
@@ -3592,8 +3500,7 @@ Execution Engine: classic
 								"c" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						},
 						{
 							"direction" : "forward",
@@ -3614,8 +3521,7 @@ Execution Engine: classic
 								"a" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						}
 					]
 				],
@@ -3625,8 +3531,7 @@ Execution Engine: classic
 						"transformBy" : {
 							"_id" : 0,
 							"a" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -3649,8 +3554,7 @@ Execution Engine: classic
 						"multiKeyPaths" : {
 							"a" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -4060,8 +3964,7 @@ Execution Engine: classic
 								"_id" : 0,
 								"a" : 1,
 								"b" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -4087,8 +3990,7 @@ Execution Engine: classic
 								"b" : [ ]
 							},
 							"nss" : "test.distinct_aggregation_multiplanning_md-2",
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						}
 					]
 				],
@@ -4099,8 +4001,7 @@ Execution Engine: classic
 							"_id" : 0,
 							"a" : 1,
 							"b" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -4127,8 +4028,7 @@ Execution Engine: classic
 							"a" : [ ],
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -4212,8 +4112,7 @@ Execution Engine: sbe
 					"_id" : 0,
 					"a" : 1,
 					"b" : 1
-				},
-				"usedJoinOptimization" : false
+				}
 			},
 			{
 				"direction" : "forward",
@@ -4240,8 +4139,7 @@ Execution Engine: sbe
 					"a" : [ ],
 					"b" : [ ]
 				},
-				"stage" : "DISTINCT_SCAN",
-				"usedJoinOptimization" : false
+				"stage" : "DISTINCT_SCAN"
 			}
 		]
 	],
@@ -4349,13 +4247,11 @@ Execution Engine: sbe
 					"a" : 1,
 					"b" : 1,
 					"c" : 1
-				},
-				"usedJoinOptimization" : false
+				}
 			},
 			{
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "FETCH",
-				"usedJoinOptimization" : false
+				"stage" : "FETCH"
 			},
 			{
 				"direction" : "forward",
@@ -4381,8 +4277,7 @@ Execution Engine: sbe
 					"b" : [ ]
 				},
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			}
 		],
 		[
@@ -4393,13 +4288,11 @@ Execution Engine: sbe
 					"a" : 1,
 					"b" : 1,
 					"c" : 1
-				},
-				"usedJoinOptimization" : false
+				}
 			},
 			{
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "FETCH",
-				"usedJoinOptimization" : false
+				"stage" : "FETCH"
 			},
 			{
 				"direction" : "forward",
@@ -4432,8 +4325,7 @@ Execution Engine: sbe
 					]
 				},
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			}
 		]
 	],
@@ -4545,13 +4437,11 @@ Execution Engine: sbe
 					"a" : 1,
 					"b" : 1,
 					"c" : 1
-				},
-				"usedJoinOptimization" : false
+				}
 			},
 			{
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "FETCH",
-				"usedJoinOptimization" : false
+				"stage" : "FETCH"
 			},
 			{
 				"direction" : "forward",
@@ -4577,8 +4467,7 @@ Execution Engine: sbe
 					"b" : [ ]
 				},
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			}
 		],
 		[
@@ -4589,13 +4478,11 @@ Execution Engine: sbe
 					"a" : 1,
 					"b" : 1,
 					"c" : 1
-				},
-				"usedJoinOptimization" : false
+				}
 			},
 			{
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "FETCH",
-				"usedJoinOptimization" : false
+				"stage" : "FETCH"
 			},
 			{
 				"direction" : "forward",
@@ -4628,8 +4515,7 @@ Execution Engine: sbe
 					]
 				},
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			}
 		]
 	],
@@ -4736,13 +4622,11 @@ Execution Engine: sbe
 					"_id" : 0,
 					"a" : 1,
 					"b" : 1
-				},
-				"usedJoinOptimization" : false
+				}
 			},
 			{
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "FETCH",
-				"usedJoinOptimization" : false
+				"stage" : "FETCH"
 			},
 			{
 				"direction" : "forward",
@@ -4775,8 +4659,7 @@ Execution Engine: sbe
 					"c" : [ ]
 				},
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			}
 		],
 		[
@@ -4786,13 +4669,11 @@ Execution Engine: sbe
 					"_id" : 0,
 					"a" : 1,
 					"b" : 1
-				},
-				"usedJoinOptimization" : false
+				}
 			},
 			{
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "FETCH",
-				"usedJoinOptimization" : false
+				"stage" : "FETCH"
 			},
 			{
 				"direction" : "forward",
@@ -4827,8 +4708,7 @@ Execution Engine: sbe
 					]
 				},
 				"nss" : "test.distinct_aggregation_multiplanning_md",
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			}
 		]
 	],
@@ -5046,8 +4926,7 @@ Execution Engine: classic
 						"multiKeyPaths" : {
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -5129,8 +5008,7 @@ Execution Engine: classic
 						"multiKeyPaths" : {
 							"b" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -5198,8 +5076,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -5236,8 +5113,7 @@ Execution Engine: classic
 								"c" : [ ],
 								"d" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -5246,8 +5122,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -5279,8 +5154,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"c" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -5289,8 +5163,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -5317,8 +5190,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
@@ -5327,8 +5199,7 @@ Execution Engine: classic
 							"transformBy" : {
 								"_id" : 0,
 								"a" : 1
-							},
-							"usedJoinOptimization" : false
+							}
 						},
 						{
 							"direction" : "forward",
@@ -5370,8 +5241,7 @@ Execution Engine: classic
 								"d" : [ ],
 								"e" : [ ]
 							},
-							"stage" : "DISTINCT_SCAN",
-							"usedJoinOptimization" : false
+							"stage" : "DISTINCT_SCAN"
 						}
 					]
 				],
@@ -5381,8 +5251,7 @@ Execution Engine: classic
 						"transformBy" : {
 							"_id" : 0,
 							"a" : 1
-						},
-						"usedJoinOptimization" : false
+						}
 					},
 					{
 						"direction" : "forward",
@@ -5404,8 +5273,7 @@ Execution Engine: classic
 						"multiKeyPaths" : {
 							"a" : [ ]
 						},
-						"stage" : "DISTINCT_SCAN",
-						"usedJoinOptimization" : false
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}

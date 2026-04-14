@@ -138,7 +138,6 @@ Creating Index
 ```json
 {
 	"isCached" : true,
-	"usedJoinOptimization" : false,
 	"stage" : "FETCH",
 	"filter" : {
 		"_id" : {
@@ -147,7 +146,6 @@ Creating Index
 	},
 	"nss" : "test.cached_partial_index_plan_not_reused_for_ineligible_query_md",
 	"inputStage" : {
-		"usedJoinOptimization" : false,
 		"stage" : "IXSCAN",
 		"nss" : "test.cached_partial_index_plan_not_reused_for_ineligible_query_md",
 		"keyPattern" : {
@@ -203,11 +201,9 @@ Verifying that the plan cache contains an entry with the partial index
 				"multiKeyPaths" : {
 					"a" : [ ]
 				},
-				"stage" : "IXSCAN",
-				"usedJoinOptimization" : false
+				"stage" : "IXSCAN"
 			},
-			"stage" : "FETCH",
-			"usedJoinOptimization" : false
+			"stage" : "FETCH"
 		},
 		"createdFromQuery" : {
 			"projection" : { },
@@ -469,11 +465,9 @@ Verifying that the plan cache contains an entry with the partial index
 								"keyPattern" : {
 									"_id" : 1
 								},
-								"stage" : "IXSCAN",
-								"usedJoinOptimization" : false
+								"stage" : "IXSCAN"
 							},
-							"stage" : "FETCH",
-							"usedJoinOptimization" : false
+							"stage" : "FETCH"
 						},
 						{
 							"direction" : "forward",
@@ -494,23 +488,19 @@ Verifying that the plan cache contains an entry with the partial index
 							"multiKeyPaths" : {
 								"a" : [ ]
 							},
-							"stage" : "IXSCAN",
-							"usedJoinOptimization" : false
+							"stage" : "IXSCAN"
 						}
 					],
-					"stage" : "OR",
-					"usedJoinOptimization" : false
+					"stage" : "OR"
 				},
-				"stage" : "FETCH",
-				"usedJoinOptimization" : false
+				"stage" : "FETCH"
 			},
 			"memLimit" : 104857600,
 			"sortPattern" : {
 				"b" : 1
 			},
 			"stage" : "SORT",
-			"type" : "simple",
-			"usedJoinOptimization" : false
+			"type" : "simple"
 		},
 		"createdFromQuery" : {
 			"projection" : { },

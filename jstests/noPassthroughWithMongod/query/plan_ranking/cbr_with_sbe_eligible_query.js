@@ -1,6 +1,12 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
-import {checkSbeStatus, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeStatus, kSbeDisabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+
+// TODO SERVER-117707 remove this check once CBR supports lowering to SBE.
+if (isDeferredGetExecutorEnabled(db)) {
+    jsTest.log.info("Exiting early as deferred engine selection is not supported yet");
+    quit();
+}
 
 const collName = jsTestName();
 const coll = db[collName];
