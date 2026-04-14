@@ -17,7 +17,6 @@ selector:
     - jstests/core/**/currentop.js # uses fsync.
     - jstests/core/**/dbhash.js # dbhash.
     - jstests/core/**/fsync.js # uses fsync.
-    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/queryoptimizera.js # "local" database.
     - jstests/core/**/startup_log.js # "local" database.
@@ -31,7 +30,7 @@ selector:
     - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
     - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
     - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
-    # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
+    # TODO SERVER-103278: Remove after fixing. executionStats.nReturned is incorrect for sharded distinct commands.
     - jstests/core/**/distinct_index1.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
@@ -200,7 +199,6 @@ selector:
     # txn interrupted by command outside of txn before getMore runs.
     - jstests/core/**/commands_namespace_parsing.js
     - jstests/core/ddl/drop_collection_cursors.js
-    - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js
     - jstests/core/**/query/kill_cursors.js
