@@ -1496,10 +1496,63 @@
 		"c_comment" : "slyly regular packages haggle carefully ironic ideas. courts are furiously. furiously unusual theodolites cajole. i"
 	}
 ]
+},
+
+{">>>command": {"idx":"12","aggregate":"orders","pipeline":[
+{"$lookup":{"from":"lineitem","as":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","pipeline":[
+{"$match":{"$and":[{"$expr":{"$in":["$l_shipmode",["MAIL","SHIP"]]}},{"$expr":{"$lt":["$l_commitdate","$l_receiptdate"]}},{"$expr":{"$lt":["$l_shipdate","$l_commitdate"]}},{"$expr":{"$gte":["$l_receiptdate","1994-01-01T00:00:00.000Z"]}},{"$expr":{"$lt":["$l_receiptdate",{"$dateAdd":{"startDate":"1994-01-01T00:00:00.000Z","unit":"year","amount":1}}]}}]}}]}},
+{"$unwind":"$lineitem"},
+{"$group":{"_id":"$lineitem.l_shipmode","high_line_count":{"$sum":{"$cond":{"if":{"$or":[{"$eq":["$o_orderpriority","1-URGENT"]},{"$eq":["$o_orderpriority","2-HIGH"]}]},"then":1,"else":0}}},"low_line_count":{"$sum":{"$cond":{"if":{"$and":[{"$ne":["$o_orderpriority","1-URGENT"]},{"$ne":["$o_orderpriority","2-HIGH"]}]},"then":1,"else":0}}}}},
+{"$project":{"_id":0,"l_shipmode":"$_id","high_line_count":1,"low_line_count":1}},
+{"$sort":{"l_shipmode":1}}]},
+    "winningPlan": [
+"HJ l_orderkey = o_orderkey",
+"  -> [lineitem] FETCH: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$lt':['$l_commitdate','$l_receiptdate']}},{'$expr':{'$lt':['$l_shipdate','$l_commitdate']}},{'$expr':{'$in':['$l_shipmode',{'$const':['MAIL','SHIP']}]}},{'$expr':{'$gte':['$l_receiptdate',{'$const':'1994-01-01T00:00:00.000Z'}]}},{'$expr':{'$lt':['$l_receiptdate',{'$const':'1995-01-01T00:00:00.000Z'}]}},{'l_shipmode':{'$in':['MAIL','SHIP']}}]} ",
+"      -> IXSCAN: plan_stability_tpch_official.lineitem l_receiptdate_1 {'l_receiptdate':['[new Date(757382400000), new Date(788918400000))']}",
+"  -> [none] PROJECTION_SIMPLE",
+"      -> COLLSCAN: plan_stability_tpch_official.orders ",
+"$group",
+"$project",
+"$sort"],
+    "keys" :     92050,
+    "docs" :    242050,
+    "result" :
+[
+	{
+		"high_line_count" : 620,
+		"low_line_count" : 943,
+		"l_shipmode" : "SHIP"
+	},
+	{
+		"high_line_count" : 647,
+		"low_line_count" : 945,
+		"l_shipmode" : "MAIL"
+	}
+]
+},
+
+{">>>command": {"idx":"14","aggregate":"lineitem","pipeline":[
+{"$match":{"$and":[{"$expr":{"$gte":["$l_shipdate","1995-09-01T00:00:00.000Z"]}},{"$expr":{"$lt":["$l_shipdate",{"$dateAdd":{"startDate":"1995-09-01T00:00:00.000Z","unit":"month","amount":1}}]}}]}},
+{"$lookup":{"from":"part","as":"part","localField":"l_partkey","foreignField":"p_partkey"}},
+{"$unwind":"$part"},
+{"$group":{"_id":{},"promo_price_total":{"$sum":{"$cond":{"if":{"$cond":{"if":{"$regexMatch":{"input":"$part.p_type","regex":"^PROMO.*$","options":"si"}},"then":1,"else":0}},"then":{"$multiply":["$l_extendedprice",{"$subtract":[1,"$l_discount"]}]},"else":0}}},"price_total":{"$sum":{"$multiply":["$l_extendedprice",{"$subtract":[1,"$l_discount"]}]}}}},
+{"$project":{"_id":0,"promo_revenue":{"$multiply":[100,{"$divide":["$promo_price_total","$price_total"]}]}}}]},
+    "winningPlan": [
+"HJ l_partkey = p_partkey",
+"  -> [none] PROJECTION_SIMPLE",
+"      -> FETCH: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$gte':['$l_shipdate',{'$const':'1995-09-01T00:00:00.000Z'}]}},{'$expr':{'$lt':['$l_shipdate',{'$const':'1995-10-01T00:00:00.000Z'}]}}]} ",
+"          -> IXSCAN: plan_stability_tpch_official.lineitem l_shipdate_1 {'l_shipdate':['[new Date(809913600000), new Date(812505600000))']}",
+"  -> [part] COLLSCAN: plan_stability_tpch_official.part ",
+"$group",
+"$project"],
+    "keys" :      7630,
+    "docs" :     27630,
+    "result" :
+[ { "promo_revenue" : 16.28385568900598 } ]
 }
 
 ],
-">>>totals": {"commands": 7, "keys":   1422713, "docs":   3408017, "rows":       220}
+">>>totals": {"commands": 9, "keys":   1522393, "docs":   3677697, "rows":       223}
 }
 
 

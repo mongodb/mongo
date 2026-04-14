@@ -649,4 +649,174 @@ export const commands = [
             {"$limit": 20},
         ],
     },
+
+    {
+        "idx": "12",
+        "aggregate": "orders",
+        "pipeline": [
+            {
+                "$lookup": {
+                    "from": "lineitem",
+                    "as": "lineitem",
+                    "localField": "o_orderkey",
+                    "foreignField": "l_orderkey",
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$and": [
+                                    {"$expr": {"$in": ["$l_shipmode", ["MAIL", "SHIP"]]}},
+                                    {"$expr": {"$lt": ["$l_commitdate", "$l_receiptdate"]}},
+                                    {"$expr": {"$lt": ["$l_shipdate", "$l_commitdate"]}},
+                                    {
+                                        "$expr": {
+                                            "$gte": ["$l_receiptdate", new ISODate("1994-01-01")],
+                                        },
+                                    },
+                                    {
+                                        "$expr": {
+                                            "$lt": [
+                                                "$l_receiptdate",
+                                                {
+                                                    "$dateAdd": {
+                                                        "startDate": new ISODate("1994-01-01"),
+                                                        "unit": "year",
+                                                        "amount": 1,
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            },
+            {"$unwind": "$lineitem"},
+            {
+                "$group": {
+                    "_id": "$lineitem.l_shipmode",
+                    "high_line_count": {
+                        "$sum": {
+                            "$cond": {
+                                "if": {
+                                    "$or": [
+                                        {
+                                            "$eq": ["$o_orderpriority", "1-URGENT"],
+                                        },
+                                        {"$eq": ["$o_orderpriority", "2-HIGH"]},
+                                    ],
+                                },
+                                "then": 1,
+                                "else": 0,
+                            },
+                        },
+                    },
+                    "low_line_count": {
+                        "$sum": {
+                            "$cond": {
+                                "if": {
+                                    "$and": [
+                                        {
+                                            "$ne": ["$o_orderpriority", "1-URGENT"],
+                                        },
+                                        {"$ne": ["$o_orderpriority", "2-HIGH"]},
+                                    ],
+                                },
+                                "then": 1,
+                                "else": 0,
+                            },
+                        },
+                    },
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "l_shipmode": "$_id",
+                    "high_line_count": 1,
+                    "low_line_count": 1,
+                },
+            },
+            {"$sort": {"l_shipmode": 1}},
+        ],
+    },
+
+    {
+        "idx": "14",
+        "aggregate": "lineitem",
+        "pipeline": [
+            {
+                "$match": {
+                    "$and": [
+                        {"$expr": {"$gte": ["$l_shipdate", new ISODate("1995-09-01")]}},
+                        {
+                            "$expr": {
+                                "$lt": [
+                                    "$l_shipdate",
+                                    {
+                                        "$dateAdd": {
+                                            "startDate": new ISODate("1995-09-01"),
+                                            "unit": "month",
+                                            "amount": 1,
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                "$lookup": {
+                    "from": "part",
+                    "as": "part",
+                    "localField": "l_partkey",
+                    "foreignField": "p_partkey",
+                },
+            },
+            {"$unwind": "$part"},
+            {
+                "$group": {
+                    "_id": {},
+                    "promo_price_total": {
+                        "$sum": {
+                            "$cond": {
+                                "if": {
+                                    "$cond": {
+                                        "if": {
+                                            "$regexMatch": {
+                                                "input": "$part.p_type",
+                                                "regex": "^PROMO.*$",
+                                                "options": "si",
+                                            },
+                                        },
+                                        "then": 1,
+                                        "else": 0,
+                                    },
+                                },
+                                "then": {
+                                    "$multiply": ["$l_extendedprice", {"$subtract": [1, "$l_discount"]}],
+                                },
+                                "else": 0,
+                            },
+                        },
+                    },
+                    "price_total": {
+                        "$sum": {
+                            "$multiply": ["$l_extendedprice", {"$subtract": [1, "$l_discount"]}],
+                        },
+                    },
+                },
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "promo_revenue": {
+                        "$multiply": [100.0, {"$divide": ["$promo_price_total", "$price_total"]}],
+                    },
+                },
+            },
+        ],
+    },
 ];
