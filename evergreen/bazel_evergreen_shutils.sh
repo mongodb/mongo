@@ -136,10 +136,13 @@ bazel_evergreen_shutils::maybe_release_flag() {
 # Timeout helper: returns a "timeout <secs>" prefix or empty string.
 # Prints a one-time warning to stderr if a timeout was requested but no
 # timeout binary is available. Supports macOS 'gtimeout' if installed.
+# SIGQUIT triggers Bazel/Bazelisk diagnostics but does not reliably stop the
+# full process tree, so follow it with a short kill-after window.
 bazel_evergreen_shutils::timeout_prefix() {
     local fallback_remote="${1:-}" # "on" = use 3600s default for remote builds
     local need_timeout=""          # "explicit" | "fallback" | ""
     local timeout_bin=""
+    local timeout_kill_after_seconds="${BAZEL_EVG_TIMEOUT_KILL_AFTER_SECONDS:-15}"
 
     # Do we want a timeout?
     if [[ -n "${build_timeout_seconds:-}" ]]; then
@@ -176,15 +179,37 @@ bazel_evergreen_shutils::timeout_prefix() {
     # Produce the prefix if we have a binary
     if [[ -n "$timeout_bin" ]]; then
         if [[ "$need_timeout" == "explicit" ]]; then
-            echo "$timeout_bin -s QUIT ${build_timeout_seconds}"
+            echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s ${build_timeout_seconds}"
         elif [[ "$need_timeout" == "fallback" ]]; then
-            echo "$timeout_bin -s QUIT 3600"
+            echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s 3600"
         else
             echo ""
         fi
     else
         echo ""
     fi
+}
+
+bazel_evergreen_shutils::is_timeout_exit_code() {
+    local ret="$1"
+    local timeout_str="${2:-}"
+    local timeout_duration="${3:-}"
+    local attempt_elapsed_seconds="${4:-0}"
+
+    if [[ "$ret" -eq 124 ]]; then
+        return 0
+    fi
+
+    # GNU timeout returns 137 when -k escalates from SIGQUIT to SIGKILL.
+    if [[ -n "$timeout_str" &&
+        "$timeout_str" == *" -k "* &&
+        -n "$timeout_duration" &&
+        "$ret" -eq 137 &&
+        "$attempt_elapsed_seconds" -ge "$timeout_duration" ]]; then
+        return 0
+    fi
+
+    return 1
 }
 
 # --- Bazel server lifecycle & OOM-detect retry -----------------------------
@@ -358,6 +383,40 @@ bazel_evergreen_shutils::request_bazel_jvm_dump() {
     sleep 5
 }
 
+bazel_evergreen_shutils::terminate_bazel_servers() {
+    local pid
+    local -a bazel_server_pids=()
+    local -a stubborn_pids=()
+
+    while IFS= read -r pid; do
+        [[ "$pid" =~ ^[0-9]+$ ]] || continue
+        bazel_server_pids+=("$pid")
+    done < <(bazel_evergreen_shutils::fast_bazel_server_pids || true)
+
+    if [[ ${#bazel_server_pids[@]} -eq 0 ]]; then
+        echo "No bazel server processes found to terminate." >&2
+        return 0
+    fi
+
+    echo "Stopping bazel server processes: ${bazel_server_pids[*]}" >&2
+    kill -TERM "${bazel_server_pids[@]}" 2>/dev/null || true
+    sleep 5
+
+    for pid in "${bazel_server_pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            stubborn_pids+=("$pid")
+        fi
+    done
+
+    if [[ ${#stubborn_pids[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    echo "Force killing bazel server processes: ${stubborn_pids[*]}" >&2
+    kill -KILL "${stubborn_pids[@]}" 2>/dev/null || true
+    sleep 1
+}
+
 bazel_evergreen_shutils::bazel_jvm_out_snapshot_dir() {
     echo "bazel_jvm_outs"
 }
@@ -526,7 +585,7 @@ bazel_evergreen_shutils::write_last_engflow_link() {
 #   $3: bazel binary
 #   $4..: full bazel subcommand + args (e.g. "build --verbose_failures ...")
 # Special handling:
-#   - exit 124 -> timeout
+#   - exit 124/137 -> timeout
 #   - server death (pid missing) -> restart, then retry
 # Returns with global RET set.
 bazel_evergreen_shutils::retry_bazel_cmd() {
@@ -536,6 +595,10 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
     shift
 
     local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "${evergreen_remote_exec:-}")"
+    local timeout_duration=""
+    if [[ -n "$timeout_str" ]]; then
+        timeout_duration=$(echo "$timeout_str" | awk '{print $NF}')
+    fi
 
     # Get command log path for usage afterwards
     # Use the selected Bazel binary so PPC/s390x don't fall back to a different
@@ -595,8 +658,6 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             # Start a background monitor to run jstack 5 seconds before the timeout will expire.
             # This is useful information for debugging a rare hang in bazel where the build gets
             # stuck.
-            local timeout_duration
-            timeout_duration=$(echo "$timeout_str" | awk '{print $NF}')
             if [[ $timeout_duration -gt 5 ]]; then
                 set -m # Enable job control to create a process group
                 (
@@ -610,6 +671,9 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
         # Run it.
         # NOTE: We *do not* add any redirections here; caller controls logging completely.
+        local attempt_start_epoch
+        local attempt_elapsed_seconds=0
+        attempt_start_epoch=$(date +%s)
         if eval $env "$cmd"; then
             RET=0
             # Kill the jstack dumper if still running
@@ -620,6 +684,7 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             break
         else
             RET=$?
+            attempt_elapsed_seconds=$(($(date +%s) - attempt_start_epoch))
             # Kill the jstack dumper if still running
             if [[ -n "$jstack_dumper_pid" ]]; then
                 kill -- -$jstack_dumper_pid 2>/dev/null || true
@@ -627,17 +692,21 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             fi
         fi
 
-        if ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
+        if bazel_evergreen_shutils::is_timeout_exit_code "$RET" "$timeout_str" "$timeout_duration" "$attempt_elapsed_seconds"; then
+            if [[ $RET -eq 137 ]]; then
+                echo "Bazel timed out and was force-killed after SIGQUIT." >&2
+            else
+                echo "Bazel timed out." >&2
+                bazel_evergreen_shutils::request_bazel_jvm_dump "$BAZEL_BINARY" || true
+            fi
+            bazel_evergreen_shutils::capture_bazel_jvm_out "$BAZEL_BINARY" "$attempt_bazel_server_pid" >/dev/null || true
+            bazel_evergreen_shutils::terminate_bazel_servers || true
+        elif ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
             echo "[retry ${i}] Bazel server down (OOM/killed). Enabling OOM guard for next attempt and restarting…" >&2
             use_oom_guard=true
             "$BAZEL_BINARY" shutdown || true
             "$BAZEL_BINARY" info >/dev/null 2>&1 || true
             bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
-        elif [[ $RET -eq 124 ]]; then
-            echo "Bazel timed out." >&2
-            bazel_evergreen_shutils::request_bazel_jvm_dump "$BAZEL_BINARY" || true
-            bazel_evergreen_shutils::capture_bazel_jvm_out "$BAZEL_BINARY" "$attempt_bazel_server_pid" >/dev/null || true
-            "$BAZEL_BINARY" shutdown || true
         else
             if [[ ${RETRY_ON_FAIL:-0} -eq 1 ]]; then
                 echo "Bazel failed (exit=$RET); restarting server before retry..." >&2
