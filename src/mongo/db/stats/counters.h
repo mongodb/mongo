@@ -76,8 +76,14 @@ public:
     void gotQuery() {
         _query->fetchAndAddRelaxed(1);
     }
+    void gotUpdates(int n) {
+        _update->fetchAndAddRelaxed(n);
+    }
     void gotUpdate() {
         _update->fetchAndAddRelaxed(1);
+    }
+    void gotDeletes(int n) {
+        _delete->fetchAndAddRelaxed(n);
     }
     void gotDelete() {
         _delete->fetchAndAddRelaxed(1);

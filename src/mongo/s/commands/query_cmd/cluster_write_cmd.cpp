@@ -725,15 +725,11 @@ bool cluster_write_cmd::runImpl(OperationContext* opCtx,
     auto& debug = CurOp::get(opCtx)->debug();
     switch (batchedRequest.getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
-            for (size_t i = 0; i < numAttempts; ++i) {
-                globalOpCounters().gotInsert();
-            }
+            globalOpCounters().gotInserts(numAttempts);
             debug.getAdditiveMetrics().ninserted = response.getN();
             break;
         case BatchedCommandRequest::BatchType_Update:
-            for (size_t i = 0; i < numAttempts; ++i) {
-                globalOpCounters().gotUpdate();
-            }
+            globalOpCounters().gotUpdates(numAttempts);
 
             // The response.getN() count is the sum of documents matched and upserted.
             if (response.isUpsertDetailsSet()) {
@@ -755,9 +751,7 @@ bool cluster_write_cmd::runImpl(OperationContext* opCtx,
             }
             break;
         case BatchedCommandRequest::BatchType_Delete:
-            for (size_t i = 0; i < numAttempts; ++i) {
-                globalOpCounters().gotDelete();
-            }
+            globalOpCounters().gotDeletes(numAttempts);
             debug.getAdditiveMetrics().ndeleted = response.getN();
             break;
     }
