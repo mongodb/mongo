@@ -63,18 +63,20 @@ CollectionType fetchCollection(OperationContext* opCtx, const NamespaceString& n
 std::vector<ChunkType> fetchOwnedChunks(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const CollectionType& coll) {
-    // TODO (SERVER-121707): Fetch only owned chunks or owned in the past (history).
-
+    auto shardId = ShardingState::get(opCtx)->shardId();
     auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto chunksStatus =
-        catalogClient->getChunks(opCtx,
-                                 BSON(ChunkType::collectionUUID() << coll.getUuid()),
-                                 BSON(ChunkType::min() << 1) /* sort */,
-                                 boost::none,
-                                 nullptr,
-                                 coll.getEpoch(),
-                                 coll.getTimestamp(),
-                                 repl::ReadConcernLevel::kSnapshotReadConcern);
+    auto chunksStatus = catalogClient->getChunks(
+        opCtx,
+        BSON(ChunkType::collectionUUID()
+             << coll.getUuid() << "$or"
+             << BSON_ARRAY(BSON(ChunkType::shard(shardId.toString()))
+                           << BSON("history.shard" << shardId.toString()))),
+        BSON(ChunkType::min() << 1) /* sort */,
+        boost::none,
+        nullptr,
+        coll.getEpoch(),
+        coll.getTimestamp(),
+        repl::ReadConcernLevel::kSnapshotReadConcern);
     uassertStatusOK(chunksStatus.getStatus());
 
     return chunksStatus.getValue();
@@ -215,8 +217,6 @@ void updateShardCatalogCache(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const CollectionType& coll,
                              const std::vector<ChunkType>& chunks) {
-    // TODO (SERVER-121707): Make collection metadata support unowned gaps.
-
     auto thisShardId = ShardingState::get(opCtx)->shardId();
     auto rt = [&] {
         auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
@@ -227,18 +227,18 @@ void updateShardCatalogCache(OperationContext* opCtx,
             return nullptr;
         }();
 
-        return RoutingTableHistory::makeNew(nss,
-                                            coll.getUuid(),
-                                            coll.getKeyPattern(),
-                                            coll.getUnsplittable().value_or(false),
-                                            std::move(defaultCollator),
-                                            coll.getUnique(),
-                                            coll.getEpoch(),
-                                            coll.getTimestamp(),
-                                            coll.getTimeseriesFields(),
-                                            coll.getReshardingFields(),
-                                            coll.getAllowMigrations(),
-                                            chunks);
+        return RoutingTableHistory::makeNewAllowingGaps(nss,
+                                                        coll.getUuid(),
+                                                        coll.getKeyPattern(),
+                                                        coll.getUnsplittable().value_or(false),
+                                                        std::move(defaultCollator),
+                                                        coll.getUnique(),
+                                                        coll.getEpoch(),
+                                                        coll.getTimestamp(),
+                                                        coll.getTimeseriesFields(),
+                                                        coll.getReshardingFields(),
+                                                        coll.getAllowMigrations(),
+                                                        chunks);
     }();
 
     auto version = rt.getVersion();

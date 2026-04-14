@@ -28,7 +28,8 @@ describe("Authoritative collection metadata vs DDLs", function () {
     }
 
     function getGlobalCatalogChunks(uuid, shardId) {
-        return st.s.getDB("config").chunks.find({uuid: uuid, shard: shardId}).sort({min: 1}).toArray();
+        const query = {uuid: uuid, $or: [{shard: shardId}, {"history.shard": shardId}]};
+        return st.s.getDB("config").chunks.find(query).sort({min: 1}).toArray();
     }
 
     function getAllGlobalCatalogChunks(uuid) {
@@ -176,9 +177,6 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             st.awaitReplicationOnShards();
 
-            // TODO (SERVER-121707): Re-factor the following checks once refineCollectionShardKey
-            // only fetches owned chunks.
-
             [
                 {rs: st.rs0, shardName: st.shard0.shardName},
                 {rs: st.rs1, shardName: st.shard1.shardName},
@@ -194,7 +192,7 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     assertShardCatalogOnNode(node, ns, {
                         expectedUuid: globalMeta.uuid,
                         expectedKey: refinedKey,
-                        expectedChunks: allGlobalChunks,
+                        expectedChunks: shardGlobalChunks,
                     });
                 });
             });
@@ -221,9 +219,6 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db2.adminCommand({refineCollectionShardKey: ns2, key: {x: 1, y: 1}}));
 
             st.awaitReplicationOnShards();
-
-            // TODO (SERVER-121707): Re-factor the following checks once refineCollectionShardKey
-            // only fetches owned chunks.
 
             // Verify shard catalog == global catalog after first refine (2 chunks, key {x, y}).
             {
