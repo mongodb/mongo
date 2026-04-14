@@ -738,7 +738,19 @@ public:
         boost::optional<ChunkVersion> targetCollectionPlacementVersion,
         const NamespaceString& outputNs) const = 0;
 
-    std::shared_ptr<executor::TaskExecutor> taskExecutor;
+    /**
+     * Returns the task executor for this process.
+     *
+     * @param withNullCheck If true (the default), throws a UserException if the task executor
+     * has not been initialized. If false, may return a null shared_ptr. Only pass false if the
+     * caller or downstream component can tolerate an uninitialized executor.
+     */
+    std::shared_ptr<executor::TaskExecutor> getTaskExecutor(bool withNullCheck = true) const {
+        if (withNullCheck) {
+            uassert(11434200, "Task executor is not initialized", taskExecutor);
+        }
+        return taskExecutor;
+    }
 
     /**
      * Creates a spill table.
@@ -779,6 +791,12 @@ public:
      */
     virtual void truncateSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     SpillTable& spillTable) const = 0;
+
+private:
+    /**
+     * The task executor for this process. May be null on standalone mongod nodes.
+     */
+    std::shared_ptr<executor::TaskExecutor> taskExecutor;
 };
 
 }  // namespace mongo

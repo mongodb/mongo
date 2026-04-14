@@ -179,12 +179,13 @@ std::vector<RemoteCursor> ChangeStreamHandleTopologyChangeStage::establishShardC
         boost::none /* changeStreamVersion */);
 
     const bool allowPartialResults = false;  // partial results are not allowed
-    return establishCursors(opCtx,
-                            pExpCtx->getMongoProcessInterface()->taskExecutor,
-                            pExpCtx->getNamespaceString(),
-                            ReadPreferenceSetting::get(opCtx),
-                            {{newShard.getName(), cmdObj}},
-                            allowPartialResults);
+    return establishCursors(
+        opCtx,
+        pExpCtx->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
+        pExpCtx->getNamespaceString(),
+        ReadPreferenceSetting::get(opCtx),
+        {{newShard.getName(), cmdObj}},
+        allowPartialResults);
 }
 
 }  // namespace exec::agg

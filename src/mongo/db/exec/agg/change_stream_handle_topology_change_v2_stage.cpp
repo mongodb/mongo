@@ -155,12 +155,13 @@ public:
                     remotes.emplace_back(shardId, cmdObj);
                 }
 
-                return establishCursors(opCtx,
-                                        expCtx->getMongoProcessInterface()->taskExecutor,
-                                        expCtx->getNamespaceString(),
-                                        ReadPreferenceSetting::get(opCtx),
-                                        remotes,
-                                        false /* allowPartialResults */);
+                return establishCursors(
+                    opCtx,
+                    expCtx->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
+                    expCtx->getNamespaceString(),
+                    ReadPreferenceSetting::get(opCtx),
+                    remotes,
+                    false /* allowPartialResults */);
             });
 
         tassert(12013801,
@@ -212,12 +213,13 @@ public:
                 aggReq.setCursor(cursor);
                 setReadWriteConcern(opCtx, aggReq, true, !expCtx->getExplain());
 
-                return establishCursors(opCtx,
-                                        expCtx->getMongoProcessInterface()->taskExecutor,
-                                        aggReq.getNamespace(),
-                                        ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
-                                        {{shardId, aggReq.toBSON()}},
-                                        false /* allowPartialResults */);
+                return establishCursors(
+                    opCtx,
+                    expCtx->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
+                    aggReq.getNamespace(),
+                    ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
+                    {{shardId, aggReq.toBSON()}},
+                    false /* allowPartialResults */);
             });
 
         tassert(12013800,

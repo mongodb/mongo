@@ -475,7 +475,7 @@ std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume_inlock(
 }
 
 std::shared_ptr<executor::TaskExecutor> BackfillCoordinator::makeExecutor(OperationContext* opCtx) {
-    return MongoProcessInterface::create(opCtx)->taskExecutor;
+    return MongoProcessInterface::create(opCtx)->getTaskExecutor();
 }
 
 std::unique_ptr<async_rpc::Targeter> ShardedClusterBackfillCoordinator::makeTargeter(

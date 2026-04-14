@@ -265,7 +265,7 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimaryRaw(
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));
-    auto scheduleResult = taskExecutor->scheduleRemoteCommand(
+    auto scheduleResult = getTaskExecutor()->scheduleRemoteCommand(
         std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
     if (!scheduleResult.isOK()) {
         // Since the command failed to be scheduled, the callback above did not and will not run.

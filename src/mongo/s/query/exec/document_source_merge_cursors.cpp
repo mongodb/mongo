@@ -109,7 +109,7 @@ std::shared_ptr<BlockingResultsMerger>& DocumentSourceMergeCursors::populateMerg
     _blockingResultsMerger = std::make_shared<BlockingResultsMerger>(
         opCtx,
         std::move(*_armParams),
-        getExpCtx()->getMongoProcessInterface()->taskExecutor,
+        getExpCtx()->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
         // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code which
         // relies on this parameter does not distinguish/care about the difference so we simply
         // always pass 'aggregate'.
@@ -125,10 +125,10 @@ std::shared_ptr<BlockingResultsMerger>& DocumentSourceMergeCursors::populateMerg
 
 std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
     tassert(9535003, "Expected conversion to happen before execution", _armParams);
-    auto result =
-        std::make_unique<RouterStageMerge>(getExpCtx()->getOperationContext(),
-                                           getExpCtx()->getMongoProcessInterface()->taskExecutor,
-                                           std::move(*_armParams));
+    auto result = std::make_unique<RouterStageMerge>(
+        getExpCtx()->getOperationContext(),
+        getExpCtx()->getMongoProcessInterface()->getTaskExecutor(/* withNullCheck */ false),
+        std::move(*_armParams));
     _armParams = boost::none;
     _ownCursors = false;
     return result;
