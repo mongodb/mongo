@@ -4564,6 +4564,77 @@ TEST_F(PipelineOptimizationTest, DeeperComplexRenameNotPromotedWithoutProof) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+// After $set{a: 1}, "a" is known non-array. The rename {"a.b": "$c"} has left-side dots,
+// but since "a" is proven non-array, the match on "a.b" can be rewritten to "c" and pushed down.
+TEST_F(PipelineOptimizationTest, MatchSwapsPastLeftDottedRenameWhenNonArray) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    std::string inputPipe =
+        "["
+        " {$set: {a: 1}},"
+        " {$addFields: {'a.b': '$c'}},"
+        " {$match: {'a.b': 42}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$match: {c: {$eq: 42}}},"
+        " {$set: {a: {$const: 1}}},"
+        " {$addFields: {a: {b: '$c'}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$match: {c: {$eq: 42}}},"
+        " {$set: {a: {$const: 1}}},"
+        " {$addFields: {a: {b: '$c'}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// Both sides have dots: {"a.b": "$c.d"}. With proof that both "a" and "c" are non-array,
+// the match on "a.b" is rewritten to "c.d" and pushed down.
+TEST_F(PipelineOptimizationTest, MatchSwapsPastBothSidesDottedRenameWhenNonArray) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    std::string inputPipe =
+        "["
+        " {$set: {a: 1, c: 1}},"
+        " {$addFields: {'a.b': '$c.d'}},"
+        " {$match: {'a.b': 42}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$set: {a: {$const: 1}, c: {$const: 1}}},"
+        " {$match: {'c.d': {$eq: 42}}},"
+        " {$addFields: {a: {b: '$c.d'}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$set: {a: {$const: 1}, c: {$const: 1}}},"
+        " {$match: {'c.d': {$eq: 42}}},"
+        " {$addFields: {a: {b: '$c.d'}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// Without proof that "a" is non-array, $match should NOT push past left-dotted rename.
+TEST_F(PipelineOptimizationTest, LeftDottedRenameNotPromotedWithoutProof) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    std::string inputPipe =
+        "["
+        " {$addFields: {'a.b': '$c'}},"
+        " {$match: {'a.b': 42}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$addFields: {a: {b: '$c'}}},"
+        " {$match: {'a.b': {$eq: 42}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$addFields: {a: {b: '$c'}}},"
+        " {$match: {'a.b': 42}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 // Without proof that 'b' is not an array, $match should NOT push past complex rename.
 TEST_F(PipelineOptimizationTest, ComplexRenameNotPromotedWithoutProof) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
