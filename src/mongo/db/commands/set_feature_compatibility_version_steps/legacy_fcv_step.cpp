@@ -54,6 +54,7 @@
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -551,11 +552,24 @@ private:
             }
         }
 
-        // Stop the background metadata checkpoint thread when downgrading to an FCV that disables
-        // the replicated size and count feature.
+        // Stop the background metadata checkpoint thread and drop the metadata store collections
+        // when downgrading to an FCV that disables the replicated size and count feature.
         if (gFeatureFlagReplicatedFastCount.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             ReplicatedFastCountManager::get(opCtx->getServiceContext()).shutdown(opCtx);
+            DropReply unused;
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               NamespaceString::makeGlobalConfigCollection(
+                                   NamespaceString::kReplicatedFastCountStore),
+                               &unused,
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               NamespaceString::makeGlobalConfigCollection(
+                                   NamespaceString::kReplicatedFastCountStoreTimestamps),
+                               &unused,
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
         }
 
         _cleanUpClusterParameters(opCtx, originalVersion, requestedVersion);

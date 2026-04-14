@@ -5,6 +5,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let name = "initial_sync_replSetGetStatus";
 let replSet = new ReplSetTest({
@@ -81,8 +82,11 @@ assert.lt(barCollRes.approxBytesCopied, pretestDbRes.initialSyncStatus.approxTot
 const bytesCopiedAdminDb =
     pretestDbRes.initialSyncStatus.databases.admin["admin.system.version"].approxBytesCopied +
     pretestDbRes.initialSyncStatus.databases.admin["admin.system.keys"].approxBytesCopied;
-assert.eq(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, bytesCopiedAdminDb + barCollRes.approxBytesCopied);
-assert.gt(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, 0);
+// Skip size assertions when the replicated size and count feature is enabled since size accounting is different.
+if (!FeatureFlagUtil.isPresentAndEnabled(primary.getDB("test"), "ReplicatedFastCount")) {
+    assert.eq(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, bytesCopiedAdminDb + barCollRes.approxBytesCopied);
+    assert.gt(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, 0);
+}
 
 // The server still has the 'pretest' and 'test' dbs to finish cloning.
 assert.eq(pretestDbRes.initialSyncStatus.databases.databasesCloned, 2);
@@ -142,14 +146,17 @@ assert.eq(fooCollRes.fetchedBatches, 2);
 assert.gt(fooCollRes.bytesToCopy, 0);
 assert.eq(fooCollRes.approxBytesCopied, fooCollRes.bytesToCopy);
 
-assert.eq(
-    endOfCloningRes.initialSyncStatus.approxTotalDataSize,
-    endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
-);
-assert.eq(
-    endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
-    fooCollRes.approxBytesCopied + barCollRes.approxBytesCopied + bytesCopiedAdminDb,
-);
+// Skip size assertions when the replicated size and count feature is enabled since size accounting is different.
+if (!FeatureFlagUtil.isPresentAndEnabled(primary.getDB("test"), "ReplicatedFastCount")) {
+    assert.eq(
+        endOfCloningRes.initialSyncStatus.approxTotalDataSize,
+        endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
+    );
+    assert.eq(
+        endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
+        fooCollRes.approxBytesCopied + barCollRes.approxBytesCopied + bytesCopiedAdminDb,
+    );
+}
 
 failPointBeforeFinish.off();
 
