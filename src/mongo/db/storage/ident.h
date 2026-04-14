@@ -56,10 +56,19 @@ private:
 };
 
 namespace ident {
+// Hardcoded idents should follow a "internal-camelCase" format. kSizeStore and kMdbCatalog
+// predate this convention so they don't follow it, but future additions should.
+
 // The size storer and catalog have hardcoded idents as we need to be able to open them before we
 // can look up idents in the catalog.
 constexpr inline StringData kSizeStorer = "sizeStorer"_sd;
 constexpr inline StringData kMdbCatalog = "_mdb_catalog"_sd;
+
+// Replicated fast count use hardcoded idents to avoid consulting the catalog when checking for
+// existence on stepup.
+constexpr inline StringData kFastCountMetadataStore = "internal-fastCountMetadataStore"_sd;
+constexpr inline StringData kFastCountMetadataStoreTimestamps =
+    "internal-fastCountMetadataStoreTimestamps"_sd;
 
 /**
  * By default, a storage engine table is uniquely identified by an 'ident' that comes in 1 of 4
@@ -131,6 +140,11 @@ bool isCollectionOrIndexIdent(StringData ident);
  * True if the ident contains the 'internal-<identStem>' prefix.
  */
 bool isInternalIdent(StringData ident, StringData identStem = ""_sd);
+
+/**
+ * Returns true if the ident is for one of the replicated fastcount containers.
+ */
+bool isReplicatedFastCountIdent(StringData ident);
 
 bool isCollectionIdent(StringData ident);
 

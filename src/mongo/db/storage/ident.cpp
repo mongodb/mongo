@@ -300,6 +300,10 @@ bool isInternalIdent(StringData ident, StringData identStem) {
         parsed->uniqueTag.starts_with(identStem);
 }
 
+bool isReplicatedFastCountIdent(StringData ident) {
+    return ident == kFastCountMetadataStore || ident == kFastCountMetadataStoreTimestamps;
+}
+
 bool isCollectionIdent(StringData ident) {
     // Internal idents prefixed "internal-" should not be considered collections, because
     // they are not eligible for orphan recovery through repair.

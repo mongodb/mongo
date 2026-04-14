@@ -32,6 +32,11 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -90,7 +95,92 @@ TEST_F(ReplicatedFastCountInitTest,
     EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
 }
 
+TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreIdents) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicatedFastCountDurability", true);
+
+    auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
+
+    // Verify idents do not exist before setup.
+    ASSERT_FALSE(
+        storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+        *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
+
+    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), false);
+
+    setUpReplicatedFastCount(_opCtx);
+
+    // Verify both idents exist after setup.
+    ASSERT_TRUE(
+        storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
+}
+
+TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicatedFastCountDurability", true);
+
+    auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
+
+    ASSERT_FALSE(
+        storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+        *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
+
+    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), false);
+
+    setUpReplicatedFastCount(_opCtx);
+
+    ASSERT_TRUE(
+        storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
+
+    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
+
+    // Calling setup a second time should succeed and the idents should still exist.
+    // TODO SERVER-122317 Verify that it isn't creating new, empty recordstores if they already
+    // exist.
+    _fastCountManager->shutdown(_opCtx);
+    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), false);
+
+    setUpReplicatedFastCount(_opCtx);
+
+    ASSERT_TRUE(
+        storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
+
+    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
+}
+
+TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountSkipsContainersWhenFlagDisabled) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicatedFastCountDurability", false);
+
+    auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
+
+    setUpReplicatedFastCount(_opCtx);
+
+    // Containers should not be created when the flag is disabled.
+    ASSERT_FALSE(
+        storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+        *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
+
+    // Collections and manager should still be set up.
+    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
+}
+
 TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicatedFastCountDurability", true);
+
     const int numIterations = 100;
     for (int i = 0; i < numIterations; ++i) {
         setUpReplicatedFastCount(_opCtx);

@@ -249,6 +249,11 @@ feature_flags:
         cpp_varname: gFeatureFlagReplicatedFastCount
         default: false
         fcv_gated: true
+    featureFlagReplicatedFastCountDurability:
+        description: "Changes to replicated fast count that modify persisted data should be guarded behind this flag"
+        cpp_varname: gFeatureFlagReplicatedFastCountDurability
+        default: false
+        fcv_gated: true
     featureFlagOtelMetrics:
         description: "Feature flag to enable exporting OpenTelemetry metrics"
         cpp_varname: gFeatureFlagOtelMetrics

@@ -18,6 +18,7 @@ mongo_cc_library(
     deps = [
         ":batched_write_context",
         "//src/mongo:base",
+        "//src/mongo/db/replicated_fast_count:init_replicated_fast_count_oplog_entry_idl",
         "//src/mongo/db/storage:container",
         "//src/mongo/db/storage/key_string",
     ],

@@ -51,7 +51,8 @@ MONGO_FAIL_POINT_DEFINE(failToParseResumeIndexInfo);
 namespace {
 /**
  * Returns whether the given ident is an internal ident and if it should be dropped or used to
- * resume an index build.
+ * resume an index build. We always return false for idents used by replicated fastcount, regardless
+ * of shutdown state.
  */
 bool identHandler(StorageEngine* engine,
                   OperationContext* opCtx,
@@ -60,7 +61,9 @@ bool identHandler(StorageEngine* engine,
                   StorageEngine::ReconcileResult* reconcileResult,
                   stdx::unordered_set<std::string>& internalIdentsToKeep,
                   stdx::unordered_set<std::string>& allInternalIdents) {
-    if (!ident::isInternalIdent(ident)) {
+    if (!ident::isInternalIdent(ident) || ident::isReplicatedFastCountIdent(ident)) {
+        // We don't need to insert replicated fastcount idents to allInternalIdents since that is
+        // just used to drop idents that aren't also in internalIdentsToKeep.
         return false;
     }
 

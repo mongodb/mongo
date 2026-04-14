@@ -1492,8 +1492,16 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
               RecordStore::Options options;
               options.keyFormat = keyFormat;
-              return storageEngine->getEngine()->createRecordStore(
+              auto status = storageEngine->getEngine()->createRecordStore(
                   provider, *ru, op->getNss(), ident, options);
+              // For now, this oplog entry is idempotent and allows the targeted idents to already
+              // exist rather than failing.
+              // TODO SERVER-123094 Refine these semantics once rollback on partial creation is
+              // implemented.
+              if (status.code() == ErrorCodes::ObjectAlreadyExists) {
+                  return Status::OK();
+              }
+              return status;
           };
 
           WriteUnitOfWork wuow(opCtx);

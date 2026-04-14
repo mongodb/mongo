@@ -2724,5 +2724,15 @@ void OpObserverImpl::onReplicatedIdentDrop(OperationContext* opCtx,
     opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 
+void OpObserverImpl::onInitReplicatedFastCount(OperationContext* opCtx,
+                                               const InitReplicatedFastCountO2& o2,
+                                               repl::OpTime& opTime) {
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
+    oplogEntry.setObject(BSON("initReplicatedFastCount" << 1));
+    oplogEntry.setObject2(o2.toBSON());
+    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+}
 
 }  // namespace mongo

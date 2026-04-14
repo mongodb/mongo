@@ -30,10 +30,26 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/version_context.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -72,6 +88,32 @@ Status _createInternalFastCountCollection(repl::StorageInterface* storageInterfa
         CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
 }
 
+Status _createInternalFastCountContainer(OperationContext* opCtx,
+                                         KVEngine* engine,
+                                         rss::PersistenceProvider& provider,
+                                         RecoveryUnit& ru,
+                                         StringData identName,
+                                         KeyFormat keyFormat) {
+    RecordStore::Options options;
+    options.keyFormat = keyFormat;
+    auto status = engine->createRecordStore(
+        provider, ru, NamespaceString::kAdminCommandNamespace, identName, options);
+    if (status.code() == ErrorCodes::ObjectAlreadyExists) {
+        LOGV2(12231502,
+              "Replicated fast count RecordStore ident already exists, skipping creation.",
+              "ident"_attr = identName);
+        return status;
+    }
+    massert(12231501,
+            fmt::format("Failed to create RecordStore for ident '{}' with error '{}' and code {}",
+                        identName,
+                        status.reason(),
+                        status.code()),
+            status.isOK());
+    LOGV2(12231500, "Created replicated fast count container.", "ident"_attr = identName);
+    return status;
+}
+
 void _createInternalFastCountCollections(repl::StorageInterface* storageInterface,
                                          OperationContext* opCtx) {
     const auto storeNss =
@@ -88,11 +130,52 @@ void _createInternalFastCountCollections(repl::StorageInterface* storageInterfac
                   "replicated fast count metadata store timestamps",
                   timestampsNss);
 }
+
+void _createInternalFastCountContainers(OperationContext* opCtx) {
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    auto* engine = storageEngine->getEngine();
+
+    Lock::GlobalLock globalLock(opCtx, MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+
+    auto metadataStatus = _createInternalFastCountContainer(
+        opCtx, engine, provider, *ru, ident::kFastCountMetadataStore, KeyFormat::String);
+    auto timestampStatus = _createInternalFastCountContainer(
+        opCtx, engine, provider, *ru, ident::kFastCountMetadataStoreTimestamps, KeyFormat::Long);
+
+    // If either ident was created, we need to replicate this creation on the secondary.
+    // TODO SERVER-123094 This should be changed to and instead of or since we should only create
+    // both idents or neither ident.
+    if (metadataStatus.isOK() || timestampStatus.isOK()) {
+        // Write the initReplicatedFastCount oplog entry so secondaries create the same
+        // RecordStores.
+        InitReplicatedFastCountO2 o2;
+        o2.setFastCountMetadataStoreIdent(std::string(ident::kFastCountMetadataStore));
+        o2.setFastCountMetadataStoreKeyFormat(static_cast<int>(KeyFormat::String));
+        o2.setFastCountMetadataStoreTimestampsIdent(
+            std::string(ident::kFastCountMetadataStoreTimestamps));
+        o2.setFastCountMetadataStoreTimestampsKeyFormat(static_cast<int>(KeyFormat::Long));
+
+        repl::OpTime opTime;
+        opCtx->getServiceContext()->getOpObserver()->onInitReplicatedFastCount(opCtx, o2, opTime);
+    }
+
+    wuow.commit();
+}
 }  // namespace
 
 void setUpReplicatedFastCount(OperationContext* opCtx) {
     _createInternalFastCountCollections(repl::StorageInterface::get(opCtx->getServiceContext()),
                                         opCtx);
+
+    if (gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        _createInternalFastCountContainers(opCtx);
+    }
+
     ReplicatedFastCountManager::get(opCtx->getServiceContext()).startup(opCtx);
 }
 

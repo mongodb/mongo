@@ -40,6 +40,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -801,6 +802,14 @@ public:
     virtual void onReplicatedIdentDrop(OperationContext* opCtx,
                                        const std::string& ident,
                                        repl::OpTime& opTime) = 0;
+
+    /**
+     * This function logs an oplog entry to initialize the replicated fast count RecordStores
+     * on secondaries. Returns the optime of the oplog entry successfully written to the oplog.
+     */
+    virtual void onInitReplicatedFastCount(OperationContext* opCtx,
+                                           const InitReplicatedFastCountO2& o2,
+                                           repl::OpTime& opTime) = 0;
 
     struct Times;
 

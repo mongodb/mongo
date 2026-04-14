@@ -313,6 +313,10 @@ public:
                                const std::string& ident,
                                repl::OpTime& opTime) final;
 
+    void onInitReplicatedFastCount(OperationContext* opCtx,
+                                   const InitReplicatedFastCountO2& o2,
+                                   repl::OpTime& opTime) final;
+
 private:
     std::unique_ptr<OperationLogger> _operationLogger;
 };

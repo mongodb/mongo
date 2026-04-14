@@ -33,9 +33,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -125,6 +129,56 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountWithKeyFormatString) {
     auto ru = storageEngine->newRecoveryUnit();
     ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
     ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+}
+
+TEST_F(OplogApplierImplTest, InitReplicatedFastCountSucceedsWhenIdentsAlreadyExist) {
+    auto storageEngine = serviceContext->getStorageEngine();
+    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
+    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
+
+    // Pre-create the idents before applying the oplog entry.
+    {
+        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_OK(
+            storageEngine->getEngine()->createRecordStore(provider,
+                                                          ru,
+                                                          NamespaceString::kAdminCommandNamespace,
+                                                          metadataIdent,
+                                                          RecordStore::Options{}));
+        ASSERT_OK(
+            storageEngine->getEngine()->createRecordStore(provider,
+                                                          ru,
+                                                          NamespaceString::kAdminCommandNamespace,
+                                                          timestampsIdent,
+                                                          RecordStore::Options{}));
+        wuow.commit();
+    }
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+
+    // Applying the oplog entry should succeed even though idents already exist.
+    auto op =
+        makeCommandOplogEntry(nextOpTime(),
+                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                              BSON("initReplicatedFastCount" << 1),
+                              makeInitReplicatedFastCountO2(metadataIdent,
+                                                            static_cast<int>(KeyFormat::Long),
+                                                            timestampsIdent,
+                                                            static_cast<int>(KeyFormat::Long)));
+
+    ASSERT_OK(runOpSteadyState(op));
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsInvalidKeyFormat) {

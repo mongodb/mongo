@@ -95,7 +95,14 @@ mongo_cc_library(
         "replicated_fast_count_init.cpp",
     ],
     deps = [
+        "init_replicated_fast_count_oplog_entry_idl",
+        "//src/mongo/db:rw_concern_d",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+        "//src/mongo/db/storage:storage_engine_impl",
     ],
 )
 

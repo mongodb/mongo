@@ -445,6 +445,18 @@ protected:
         return ret;
     }
 
+    // Creates a table in the KV engine with a specific ident name, not reflected in the catalog.
+    void createTableWithIdent(OperationContext* opCtx, StringData ident) {
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(_storageEngine->getEngine()->createRecordStore(
+            provider, ru, NamespaceString{}, ident, RecordStore::Options{}));
+        wuow.commit();
+        ASSERT_TRUE(identExists(opCtx, ident));
+    }
+
     std::unique_ptr<RecordStore> makeSpillTable(OperationContext* opCtx) {
         Lock::GlobalLock lk{opCtx, MODE_IS};
         auto spillEngine = opCtx->getServiceContext()->getStorageEngine()->getSpillEngine();
@@ -546,6 +558,48 @@ TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
     ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
+}
+
+TEST_F(StorageEngineReconcileTest, ReconcileKeepsFastCountIdentsForUncleanShutdown) {
+    auto opCtx = cc().makeOperationContext();
+
+    createTableWithIdent(opCtx.get(), ident::kFastCountMetadataStore);
+    createTableWithIdent(opCtx.get(), ident::kFastCountMetadataStoreTimestamps);
+
+    // Replicated fast count idents must survive reconciliation after an unclean shutdown.
+    auto reconcileResult = unittest::assertGet(reconcileAfterUncleanShutdown(opCtx.get()));
+
+    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
+    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
+}
+
+TEST_F(StorageEngineReconcileTest, ReconcileKeepsFastCountIdentsForCleanShutdown) {
+    auto opCtx = cc().makeOperationContext();
+
+    createTableWithIdent(opCtx.get(), ident::kFastCountMetadataStore);
+    createTableWithIdent(opCtx.get(), ident::kFastCountMetadataStoreTimestamps);
+
+    // Replicated fast count idents must survive reconciliation after a clean shutdown.
+    auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
+
+    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
+    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
+}
+
+TEST_F(StorageEngineReconcileTest, StartupRecoveryKeepsFastCountIdentsForUncleanShutdown) {
+    repl::StorageInterface::set(getServiceContext(),
+                                std::make_unique<repl::StorageInterfaceImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    createTableWithIdent(opCtx.get(), ident::kFastCountMetadataStore);
+    createTableWithIdent(opCtx.get(), ident::kFastCountMetadataStoreTimestamps);
+
+    startup_recovery::repairAndRecoverDatabases(opCtx.get(),
+                                                StorageEngine::LastShutdownState::kUnclean);
+
+    // Replicated fast count idents must survive full startup recovery after an unclean shutdown.
+    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
+    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
 }
 
 TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShutdown) {
@@ -744,7 +798,7 @@ TEST_F(StorageEngineTest, InternalRecordStoreDoesNotTrackSizeAdjustments) {
     auto opCtx = cc().makeOperationContext();
 
     const auto insertRecordAndAssertSize = [&](RecordStore* rs, const RecordId& rid) {
-        // Verify a temporary record store does not track size adjustments.
+        // Verify an internal record store does not track size adjustments.
         const auto data = "data";
 
         WriteUnitOfWork wuow(opCtx.get());

@@ -719,6 +719,15 @@ public:
         }
     }
 
+    void onInitReplicatedFastCount(OperationContext* opCtx,
+                                   const InitReplicatedFastCountO2& o2,
+                                   repl::OpTime& opTime) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers) {
+            o->onInitReplicatedFastCount(opCtx, o2, opTime);
+        }
+    }
+
 private:
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {

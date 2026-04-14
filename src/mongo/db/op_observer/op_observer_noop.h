@@ -302,6 +302,10 @@ public:
     void onReplicatedIdentDrop(OperationContext* opCtx,
                                const std::string& ident,
                                repl::OpTime& opTime) override {}
+
+    void onInitReplicatedFastCount(OperationContext* opCtx,
+                                   const InitReplicatedFastCountO2& o2,
+                                   repl::OpTime& opTime) override {}
 };
 
 }  // namespace mongo
