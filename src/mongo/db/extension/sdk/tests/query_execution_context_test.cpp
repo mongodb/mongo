@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/host/query_execution_context.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
@@ -115,6 +116,56 @@ TEST_F(QueryExecutionContextTestFixture, GetDeadlineTimestampMsWhenNoDeadline) {
     ASSERT_EQ(handle->getDeadlineTimestampMs(), std::numeric_limits<int64_t>::max());
 }
 
+TEST_F(QueryExecutionContextTestFixture, GetHostMetricsEmpty) {
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    BSONObj result = handle->getHostMetrics({});
+    ASSERT_TRUE(result.isEmpty());
+}
+
+TEST_F(QueryExecutionContextTestFixture, GetHostMetricsKnownFieldNotPopulated) {
+    // Request a known OpDebug field that is not populated (searchIdLookupMetrics is null).
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    BSONObj result = handle->getHostMetrics({"docsSeenByIdLookup"});
+    // The field is known but not populated — it should not appear in the result.
+    ASSERT_FALSE(result.hasField("docsSeenByIdLookup"));
+}
+
+TEST_F(QueryExecutionContextTestFixture, GetHostMetricsPopulatedFields) {
+    // Populate searchIdLookupMetrics on the current operation's OpDebug.
+    auto& opDebug = CurOp::get(_opCtx.get())->debug();
+    opDebug.searchIdLookupMetrics = std::make_shared<OpDebug::SearchIdLookupMetrics>();
+    opDebug.searchIdLookupMetrics->incrementDocsSeenByIdLookup();
+    opDebug.searchIdLookupMetrics->incrementDocsSeenByIdLookup();
+    opDebug.searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
+
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    BSONObj result = handle->getHostMetrics({"docsSeenByIdLookup", "docsReturnedByIdLookup"});
+    ASSERT_EQ(result["docsSeenByIdLookup"].Long(), 2LL);
+    ASSERT_EQ(result["docsReturnedByIdLookup"].Long(), 1LL);
+}
+
+TEST_F(QueryExecutionContextTestFixture, GetHostMetricsUnknownFieldThrows) {
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    // Requesting an unknown metric name must throw a DBException.
+    ASSERT_THROWS(handle->getHostMetrics({"thisMetricDoesNotExist"}), DBException);
+}
+
 class QueryExecutionContextVTableDeathTest : public unittest::Test {
 public:
     void setUp() override {
@@ -140,6 +191,12 @@ DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetMetrics, "11213507"
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetDeadlineTimestampMs, "11646100") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_deadline_timestamp_ms = nullptr;
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetHostMetrics, "12199900") {
+    auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
+    vtable.get_host_metrics = nullptr;
     sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
 };
 

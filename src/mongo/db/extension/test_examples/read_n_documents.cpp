@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
@@ -54,6 +55,12 @@ public:
     extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                               ::MongoExtensionExecAggStage* execStage) override {
         if (_currentDoc == _numDocs) {
+            // At EOF, all idLookup processing for previously produced IDs is complete. Capture the
+            // accumulated idLookup metrics into this stage's extension operation metrics.
+            auto metrics = execCtx->getMetrics(execStage);
+            BSONObj hostMetrics = execCtx->getHostMetrics(
+                {"docsSeenByIdLookup", "docsReturnedByIdLookup", "idLookupSuccessRate"});
+            metrics->update(extension::objAsByteView(hostMetrics));
             return extension::ExtensionGetNextResult::eof();
         }
 
@@ -79,6 +86,10 @@ public:
     BSONObj explain(const sdk::QueryExecutionContextHandle&,
                     ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::OperationMetricsBase> createMetrics() const override {
+        return std::make_unique<sdk::shared_test_stages::BSONSnapshotOperationMetrics>();
     }
 
 private:

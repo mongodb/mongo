@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
@@ -58,6 +59,7 @@ public:
     virtual UnownedOperationMetricsHandle getMetrics(
         const std::string& stageName, const UnownedExecAggStageHandle& execStage) const = 0;
     virtual int64_t getDeadlineTimestampMs() const = 0;
+    virtual BSONObj getHostMetrics(const std::vector<std::string>& metricNames) const = 0;
 };
 
 /**
@@ -95,10 +97,16 @@ private:
     static MongoExtensionStatus* _extGetDeadlineTimestampMs(
         const MongoExtensionQueryExecutionContext* ctx, int64_t* deadlineTimestampMs) noexcept;
 
+    static MongoExtensionStatus* _extGetHostMetrics(const MongoExtensionQueryExecutionContext* ctx,
+                                                    const MongoExtensionByteView* metricNames,
+                                                    uint64_t numMetricNames,
+                                                    MongoExtensionByteBuf** result) noexcept;
+
     static constexpr ::MongoExtensionQueryExecutionContextVTable VTABLE = {
         .check_for_interrupt = &_extCheckForInterrupt,
         .get_metrics = &_extGetMetrics,
-        .get_deadline_timestamp_ms = &_extGetDeadlineTimestampMs};
+        .get_deadline_timestamp_ms = &_extGetDeadlineTimestampMs,
+        .get_host_metrics = &_extGetHostMetrics};
 
     std::unique_ptr<QueryExecutionContextBase> _ctx;
 };

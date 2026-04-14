@@ -66,6 +66,19 @@ public:
         return _ctx->getOperationContext()->getDeadline().asInt64();
     }
 
+    BSONObj getHostMetrics(const std::vector<std::string>& metricNames) const override {
+        auto* opCtx = _ctx->getOperationContext();
+        auto* curOp = CurOp::get(opCtx);
+        const auto& opDebug = curOp->debug();
+
+        // OpDebug::appendStaged() returns a lambda that accepts an OpDebug object, and returns a
+        // snapshot of the requested metrics.
+        StringSet requestedFields(metricNames.begin(), metricNames.end());
+        auto appendFn =
+            OpDebug::appendStaged(opCtx, std::move(requestedFields), /*needWholeDocument=*/false);
+        return appendFn(OpDebug::AppendArgs(opCtx, opDebug, *curOp));
+    }
+
 private:
     const ExpressionContext* _ctx;
 };

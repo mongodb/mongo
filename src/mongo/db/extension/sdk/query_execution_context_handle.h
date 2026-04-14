@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #pragma once
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -62,6 +63,13 @@ public:
 
     int64_t getDeadlineTimestampMs() const;
 
+    /**
+     * Returns a BSONObj containing the requested host metrics from OpDebug. Throws if any metric
+     * name is not recognized. Metrics that are valid but not yet populated are omitted from the
+     * result.
+     */
+    BSONObj getHostMetrics(const std::vector<std::string_view>& metricNames) const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         sdk_tassert(11098300,
                     "QueryExecutionContext' 'check_for_interrupt' is null",
@@ -72,6 +80,9 @@ public:
         sdk_tassert(11646100,
                     "QueryExecutionContext' 'get_deadline_timestamp_ms' is null",
                     vtable.get_deadline_timestamp_ms != nullptr);
+        sdk_tassert(12199900,
+                    "QueryExecutionContext' 'get_host_metrics' is null",
+                    vtable.get_host_metrics != nullptr);
     };
 };
 

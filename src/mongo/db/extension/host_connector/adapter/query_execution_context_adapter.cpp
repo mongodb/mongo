@@ -67,4 +67,24 @@ MongoExtensionStatus* QueryExecutionContextAdapter::_extGetDeadlineTimestampMs(
         *deadlineTimestampMs = execCtx.getDeadlineTimestampMs();
     });
 }
+
+MongoExtensionStatus* QueryExecutionContextAdapter::_extGetHostMetrics(
+    const MongoExtensionQueryExecutionContext* ctx,
+    const MongoExtensionByteView* metricNames,
+    uint64_t numMetricNames,
+    MongoExtensionByteBuf** result) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
+
+        std::vector<std::string> names;
+        names.reserve(numMetricNames);
+        for (uint64_t i = 0; i < numMetricNames; ++i) {
+            names.emplace_back(byteViewAsStringView(metricNames[i]));
+        }
+
+        BSONObj metrics = execCtx.getHostMetrics(names);
+        // Allocate a buffer on the heap. Ownership is transferred to the caller.
+        *result = new ByteBuf(metrics);
+    });
+}
 }  // namespace mongo::extension::host_connector

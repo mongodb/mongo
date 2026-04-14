@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#pragma once
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
@@ -38,6 +38,7 @@
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/util/assert_util.h"
@@ -939,6 +940,25 @@ public:
 };
 
 /**
+ * An OperationMetricsBase implementation that stores a BSON document supplied via update() and
+ * returns it verbatim from serialize(). Suitable for stages that snapshot an externally-computed
+ * metrics document (e.g. host OpDebug metrics) rather than accumulating their own counters.
+ */
+class BSONSnapshotOperationMetrics : public sdk::OperationMetricsBase {
+public:
+    BSONObj serialize() const override {
+        return _metrics;
+    }
+
+    void update(MongoExtensionByteView view) override {
+        _metrics = extension::bsonObjFromByteView(view).getOwned();
+    }
+
+private:
+    BSONObj _metrics;
+};
+
+/**
  * =========================================================
  * Sharding-related testing
  * =========================================================
@@ -956,6 +976,10 @@ public:
 
     int64_t getDeadlineTimestampMs() const override {
         return std::numeric_limits<int64_t>::max();
+    }
+
+    BSONObj getHostMetrics(const std::vector<std::string>& metricNames) const override {
+        return BSONObj{};
     }
 };
 

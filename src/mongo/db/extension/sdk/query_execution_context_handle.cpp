@@ -56,4 +56,22 @@ int64_t QueryExecutionContextAPI::getDeadlineTimestampMs() const {
         [&]() { return _vtable().get_deadline_timestamp_ms(get(), &deadlineTimestampMs); });
     return deadlineTimestampMs;
 }
+
+BSONObj QueryExecutionContextAPI::getHostMetrics(
+    const std::vector<std::string_view>& metricNames) const {
+    std::vector<MongoExtensionByteView> views;
+    views.reserve(metricNames.size());
+    for (const auto& name : metricNames) {
+        views.push_back(stringViewAsByteView(name));
+    }
+
+    MongoExtensionByteBuf* buf = nullptr;
+    invokeCAndConvertStatusToException(
+        [&]() { return _vtable().get_host_metrics(get(), views.data(), views.size(), &buf); });
+
+    // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
+    // BSONObj to return to the caller.
+    ExtensionByteBufHandle ownedBuf{buf};
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
+}
 }  // namespace mongo::extension::sdk

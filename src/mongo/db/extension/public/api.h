@@ -1007,6 +1007,19 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
      */
     MongoExtensionStatus* (*get_deadline_timestamp_ms)(
         const MongoExtensionQueryExecutionContext* ctx, int64_t* deadlineTimestampMs);
+
+    /**
+     * Returns a BSONObj containing each {metricName: metricValue} for the given host metrics.
+     * If any metric name is not valid, this method will return an error status. If a metric is
+     * valid but not yet populated on the host side, it will not appear in the result.
+     *
+     * `metricNames` is an array of `numMetricNames` byte views, each naming a metric field from
+     * the host's OpDebug. Ownership of the output is transferred to the caller.
+     */
+    MongoExtensionStatus* (*get_host_metrics)(const MongoExtensionQueryExecutionContext* ctx,
+                                              const MongoExtensionByteView* metricNames,
+                                              uint64_t numMetricNames,
+                                              MongoExtensionByteBuf** result);
 } MongoExtensionQueryExecutionContextVTable;
 
 ////////////////////////////////////////////////////////////////
