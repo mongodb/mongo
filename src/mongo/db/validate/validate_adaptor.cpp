@@ -1302,6 +1302,20 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                     timeseriesValidationResult.result));
                                 break;
 
+                            case TimeseriesValidationResult::kV3WithOrderedTime:
+                                LOGV2_WARNING_OPTIONS(
+                                    12351700,
+                                    {logv2::LogTruncation::Disabled},
+                                    "Document is not compliant with time-series specifications",
+                                    logAttrs(coll->ns()),
+                                    "recordId"_attr = record->id,
+                                    "record"_attr = record->data.toBson(),
+                                    "reason"_attr = timeseriesValidationResult.reason);
+                                ++nNonCompliantDocuments;
+                                results->addWarning(_describeTimeseriesValidationResult(
+                                    timeseriesValidationResult.result));
+                                break;
+
                             // All remaining result cases are errors
                             default:
                                 LOGV2_ERROR_OPTIONS(

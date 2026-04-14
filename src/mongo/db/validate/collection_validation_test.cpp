@@ -1418,5 +1418,12 @@ TEST_F(TimeseriesCollectionValidationTest, ValidationOfDocumentJustPastEpochMax)
         _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 0});
 }
 
+TEST_F(TimeseriesCollectionValidationTest, ReportWarningForV3BucketWithMeasurementsInOrder) {
+    static constexpr std::array version = {"control"_sd, "version"_sd};
+    insertDoc(replaceNestedField(getSampleDoc(), version, 3));
+    foregroundValidate(
+        _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1});
+}
+
 }  // namespace
 }  // namespace mongo

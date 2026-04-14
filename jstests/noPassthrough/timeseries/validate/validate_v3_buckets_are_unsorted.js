@@ -46,9 +46,7 @@ assert.commandWorked(
 let res = assert.commandWorked(tsColl.validate());
 assert(res.valid);
 
-// Compressed bucket with the compressed time field in-order and version set to 3. This should fail,
-// since this bucket's measurements are in-order on time field, meaning this bucket shouldn't have
-// been promoted to v3.
+// Compressed bucket with the compressed time field in-order and version set to 3. This should produce a warning.
 // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
 assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
 
@@ -79,9 +77,9 @@ assert.commandWorked(
     getTimeseriesCollForRawOps(testDB, tsColl).insert(invalidVersion3Doc, getRawOperationSpec(testDB)),
 );
 res = assert.commandWorked(tsColl.validate());
-assert(!res.valid);
-assert.eq(res.errors.length, 1);
+assert(res.valid);
+assert.eq(res.warnings.length, 1);
 
-TimeseriesTest.checkForDocumentValidationFailureLog(tsColl, invalidVersion3Doc);
+TimeseriesTest.checkForDocumentValidationFailureLog(tsColl, invalidVersion3Doc, 12351700);
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
