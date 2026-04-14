@@ -40,6 +40,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -128,5 +129,12 @@ void killRemoteCursor(OperationContext* opCtx,
  * Appends the given operation key to the given request.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void appendOpKey(const OperationKey& opKey, BSONObjBuilder* cmdBuilder);
+
+/**
+ * Resets the log severity suppressor to use the given clock source (pass nullptr to restore the
+ * real system clock). This allows tests to advance time deterministically instead of relying on
+ * real sleeps. Not thread-safe, so use only during controlled testing.
+ */
+void setCursorEstablisherSuppressorClockSource_forTest(ClockSource* cs);
 
 }  // namespace mongo

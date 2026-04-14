@@ -150,6 +150,16 @@ public:
         _period.store(durationCount<Milliseconds>(period));
     }
 
+    /**
+     * Replaces the clock source and resets the period state so the next call returns the
+     * normal (unsuppressed) severity regardless of elapsed time.
+     * Not thread-safe, so use only for testing purposes.
+     */
+    MONGO_MOD_PUBLIC void resetWithClockSource_forTest(ClockSource* cs) {
+        _stopWatch = ClockSource::StopWatch{cs ? cs : SystemClockSource::get()};
+        _periodStartedAtMillis.store(std::numeric_limits<int64_t>::min());
+    }
+
 private:
     ClockSource::StopWatch _stopWatch;
     Atomic<int64_t> _period;

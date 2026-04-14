@@ -47,8 +47,10 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -1338,61 +1340,57 @@ TEST_F(EstablishCursorsTest, LogsUnableToEstablishRemoteCursorsOnTimeout) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
-    int iterations = 3;
+    constexpr int iterations = 3;
 
-    // Set the log level to debug and count the number of log lines
+    // Runs 3 consecutivey establishCursors commands, and injects a FailedToParse error in their
+    // responses.
+    auto runEstablishCursorsWithFailureResponses = [&]() {
+        for (int i = 0; i < iterations; i++) {
+            auto future = launchAsync([&] {
+                ASSERT_THROWS(establishCursors(operationContext(),
+                                               executor(),
+                                               _nss,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               remotes,
+                                               false),
+                              ExceptionFor<ErrorCodes::FailedToParse>);
+            });
+
+            // Remote responds with non-retriable error.
+            onCommand([this](const RemoteCommandRequest& request) {
+                ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+                return createErrorCursorResponse(
+                    Status(ErrorCodes::FailedToParse, "failed to parse"));
+            });
+            future.default_timed_get();
+        }
+    };
+
+    // Use a mock clock so we can advance time deterministically instead of relying on real
+    // sleeps, which are flaky when the suppressor period resets mid-iteration.
+    ClockSourceMock mockClock;
+    setCursorEstablisherSuppressorClockSource_forTest(&mockClock);
+    const ScopeGuard restoreClock(
+        [&] { setCursorEstablisherSuppressorClockSource_forTest(nullptr); });
+
+    // Phase 1: at Debug(5) level every invocation is logged, regardless of suppression, because
+    // even the suppressed Debug(2) severity is visible at this verbosity.
     settings.setMinimumLoggedSeverity(logv2::LogComponent::kQuery, logv2::LogSeverity::Debug(5));
 
-    // Wait for 1 second for the timer to reset.
-    sleepmillis(1000);
-    for (int i = 0; i < iterations; i++) {
-        auto future = launchAsync([&] {
-            ASSERT_THROWS(establishCursors(operationContext(),
-                                           executor(),
-                                           _nss,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           remotes,
-                                           false),
-                          ExceptionFor<ErrorCodes::FailedToParse>);
-        });
-
-        // Remote responds with non-retriable error.
-        onCommand([this](const RemoteCommandRequest& request) {
-            ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
-            return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
-        });
-        future.default_timed_get();
-    }
-
+    runEstablishCursorsWithFailureResponses();
     ASSERT_EQUALS(logs.countBSONContainingSubset(BSON("id" << 4625501)), iterations);
 
-    // Set the log level to info and count the additional number of log lines.
+    // Advance the mock clock past the suppressor period so the next invocation resets it.
+    mockClock.advance(Seconds{2});
+
+    // Phase 2: at Info level only the first invocation per period produces a log; subsequent
+    // ones are suppressed to Debug(2) which is filtered out at Info verbosity.
     settings.setMinimumLoggedSeverity(logv2::LogComponent::kQuery, logv2::LogSeverity::Info());
 
-    // Wait for 1 second for the timer to reset.
-    sleepmillis(1000);
-    for (int i = 0; i < iterations; i++) {
-        auto future = launchAsync([&] {
-            ASSERT_THROWS(establishCursors(operationContext(),
-                                           executor(),
-                                           _nss,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           remotes,
-                                           false),
-                          ExceptionFor<ErrorCodes::FailedToParse>);
-        });
-
-        // Remote responds with non-retriable error.
-        onCommand([this](const RemoteCommandRequest& request) {
-            ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
-            return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
-        });
-        future.default_timed_get();
-    }
+    runEstablishCursorsWithFailureResponses();
+    ASSERT_EQUALS(logs.countBSONContainingSubset(BSON("id" << 4625501)), 1 + iterations);
 
     logs.stop();
-
-    ASSERT_EQUALS(logs.countBSONContainingSubset(BSON("id" << 4625501)), 1 + iterations);
 
     settings.setMinimumLoggedSeverity(logv2::LogComponent::kQuery, originalSeverity);
 }
