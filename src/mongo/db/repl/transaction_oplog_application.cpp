@@ -210,8 +210,11 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
 
             auto status = [&] {
                 if (op.isContainerOpType()) {
-                    return applyContainerOperation(
-                        opCtx, ApplierOperation{&op}, oplogApplicationMode);
+                    auto applierOp = ApplierOperation{&op};
+                    return applyContainerOperations(
+                        opCtx,
+                        std::span<const ApplierOperation>{&applierOp, 1},
+                        oplogApplicationMode);
                 }
                 auto coll = acquireCollection(
                     opCtx,

@@ -1098,8 +1098,8 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
 
     // Count each log op application as a separate operation, for reporting purposes
 
-    auto incrementOpsAppliedStats = [] {
-        opsAppliedStats.increment(1);
+    auto incrementOpsAppliedStats = [](int64_t n) {
+        opsAppliedStats.increment(n);
     };
 
     auto& clockSource = opCtx->fastClockSource();
@@ -1170,7 +1170,8 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
             getOptions().mode,
             getOptions().allowNamespaceNotFoundErrorsOnCrudOps,
             isDataConsistent,
-            &applyOplogEntryOrGroupedInserts);
+            &applyOplogEntryOrGroupedInserts,
+            [](int64_t n) { opsAppliedStats.increment(n); });
         if (!status.isOK())
             return status;
     }

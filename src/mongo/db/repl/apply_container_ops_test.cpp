@@ -63,10 +63,12 @@ StatusWith<UniqueBuffer> _get(OperationContext* opCtx, StringData ident, int64_t
 }
 
 /**
- * Helper for applyContainerOperation that satisfies its preconditions.
+ * Applies a single container oplog entry as a secondary.
  */
 Status applyContainerOpHelper(OperationContext* opCtx, const OplogEntry& e) {
-    return applyContainerOperation(opCtx, {&e}, OplogApplication::Mode::kSecondary);
+    auto op = ApplierOperation{&e};
+    return applyContainerOperations(
+        opCtx, std::span<const ApplierOperation>{&op, 1}, OplogApplication::Mode::kSecondary);
 }
 
 DurableOplogEntryParams makeBaseParams(const NamespaceString& nss,
@@ -347,6 +349,46 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsApplyOpsTimestampVisibility) {
     ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
 }
 
+TEST_F(ApplyContainerOpsTest, GroupedContainerOpsApplyOpsTimestampVisibility) {
+    const auto commitTs = Timestamp(20, 1);
+    const auto earlierTs = Timestamp(10, 1);
+
+    const int64_t k1 = 1;
+    const int64_t k2 = 2;
+    const auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    const auto v2 = BSONBinData("B", 1, BinDataGeneral);
+
+    auto insert1 = makeContainerInsertOplogEntry(OpTime(), _intIdent, k1, v1);
+    auto insert2 = makeContainerInsertOplogEntry(OpTime(), _intIdent, k2, v2);
+    auto delete1 = makeContainerDeleteOplogEntry(OpTime(), _intIdent, k1);
+    insert1.setApplyOpsTimestamp(commitTs);
+    insert2.setApplyOpsTimestamp(commitTs);
+    delete1.setApplyOpsTimestamp(commitTs);
+
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        std::vector<ApplierOperation> ops{{&insert1}, {&insert2}, {&delete1}};
+        ASSERT_OK(applyContainerOperations(_opCtx.get(), ops, OplogApplication::Mode::kSecondary));
+    }
+
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, earlierTs);
+    ASSERT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
+    ASSERT_EQ(_get(_opCtx.get(), _intIdent, k2).getStatus(), ErrorCodes::NoSuchKey);
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, commitTs);
+    ASSERT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
+    auto visible = _get(_opCtx.get(), _intIdent, k2);
+    ASSERT_OK(visible.getStatus());
+    ASSERT_EQ(0, std::memcmp(visible.getValue().get(), v2.data, v2.length));
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
+}
+
 TEST_F(ApplyContainerOpsTest, ContainerOpsSingleOpTimestampVisibility) {
     const auto commitTs = Timestamp(20, 1);
     const auto earlierTs = Timestamp(10, 1);
@@ -389,7 +431,56 @@ TEST_F(ApplyContainerOpsTest, ApplyContainerOpInvalidOpType) {
     auto params = makeBaseParams(_nss, _bytesIdent, OpTypeEnum::kNoop, BSON("k" << k << "v" << v));
     auto op = DurableOplogEntry(params);
 
-    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), {op}), DBException, 10704705);
+    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), {op}), DBException, 12337301);
+}
+
+TEST_F(ApplyContainerOpsTest, ApplyContainerOpsRejectsEmptySpan) {
+    std::vector<ApplierOperation> empty;
+    ASSERT_THROWS_CODE(
+        applyContainerOperations(_opCtx.get(), empty, OplogApplication::Mode::kSecondary),
+        DBException,
+        12337300);
+}
+
+TEST_F(ApplyContainerOpsTest, ApplyContainerOpsRejectsMismatchedTimestamps) {
+    const auto ts1 = Timestamp(10, 1);
+    const auto ts2 = Timestamp(20, 1);
+
+    auto insert1 =
+        makeContainerInsertOplogEntry(OpTime(), _intIdent, 1, BSONBinData("A", 1, BinDataGeneral));
+    auto insert2 =
+        makeContainerInsertOplogEntry(OpTime(), _intIdent, 2, BSONBinData("B", 1, BinDataGeneral));
+    insert1.setApplyOpsTimestamp(ts1);
+    insert2.setApplyOpsTimestamp(ts2);
+
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+    std::vector<ApplierOperation> ops{{&insert1}, {&insert2}};
+    ASSERT_THROWS_CODE(
+        applyContainerOperations(_opCtx.get(), ops, OplogApplication::Mode::kSecondary),
+        DBException,
+        12337302);
+}
+
+TEST_F(ApplyContainerOpsTest, GroupedContainerOpsMidBatchFailureRollsBack) {
+    const auto commitTs = Timestamp(20, 1);
+    const int64_t k1 = 1;
+    const int64_t kMissing = 2;
+    const auto v1 = BSONBinData("A", 1, BinDataGeneral);
+
+    auto insert1 = makeContainerInsertOplogEntry(OpTime(), _intIdent, k1, v1);
+    auto updateMissing = makeContainerUpdateOplogEntry(OpTime(), _intIdent, kMissing, v1);
+    insert1.setApplyOpsTimestamp(commitTs);
+    updateMissing.setApplyOpsTimestamp(commitTs);
+
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        std::vector<ApplierOperation> ops{{&insert1}, {&updateMissing}};
+        auto status =
+            applyContainerOperations(_opCtx.get(), ops, OplogApplication::Mode::kSecondary);
+        ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
+    }
+
+    ASSERT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
 }
 
 TEST_F(ApplyContainerOpsTest, ContainerOpsRequiresTimestamp) {

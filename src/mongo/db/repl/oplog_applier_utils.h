@@ -242,7 +242,9 @@ public:
 
     /**
      * The logic for oplog batch application which is shared between standard and tenant oplog
-     * application.
+     * application. Consecutive container ops sharing the same ident and timestamp are applied
+     * atomically. If provided, 'incrementOpsAppliedStats' is called once per successfully
+     * applied op.
      */
     static Status applyOplogBatchCommon(
         OperationContext* opCtx,
@@ -250,7 +252,8 @@ public:
         OplogApplication::Mode oplogApplicationMode,
         bool allowNamespaceNotFoundErrorsOnCrudOps,
         bool isDataConsistent,
-        InsertGroup::ApplyFunc applyOplogEntryOrGroupedInserts) noexcept;
+        InsertGroup::ApplyFunc applyOplogEntryOrGroupedInserts,
+        IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {}) noexcept;
 };
 
 }  // namespace repl

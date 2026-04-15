@@ -144,8 +144,11 @@ Status _applyOps(OperationContext* opCtx,
                                                         .acquireFCVSnapshot()) &&
                                             getTestCommandsEnabled());
                             }
-                            uassertStatusOK(applyContainerOperation(
-                                opCtx, ApplierOperation{&entry}, oplogApplicationMode));
+                            auto op = ApplierOperation{&entry};
+                            uassertStatusOK(
+                                applyContainerOperations(opCtx,
+                                                         std::span<const ApplierOperation>{&op, 1},
+                                                         oplogApplicationMode));
                             return Status::OK();
                         }
                         case OpTypeEnum::kCommand: {

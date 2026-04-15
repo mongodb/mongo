@@ -54,6 +54,7 @@
 #include <cstddef>
 #include <functional>
 #include <iosfwd>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -187,7 +188,7 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx);
  */
 void establishOplogRecordStoreForLogging(OperationContext* opCtx, RecordStore* oplog);
 
-using IncrementOpsAppliedStatsFn = std::function<void()>;
+using IncrementOpsAppliedStatsFn = std::function<void(int64_t)>;
 
 /**
  * This class represents the different modes of oplog application that are used within the
@@ -275,14 +276,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
 
 /**
- * Apply a container insert or delete operation. The caller must hold a MODE_IX lock on the
- * namespace the container belongs to. Only container ops are allowed.
+ * Atomically apply one or more container operations (insert, update, or delete). All ops must
+ * be container ops sharing the same commit timestamp. The caller must hold a MODE_IX lock on
+ * the namespace the container belongs to.
  *
- * Returns OK on success, or the the failure status reported by the storage engine.
+ * Returns OK on success, or the failure status reported by the storage engine.
  */
-Status applyContainerOperation(OperationContext* opCtx,
-                               const ApplierOperation& op,
-                               OplogApplication::Mode oplogApplicationMode);
+Status applyContainerOperations(OperationContext* opCtx,
+                                std::span<const ApplierOperation> ops,
+                                OplogApplication::Mode oplogApplicationMode);
 
 /**
  * Take a command op and apply it locally
