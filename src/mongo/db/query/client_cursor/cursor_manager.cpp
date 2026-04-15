@@ -440,7 +440,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 //   destruction, since it is an error to delete a pinned cursor.
 // - In addition, we must deregister the cursor from the manager's map before clearing the
 //   '_operationUsingCursor' field, since it is an error to unpin a registered cursor without
-//   holidng the appropriate cursor manager mutex. By first deregistering the cursor, we ensure that
+//   holding the appropriate cursor manager mutex. By first deregistering the cursor, we ensure that
 //   no other thread can access '_cursor', meaning that it is safe for us to write to
 //   '_operationUsingCursor' without holding the CursorManager mutex.
 void CursorManager::deregisterAndDestroyCursor(

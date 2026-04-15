@@ -450,7 +450,6 @@ TEST_F(ClusterClientCursorImplTest, IsEOF) {
 }
 
 TEST_F(ClusterClientCursorImplTest, CheckChangeStreamServerStatusCursorMetrics) {
-
     otel::metrics::OtelMetricsCapturer capturer;
     using otel::metrics::MetricNames;
 
@@ -515,6 +514,39 @@ TEST_F(ClusterClientCursorImplTest, CheckChangeStreamServerStatusCursorMetrics) 
     ASSERT_EQ(histogram2.count, 2);
     // 200 ms + 400 ms = 600 000 µs cumulative.
     ASSERT_EQ(histogram2.sum, 600'000);
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorCanBeDisposedEvenIfTimeGoesBackwards) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    const Date_t createdDate = Date_t::fromMillisSinceEpoch(1000 * 1000);
+    const Date_t beforeCreatedDate = Date_t::fromMillisSinceEpoch(1000);
+
+    auto clock = useClock();
+    clock->reset(createdDate);
+
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    auto cursor = ClusterClientCursorImpl(
+        _opCtx.get(),
+        std::make_unique<RouterStageMock>(_opCtx.get()),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    // Move time backwards.
+    clock->reset(beforeCreatedDate);
+
+    // Enable log capture.
+    unittest::LogCaptureGuard logs;
+
+    // Kill the cursor. This should not fail.
+    cursor.kill(_opCtx.get());
+
+    // Expect 0 massert log messages to be captured about invalid histogram values.
+    ASSERT_EQ(0, logs.countBSONContainingSubset(BSON("id" << 23077)));
 }
 
 }  // namespace

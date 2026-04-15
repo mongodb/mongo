@@ -408,6 +408,37 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
 }
 
 /**
+ * Test that client cursors can be destroyed properly even if wall clock time goes backwards.
+ */
+TEST_F(CursorManagerTest, CursorCanBeDisposedEvenIfTimeGoesBackwards) {
+    const Date_t createdDate = Date_t::fromMillisSinceEpoch(1000 * 1000);
+    const Date_t beforeCreatedDate = Date_t::fromMillisSinceEpoch(1000);
+
+    auto clock = useClock();
+    clock->reset(createdDate);
+
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    auto cursorPin = makeCursor(_opCtx.get());
+
+    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(createdDate, cursorPin.getCursor()->getCreatedDate());
+
+    // Move time backwards.
+    clock->reset(beforeCreatedDate);
+
+    // Enable log capture.
+    unittest::LogCaptureGuard logs;
+
+    // Delete the cursor. This should not fail.
+    cursorPin.deleteUnderlying();
+
+    ASSERT_EQ(0UL, _cursorManager.numCursors());
+
+    // Expect 0 massert log messages to be captured about invalid histogram values.
+    ASSERT_EQ(0, logs.countBSONContainingSubset(BSON("id" << 23077)));
+}
+
+/**
  * Test that a cursor cannot be timed out while in use, and that it's time of last use is updated
  * when it is unpinned.
  */

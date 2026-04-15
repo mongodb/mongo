@@ -403,6 +403,11 @@ private:
         return _isNoTimeout;
     }
 
+    /**
+     * Updates the cursor metrics on cursor shutdown. Only supposed to be called once per cursor.
+     */
+    void updateCursorMetrics(boost::optional<Date_t> now);
+
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
     const CursorId _cursorid = 0;
 

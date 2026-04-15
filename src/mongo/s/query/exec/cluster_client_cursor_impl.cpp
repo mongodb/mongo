@@ -199,20 +199,26 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
 
+    try {
+        query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
+                                                          _queryStatsKeyHash,
+                                                          std::move(_queryStatsKey),
+                                                          _queryStatsWillNeverExhaust,
+                                                          _firstResponseExecutionTime,
+                                                          _metrics);
 
-    query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
-                                                      _queryStatsKeyHash,
-                                                      std::move(_queryStatsKey),
-                                                      _queryStatsWillNeverExhaust,
-                                                      _firstResponseExecutionTime,
-                                                      _metrics);
+        if (_isChangeStreamQuery) {
+            const auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
 
-    if (_isChangeStreamQuery) {
-        const auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
-        const int64_t lifespanUs = (now - _createdDate).count() * 1000;
-        change_stream_metrics::gLifespan.record(lifespanUs);
-        change_stream_metrics::gCursorsOpenTotal.add(-1);
+            // Clamp to values >= 0, because clock values may go backwards.
+            const int64_t lifespanUs = std::max<int64_t>(0, (now - _createdDate).count() * 1000);
+            change_stream_metrics::gLifespan.record(lifespanUs);
+            change_stream_metrics::gCursorsOpenTotal.add(-1);
+        }
+    } catch (...) {
+        // Continue with the disposal even if errors happen during query stats or metrics updates.
     }
+
     _root->kill(opCtx);
     _hasBeenKilled = true;
 }

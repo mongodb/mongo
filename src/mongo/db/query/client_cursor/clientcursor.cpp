@@ -90,6 +90,11 @@ CursorStats& cursorStats() {
 }
 
 void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
+    if (MONGO_unlikely(birth > death)) {
+        // This can happen because the ClockSource values used for calculating dates are not
+        // guaranteed to be monotonic.
+        birth = death;
+    }
     auto elapsed = death - birth;
     if (elapsed < Seconds(1)) {
         cursorStats().lifespanLessThan1Second.increment();
@@ -186,25 +191,10 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         return;
     }
 
-    if (now) {
-        incrementCursorLifespanMetric(_createdDate, *now);
-
-        if (_isChangeStreamQuery) {
-            const int64_t lifespanUs = (*now - _createdDate).count() * 1000;
-            change_stream_metrics::gLifespan.record(lifespanUs);
-        }
-    }
-
-    cursorStats().open.decrement();
-    if (_isChangeStreamQuery) {
-        change_stream_metrics::gCursorsOpenTotal.add(-1);
-    }
-    if (isNoTimeout()) {
-        cursorStats().openNoTimeout.decrement();
-    }
-
-    if (_metrics.nBatches && *_metrics.nBatches > 1) {
-        cursorStats().moreThanOneBatch.increment();
+    try {
+        updateCursorMetrics(now);
+    } catch (...) {
+        // If any exception occurs when updating metrics, ignore it and continue the disposal.
     }
 
     _exec->dispose(opCtx);
@@ -250,6 +240,33 @@ GenericCursor ClientCursor::toGenericCursor() const {
     }
     gc.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
     return gc;
+}
+
+void ClientCursor::updateCursorMetrics(boost::optional<Date_t> now) {
+    // Should only be called once per cursor.
+    dassert(!_disposed);
+
+    if (now) {
+        incrementCursorLifespanMetric(_createdDate, *now);
+
+        if (_isChangeStreamQuery) {
+            // Clamp to values >= 0, because clock values may go backwards.
+            const int64_t lifespanUs = std::max<int64_t>(0, (*now - _createdDate).count() * 1000);
+            change_stream_metrics::gLifespan.record(lifespanUs);
+        }
+    }
+
+    cursorStats().open.decrement();
+    if (_isChangeStreamQuery) {
+        change_stream_metrics::gCursorsOpenTotal.add(-1);
+    }
+    if (isNoTimeout()) {
+        cursorStats().openNoTimeout.decrement();
+    }
+
+    if (_metrics.nBatches && *_metrics.nBatches > 1) {
+        cursorStats().moreThanOneBatch.increment();
+    }
 }
 
 //
