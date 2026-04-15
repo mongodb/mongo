@@ -96,6 +96,14 @@ void OutStage::doDispose() {
     switch (_tmpCleanUpState) {
         case OutCleanUpProgress::kTmpCollExists:
             dropCollectionCmd(_tempNs);
+            // SERVER-112874: For viewful timeseries, if the primary stepped down and the
+            // temp buckets collection was dropped, inserts may have implicitly created a
+            // non-timeseries collection at the view namespace. Drop it to avoid leaving
+            // temp collections behind.
+            // TODO SERVER-111600: Remove this once 9.0 is LTS and all timeseries are viewless.
+            if (_timeseries && !_viewlessTimeseriesEnabled) {
+                dropCollectionCmd(_tempNs.getTimeseriesViewNamespace());
+            }
             break;
         case OutCleanUpProgress::kRenameComplete:
             // For legacy time-series collections, since we haven't created a view in this state, we

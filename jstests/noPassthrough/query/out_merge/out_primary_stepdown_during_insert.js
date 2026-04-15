@@ -10,7 +10,6 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const sourceCollName = "sourceColl";
 
@@ -100,18 +99,14 @@ function runTest(connInfo, isSharded) {
                 fp.off();
                 awaitAgg();
 
-                // No temporary collections should be left behind after $out fails. There is a known bug
-                // (see SERVER-112874) for viewful timeseries on a sharded cluster, so we avoid validating
-                // this case.
-                if (!isSharded || !isTimeseries || areViewlessTimeseriesEnabled(db)) {
-                    const collNames = db.getCollectionNames();
-                    const temporaryAggCollections = collNames.filter((coll) => coll.includes("tmp.agg_out"));
-                    assert.eq(
-                        temporaryAggCollections.length,
-                        0,
-                        "Temporary agg collection unexpectedly left behind: " + tojson(temporaryAggCollections),
-                    );
-                }
+                // No temporary collections should be left behind after $out fails.
+                const collNames = db.getCollectionNames();
+                const temporaryAggCollections = collNames.filter((coll) => coll.includes("tmp.agg_out"));
+                assert.eq(
+                    temporaryAggCollections.length,
+                    0,
+                    "Temporary agg collection unexpectedly left behind: " + tojson(temporaryAggCollections),
+                );
             }
         }
     }
