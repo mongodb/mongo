@@ -205,6 +205,15 @@ public:
         return;                                                                      \
     }
 
+#ifndef __linux__
+#define SKIP_ON_NON_LINUX()                                                                 \
+    LOGV2(1196906,                                                                          \
+          "Skipping test: client disconnect detection requires Linux epoll-based polling"); \
+    return;
+#else
+#define SKIP_ON_NON_LINUX()
+#endif
+
 // ---------------------------------------------------------------------------
 // With an established connection: requests survive rate-limiter rejections.
 // ---------------------------------------------------------------------------
@@ -237,6 +246,7 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithEstablishedConnection) 
 // ---------------------------------------------------------------------------
 TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithEstablishedConnection) {
     SKIP_ON_GRPC_RATE_LIMITER();
+    SKIP_ON_NON_LINUX();
 
     withEstablishedConnection([&] {
         auto baseline = getRateLimiterStats();
@@ -290,6 +300,7 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithNoEstablishedConnection
 // ---------------------------------------------------------------------------
 TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithNoEstablishedConnection) {
     SKIP_ON_GRPC_RATE_LIMITER();
+    SKIP_ON_NON_LINUX();
 
     auto baseline = getRateLimiterStats();
     auto baselineInterrupted =
