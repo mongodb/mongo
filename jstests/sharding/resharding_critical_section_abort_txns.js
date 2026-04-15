@@ -5,7 +5,8 @@
  * - The response has RetryableWriteError label if the in-progress command is commitTransaction or
  *   abortTransaction. Otherwise, it has TransientTransactionError label.
  * @tags: [
- *   requires_fcv_83
+ *   requires_fcv_83,
+ *   resource_intensive,
  * ]
  */
 
@@ -130,10 +131,7 @@ function assertInterruptedWithRetryableWriteErrorLabel(res) {
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 }
 
-// TODO (SERVER-109184): When featureFlagReshardingVerification is enabled, resharding could hang
-// if the critical section times out while donors are still trying to acquire critical section.
-// This is what one of test cases below is testing. Re-enable the feature flag after the fix.
-const featureFlagReshardingVerification = false;
+const featureFlagReshardingVerification = true;
 const reshardingCriticalSectionTimeoutMillisForTimeoutTest = 5000;
 
 const st = new ShardingTest({
