@@ -381,8 +381,15 @@ class PrefixReadTestCase {
 
     run(conn, ctx) {
         const events = ctx.getChangeEvents(conn, this._readerInstanceName);
-        const startTime = events[0]?.changeEvent?.clusterTime;
-        const endTime = events[events.length - 1]?.changeEvent?.clusterTime;
+        if (events.length === 0) {
+            // IRS (ignoreRemovedShards) drain readers can legitimately see zero
+            // events when the removed shard held all data for this collection.
+            assert(this._allowSkips, "No events captured but allowSkips is false — this indicates a real bug");
+            return;
+        }
+
+        const startTime = events[0].changeEvent.clusterTime;
+        const endTime = events[events.length - 1].changeEvent.clusterTime;
 
         const clusterTimes = ctx.getClusterTimesForResumeTesting(startTime, endTime);
         const workItems = this._buildWorkItems(events, clusterTimes);
