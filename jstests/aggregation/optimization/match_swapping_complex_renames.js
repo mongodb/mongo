@@ -16,9 +16,9 @@ const coll = db.match_swapping_complex_renames;
 
 function createIndexes(indexes) {
     if (Array.isArray(indexes)) {
-        indexes.forEach((idx) => coll.createIndex(idx));
+        indexes.forEach((idx) => assert.commandWorked(coll.createIndex(idx)));
     } else {
-        coll.createIndex(indexes);
+        assert.commandWorked(coll.createIndex(indexes));
     }
 }
 
@@ -27,7 +27,7 @@ function runTest({name, pipeline, positive, negative}) {
         if (positive) {
             it("pushes down $match", function () {
                 coll.drop();
-                coll.insertMany(positive.docs);
+                assert.commandWorked(coll.insertMany(positive.docs));
                 createIndexes(positive.index);
                 assert.eq(positive.expectedCount, coll.aggregate(pipeline).itcount());
                 const explain = coll.explain().aggregate(pipeline);
@@ -38,7 +38,7 @@ function runTest({name, pipeline, positive, negative}) {
         if (negative) {
             it("does not push down $match", function () {
                 coll.drop();
-                coll.insertMany(negative.docs);
+                assert.commandWorked(coll.insertMany(negative.docs));
                 createIndexes(negative.index);
                 assert.eq(negative.expectedCount, coll.aggregate(pipeline).itcount());
                 const explain = coll.explain().aggregate(pipeline);
