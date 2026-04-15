@@ -298,9 +298,10 @@ function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderSt
                 ns: {$in: namespaces},
                 op: {$in: ["c", "n"]},
                 // Discard entries related to
-                // authoritative db metadata management.
+                // authoritative metadata management.
                 "o.dropDatabaseMetadata": {$exists: false},
                 "o.createDatabaseMetadata": {$exists: false},
+                "o.invalidateCollectionMetadata": {$exists: false},
             })
             .sort({ts: -1})
             .limit(expectedOpEntryTemplates.length)

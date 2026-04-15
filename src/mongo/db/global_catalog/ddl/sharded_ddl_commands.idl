@@ -1080,3 +1080,13 @@ commands:
                 type: uuid
                 description: "UUID of the collection being dropped"
         reply_type: OkReply
+
+    _shardsvrCommitCreateCollectionMetadata:
+        command_name: _shardsvrCommitCreateCollectionMetadata
+        cpp_name: ShardsvrCommitCreateCollectionMetadata
+        description: "Internal command to create collection metadata in the shard's catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply

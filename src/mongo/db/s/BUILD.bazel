@@ -713,6 +713,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:internal_clear_collection_sharding_metadata_gen",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_cleanup_structured_encryption_data_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_clone_authoritative_metadata_command.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:shardsvr_commit_create_collection_metadata_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_commit_drop_collection_metadata_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_commit_refine_collection_shard_key_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_compact_structured_encryption_data_command.cpp",

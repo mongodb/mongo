@@ -192,6 +192,7 @@ let testCases = {
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrCommitDropCollectionMetadata: {skip: "internal command"},
+    _shardsvrCommitCreateCollectionMetadata: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},
     _shardsvrRenameCollectionParticipantUnblock: {skip: "internal command"},

@@ -312,5 +312,45 @@ void commitDropCollectionLocally(OperationContext* opCtx,
     clearShardCatalogCacheForDroppedCollection(opCtx, nss, uuid);
 }
 
+void commitCreateCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
+    auto coll = fetchCollection(opCtx, nss);
+    auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
+
+    // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
+    writeCollectionMetadataLocally(opCtx, nss, coll, ownedChunks);
+
+    // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
+    invalidateCollectionMetadataOnSecondaries(
+        opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
+
+    // Update this node CSR with collection metadata and chunks.
+    updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
+}
+
+void commitCreateCollectionChunklessLocally(OperationContext* opCtx, const NamespaceString& nss) {
+    auto coll = fetchCollection(opCtx, nss);
+
+    // This shard does not own any chunks, but we still need the CSS to know the collection is
+    // tracked. Persist a single placeholder chunk so that disk recovery can distinguish a
+    // chunkless-tracked collection from an untracked one without special-case logic.
+    auto range = ChunkRange(coll.getKeyPattern().globalMin(), coll.getKeyPattern().globalMax());
+    ChunkType placeholder(coll.getUuid(),
+                          std::move(range),
+                          ChunkVersion({coll.getEpoch(), coll.getTimestamp()}, {1, 0}),
+                          kChunklessPlaceholderShardId);
+    placeholder.setName(OID::gen());
+    std::vector<ChunkType> placeholderChunks{std::move(placeholder)};
+
+    // Write the collection document and the placeholder chunk to the shard catalog.
+    writeCollectionMetadataLocally(opCtx, nss, coll, placeholderChunks);
+
+    // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
+    invalidateCollectionMetadataOnSecondaries(
+        opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
+
+    // Update this node CSR with chunkless tracked metadata.
+    updateShardCatalogCache(opCtx, nss, coll, placeholderChunks);
+}
+
 }  // namespace shard_catalog_commit
 }  // namespace mongo

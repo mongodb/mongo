@@ -8,9 +8,17 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1, config: 1});
+
+// TODO (SERVER-124050): Investigate failure in this test when authoritative shards are enabled.
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "ShardAuthoritativeCollMetadata")) {
+    jsTestLog("Skipping test because featureFlagShardAuthoritativeCollMetadata is enabled");
+    st.stop();
+    quit();
+}
 
 const kDbName = "testDb";
 const kCollName = "testColl";

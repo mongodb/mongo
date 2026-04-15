@@ -32,9 +32,11 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -905,6 +907,48 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
     ASSERT_EQ(stats.getIntField("recoverersCreated"), 0);
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 0);
     ASSERT_EQ(stats.getIntField("versionResolvedBeforeRecovery"), 1);
+}
+
+TEST_F(AuthoritativeRefreshFixture, TrackedCollectionWithNoChunksOnDiskRecoveredCorrectly) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    const UUID uuid = UUID::gen();
+    const OID epoch = OID::gen();
+    const Timestamp timestamp(Date_t::now());
+    CollectionType collType{kTestNss, epoch, timestamp, Date_t::now(), uuid, kShardKeyPattern};
+
+    auto keyPattern = KeyPattern(kShardKeyPattern);
+    auto range = ChunkRange(keyPattern.globalMin(), keyPattern.globalMax());
+    ChunkType placeholder(uuid,
+                          std::move(range),
+                          ChunkVersion({epoch, timestamp}, {1, 0}),
+                          shard_catalog_commit::kChunklessPlaceholderShardId);
+    placeholder.setName(OID::gen());
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+    {
+        DBDirectClient client(opCtx);
+        client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace, collType.toBSON());
+        client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
+                      placeholder.toConfigBSON());
+    }
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
+    ASSERT_OK(status);
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    auto metadataOpt = csr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadataOpt.has_value());
+    ASSERT_TRUE(metadataOpt->isSharded());
+    ASSERT_FALSE(metadataOpt->getShardPlacementVersion().isSet());
 }
 
 }  // namespace

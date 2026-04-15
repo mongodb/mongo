@@ -90,6 +90,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -1137,12 +1138,23 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         ? originalNss.getTimeseriesViewNamespace()
         : originalNss;
 
+    const bool clearFilteringMetadata = !feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
+    if (clearFilteringMetadata) {
+        actionPtr = std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+    } else {
+        actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+    }
+
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
         defaultMajorityWriteConcernDoNotUse(),
-        ShardingRecoveryService::FilteringMetadataClearer(),
+        *actionPtr,
         throwIfReasonDiffers);
 
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
@@ -1150,7 +1162,7 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         mainNss,
         critSecReason,
         defaultMajorityWriteConcernDoNotUse(),
-        ShardingRecoveryService::FilteringMetadataClearer(),
+        *actionPtr,
         throwIfReasonDiffers);
 }
 
@@ -1484,9 +1496,22 @@ void CreateCollectionCoordinator::_exitCriticalSectionOnShards(
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
     unblockCRUDOperationsRequest.setThrowIfReasonDiffers(throwIfReasonDiffers);
+
+    // When shards are authoritative, there is no need to clear the filtering metadata upon
+    // releasing the critical section; the commit phase is responsible for updating the shard
+    // catalog (both durable and in-memory) with current information on both primary and secondary
+    // nodes.
+    bool isDDLAuthoritative = feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (isDDLAuthoritative) {
+        unblockCRUDOperationsRequest.setClearCollMetadata(false);
+    }
+
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
                                                    getNewSession(opCtx));
+
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
         **executor, token, unblockCRUDOperationsRequest);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
@@ -1578,7 +1603,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kCommitOnShardingCatalog,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                _commitOnShardingCatalog(opCtx, executor, token);
+                _commitOnGlobalCatalog(opCtx, executor, token);
+                _commitOnShardCatalog(opCtx, executor, token);
             }))
         .then(_buildPhaseHandler(
             Phase::kSetPostCommitMetadata,
@@ -2213,7 +2239,7 @@ void CreateCollectionCoordinator::_notifyChangeStreamReadersOnPlacementChanged(
 }
 
 
-void CreateCollectionCoordinator::_commitOnShardingCatalog(
+void CreateCollectionCoordinator::_commitOnGlobalCatalog(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
@@ -2320,6 +2346,39 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
     // Checkpoint configTime in order to preserve causality of operations in
     // case of a stepdown.
     VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
+}
+
+void CreateCollectionCoordinator::_commitOnShardCatalog(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
+    }
+
+    // At this point, metadata is published in the global catalog. The shard catalog commit is
+    // protected from concurrent migrations because the critical section is still held on all
+    // involved shards.
+
+    std::set<ShardId> involvedShards;
+    const auto& cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
+    cm.getAllShardIds(&involvedShards);
+
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+        opCtx, nss(), {involvedShards.begin(), involvedShards.end()}, session, executor, token);
+
+    // The DB primary shard must always know that a collection is tracked, even when it does not
+    // own any chunks. We persist a placeholder chunk locally so that (1) disk recovery can
+    // distinguish a chunkless-tracked collection from an untracked one without special-case
+    // logic, and (2) CheckMetadataConsistency can verify the DB primary always has an entry.
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    if (involvedShards.find(primaryShardId) == involvedShards.end()) {
+        shard_catalog_commit::commitCreateCollectionChunklessLocally(opCtx, nss());
+    }
 }
 
 void CreateCollectionCoordinator::_setPostCommitMetadata(

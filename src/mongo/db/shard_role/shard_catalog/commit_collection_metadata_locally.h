@@ -31,11 +31,18 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
-
+MONGO_MOD_PARENT_PRIVATE;
 namespace mongo {
 namespace shard_catalog_commit {
+
+/**
+ * Shard id for the placeholder chunk when a collection is tracked on a shard but owns no real
+ * chunks (see commitCreateCollectionChunklessLocally).
+ */
+inline const ShardId kChunklessPlaceholderShardId{"__chunkless_placeholder__"};
 
 /**
  * Fetches the latest collection metadata and owned chunks from the global catalog, persists them
@@ -55,6 +62,24 @@ void commitRefineShardKeyLocally(OperationContext* opCtx, const NamespaceString&
 void commitDropCollectionLocally(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const UUID& uuid);
+
+/**
+ * Fetches the collection metadata and owned chunks from the global catalog, persists them to the
+ * shard catalog (config.shard.catalog.collections and config.shard.catalog.chunks), writes an
+ * oplog entry to invalidate collection metadata on secondaries, and updates the in-memory
+ * CollectionShardingRuntime (CSR) with the new routing information.
+ */
+void commitCreateCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Fetches the collection metadata from the global catalog (without chunks), persists only the
+ * collection document to the shard catalog (config.shard.catalog.collections), writes an oplog
+ * entry to invalidate collection metadata on secondaries, and updates the in-memory
+ * CollectionShardingRuntime (CSR) with a chunkless tracked metadata. This is used for shards that
+ * participate on a tracked collection but do not own any chunks (e.g., the DB primary shard after
+ * create collection).
+ */
+void commitCreateCollectionChunklessLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace shard_catalog_commit
 }  // namespace mongo

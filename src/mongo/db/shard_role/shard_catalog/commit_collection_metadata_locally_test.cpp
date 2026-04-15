@@ -197,6 +197,79 @@ TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyIsIdempotent) {
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
 }
 
+TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionPersistsCollectionAndChunks) {
+    auto [collType, chunks] = makeCollectionMetadata(3);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCreateCollectionLocally(operationContext(), kTestNss);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 3);
+
+    auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(collDocs.size(), 1u);
+    ASSERT_EQ(UUID::fromCDR(collDocs[0].getField("uuid").uuid()), collType.getUuid());
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    ASSERT_EQ(chunkDocs.size(), 3u);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionUpdatesCSR) {
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCreateCollectionLocally(operationContext(), kTestNss);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->isSharded());
+    ASSERT_EQ(metadata->getChunkManager()->getUUID(), collType.getUuid());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionIsIdempotent) {
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCreateCollectionLocally(operationContext(), kTestNss);
+    shard_catalog_commit::commitCreateCollectionLocally(operationContext(), kTestNss);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionChunklessPersistsTokenToDisk) {
+    auto [collType, chunks] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+
+    shard_catalog_commit::commitCreateCollectionChunklessLocally(operationContext(), kTestNss);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+
+    auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(collDocs.size(), 1u);
+    ASSERT_EQ(UUID::fromCDR(collDocs[0].getField("uuid").uuid()), collType.getUuid());
+
+    // The placeholder chunk is persisted so the token survives restarts.
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    ASSERT_EQ(UUID::fromCDR(chunkDocs[0].getField(ChunkType::collectionUUID.name()).uuid()),
+              collType.getUuid());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionChunklessUpdatesCSR) {
+    auto [collType, chunks] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+
+    shard_catalog_commit::commitCreateCollectionChunklessLocally(operationContext(), kTestNss);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->isSharded());
+    ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
+}
+
 TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyRemovesStaleChunks) {
     auto [collType, chunks] = makeCollectionMetadata(2);
 

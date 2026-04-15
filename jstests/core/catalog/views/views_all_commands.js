@@ -201,6 +201,7 @@ let viewsCommandTests = {
     _shardsvrRefineCollectionShardKey: {skip: isAnInternalCommand},
     _shardsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _shardsvrCommitDropCollectionMetadata: {skip: isAnInternalCommand},
+    _shardsvrCommitCreateCollectionMetadata: {skip: isAnInternalCommand},
     _shardsvrRenameCollection: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipantUnblock: {skip: isAnInternalCommand},

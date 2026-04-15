@@ -199,9 +199,15 @@ private:
         const CancellationToken& token);
 
     // Commits the create collection operation to the global catalog within a transaction.
-    void _commitOnShardingCatalog(OperationContext* opCtx,
-                                  const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                  const CancellationToken& token);
+    void _commitOnGlobalCatalog(OperationContext* opCtx,
+                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                const CancellationToken& token);
+
+
+    // Commits the create collection operation to the shard catalog with a command.
+    void _commitOnShardCatalog(OperationContext* opCtx,
+                               const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                               const CancellationToken& token);
 
     // Ensure that the change stream event gets emitted and install the new filtering metadata.
     void _setPostCommitMetadata(OperationContext* opCtx,

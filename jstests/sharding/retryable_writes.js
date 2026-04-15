@@ -2,6 +2,7 @@
  * Test basic retryable write without errors by checking that the resulting collection after the
  * retry is as expected and it does not create additional oplog entries.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -121,10 +122,23 @@ function handleSessionsCollection(mainConn, priConn, configConn) {
         createSessionsCollection(configConn);
         createdCollection = true;
     }
-    // If we are in a config shard and we dropped and recreated the sessions collection then, as
-    // part of the create coordinator, we ran a transaction which will mess with server status
-    // counts.
-    return TestData.configShard && mainConn != priConn && createdCollection;
+
+    let extraCollectionWrites = 0;
+    if (createdCollection && mainConn != priConn) {
+        // If we are in a config shard and we dropped and recreated the sessions collection then,
+        // as part of the create coordinator, we ran a transaction which will mess with server
+        // status counts.
+        if (TestData.configShard) {
+            extraCollectionWrites += 1;
+        }
+        // When shard authoritative collection metadata is enabled, the create coordinator commits
+        // metadata to the shard catalog via a retryable write (_shardsvrCommitCreateCollection
+        // Metadata), adding another write to config.transactions on the shard.
+        if (FeatureFlagUtil.isPresentAndEnabled(priConn, "ShardAuthoritativeCollMetadata")) {
+            extraCollectionWrites += 1;
+        }
+    }
+    return extraCollectionWrites;
 }
 
 function runTests(mainConn, priConn, configConn) {
@@ -154,7 +168,7 @@ function runTests(mainConn, priConn, configConn) {
     let testDBPri = priConn.getDB("test");
     assert.eq(2, testDBPri.user.find().itcount());
 
-    let createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+    let extraCollectionWrites = handleSessionsCollection(mainConn, priConn, configConn);
 
     let retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
     assert.eq(result.ok, retryResult.ok);
@@ -172,7 +186,7 @@ function runTests(mainConn, priConn, configConn) {
         newStatus.transactions,
         1 /* newCommands */,
         2 /* newStatements */,
-        createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */,
+        1 + extraCollectionWrites /* newCollectionWrites */,
     );
 
     ////////////////////////////////////////////////////////////////////////
@@ -202,7 +216,7 @@ function runTests(mainConn, priConn, configConn) {
 
     assert.eq(3, testDBPri.user.find().itcount());
 
-    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+    extraCollectionWrites = handleSessionsCollection(mainConn, priConn, configConn);
 
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
     assert.eq(result.ok, retryResult.ok);
@@ -228,7 +242,7 @@ function runTests(mainConn, priConn, configConn) {
         newStatus.transactions,
         1 /* newCommands */,
         3 /* newStatements */,
-        createdCollectionInTxn ? 4 : 3 /* newCollectionWrites */,
+        3 + extraCollectionWrites /* newCollectionWrites */,
     );
 
     ////////////////////////////////////////////////////////////////////////
@@ -261,7 +275,7 @@ function runTests(mainConn, priConn, configConn) {
     assert.eq(1, testDBPri.user.find({x: 1}).itcount());
     assert.eq(1, testDBPri.user.find({y: 1}).itcount());
 
-    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+    extraCollectionWrites = handleSessionsCollection(mainConn, priConn, configConn);
 
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
     assert.eq(result.ok, retryResult.ok);
@@ -281,7 +295,7 @@ function runTests(mainConn, priConn, configConn) {
         newStatus.transactions,
         1 /* newCommands */,
         2 /* newStatements */,
-        createdCollectionInTxn ? 3 : 2 /* newCollectionWrites */,
+        2 + extraCollectionWrites /* newCollectionWrites */,
     );
 
     ////////////////////////////////////////////////////////////////////////
@@ -305,7 +319,7 @@ function runTests(mainConn, priConn, configConn) {
     updateOplogEntries = oplog.find({ns: "test.user", op: "u"}).itcount();
     assert.eq({_id: 60, x: 1}, testDBPri.user.findOne({_id: 60}));
 
-    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+    extraCollectionWrites = handleSessionsCollection(mainConn, priConn, configConn);
 
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
@@ -322,7 +336,7 @@ function runTests(mainConn, priConn, configConn) {
         newStatus.transactions,
         1 /* newCommands */,
         1 /* newStatements */,
-        createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */,
+        1 + extraCollectionWrites /* newCollectionWrites */,
     );
 
     ////////////////////////////////////////////////////////////////////////
@@ -345,7 +359,7 @@ function runTests(mainConn, priConn, configConn) {
     let oplogEntries = oplog.find({ns: "test.user", op: "u"}).itcount();
     assert.eq({_id: 60, x: 2}, testDBPri.user.findOne({_id: 60}));
 
-    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+    extraCollectionWrites = handleSessionsCollection(mainConn, priConn, configConn);
 
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
@@ -361,7 +375,7 @@ function runTests(mainConn, priConn, configConn) {
         newStatus.transactions,
         1 /* newCommands */,
         1 /* newStatements */,
-        createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */,
+        1 + extraCollectionWrites /* newCollectionWrites */,
     );
 
     ////////////////////////////////////////////////////////////////////////
@@ -384,7 +398,7 @@ function runTests(mainConn, priConn, configConn) {
     oplogEntries = oplog.find({ns: "test.user", op: "u"}).itcount();
     assert.eq({_id: 60, x: 3}, testDBPri.user.findOne({_id: 60}));
 
-    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+    extraCollectionWrites = handleSessionsCollection(mainConn, priConn, configConn);
 
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
@@ -400,7 +414,7 @@ function runTests(mainConn, priConn, configConn) {
         newStatus.transactions,
         1 /* newCommands */,
         1 /* newStatements */,
-        createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */,
+        1 + extraCollectionWrites /* newCollectionWrites */,
     );
 
     ////////////////////////////////////////////////////////////////////////
@@ -424,7 +438,7 @@ function runTests(mainConn, priConn, configConn) {
     oplogEntries = oplog.find({ns: "test.user", op: "d"}).itcount();
     let docCount = testDBPri.user.find().itcount();
 
-    createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
+    extraCollectionWrites = handleSessionsCollection(mainConn, priConn, configConn);
 
     retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
 
@@ -440,7 +454,7 @@ function runTests(mainConn, priConn, configConn) {
         newStatus.transactions,
         1 /* newCommands */,
         1 /* newStatements */,
-        createdCollectionInTxn ? 2 : 1 /* newCollectionWrites */,
+        1 + extraCollectionWrites /* newCollectionWrites */,
     );
 }
 

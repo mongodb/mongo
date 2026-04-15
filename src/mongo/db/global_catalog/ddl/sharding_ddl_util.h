@@ -406,6 +406,18 @@ MONGO_MOD_PRIVATE void commitDropCollectionMetadataToShardCatalog(
     const CancellationToken& token);
 
 /**
+ *  Commits a shardCollection operation to the shard catalog by sending the command
+ * `_shardsvrCommitCreateCollectionMetadata` to all given shards.
+ */
+MONGO_MOD_PRIVATE void commitCreateCollectionMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
+/**
  * Based on the FCV, get the where the DDL needs to act accordingly to the database
  * authoritativeness.
  */

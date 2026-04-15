@@ -139,6 +139,7 @@ const allCommands = {
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrCommitRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrCommitDropCollectionMetadata: {skip: isPrimaryOnly},
+    _shardsvrCommitCreateCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},
     _shardsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},
