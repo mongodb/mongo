@@ -630,7 +630,12 @@ class _AddRemoveShardThread(threading.Thread):
             destination = self._get_other_shard_id(source)
             self.logger.info("Running moveCollection for " + namespace + " to " + destination)
             try:
-                self._client.admin.command({"moveCollection": namespace, "toShard": destination})
+                self._client.admin.command(
+                    {
+                        "moveCollection": namespace,
+                        "toShard": destination,
+                    }
+                )
             except pymongo.errors.OperationFailure as err:
                 if not self._is_expected_move_collection_error(err, namespace):
                     raise err
@@ -667,12 +672,14 @@ class _AddRemoveShardThread(threading.Thread):
                 + destination
             )
             try:
+                # Explicitly specifying a wc as a jsfuzztest might changed the default to something unsatisfiable
                 self._client.admin.command(
                     {
                         "moveRange": namespace,
                         "min": chunk["min"],
                         "max": chunk["max"],
                         "toShard": destination,
+                        "writeConcern": {"w": "majority"},
                     }
                 )
             except pymongo.errors.OperationFailure as err:
@@ -692,7 +699,12 @@ class _AddRemoveShardThread(threading.Thread):
             destination = self._get_other_shard_id(source)
             try:
                 self.logger.info("Running movePrimary for " + database + " to " + destination)
-                cmd_obj = {"movePrimary": database, "to": destination}
+                # Explicitly specifying a wc as a jsfuzztest might changed the default to something unsatisfiable
+                cmd_obj = {
+                    "movePrimary": database,
+                    "to": destination,
+                    "writeConcern": {"w": "majority"},
+                }
                 if self._move_primary_comment:
                     cmd_obj["comment"] = self._move_primary_comment
                 self._client.admin.command(cmd_obj)
