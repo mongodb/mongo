@@ -88,10 +88,9 @@ protected:
 
         int currentBufSize = 0;
         // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
-        FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(
-            makeFile(),
-            /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+        FileBasedStorage<IntWrapper, IntWrapper> sorterStorage(makeFile(),
+                                                               /*dbName=*/boost::none,
+                                                               sorter::kLatestChecksumVersion);
         std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> sorter =
             sorterStorage.makeWriter(opts, /*settings=*/{});
         for (int i = 0; i < range; ++i) {

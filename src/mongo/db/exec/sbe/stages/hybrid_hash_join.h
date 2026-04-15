@@ -182,7 +182,7 @@ public:
     }
 
 private:
-    sorter::FileBasedSorterStorage<FileKey, FileValue> _storage;
+    sorter::FileBasedStorage<FileKey, FileValue> _storage;
     std::unique_ptr<SortedStorageWriter<FileKey, FileValue>> _writer;
     SorterRange _buildRange{};
     SorterRange _probeRange{};

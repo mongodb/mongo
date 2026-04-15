@@ -108,10 +108,9 @@ void SpoolStage::spill() {
 
     auto opts = SortOptions();
 
-    sorter::FileBasedSorterStorage<RecordId, NullValue> sorterStorage(
-        _file,
-        /*dbName=*/boost::none,
-        sorter::kLatestChecksumVersion);
+    sorter::FileBasedStorage<RecordId, NullValue> sorterStorage(_file,
+                                                                /*dbName=*/boost::none,
+                                                                sorter::kLatestChecksumVersion);
     std::unique_ptr<SortedStorageWriter<RecordId, NullValue>> writer =
         sorterStorage.makeWriter(opts, /*settings=*/{});
     // Do not spill the records that have been already consumed.

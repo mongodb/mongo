@@ -273,18 +273,18 @@ private:
 };
 
 template <typename Key, typename Value>
-class ContainerBasedSorterStorage : public SorterStorageBase<Key, Value> {
+class ContainerBasedStorage : public StorageBase<Key, Value> {
 public:
-    using Settings = SorterStorageBase<Key, Value>::Settings;
+    using Settings = StorageBase<Key, Value>::Settings;
 
-    ContainerBasedSorterStorage(OperationContext& opCtx,
-                                RecoveryUnit& ru,
-                                IntegerKeyedContainer& container,
-                                SorterContainerStats& stats,
-                                int64_t currKey,
-                                boost::optional<DatabaseName> dbName,
-                                SorterChecksumVersion checksumVersion)
-        : SorterStorageBase<Key, Value>(std::move(dbName), checksumVersion),
+    ContainerBasedStorage(OperationContext& opCtx,
+                          RecoveryUnit& ru,
+                          IntegerKeyedContainer& container,
+                          SorterContainerStats& stats,
+                          int64_t currKey,
+                          boost::optional<DatabaseName> dbName,
+                          SorterChecksumVersion checksumVersion)
+        : StorageBase<Key, Value>(std::move(dbName), checksumVersion),
           _opCtx(opCtx),
           _ru(ru),
           _container(container),
@@ -353,7 +353,7 @@ public:
                           int64_t batchBytes,
                           int64_t minAvailableDiskBytesToSpill)
         : SpillerBase<Key, Value, Comparator>(
-              std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
+              std::make_unique<ContainerBasedStorage<Key, Value>>(
                   opCtx, ru, container, stats, 1, std::move(dbName), checksumVersion),
               minAvailableDiskBytesToSpill),
           _opCtx(opCtx),
@@ -435,8 +435,8 @@ public:
     };
 
 private:
-    ContainerBasedSorterStorage<Key, Value>& _containerBasedStorage() {
-        return *static_cast<ContainerBasedSorterStorage<Key, Value>*>(this->_storage.get());
+    ContainerBasedStorage<Key, Value>& _containerBasedStorage() {
+        return *static_cast<ContainerBasedStorage<Key, Value>*>(this->_storage.get());
     }
 
     std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(

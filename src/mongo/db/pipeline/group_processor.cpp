@@ -240,9 +240,9 @@ void GroupProcessor::spill() {
         _file = std::make_shared<SorterFile>(sorter::nextFileName(_expCtx->getTempDir()),
                                              _spillStats.get());
     }
-    sorter::FileBasedSorterStorage<Value, Value> sorterStorage(_file,
-                                                               /*dbName=*/boost::none,
-                                                               sorter::kLatestChecksumVersion);
+    sorter::FileBasedStorage<Value, Value> sorterStorage(_file,
+                                                         /*dbName=*/boost::none,
+                                                         sorter::kLatestChecksumVersion);
     std::unique_ptr<SortedStorageWriter<Value, Value>> writer =
         sorterStorage.makeWriter(SortOptions(), /*settings=*/{});
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.

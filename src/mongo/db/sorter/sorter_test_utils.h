@@ -308,7 +308,7 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter,
     const SortOptions opts = SortOptions();
     auto spillFile = std::make_shared<SorterFile>(sorter::nextFileName(spillDir.path()), fileStats);
     // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
-    FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(
+    FileBasedStorage<IntWrapper, IntWrapper> sorterStorage(
         spillFile, /*dbName=*/boost::none, SorterChecksumVersion::v2);
     std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> writer =
         sorterStorage.makeWriter(opts, /*settings=*/{});
