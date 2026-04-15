@@ -38,11 +38,9 @@ CollectionSizeCount readLatest(OperationContext* opCtx,
                                const SizeCountTimestampStore& timestampStore,
                                SeekableRecordCursor& cursor,
                                UUID uuid) {
-    const auto entry = sizeCountStore.read(opCtx, uuid);
-    massert(12092100,
-            fmt::format("Expected the size/count store to contain an entry for UUID={}",
-                        uuid.toString()),
-            entry.has_value());
+    const auto entry =
+        sizeCountStore.read(opCtx, uuid)
+            .value_or(SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 0, .count = 0});
     // We default to Timestamp::min() when the timestamp store does not yet contain a timestamp.
     const Timestamp timestamp = timestampStore.read(opCtx).value_or(Timestamp::min());
 
@@ -50,17 +48,17 @@ CollectionSizeCount readLatest(OperationContext* opCtx,
     // timestamp store to determine where to begin reading the oplog. The size and count entry is
     // valid as of the maximum timestamp, so we only need to aggregate deltas after that point in
     // time.
-    const Timestamp seekAfterTs = std::max(entry->timestamp, timestamp);
+    const Timestamp seekAfterTs = std::max(entry.timestamp, timestamp);
     const auto deltas = aggregateSizeCountDeltasInOplog(cursor, seekAfterTs, uuid).deltas;
 
     // If there are no oplog entries for this UUID after seekAfterTs, the stored values are already
     // accurate and no delta adjustment is needed.
     if (!deltas.contains(uuid)) {
-        return CollectionSizeCount{.size = entry->size, .count = entry->count};
+        return CollectionSizeCount{.size = entry.size, .count = entry.count};
     }
 
-    return CollectionSizeCount{.size = entry->size + deltas.at(uuid).sizeCount.size,
-                               .count = entry->count + deltas.at(uuid).sizeCount.count};
+    return CollectionSizeCount{.size = entry.size + deltas.at(uuid).sizeCount.size,
+                               .count = entry.count + deltas.at(uuid).sizeCount.count};
 }
 
 [[nodiscard]] CollectionSizeCount readPersisted(OperationContext* opCtx,

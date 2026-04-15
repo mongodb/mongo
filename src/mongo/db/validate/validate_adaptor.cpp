@@ -1407,7 +1407,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         switch (fastCountType) {
             case CollectionValidation::FastCountType::legacySizeStorer:
                 if (enforceCount) {
-                    if (const auto fastCount = coll->numRecords(opCtx); fastCount != _numRecords) {
+                    if (const auto fastCount = coll->latestSizeCount(opCtx).count;
+                        fastCount != _numRecords) {
                         results->addError(
                             fmt::format("fast count ({}) does not match number of "
                                         "records ({}) for collection '{}'",
@@ -1417,7 +1418,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                     }
                 }
                 if (enforceSize) {
-                    if (const auto fastSize = coll->dataSize(opCtx); fastSize != dataSizeTotal) {
+                    if (const auto fastSize = coll->latestSizeCount(opCtx).size;
+                        fastSize != dataSizeTotal) {
                         results->addError(
                             fmt::format("fast size ({}) does not match data size ({}) for "
                                         "collection '{}'",
@@ -1429,7 +1431,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 break;
             case CollectionValidation::FastCountType::replicated:
                 if (enforceCount) {
-                    if (const auto fastCount = coll->numRecords(opCtx); fastCount != _numRecords) {
+                    if (const auto fastCount = coll->latestSizeCount(opCtx).count;
+                        fastCount != _numRecords) {
                         results->addError(
                             fmt::format("replicated fast count ({}) does not match number of "
                                         "records ({}) for collection '{}'",
@@ -1439,7 +1442,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                     }
                 }
                 if (enforceSize) {
-                    if (const auto fastSize = coll->dataSize(opCtx); fastSize != dataSizeTotal) {
+                    if (const auto fastSize = coll->latestSizeCount(opCtx).size;
+                        fastSize != dataSizeTotal) {
                         results->addError(
                             fmt::format("replicated fast size ({}) does not match data size ({}) "
                                         "for collection '{}'",

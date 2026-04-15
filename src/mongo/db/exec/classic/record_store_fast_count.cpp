@@ -56,7 +56,7 @@ PlanStage::StageState RecordStoreFastCountStage::doWork(WorkingSetID* out) {
     // This stage never returns a working set member.
     *out = WorkingSet::INVALID_ID;
 
-    long long nCounted = collectionPtr()->numRecords(opCtx());
+    long long nCounted = collectionPtr()->latestSizeCount(opCtx()).count;
 
     if (_skip) {
         nCounted -= _skip;

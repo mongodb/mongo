@@ -33,6 +33,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_read.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -197,8 +198,37 @@ CollectionSizeCount ReplicatedFastCountManager::find(const UUID& uuid) const {
     return {};
 }
 
+CollectionSizeCount ReplicatedFastCountManager::findLatest(OperationContext* opCtx,
+                                                           UUID uuid) const {
+    // Callers sometimes acquire a collection lock before reading findLatest(). When we try to
+    // acquire an additional oplog collection lock here, an assertion can be triggered when multiple
+    // lock acquisitions are disallowed, for example, during capped collection deletes. These
+    // operations should be thread safe, though, since we only acquire IS locks here, but this RAII
+    // wrapper suppresses the assertion for now.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+        shard_role_details::getLocker(opCtx));
+
+    // The oplog visible timestamp managed by the WiredTigerOplogManager is at most the WiredTiger
+    // all_durable timestamp which never includes oplog holes. However, some callers of findLatest()
+    // expect to see all committed changes, including those beyond one or more oplog holes. We
+    // override the RecoveryUnit's oplog visible timestamp here to allow reading all oplog entries
+    // for the duration of this function.
+    ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
+        shard_role_details::getRecoveryUnit(opCtx), boost::none);
+
+    const AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+    const auto& oplogColl = oplogRead.getCollection();
+    massert(123334, "oplog collection not found", oplogColl);
+
+    auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/true);
+
+    return replicated_fast_count::readLatest(
+        opCtx, _sizeCountStore, _timestampStore, *oplogCursor, uuid);
+}
+
 CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* opCtx,
-                                                              const UUID& uuid) const {
+                                                              UUID uuid) const {
     return replicated_fast_count::readPersisted(opCtx, _sizeCountStore, uuid);
 }
 

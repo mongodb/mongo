@@ -507,6 +507,10 @@ public:
         return _coll->dataSize(opCtx);
     }
 
+    CollectionSizeCount latestSizeCount(OperationContext* opCtx) const override {
+        return _coll->latestSizeCount(opCtx);
+    }
+
     CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const override {
         return _coll->persistedSizeCount(opCtx);
     }

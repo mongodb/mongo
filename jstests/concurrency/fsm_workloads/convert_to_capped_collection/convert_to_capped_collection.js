@@ -16,11 +16,13 @@
  *   # it to fail due to not finishing quickly enough.
  *   incompatible_with_concurrency_simultaneous,
  *   requires_collstats,
- *   requires_capped
+ *   requires_capped,
+ *   # TODO(SERVER-124037): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 export const $config = (function () {
-    // TODO: This workload may fail if an iteration multiplier is specified.
+    // TODO(SERVER-124041): This workload may fail if an iteration multiplier is specified.
     let data = {prefix: "convert_to_capped_collection"};
 
     let states = (function () {

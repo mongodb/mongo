@@ -10,6 +10,8 @@
  *   # convertToCapped requires a global lock and any background operations on the database causes
  *   # it to fail due to not finishing quickly enough.
  *   incompatible_with_concurrency_simultaneous,
+ *   # TODO(SERVER-124037): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

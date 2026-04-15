@@ -51,6 +51,12 @@ TEST_F(SizeCountTimestampStoreTest, WriteMassertsWithoutWriteUnitOfWork) {
     ASSERT_THROWS_CODE(store.write(operationContext(), Timestamp(10, 1)), DBException, 12280400);
 }
 
+TEST_F(SizeCountTimestampStoreTest, ReadReturnsNoneWhenCollectionDoesNotExist) {
+    const SizeCountTimestampStore store;
+
+    EXPECT_FALSE(store.read(operationContext()).has_value());
+}
+
 TEST_F(SizeCountTimestampStoreTest, ReadReturnsNoneWhenDocumentDoesNotExist) {
     ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), operationContext()));
     const SizeCountTimestampStore store;

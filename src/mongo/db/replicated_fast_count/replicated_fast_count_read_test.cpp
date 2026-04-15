@@ -134,9 +134,8 @@ TEST_F(ReadLatestTest, UuidNotFoundInSizeCountStore) {
     OplogCursorMock cursor(std::list<repl::OplogEntry>{});
     const UUID uuid = UUID::gen();
 
-    EXPECT_THROW(std::ignore =
-                     readLatest(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
-                 DBException);
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
+              CollectionSizeCount({.size = 0, .count = 0}));
 }
 
 TEST_F(ReadLatestTest, UuidNotFoundInSizeCountTimestampStore) {

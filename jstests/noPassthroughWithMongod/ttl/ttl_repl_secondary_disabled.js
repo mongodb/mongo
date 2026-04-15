@@ -1,6 +1,9 @@
 /**
  * Test TTL docs are not deleted from secondaries directly
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   featureFlagReplicatedFastCount_incompatible
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

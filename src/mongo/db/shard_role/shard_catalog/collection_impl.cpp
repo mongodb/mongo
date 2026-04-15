@@ -65,6 +65,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -798,12 +799,28 @@ bool CollectionImpl::isCappedAndNeedsDelete(OperationContext* opCtx) const {
         return false;
     }
 
-    if (dataSize(opCtx) > getCollectionOptions().cappedSize) {
+    // When writes are batched, the capped collection insert is not written to the oplog until the
+    // top-level WriteUnitOfWork commits. When writes are not batched, the capped collection insert
+    // is written to the oplog immediately. latestSizeCount() scans the oplog to compute the latest
+    // collection size/count, so it misses the latest insert when writes are batched. To correctly
+    // compute currentDataSize and currentNumRecords, we include the uncommitted size/count changes
+    // if and only if writes are batched.
+    const bool batched = BatchedWriteContext::get(opCtx).writesAreBatched();
+    const CollectionSizeCount uncommittedChanges = (batched)
+        ? UncommittedFastCountChange::getForRead(opCtx).find(uuid())
+        : CollectionSizeCount{.size = 0, .count = 0};
+
+    const auto [latestSize, latestCount] = latestSizeCount(opCtx);
+
+    const long long currentDataSize = latestSize + uncommittedChanges.size;
+    const long long currentNumRecords = latestCount + uncommittedChanges.count;
+
+    if (currentDataSize > getCollectionOptions().cappedSize) {
         return true;
     }
 
     const auto cappedMaxDocs = getCollectionOptions().cappedMaxDocs;
-    if ((cappedMaxDocs != 0) && (numRecords(opCtx) > cappedMaxDocs)) {
+    if ((cappedMaxDocs != 0) && (currentNumRecords > cappedMaxDocs)) {
         return true;
     }
 
@@ -1116,6 +1133,13 @@ long long CollectionImpl::dataSize(OperationContext* opCtx) const {
         ? ReplicatedFastCountManager::get(opCtx->getServiceContext()).find(uuid()).size +
             UncommittedFastCountChange::getForRead(opCtx).find(uuid()).size
         : _shared->_recordStore->dataSize();
+}
+
+CollectionSizeCount CollectionImpl::latestSizeCount(OperationContext* opCtx) const {
+    return (isReplicatedFastCountEnabled(opCtx) && isReplicatedFastCountEligible(_ns))
+        ? ReplicatedFastCountManager::get(opCtx->getServiceContext()).findLatest(opCtx, uuid())
+        : CollectionSizeCount{_shared->_recordStore->dataSize(),
+                              _shared->_recordStore->numRecords()};
 }
 
 CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) const {

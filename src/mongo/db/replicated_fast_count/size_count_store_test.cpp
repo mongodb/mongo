@@ -44,6 +44,12 @@ namespace {
 
 class SizeCountStoreTest : public CatalogTestFixture {};
 
+TEST_F(SizeCountStoreTest, ReadReturnsNoneWhenCollectionDoesNotExist) {
+    const SizeCountStore store;
+
+    EXPECT_FALSE(store.read(operationContext(), UUID::gen()).has_value());
+}
+
 TEST_F(SizeCountStoreTest, ReadReturnsNoneWhenDocumentDoesNotExist) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
     const SizeCountStore store;

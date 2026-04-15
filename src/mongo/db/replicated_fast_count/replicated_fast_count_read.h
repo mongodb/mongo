@@ -45,8 +45,6 @@ namespace mongo::replicated_fast_count {
  * `timestampStore` are used to determine where to begin traversing `cursor`.
  *
  * `cursor` must be positioned on an oplog collection.
- *
- * If `uuid` is not contained in `sizeCountStore`, readLatest() throws an assertion error.
  */
 [[nodiscard]] CollectionSizeCount readLatest(OperationContext* opCtx,
                                              const SizeCountStore& sizeCountStore,

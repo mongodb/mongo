@@ -33,6 +33,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
@@ -119,8 +120,21 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     invariant(shard_role_details::getLocker(opCtx)->getLockMode(
                   ResourceId(RESOURCE_METADATA, nss)) == MODE_X);
 
-    const long long currentDataSize = collection->dataSize(opCtx);
-    const long long currentNumRecords = collection->numRecords(opCtx);
+    // When writes are batched, the capped collection insert is not written to the oplog until the
+    // top-level WriteUnitOfWork commits. When writes are not batched, the capped collection insert
+    // is written to the oplog immediately. latestSizeCount() scans the oplog to compute the latest
+    // collection size/count, so it misses the latest insert when writes are batched. To correctly
+    // compute currentDataSize and currentNumRecords, we include the uncommitted size/count changes
+    // if and only if writes are batched.
+    const bool batched = BatchedWriteContext::get(opCtx).writesAreBatched();
+    const CollectionSizeCount uncommittedChanges = (batched)
+        ? UncommittedFastCountChange::getForRead(opCtx).find(collection->uuid())
+        : CollectionSizeCount{.size = 0, .count = 0};
+
+    const auto [latestSize, latestCount] = collection->latestSizeCount(opCtx);
+
+    const long long currentDataSize = latestSize + uncommittedChanges.size;
+    const long long currentNumRecords = latestCount + uncommittedChanges.count;
 
     const auto cappedMaxSize = collection->getCollectionOptions().cappedSize;
     const long long sizeOverCap =

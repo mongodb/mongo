@@ -214,6 +214,26 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "replicated_fast_count_manager_test",
+    srcs = [
+        "replicated_fast_count_manager_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "replicated_fast_count_init",
+        "replicated_fast_count_manager",
+        "replicated_fast_count_test_helpers",
+        "size_count_store",
+        "size_count_timestamp_store",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:recovery_unit_base",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "persisted_size_count_test",
     srcs = [
         "persisted_size_count_test.cpp",

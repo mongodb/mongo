@@ -296,6 +296,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    CollectionSizeCount latestSizeCount(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
     CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
     }

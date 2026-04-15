@@ -201,7 +201,8 @@ public:
                 max = shardKeyPattern.normalizeShardKey(max);
             }
 
-            const long long numRecords = collection.getCollectionPtr()->numRecords(opCtx);
+            const auto [dataSize, numRecords] =
+                collection.getCollectionPtr()->latestSizeCount(opCtx);
             reply.setNumObjects(numRecords);
 
             if (numRecords == 0) {
@@ -220,8 +221,7 @@ public:
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             if (min.isEmpty() && max.isEmpty()) {
                 if (estimate) {
-                    reply.setSize(
-                        static_cast<long long>(collection.getCollectionPtr()->dataSize(opCtx)));
+                    reply.setSize(dataSize);
                     reply.setMillis(timer.millis());
                     return reply;
                 }
@@ -268,8 +268,7 @@ public:
             const auto maxObjects = cmd.getMaxObjects();
 
             std::remove_const_t<decltype(maxSize)> size = 0;
-            std::remove_const_t<decltype(size)> avgObjSize =
-                collection.getCollectionPtr()->dataSize(opCtx) / numRecords;
+            std::remove_const_t<decltype(size)> avgObjSize = dataSize / numRecords;
             std::remove_const_t<decltype(maxObjects)> numObjects = 0;
 
             try {

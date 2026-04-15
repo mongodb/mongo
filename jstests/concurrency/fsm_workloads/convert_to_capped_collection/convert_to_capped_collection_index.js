@@ -20,7 +20,9 @@
  *   # it to fail due to not finishing quickly enough.
  *   incompatible_with_concurrency_simultaneous,
  *   requires_collstats,
- *   requires_capped
+ *   requires_capped,
+ *   # TODO(SERVER-124037): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

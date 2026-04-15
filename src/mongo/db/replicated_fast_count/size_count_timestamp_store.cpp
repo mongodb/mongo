@@ -80,8 +80,12 @@ boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForWrite(
 }  // namespace
 
 boost::optional<Timestamp> SizeCountTimestampStore::read(OperationContext* opCtx) const {
-    const auto acquisition = acquireTimestampCollectionForRead(opCtx).value();
-    const CollectionPtr& coll = acquisition.getCollectionPtr();
+    const auto acquisition = acquireTimestampCollectionForRead(opCtx);
+    if (!acquisition.has_value()) {
+        return boost::none;
+    }
+
+    const CollectionPtr& coll = acquisition->getCollectionPtr();
     const RecordId rid =
         record_id_helpers::keyForDoc(BSON("_id" << kTimestampDocId),
                                      clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),

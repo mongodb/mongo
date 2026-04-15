@@ -491,6 +491,11 @@ public:
         return _shared->_recordStore->dataSize();
     }
 
+    CollectionSizeCount latestSizeCount(OperationContext* opCtx) const final {
+        return CollectionSizeCount{_shared->_recordStore->dataSize(),
+                                   _shared->_recordStore->numRecords()};
+    }
+
     CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const final {
         return CollectionSizeCount{_shared->_recordStore->dataSize(),
                                    _shared->_recordStore->numRecords()};

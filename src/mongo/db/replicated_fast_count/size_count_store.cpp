@@ -42,8 +42,13 @@ namespace mongo::replicated_fast_count {
 
 boost::optional<SizeCountStore::Entry> SizeCountStore::read(OperationContext* opCtx,
                                                             UUID uuid) const {
-    const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
-    const CollectionPtr& coll = acquisition.getCollectionPtr();
+    const auto acquisition = acquireFastCountCollectionForRead(opCtx);
+    if (!acquisition.has_value()) {
+        // TODO(SERVER-123051): Revisit this.
+        return boost::none;
+    }
+
+    const CollectionPtr& coll = acquisition->getCollectionPtr();
     const RecordId rid =
         record_id_helpers::keyForDoc(BSON("_id" << uuid),
                                      clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
