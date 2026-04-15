@@ -41,6 +41,14 @@ configs:
             <config replset name>/<host1:port>,<host2:port>,[...]
         short_name: configdb
         arg_vartype: String
+    "sharding.configOnly":
+        description: >-
+            Run mongos in config-only mode for standby clusters. This mode only provides the ability
+            to connect to the standby cluster's config server for non-data-accessing commands.
+        short_name: configOnly
+        cpp_varname: "serverGlobalParams.configOnly"
+        arg_vartype: Bool
+        implicit: true
     "replication.localPingThresholdMs":
         description: "ping time (in ms) for a node to be considered local (default 15ms)"
         short_name: "localThreshold"
