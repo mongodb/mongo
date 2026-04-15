@@ -424,12 +424,14 @@ template <AttributeType... AttributeTs>
 OwnedAttributeValueLists<AttributeTs...> makeOwnedAttributeValueLists(
     const AttributeDefinition<AttributeTs>&... defs) {
     return {.lists = std::make_tuple([](const auto& values) {
-                using ViewT = std::decay_t<decltype(*values.begin())>;
+                // Use value_type rather than the iterator's dereference type to avoid
+                // the std::vector<bool> proxy reference (std::__bit_const_reference).
+                using ViewT = typename std::decay_t<decltype(values)>::value_type;
                 using OwnedT = typename AttributeOwnership<ViewT>::OwnedType;
                 std::vector<std::unique_ptr<OwnedT>> ptrs;
                 ptrs.reserve(values.size());
                 for (const auto& val : values)
-                    ptrs.push_back(std::make_unique<OwnedT>(toOwned(val)));
+                    ptrs.push_back(std::make_unique<OwnedT>(toOwned(static_cast<ViewT>(val))));
                 return ptrs;
             }(defs.values)...)};
 }
