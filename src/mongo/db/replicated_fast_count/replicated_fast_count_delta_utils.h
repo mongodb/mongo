@@ -69,14 +69,14 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::Oplo
 /**
  * Accumulates cumulative size and count deltas for each uuid across the inner operations of the
  * 'applyOpsEntry' into 'sizeCountDeltasOut'. If 'uuidFilter' is provided, only entries for that
- * UUID are collected.
+ * UUID are collected. Returns the number of size/count entries processed.
  *
  * The OplogEntry provided must be of type 'repl::OplogEntry::CommandType::kApplyOps'; otherwise,
  * the method throws and terminates the current operation.
  */
-void extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
-                                       const boost::optional<UUID>& uuidFilter,
-                                       SizeCountDeltas& sizeCountDeltasOut);
+int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
+                                      const boost::optional<UUID>& uuidFilter,
+                                      SizeCountDeltas& sizeCountDeltasOut);
 
 /**
  * The result of scanning the oplog for size and count deltas.
@@ -96,12 +96,14 @@ struct OplogScanResult {
 /**
  * Given a cursor to the oplog, scans the oplog starting after "seekAfterTS" (exclusive bound) and
  * aggregates the size count deltas across UUIDs. Only accumulates size count information for
- * "uuidFilter" when provided.
+ * "uuidFilter" when provided. Pass 'isCheckpoint=true' only on the checkpoint scan path to
+ * increment checkpoint scan counters; leave false (the default) on read paths.
  */
 OplogScanResult aggregateSizeCountDeltasInOplog(
     SeekableRecordCursor& oplogCursor,
     const Timestamp& seekAfterTS,
-    const boost::optional<UUID>& uuidFilter = boost::none);
+    const boost::optional<UUID>& uuidFilter = boost::none,
+    bool isCheckpoint = false);
 
 /**
  * Acquires the replicated fast count collection for read access.

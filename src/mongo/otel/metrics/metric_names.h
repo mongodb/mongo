@@ -146,6 +146,12 @@ public:
         "replicated_fast_count.update_count"};
     static constexpr MetricName kReplicatedFastCountWriteTimeMsTotal = {
         "replicated_fast_count.write_time.total"};
+    static constexpr MetricName kReplicatedFastCountCheckpointOplogEntriesProcessed = {
+        "replicated_fast_count.checkpoint.oplog_entries_processed"};
+    static constexpr MetricName kReplicatedFastCountCheckpointOplogEntriesSkipped = {
+        "replicated_fast_count.checkpoint.oplog_entries_skipped"};
+    static constexpr MetricName kReplicatedFastCountCheckpointSizeCountEntriesProcessed = {
+        "replicated_fast_count.checkpoint.size_count_entries_processed"};
 
     static constexpr MetricName kIndexBuildKeysInsertedFromScan = {
         "index_builds.keys_inserted_from_scan"};

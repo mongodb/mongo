@@ -32,6 +32,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/server_status_options.h"
 
 #include <algorithm>
 
@@ -148,6 +149,48 @@ void ReplicatedFastCountMetrics::incrementUpdateCount() {
 
 void ReplicatedFastCountMetrics::addWriteTimeMsTotal(int64_t ms) {
     _writeTimeMsTotalCounter.add(ms);
+}
+
+namespace {
+
+using otel::metrics::MetricNames;
+using otel::metrics::MetricsService;
+using otel::metrics::MetricUnit;
+using otel::metrics::ServerStatusOptions;
+
+auto& checkpointOplogEntriesProcessedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed,
+    "Total oplog entries forwarded to delta processing during checkpoint scans",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.checkpoint.oplogEntriesProcessed"}});
+
+auto& checkpointOplogEntriesSkippedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountCheckpointOplogEntriesSkipped,
+    "Total oplog entries discarded as fastcount-internal writes during checkpoint scans",
+    MetricUnit::kEvents,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "replicatedFastCount.checkpoint.oplogEntriesSkipped"}});
+
+auto& checkpointSizeCountEntriesProcessedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountCheckpointSizeCountEntriesProcessed,
+    "Total individual size/count deltas accumulated during checkpoint scans",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.checkpoint.sizeCountEntriesProcessed"}});
+
+}  // namespace
+
+void recordCheckpointOplogEntryProcessed() {
+    checkpointOplogEntriesProcessedCounter.add(1);
+}
+
+void recordCheckpointOplogEntrySkipped() {
+    checkpointOplogEntriesSkippedCounter.add(1);
+}
+
+void recordCheckpointSizeCountEntryProcessed(int count) {
+    checkpointSizeCountEntriesProcessedCounter.add(count);
 }
 
 }  // namespace mongo

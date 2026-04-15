@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/idl/idl_parser.h"
@@ -164,33 +165,34 @@ bool operationsOnFastCountCollections(const NamespaceString& nss,
 
 // Processes a single oplog entry and accumulates its size/count contribution into
 // 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, and CRUD operations.
-void processOplogEntry(const repl::OplogEntry& entry,
-                       const boost::optional<UUID>& uuidFilter,
-                       SizeCountDeltas& sizeCountDeltasOut) {
+int processOplogEntry(const repl::OplogEntry& entry,
+                      const boost::optional<UUID>& uuidFilter,
+                      SizeCountDeltas& sizeCountDeltasOut) {
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        extractSizeCountDeltasForApplyOps(entry, uuidFilter, sizeCountDeltasOut);
-        return;
+        return extractSizeCountDeltasForApplyOps(entry, uuidFilter, sizeCountDeltasOut);
     }
     const auto& entryUuid = entry.getUuid();
     if (uuidFilter && entryUuid != uuidFilter) {
-        return;
+        return 0;
     }
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kTruncateRange) {
         const auto delta = extractSizeCountDeltaForTruncateRange(entry);
         recordCollectionSizeCountDelta(*entryUuid, delta, sizeCountDeltasOut);
-        return;
+        return 1;
     }
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kCreate) {
         recordCollectionCreate(*entryUuid, sizeCountDeltasOut);
-        return;
+        return 1;
     }
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kDrop) {
         recordCollectionDrop(*entryUuid, sizeCountDeltasOut);
-        return;
+        return 1;
     }
     if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
         recordCollectionSizeCountDelta(*entryUuid, *delta, sizeCountDeltasOut);
+        return 1;
     }
+    return 0;
 }
 
 }  // namespace
@@ -235,9 +237,9 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
     return CollectionSizeCount{.size = sizeDelta, .count = countDelta};
 }
 
-void extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
-                                       const boost::optional<UUID>& uuidFilter,
-                                       SizeCountDeltas& sizeCountDeltasOut) {
+int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
+                                      const boost::optional<UUID>& uuidFilter,
+                                      SizeCountDeltas& sizeCountDeltasOut) {
     massert(12116000,
             str::stream() << "Unexpected input: Expected applyOps oplog entry for extracting size "
                              "metadata, instead received entry of command type '"
@@ -249,14 +251,17 @@ void extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
     repl::ApplyOps::extractOperationsTo(
         applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerEntries);
 
+    int processed = 0;
     for (const auto& op : innerEntries) {
-        processOplogEntry(op, uuidFilter, sizeCountDeltasOut);
+        processed += processOplogEntry(op, uuidFilter, sizeCountDeltasOut);
     }
+    return processed;
 }
 
 OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCursor,
                                                 const Timestamp& seekAfterTS,
-                                                const boost::optional<UUID>& uuidFilter) {
+                                                const boost::optional<UUID>& uuidFilter,
+                                                bool isCheckpoint) {
     OplogScanResult result;
     RecordId seekRid =
         massertStatusOK(record_id_helpers::keyForOptime(seekAfterTS, KeyFormat::Long));
@@ -269,10 +274,17 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
         // Otherwise, we create a feedback loop where we'd advance the timestamp in response to
         // seeing oplog entries for advancing the timestamp.
         if (operationsOnFastCountCollections(nss, entry)) {
+            if (isCheckpoint) {
+                recordCheckpointOplogEntrySkipped();
+            }
             continue;
         }
         result.lastTimestamp = entry.getTimestamp();
-        processOplogEntry(entry, uuidFilter, result.deltas);
+        int numSizeCountEntries = processOplogEntry(entry, uuidFilter, result.deltas);
+        if (isCheckpoint) {
+            recordCheckpointOplogEntryProcessed();
+            recordCheckpointSizeCountEntryProcessed(numSizeCountEntries);
+        }
     }
     return result;
 }

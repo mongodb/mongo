@@ -104,4 +104,12 @@ private:
     Atomic<int64_t> _flushedDocsMinPlaceholder{std::numeric_limits<int64_t>::max()};
 };
 
+/**
+ * Free functions for recording checkpoint oplog scan metrics. These functions are safe to call from
+ * any code in the checkpoint scan path without needing a ReplicatedFastCountMetrics instance.
+ */
+void recordCheckpointOplogEntryProcessed();
+void recordCheckpointOplogEntrySkipped();
+void recordCheckpointSizeCountEntryProcessed(int count = 1);
+
 }  // namespace mongo
