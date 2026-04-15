@@ -34,6 +34,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sorter/container_based_spiller.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_file_name.h"
@@ -81,7 +82,7 @@ inline std::unique_ptr<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>> m
             testSpillingMinAvailableDiskSpaceBytes);
     }
     return std::make_unique<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>>(
-        std::make_shared<SorterFile>(spillDir / storageIdentifier, fileStats),
+        std::make_shared<File>(spillDir / storageIdentifier, fileStats),
         spillDir,
         /*dbName=*/boost::none,
         checksumVersion,
@@ -139,7 +140,7 @@ struct FileTraits {
 
     static std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> makeWriter(
         const SortOptions& opts, const boost::filesystem::path& spillDir) {
-        auto spillFile = std::make_shared<SorterFile>(sorter::nextFileName(spillDir), nullptr);
+        auto spillFile = std::make_shared<File>(sorter::nextFileName(spillDir), nullptr);
         return std::make_unique<SortedFileWriter<IntWrapper, IntWrapper>>(
             opts,
             spillFile,

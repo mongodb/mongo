@@ -237,8 +237,8 @@ void GroupProcessor::spill() {
     // Initialize '_file' in a lazy manner only when it is needed.
     if (!_file) {
         _spillStats = std::make_unique<SorterFileStats>(nullptr /* sorterTracker */);
-        _file = std::make_shared<SorterFile>(sorter::nextFileName(_expCtx->getTempDir()),
-                                             _spillStats.get());
+        _file = std::make_shared<sorter::File>(sorter::nextFileName(_expCtx->getTempDir()),
+                                               _spillStats.get());
     }
     sorter::FileBasedStorage<Value, Value> sorterStorage(_file,
                                                          /*dbName=*/boost::none,

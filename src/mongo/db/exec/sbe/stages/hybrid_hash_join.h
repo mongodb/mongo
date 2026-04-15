@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/util/bloom_filter.h"
 #include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
@@ -154,7 +155,7 @@ public:
     static constexpr int64_t kWriteBufferSize = (int64_t)sorter::kSortedFileBufferSize;
 
     SpilledPartition(const boost::filesystem::path& tempDir, SorterFileStats* fileStats)
-        : _storage(std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
+        : _storage(std::make_shared<sorter::File>(sorter::nextFileName(tempDir), fileStats),
                    /*dbName=*/boost::none,
                    sorter::kLatestChecksumVersion),
           _writer(_storage.makeWriter(SortOptions{}, /*settings=*/{})) {}

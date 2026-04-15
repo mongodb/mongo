@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
@@ -306,7 +307,7 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter,
         return std::make_shared<EmptyIterator>();
     }
     const SortOptions opts = SortOptions();
-    auto spillFile = std::make_shared<SorterFile>(sorter::nextFileName(spillDir.path()), fileStats);
+    auto spillFile = std::make_shared<File>(sorter::nextFileName(spillDir.path()), fileStats);
     // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
     FileBasedStorage<IntWrapper, IntWrapper> sorterStorage(
         spillFile, /*dbName=*/boost::none, SorterChecksumVersion::v2);

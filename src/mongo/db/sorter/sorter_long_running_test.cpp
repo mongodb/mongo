@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
@@ -83,7 +84,7 @@ protected:
                      int currentFileSize,
                      int range) const {
         auto makeFile = [&] {
-            return std::make_shared<SorterFile>(sorter::nextFileName(spillDir), sorterFileStats);
+            return std::make_shared<File>(sorter::nextFileName(spillDir), sorterFileStats);
         };
 
         int currentBufSize = 0;

@@ -31,6 +31,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/modules.h"
@@ -109,7 +110,7 @@ protected:
     // Only used if the accumulator needs to spill to disk after $group spills are merged together.
     // File where spilled data will be written to disk.
     std::unique_ptr<SorterFileStats> _spillStats;
-    std::shared_ptr<SorterFile> _spillFile;
+    std::shared_ptr<sorter::File> _spillFile;
 
     // Vector of file iterators tracking each sorted segment that is written to disk when we spill.
     std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _spilledSortedSegments;

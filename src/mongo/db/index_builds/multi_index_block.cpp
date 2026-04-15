@@ -61,6 +61,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sorter/container_based_spiller.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
@@ -221,7 +222,7 @@ makeSpiller(OperationContext* opCtx,
     auto fileName = stateInfo ? stateInfo->getStorageIdentifier() : boost::none;
     return fileName
         ? std::make_shared<FileBasedSpiller>(
-              std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, &fileStats),
+              std::make_shared<sorter::File>(tmpPath / std::string{*fileName}, &fileStats),
               tmpPath,
               dbName,
               sorter::kLatestChecksumVersion,

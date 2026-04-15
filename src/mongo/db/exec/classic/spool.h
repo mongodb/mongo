@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/util/modules.h"
@@ -103,7 +104,7 @@ private:
     // Machinery for spilling to disk.
     MemoryUsageTracker _memTracker;
     std::unique_ptr<SorterFileStats> _spillStats;
-    std::shared_ptr<SorterFile> _file;
+    std::shared_ptr<sorter::File> _file;
 
     // Iterators over the file that has been spilled to disk. These must be exhausted in addition to
     // '_buffer' when returning results.

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/group_processor_base.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/util/modules.h"
 
@@ -132,7 +133,7 @@ private:
 
     // Tracks the size of the spill file.
     std::unique_ptr<SorterFileStats> _spillStats;
-    std::shared_ptr<SorterFile> _file;
+    std::shared_ptr<sorter::File> _file;
     std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _sortedFiles;
     bool _spilled{false};
 
