@@ -11,28 +11,26 @@ have the following procedure:
   Catalog](../shard_role/shard_catalog/README.md#durable-catalog).
 - Downgrade to a collection IX lock.
 - Scan all documents on the collection to be indexed
-  - Generate [KeyString](../storage/key_string/README.md) keys for the indexed fields for each
+  - Generate [keys](../storage/key_string/README.md) for the indexed fields for each
     document
   - Periodically yield locks and storage engine snapshots
   - Insert the generated keys into the [external sorter](../sorter/README.md)
-- Read the sorted keys from the external sorter and [bulk
-  load](http://source.wiredtiger.com/3.2.1/tune_bulk_load.html) into the storage engine index.
-  Bulk-loading requires keys to be inserted in sorted order, but builds a B-tree structure that is
-  more efficiently filled than with random insertion.
+- Read the sorted keys from the external sorter and load them into the storage engine index.
+  For performance reasons, we insert the keys into the index table in sorted order.
 - While holding a collection X lock, make a final `ready: true` write to the durable catalog.
 
 ## Hybrid Index Builds
 
 Hybrid index builds refer to the default procedure introduced in 4.2 that produces efficient index
 data structures without blocking reads or writes for extended periods of time. This is achieved by
-performing a full collection scan and bulk-loading keys (described above) while concurrently
-intercepting new writes into a temporary storage engine table.
+performing a full collection scan and loading keys while concurrently
+intercepting new writes into an internal storage engine table.
 
-### Temporary Side Table For New Writes
+### Internal Table For Side Writes
 
 During an index build, new writes (i.e. inserts, updates, and deletes) are applied to the collection
 as usual. However, instead of writing directly into the index table as a normal write would, index
-keys for documents are generated and intercepted by inserting into a temporary _side-writes_ table.
+keys for documents are generated and intercepted by inserting into an internal _side-writes_ table.
 Writes are intercepted for the duration of the index build, from before the collection scan begins
 until the build is completed.
 
@@ -40,7 +38,20 @@ Both inserted and removed keys are recorded in the _side-writes_ table. For exam
 build on `{a: 1}`, an update on a document from `{_id: 0, a: 1}` to `{_id: 0, a: 2}` is recorded as
 a deletion of the key `1` and an insertion of the key `2`.
 
-Once the collection scan and bulk-load phases of the index build are complete, these intercepted
+Each record in the side-writes table is keyed by a monotonically increasing record identifier and
+must be consumed in insertion order. The value is a BSON document with two fields:
+
+- `"op"`: The string `"i"` (insert) or `"d"` (delete).
+- `"key"`: A BinData value containing the serialized index key including both the key bytes and the
+  type bits. The type bits are needed to reconstruct the original BSON types when the key is later
+  deserialized during the drain phase.
+
+For example: `{op: "i", key: BinData(0, <serialized bytes>)}`.
+
+For wildcard indexes, multikey metadata keys are written as additional `"op": "i"` entries in the
+same batch.
+
+Once the collection scan and key-loading phases of the index build are complete, these intercepted
 keys are applied directly to the index in three phases:
 
 - Drain the side table while holding a collection IX lock to allow concurrent reads and writes.
@@ -51,28 +62,39 @@ keys are applied directly to the index in three phases:
   writes, while waiting for other replicas to become commit-ready.
 - Drain the side table while holding a collection X lock to block all reads and writes.
 
+During drain, each record's BSON value is parsed: the `"key"` field is deserialized into an index
+key and routed to either an insert or delete operation depending on the `"op"` field. The drain
+phase reads records front-to-back and deletes each one after it has been applied to the index.
+
 See
 [IndexBuildInterceptor::sideWrite](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_build_interceptor.cpp#L208)
 and
 [IndexBuildInterceptor::drainWritesIntoIndex](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_build_interceptor.cpp#L150).
 
-### Temporary Table For Duplicate Key Violations
+### Internal Table For Duplicate Key Violations
 
 Unique indexes created with `{unique: true}` enforce a constraint that there are no duplicate keys
 in an index. The hybrid index procedure makes it challenging to detect duplicates because keys are
-split between the bulk-loaded index and the side-writes table. Additionally, during the lifetime of
+split between the index and the side-writes table. Additionally, during the lifetime of
 an index build, concurrent writes may introduce and resolve duplicate key conflicts on the index.
 
 For those reasons, during an index build we temporarily allow duplicate key violations, and record
-any detected violations in a temporary table, the _duplicate key table_. At the conclusion of the
-index build, under a collection X lock, [duplicate keys are
+any detected violations in an internal table, the _duplicate key tracker_. Each record is keyed by a
+monotonic record identifier, and the value is raw binary (not a BSON document): the serialized index
+key **without** the trailing record identifier but **with** type bits. The record identifier is
+excluded because the tracker only cares whether the key still has duplicates at commit time, not
+which specific document owns the key. The type bits are preserved so that a human-readable key can
+be reconstructed for the error message if the violation persists.
+
+At the conclusion of the index build, under a collection X lock, [duplicate keys are
 re-checked](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_builds_coordinator.cpp#L3730).
-If there are still constraint violations, an error is thrown.
+If the duplicate has been resolved (e.g. the conflicting document was deleted during the build), the
+record is deleted. If it persists, an error is thrown.
 
 See
 [DuplicateKeyTracker](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/duplicate_key_tracker.h#L51).
 
-### Temporary Table For Key Generation Errors
+### Internal Table For Key Generation Errors
 
 In addition to uniqueness constraints, indexes may have per-key constraints. For example, a compound
 index may not be built on documents with parallel arrays. An index build on `{a: 1, b: 1}` will fail
@@ -91,17 +113,31 @@ in the secondary state, we would not be able to commit the index build and guara
 since we may have suppressed valid key generation errors.
 
 To solve this problem, on secondaries, the records associated with key generation errors are
-skipped and recorded in a temporary table, the _skipped record table_. If a secondary node becomes
-primary and then commits the index build, it re-generates and re-inserts keys for the [skipped
+skipped and recorded in an internal table, the _skipped records tracker_. Each record is a BSON
+document containing the record identifier of the collection document that failed key generation. No
+index key is stored because the key failed to generate in the first place.
+
+If a secondary node becomes primary and then commits the index build, it re-generates and
+re-inserts keys for the [skipped
 records](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_builds_coordinator.cpp#L2037)
-under a collection X lock. If there are still constraint violations, an error is thrown and the
+under a collection X lock: for each stored record identifier, the current version of the document is
+read and keys are re-generated. If there are still constraint violations, an error is thrown and the
 index build aborts. Primaries do not suppress key generation errors, so they do not use the skipped
-record table; they abort immediately when a key generation error occurs. Secondaries that remain
+records tracker; they abort immediately when a key generation error occurs. Secondaries that remain
 secondary rely on the primary's decision to commit as assurance that skipped records do not need
 to be checked.
 
 See
 [SkippedRecordTracker](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/skipped_record_tracker.h#L54).
+
+### Summary of Keys and Values for Internal Tables
+
+| Table           | Key                                                     | Value                                                                |
+| --------------- | ------------------------------------------------------- | -------------------------------------------------------------------- |
+| Sorter          | Serialized index key (field values + types + record ID) | Empty                                                                |
+| Side-writes     | Monotonic record ID                                     | BSON document: `{op: "i"/"d", key: BinData(...)}`                    |
+| Duplicate key   | Monotonic record ID                                     | Raw binary: serialized index key (without record ID, with type bits) |
+| Skipped records | Monotonic record ID                                     | BSON document: `{recordId: <RecordId>}`                              |
 
 ## Replica Set Index Builds
 
@@ -115,6 +151,10 @@ primary is done with its indexing, it will decide to replicate either an `abortI
 
 Each node independently builds the index by scanning its own collection data. The external sorter
 spills to local unreplicated temporary files under `dbpath/_tmp` when the memory limit is reached.
+Once sorted, the keys are
+[bulk-loaded](https://source.wiredtiger.com/develop/tune_bulk_load.html) into the WiredTiger index
+table. Bulk-loading requires keys to be inserted in sorted order, but builds a B-tree structure that
+is more efficiently filled than with random insertion.
 
 Simultaneous index builds are resilient to replica set state transitions. The node that starts an
 index build does not need to be the same node that decides to commit it.
@@ -230,7 +270,7 @@ using the startup recovery logic that RTT uses to bring the node back to a writa
 For improved rollback semantics, resumable index builds require a majority read cursor during
 collection scan phase. Index builds wait for the majority commit point to advance before starting
 the collection scan. The majority wait happens after installing the [side table for intercepting new
-writes](#temporary-side-table-for-new-writes).
+writes](#internal-side-table-for-new-writes).
 
 See
 [MultiIndexBlock::\_constructStateObject()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/catalog/multi_index_block.cpp#L900)
