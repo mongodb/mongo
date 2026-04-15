@@ -49,6 +49,8 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 namespace mongo {
 
 Status ShardingNetworkConnectionHook::validateHost(
@@ -84,6 +86,17 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             // The hello response indicates that remoteHost is not a config server, or that
             // the config server is running a version prior to the 3.1 development series.
             if (!shard->isConfig()) {
+                return Status::OK();
+            }
+
+            // In a standby cluster, the config server is not started with --configsvr, so we allow
+            // the mongoS to ignore this case if it is started with the --configOnly option.
+            if (serverGlobalParams.configOnly) {
+                LOGV2_DEBUG(12296001,
+                            2,
+                            "Replica set member is not a config server, but ignoring this since "
+                            "the mongoS is started with --configOnly",
+                            "host"_attr = remoteHost.toString());
                 return Status::OK();
             }
 

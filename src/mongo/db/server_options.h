@@ -94,6 +94,7 @@ struct ServerGlobalParams {
 
     bool upgradeBackCompat{false};    // --upgradeBackCompat
     bool downgradeBackCompat{false};  // --downgradeBackCompat
+    bool configOnly{false};           // --configOnly (mongos only)
 
     boost::optional<int> routerPort;      // --routerPort
     boost::optional<int> proxyPort;       // --proxyPort
