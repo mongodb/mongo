@@ -2557,6 +2557,23 @@ tasks:
           suite: disagg_storage
           use_large_distro: "true"
 
+  - <<: *task_template
+    name: disagg_pali_chaos
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "default",
+        "large",
+        "requires_large_host",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: disagg_pali_chaos
+          resmoke_jobs_max: 1
+
   - <<: *gen_task_template
     name: disagg_repl_jscore_passthrough_gen
     tags:
