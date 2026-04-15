@@ -2563,6 +2563,7 @@ tasks:
       [
         "assigned_to_jira_team_server_storage_engines",
         "default",
+        "incompatible_tsan",
         "large",
         "requires_large_host",
         "requires_extra_system_deps",
