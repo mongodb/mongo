@@ -3,14 +3,22 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:b5575296-afef-4ad6-b619-f0c999b1b7e2",
-  "version": 8,
+  "version": 10,
   "metadata": {
-    "timestamp": "2025-12-01T19:11:00Z",
+    "timestamp": "2026-04-13T15:17:52Z",
     "lifecycles": [
       {
         "phase": "pre-build"
       }
     ],
+    "tools": {
+      "services": [
+        {
+          "name": "Endor Labs Inc",
+          "version": "v1.7.870"
+        }
+      ]
+    },
     "component": {
       "type": "application",
       "bom-ref": "pkg:github/mongodb/mongo@v8.2",
@@ -29,27 +37,27 @@
       "purl": "pkg:github/mongodb/mongo@v8.2",
       "externalReferences": [
         {
-          "type": "license",
           "url": "https://raw.githubusercontent.com/mongodb/mongo/refs/heads/master/LICENSE-Community.txt",
-          "comment": "Server Side Public License 1.0"
+          "comment": "Server Side Public License 1.0",
+          "type": "license"
         },
         {
-          "type": "website",
           "url": "https://www.mongodb.com/products/self-managed/community-edition",
-          "comment": "MongoDB Community Edition is self-managed and can be hosted locally or in the cloud."
+          "comment": "MongoDB Community Edition is self-managed and can be hosted locally or in the cloud.",
+          "type": "website"
         },
         {
-          "type": "website",
           "url": "https://www.mongodb.com/products/self-managed/enterprise-advanced",
-          "comment": "MongoDB Enterprise Advanced has powerful tools for automation, operations, and security in self-managed environments."
+          "comment": "MongoDB Enterprise Advanced has powerful tools for automation, operations, and security in self-managed environments.",
+          "type": "website"
         },
         {
-          "type": "release-notes",
-          "url": "https://www.mongodb.com/docs/manual/release-notes/"
+          "url": "https://www.mongodb.com/docs/manual/release-notes/",
+          "type": "release-notes"
         },
         {
-          "type": "vcs",
-          "url": "https://github.com/mongodb/mongo"
+          "url": "https://github.com/mongodb/mongo",
+          "type": "vcs"
         }
       ]
     },
@@ -57,14 +65,6 @@
       "name": "MongoDB, Inc.",
       "url": [
         "https://mongodb.com"
-      ]
-    },
-    "tools": {
-      "services": [
-        {
-          "name": "Endor Labs Inc",
-          "version": "v1.7.671"
-        }
       ]
     }
   },
@@ -83,6 +83,7 @@
       "name": "Mozilla Firefox ESR",
       "version": "128.11.0esr",
       "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -99,11 +100,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/mozjs"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Integration"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -112,15 +116,7 @@
           "name": "import_script_path",
           "value": "src/third_party/mozjs/get-sources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/mozjs"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -141,6 +137,7 @@
       "name": "Intel\u00ae Decimal Floating-Point Math Library",
       "version": "2.0.1",
       "description": "A a software implementation of the IEEE Standard 754-2019 Decimal Floating-Point Arithmetic specification.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -152,18 +149,8 @@
       "purl": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
       "externalReferences": [
         {
-          "type": "distribution",
-          "url": "https://www.netlib.org/misc/intel/"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Storage Execution"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
+          "url": "https://www.netlib.org/misc/intel/",
+          "type": "distribution"
         }
       ],
       "evidence": {
@@ -173,7 +160,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "data",
@@ -189,6 +181,7 @@
       "name": "Unicode Character Database",
       "version": "8.0.0",
       "description": "Unicode Data Files",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -204,16 +197,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Execution"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "true"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -221,7 +204,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        }
+      ]
     },
     {
       "type": "library",
@@ -231,6 +219,7 @@
       "name": "valgrind.h",
       "version": "093bef43d69236287ccc748591c9560a71181b0a",
       "description": "This header file is part of Valgrind, a dynamic binary instrumentation framework.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -246,16 +235,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Build"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -263,7 +242,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -273,6 +257,7 @@
       "name": "MurmurHash3",
       "version": "a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
       "description": "MurmurHash is a non-cryptographic hash function suitable for general hash-based lookup.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -288,16 +273,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Storage Execution"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -305,7 +280,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -321,6 +301,7 @@
       "name": "Abseil Common Libraries (C++)",
       "version": "20250512.1",
       "description": "Abseil is an open-source collection of C++ code (compliant to C++17) designed to augment the C++ standard library.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -336,11 +317,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/abseil-cpp"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -349,15 +333,7 @@
           "name": "import_script_path",
           "value": "src/third_party/abseil-cpp/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/abseil-cpp"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -367,6 +343,7 @@
       "name": "linenoise",
       "version": "6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
       "description": "A small self-contained alternative to readline and libedit",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -382,16 +359,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Build"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -402,7 +369,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -415,6 +387,7 @@
       "name": "immer",
       "version": "0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
       "description": "Postmodern immutable and persistent data structures for C++ \u2014 value semantics at scale",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -430,16 +403,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Storage Execution"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -447,7 +410,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -462,6 +430,8 @@
       "group": "aws",
       "name": "AWS SDK for C++",
       "version": "1.11.471",
+      "description": "The AWS SDK for C++ provides a C++ interface for Amazon Web Services.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -478,11 +448,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/aws-sdk"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Atlas Streams"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -491,15 +464,7 @@
           "name": "import_script_path",
           "value": "src/third_party/aws-sdk/scripts/getsources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/aws-sdk"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -515,6 +480,7 @@
       "name": "Boost C++ Libraries",
       "version": "1.88.0",
       "description": "Super-project for modularized Boost. Boost is a repository of free, portable, peer-reviewed C++ libraries. It acts as a proving ground for new libraries, particularly those which work well with the ISO C++ Standard Library.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -531,11 +497,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/boost"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -544,15 +513,7 @@
           "name": "import_script_path",
           "value": "src/third_party/boost/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/boost"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -568,6 +529,7 @@
       "name": "c-ares",
       "version": "1.27.0",
       "description": "A C library for asynchronous DNS requests",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -584,11 +546,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/cares"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -597,15 +562,7 @@
           "name": "import_script_path",
           "value": "src/third_party/cares/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/cares"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -615,6 +572,7 @@
       "name": "Asio C++ Library",
       "version": "1.12.2",
       "description": "Asio is a cross-platform C++ library for network and low-level I/O programming that provides developers with a consistent asynchronous model using a modern C++ approach.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -630,16 +588,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -647,7 +595,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -660,6 +613,7 @@
       "name": "librdkafka - The Apache Kafka C/C++ library",
       "version": "2.0.2",
       "description": "The Apache Kafka C/C++ library",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -676,11 +630,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/librdkafka"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Atlas Streams"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -689,15 +646,7 @@
           "name": "import_script_path",
           "value": "src/third_party/librdkafka/scripts/librdkafka_get_sources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/librdkafka"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -705,8 +654,8 @@
       "supplier": {
         "name": "The Cyrus Project",
         "url": [
-          "https://www.cyrusimap.org/sasl/",
-          "https://www.cyrusimap.org/overview/who_is_cyrus.html"
+          "https://www.cyrusimap.org/overview/who_is_cyrus.html",
+          "https://www.cyrusimap.org/sasl/"
         ]
       },
       "author": "The Cyrus Team",
@@ -714,6 +663,7 @@
       "name": "Cyrus SASL",
       "version": "2.1.28",
       "description": "Simple Authentication and Security Layer (SASL) is a specification that describes how authentication mechanisms can be plugged into an application protocol on the wire. Cyrus SASL is an implementation of SASL that makes it easy for application developers to integrate authentication mechanisms into their application in a generic way.",
+      "scope": "optional",
       "licenses": [
         {
           "license": {
@@ -730,16 +680,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Build"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -747,7 +687,12 @@
           }
         ]
       },
-      "scope": "optional"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -757,6 +702,7 @@
       "name": "SafeInt",
       "version": "3.0.26",
       "description": "SafeInt is a class library for C++ that manages integer overflows.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -772,16 +718,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -789,7 +725,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -799,6 +740,7 @@
       "name": "timelib",
       "version": "2022.13",
       "description": "Timelib is a timezone and date/time library that can calculate local time, convert between timezones and parse textual descriptions of date/time information.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -814,11 +756,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/timelib"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Execution"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -827,15 +772,7 @@
           "name": "import_script_path",
           "value": "src/third_party/timelib/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/timelib"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -851,6 +788,7 @@
       "name": "folly",
       "version": "2023.12.25.00",
       "description": "An open-source C++ library developed and used at Facebook.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -863,22 +801,8 @@
       "purl": "pkg:github/facebook/folly@v2023.12.25.00",
       "externalReferences": [
         {
-          "type": "vcs",
-          "url": "https://github.com/facebook/folly.git"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Workload Scheduling"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/folly/scripts/import.sh"
+          "url": "https://github.com/facebook/folly.git",
+          "type": "vcs"
         }
       ],
       "evidence": {
@@ -888,7 +812,16 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/folly/scripts/import.sh"
+        }
+      ]
     },
     {
       "type": "library",
@@ -904,6 +837,7 @@
       "name": "Zstandard (zstd)",
       "version": "1.5.5",
       "description": "Zstandard - Fast real-time compression algorithm",
+      "scope": "required",
       "licenses": [
         {
           "expression": "BSD-3-Clause OR GPL-2.0-only"
@@ -918,11 +852,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/zstandard"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -931,15 +868,7 @@
           "name": "import_script_path",
           "value": "src/third_party/scripts/zstandard_get_sources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/zstandard"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -955,6 +884,7 @@
       "name": "fmt",
       "version": "11.1.3",
       "description": "A modern formatting library",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -971,11 +901,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/fmt"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -984,15 +917,7 @@
           "name": "import_script_path",
           "value": "src/third_party/fmt/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/fmt"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1008,6 +933,7 @@
       "name": "benchmark",
       "version": "1.5.2",
       "description": "A microbenchmark support library",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
@@ -1023,11 +949,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/benchmark"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -1036,15 +965,7 @@
           "name": "import_script_path",
           "value": "src/third_party/benchmark/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/benchmark"
-          }
-        ]
-      },
-      "scope": "excluded"
+      ]
     },
     {
       "type": "library",
@@ -1060,6 +981,7 @@
       "name": "re2",
       "version": "2023-11-01",
       "description": "RE2 is a fast, safe, thread-friendly alternative to backtracking regular expression engines like those used in PCRE, Perl, and Python. It is a C++ library.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1076,11 +998,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/re2"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -1089,15 +1014,7 @@
           "name": "import_script_path",
           "value": "src/third_party/re2/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/re2"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1113,6 +1030,7 @@
       "name": "S2 Geometry Library",
       "version": "a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
       "description": "Computational geometry and spatial indexing on the sphere",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1128,16 +1046,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Integration"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "true"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -1145,7 +1053,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        }
+      ]
     },
     {
       "type": "library",
@@ -1161,6 +1074,7 @@
       "name": "snappy",
       "version": "1.1.10",
       "description": "A fast compressor/decompressor",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1177,11 +1091,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/snappy"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -1190,15 +1107,7 @@
           "name": "import_script_path",
           "value": "src/third_party/snappy/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/snappy"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1214,6 +1123,7 @@
       "name": "tcmalloc",
       "version": "f3b20f9a07e175c5d897df7b49d9830d4efa6110",
       "description": "TCMalloc is Google's customized implementation of C's malloc() and C++'s operator new used for memory allocation within our C and C++ code. TCMalloc is a fast, multi-threaded malloc implementation.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1223,12 +1133,6 @@
       ],
       "copyright": "Copyright 2024 The TCMalloc Authors",
       "purl": "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
-      "externalReferences": [
-        {
-          "url": "https://github.com/google/tcmalloc.git",
-          "type": "distribution"
-        }
-      ],
       "pedigree": {
         "descendants": [
           {
@@ -1248,18 +1152,10 @@
           }
         ]
       },
-      "properties": [
+      "externalReferences": [
         {
-          "name": "internal:team_responsible",
-          "value": "Workload Scheduling"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/tcmalloc/scripts/import.sh"
+          "url": "https://github.com/google/tcmalloc.git",
+          "type": "distribution"
         }
       ],
       "evidence": {
@@ -1269,11 +1165,20 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/tcmalloc/scripts/import.sh"
+        }
+      ]
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+      "bom-ref": "pkg:github/gperftools/gperftools@2.9.1",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1285,6 +1190,7 @@
       "name": "gperftools",
       "version": "2.9.1",
       "description": "gperftools (originally Google Performance Tools) is a collection of a high-performance multi-threaded malloc() implementation, plus some pretty nifty performance analysis tools.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1294,25 +1200,11 @@
       ],
       "copyright": "Copyright (c) 2005, Google Inc. All rights reserved.",
       "cpe": "cpe:2.3:a:gperftools_project:gperftools:2.9.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+      "purl": "pkg:github/gperftools/gperftools@2.9.1",
       "externalReferences": [
         {
           "url": "https://github.com/gperftools/gperftools.git",
           "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Workload Scheduling"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/gperftools/scripts/import.sh"
         }
       ],
       "evidence": {
@@ -1322,11 +1214,20 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/gperftools/scripts/import.sh"
+        }
+      ]
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/grpc/grpc@1.59.5",
+      "bom-ref": "pkg:github/grpc/grpc@v1.59.3",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1336,8 +1237,9 @@
       "author": "gRPC authors",
       "group": "google.opensource",
       "name": "gRPC (C++)",
-      "version": "1.59.5",
+      "version": "1.59.3",
       "description": "gRPC is a modern, open source, high-performance remote procedure call (RPC) framework that can run anywhere. gRPC enables client and server applications to communicate transparently, and simplifies the building of connected systems.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1346,26 +1248,12 @@
         }
       ],
       "copyright": "Copyright 2015 gRPC authors",
-      "cpe": "cpe:2.3:a:grpc:grpc:1.59.5:*:*:*:*:*:*:*",
-      "purl": "pkg:github/grpc/grpc@1.59.5",
+      "cpe": "cpe:2.3:a:grpc:grpc:1.59.3:*:*:*:*:*:*:*",
+      "purl": "pkg:github/grpc/grpc@v1.59.3",
       "externalReferences": [
         {
           "url": "https://github.com/grpc/grpc.git",
           "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/grpc/scripts/import.sh"
         }
       ],
       "evidence": {
@@ -1375,7 +1263,16 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/grpc/scripts/import.sh"
+        }
+      ]
     },
     {
       "type": "library",
@@ -1385,6 +1282,7 @@
       "name": "yaml-cpp",
       "version": "0.6.3",
       "description": "A YAML parser and emitter in C++",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1401,11 +1299,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/yaml-cpp"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Security"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -1414,15 +1315,7 @@
           "name": "import_script_path",
           "value": "src/third_party/scripts/yaml-cpp_get_sources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/yaml-cpp"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1438,6 +1331,7 @@
       "name": "JSON-Schema-Test-Suite",
       "version": "728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
       "description": "A language agnostic test suite for the JSON Schema specifications",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
@@ -1453,16 +1347,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Optimization"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -1470,7 +1354,56 @@
           }
         ]
       },
-      "scope": "excluded"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/juliastrings/utf8proc@v2.8.0",
+      "author": "Jan Behrens",
+      "group": "juliastrings",
+      "name": "utf8proc",
+      "version": "2.8.0",
+      "description": "A clean C library for processing UTF-8 Unicode data",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "id": "Unicode-TOU",
+            "url": "https://www.unicode.org/copyright.html"
+          }
+        }
+      ],
+      "copyright": "Copyright \u00a9 2014-2021 by Steven G. Johnson, Jiahao Chen, Tony Kelman, Jonas Fonseca, and other contributors listed in the git history.",
+      "purl": "pkg:github/juliastrings/utf8proc@v2.8.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/juliastrings/utf8proc.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongoc/utf8proc"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -1486,6 +1419,7 @@
       "name": "LibTomCrypt",
       "version": "1.18.2",
       "description": "LibTomCrypt is a fairly comprehensive, modular and portable cryptographic toolkit that provides developers with a vast array of well known published block ciphers, one-way hash functions, chaining modes, pseudo-random number generators, public key cryptography and a plethora of other routines.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1502,11 +1436,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/tomcrypt-1.18.2"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Security"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -1515,15 +1452,7 @@
           "name": "import_script_path",
           "value": "src/third_party/scripts/tomcrypt_get_sources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/tomcrypt-1.18.2"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1539,6 +1468,7 @@
       "name": "libunwind",
       "version": "1.8.1",
       "description": "The primary goal of this project is to define a portable and efficient C programming interface (API) to determine the call-chain of a program. The API additionally provides the means to manipulate the preserved (callee-saved) state of each call-frame and to resume execution at any point in the call-chain (non-local goto). The API supports both local (same-process) and remote (across-process) operation.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1555,11 +1485,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/unwind"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -1568,15 +1501,7 @@
           "name": "import_script_path",
           "value": "src/third_party/unwind/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/unwind"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1592,6 +1517,7 @@
       "name": "zlib",
       "version": "1.3.2",
       "description": "zlib is a general purpose data compression library.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1608,11 +1534,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/zlib"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -1621,15 +1550,7 @@
           "name": "import_script_path",
           "value": "src/third_party/zlib/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/zlib"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1645,6 +1566,7 @@
       "name": "libmongocrypt",
       "version": "1.14.0",
       "description": "Required C library for Client Side and Queryable Encryption in MongoDB",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1661,11 +1583,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/libmongocrypt"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Security"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -1674,15 +1599,7 @@
           "name": "import_script_path",
           "value": "src/third_party/libmongocrypt/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/libmongocrypt"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1696,8 +1613,9 @@
       "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "MongoDB C Driver",
-      "description": "The Official MongoDB driver for C language",
       "version": "1.28.1",
+      "description": "The Official MongoDB driver for C language",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -1714,11 +1632,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/libbson"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Security"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -1727,15 +1648,56 @@
           "name": "import_script_path",
           "value": "src/third_party/libbson/import.sh"
         }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:github/mongodb/mongo-cxx-driver@r3.7.2",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "author": "MongoDB, Inc.",
+      "group": "mongodb",
+      "name": "mongo-cxx-driver",
+      "version": "3.7.2",
+      "description": "C++ Driver for MongoDB",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2009-present MongoDB, Inc.",
+      "cpe": "cpe:2.3:a:mongodb:c++:3.7.2:*:*:*:*:*:*:*",
+      "purl": "pkg:github/mongodb/mongo-cxx-driver@r3.7.2",
+      "externalReferences": [
+        {
+          "url": "https://github.com/mongodb/mongo-cxx-driver",
+          "type": "vcs"
+        }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/libbson"
+            "location": "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx"
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
+        }
+      ]
     },
     {
       "type": "library",
@@ -1745,6 +1707,7 @@
       "name": "nlohmann/json",
       "version": "3.11.3",
       "description": "JSON for Modern C++",
+      "scope": "optional",
       "licenses": [
         {
           "license": {
@@ -1753,25 +1716,11 @@
         }
       ],
       "copyright": "Copyright (c) 2013-2022 Niels Lohmann <http://nlohmann.me>.",
-      "purl": "pkg:github/nlohmann/json@3.11.3",
+      "purl": "pkg:github/nlohmann/json@v3.11.3",
       "externalReferences": [
         {
           "url": "https://github.com/nlohmann/json.git",
           "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "true"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/nlohmann-json/scripts/import.sh"
         }
       ],
       "evidence": {
@@ -1781,7 +1730,16 @@
           }
         ]
       },
-      "scope": "optional"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/nlohmann-json/scripts/import.sh"
+        }
+      ]
     },
     {
       "type": "library",
@@ -1795,8 +1753,9 @@
       "author": "OpenJS Foundation",
       "group": "nodejs",
       "name": "node",
-      "description": "A modified version of the GetStringWidth function from Node.js, originating from the https://github.com/joyent/node repository.",
       "version": "22.1.0",
+      "description": "A modified version of the GetStringWidth function from Node.js, originating from the https://github.com/joyent/node repository.",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
@@ -1812,12 +1771,6 @@
           "type": "website"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Workload Scheduling"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -1825,7 +1778,7 @@
           }
         ]
       },
-      "scope": "excluded"
+      "properties": []
     },
     {
       "type": "library",
@@ -1841,6 +1794,7 @@
       "name": "opentelemetry-cpp",
       "version": "1.17.0",
       "description": "OpenTelemetry, also known as OTel, is a vendor-neutral open source Observability framework for instrumenting, generating, collecting, and exporting telemetry data such as traces, metrics, and logs. As an industry-standard, OpenTelemetry is supported by more than 40 observability vendors, integrated by many libraries, services, and apps, and adopted by numerous end users.",
+      "scope": "optional",
       "licenses": [
         {
           "license": {
@@ -1856,11 +1810,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/opentelemetry-cpp"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -1869,15 +1826,7 @@
           "name": "import_script_path",
           "value": "src/third_party/opentelemetry-cpp/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/opentelemetry-cpp"
-          }
-        ]
-      },
-      "scope": "optional"
+      ]
     },
     {
       "type": "library",
@@ -1893,6 +1842,7 @@
       "name": "opentelemetry-proto",
       "version": "1.3.2",
       "description": "OpenTelemetry protocol (OTLP) specification and Protobuf definitions",
+      "scope": "optional",
       "licenses": [
         {
           "license": {
@@ -1908,11 +1858,14 @@
           "type": "vcs"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/opentelemetry-proto"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -1921,15 +1874,7 @@
           "name": "import_script_path",
           "value": "src/third_party/opentelemetry-proto/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/opentelemetry-proto"
-          }
-        ]
-      },
-      "scope": "optional"
+      ]
     },
     {
       "type": "library",
@@ -1945,6 +1890,7 @@
       "name": "PCRE2 - Perl-Compatible Regular Expressions",
       "version": "10.40",
       "description": "The PCRE2 library is a set of C functions that implement regular expression pattern matching.",
+      "scope": "required",
       "licenses": [
         {
           "expression": "BSD-3-Clause WITH PCRE2-exception"
@@ -1959,11 +1905,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/pcre2"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Execution"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -1972,15 +1921,7 @@
           "name": "import_script_path",
           "value": "src/third_party/scripts/pcre2_get_sources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/pcre2"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -1996,6 +1937,7 @@
       "name": "Protobuf",
       "version": "v25.0",
       "description": "Protocol Buffers - Google's data interchange format",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -2012,11 +1954,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/protobuf"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -2025,15 +1970,7 @@
           "name": "import_script_path",
           "value": "src/third_party/protobuf/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/protobuf"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -2049,6 +1986,7 @@
       "name": "CRoaring",
       "version": "3.0.1",
       "description": "Roaring bitmaps in C (and C++), with SIMD (AVX2, AVX-512 and NEON) optimizations: used by Apache Doris, ClickHouse, and StarRocks. Roaring bitmaps are compressed bitmaps which tend to outperform conventional compressed bitmaps such as WAH, EWAH or Concise. In some instances, they can be hundreds of times faster and they often offer significantly better compression.",
+      "scope": "required",
       "licenses": [
         {
           "expression": "Apache-2.0 OR MIT"
@@ -2063,11 +2001,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/croaring"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Execution"
-        },
         {
           "name": "emits_persisted_data",
           "value": "false"
@@ -2076,15 +2017,7 @@
           "name": "import_script_path",
           "value": "src/third_party/croaring/scripts/import.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/croaring"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "library",
@@ -2100,6 +2033,7 @@
       "name": "JSON Schema Store",
       "version": "6847cfc3a17a04a7664474212db50c627e1e3408",
       "description": "A collection of JSON schema files including full API",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
@@ -2115,16 +2049,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Optimization"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -2132,7 +2056,12 @@
           }
         ]
       },
-      "scope": "excluded"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -2148,6 +2077,7 @@
       "name": "Snowball Stemming Algorithms (libstemmer)",
       "version": "1.0.0",
       "description": "Snowball is a small string processing language for creating stemming algorithms for use in Information Retrieval, plus a collection of stemming algorithms implemented using it.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -2163,11 +2093,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/libstemmer_c"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Integration"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -2176,15 +2109,45 @@
           "name": "import_script_path",
           "value": "src/third_party/libstemmer_c/scripts/import.sh"
         }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/troydhanson/uthash@v2.3.0",
+      "author": "Troy D. Hanson",
+      "group": "troydhanson",
+      "name": "uthash",
+      "version": "2.3.0",
+      "description": "C macros for hash tables and more",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-1-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2005-2025, Troy D. Hanson",
+      "purl": "pkg:github/troydhanson/uthash@v2.3.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/troydhanson/uthash.git",
+          "type": "distribution"
+        }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/libstemmer_c"
+            "location": "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongoc/uthash"
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -2200,6 +2163,7 @@
       "name": "ICU4C - International Components for Unicode C/C++",
       "version": "57.1",
       "description": "International Components for Unicode (ICU) is an open-source project of mature libraries for Unicode support, software internationalization, and software globalization. The C/C++ version, known as ICU4C, offers comprehensive functionalities for handling globalized applications.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
@@ -2217,11 +2181,14 @@
           "type": "distribution"
         }
       ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/icu4c-57.1"
+          }
+        ]
+      },
       "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Query Execution"
-        },
         {
           "name": "emits_persisted_data",
           "value": "true"
@@ -2230,15 +2197,7 @@
           "name": "import_script_path",
           "value": "src/third_party/scripts/icu_get_sources.sh"
         }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/icu4c-57.1"
-          }
-        ]
-      },
-      "scope": "required"
+      ]
     },
     {
       "type": "framework",
@@ -2254,6 +2213,7 @@
       "name": "WiredTiger",
       "version": "12.0.0",
       "description": "WiredTiger is an high performance, scalable, production quality, NoSQL, Open Source extensible platform for data management.",
+      "scope": "required",
       "licenses": [
         {
           "expression": "GPL-2.0-only OR GPL-3.0-only"
@@ -2267,16 +2227,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Storage Engines"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "true"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -2284,7 +2234,12 @@
           }
         ]
       },
-      "scope": "required"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        }
+      ]
     },
     {
       "type": "library",
@@ -2294,6 +2249,7 @@
       "name": "pypi/ocspbuilder",
       "version": "0.10.2",
       "description": "Creates and signs online certificate status protocol (OCSP) requests and responses for X.509 certificates",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
@@ -2309,16 +2265,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Security"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -2326,7 +2272,12 @@
           }
         ]
       },
-      "scope": "excluded"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     },
     {
       "type": "library",
@@ -2342,6 +2293,7 @@
       "name": "pypi/ocspresponder",
       "version": "0.5.0",
       "description": "RFC 6960 compliant OCSP Responder framework written in Python 3.",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
@@ -2357,16 +2309,6 @@
           "type": "distribution"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Security"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ],
       "evidence": {
         "occurrences": [
           {
@@ -2374,61 +2316,15 @@
           }
         ]
       },
-      "scope": "excluded"
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
     }
   ],
   "dependencies": [
-    {
-      "ref": "pkg:github/mongodb/mongo@v8.2",
-      "dependsOn": [
-        "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
-        "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
-        "pkg:generic/unicode-org/unicode@8.0.0",
-        "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
-        "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
-        "pkg:github/abseil/abseil-cpp@20250512.1",
-        "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
-        "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
-        "pkg:github/aws/aws-sdk-cpp@1.11.471",
-        "pkg:github/boostorg/boost@boost-1.88.0",
-        "pkg:github/c-ares/c-ares@cares-1_27_0",
-        "pkg:github/chriskohlhoff/asio@asio-1-12-2",
-        "pkg:github/confluentinc/librdkafka@2.0.2",
-        "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
-        "pkg:github/dcleblanc/safeint@3.0.26",
-        "pkg:github/derickr/timelib@2022.13",
-        "pkg:github/facebook/folly@v2023.12.25.00",
-        "pkg:github/facebook/zstd@v1.5.5",
-        "pkg:github/fmtlib/fmt@11.1.3",
-        "pkg:github/google/benchmark@v1.5.2",
-        "pkg:github/google/re2@2023-11-01",
-        "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
-        "pkg:github/google/snappy@1.1.10",
-        "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
-        "pkg:github/gperftools/gperftools@gperftools-2.9.1",
-        "pkg:github/grpc/grpc@1.59.5",
-        "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
-        "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
-        "pkg:github/libtom/libtomcrypt@v1.18.2",
-        "pkg:github/libunwind/libunwind@v1.8.1",
-        "pkg:github/madler/zlib@1.3.2",
-        "pkg:github/mongodb/libmongocrypt@1.14.0",
-        "pkg:github/mongodb/mongo-c-driver@1.28.1",
-        "pkg:github/nlohmann/json@v3.11.3",
-        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
-        "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
-        "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
-        "pkg:github/pcre2project/pcre2@pcre2-10.40",
-        "pkg:github/protocolbuffers/protobuf@v25.0",
-        "pkg:github/roaringbitmap/croaring@v3.0.1",
-        "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
-        "pkg:github/snowballstem/snowball@1.0.0",
-        "pkg:github/unicode-org/icu@icu-release-57-1",
-        "pkg:github/wiredtiger/wiredtiger@12.0.0",
-        "pkg:pypi/ocspbuilder@0.10.2",
-        "pkg:pypi/ocspresponder@0.5.0"
-      ]
-    },
     {
       "ref": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
       "dependsOn": []
@@ -2526,11 +2422,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+      "ref": "pkg:github/gperftools/gperftools@2.9.1",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/grpc/grpc@1.59.5",
+      "ref": "pkg:github/grpc/grpc@v1.59.3",
       "dependsOn": []
     },
     {
@@ -2539,6 +2435,10 @@
     },
     {
       "ref": "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/juliastrings/utf8proc@v2.8.0",
       "dependsOn": []
     },
     {
@@ -2560,6 +2460,64 @@
     {
       "ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/mongodb/mongo-cxx-driver@r3.7.2",
+      "dependsOn": [
+        "pkg:github/juliastrings/utf8proc@v2.8.0",
+        "pkg:github/troydhanson/uthash@v2.3.0"
+      ]
+    },
+    {
+      "ref": "pkg:github/mongodb/mongo@v8.2",
+      "dependsOn": [
+        "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+        "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
+        "pkg:generic/unicode-org/unicode@8.0.0",
+        "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
+        "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+        "pkg:github/abseil/abseil-cpp@20250512.1",
+        "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+        "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
+        "pkg:github/aws/aws-sdk-cpp@1.11.471",
+        "pkg:github/boostorg/boost@boost-1.88.0",
+        "pkg:github/c-ares/c-ares@cares-1_27_0",
+        "pkg:github/chriskohlhoff/asio@asio-1-12-2",
+        "pkg:github/confluentinc/librdkafka@2.0.2",
+        "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
+        "pkg:github/dcleblanc/safeint@3.0.26",
+        "pkg:github/derickr/timelib@2022.13",
+        "pkg:github/facebook/folly@v2023.12.25.00",
+        "pkg:github/facebook/zstd@v1.5.5",
+        "pkg:github/fmtlib/fmt@11.1.3",
+        "pkg:github/google/benchmark@v1.5.2",
+        "pkg:github/google/re2@2023-11-01",
+        "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
+        "pkg:github/google/snappy@1.1.10",
+        "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
+        "pkg:github/gperftools/gperftools@2.9.1",
+        "pkg:github/grpc/grpc@v1.59.3",
+        "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
+        "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
+        "pkg:github/libtom/libtomcrypt@v1.18.2",
+        "pkg:github/libunwind/libunwind@v1.8.1",
+        "pkg:github/madler/zlib@1.3.2",
+        "pkg:github/mongodb/libmongocrypt@1.14.0",
+        "pkg:github/mongodb/mongo-c-driver@1.28.1",
+        "pkg:github/nlohmann/json@v3.11.3",
+        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
+        "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
+        "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
+        "pkg:github/pcre2project/pcre2@pcre2-10.40",
+        "pkg:github/protocolbuffers/protobuf@v25.0",
+        "pkg:github/roaringbitmap/croaring@v3.0.1",
+        "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
+        "pkg:github/snowballstem/snowball@1.0.0",
+        "pkg:github/unicode-org/icu@icu-release-57-1",
+        "pkg:github/wiredtiger/wiredtiger@12.0.0",
+        "pkg:pypi/ocspbuilder@0.10.2",
+        "pkg:pypi/ocspresponder@0.5.0"
+      ]
     },
     {
       "ref": "pkg:github/nlohmann/json@v3.11.3",
@@ -2595,6 +2553,10 @@
     },
     {
       "ref": "pkg:github/snowballstem/snowball@1.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/troydhanson/uthash@v2.3.0",
       "dependsOn": []
     },
     {

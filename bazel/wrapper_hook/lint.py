@@ -231,7 +231,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
         args = ["//..."] + args
 
-    if lint_all or "sbom.json" in files_to_format:
+    if lint_all or "sbom.private.json" in files_to_format:
         subprocess.run([bazel_bin, "run", "//buildscripts:sbom_linter"], check=True)
 
     if lint_all or any(file.endswith(".h") or file.endswith(".cpp") for file in files_to_format):

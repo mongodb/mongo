@@ -2,16 +2,10 @@ import argparse
 import json
 import os
 import sys
-from typing import List
 
+import jsonschema
 from license_expression import get_spdx_licensing
 from referencing import Registry, Resource
-
-try:
-    import jsonschema
-except ImportError:
-    print("'jsonschema' not found. Continuing without it.")
-    jsonschema = None
 
 BOM_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
 SPDX_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "spdx.schema.json")
@@ -48,7 +42,7 @@ class ErrorManager:
     def __init__(self, input_file: str):
         self.input_file: str = input_file
         self.component_name: str = ""
-        self.errors: List[str] = []
+        self.errors: list[str] = []
 
     def update_component_attribute(self, component_name: str) -> None:
         self.component_name = component_name
@@ -155,7 +149,7 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
 
 
 def validate_evidence(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
-    if component.get("scope") == "required":
+    if component["scope"] == "required":
         if "evidence" not in component or "occurrences" not in component["evidence"]:
             error_manager.append_full_error_message(MISSING_EVIDENCE_ERROR)
             return
@@ -164,7 +158,7 @@ def validate_evidence(component: dict, third_party_libs: set, error_manager: Err
 
 
 def validate_properties(component: dict, error_manager: ErrorManager) -> None:
-    has_team_responsible_property = False or component.get("scope") == "excluded"
+    has_team_responsible_property = False or component["scope"] == "excluded"
     script_path = ""
     if "properties" in component:
         for prop in component["properties"]:
@@ -172,25 +166,45 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
                 has_team_responsible_property = True
             elif prop["name"] == "import_script_path":
                 script_path = prop["value"]
-
     if not has_team_responsible_property:
         error_manager.append_full_error_message(MISSING_TEAM_ERROR)
-
-    if script_path:
-        script_path_is_file = os.path.isfile(script_path)
-        if not script_path_is_file:
-            error_manager.append_full_error_message(COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR)
-        # Only look for VERSION if the import script is a shell script file
-        elif script_path.endswith(".sh"):
-            script_version = get_script_version(script_path, "VERSION", error_manager)
-            if script_version == "":
-                error_manager.append_full_error_message(
-                    MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path
-                )
 
     if not component.get("version"):
         error_manager.append_full_error_message(MISSING_VERSION_IN_SBOM_COMPONENT_ERROR)
         return
+
+    comp_version = component["version"]
+    # If the version is unknown or the script path property is absent, the version
+    # check is not possible (these are valid options and no error is generated).
+    if comp_version == "Unknown" or script_path == "":
+        return
+
+    # Include the .pedigree.descendants[0] version for version matching
+    if (
+        "pedigree" in component
+        and "descendants" in component["pedigree"]
+        and "version" in component["pedigree"]["descendants"][0]
+    ):
+        comp_pedigree_version = component["pedigree"]["descendants"][0]["version"]
+    else:
+        comp_pedigree_version = ""
+
+    # At this point a version is attempted to be read from the import script file
+    script_version_key = "VERSION"
+    if "properties" in component:
+        for prop in component["properties"]:
+            if prop["name"] == "internal:generate_sbom:import_script_variable_name":
+                script_version_key = prop["value"]
+
+    script_version = get_script_version(script_path, script_version_key, error_manager)
+    if script_version == "":
+        error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path)
+    elif strip_extra_prefixes(script_version) != strip_extra_prefixes(
+        comp_version
+    ) and strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_pedigree_version):
+        print(
+            f"WARNING: {VERSION_MISMATCH_ERROR}\n  script version:{script_version}\n  sbom component version:{comp_version}\n  sbom component pedigree version:{comp_pedigree_version}"
+        )
 
 
 def validate_component(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
@@ -242,16 +256,15 @@ def lint_sbom(
         error_manager.append(f"Failed to parse {input_file}: {str(ex)}")
         return error_manager
 
-    if jsonschema:
-        try:
-            schema = get_schema()
-            jsonschema.validators.validator_for(schema)(
-                schema, registry=local_schema_registry()
-            ).validate(sbom)
-        except jsonschema.ValidationError as error:
-            error_manager.append(f"{SCHEMA_MATCH_FAILURE} {input_file}")
-            error_manager.append(error.message)
-            return error_manager
+    try:
+        schema = get_schema()
+        jsonschema.validators.validator_for(schema)(
+            schema, registry=local_schema_registry()
+        ).validate(sbom)
+    except jsonschema.ValidationError as error:
+        error_manager.append(f"{SCHEMA_MATCH_FAILURE} {input_file}")
+        error_manager.append(error.message)
+        return error_manager
 
     components = sbom["components"]
     for component in components:
@@ -283,11 +296,13 @@ def main() -> int:
         help="Whether to apply formatting to the output file.",
     )
     parser.add_argument(
-        "--input-file", default="sbom.json", help="The input CycloneDX file to format and lint."
+        "--input-file",
+        default="sbom.private.json",
+        help="The input CycloneDX file to format and lint.",
     )
     parser.add_argument(
         "--output-file",
-        default="sbom.json",
+        default="sbom.private.json",
         help="The file to output to when formatting is specified.",
     )
     args = parser.parse_args()
@@ -302,9 +317,15 @@ def main() -> int:
         ]
     )
     # the only files in this dir that are not third party libs
-    third_party_libs.remove("scripts")
+    third_party_libs.discard("scripts")
+    # the only files in the sasl dir are BUILD files to setup the sasl library in Windows
+    third_party_libs.discard("sasl")
+    # This is not a real third party, its just the local ssl pretending to be boringssl
+    third_party_libs.discard("boringssl_replacement")
+    # This is just a build file that gets inserted into a third party
+    third_party_libs.discard("wasmtime")
     # Nothing in this directory is included in Community/EA
-    third_party_libs.remove("private")
+    third_party_libs.discard("private")
     error_manager = lint_sbom(input_file, output_file, third_party_libs, should_format)
     error_manager.print_errors()
 

@@ -2,13 +2,12 @@ import fnmatch
 import os
 import re
 from functools import lru_cache
-from typing import Dict, List, Tuple
 
 import yaml
 
 
 @lru_cache
-def process_owners(cur_dir: str) -> Tuple[Dict[re.Pattern, List[str]], bool]:
+def process_owners(cur_dir: str) -> tuple[dict[re.Pattern, list[str]], bool]:
     if not cur_dir:
         return ({}, False)
 
@@ -20,7 +19,9 @@ def process_owners(cur_dir: str) -> Tuple[Dict[re.Pattern, List[str]], bool]:
         contents = yaml.safe_load(f)
 
         assert "version" in contents, f"Version not found in {owners_file_path}"
-        assert contents["version"] == "1.0.0", f"Invalid version in {owners_file_path}"
+        assert (
+            contents["version"] == "1.0.0" or contents["version"] == "2.0.0"
+        ), f"Invalid version in {owners_file_path}"
         assert "filters" in contents
 
         no_parent_owners = False
@@ -54,7 +55,7 @@ class Owners:
             open("buildscripts/util/co_jira_map.yml", "r", encoding="utf8")
         )
 
-    def get_codeowners(self, file_path: str) -> List[str]:
+    def get_codeowners(self, file_path: str) -> list[str]:
         cur_dir = os.path.dirname(file_path)
         codeowners = []
         # search up tree until matching filter found
@@ -71,10 +72,10 @@ class Owners:
             cur_dir = os.path.dirname(cur_dir)
         return codeowners
 
-    def get_jira_team_from_codeowner(self, codeowner: str) -> List[str]:
+    def get_jira_team_from_codeowner(self, codeowner: str) -> list[str]:
         return self.co_jira_map[codeowner]
 
-    def get_jira_team_owner(self, file_path: str) -> List[str]:
+    def get_jira_team_owner(self, file_path: str) -> list[str]:
         return [
             jira_team
             for codeowner in self.get_codeowners(file_path)

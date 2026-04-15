@@ -10,6 +10,8 @@
   - Services & Integrations
 10gen/performance:
   - Product Performance
+10gen/platsec-server:
+  - Product Security
 10gen/query:
   - Query Execution
   - Query Integration
@@ -64,5 +66,7 @@
   - Storage Execution
 10gen/server-workload-scheduling:
   - Workload Execution
+10gen/storage-engines:
+  - Storage Engines
 10gen/streams-engine:
   - Atlas Streams

@@ -34,7 +34,7 @@ a notice will be included in
 | [fmt]                                                | MIT                               | 11.1.3                                   |                      | ✗                               |
 | [folly]                                              | Apache-2.0                        | 2023.12.25.00                            |                      | ✗                               |
 | [gperftools]                                         | BSD-3-Clause                      | 2.9.1                                    |                      | ✗                               |
-| [gRPC (C++)]                                         | Apache-2.0                        | 1.59.5                                   |                      | ✗                               |
+| [gRPC (C++)]                                         | Apache-2.0                        | 1.59.3                                   |                      | ✗                               |
 | [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                       | 57.1                                     | ✗                    | ✗                               |
 | [immer]                                              | BSL-1.0                           | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                      | 2.0.1                                    |                      | ✗                               |
@@ -64,6 +64,8 @@ a notice will be included in
 | [tcmalloc]                                           | Apache-2.0                        | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
 | [timelib]                                            | MIT                               | 2022.13                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                  | 8.0.0                                    | ✗                    | ✗                               |
+| [utf8proc]                                           | MIT, Unicode-TOU                  | 2.8.0                                    |                      | ✗                               |
+| [uthash]                                             | BSD-1-Clause                      | 2.3.0                                    |                      | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                      | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
 | [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only      | 12.0.0                                   | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |
@@ -113,9 +115,27 @@ a notice will be included in
 [snappy]: https://github.com/google/tcmalloc.git
 [tcmalloc]: https://github.com/google/tcmalloc.git
 [timelib]: https://github.com/derickr/timelib.git
+[utf8proc]: https://github.com/juliastrings/utf8proc.git
+[uthash]: https://github.com/troydhanson/uthash.git
 [valgrind.h]: https://sourceware.org/git/valgrind.git
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
+
+## WiredTiger Vendored Test Libraries
+
+The following libraries are transitively included by WiredTiger,
+and are used by that component for testing. They don't appear in
+released binary artifacts.
+
+| Name                           |
+| ------------------------------ |
+| pkg:pypi/concurrencytest@0.1.2 |
+| pkg:pypi/discover@0.4.0        |
+| pkg:pypi/extras@0.0.3          |
+| pkg:pypi/iso8601@2.1.0         |
+| pkg:pypi/python-subunit@1.4.4  |
+| pkg:pypi/testscenarios@0.4     |
+| pkg:pypi/testtools@2.7.1       |
 
 ## Dynamically Linked Libraries
 
