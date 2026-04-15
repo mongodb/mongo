@@ -1403,31 +1403,25 @@ typedef struct MongoExtensionVTable {
      * extension to avoid a dangling pointer.
      */
     MongoExtensionStatus* (*initialize)(const MongoExtension* extension,
-                                        const MongoExtensionHostPortal* portal,
-                                        const MongoExtensionHostServices* services);
+                                        const MongoExtensionHostPortal* portal);
 } MongoExtensionVTable;
 
 /**
  * The symbol that must be defined in all extension shared libraries to register the extension with
  * the MongoDB server when the extension is loaded. Returns a MongoExtensionStatus indicating
  * whether or not the parameter MongoExtension was successfully initialized. Also takes a struct
- * representing the API version requirements to comply with the host.
+ * representing the API version requirements to comply with the host, and a pointer to HostServices
+ * so that the extension can use host assertion functions during loading. The HostServices pointer
+ * is valid for the lifetime of the extension and may be saved by the extension for later use.
  *
  * NOTE: You must define this symbol in your extension shared library and avoid name mangling (for
  * example, with 'extern "C"') so that the MongoDB server can find it at loadtime.
- *
- * IMPORTANT: We require that extensions throw exceptions using the HostServices' user_asserted()
- * and tripwire_asserted() functions instead of throwing C++ exceptions across the API boundary.
- * However, the HostServices is only initialized after this function is called (during the call
- * to MongoExtension::initialize). Attempting to use HostServices in the body of
- * get_mongodb_extension would result in a crash. Therefore, if your extension needs to report
- * errors during get_mongodb_extension, you must build a "hand-crafted" MongoExtensionStatus object
- * and return it directly from this function.
- * TODO SERVER-115700: Fix this design limitation.
  */
 #define GET_MONGODB_EXTENSION_SYMBOL "get_mongodb_extension"
 typedef MongoExtensionStatus* (*get_mongo_extension_t)(
-    const MongoExtensionAPIVersionVector* hostVersions, const MongoExtension** extension);
+    const MongoExtensionAPIVersionVector* hostVersions,
+    const MongoExtensionHostServices* hostServices,
+    const MongoExtension** extension);
 
 #ifdef __cplusplus
 }  // extern "C"

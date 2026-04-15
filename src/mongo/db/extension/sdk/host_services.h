@@ -108,10 +108,11 @@ public:
         return IdleThreadBlockHandle{idleThreadBlock};
     }
     /**
-     * setHostServices() should be called only once during initialization of the extension. The
-     * host guarantees that the pointer remains valid during the lifetime of the extension.
+     * Sets the static HostServices instance. Called during get_mongodb_extension() so that
+     * sdk_uassert/sdk_tassert are available from the start of extension loading. The host
+     * guarantees the pointer remains valid for the lifetime of the extension.
      */
-    static void setHostServices(const ::MongoExtensionHostServices* services) {
+    static void setHostServices(const ::MongoExtensionHostServices* services) noexcept {
         // The host should only call this function once.
         _sHostServices = UnownedHandle<const ::MongoExtensionHostServices>{services};
     }

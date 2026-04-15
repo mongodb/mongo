@@ -190,22 +190,21 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
                        AssertionException,
                        10696402);
 
-    // TODO SERVER-115700: With statically linked .so's, extensions that report errors during
-    // get_mongodb_extension (e.g. duplicate_version, no_compatible_version) use sdk_uassert, which
-    // require HostServices. HostServices is only set in initialize() (after get_mongodb_extension
-    // returns), so we get Invalid VTable (10596403).
+    // duplicate_version_bad_extension registers the same version twice, which triggers
+    // sdk_uassert during get_mongodb_extension's version negotiation.
+    ASSERT_THROWS_CODE(ExtensionLoader::load("duplicate_version_bad_extension",
+                                             test_util::makeEmptyExtensionConfig(
+                                                 "libduplicate_version_bad_extension.so")),
+                       AssertionException,
+                       10930201);
 
-    // ASSERT_THROWS_CODE(ExtensionLoader::load("duplicate_version_bad_extension",
-    //                                          test_util::makeEmptyExtensionConfig(
-    //                                              "libduplicate_version_bad_extension.so")),
-    //                    AssertionException,
-    //                    10930201);
-
-    // ASSERT_THROWS_CODE(ExtensionLoader::load("no_compatible_version_bad_extension",
-    //                                          test_util::makeEmptyExtensionConfig(
-    //                                              "libno_compatible_version_bad_extension.so")),
-    //                    AssertionException,
-    //                    10930202);
+    // no_compatible_version_bad_extension registers a version incompatible with the host,
+    // which triggers sdk_uasserted during get_mongodb_extension's version negotiation.
+    ASSERT_THROWS_CODE(ExtensionLoader::load("no_compatible_version_bad_extension",
+                                             test_util::makeEmptyExtensionConfig(
+                                                 "libno_compatible_version_bad_extension.so")),
+                       AssertionException,
+                       10930202);
 }
 
 // null_initialize_function_bad_extension has a null initialization function.

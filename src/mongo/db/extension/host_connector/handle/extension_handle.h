@@ -56,16 +56,12 @@ public:
     ExtensionAPI(::MongoExtension* ext) : VTableAPI<::MongoExtension>(ext) {}
 
     /**
-     * Initialize the extension by providing it with a HostPortal and HostServices.
+     * Initialize the extension by providing it with a HostPortal.
      *
-     * Both are passed as pointers, but they have different lifetime semantics. The HostServices
-     * pointer remains valid for the lifetime of the extension and will be saved by the extension.
      * The HostPortal pointer is only valid during the call to initialize() and must not be saved.
      */
-    void initialize(const MongoExtensionHostPortal* portal,
-                    const MongoExtensionHostServices* hostServices) const {
-        invokeCAndConvertStatusToException(
-            [&] { return _vtable().initialize(get(), portal, hostServices); });
+    void initialize(const MongoExtensionHostPortal* portal) const {
+        invokeCAndConvertStatusToException([&] { return _vtable().initialize(get(), portal); });
     }
 
     ::MongoExtensionAPIVersion getVersion() const {

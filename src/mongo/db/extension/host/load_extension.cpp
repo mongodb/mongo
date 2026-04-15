@@ -111,6 +111,7 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
     const ::MongoExtension* extension = nullptr;
     invokeCAndConvertStatusToException([&]() {
         return swGetExtensionFunction.getValue()(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED,
+                                                 &host_connector::HostServicesAdapter::get(),
                                                  &extension);
     });
     uassert(10615503,
@@ -258,7 +259,7 @@ void ExtensionLoader::load(const std::string& name,
                                              maxWireVersion,
                                              YAML::Dump(config.extOptions),
                                              std::move(hostPortal)};
-    extHandle->initialize(&portal, &host_connector::HostServicesAdapter::get());
+    extHandle->initialize(&portal);
 }
 #endif
 

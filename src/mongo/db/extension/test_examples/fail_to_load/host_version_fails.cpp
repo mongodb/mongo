@@ -51,6 +51,7 @@ public:
 
 extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
+                                              const ::MongoExtensionHostServices* hostServices,
                                               const ::MongoExtension** extension) {
     // We expect to fail to initialize extension. extensionA's major version is higher than
     // host's and extensionB's minor version is higher than host's.

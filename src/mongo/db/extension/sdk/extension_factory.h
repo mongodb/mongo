@@ -119,13 +119,7 @@ public:
 
 private:
     static ::MongoExtensionStatus* _extInitialize(
-        const ::MongoExtension* extensionPtr,
-        const ::MongoExtensionHostPortal* portal,
-        const ::MongoExtensionHostServices* hostServices) noexcept {
-        // Immediately set the static HostServices instance so that the extension can access it
-        // during initialization if needed.
-        HostServicesAPI::setHostServices(hostServices);
-
+        const ::MongoExtension* extensionPtr, const ::MongoExtensionHostPortal* portal) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             // The host portal will go out of scope on the host side after initialization, so we
             // should not retain it to avoid a dangling pointer
@@ -162,12 +156,18 @@ private:
 
 /**
  * Base case macro to define get_mongodb_extension.
+ *
+ * setHostServices() is called BEFORE wrapCXXAndConvertExceptionToStatus so that sdk_uassert
+ * and sdk_tassert (which rely on HostServices to throw across the C API boundary) are
+ * available during version negotiation inside the lambda. setHostServices itself cannot throw.
  */
 #define DEFINE_GET_EXTENSION()                                                               \
     extern "C" {                                                                             \
     ::MongoExtensionStatus* get_mongodb_extension(                                           \
         const ::MongoExtensionAPIVersionVector* hostVersions,                                \
+        const ::MongoExtensionHostServices* hostServices,                                    \
         const ::MongoExtension** extension) {                                                \
+        mongo::extension::sdk::HostServicesAPI::setHostServices(hostServices);               \
         return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {                    \
             const auto& versionedExtensionContainer =                                        \
                 mongo::extension::sdk::VersionedExtensionContainer::getInstance();           \
