@@ -1573,7 +1573,7 @@ TEST_F(WiredTigerKVEngineTest, AllowUntimestampedWritesWithoutServerParam) {
 
 TEST_F(WiredTigerKVEngineTest, SetStorageTierCold) {
     auto* engine = _helper->getWiredTigerKVEngine();
-    auto result = engine->setStorageTierToStorageOptions(BSONObj(), "cold");
+    auto result = engine->setStorageTierToStorageOptions(BSONObj(), StorageTierLevelEnum::cold);
     // Verify the returned storage options contain the cold tier WT config.
     auto wtObj = result.getObjectField("wiredTiger");
     auto configString = wtObj.getStringField("configString");
@@ -1621,6 +1621,28 @@ TEST_F(WiredTigerKVEngineTest, IsColdCollectionRecordStore) {
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtxPtr.get())),
         params);
     ASSERT_TRUE(coldRs->isColdCollection());
+}
+
+TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsNone) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    // WiredTiger's default config string uses storage_tier=none, which should be treated as unset.
+    auto options =
+        BSON("wiredTiger" << BSON("configString" << "disaggregated=(storage_tier=none)"));
+    ASSERT_EQ(engine->getStorageTierFromStorageOptions(options), boost::none);
+}
+
+TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsCold) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto options =
+        BSON("wiredTiger" << BSON("configString" << "disaggregated=(storage_tier=cold)"));
+    auto result = engine->getStorageTierFromStorageOptions(options);
+    ASSERT(result);
+    ASSERT_EQ(*result, StorageTierLevelEnum::cold);
+}
+
+TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsEmpty) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    ASSERT_EQ(engine->getStorageTierFromStorageOptions(BSONObj()), boost::none);
 }
 
 }  // namespace

@@ -427,7 +427,7 @@ CollectionOptions CollectionOptions::fromCreateCommand(OperationContext* opCtx,
         if (storageTier->getCollection() == StorageTierLevelEnum::cold) {
             auto storageEngine = getGlobalServiceContext()->getStorageEngine();
             options.storageEngine = storageEngine->setStorageTierToStorageOptions(
-                options.storageEngine, idlSerialize(StorageTierLevelEnum::cold));
+                options.storageEngine, StorageTierLevelEnum::cold);
         }
 
         if (storageTier->getIndexes().has_value()) {

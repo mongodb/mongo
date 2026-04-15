@@ -381,7 +381,7 @@ private:
                                         collection->ns().toStringForErrorMsg(),
                                         collection->uuid().toString()),
                             !storageTier.has_value() ||
-                                storageTier.value() != idlSerialize(StorageTierLevelEnum::cold));
+                                storageTier.value() != StorageTierLevelEnum::cold);
                     }
 
                     return true;

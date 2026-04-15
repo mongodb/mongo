@@ -304,9 +304,9 @@ public:
                                                     StringData flagName) const override;
 
     [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
-                                                         StringData value) const override;
+                                                         StorageTierLevelEnum value) const override;
 
-    boost::optional<std::string> getStorageTierFromStorageOptions(
+    boost::optional<StorageTierLevelEnum> getStorageTierFromStorageOptions(
         const BSONObj& storageEngineOptions) const override;
 
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(
