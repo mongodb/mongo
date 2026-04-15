@@ -6,7 +6,6 @@
  *   requires_sbe
  * ]
  */
-import {getQueryPlanner, getAllPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 let conn = MongoRunner.runMongod();
@@ -78,11 +77,5 @@ let pipeline = [
 const explain = coll.explain().aggregate(pipeline);
 
 assert(!joinOptUsed(explain));
-/*
- * Inspect to make sure the nested pipeline was not optimized since it is nested too deep.
- */
-const nestedSubPipeline = explain.stages[1]["$lookup"]["pipeline"][0]["$lookup"]["pipeline"];
-/* Ensure that the three consecutive $match stages weren't collapsed into one single stage */
-assert.eq(nestedSubPipeline.length, 3, nestedSubPipeline);
 
 MongoRunner.stopMongod(conn);

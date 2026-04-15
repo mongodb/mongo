@@ -5,10 +5,13 @@
  * ]
  */
 
-import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
-import {verifyE2ESearchExplainOutput} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {
+    verifyE2ELookupSearchExplainOutput,
+    verifyE2ESearchExplainOutput,
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -34,10 +37,9 @@ assert.commandWorked(collBase.insert({"_id": 100, "localField": "cakes", "weird"
 assert.commandWorked(collBase.insert({"_id": 101, "localField": "cakes and kale", "weird": true}));
 
 function runExplainTest(verbosity) {
-    // Test with $lookup. $lookup does not include explain info about its subpipeline, so we check
-    // the result of the $lookup output instead. We only check the value of "nReturned" when
-    // executing with non "queryplanner" verbosity. Otherwise, we run the query to confirm the query
-    // does not error.
+    // Test with $lookup. $lookup serializes the resolved and optimized sub-pipeline in explain
+    // output. Verify the sub-pipeline is present and check nReturned for non-queryPlanner
+    // verbosities.
     let result = collBase.explain(verbosity).aggregate([
         {$project: {"_id": 0}},
         {
@@ -57,17 +59,12 @@ function runExplainTest(verbosity) {
             },
         },
     ]);
-    if (verbosity != "queryPlanner") {
-        let lookupStages = getAggPlanStages(result, "$lookup");
-        let lookupReturned = 0;
-        // In the sharded scenario, there will be more than one $lookup stage.
-        for (let stage of lookupStages) {
-            assert.neq(stage, null, result);
-            assert(stage.hasOwnProperty("nReturned"));
-            lookupReturned += stage["nReturned"];
-        }
-        assert.eq(NumberLong(2), lookupReturned);
-    }
+    verifyE2ELookupSearchExplainOutput({
+        explainOutput: result,
+        searchStageType: "$search",
+        verbosity,
+        nReturned: NumberLong(2),
+    });
 
     // Test with $unionWith.
     result = collBase.explain(verbosity).aggregate([

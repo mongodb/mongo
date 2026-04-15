@@ -950,6 +950,108 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineS
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
+TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipeline) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "let" << BSON("local_x" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                      << "as"))
+            .firstElement(),
+        expCtx);
+
+    std::vector<Value> serialization;
+    lookupStage->serializeToArray(serialization, kExplain);
+    ASSERT_EQ(serialization.size(), 1UL);
+
+    auto serializedDoc = serialization[0].getDocument();
+    auto serializedStage = serializedDoc["$lookup"].getDocument();
+    ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::array);
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 1UL);
+
+    ASSERT_DOCUMENT_EQ(serializedStage["pipeline"][0]["$match"].getDocument(),
+                       Document(fromjson("{x: {$eq: 1}}")));
+}
+
+TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipelineIncludingViewStages) {
+    auto expCtx = getExpCtx();
+    NamespaceString viewNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "myView");
+    auto viewPipeline = BSON_ARRAY(BSON("$addFields" << BSON("viewField" << 1)));
+
+    std::vector<BSONObj> viewPipelineVec;
+    for (const auto& stage : viewPipeline) {
+        viewPipelineVec.push_back(stage.Obj().getOwned());
+    }
+
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{viewNs, {viewNs, viewPipelineVec, boost::none, true}}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "myView"
+                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "as"
+                                      << "results"))
+            .firstElement(),
+        expCtx);
+
+    std::vector<Value> serialization;
+    lookupStage->serializeToArray(serialization, kExplain);
+    ASSERT_EQ(serialization.size(), 1UL);
+
+    auto serializedDoc = serialization[0].getDocument();
+    auto serializedStage = serializedDoc["$lookup"].getDocument();
+    ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::array);
+
+    // The resolved pipeline should include both the view pipeline ($addFields) and the user
+    // pipeline ($match), i.e. 2 stages instead of just the 1 stage from the user pipeline.
+    // After optimization, the $match may be reordered before the $addFields since the $match
+    // predicate does not depend on the field added by the view pipeline.
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 2UL);
+    ASSERT_FALSE(serializedStage["pipeline"][0].getDocument().getField("$match").missing());
+    ASSERT_FALSE(serializedStage["pipeline"][1].getDocument().getField("$addFields").missing());
+}
+
+TEST_F(DocumentSourceLookUpTest,
+       ExplainSerializesSubpipelineWithoutFieldMatchPlaceholderForFieldsAndPipeline) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "let" << BSON("local_x" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("a" << 1))
+                                                    << BSON("$match" << BSON("b" << 2))
+                                                    << BSON("$match" << BSON("c" << 3)))
+                                      << "localField"
+                                      << "x"
+                                      << "foreignField"
+                                      << "y"
+                                      << "as"
+                                      << "as"))
+            .firstElement(),
+        expCtx);
+
+    std::vector<Value> serialization;
+    lookupStage->serializeToArray(serialization, kExplain);
+    ASSERT_EQ(serialization.size(), 1UL);
+
+    auto serializedDoc = serialization[0].getDocument();
+    auto serializedStage = serializedDoc["$lookup"].getDocument();
+    ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::array);
+
+    // The placeholder $match for localField/foreignField should be stripped from explain output.
+    // The 3 user-specified $match stages are merged into a single $match by optimization.
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 1UL);
+    ASSERT_FALSE(serializedStage["pipeline"][0].getDocument().getField("$match").missing());
+}
+
 // $lookup : {from: {db: <>, coll: <>}} syntax is allowed when parseCtx.allowGenericForeignDbLookup
 // or expCtx.allowGenericForeignDbLookup is true.
 TEST_F(DocumentSourceLookUpTest, AllowsPipelineFromDBAndCollWithContextFlag) {
@@ -1265,8 +1367,9 @@ TEST_F(DocumentSourceLookUpTest, ShouldInsertCacheBeforeCorrelatedNestedLookup) 
         str::stream() << "[{$mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
                       << sequentialCacheStageObj()
                       << ", {$lookup: {from: 'coll', as: 'subas', let: {}, pipeline: "
-                         "[{$match: {x: 1}}, {$lookup: {from: 'coll', as: 'subsubas', "
-                         "pipeline: [{$match: {$expr: {$eq: ['$y', '$$var1']}}}]}}]}}, "
+                         "[{$match: {x: {$eq: 1}}}, {$lookup: {from: 'coll', as: 'subsubas', "
+                         "let: {}, pipeline: [{$match: {$and: [{y: {$_internalExprEq: 5}}, "
+                         "{$expr: {$eq: ['$y', {$const: 5}]}}]}}]}}]}}, "
                          "{$addFields: {varField: {$const: 5}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
@@ -1324,7 +1427,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheEntirePipelineIfNonCorrelated) {
     auto expectedPipe = fromjson(
         str::stream()
         << "[{$mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, {$lookup: {from: "
-           "'coll', as: 'subas', let: {}, pipeline: [{$match: {y: 5}}]}}, {$addFields: "
+           "'coll', as: 'subas', let: {}, pipeline: [{$match: {y: {$eq: 5}}}]}}, {$addFields: "
            "{constField: {$const: 5}}}, "
         << sequentialCacheStageObj() << "]");
 

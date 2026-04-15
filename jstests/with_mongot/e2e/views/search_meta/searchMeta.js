@@ -76,9 +76,9 @@ collBase.drop();
 assert.commandWorked(collBase.insert({_id: 0}));
 assert.commandWorked(collBase.insert({_id: 1}));
 
-// $lookup doesn't include any details about its subpipeline in the explain output. Therefore there
-// isn't any chance that the $lookup subpipeline will include the view pipeline in the explain
-// output. Instead, we just verify that the top-level agg doesn't contain the view transforms.
+// $lookup serializes its resolved pipeline for explain. For mongot pipelines on
+// mongot-indexed views, the view transforms are handled by idLookup, not prepended to the
+// resolved pipeline. Verify the top-level agg doesn't contain the view transforms.
 const lookupPipeline = [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}];
 explain = collBase.explain().aggregate(lookupPipeline);
 assertViewNotApplied(explain, lookupPipeline, viewPipeline);

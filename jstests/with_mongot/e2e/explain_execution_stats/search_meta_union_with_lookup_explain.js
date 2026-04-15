@@ -5,10 +5,13 @@
  * ]
  */
 
-import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
-import {verifyE2ESearchMetaExplainOutput} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {
+    verifyE2ELookupSearchExplainOutput,
+    verifyE2ESearchMetaExplainOutput,
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -66,27 +69,19 @@ function runExplainTest(verbosity) {
         verbosity: verbosity,
     });
 
-    // Test with $lookup. $lookup does not include explain info about its subpipeline, so we
-    // check the result of the $lookup output instead. We only check the value of "nReturned"
-    // when executing with non "queryplanner" verbosity. Otherwise, we run the query to confirm
-    // the query does not error.
+    // Test with $lookup.
     result = collBase
         .explain(verbosity)
         .aggregate([
             {$project: {"_id": 0}},
             {$lookup: {from: coll.getName(), pipeline: [facetQuery], as: "meta_facet"}},
         ]);
-    if (verbosity != "queryPlanner") {
-        let lookupStages = getAggPlanStages(result, "$lookup");
-        let lookupReturned = 0;
-        // In the sharded scenario, there will be more than one $lookup stage.
-        for (let stage of lookupStages) {
-            assert.neq(stage, null, result);
-            assert(stage.hasOwnProperty("nReturned"));
-            lookupReturned += stage["nReturned"];
-        }
-        assert.eq(NumberLong(2), lookupReturned);
-    }
+    verifyE2ELookupSearchExplainOutput({
+        explainOutput: result,
+        searchStageType: "$searchMeta",
+        verbosity,
+        nReturned: NumberLong(2),
+    });
 }
 
 runExplainTest("queryPlanner");

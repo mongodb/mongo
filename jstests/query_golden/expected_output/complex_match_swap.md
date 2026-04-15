@@ -626,7 +626,8 @@
 						"_id" : "$a",
 						"b" : {
 							"$push" : "$b"
-						}
+						},
+						"$willBeMerged" : false
 					}
 				}
 			]

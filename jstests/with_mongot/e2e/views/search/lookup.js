@@ -7,7 +7,10 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {assertLookupInExplain} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {
+    assertLookupInExplain,
+    assertLookupSearchSubPipelineAppliedViews,
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 import {
     createSearchIndexesAndExecuteTests,
     validateSearchExplain,
@@ -159,15 +162,14 @@ const lookupTestCases = (isStoredSource) => {
         },
     ];
 
-    // $lookup doesn't include any details about its subpipeline in the explain output. More
-    // concretely, its serialize function returns the stored _userPipeline which is the pipeline
-    // prior to any optimizations/view resolution. In other words, $search will not be desugared and
-    // therefore DocumentSourceInternalSearchIdLookup::serialize(), which publicizies the view
-    // transforms for mongot pipelines, will never be invoked. This is relevant for testing because
-    // we cannot examine the explain output for the view transforms for $lookup.$search when the
-    // inner coll is a view - because again, the view transforms will not be present.
     validateSearchExplain(productColl, lookupPipeline, isStoredSource, null, (explain) => {
         assertLookupInExplain(explain, lookupPipeline[0]);
+        assertLookupSearchSubPipelineAppliedViews(
+            explain,
+            lookupPipeline[0],
+            verifiedReviewViewPipeline,
+            isStoredSource,
+        );
     });
 
     let results = productColl.aggregate(lookupPipeline).toArray();
@@ -361,6 +363,7 @@ const lookupTestCases = (isStoredSource) => {
 
     validateSearchExplain(verifiedReviewView, lookupPipeline, isStoredSource, verifiedReviewViewPipeline, (explain) => {
         assertLookupInExplain(explain, lookupPipeline[0]);
+        assertLookupSearchSubPipelineAppliedViews(explain, lookupPipeline[0], batteryTypeViewPipeline, isStoredSource);
     });
 
     results = verifiedReviewView.aggregate(lookupPipeline).toArray();

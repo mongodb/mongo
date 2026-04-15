@@ -1090,6 +1090,21 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
             {verbosity: currentVerbosity},
             explainObj,
         );
+        // $lookup will run the search stage once to execute the query and again to obtain
+        // execution stats, so we need to mock another response.
+        setupSearchQuery(
+            "cakes",
+            1,
+            [
+                {_id: 1, $searchScore: 0.9},
+                {_id: 2, $searchScore: 0.8},
+            ],
+            "metaVal",
+            true,
+            null, // viewName
+            {verbosity: currentVerbosity},
+            explainObj,
+        );
 
         const explainResult = coll.explain(currentVerbosity).aggregate([
             {$match: {_id: 1}}, // Match one document.

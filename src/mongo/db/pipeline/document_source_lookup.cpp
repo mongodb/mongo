@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
@@ -856,8 +857,13 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
                 ->serializeToBson(opts);
         }
         if (opts.isSerializingForExplain()) {
-            // TODO SERVER-81802 We should also serialize the resolved pipeline for explain.
-            return *_userPipeline;
+            // We must optimize a clone rather than the original resolvedIntrospectionPipeline
+            // because optimization can resolve 'let' variables to constants, which would cause
+            // dependency tracking to no longer see correlated references. That in turn would
+            // break cache placement for correlated nested $lookups.
+            auto optimizedCopy = _sharedState->resolvedIntrospectionPipeline->clone(_fromExpCtx);
+            pipeline_optimization::optimizePipeline(*optimizedCopy);
+            return optimizedCopy->serializeToBson(opts);
         }
         if (opts.serializeForFLE2) {
             // This is a workaround for testing server rewrites for FLE2. We need to verify that the

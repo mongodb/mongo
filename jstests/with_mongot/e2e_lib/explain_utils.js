@@ -177,7 +177,9 @@ export function assertUnionWithSearchSubPipelineAppliedViews(
 
 /**
  * This function is used to assert that the $lookup stage exists as expected in the explain
- * output. Note that $lookup doesn't apply the view definition in explain like $unionWith does.
+ * output. $lookup explain serializes the resolved pipeline (with view definitions applied),
+ * so the pipeline in explain output may be longer than the user-specified pipeline when the
+ * $lookup targets a view.
  *
  * @param {Object} explainOutput The explain output from the whole aggregation.
  * @param {Object} lookupStage The lookup stage to be searched for in the explain output.
@@ -196,19 +198,119 @@ export function assertLookupInExplain(explainOutput, lookupStage) {
             'There should be a key "' + lookupKey + '" in the lookup stage from the explain output.' + tojson(stage),
         );
 
-        // On the "pipeline" key, simply make sure that the two pipelines have the same length.
-        // There are some optimizations in various environment configurations that will make the
-        // actual content of the pipeline different, but the length should stay the same.
+        // On the "pipeline" key, the explain pipeline length should be at least the length of
+        // the user-specified pipeline. It may be longer when the $lookup targets a view, since
+        // view definition stages are prepended to the resolved pipeline.
         if (lookupKey == "pipeline") {
-            assert.eq(
+            assert.gte(
                 stage["$lookup"][lookupKey].length,
                 lookupStage["$lookup"][lookupKey].length,
-                "The $lookup stage in the explain output should have the same number of " +
+                "The $lookup stage in the explain output should have at least as many " +
                     "stages as the lookup stage passed to the function." +
                     tojson(stage),
             );
         }
     });
+}
+
+/**
+ * This function is used to assert that the view definition from the search stage *inside* of
+ * the $lookup is applied as intended. For mongot ($search/$vectorSearch) queries on
+ * mongot-indexed views inside $lookup, the view transforms are applied by
+ * $_internalSearchIdLookup at execution time rather than being prepended to the $lookup's
+ * resolved pipeline. This function verifies the $lookup explain pipeline structure is correct
+ * and contains the expected search stages.
+ *
+ * This is analogous to assertUnionWithSearchSubPipelineAppliedViews for $unionWith.
+ *
+ * @param {Object} explainOutput The explain output from the whole aggregation.
+ * @param {Object} lookupStage The $lookup stage spec from the user pipeline, used to verify
+ *     the explain pipeline contains at least the user-specified stages.
+ * @param {Array} viewPipeline The view pipeline defining the view that the $lookup targets.
+ * @param {boolean} isStoredSource Whether the $search query uses returnStoredSource.
+ */
+export function assertLookupSearchSubPipelineAppliedViews(
+    explainOutput,
+    lookupStage,
+    viewPipeline,
+    isStoredSource = false,
+) {
+    const stage = getLookupStage(explainOutput);
+    assert(stage, "There should be one $lookup stage in the explain output. " + tojson(explainOutput));
+
+    const lookupSpec = stage["$lookup"];
+    assert(
+        lookupSpec.hasOwnProperty("pipeline"),
+        "$lookup explain should include resolved sub-pipeline: " + tojson(stage),
+    );
+
+    const explainPipeline = lookupSpec["pipeline"];
+    const userPipeline = lookupStage["$lookup"]["pipeline"];
+
+    assert.gte(
+        explainPipeline.length,
+        userPipeline.length,
+        "The $lookup explain pipeline should have at least as many stages as the user pipeline. " + tojson(stage),
+    );
+
+    if (!isStoredSource) {
+        // For mongot queries on mongot-indexed views, the view transforms are NOT prepended
+        // to the $lookup explain pipeline (unlike non-search lookups on views). The view
+        // transforms are applied by $_internalSearchIdLookup at execution time. Therefore,
+        // the first stage should be $search or $vectorSearch.
+        const firstStageKey = Object.keys(explainPipeline[0])[0];
+        assert(
+            firstStageKey === "$search" || firstStageKey === "$vectorSearch",
+            "Expected first stage in $lookup resolved pipeline to be $search or " +
+                "$vectorSearch for a mongot-indexed view, but found: " +
+                tojson(explainPipeline[0]),
+        );
+    }
+}
+
+/**
+ * Verifies that a $lookup explain sub-pipeline contains the expected search stage. Unlike
+ * $unionWith, $lookup does not produce a full nested explain with per-stage execution stats — it
+ * serializes the resolved introspection pipeline as an array of stage specs. This function performs
+ * an abridged verification: confirming the sub-pipeline is present, that the expected search stage
+ * appears as its first stage, and (for non-queryPlanner verbosities) that the $lookup stage itself
+ * reports the expected nReturned.
+ *
+ * @param {Object} explainOutput The explain output from the whole aggregation.
+ * @param {string} searchStageType The expected first stage name, e.g. "$search" or "$searchMeta".
+ * @param {string} verbosity The explain verbosity.
+ * @param {NumberLong} nReturned Expected total nReturned across all $lookup stages (sum across
+ *     shards). Not needed when verbosity is "queryPlanner".
+ */
+export function verifyE2ELookupSearchExplainOutput({explainOutput, searchStageType, verbosity, nReturned = null}) {
+    let lookupStages = getAggPlanStages(explainOutput, "$lookup");
+    assert.gt(lookupStages.length, 0, "Expected at least one $lookup stage: " + tojson(explainOutput));
+    for (let stage of lookupStages) {
+        let stageSpec = stage["$lookup"];
+        assert(
+            stageSpec.hasOwnProperty("pipeline"),
+            "$lookup explain should include resolved sub-pipeline: " + tojson(stage),
+        );
+        assert.gt(stageSpec["pipeline"].length, 0, "$lookup sub-pipeline should not be empty: " + tojson(stage));
+        const firstStageKey = Object.keys(stageSpec["pipeline"][0])[0];
+        assert.eq(
+            firstStageKey,
+            searchStageType,
+            "Expected first stage in $lookup sub-pipeline to be " +
+                searchStageType +
+                ", but found: " +
+                tojson(stageSpec["pipeline"][0]),
+        );
+    }
+    if (verbosity != "queryPlanner") {
+        let lookupReturned = 0;
+        // In the sharded scenario, there will be more than one $lookup stage.
+        for (let stage of lookupStages) {
+            assert(stage.hasOwnProperty("nReturned"));
+            lookupReturned += stage["nReturned"];
+        }
+        assert.eq(nReturned, lookupReturned);
+    }
 }
 
 /**
