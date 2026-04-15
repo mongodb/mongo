@@ -3689,6 +3689,8 @@ private:
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kCharacters = 1;  // Optional, null if not specified.
 
+    static constexpr size_t _kMaximumAllowedTrimStringBytes = 4096;
+
     TrimType _trimType;
     std::string _name;  // "$trim", "$ltrim", or "$rtrim".
 };
