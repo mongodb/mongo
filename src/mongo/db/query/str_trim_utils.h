@@ -39,6 +39,8 @@
 
 namespace mongo::str_trim_utils {
 
+const size_t kMaximumAllowedTrimStringBytes = 4096;
+
 const std::vector<StringData> kDefaultTrimWhitespaceChars = {
     "\0"_sd,      // Null character. Avoid using "\u0000" syntax to work around a gcc bug:
                   // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53690.
