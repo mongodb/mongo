@@ -624,7 +624,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                return _awaitAllParticipantShardsDone(executor);
                            })
                            .then([this, executor] {
-                               _metrics->setEndFor(CoordinatorStateEnum::kBlockingWrites,
+                               _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                                    resharding::getCurrentTime());
 
                                // Best-effort attempt to trigger a refresh on the participant shards
@@ -1265,7 +1265,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
                     auto now = resharding::getCurrentTime();
                     auto updatedDocument = _coordinatorDao.transitionToCloningPhase(
                         opCtx, now, highestMinFetchTimestamp, approxCopySize, txnNumber);
-                    _metrics->setStartFor(CoordinatorStateEnum::kCloning, now);
+                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, now);
                     return updatedDocument;
                 });
         })
@@ -1287,6 +1287,9 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
     if (!needToFetch) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
+
+    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                          resharding::getCurrentTime());
 
     LOGV2(9858100,
           "Start fetching the number of documents to copy from all donor shards",
@@ -1385,6 +1388,8 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
         })
         .runOn(**executor, _ctHolder->getAbortToken())
         .then([this] {
+            _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                                resharding::getCurrentTime());
             // Wait for the update to the coordinator doc to be majority committed before moving to
             // the next step.
             return resharding::waitForMajority(_ctHolder->getAbortToken(),
@@ -1405,8 +1410,6 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
         .thenRunOn(**executor)
         .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             if (_metadata.getPerformVerification()) {
-                _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
-                                      resharding::getCurrentTime());
                 auto opCtx = _makeOperationContext();
                 // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk' above
                 // came from the OpObserver and may not reflect the latest version coordinator doc
@@ -1420,8 +1423,9 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                     **executor,
                     _ctHolder->getAbortToken(),
                     coordinatorDocChangedOnDisk);
-                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
-                                    resharding::getCurrentTime());
+                LOGV2(9858412,
+                      "Verification before applying completed",
+                      "reshardingUUID"_attr = _metadata.getReshardingUUID());
             }
         })
         .then([this] {
@@ -1437,8 +1441,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                     auto updatedDocument =
                         _coordinatorDao.transitionToApplyingPhase(opCtx, now, txnNumber);
 
-                    _metrics->setEndFor(CoordinatorStateEnum::kCloning, now);
-                    _metrics->setStartFor(CoordinatorStateEnum::kApplying, now);
+                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, now);
+                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, now);
                     return updatedDocument;
                 });
         })
@@ -1532,7 +1536,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
                 [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
                     auto updatedDocument = _coordinatorDao.transitionToBlockingWritesPhase(
                         opCtx, now, criticalSectionExpiresAt, txnNumber);
-                    _metrics->setStartFor(CoordinatorStateEnum::kBlockingWrites, now);
+                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, now);
                     return updatedDocument;
                 });
         })
@@ -1627,6 +1631,11 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
     }
 
     auto opCtx = _makeOperationContext();
+
+    auto verifyPreCommitStart = resharding::getCurrentTime();
+    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit,
+                          verifyPreCommitStart);
+
     _persistDocumentsDelta(opCtx.get(), _deltaFuture->get(opCtx.get()));
 
     // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk'
@@ -1637,8 +1646,6 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
     coordinatorDocChangedOnDisk =
         resharding::getCoordinatorDoc(opCtx.get(), coordinatorDocChangedOnDisk.getReshardingUUID());
 
-    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit,
-                          resharding::getCurrentTime());
     try {
         _reshardingCoordinatorExternalState->verifyFinalCollection(opCtx.get(),
                                                                    coordinatorDocChangedOnDisk);
@@ -1648,8 +1655,12 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
                       "strict consistency",
                       "error"_attr = redact(ex.toString()));
     }
-    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit,
-                        resharding::getCurrentTime());
+    auto verifyPreCommitEnd = resharding::getCurrentTime();
+    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit, verifyPreCommitEnd);
+    LOGV2(9858413,
+          "Verification before commit completed",
+          "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+          "durationSecs"_attr = durationCount<Seconds>(verifyPreCommitEnd - verifyPreCommitStart));
 
     return coordinatorDocChangedOnDisk;
 }

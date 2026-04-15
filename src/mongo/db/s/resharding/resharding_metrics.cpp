@@ -665,18 +665,95 @@ StringData ReshardingMetrics::getStateString() const {
 void ReshardingMetrics::appendChangeStreamMonitorLagMetrics(BSONObjBuilder& bob) const {
     using namespace resharding_metrics::field_names;
 
-    // Only report lag while the monitor is still running. Once it completes, the last
-    // clusterTime is frozen and lag would grow indefinitely against clock->now().
+    // Only report lag while the monitor is still running. Once it completes, the stored
+    // lag is stale and would not reflect the current state.
     auto monitorEnd = getEndFor(TimedPhase::kChangeStreamMonitor);
-    auto lastClusterTimeSecs = _changeStreamMonitorLastClusterTimeSecs.load();
-    if (lastClusterTimeSecs != 0 && !monitorEnd) {
-        auto lastClusterTimeDate =
-            Date_t::fromMillisSinceEpoch(static_cast<long long>(lastClusterTimeSecs) * 1000);
-        auto lagSecs =
-            duration_cast<Seconds>(getClockSource()->now() - lastClusterTimeDate).count();
-        // Clamp to zero in case of minor clock skew or rounding.
-        bob.append(kChangeStreamMonitorLagSecs, std::max<long long>(0, lagSecs));
+    auto lagMillis = _changeStreamMonitorLagMillis.load();
+    if (lagMillis >= 0 && !monitorEnd) {
+        bob.append(kChangeStreamMonitorLagSecs, durationCount<Seconds>(Milliseconds(lagMillis)));
     }
+}
+
+BSONObj ReshardingMetrics::getDiagnosticMetrics() const {
+    using namespace resharding_metrics::field_names;
+    constexpr auto kNotAvailable = -1LL;
+
+    BSONObjBuilder bob;
+    auto clock = getClockSource();
+
+    auto computeLagMillis = [&]() -> long long {
+        auto monitorEnd = getEndFor(TimedPhase::kChangeStreamMonitor);
+        auto lagMillis = _changeStreamMonitorLagMillis.load();
+        if (lagMillis >= 0 && !monitorEnd) {
+            return lagMillis;
+        }
+        return kNotAvailable;
+    };
+
+    auto elapsedMillisOr = [&](TimedPhase phase) -> long long {
+        auto elapsed = getElapsed<Milliseconds>(phase, clock);
+        return elapsed ? elapsed->count() : kNotAvailable;
+    };
+
+    auto crossPhaseMillisOr = [&](TimedPhase startPhase, TimedPhase endPhase) -> long long {
+        auto elapsed = getCrossPhaseElapsed<Milliseconds>(startPhase, endPhase);
+        return elapsed ? elapsed->count() : kNotAvailable;
+    };
+
+    switch (_role) {
+        case Role::kDonor:
+            bob.append(kDonorChangeStreamMonitorLagMillis, computeLagMillis());
+            bob.append(
+                kDonorBlockingWritesToMonitorCompletionMillis,
+                crossPhaseMillisOr(TimedPhase::kCriticalSection, TimedPhase::kChangeStreamMonitor));
+            bob.append(kDonorChangeStreamMonitorTotalTimeElapsedMillis,
+                       elapsedMillisOr(TimedPhase::kChangeStreamMonitor));
+            break;
+        case Role::kRecipient:
+            bob.append(kRecipientChangeStreamMonitorLagMillis, computeLagMillis());
+            bob.append(kRecipientStrictConsistencyToMonitorCompletionMillis,
+                       crossPhaseMillisOr(TimedPhase::kStrictConsistency,
+                                          TimedPhase::kChangeStreamMonitor));
+            bob.append(kRecipientChangeStreamMonitorTotalTimeElapsedMillis,
+                       elapsedMillisOr(TimedPhase::kChangeStreamMonitor));
+            break;
+        case Role::kCoordinator:
+            bob.append(kCoordinatorVerificationPreApplyingTimeElapsedMillis,
+                       elapsedMillisOr(TimedPhase::kVerificationPreApplying));
+            bob.append(kCoordinatorVerificationPreCommitTimeElapsedMillis,
+                       elapsedMillisOr(TimedPhase::kVerificationPreCommit));
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    return bob.obj();
+}
+
+BSONObj ReshardingMetrics::getDiagnosticMetricDefaults(ReshardingMetricsCommon::Role role) {
+    using namespace resharding_metrics::field_names;
+    constexpr auto kNotAvailable = -1LL;
+
+    BSONObjBuilder bob;
+    switch (role) {
+        case Role::kDonor:
+            bob.append(kDonorChangeStreamMonitorLagMillis, kNotAvailable);
+            bob.append(kDonorBlockingWritesToMonitorCompletionMillis, kNotAvailable);
+            bob.append(kDonorChangeStreamMonitorTotalTimeElapsedMillis, kNotAvailable);
+            break;
+        case Role::kRecipient:
+            bob.append(kRecipientChangeStreamMonitorLagMillis, kNotAvailable);
+            bob.append(kRecipientStrictConsistencyToMonitorCompletionMillis, kNotAvailable);
+            bob.append(kRecipientChangeStreamMonitorTotalTimeElapsedMillis, kNotAvailable);
+            break;
+        case Role::kCoordinator:
+            bob.append(kCoordinatorVerificationPreApplyingTimeElapsedMillis, kNotAvailable);
+            bob.append(kCoordinatorVerificationPreCommitTimeElapsedMillis, kNotAvailable);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+    return bob.obj();
 }
 
 BSONObj ReshardingMetrics::reportForCurrentOp() const {
@@ -875,8 +952,8 @@ void ReshardingMetrics::setIndexesBuilt(int64_t numIndexes) {
     _indexesBuilt.store(numIndexes);
 }
 
-void ReshardingMetrics::setChangeStreamMonitorLastClusterTime(Timestamp clusterTime) {
-    _changeStreamMonitorLastClusterTimeSecs.store(clusterTime.getSecs());
+void ReshardingMetrics::setChangeStreamMonitorLag(Milliseconds lag) {
+    _changeStreamMonitorLagMillis.store(durationCount<Milliseconds>(lag));
 }
 
 ReshardingMetrics::OplogLatencyMetrics::OplogLatencyMetrics(ShardId donorShardId)

@@ -58,6 +58,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -1050,15 +1051,25 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
     }
 
     auto batchCallback = [this, factory](const auto& batch) {
+        boost::optional<long long> lagSecs;
+        if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
+            auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
+            auto lastCommittedSecs = replCoord->getLastCommittedOpTime().getTimestamp().getSecs();
+            auto lagMs =
+                Milliseconds(std::max<int64_t>(0,
+                                               static_cast<int64_t>(lastCommittedSecs) -
+                                                   static_cast<int64_t>(*clusterTimeSecs)) *
+                             1000);
+            _metrics->setChangeStreamMonitorLag(lagMs);
+            lagSecs = durationCount<Seconds>(lagMs);
+        }
+
         LOGV2(9858300,
               "Persisting change streams monitor's progress",
               "reshardingUUID"_attr = _metadata.getReshardingUUID(),
               "documentsDelta"_attr = batch.getDocumentsDelta(),
-              "completed"_attr = batch.containsFinalEvent());
-
-        if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
-            _metrics->setChangeStreamMonitorLastClusterTime(Timestamp(*clusterTimeSecs, 0));
-        }
+              "completed"_attr = batch.containsFinalEvent(),
+              "changeStreamMonitorLagSecs"_attr = lagSecs);
 
         invariant(_changeStreamsMonitorCtx);
         auto newChangeStreamsCtx = *_changeStreamsMonitorCtx;
@@ -1108,14 +1119,24 @@ ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCom
         .thenRunOn(**executor)
         .onCompletion([this](Status status) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            LOGV2(9858302,
-                  "The change streams monitor completed",
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "status"_attr = status);
-
             if (status.isOK()) {
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
                                     resharding::getCurrentTime());
+            }
+
+            LOGV2(9858302,
+                  "The change streams monitor completed",
+                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                  "status"_attr = status,
+                  "changeStreamMonitorTotalTimeSecs"_attr = _metrics->getElapsed<Seconds>(
+                      ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                      _serviceContext->getFastClockSource()),
+                  "strictConsistencyToMonitorCompletionSecs"_attr =
+                      _metrics->getCrossPhaseElapsed<Seconds>(
+                          ReshardingMetrics::TimedPhase::kStrictConsistency,
+                          ReshardingMetrics::TimedPhase::kChangeStreamMonitor));
+
+            if (status.isOK()) {
                 ensureFulfilledPromise(lk,
                                        _changeStreamsMonitorCompleted,
                                        _changeStreamsMonitorCtx->getDocumentsDelta());

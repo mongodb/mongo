@@ -1675,13 +1675,13 @@ TEST_F(ReshardingMetricsTest, DonorChangeStreamMonitorLagReported) {
     auto clock = getClockSource();
     auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
 
-    // Before cluster time is set, lag field should not appear.
+    // Before lag is set, lag field should not appear.
     auto report = metrics->reportForCurrentOp();
     ASSERT_FALSE(report.hasField("changeStreamMonitorLagSecs"));
 
     // Simulate the monitor being 20 seconds behind.
-    auto clusterTimeSecs = durationCount<Seconds>(clock->now().toDurationSinceEpoch()) - 20;
-    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(clusterTimeSecs, 0));
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    metrics->setChangeStreamMonitorLag(Seconds(20));
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("changeStreamMonitorLagSecs"), 20);
@@ -1694,8 +1694,8 @@ TEST_F(ReshardingMetricsTest, RecipientChangeStreamMonitorLagReported) {
     auto report = metrics->reportForCurrentOp();
     ASSERT_FALSE(report.hasField("changeStreamMonitorLagSecs"));
 
-    auto clusterTimeSecs = durationCount<Seconds>(clock->now().toDurationSinceEpoch()) - 10;
-    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(clusterTimeSecs, 0));
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    metrics->setChangeStreamMonitorLag(Seconds(10));
 
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("changeStreamMonitorLagSecs"), 10);
@@ -1705,9 +1705,9 @@ TEST_F(ReshardingMetricsTest, ChangeStreamMonitorLagClampedToZero) {
     auto clock = getClockSource();
     auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
 
-    // Set clusterTime slightly ahead of wall clock to simulate minor clock skew.
-    auto clusterTimeSecs = durationCount<Seconds>(clock->now().toDurationSinceEpoch()) + 5;
-    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(clusterTimeSecs, 0));
+    // Lag of zero should be reported as zero, not omitted.
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    metrics->setChangeStreamMonitorLag(Milliseconds(0));
 
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("changeStreamMonitorLagSecs"), 0);
@@ -1815,7 +1815,7 @@ TEST_F(ReshardingMetricsTest, CoordinatorDoesNotReportChangeStreamMonitorLagOrCr
     // Set all change stream monitor fields — lag and cross-phase should not appear for the
     // coordinator. Elapsed time is reported via reportDurationsForAllPhases for all roles.
     metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
-    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(1000, 0));
+    metrics->setChangeStreamMonitorLag(Seconds(5));
     clock->advance(Seconds(10));
     metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
 
@@ -1868,6 +1868,136 @@ TEST_F(ReshardingMetricsTest, SettersAreIdempotent) {
     // Elapsed should be 10s (from original start to end), not 0s (if second setStartFor took
     // effect).
     ASSERT_EQ(report.getIntField("changeStreamMonitorTotalTimeElapsedSecs"), 10);
+}
+
+// --- getDiagnosticMetrics tests (serverStatus) ---
+
+TEST_F(ReshardingMetricsTest, DonorDiagnosticMetricsAllDefaultsWhenNoData) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("donorChangeStreamMonitorLagMillis").Long(), -1);
+    ASSERT_EQ(diag.getField("donorBlockingWritesToMonitorCompletionMillis").Long(), -1);
+    ASSERT_EQ(diag.getField("donorChangeStreamMonitorTotalTimeElapsedMillis").Long(), -1);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientDiagnosticMetricsAllDefaultsWhenNoData) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kRecipient);
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("recipientChangeStreamMonitorLagMillis").Long(), -1);
+    ASSERT_EQ(diag.getField("recipientStrictConsistencyToMonitorCompletionMillis").Long(), -1);
+    ASSERT_EQ(diag.getField("recipientChangeStreamMonitorTotalTimeElapsedMillis").Long(), -1);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsAllDefaultsWhenNoData) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("coordinatorVerificationPreApplyingTimeElapsedMillis").Long(), -1);
+    ASSERT_EQ(diag.getField("coordinatorVerificationPreCommitTimeElapsedMillis").Long(), -1);
+}
+
+TEST_F(ReshardingMetricsTest, DonorDiagnosticMetricsReportsLagWhileMonitorRunning) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    // Simulate the monitor being 20 seconds behind.
+    metrics->setChangeStreamMonitorLag(Seconds(20));
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("donorChangeStreamMonitorLagMillis").Long(), 20000);
+}
+
+TEST_F(ReshardingMetricsTest, DonorDiagnosticMetricsLagIsNegOneAfterMonitorCompletes) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    metrics->setChangeStreamMonitorLag(Seconds(5));
+
+    clock->advance(Seconds(10));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    auto diag = metrics->getDiagnosticMetrics();
+    // Lag should be -1 after monitor completes (stale lag should not be reported).
+    ASSERT_EQ(diag.getField("donorChangeStreamMonitorLagMillis").Long(), -1);
+}
+
+TEST_F(ReshardingMetricsTest, DonorDiagnosticMetricsCrossPhaseAndElapsed) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, clock->now());
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    clock->advance(Seconds(45));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("donorBlockingWritesToMonitorCompletionMillis").Long(), 45000);
+    ASSERT_EQ(diag.getField("donorChangeStreamMonitorTotalTimeElapsedMillis").Long(), 45000);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientDiagnosticMetricsCrossPhaseAndElapsed) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kRecipient);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kStrictConsistency, clock->now());
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    clock->advance(Seconds(60));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("recipientStrictConsistencyToMonitorCompletionMillis").Long(), 60000);
+    ASSERT_EQ(diag.getField("recipientChangeStreamMonitorTotalTimeElapsedMillis").Long(), 60000);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsVerificationPhases) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying, clock->now());
+    clock->advance(Seconds(10));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying, clock->now());
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit, clock->now());
+    clock->advance(Seconds(25));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit, clock->now());
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("coordinatorVerificationPreApplyingTimeElapsedMillis").Long(), 10000);
+    ASSERT_EQ(diag.getField("coordinatorVerificationPreCommitTimeElapsedMillis").Long(), 25000);
+}
+
+TEST_F(ReshardingMetricsTest, DiagnosticMetricDefaultsMatchRealFields) {
+    // Verify that defaults for each role produce the same field set as real metrics.
+    auto clock = getClockSource();
+
+    for (auto role : {Role::kDonor, Role::kRecipient, Role::kCoordinator}) {
+        auto metrics = createInstanceMetrics(clock, UUID::gen(), role);
+        auto real = metrics->getDiagnosticMetrics();
+        auto defaults = ReshardingMetrics::getDiagnosticMetricDefaults(role);
+
+        // Same field names must be present in both.
+        std::set<std::string> realFields, defaultFields;
+        for (auto& elem : real) {
+            realFields.insert(elem.fieldName());
+        }
+        for (auto& elem : defaults) {
+            defaultFields.insert(elem.fieldName());
+        }
+        ASSERT_EQ(realFields, defaultFields)
+            << "Field mismatch for role " << static_cast<int>(role);
+
+        // Defaults must all be -1.
+        for (auto& elem : defaults) {
+            ASSERT_EQ(elem.Long(), -1) << "Field " << elem.fieldName() << " should be -1";
+        }
+    }
 }
 
 }  // namespace

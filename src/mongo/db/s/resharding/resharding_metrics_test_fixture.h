@@ -81,6 +81,10 @@ public:
         return _role;
     }
 
+    BSONObj getDiagnosticMetrics() const override {
+        return ReshardingMetrics::getDiagnosticMetricDefaults(_role);
+    }
+
 private:
     UUID _uuid;
     Date_t _startTime;

@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_field_names.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
@@ -296,6 +297,21 @@ void ReshardingCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const 
                 getOldestOperationLowEstimateRemainingTimeMillis(Role::kCoordinator));
     bob->append(kRecipientRemainingOperationTimeEstimatedMillis,
                 getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient));
+
+    appendOldestDiagnosticMetrics(Role::kCoordinator, bob);
+    appendOldestDiagnosticMetrics(Role::kDonor, bob);
+    appendOldestDiagnosticMetrics(Role::kRecipient, bob);
+}
+
+void ReshardingCumulativeMetrics::appendOldestDiagnosticMetrics(Role role,
+                                                                BSONObjBuilder* bob) const {
+    stdx::unique_lock guard(_mutex);
+    auto op = getOldestOperation(guard, role);
+    if (op) {
+        bob->appendElements(op->getDiagnosticMetrics());
+    } else {
+        bob->appendElements(ReshardingMetrics::getDiagnosticMetricDefaults(role));
+    }
 }
 
 int64_t ReshardingCumulativeMetrics::getInsertsApplied() const {

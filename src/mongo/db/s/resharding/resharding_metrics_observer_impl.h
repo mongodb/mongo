@@ -47,6 +47,7 @@ public:
     Date_t getStartTimestamp() const override;
     const UUID& getUuid() const override;
     ReshardingMetricsCommon::Role getRole() const override;
+    BSONObj getDiagnosticMetrics() const override;
 
 private:
     ReshardingMetrics* _metrics;

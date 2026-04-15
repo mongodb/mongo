@@ -1021,5 +1021,49 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchRetrievedDuringClonin
     ASSERT_EQ(latencies.getIntField("collectionCloningTotalRemoteBatchRetrievalTimeMillis"), 19);
 }
 
+TEST_F(ReshardingCumulativeMetricsTest, OldestActiveContainsDiagnosticMetricDefaults) {
+    // When no operations are active, all diagnostic fields should be -1.
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    BSONObjBuilder bob;
+    _cumulativeMetrics->reportForServerStatus(&bob);
+    auto report = bob.done();
+    auto section = report.getObjectField(kResharding).getObjectField("oldestActive");
+
+    // Coordinator fields come from ObserverMock which returns defaults.
+    ASSERT_EQ(section.getField("coordinatorVerificationPreApplyingTimeElapsedMillis").Long(), -1);
+    ASSERT_EQ(section.getField("coordinatorVerificationPreCommitTimeElapsedMillis").Long(), -1);
+
+    // Donor/recipient have no active operations, so defaults should be present.
+    ASSERT_EQ(section.getField("donorChangeStreamMonitorLagMillis").Long(), -1);
+    ASSERT_EQ(section.getField("donorBlockingWritesToMonitorCompletionMillis").Long(), -1);
+    ASSERT_EQ(section.getField("donorChangeStreamMonitorTotalTimeElapsedMillis").Long(), -1);
+    ASSERT_EQ(section.getField("recipientChangeStreamMonitorLagMillis").Long(), -1);
+    ASSERT_EQ(section.getField("recipientStrictConsistencyToMonitorCompletionMillis").Long(), -1);
+    ASSERT_EQ(section.getField("recipientChangeStreamMonitorTotalTimeElapsedMillis").Long(), -1);
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, OldestActiveContainsDiagnosticMetricsNoActiveOps) {
+    // When _shouldReportMetrics is true but no observers registered for some roles,
+    // those roles get defaults. Register a coordinator to trigger reporting.
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto coordObs = _cumulativeMetrics->registerInstanceMetrics(&coordinator);
+    // Deregister so no observers remain — but _shouldReportMetrics stays true.
+    coordObs.reset();
+
+    _cumulativeMetrics->onStarted(false, UUID::gen());
+
+    BSONObjBuilder bob;
+    _cumulativeMetrics->reportForServerStatus(&bob);
+    auto report = bob.done();
+    auto section = report.getObjectField(kResharding).getObjectField("oldestActive");
+
+    // All roles should have defaults since no observers are registered.
+    ASSERT_EQ(section.getField("coordinatorVerificationPreApplyingTimeElapsedMillis").Long(), -1);
+    ASSERT_EQ(section.getField("donorChangeStreamMonitorLagMillis").Long(), -1);
+    ASSERT_EQ(section.getField("recipientChangeStreamMonitorLagMillis").Long(), -1);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -42,6 +43,12 @@ public:
     virtual Date_t getStartTimestamp() const = 0;
     virtual const UUID& getUuid() const = 0;
     virtual ReshardingMetricsCommon::Role getRole() const = 0;
+
+    /**
+     * Returns a BSONObj containing role-specific diagnostic metrics for resharding validation.
+     * Fields always present with -1 sentinel when data is unavailable (FTDC stability).
+     */
+    virtual BSONObj getDiagnosticMetrics() const = 0;
 };
 
 }  // namespace mongo

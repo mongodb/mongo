@@ -181,6 +181,7 @@ private:
     void reportOldestActive(BSONObjBuilder* bob) const;
     void reportLatencies(BSONObjBuilder* bob) const;
     void reportCurrentInSteps(BSONObjBuilder* bob) const;
+    void appendOldestDiagnosticMetrics(Role role, BSONObjBuilder* bob) const;
 
     const std::string _rootSectionName;
     mutable stdx::mutex _mutex;

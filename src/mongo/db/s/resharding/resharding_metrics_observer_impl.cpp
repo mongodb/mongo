@@ -58,4 +58,8 @@ ReshardingMetricsCommon::Role ReshardingMetricsObserverImpl::getRole() const {
     return _metrics->getRole();
 }
 
+BSONObj ReshardingMetricsObserverImpl::getDiagnosticMetrics() const {
+    return _metrics->getDiagnosticMetrics();
+}
+
 }  // namespace mongo

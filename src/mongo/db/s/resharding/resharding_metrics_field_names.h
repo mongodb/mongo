@@ -116,6 +116,25 @@ constexpr auto kBlockingWritesToMonitorCompletionSecs = "blockingWritesToMonitor
 constexpr auto kStrictConsistencyToMonitorCompletionSecs =
     "strictConsistencyToMonitorCompletionSecs";
 
+// serverStatus oldestActive diagnostic fields (milliseconds, role-prefixed).
+// Donor fields.
+constexpr auto kDonorChangeStreamMonitorLagMillis = "donorChangeStreamMonitorLagMillis";
+constexpr auto kDonorBlockingWritesToMonitorCompletionMillis =
+    "donorBlockingWritesToMonitorCompletionMillis";
+constexpr auto kDonorChangeStreamMonitorTotalTimeElapsedMillis =
+    "donorChangeStreamMonitorTotalTimeElapsedMillis";
+// Recipient fields.
+constexpr auto kRecipientChangeStreamMonitorLagMillis = "recipientChangeStreamMonitorLagMillis";
+constexpr auto kRecipientStrictConsistencyToMonitorCompletionMillis =
+    "recipientStrictConsistencyToMonitorCompletionMillis";
+constexpr auto kRecipientChangeStreamMonitorTotalTimeElapsedMillis =
+    "recipientChangeStreamMonitorTotalTimeElapsedMillis";
+// Coordinator fields.
+constexpr auto kCoordinatorVerificationPreApplyingTimeElapsedMillis =
+    "coordinatorVerificationPreApplyingTimeElapsedMillis";
+constexpr auto kCoordinatorVerificationPreCommitTimeElapsedMillis =
+    "coordinatorVerificationPreCommitTimeElapsedMillis";
+
 }  // namespace field_names
 }  // namespace resharding_metrics
 }  // namespace mongo

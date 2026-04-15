@@ -50,6 +50,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
@@ -1142,15 +1143,26 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
         .then([this, executor, factory] {
             auto batchCallback = [this, factory = factory, anchor = shared_from_this()](
                                      const auto& batch) {
+                boost::optional<long long> lagSecs;
+                if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
+                    auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
+                    auto lastCommittedSecs =
+                        replCoord->getLastCommittedOpTime().getTimestamp().getSecs();
+                    auto lagMs =
+                        Milliseconds(std::max<int64_t>(0,
+                                                       static_cast<int64_t>(lastCommittedSecs) -
+                                                           static_cast<int64_t>(*clusterTimeSecs)) *
+                                     1000);
+                    _metrics->setChangeStreamMonitorLag(lagMs);
+                    lagSecs = durationCount<Seconds>(lagMs);
+                }
+
                 LOGV2(9858404,
                       "Persisting change streams monitor's progress",
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                       "documentsDelta"_attr = batch.getDocumentsDelta(),
-                      "completed"_attr = batch.containsFinalEvent());
-
-                if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
-                    _metrics->setChangeStreamMonitorLastClusterTime(Timestamp(*clusterTimeSecs, 0));
-                }
+                      "completed"_attr = batch.containsFinalEvent(),
+                      "changeStreamMonitorLagSecs"_attr = lagSecs);
 
                 auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
                 changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
@@ -1204,15 +1216,25 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStre
                                          _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .onCompletion([this](Status status) {
-            LOGV2(9858402,
-                  "The change streams monitor completed",
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "status"_attr = status);
-
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (status.isOK()) {
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
                                     resharding::getCurrentTime());
+            }
+
+            LOGV2(9858402,
+                  "The change streams monitor completed",
+                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                  "status"_attr = status,
+                  "changeStreamMonitorTotalTimeSecs"_attr = _metrics->getElapsed<Seconds>(
+                      ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                      _serviceContext->getFastClockSource()),
+                  "blockingWritesToMonitorCompletionSecs"_attr =
+                      _metrics->getCrossPhaseElapsed<Seconds>(
+                          ReshardingMetrics::TimedPhase::kCriticalSection,
+                          ReshardingMetrics::TimedPhase::kChangeStreamMonitor));
+
+            if (status.isOK()) {
                 ensureFulfilledPromise(lk,
                                        _changeStreamsMonitorCompleted,
                                        _changeStreamsMonitorCtx->getDocumentsDelta());

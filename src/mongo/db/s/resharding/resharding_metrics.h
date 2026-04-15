@@ -367,10 +367,24 @@ public:
     void setIndexesBuilt(int64_t numIndexes);
 
     /**
-     * Records the clusterTime from the latest postBatchResumeToken received by the change stream
-     * monitor. This is used to compute the monitor lag in currentOp/serverStatus output.
+     * Records the pre-computed change stream monitor lag. The lag is the difference between the
+     * majority-committed oplog timestamp and the change stream monitor's resume token timestamp,
+     * computed in the donor/recipient service where ReplicationCoordinator is accessible.
      */
-    void setChangeStreamMonitorLastClusterTime(Timestamp clusterTime);
+    void setChangeStreamMonitorLag(Milliseconds lag);
+
+    /**
+     * Returns a BSONObj containing role-specific diagnostic metrics for serverStatus reporting.
+     * All fields for the role are always present, using -1 when data is unavailable (FTDC
+     * stability). Units are milliseconds to match existing oldestActive conventions.
+     */
+    BSONObj getDiagnosticMetrics() const;
+
+    /**
+     * Returns a BSONObj with all diagnostic metric fields for the given role set to -1.
+     * Used by cumulative metrics when no active operation exists for a role.
+     */
+    static BSONObj getDiagnosticMetricDefaults(ReshardingMetricsCommon::Role role);
 
 private:
     static constexpr auto kNoDate = Date_t::min();
@@ -547,9 +561,9 @@ private:
     AtomicWord<int64_t> _indexesBuilt;
 
     // Change stream monitor metrics (donors and recipients only).
-    // The clusterTime from the latest postBatchResumeToken received from the change stream,
-    // stored as seconds since epoch (Timestamp::getSecs()). Zero means "not yet set".
-    AtomicWord<uint32_t> _changeStreamMonitorLastClusterTimeSecs{0};
+    // Pre-computed lag between the majority-committed oplog timestamp and the change stream
+    // monitor's resume token timestamp, in milliseconds. -1 means "not yet set".
+    AtomicWord<int64_t> _changeStreamMonitorLagMillis{-1};
 
     UniqueScopedObserver _scopedObserver;
     const ReshardingProvenanceEnum _provenance;
