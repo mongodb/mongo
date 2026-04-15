@@ -6,6 +6,9 @@ import unittest
 
 import mock
 
+from buildscripts.resmokelib.generate_fuzz_config.mongo_fuzzer_configs import (
+    generate_special_runtime_parameters,
+)
 from buildscripts.resmokelib.testing.hooks import fuzz_runtime_parameters as _runtime_fuzzer
 
 
@@ -93,6 +96,41 @@ class TestRuntimeFuzzGeneration(unittest.TestCase):
         self.assertIn("ShardingTaskExecutorPoolMinSize", param_names_to_set)
         self.assertIn("ingressAdmissionControlEnabled", param_names_to_set)
         self.assert_parameter_values_ok(mongod_spec, ret)
+
+    def test_special_runtime_param_known_returns_in_range(self):
+        rng = random.Random(42)
+        for _ in range(50):
+            val = generate_special_runtime_parameters(rng, "flowControlThresholdLagPercentage", {})
+            self.assertIsInstance(val, float)
+            self.assertGreaterEqual(val, 0.0)
+            self.assertLess(val, 1.0)  # rng.random() is [0.0, 1.0)
+
+    def test_special_runtime_param_unknown_raises(self):
+        with self.assertRaises(ValueError):
+            generate_special_runtime_parameters(random.Random(0), "unknownSpecialParam", {})
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.fuzz_runtime_parameters.time.time")
+    def test_custom_fuzz_value_assignment_dispatches_to_special_handler(self, mock_time):
+        start_time = 1625140800
+        mock_time.return_value = start_time
+
+        spec = {
+            "flowControlThresholdLagPercentage": {
+                "min": 0.0,
+                "max": 1.0,
+                "custom_fuzz_value_assignment": True,
+                "period": 1,
+            },
+        }
+        state = _runtime_fuzzer.RuntimeParametersState(spec, seed=42)
+
+        mock_time.return_value = start_time + 1
+        ret = state.generate_parameters()
+        self.assertIn("flowControlThresholdLagPercentage", ret)
+        val = ret["flowControlThresholdLagPercentage"]
+        self.assertIsInstance(val, float)
+        self.assertGreaterEqual(val, 0.0)
+        self.assertLess(val, 1.0)
 
     def test_runtime_param_spec_validation(self):
         bad_spec_value_not_dict = {"fakeRuntimeParam": 1}

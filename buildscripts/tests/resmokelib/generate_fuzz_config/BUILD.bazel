@@ -1,0 +1,14 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "test_mongo_fuzzer_configs",
+    srcs = [
+        "__init__.py",
+        "test_mongo_fuzzer_configs.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/generate_fuzz_config",
+    ],
+)

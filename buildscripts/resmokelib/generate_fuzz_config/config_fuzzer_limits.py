@@ -324,7 +324,11 @@ config_fuzzer_params = {
             "fuzz_at": ["startup"],
         },
         # Flow control related parameters
-        "enableFlowControl": {"choices": [True, False], "fuzz_at": ["startup"]},
+        "enableFlowControl": {
+            "choices": [True, False],
+            "custom_fuzz_value_assignment": True,
+            "fuzz_at": ["startup"],
+        },
         "flowControlTicketAdderConstant": {
             "min": 500,
             "max": 1000,
