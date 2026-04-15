@@ -50,7 +50,8 @@ bool OrderedTicketSemaphore::acquire(OperationContext* opCtx,
     }
 
     if (admCtx->getLowAdmissions() == 0 &&
-        static_cast<int>(_waitQueue.size()) >= _maxWaiters.loadRelaxed()) {
+        static_cast<int>(_waitQueue.size()) >= _maxWaiters.loadRelaxed() &&
+        !admCtx->isLoadShedExempt()) {
         admCtx->recordOperationLoadShed();
         lk.unlock();
         uasserted(ErrorCodes::AdmissionQueueOverflow,

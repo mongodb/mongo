@@ -409,6 +409,52 @@ TEST_F(OrderedTicketSemaphoreTest, LowAdmissionsCanBypassMaxWaitersLimit) {
     future2.get();
 }
 
+/**
+ * Test that operations marked as load-shed-exempt bypass the max waiters limit.
+ */
+TEST_F(OrderedTicketSemaphoreTest, LoadShedExemptOperationsBypassesMaxWaitersLimit) {
+    auto sem = makeSemaphore(0, 1);  // 0 tickets, max 1 waiter.
+
+    // Create a custom AdmissionContext that overrides isLoadShedExempt().
+    class ExemptAdmissionContext : public MockAdmissionContext {
+    public:
+        bool isLoadShedExempt() const override {
+            return true;
+        }
+    };
+
+    MockAdmissionContext admCtx1, admCtx2NoExemption;
+    ExemptAdmissionContext admCtx3Exempt;
+
+    // First operation fills the queue.
+    auto future1 = launchAsync([&]() {
+        auto [client, opCtx] = makeOpCtx();
+        ASSERT_TRUE(sem->acquire(opCtx.get(), &admCtx1, Date_t::max(), true));
+    });
+
+    waitForQueuedThreads(sem, 1);
+    ASSERT_EQ(sem->waiters(), 1);
+
+    // Non-exempt operation should be load-shed.
+    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx2NoExemption, getDeadline(), true),
+                       DBException,
+                       ErrorCodes::AdmissionQueueOverflow);
+    ASSERT_EQ(sem->waiters(), 1);
+
+    // Exempt operation should bypass the limit.
+    auto future3 = launchAsync([&]() {
+        auto [client, opCtx] = makeOpCtx();
+        ASSERT_TRUE(sem->acquire(opCtx.get(), &admCtx3Exempt, Date_t::max(), true));
+    });
+
+    waitForQueuedThreads(sem, 2);
+    ASSERT_EQ(sem->waiters(), 2);
+
+    sem->resize(2);
+    future1.get();
+    future3.get();
+}
+
 TEST_F(OrderedTicketSemaphoreTest, AcquireReleaseTryAcquireResizeMockMultipleIterations) {
     auto sem = makeSemaphore(2, 10);
     size_t kNumThreads = 3;

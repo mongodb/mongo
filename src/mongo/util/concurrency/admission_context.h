@@ -49,6 +49,7 @@ class MONGO_MOD_OPEN AdmissionContext {
 public:
     AdmissionContext(const AdmissionContext& other);
     AdmissionContext& operator=(const AdmissionContext& other);
+    virtual ~AdmissionContext() = default;
 
     /**
      * Classifies the priority that an operation acquires a ticket when the system is under high
@@ -143,6 +144,13 @@ public:
 
     void markTicketReleased() {
         _holdingTicket.store(false);
+    }
+
+    /**
+     * Prevent the admission control mechanisms from load shedding the operation.
+     */
+    virtual bool isLoadShedExempt() const {
+        return false;
     }
 
     /**
