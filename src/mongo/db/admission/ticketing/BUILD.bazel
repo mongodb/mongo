@@ -153,3 +153,16 @@ mongo_cc_fuzztest(
         "//src/mongo/util/concurrency:thread_pool",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "ticket_semaphore_bm",
+    srcs = ["ticket_semaphore_bm.cpp"],
+    tags = [
+        "second_half_bm",
+    ],
+    deps = [
+        ":ticket_semaphore",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/shard_role/lock_manager",
+    ],
+)
