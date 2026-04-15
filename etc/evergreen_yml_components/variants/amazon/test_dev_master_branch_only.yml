@@ -117,8 +117,6 @@ buildvariants:
       - rhel83-zseries-large
     stepback: false
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: *rhel83-s390x-bazel-compile
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel83
