@@ -426,6 +426,11 @@ public:
                 _opCtx,
                 rankerResult.getValue().maybeExplainData,
                 rankerResult.getValue().solutions[0].get());
+            // The solution may be owned by the MultiPlanStage (when CBR chose the winner
+            // via CBRForNoMPResults). Set to nullptr after capturing query stats metrics.
+            if (rankerResult.getValue().execState) {
+                rankerResult.getValue().solutions[0] = nullptr;
+            }
         }
 
         if (auto result = maybePlannerFromRankerResult(rankerResult, *_cq)) {
@@ -642,6 +647,10 @@ private:
         tassert(11727700,
                 "Ranker saved execution state but did not select a single solution",
                 solutions.size() == 1);
+
+        tassert(12078400,
+                "Expected null solution since it is owned by the MultiPlanStage",
+                solutions[0] == nullptr);
 
         // We wish to cache the plan for every query passing through CBR.
         // Multi-planning is entangled with plan caching.

@@ -211,6 +211,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
 
     auto [cq, plannerData] =
         createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1));
+    cq->getExpCtx()->setExplain(ExplainOptions::Verbosity::kExecAllPlans);
 
     plannerData.plannerParams =
         makePlannerParams({.indices = indices,
@@ -224,7 +225,8 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     auto& explainData = status.getValue().maybeExplainData.value();
     // The plan rejected from CBR is in rejectedPlansWithStages
     ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
-    ASSERT_EQ(explainData.estimates.size(), 4);  // 2 x (IXSCAN + FETCH)
+    // Original CBR estimates (2 plans x 2 nodes) plus remapped MP entries for the winning plan.
+    ASSERT_EQ(explainData.estimates.size(), 6);
     for (const auto& rejectedPlan : explainData.rejectedPlansWithStages) {
         ASSERT_FALSE(rejectedPlan.solution == nullptr);
         ASSERT_EQ(rejectedPlan.planStage, nullptr);  // Not rejected by the multi-planner
@@ -242,6 +244,39 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
         status.getValue().execState->peekExecState<ClassicExecState>()->root.get());
     ASSERT_TRUE(mp);
     ASSERT_EQ(mp->getStats()->children.size(), 2);  // One winning and one rejected plan
+}
+
+TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBRWithoutExplain) {
+    createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
+    createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
+    insertNDocuments(5001);
+    auto colls = getCollsAccessor();
+
+    auto [cq, plannerData] =
+        createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1));
+    cq->getExpCtx()->setExplain(boost::none);
+    // Verify that remapping and explain data collection are skipped for non-explain queries.
+
+    plannerData.plannerParams =
+        makePlannerParams({.indices = indices,
+                           .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
+                               static_cast<double>(5001), kNss)});
+
+    CBRForNoMPResultsStrategySpy strategy;
+    auto status = planAndRank(strategy, plannerData);
+    ASSERT_OK(status.getStatus());
+    ASSERT_EQ(status.getValue().solutions.size(), 1);
+    // CBR always populates estimates, but without explain the remapping and
+    // planStageQsnMap are skipped.
+    ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
+    auto& explainData = status.getValue().maybeExplainData.value();
+    ASSERT_EQ(explainData.estimates.size(), 4);  // 2 plans x 2 nodes, no remapped entries.
+    ASSERT_TRUE(explainData.planStageQsnMap.empty());
+
+    ASSERT_TRUE(status.getValue().execState);
+    auto mp = dynamic_cast<MultiPlanStage*>(
+        status.getValue().execState->peekExecState<ClassicExecState>()->root.get());
+    ASSERT_TRUE(mp);
 }
 
 TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {

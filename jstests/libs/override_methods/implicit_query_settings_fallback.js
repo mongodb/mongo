@@ -6,6 +6,7 @@ import {
     isInternalDbName,
     isSystemCollectionName,
 } from "jstests/libs/cmd_object_utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {everyWinningPlan, getNestedProperties, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
@@ -55,49 +56,69 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
             return;
         }
 
-        const explain = db.runCommand(getExplainCommand(innerCmd));
-        if (!explain.ok) {
-            // Some commands such as $collStats cannot be explained and will lead to failures.
-            return;
-        }
+        // Use deterministic (sequential scan) sampling so that CBR cost estimates are
+        // identical across the two explain runs being compared. Set on all mongod nodes
+        // (including secondaries) since in a sharded cluster, sampling runs on each shard.
+        const setSamplingCmd = {setParameter: 1, internalQuerySamplingBySequentialScan: true};
+        const prevSamplingValues = FixtureHelpers.mapOnEachShardNode({
+            db,
+            func: (nodeDb) => assert.commandWorked(nodeDb.adminCommand(setSamplingCmd)),
+            primaryNodeOnly: false,
+        });
 
-        if (explain.hasOwnProperty("warning")) {
-            // The explain output exceeded the 16MB BSON size limit and was truncated.
-            return;
-        }
+        try {
+            const explain = db.runCommand(getExplainCommand(innerCmd));
+            if (!explain.ok) {
+                // Some commands such as $collStats cannot be explained and will lead to failures.
+                return;
+            }
 
-        // If the query explain has no 'winningPlan', we can not assert for query settings
-        // fallback.
-        if (getNestedProperties(explain, "winningPlan").length === 0) {
-            return;
-        }
+            if (explain.hasOwnProperty("warning")) {
+                // The explain output exceeded the 16MB BSON size limit and was truncated.
+                return;
+            }
 
-        const isIdHackQuery = everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
-        if (isIdHackQuery) {
-            // Query settings cannot be applied over IDHACK or Express queries.
-            return;
-        }
+            // If the query explain has no 'winningPlan', we can not assert for query settings
+            // fallback.
+            if (getNestedProperties(explain, "winningPlan").length === 0) {
+                return;
+            }
 
-        const collectionName = getCollectionName(db, innerCmd);
-        if (!collectionName || isSystemCollectionName(collectionName)) {
-            // Can't test the fallback on queries not involving any collections or queries targeting
-            // the system collection:
-            // - Queries not involving any collections will always yield to EOF plans.
-            // - Query settings validate against queries targeting system collections.
-            return;
-        }
+            const isIdHackQuery = everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+            if (isIdHackQuery) {
+                // Query settings cannot be applied over IDHACK or Express queries.
+                return;
+            }
 
-        if (innerCmd.hasOwnProperty("rawData")) {
-            // Query settings can't be applied on rawData queries
-            return;
-        }
+            const collectionName = getCollectionName(db, innerCmd);
+            if (!collectionName || isSystemCollectionName(collectionName)) {
+                // Can't test the fallback on queries not involving any collections or queries targeting
+                // the system collection:
+                // - Queries not involving any collections will always yield to EOF plans.
+                // - Query settings validate against queries targeting system collections.
+                return;
+            }
 
-        const ns = {db: dbName, coll: collectionName};
-        const qsutils = new QuerySettingsUtils(db, collectionName);
-        qsutils.onSetQuerySettings(computeAndStoreResult);
-        const qstests = new QuerySettingsIndexHintsTests(qsutils);
-        const representativeQuery = qsutils.makeQueryInstance(innerCmd);
-        qstests.assertQuerySettingsFallback(representativeQuery, ns, explain);
+            if (innerCmd.hasOwnProperty("rawData")) {
+                // Query settings can't be applied on rawData queries
+                return;
+            }
+
+            const ns = {db: dbName, coll: collectionName};
+            const qsutils = new QuerySettingsUtils(db, collectionName);
+            qsutils.onSetQuerySettings(computeAndStoreResult);
+            const qstests = new QuerySettingsIndexHintsTests(qsutils);
+            const representativeQuery = qsutils.makeQueryInstance(innerCmd);
+            qstests.assertQuerySettingsFallback(representativeQuery, ns, explain);
+        } finally {
+            const prevValue = prevSamplingValues[0].was.internalQuerySamplingBySequentialScan;
+            const restoreCmd = {setParameter: 1, internalQuerySamplingBySequentialScan: prevValue};
+            FixtureHelpers.mapOnEachShardNode({
+                db,
+                func: (nodeDb) => assert.commandWorked(nodeDb.adminCommand(restoreCmd)),
+                primaryNodeOnly: false,
+            });
+        }
     };
     OverrideHelpers.withPreOverrideRunCommand(assertFallbackPlanMatchesOriginalPlan);
     return resultWithQuerySettings || clientFunction.apply(conn, makeFuncArgs(cmdObj));

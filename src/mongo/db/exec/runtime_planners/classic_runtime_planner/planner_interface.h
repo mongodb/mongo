@@ -98,6 +98,9 @@ public:
     /**
      * State accessors.
      */
+    stage_builder::PlanStageToQsnMap& planStageQsnMap() {
+        return _planStageQsnMap;
+    }
     virtual const QuerySolution* querySolution() const = 0;
     const CanonicalQuery* cq() const;
     PlanStage* getRoot() const;

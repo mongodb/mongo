@@ -95,19 +95,19 @@ function testNoResultsQueryIsPlannedWithCBR() {
         return;
     }
     const winningPlan = getWinningPlanFromExplain(explain);
-    // TODO SERVER-121641: The winning plan should have CBR cost metrics when CBR picks it.
-    assertPlanNotCosted(winningPlan);
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
         const numShards = getNumShardsFromExplain(explain);
         if (shardsHaveShardingFilter(explain)) {
             // SHARDING_FILTER is inestimable by CBR's sampling estimator, so CBR cannot pick a
             // single winner. All plans end up not costed. At least 1 rejected per shard.
+            assertPlanNotCosted(winningPlan);
             assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
             for (const plan of rejectedPlans) {
                 assertPlanNotCosted(plan);
             }
         } else {
+            assertPlanCosted(winningPlan);
             // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
             assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
             let numCosted = 0;
@@ -123,17 +123,21 @@ function testNoResultsQueryIsPlannedWithCBR() {
         }
     } else if (winningPlan.stage === "SHARDING_FILTER") {
         // Shard-local but SHARDING_FILTER still present: 1 from MP + 2 from CBR, all not costed.
+        assertPlanNotCosted(winningPlan);
         assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
         for (const plan of rejectedPlans) {
             assertPlanNotCosted(plan);
         }
     } else if (hasV1Index(winningPlan)) {
         // v1 indexes are inestimable by CBR: 1 from MP + 2 from CBR, all not costed.
+        assertPlanNotCosted(winningPlan);
         assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
         for (const plan of rejectedPlans) {
             assertPlanNotCosted(plan);
         }
     } else {
+        // CBR chose the winning plan — it should be costed.
+        assertPlanCosted(winningPlan);
         // 2 rejected plans: 1 from MP (not costed) + 1 from CBR (costed).
         assert.eq(rejectedPlans.length, 2, toJsonForLog(explain));
         assertPlanNotCosted(rejectedPlans[0]);
@@ -233,17 +237,17 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
             return;
         }
         const winningPlan = getWinningPlanFromExplain(explain);
-        // TODO SERVER-121641: The winning plan should have CBR cost metrics when CBR picks it.
-        assertPlanNotCosted(winningPlan);
         const rejectedPlans = getRejectedPlans(explain);
         if (isExecutionSplitInShards(explain)) {
             const numShards = getNumShardsFromExplain(explain);
             if (shardsHaveShardingFilter(explain)) {
+                assertPlanNotCosted(winningPlan);
                 assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
                 for (const plan of rejectedPlans) {
                     assertPlanNotCosted(plan);
                 }
             } else {
+                assertPlanCosted(winningPlan);
                 // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
                 assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
                 let numCosted = 0;
@@ -260,17 +264,21 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         } else if (winningPlan.stage === "SHARDING_FILTER") {
             // Shard-local but SHARDING_FILTER still present: 1 from MP + 2 from CBR, all not
             // costed.
+            assertPlanNotCosted(winningPlan);
             assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
             for (const plan of rejectedPlans) {
                 assertPlanNotCosted(plan);
             }
         } else if (hasV1Index(winningPlan)) {
             // v1 indexes are inestimable by CBR: 1 from MP + 2 from CBR, all not costed.
+            assertPlanNotCosted(winningPlan);
             assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
             for (const plan of rejectedPlans) {
                 assertPlanNotCosted(plan);
             }
         } else {
+            // CBR chose the winning plan — it should be costed.
+            assertPlanCosted(winningPlan);
             // 2 rejected plans: 1 from MP (not costed) + 1 from CBR (costed).
             assert.eq(rejectedPlans.length, 2, toJsonForLog(explain));
             assertPlanNotCosted(rejectedPlans[0]);

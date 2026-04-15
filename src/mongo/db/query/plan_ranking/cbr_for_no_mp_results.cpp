@@ -39,7 +39,41 @@
 
 namespace mongo {
 namespace plan_ranking {
+namespace {
 
+/**
+ * Walks two QSN trees (which must have identical structure) in parallel and adds entries keyed
+ * by MP's QSN pointers into the estimates map (which already contains entries keyed by CBR's QSN
+ * pointers). This allows the explain output to connect MP's PlanStage tree (via planStageQsnMap)
+ * to CBR's cost/cardinality estimates.
+ */
+void addRemappedEstimates(const QuerySolutionNode* mpNode,
+                          const QuerySolutionNode* cbrNode,
+                          cost_based_ranker::EstimateMap& estimates) {
+    auto it = estimates.find(cbrNode);
+    if (it != estimates.end()) {
+        // Copy the value before inserting. We cannot write `estimates[mpNode] = ...` in one
+        // expression because operator[] may rehash the map (invalidating 'it') before
+        // it->second is read — their evaluation order is indeterminate in an overloaded
+        // operator= call.
+        auto estimate = std::make_unique<cost_based_ranker::QSNEstimate>(*it->second);
+        estimates[mpNode] = std::move(estimate);
+    }
+    tassert(11763502,
+            "QSN tree structure mismatch between MP and CBR plans",
+            mpNode->children.size() == cbrNode->children.size());
+    for (size_t i = 0; i < mpNode->children.size(); ++i) {
+        tassert(11763505,
+                "Expected non-null MP child QSN node for estimate remapping",
+                mpNode->children[i]);
+        tassert(11763506,
+                "Expected non-null CBR child QSN node for estimate remapping",
+                cbrNode->children[i]);
+        addRemappedEstimates(mpNode->children[i].get(), cbrNode->children[i].get(), estimates);
+    }
+}
+
+}  // namespace
 
 StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& plannerData) {
     OperationContext* opCtx = plannerData.opCtx;
@@ -110,12 +144,13 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
 
     if (cbrResult.getValue().solutions.size() == 1) {
         auto resultValue = std::move(cbrResult.getValue());
+        auto& cbrWinningSolution = resultValue.solutions[0];
 
         // Stop collecting MP metrics because at this point CBR has already chosen the winning plan.
         _multiPlanner->stopCollectingMetrics();
 
         // TODO(SERVER-104684): Avoid abandoning the backup plan.
-        _multiPlanner->abandonTrialsExceptHashes({resultValue.solutions[0]->hash()});
+        _multiPlanner->abandonTrialsExceptHashes({cbrWinningSolution->hash()});
         auto remainingMultiPlannerWorksPerPlan =
             trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
         auto status =
@@ -132,10 +167,30 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         if (!status.isOK()) {
             return status;
         }
-        resultValue.execState = std::move(*_multiPlanner).extractExecState();
 
-        // TODO(SERVER-121641): Set resultValue.solutions[0] to nullptr (like we do when
-        // MP decides) & re-introduce the tassert in get_executor.cpp from SERVER-120784.
+        if (query.getExplain()) {
+            // Add MP-keyed entries into the estimates map so the explain output can connect
+            // MP's PlanStage tree to CBR's cost/cardinality estimates. CBR re-enumerates plans
+            // internally, so its QSN objects differ from MP's even though the plans are
+            // structurally identical (matched by hash).
+            const auto* mpWinningRoot = _multiPlanner->querySolution()->root();
+            const auto* cbrWinningRoot = cbrWinningSolution->root();
+            tassert(11763503,
+                    "Expected non-null MP winning QSN root for estimate remapping",
+                    mpWinningRoot);
+            tassert(11763504,
+                    "Expected non-null CBR winning QSN root for estimate remapping",
+                    cbrWinningRoot);
+            addRemappedEstimates(
+                mpWinningRoot, cbrWinningRoot, resultValue.maybeExplainData->estimates);
+
+            // Provide the planStageQsnMap so the explain output can look up QSN nodes for
+            // each PlanStage. The multi-planner will take care of the rest of the explain data.
+            resultValue.maybeExplainData->planStageQsnMap =
+                std::move(_multiPlanner->planStageQsnMap());
+        }
+
+        resultValue.execState = std::move(*_multiPlanner).extractExecState();
 
         return resultValue;
     }
