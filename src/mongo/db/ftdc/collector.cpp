@@ -60,6 +60,8 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
@@ -118,10 +120,15 @@ SampleCollectorCache::~SampleCollectorCache() {
     _shutdownPool_inlock(lk);
 }
 
-void SampleCollectorCache::addCollector(StringData name, bool hasData, SampleCollectFn&& fn) {
-    _sampleCollectors[std::string{name}] = {
+void SampleCollectorCache::addCollector(const std::string& name,
+                                        bool hasData,
+                                        SampleCollectFn&& fn) {
+    iassert(ErrorCodes::BadValue,
+            fmt::format("Duplicate FTDC collector name: '{}'", name),
+            !_sampleCollectors.contains(name));
+    _sampleCollectors[name] = {
         ClientStrand::make(getGlobalServiceContext()->getService()->makeClient(
-            std::string{name}, nullptr, ClientOperationKillableByStepdown{false})),
+            name, nullptr, ClientOperationKillableByStepdown{false})),
         boost::none,
         std::move(fn),
         0,
@@ -253,7 +260,10 @@ void AsyncFTDCCollectorCollection::_collect(
 }
 
 void SyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector) {
-    // TODO SERVER-123480: ensure the collectors all have unique names.
+    const std::string newName = collector->name();
+    iassert(ErrorCodes::BadValue,
+            fmt::format("Duplicate FTDC collector name: '{}'", newName),
+            _collectorNames.emplace(newName).second);
     _collectors.emplace_back(std::move(collector));
 }
 

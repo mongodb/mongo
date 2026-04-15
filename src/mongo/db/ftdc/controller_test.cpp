@@ -122,6 +122,9 @@ public:
 
 class MockCollector : public FTDCCollectorInterface {
 public:
+    MockCollector() = default;
+    explicit MockCollector(std::string name) : _collName(std::move(name)) {}
+
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) final {
         _state = State::kStarted;
 
@@ -156,7 +159,7 @@ public:
     }
 
     std::string name() const final {
-        return "mock";
+        return _collName;
     }
 
     virtual void generateDocument(BSONObjBuilder& builder, std::uint32_t counter) = 0;
@@ -186,6 +189,8 @@ private:
     std::uint32_t _collectorWrites = 0;
 
     std::vector<BSONObj> _docs;
+
+    std::string _collName = "mock";
 };
 
 class MockPeriodicCollector : public MockCollector {
@@ -257,7 +262,9 @@ std::vector<BSONObj> insertNewSchemaDocuments(const std::vector<BSONObj>& docs, 
 
 class MockLargeDataCollector : public MockCollector {
 public:
-    MockLargeDataCollector(int32_t largeDataSize) : _largeDataSize(largeDataSize) {}
+    explicit MockLargeDataCollector(int32_t largeDataSize) : _largeDataSize(largeDataSize) {}
+    MockLargeDataCollector(int32_t largeDataSize, std::string name)
+        : MockCollector(std::move(name)), _largeDataSize(largeDataSize) {}
 
     void generateDocument(BSONObjBuilder& builder, std::uint32_t counter) final {
         builder.append("testingDataLarge", std::string(_largeDataSize, 'a'));
@@ -489,9 +496,9 @@ TEST_F(FTDCControllerTest, DiscardLargeSamplesWithBufBuilderExceptionWhenEnabled
     config.period = Milliseconds(1);
     setUpControllerAndCheckpoint(config);
 
-    auto collector1 = std::make_unique<MockLargeDataCollector>(50 * 1024 * 1024);
-    auto collector2 = std::make_unique<MockLargeDataCollector>(60 * 1024 * 1024);
-    auto collector3 = std::make_unique<MockLargeDataCollector>(70 * 1024 * 1024);
+    auto collector1 = std::make_unique<MockLargeDataCollector>(50 * 1024 * 1024, "mock1");
+    auto collector2 = std::make_unique<MockLargeDataCollector>(60 * 1024 * 1024, "mock2");
+    auto collector3 = std::make_unique<MockLargeDataCollector>(70 * 1024 * 1024, "mock3");
     controller()->addPeriodicCollector(std::move(collector1));
     controller()->addPeriodicCollector(std::move(collector2));
     controller()->addPeriodicCollector(std::move(collector3));
@@ -545,9 +552,9 @@ DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
     config.period = Milliseconds(100);
     setUpControllerAndCheckpoint(config);
 
-    auto collector1 = std::make_unique<MockLargeDataCollector>(50 * 1024 * 1024);
-    auto collector2 = std::make_unique<MockLargeDataCollector>(60 * 1024 * 1024);
-    auto collector3 = std::make_unique<MockLargeDataCollector>(70 * 1024 * 1024);
+    auto collector1 = std::make_unique<MockLargeDataCollector>(50 * 1024 * 1024, "mock1");
+    auto collector2 = std::make_unique<MockLargeDataCollector>(60 * 1024 * 1024, "mock2");
+    auto collector3 = std::make_unique<MockLargeDataCollector>(70 * 1024 * 1024, "mock3");
     controller()->addPeriodicCollector(std::move(collector1));
     controller()->addPeriodicCollector(std::move(collector2));
     controller()->addPeriodicCollector(std::move(collector3));

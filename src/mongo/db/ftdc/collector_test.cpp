@@ -29,6 +29,7 @@
 
 #include "mongo/db/ftdc/collector.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/constants.h"
@@ -48,8 +49,8 @@ namespace {
 
 constexpr auto kFieldName = "Field"_sd;
 constexpr auto kAnotherFieldName = "AnotherField"_sd;
-constexpr auto kCollectorName = "Collector1"_sd;
-constexpr auto kAnotherCollectorName = "Collector2"_sd;
+constexpr auto kCollectorName = "Collector1";
+constexpr auto kAnotherCollectorName = "Collector2";
 constexpr auto kSampleData = 1;
 constexpr auto kMoreSampleData = 12;
 
@@ -87,6 +88,29 @@ public:
     }
 };
 
+class NamedDummyFTDCCollector : public FTDCCollectorInterface {
+public:
+    explicit NamedDummyFTDCCollector(std::string name) : _name(std::move(name)) {}
+
+    std::string name() const override {
+        return _name;
+    }
+
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {}
+
+private:
+    std::string _name;
+};
+
+TEST(FTDCCollectorTest, SyncCollectionRejectsDuplicateCollectorNames) {
+    SyncFTDCCollectorCollection coll;
+    coll.add(std::make_unique<NamedDummyFTDCCollector>("same"));
+    coll.add(std::make_unique<NamedDummyFTDCCollector>("different"));
+    ASSERT_THROWS_CODE(coll.add(std::make_unique<NamedDummyFTDCCollector>("same")),
+                       DBException,
+                       ErrorCodes::BadValue);
+}
+
 TEST(FTDCCollectorTest, FilteredCollectorTest) {
     auto doCollect = [](FTDCCollectorInterface& collector) {
         BSONObjBuilder builder;
@@ -105,6 +129,16 @@ TEST(FTDCCollectorTest, FilteredCollectorTest) {
     enabled = false;
     ASSERT_FALSE(filter.hasData());
     ASSERT_EQUALS(doCollect(filter), R"({})");
+}
+
+TEST_F(SampleCollectorCacheTestFixture, DuplicateCollectorNamesRejected) {
+    auto collector = makeSampleCollectorCache();
+    collector.addCollector(kCollectorName, true, [](OperationContext*, BSONObjBuilder*) {});
+    collector.addCollector(kAnotherCollectorName, true, [](OperationContext*, BSONObjBuilder*) {});
+    ASSERT_THROWS_CODE(
+        collector.addCollector(kCollectorName, true, [](OperationContext*, BSONObjBuilder*) {}),
+        DBException,
+        ErrorCodes::BadValue);
 }
 
 TEST_F(SampleCollectorCacheTestFixture, NoCollectorsShouldReturnNothing) {

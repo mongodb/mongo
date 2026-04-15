@@ -47,6 +47,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <unordered_set>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -190,7 +191,7 @@ public:
     /**
      * Registers a new SampleCollector.
      */
-    void addCollector(StringData name, bool hasData, SampleCollectFn&& fn);
+    void addCollector(const std::string& name, bool hasData, SampleCollectFn&& fn);
 
     /**
      * Refreshes the data in each SampleCollector and writes the results to builder.
@@ -291,6 +292,7 @@ private:
 private:
     // collection of collectors
     std::vector<std::unique_ptr<FTDCCollectorInterface>> _collectors;
+    stdx::unordered_set<std::string> _collectorNames;
 };
 
 }  // namespace mongo
