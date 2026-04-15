@@ -51,3 +51,14 @@ py_test(
         ":wrapper_hook",
     ],
 )
+
+py_test(
+    name = "install_modules_test",
+    srcs = [
+        "install_modules_test.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)

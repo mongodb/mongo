@@ -6,14 +6,14 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
-from bazel.wrapper_hook.install_modules import install_modules
+from bazel.wrapper_hook.install_modules import bootstrap_modules
 
 BAZEL_USER_NAMESPACE = "user-prod"
 BAZEL_CI_NAMESPACE = "ci-prod"
 
 
 def main():
-    install_modules(sys.argv[1], sys.argv[1:])
+    bootstrap_modules(sys.argv[1], sys.argv[1:])
 
     from bazel.wrapper_hook.compiledb import finalize_compiledb_posthook
     from bazel.wrapper_hook.flag_sync import sync_flags

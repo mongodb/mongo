@@ -12,7 +12,7 @@ sys.path.append(str(REPO_ROOT))
 # may be expecting certain stdout, always print to stderr.
 sys.stdout = sys.stderr
 
-from bazel.wrapper_hook.install_modules import install_modules
+from bazel.wrapper_hook.install_modules import bootstrap_modules
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 from bazel.wrapper_hook.wrapper_util import get_terminal_stream
 
@@ -81,7 +81,7 @@ def run_with_terminal_output(func, *args, **kwargs):
 
 
 def main():
-    install_modules(sys.argv[1], sys.argv[1:])
+    bootstrap_modules(sys.argv[1], sys.argv[1:])
 
     from bazel.auto_header.auto_header import gen_auto_headers
     from bazel.auto_header.gen_all_headers import spawn_all_headers_thread

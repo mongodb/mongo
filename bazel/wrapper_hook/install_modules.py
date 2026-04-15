@@ -12,6 +12,8 @@ sys.path.append(str(REPO_ROOT))
 
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
+MODULES_READY_ENV = "MONGO_BAZEL_WRAPPER_MODULES_READY"
+
 
 def get_deps_dirs(deps):
     tmp_dir = pathlib.Path(os.environ["Temp"] if platform.system() == "Windows" else "/tmp")
@@ -100,6 +102,26 @@ def skip_cplusplus_toolchain(args):
     return False
 
 
+def _reexec_current_python(env_var: str = MODULES_READY_ENV) -> None:
+    wrapper_debug("python deps changed; restarting wrapper interpreter")
+    env = os.environ.copy()
+    env[env_var] = "1"
+    os.execve(sys.executable, [sys.executable, *sys.argv], env)
+
+
+def bootstrap_modules(bazel, args):
+    # Nested Bazel installs can refresh the repo-rule python tree under the
+    # running interpreter. Re-exec so later stdlib imports come from the
+    # refreshed tree instead of the potentially stale one this process started
+    # with.
+    if os.environ.get(MODULES_READY_ENV) == "1":
+        setup_python_path()
+        return
+
+    if install_modules(bazel, args):
+        _reexec_current_python()
+
+
 def install_modules(bazel, args):
     need_to_install = False
     pwd_hash = hashlib.md5(str(REPO_ROOT).encode()).hexdigest()
@@ -159,3 +181,4 @@ def install_modules(bazel, args):
         if deps_missing:
             raise Exception(f"Failed to install python deps {deps_missing}")
     setup_python_path()
+    return need_to_install
