@@ -162,7 +162,8 @@ void _validateCompressedMinMax(boost::intrusive_ptr<BSONElementStorage>& allocat
                                BSONElement min,
                                BSONElement max,
                                int expectedCount,
-                               const CollatorInterface* collator) {
+                               const CollatorInterface* collator,
+                               bool criticalValidationOnly) {
     uassert(ErrorCodes::BadValue,
             fmt::format("Invalid bucket data type. Expected binData, but got {}.", data.type()),
             data.type() == BSONType::binData);
@@ -173,6 +174,11 @@ void _validateCompressedMinMax(boost::intrusive_ptr<BSONElementStorage>& allocat
     uassert(ErrorCodes::BadValue,
             fmt::format("Invalid bucket data binData subtype. Expected 7, but got {}.", type),
             type == BinDataType::Column);
+
+    // Disable remaining validation if critical-only is set.
+    if (criticalValidationOnly) {
+        return;
+    }
 
     // All columns should have the count as stored in the control object.
     size_t cnt = bsoncolumn::count(binary, len);
@@ -320,13 +326,19 @@ void _validateCompressedTimeField(boost::intrusive_ptr<BSONElementStorage>& allo
                                   BSONElement min,
                                   BSONElement max,
                                   int expectedCount,
-                                  const CollatorInterface* collator) {
+                                  const CollatorInterface* collator,
+                                  bool criticalValidationOnly) {
     int len = 0;
     const char* binary = data.binData(len);
     BinDataType type = data.binDataType();
     uassert(ErrorCodes::BadValue,
             fmt::format("Invalid bucket data binData subtype. Expected 7, but got {}.", type),
             type == BinDataType::Column);
+
+    // Disable remaining validation if critical-only is set.
+    if (criticalValidationOnly) {
+        return;
+    }
 
     size_t cnt = bsoncolumn::count(binary, len);
     uassert(ErrorCodes::BadValue,
@@ -376,7 +388,8 @@ void _validateUncompressedBucketData(const TimeseriesOptions& timeseriesOptions,
                                      const CollatorInterface* collator,
                                      const StringDataMap<BSONElement>& dataFields,
                                      const StringDataMap<BSONElement>& controlMinFields,
-                                     const StringDataMap<BSONElement>& controlMaxFields) {
+                                     const StringDataMap<BSONElement>& controlMaxFields,
+                                     bool criticalValidationOnly) {
     auto it = dataFields.find(timeseriesOptions.getTimeField());
     uassert(ErrorCodes::BadValue,
             fmt::format("Field '{}' is missing from control.max", timeseriesOptions.getTimeField()),
@@ -394,6 +407,11 @@ void _validateUncompressedBucketData(const TimeseriesOptions& timeseriesOptions,
             fmt::format("Field '{}' is missing from control.max", timeseriesOptions.getTimeField()),
             it != controlMaxFields.end());
     BSONElement max = it->second;
+
+    // Disable remaining validation if critical-only is set.
+    if (criticalValidationOnly) {
+        return;
+    }
 
     // Validate the time column first, we use this to discover the count to validate the other
     // columns with.
@@ -431,7 +449,8 @@ void _validateCompressedBucketData(const TimeseriesOptions& timeseriesOptions,
                                    const int bucketCount,
                                    const StringDataMap<BSONElement>& dataFields,
                                    const StringDataMap<BSONElement>& controlMinFields,
-                                   const StringDataMap<BSONElement>& controlMaxFields) {
+                                   const StringDataMap<BSONElement>& controlMaxFields,
+                                   bool criticalValidationOnly) {
     boost::intrusive_ptr allocator{new BSONElementStorage()};
     for (auto&& data : dataFields) {
         auto it = controlMinFields.find(data.first);
@@ -447,11 +466,23 @@ void _validateCompressedBucketData(const TimeseriesOptions& timeseriesOptions,
         BSONElement max = it->second;
 
         if (data.first == timeseriesOptions.getTimeField()) {
-            _validateCompressedTimeField(
-                allocator, timeseriesOptions, data.second, min, max, bucketCount, collator);
+            _validateCompressedTimeField(allocator,
+                                         timeseriesOptions,
+                                         data.second,
+                                         min,
+                                         max,
+                                         bucketCount,
+                                         collator,
+                                         criticalValidationOnly);
         } else {
-            _validateCompressedMinMax(
-                allocator, data.first, data.second, min, max, bucketCount, collator);
+            _validateCompressedMinMax(allocator,
+                                      data.first,
+                                      data.second,
+                                      min,
+                                      max,
+                                      bucketCount,
+                                      collator,
+                                      criticalValidationOnly);
         }
     }
 }
@@ -462,6 +493,7 @@ void _validateCompressedBucketData(const TimeseriesOptions& timeseriesOptions,
 void validateBucketConsistency(const Collection* collection, const BSONObj& bucketDoc) {
     OID bucketId;
     try {
+        bool criticalValidationOnly = gTimeseriesLessStrictBucketValidator.load();
         // First perform some basic schema validation and extract elements to validate more
         // thoroughly.
         bucketId = bucketDoc[timeseries::kBucketIdFieldName].OID();
@@ -485,10 +517,13 @@ void validateBucketConsistency(const Collection* collection, const BSONObj& buck
         }
 
         // Perform the actual validation
-        validateBucketIdTimestamp(timeseriesOptions, bucketId, min);
+        validateBucketIdTimestamp(timeseriesOptions, bucketId, min, criticalValidationOnly);
 
-        validateBucketTimeSpan(
-            timeseriesOptions, collection->areTimeseriesBucketsFixed(), min, max);
+        validateBucketTimeSpan(timeseriesOptions,
+                               collection->areTimeseriesBucketsFixed(),
+                               min,
+                               max,
+                               criticalValidationOnly);
 
         validateBucketData(timeseriesOptions,
                            collection->getDefaultCollator(),
@@ -496,7 +531,8 @@ void validateBucketConsistency(const Collection* collection, const BSONObj& buck
                            control[timeseries::kBucketControlCountFieldName],
                            min,
                            max,
-                           data);
+                           data,
+                           criticalValidationOnly);
     } catch (DBException& ex) {
         // Catch any validation error and attach extra context to be able to debug validation errors
         // or remediate corrupt buckets
@@ -509,7 +545,8 @@ void validateBucketConsistency(const Collection* collection, const BSONObj& buck
 
 void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
                                const OID& id,
-                               const BSONObj& controlMin) {
+                               const BSONObj& controlMin,
+                               bool criticalValidationOnly) {
     // Ensure the time field exists
     const StringData timeField = timeseriesOptions.getTimeField();
 
@@ -520,7 +557,7 @@ void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
     // If this bucket contains extended-range measurements, we cannot assert that the
     // minTimestamp matches the embedded timestamp.
     if (minTimestamp != oidEmbeddedTimestamp &&
-        !timeseries::dateOutsideStandardRange(minTimestamp)) {
+        !timeseries::dateOutsideStandardRange(minTimestamp) && !criticalValidationOnly) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Mismatch between the embedded timestamp "
                                 << oidEmbeddedTimestamp.toString()
@@ -532,11 +569,12 @@ void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
 void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
                             bool fixedBucketingEnabled,
                             const BSONObj& controlMin,
-                            const BSONObj& controlMax) {
+                            const BSONObj& controlMax,
+                            bool criticalValidationOnly) {
     auto minTimestamp = controlMin[timeseriesOptions.getTimeField()].Date();
     auto maxTimestamp = controlMax[timeseriesOptions.getTimeField()].Date();
     auto bucketMaxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
-    if (maxTimestamp - minTimestamp >= Seconds(*bucketMaxSpanSeconds)) {
+    if (maxTimestamp - minTimestamp >= Seconds(*bucketMaxSpanSeconds) && !criticalValidationOnly) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Time span of measurements in the bucket is too large. "
                                 << "The difference between control.max and control.min is "
@@ -547,7 +585,7 @@ void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
 
     // Enforce that control.min time is aligned to the fixed bucket boundary when the
     // fixed-bucketing optimization is enabled.
-    if (fixedBucketingEnabled) {
+    if (fixedBucketingEnabled && !criticalValidationOnly) {
         auto expectedMinTimestamp = roundTimestampToGranularity(minTimestamp, timeseriesOptions);
         uassert(ErrorCodes::BadValue,
                 fmt::format("control.min.{} is not rounded to expected boundary when "
@@ -565,7 +603,8 @@ void validateBucketData(const TimeseriesOptions& timeseriesOptions,
                         BSONElement controlCount,
                         const BSONObj& controlMin,
                         const BSONObj& controlMax,
-                        const BSONObj& data) {
+                        const BSONObj& data,
+                        bool criticalValidationOnly) {
 
     // Builds a hash map for the fields to avoid repeated traversals.
     auto buildFieldTable = [](StringDataMap<BSONElement>& table, const BSONObj& fields) {
@@ -599,8 +638,12 @@ void validateBucketData(const TimeseriesOptions& timeseriesOptions,
     };
 
     if (bucketVersion == timeseries::kTimeseriesControlUncompressedVersion) {
-        _validateUncompressedBucketData(
-            timeseriesOptions, collator, dataFields, controlMinFields, controlMaxFields);
+        _validateUncompressedBucketData(timeseriesOptions,
+                                        collator,
+                                        dataFields,
+                                        controlMinFields,
+                                        controlMaxFields,
+                                        criticalValidationOnly);
     } else {
         int count = controlCount.numberInt();
         uassert(ErrorCodes::BadValue,
@@ -612,7 +655,8 @@ void validateBucketData(const TimeseriesOptions& timeseriesOptions,
                                       count,
                                       dataFields,
                                       controlMinFields,
-                                      controlMaxFields);
+                                      controlMaxFields,
+                                      criticalValidationOnly);
     }
 }
 }  // namespace mongo::timeseries

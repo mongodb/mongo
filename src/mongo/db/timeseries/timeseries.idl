@@ -188,6 +188,14 @@ server_parameters:
         default: false
         redact: false
 
+    "timeseriesLessStrictBucketValidator":
+        description: "Make the timeseries bucket validator for timeseries collection less strict."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: "gTimeseriesLessStrictBucketValidator"
+        default: false
+        redact: false
+
 enums:
     BucketGranularity:
         description:

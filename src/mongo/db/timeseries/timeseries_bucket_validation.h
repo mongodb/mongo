@@ -63,7 +63,8 @@ void validateBucketConsistency(const Collection* collection, const BSONObj& buck
  */
 void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
                                const OID& id,
-                               const BSONObj& controlMin);
+                               const BSONObj& controlMin,
+                               bool criticalValidationOnly);
 
 /**
  * TODO SERVER-122862: Use in validation command
@@ -71,7 +72,8 @@ void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
 void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
                             bool fixedBucketingEnabled,
                             const BSONObj& controlMin,
-                            const BSONObj& controlMax);
+                            const BSONObj& controlMax,
+                            bool criticalValidationOnly);
 
 /**
  * TODO SERVER-122862: Use in validation command
@@ -82,5 +84,6 @@ void validateBucketData(const TimeseriesOptions& timeseriesOptions,
                         BSONElement controlCount,
                         const BSONObj& controlMin,
                         const BSONObj& controlMax,
-                        const BSONObj& data);
+                        const BSONObj& data,
+                        bool criticalValidationOnly);
 }  // namespace mongo::timeseries
