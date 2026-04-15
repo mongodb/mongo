@@ -363,6 +363,12 @@ public:
         };
 
         //
+        // Object to BinData
+        //
+        table[stdx::to_underlying(BSONType::object)][stdx::to_underlying(BSONType::binData)] =
+            &performConvertObjectToBinData;
+
+        //
         // String to object/array
         //
         fcvGatedTable[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::array)] =
@@ -1197,6 +1203,21 @@ private:
                                                SubtypeArg subtypeValue) {
         return writeNumberAccordingToEndianness<double>(
             inputValue.getDouble(), byteOrder, subtypeValue);
+    }
+
+    static Value performConvertObjectToBinData(ExpressionContext* const expCtx,
+                                               Value inputValue,
+                                               SubtypeArg subtypeValue) {
+        if (!feature_flags::gFeatureFlagConvertObjectToBinData.isEnabled(
+                VersionContext::getDecoration(expCtx->getOperationContext()),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            uasserted(ErrorCodes::ConversionFailure,
+                      "$convert from Object to BinData is not enabled");
+        }
+
+        auto bsonObj = inputValue.getDocument().toBson();
+        auto binDataType = computeBinDataType(subtypeValue);
+        return Value(BSONBinData(bsonObj.objdata(), bsonObj.objsize(), binDataType));
     }
 
     static bool isValidUserDefinedBinDataType(int typeCode) {

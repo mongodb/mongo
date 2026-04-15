@@ -966,6 +966,220 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBool) {
         convertExp->evaluate(objectInput, &expCtx->variables), true, BSONType::boolean);
 }
 
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFailsWhenFeatureFlagDisabled) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", false};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{{"a", 1}}}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "$convert from Object to BinData is not enabled");
+                             });
+}
+
+TEST_F(EvaluateConvertTest, ConvertEmptyObjectToBinData) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{}}};
+    auto result = convertExp->evaluate(input, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::binData);
+
+    auto expectedBson = BSONObj();
+    ASSERT_VALUE_EQ(
+        result, Value(BSONBinData(expectedBson.objdata(), expectedBson.objsize(), BinDataGeneral)));
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectWithFieldsToBinData) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{{"a", 1}}}};
+    auto result = convertExp->evaluate(input, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::binData);
+
+    auto expectedBson = Document{{"a", 1}}.toBson();
+    ASSERT_VALUE_EQ(
+        result, Value(BSONBinData(expectedBson.objdata(), expectedBson.objsize(), BinDataGeneral)));
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFieldOrderMatters) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document inputAB{{"path1", Document{{"a", "a"_sd}, {"b", "b"_sd}}}};
+    Document inputBA{{"path1", Document{{"b", "b"_sd}, {"a", "a"_sd}}}};
+
+    auto resultAB = convertExp->evaluate(inputAB, &expCtx->variables);
+    auto resultBA = convertExp->evaluate(inputBA, &expCtx->variables);
+
+    ASSERT_EQ(resultAB.getType(), BSONType::binData);
+    ASSERT_EQ(resultBA.getType(), BSONType::binData);
+    ASSERT_VALUE_NE(resultAB, resultBA);
+}
+
+TEST_F(EvaluateConvertTest, ConvertNestedObjectToBinData) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document nested{{"path1", Document{{"a", "hello"_sd}, {"b", Document{{"x", 42}}}}}};
+    auto result = convertExp->evaluate(nested, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::binData);
+
+    auto expectedBson = BSON("a" << "hello"
+                                 << "b" << BSON("x" << 42));
+    ASSERT_VALUE_EQ(
+        result, Value(BSONBinData(expectedBson.objdata(), expectedBson.objsize(), BinDataGeneral)));
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataWithCustomSubtype) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: {type: 'binData', subtype: 128}}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{{"a", "a"_sd}}}};
+    auto result = convertExp->evaluate(input, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::binData);
+
+    auto expectedBson = BSON("a" << "a");
+    ASSERT_VALUE_EQ(result,
+                    Value(BSONBinData(expectedBson.objdata(),
+                                      expectedBson.objsize(),
+                                      static_cast<BinDataType>(128))));
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataNullInputReturnsNull) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document nullInput{{"path1", BSONNULL}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(nullInput, &expCtx->variables), Value(BSONNULL), BSONType::null);
+
+    Document missingInput{};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(missingInput, &expCtx->variables), Value(BSONNULL), BSONType::null);
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataOnNullReturnsOnNullValue) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', onNull: 'was null'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document nullInput{{"path1", BSONNULL}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(nullInput, &expCtx->variables), "was null"_sd, BSONType::string);
+}
+
+TEST_F(EvaluateConvertTest, ConvertNonObjectToBinDataWithOnError) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', onError: 'error!'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document boolInput{{"path1", true}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(boolInput, &expCtx->variables), "error!"_sd, BSONType::string);
+}
+
+TEST_F(EvaluateConvertTest, ConvertNonObjectToBinDataWithoutOnErrorFails) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document boolInput{{"path1", true}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(boolInput, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Unsupported conversion from bool to binData");
+                             });
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFormatIsIgnored) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', format: 'hex'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{{"a", "a"_sd}}}};
+    auto result = convertExp->evaluate(input, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::binData);
+
+    auto expectedBson = BSON("a" << "a");
+    ASSERT_VALUE_EQ(
+        result, Value(BSONBinData(expectedBson.objdata(), expectedBson.objsize(), BinDataGeneral)));
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataInvalidFormatStillFails) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', format: 'bson'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{{"a", "a"_sd}}}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), 4341125);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Invalid 'format' argument for $convert: bson");
+                             });
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataInvalidSubtypeFails) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: {type: 5, subtype: 50}}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{{"a", "a"_sd}}}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), 4341107);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "In $convert, numeric value for 'subtype' does not correspond "
+                                     "to a BinData type: 50");
+                             });
+}
+
 TEST_F(EvaluateConvertTest, ConvertArrayToBool) {
     auto expCtx = getExpCtx();
 

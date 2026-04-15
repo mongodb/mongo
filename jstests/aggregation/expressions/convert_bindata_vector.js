@@ -379,7 +379,6 @@ let bsonToBinErrorCases = [
     {invalid_bson_array: ["oh", "hi", "mark"], error_code: ErrorCodes.ConversionFailure},
     // Must be an array
     {invalid_bson_array: "theroom", error_code: ErrorCodes.ConversionFailure},
-    {invalid_bson_array: {mongodb: "skunkworks"}, error_code: ErrorCodes.ConversionFailure},
     // TODO SERVER-106059 Remove this test.
     {
         invalid_bson_array: [NumberInt(5), NumberInt(6), NumberInt(200)],
