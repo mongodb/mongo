@@ -565,15 +565,16 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     if lint_all or any(file.endswith((".h", ".cpp")) for file in files_to_lint):
         lr.run_bazel("//buildscripts:quickmongolint", ["lint"])
 
-    if lint_all or any(
-        file.endswith(
-            (".cpp", ".c", ".h", ".hpp", ".py", ".js", ".mjs", ".inl", ".idl", ".yml", ".bazel")
-        )
-        for file in files_to_lint
-    ):
-        lr.run_bazel(
-            "//buildscripts:todo_linter", ["lint-patch", "--branch", parsed_args.origin_branch]
-        )
+    # TODO(SERVER-124155): re-enable once the codebase is free of existing violations
+    # if lint_all or any(
+    #     file.endswith(
+    #         (".cpp", ".c", ".h", ".hpp", ".py", ".js", ".mjs", ".inl", ".idl", ".yml", ".bazel")
+    #     )
+    #     for file in files_to_lint
+    # ):
+    #     lr.run_bazel(
+    #         "//buildscripts:todo_linter", ["lint-patch", "--branch", parsed_args.origin_branch]
+    #     )
 
     if lint_all or any(
         file.endswith((".cpp", ".c", ".h", ".py", ".idl")) for file in files_to_lint

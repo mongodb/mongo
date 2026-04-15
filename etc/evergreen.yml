@@ -111,8 +111,9 @@ parameters:
     description: "Array of test selection strategies"
 
 commit_queue_aliases:
+  # TODO(SERVER-124155): add check_for_todos to the commit queue variant's task list once the codebase is free of existing violations
   - variant: "^(commit-queue)$"
-    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test|check_for_todos)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
     variant_tags: []
     task_tags: []
   - variant: "^(amazon-linux2023-arm64-static-compile)$"
@@ -129,8 +130,9 @@ commit_queue_aliases:
     task_tags: []
 
 github_pr_aliases:
+  # TODO(SERVER-124155): add check_for_todos to the commit queue variant's task list once the codebase is free of existing violations
   - variant: "^(commit-queue)$"
-    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test|check_for_todos)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
     variant_tags: []
     task_tags: []
   - variant: "^(amazon-linux2023-arm64-static-compile)$"

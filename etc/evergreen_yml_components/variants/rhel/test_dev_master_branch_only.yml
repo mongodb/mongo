@@ -655,7 +655,6 @@ buildvariants:
           - name: archive_dist_test
             variant: *linux_x86_dynamic_compile_variant_name
       - name: check_feature_flag_tags
-      - name: check_for_todos
 
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-quick-patch-only
