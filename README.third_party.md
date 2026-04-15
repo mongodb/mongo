@@ -31,14 +31,13 @@ a notice will be included in
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer   | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                               | 7.1.3                                    |                      | ✗                               |
 | [folly]                                              | Apache-2.0                        | 2025.04.21.00                            |                      | ✗                               |
-| [gperftools]                                         | BSD-3-Clause                      | 2.9.1                                    |                      | ✗                               |
+| [gperftools]                                         | BSD-3-Clause                      | 003775aa816cb3fe01215455825245089d423a7c |                      | ✗                               |
 | [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                       | 57.1                                     | ✗                    | ✗                               |
 | [immer]                                              | BSL-1.0                           | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                      | 2.0.1                                    |                      | ✗                               |
 | [JSON Schema Store]                                  | Apache-2.0                        | 6847cfc3a17a04a7664474212db50c627e1e3408 |                      |                                 |
 | [JSON-Schema-Test-Suite]                             | MIT                               | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
-| [libmongocrypt]                                      | Apache-2.0                        | 1.8.4                                    | ✗                    | ✗                               |
-| [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | 2.0.2-RC2                                |                      | ✗                               |
+| [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | full-integration-tests                   |                      | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                         | 1.18.2                                   | ✗                    | ✗                               |
 | [libunwind]                                          | MIT                               | 1.8.1                                    |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                      | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
@@ -53,10 +52,9 @@ a notice will be included in
 | [snappy]                                             | BSD-3-Clause                      | 1.1.10                                   | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 1.0.0                                    | ✗                    | ✗                               |
 | [tcmalloc]                                           | Apache-2.0                        | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
-| [timelib]                                            | MIT                               | 2022.10                                  |                      | ✗                               |
+| [timelib]                                            | MIT                               | b7e3db4b43ec45235eeacf80b197de43d3c1d114 |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                  | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                      | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
-| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only      | 11.3.0                                   | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |
 | [zlib]                                               | Zlib                              | 1.3.1                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only      | 1.5.5                                    | ✗                    | ✗                               |
@@ -71,7 +69,6 @@ a notice will be included in
 [JSON Schema Store]: https://github.com/schemastore/schemastore.git
 [JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
 [LibTomCrypt]: https://github.com/libtom/libtomcrypt.git
-[MongoDB C Driver]: https://github.com/mongodb/mongo-c-driver.git
 [Mozilla Firefox ESR]: https://github.com/mozilla-firefox/firefox.git
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [PCRE2 - Perl-Compatible Regular Expressions]: https://github.com/pcre2project/pcre2.git
@@ -79,25 +76,38 @@ a notice will be included in
 [SafeInt]: https://github.com/dcleblanc/safeint.git
 [Snowball Stemming Algorithms (libstemmer)]: http://github.com/snowballstem/snowball.git
 [Unicode Character Database]: https://www.unicode.org/Public/8.0.0/
-[WiredTiger]: https://github.com/wiredtiger/wiredtiger.git
 [Zstandard (zstd)]: https://github.com/facebook/zstd.git
 [benchmark]: https://github.com/google/benchmark.git
 [fmt]: https://github.com/fmtlib/fmt.git
 [folly]: https://github.com/facebook/folly.git
 [gperftools]: https://github.com/gperftools/gperftools.git
 [immer]: https://github.com/arximboldi/immer.git
-[libmongocrypt]: https://github.com/mongodb/libmongocrypt.git
 [librdkafka - The Apache Kafka C/C++ library]: https://github.com/confluentinc/librdkafka.git
 [libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
-[pypi/ocspbuilder]: https://github.com/wbond/ocspbuilder
-[pypi/ocspresponder]: https://github.com/threema-ch/ocspresponder
+[pypi/ocspbuilder]: https://pypi.org/project/ocspbuilder/
+[pypi/ocspresponder]: https://pypi.org/project/ocspresponder/
 [snappy]: https://github.com/google/tcmalloc.git
 [tcmalloc]: https://github.com/google/tcmalloc.git
 [timelib]: https://github.com/derickr/timelib.git
 [valgrind.h]: https://sourceware.org/git/valgrind.git
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
+
+## WiredTiger Vendored Test Libraries
+
+The following libraries are transitively included by WiredTiger,
+and are used by that component for testing. They don't appear in
+released binary artifacts.
+
+| Name                           |
+| ------------------------------ |
+| pkg:pypi/concurrencytest@0.1.2 |
+| pkg:pypi/discover@0.4.0        |
+| pkg:pypi/extras@0.0.3          |
+| pkg:pypi/python-subunit@0.0.16 |
+| pkg:pypi/testscenarios@0.4     |
+| pkg:pypi/testtools@0.9.34      |
 
 ## Dynamically Linked Libraries
 

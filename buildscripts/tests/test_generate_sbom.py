@@ -9,16 +9,16 @@ import os
 import sys
 import unittest
 
-sys.path.append("buildscripts/sbom")
-
 from buildscripts.sbom.config import get_semver_from_release_version, regex_semver
 from buildscripts.sbom.endorctl_utils import EndorCtl
-from buildscripts.sbom.generate_sbom import is_valid_purl
+from buildscripts.sbom.sbom_utils import is_valid_purl
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
 
 class TestEndorctl(unittest.TestCase):
+    """Test cases for the EndorCtl class."""
+
     def test_endorctl_init(self):
         """Tests the Endorctl constructor."""
         e = EndorCtl(namespace="mongodb.10gen", retry_limit=1, sleep_duration=5)
@@ -34,12 +34,18 @@ class TestEndorctl(unittest.TestCase):
         e = EndorCtl(
             namespace="mongodb.10gen", endorctl_path="this_path_does_not_exist"
         )
-        result = e.get_sbom_for_project("https://github.com/10gen/mongo.git")
+        result = e.get_sbom("https://github.com/10gen/mongo.git")
         self.assertRaises(FileNotFoundError)
         self.assertIsNone(result, None)
 
 
 class TestConfigRegex(unittest.TestCase):
+    """Test suite for configuration regex patterns and PURL validation.
+
+    This test class validates regex patterns used for semantic versioning,
+    version extraction from release strings, and Package URL (PURL) validation.
+    """
+
     def test_semver_regex(self):
         """Tests the regex_semver."""
 
@@ -184,10 +190,9 @@ class TestConfigRegex(unittest.TestCase):
                 )
 
 
-__unittest = True
-
-
 class TestMetadataFile(unittest.TestCase):
+    """Unit tests for SBOM metadata file validation and version tag consistency."""
+
     TEST_DIR = os.path.join("buildscripts", "sbom")
     VERSION_TAG = "{{VERSION}}"
 
@@ -198,6 +203,13 @@ class TestMetadataFile(unittest.TestCase):
         return json.loads(sbom_json)
 
     def test_metadata_sbom_version_tags(self):
+        """Test that SBOM metadata components have consistent version tags.
+
+        Verifies that each component in the metadata SBOM file contains required fields
+        (bom-ref and version) plus at least one of purl or cpe. Additionally ensures that
+        the VERSION_TAG is either present in all component properties or absent from all,
+        maintaining consistency across bom-ref, version, purl, and cpe fields.
+        """
         sbom_metadata_file = os.path.join(self.TEST_DIR, "metadata.cdx.json")
         print(sbom_metadata_file)
         meta_bom = self.read_sbom_json_file(sbom_metadata_file)

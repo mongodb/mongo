@@ -27,27 +27,48 @@ components_remove = [
     "amokhuginnsson/replxx",
     # a transitive dependency of s2 that is not necessary to include
     "sparsehash/sparsehash",
+    # a false match under iceberg-cpp, should be resolved when iceberg-cpp is added to Endor OSS DB
+    "dmlc/xgboost",
+    # mongo-cxx-driver is mismatched to files src/mongo/db/modules/enterprise/src/audit/logger/[encoder.h,rotatable_file_writer_test.cpp]
+    # excluding the path is not preventing the component from being identified erroneously, so compensating with this exclusion in the meantime
+    "mongodb/mongo-cxx-driver",
 ]
 
 for component in components_remove:
     for prefix in prefixes:
         endor_components_remove.append(prefix + component)
 
+
+# ################ Third-Party Folder Filter ################
+
+# List of folders in src/third_party to exclude from SBOM generation warnings
+third_party_folders_remove = [
+    "src/third_party/scripts",  # this folder contains scripts related to the import process, but does not contain SBOM components itself
+    "src/third_party/private",  # this is not a real third-party folder, but rather a place for MongoDB to store private forks of third-party code. The actual SBOM components in this folder are still included.
+]
+
 # ################ Component Renaming ################
-# Endor does not have syntactically valid PURLs for C/C++ packages.
+# Endor does not always have syntactically valid PURLs for C/C++ packages.
 # e.g.,
-# Invalid: pkg:c/github.com/abseil/abseil-cpp@20250512.1
-# Valid: pkg:github/abseil/abseil-cpp@20250512.1
+#  Invalid: pkg:c/github.com/abseil/abseil-cpp@20250512.1
+#  Valid: pkg:github/abseil/abseil-cpp@20250512.1
 # Run string replacements to correct for this:
 endor_components_rename = [
     ["pkg:c/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
     ["pkg:generic/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
+    ["pkg:generic/zlib", "pkg:github/madler/zlib"],
     ["pkg:generic/zlib.net/zlib", "pkg:github/madler/zlib"],
+    ["pkg:generic/libstemmer", "pkg:github/snowballstem/snowball"],
     ["pkg:generic/tartarus.org/libstemmer", "pkg:github/snowballstem/snowball"],
+    ["pkg:generic/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
     ["pkg:generic/intel.com/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
     ["pkg:c/git.openldap.org/openldap/openldap", "pkg:generic/openldap/openldap"],
-    ["pkg:generic/github.com/", "pkg:github/"],
-    ["pkg:c/github.com/", "pkg:github/"],
+    ["pkg:generic/gitlab.gnome.org/gnome/libxml2", "pkg:generic/gnome/libxml2"],
+    ["pkg:generic/gitlab.com/bzip2/bzip2", "pkg:github/libarchive/bzip2"],
+    [
+        "pkg:generic/gitlab.com/federicomenaquintero/bzip2",
+        "pkg:github/libarchive/bzip2",
+    ],
 ]
 
 # ################ Version Transformation ################
@@ -101,7 +122,7 @@ def get_semver_from_release_version(release_ver: str) -> str:
 # region special component use-case functions
 
 
-def get_version_from_wiredtiger_release_info(wt_dir: str) -> str:
+def get_version_from_wiredtiger_release_info(wt_dir: str) -> str | None:
     """Get version from 'RELEASE_INFO' file in the wiredtiger folder"""
 
     import os
@@ -123,7 +144,7 @@ def get_version_from_wiredtiger_release_info(wt_dir: str) -> str:
         return None
 
 
-def get_version_sasl_from_workspace(file_path: str) -> str:
+def get_version_sasl_from_workspace(file_path: str) -> str | None:
     """Determine the version that is pulled for Windows Cyrus SASL by searching WORKSPACE.bazel"""
     # e.g.,
     #         "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
@@ -171,6 +192,16 @@ def process_component_special_cases(
             )
             logger.info(
                 f"VERSION SPECIAL CASE: {component_key}: Found version '{versions['import_script']}' in 'RELEASE_INFO' file"
+            )
+
+    ## Special case for opentelemetry-cpp ##
+    elif component_key == "pkg:github/open-telemetry/opentelemetry-cpp":
+        # The opentelementry import script has the mongodb-forks version ref in Major.Minor format (e.g., 1.17), which deviates from
+        # what the open-telemetry/opentelemetry-cpp project uses (v{SEMVER}). This corrects the version string by adding a '.0', if needed
+        if re.match(rf"^{RE_VER_NUM}\.{RE_VER_NUM}$", versions["import_script"]):
+            versions["import_script"] += ".0"
+            logger.info(
+                f"VERSION SPECIAL CASE: {component_key}: Adjusted import script version string to semver format: '{versions['import_script']}'"
             )
 
 
