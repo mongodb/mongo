@@ -21,6 +21,7 @@ from config import (
     endor_components_remove,
     endor_components_rename,
     get_semver_from_release_version,
+    license_replacements,
     process_component_special_cases,
     third_party_folders_remove,
 )
@@ -1053,6 +1054,27 @@ def main() -> None:
 
     # metadata.tools https://cyclonedx.org/docs/1.5/json/#metadata_tools
     meta_bom["metadata"]["tools"] = endor_bom["metadata"]["tools"]
+
+    # Apply license expression/id replacements
+    for component in meta_bom.get("components", []):
+        for license_entry in component.get("licenses", []):
+            for old, new in license_replacements:
+                if license_entry.get("expression") == old:
+                    logger.info(
+                        "LICENSE REPLACEMENT: %s: replacing expression '%s' with '%s'",
+                        component.get("bom-ref", ""),
+                        old,
+                        new,
+                    )
+                    license_entry["expression"] = new
+                if license_entry.get("license", {}).get("id") == old:
+                    logger.info(
+                        "LICENSE REPLACEMENT: %s: replacing license.id '%s' with '%s'",
+                        component.get("bom-ref", ""),
+                        old,
+                        new,
+                    )
+                    license_entry["license"]["id"] = new
 
     write_sbom_json_file(meta_bom, sbom_out_internal_path)
 

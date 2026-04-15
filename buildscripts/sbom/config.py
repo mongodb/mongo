@@ -46,6 +46,15 @@ third_party_folders_remove = [
     "src/third_party/wasmtime",  # currently no targets depend on this
 ]
 
+# ################ License Expression/ID Replacements ################
+# Some package repositories provide invalid SPDX license identifiers.
+# Define string replacements for .components[].licenses[].expression and
+# .components[].licenses[].license.id values here.
+license_replacements = [
+    # "LicenseRef-The-BSD-License" is not a valid SPDX identifier; replace with BSD-2-Clause
+    ["LicenseRef-The-BSD-License", "BSD-2-Clause"],
+]
+
 # ################ Component Renaming ################
 # Endor does not always have syntactically valid PURLs for C/C++ packages.
 # e.g.,
