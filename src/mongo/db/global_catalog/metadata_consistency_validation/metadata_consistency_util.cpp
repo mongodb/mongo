@@ -1073,13 +1073,12 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
     return inconsistencies;
 }
 
-std::vector<MetadataInconsistencyItem> _checkUniqueAndCollationIndexConsistency(
-    OperationContext* opCtx, const CollectionPtr& localColl, const CollectionType& catalogColl) {
+std::vector<MetadataInconsistencyItem> _checkShardedCollectionUniqueIndexConsistency(
+    OperationContext* opCtx,
+    const CollectionPtr& localColl,
+    const CollectionType& catalogColl,
+    const ShardId& shardId) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
-    // Uniqueness constraint is not violated on clusters with only one shard.
-    if (Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size() <= 1) {
-        return inconsistencies;
-    }
     auto& nss = localColl->ns();
     const ShardKeyPattern shardKey(catalogColl.getKeyPattern());
     auto indexCatalog = localColl->getIndexCatalog();
@@ -1093,22 +1092,19 @@ std::vector<MetadataInconsistencyItem> _checkUniqueAndCollationIndexConsistency(
             continue;
         }
 
-        auto collator = entry->getCollator();
-
-        if (CollatorInterface::isSimpleCollator(collator)) {
-            continue;
-        }
-
+        auto collator = CollatorInterface::isSimpleCollator(entry->getCollator())
+            ? BSONObj()
+            : entry->getCollator()->getSpec().toBSON();
         auto key = descriptor->keyPattern();
-        if (!shardKey.isIndexUniquenessAndCollationCompatible(key, collator->getSpec().toBSON())) {
-            auto info =
-                BSON("shardKey" << shardKey.toBSON() << "index" << descriptor->infoObj()
-                                << "incompatibility"
-                                << "Collation must be simple if the index is unique in a sharded "
-                                   "collection and the key is a prefix of the shard key");
+        if (!shardKey.isIndexUniquenessAndCollationCompatible(key, collator)) {
+            const std::string errMsg =
+                "Collation must be simple and the shard key must be a prefix of the index key if "
+                "the index is unique in a sharded collection";
+            UniqueIndexInconsistencyInfo info{descriptor->infoObj(), shardId, errMsg};
+            info.setShardKey(shardKey.toBSON());
             inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
                 MetadataInconsistencyTypeEnum::kIncompatibleUniqueIndexOnShardedCollection,
-                InconsistentIndexDetails{nss, info}));
+                InconsistentIndexDetails{nss, info.toBSON()}));
         }
     }
     return inconsistencies;
@@ -1351,11 +1347,9 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
                                                   localColl,
                                                   primaryShardId == shardId /* isPrimaryShard */,
                                                   inconsistencies);
-            // Only check on primary shard to prevent checking the same inconsistency more than
-            // once.
-            if (optionalCheckIndexes && shardId == primaryShardId) {
-                auto indexesInconsistencies =
-                    _checkUniqueAndCollationIndexConsistency(opCtx, localColl, catalogColl);
+            if (optionalCheckIndexes && !catalogColl.getUnsplittable()) {
+                auto indexesInconsistencies = _checkShardedCollectionUniqueIndexConsistency(
+                    opCtx, localColl, catalogColl, shardId);
 
                 inconsistencies.insert(inconsistencies.end(),
                                        std::make_move_iterator(indexesInconsistencies.begin()),

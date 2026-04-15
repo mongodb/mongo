@@ -604,3 +604,21 @@ structs:
                 description: "Check that in the presence of outstanding range deletion tasks a shard key index must exists"
                 type: safeBool
                 default: false
+
+    UniqueIndexInconsistencyInfo:
+        description: "Details about unique index misconfiguration."
+        strict: false
+        fields:
+            index:
+                type: object
+                description: "Index with the issue."
+            shard:
+                type: shard_id
+                description: "Shard id where the issue was found."
+            issue:
+                type: string
+                description: "Uniqueness issue found."
+            shardKey:
+                type: object
+                description: "Collection shard key."
+                optional: true
