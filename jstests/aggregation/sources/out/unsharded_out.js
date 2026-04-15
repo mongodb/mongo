@@ -7,6 +7,7 @@
 
 // server-3253 Unsharded support for $out
 import {anyEq, assertErrorCode, collectionExists} from "jstests/aggregation/extras/utils.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const testDb = db.getSiblingDB("unsharded_out");
 let input = testDb.unsharded_out_in;
@@ -19,13 +20,19 @@ inputDoesntExist.drop(); // never created
 output.drop();
 
 function getOutputIndexes() {
-    return output.getIndexes().sort(function (a, b) {
-        if (a.name < b.name) {
-            return -1;
-        } else {
-            return 1;
-        }
-    });
+    return output
+        .getIndexes()
+        .map(function (index) {
+            // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+            return IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, index);
+        })
+        .sort(function (a, b) {
+            if (a.name < b.name) {
+                return -1;
+            } else {
+                return 1;
+            }
+        });
 }
 
 function test(input, pipeline, expected) {

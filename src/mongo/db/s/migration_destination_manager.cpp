@@ -926,6 +926,15 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
             continue;
         }
 
+        // The listIndexes command always includes a 'collation' field in its output. However,
+        // unless 'expandSimpleCollation' is true, the caller expects a normalized index
+        // specification, in which case the 'collation' field should be omitted when it
+        // represents the simple collation. Apply normalization here to ensure compatibility
+        // with storage index specs.
+        // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs
+        // compatible with the storage format.
+        spec = IndexCatalog::normalizeIndexSpecFromListIndexes(spec);
+
         if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName];
             indexNameElem.type() == BSONType::string &&
             indexNameElem.valueStringData() == IndexConstants::kIdIndexName) {
@@ -1044,15 +1053,25 @@ namespace {
  */
 void _dropLocalIndexes(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       const std::vector<BSONObj>& indexSpecs) {
+                       const std::vector<BSONObj>& donorIndexSpecs) {
     // Determine which indexes exist on the local collection that don't exist on the donor's
     // collection.
     DBDirectClient client(opCtx);
     auto indexes = listIndexesEmptyListIfMissing(
         opCtx, nss, ListIndexesInclude::kNothing, /*isRawDataRequest=*/true);
-    for (auto&& recipientIndex : indexes) {
+
+    // The listIndexes command always includes a 'collation' field in each index spec as of
+    // SERVER-89953, even if it has a simple collation. In contrast, `donorIndexSpecs` are
+    // normalized, which means that the 'collation' field is omitted when it is a simple collation.
+    // Therefore, we normalize the listIndexes output here to enable direct comparison between both
+    // formats.
+    // TODO (SERVER-119573): Remove this normalization once listIndexes output matches storage
+    // format.
+    const auto& normalizedSpecs = IndexCatalog::normalizeIndexSpecsFromListIndexes(indexes);
+
+    for (auto&& recipientIndex : normalizedSpecs) {
         bool dropIndex = true;
-        for (auto&& donorIndex : indexSpecs) {
+        for (auto&& donorIndex : donorIndexSpecs) {
             if (recipientIndex.woCompare(donorIndex) == 0) {
                 dropIndex = false;
                 break;

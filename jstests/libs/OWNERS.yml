@@ -111,3 +111,6 @@ filters:
   - "release_memory_util.js":
     approvers:
       - 10gen/query-execution
+  - "index_catalog_helpers.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

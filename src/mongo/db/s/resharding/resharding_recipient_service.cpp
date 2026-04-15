@@ -1342,7 +1342,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 .then([this, factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
                     if (auto opCtx = _makeOperationContext(factory);
                         resharding::gReshardingIndexVerification.load()) {
-                        auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
+                        auto [normalizedSourceIdxSpecs, _] = _externalState->getCollectionIndexes(
                             opCtx.get(),
                             _metadata.getSourceNss(),
                             _metadata.getSourceUUID(),
@@ -1355,10 +1355,22 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                                           _metadata.getTempReshardingNss(),
                                                           ListIndexesInclude::kNothing,
                                                           /*isRawDataRequest=*/true);
-                        resharding::verifyIndexSpecsMatch(sourceIdxSpecs.cbegin(),
-                                                          sourceIdxSpecs.cend(),
-                                                          tempCollIdxSpecs.cbegin(),
-                                                          tempCollIdxSpecs.cend());
+
+                        // The listIndexes command always includes a 'collation' field in each index
+                        // spec as of SERVER-89953, even if it represents the simple collation. In
+                        // contrast, getCollectionIndexes() returns normalized specs where the
+                        // 'collation' field is omitted when it is a simple collation. Therefore, we
+                        // normalize the listIndexes output here to enable direct comparison between
+                        // both formats.
+                        // TODO (SERVER-119573): Remove this normalization once listIndexes output
+                        // matches storage format.
+                        const auto& normalizedTempCollIdxSpecs =
+                            IndexCatalog::normalizeIndexSpecsFromListIndexes(tempCollIdxSpecs);
+
+                        resharding::verifyIndexSpecsMatch(normalizedSourceIdxSpecs.cbegin(),
+                                                          normalizedSourceIdxSpecs.cend(),
+                                                          normalizedTempCollIdxSpecs.cbegin(),
+                                                          normalizedTempCollIdxSpecs.cend());
                     }
                     _transitionToApplying(factory);
                 });

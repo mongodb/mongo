@@ -445,7 +445,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj getIndexSpec(StringData indexName) const override {
+    BSONObj getIndexSpec(StringData indexName, bool expandSimpleCollation) const override {
         MONGO_UNREACHABLE;
     }
 

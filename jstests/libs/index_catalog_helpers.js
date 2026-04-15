@@ -1,3 +1,6 @@
+import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 /**
  * Helper functions that help test things to do with the index catalog.
  */
@@ -46,9 +49,10 @@ export var IndexCatalogHelpers = (function () {
 
         const foundByKeyPatternAndCollation = foundByKeyPattern.filter((spec) => {
             if (collation.locale === "simple") {
-                // The simple collation is not explicitly stored in the index catalog, so we expect
-                // the "collation" field to be absent.
-                return !spec.hasOwnProperty("collation");
+                // The simple collation is not returned by listIndexes on older versions.
+                // On newer versions, the simple collation is always returned by listIndexes.
+                // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+                return !spec.hasOwnProperty("collation") || spec.collation.locale === "simple";
             }
             return bsonWoCompare(spec.collation, collation) === 0;
         });
@@ -82,10 +86,97 @@ export var IndexCatalogHelpers = (function () {
         );
     }
 
+    /**
+     * Converts the index specs returned by listIndexes to the storage index format by stripping out
+     * the 'collation' field if it is a simple collation.
+     *
+     * As of SERVER-89953, every index spec returned by listIndexes includes a 'collation' field,
+     * even when it is just the default "simple" collation. However, the format stored in the catalog
+     * omits the 'collation' field for simple collations.
+     *
+     * TODO (SERVER-119573): Remove this utility once listIndexes output is consistent with storage.
+     */
+    function convertListIndexesResponseToStorageIndexFormat(indexes) {
+        return indexes.map((index) => {
+            if (index.collation && index.collation.locale === "simple") {
+                const {collation, ...rest} = index;
+                return rest;
+            }
+            return index;
+        });
+    }
+
+    /**
+     * Returns true if listIndexes always includes the simple collation in index specs.
+     *
+     * In FCV upgrade/downgrade suites, listIndexes may not include the simple collation if the feature
+     * flag was not enabled in the lastLTS FCV. This function handles both stable and upgrade/downgrade
+     * suite contexts.
+     *
+     * TODO (SERVER-122417): Remove this function once v9.0 branches out.
+     */
+    function listIndexesIncludesSimpleCollation(db) {
+        if (isStableFCVSuite()) {
+            return FeatureFlagUtil.isPresentAndEnabled(db, "ListIndexesAlwaysIncludesSimpleCollation");
+        }
+
+        // In FCV upgrade/downgrade suite, the flag is reliably enabled only if it has been enabled since
+        // lastLTS (e.g., flag released in FCV 9.0, running binary 9.1 with FCV 9.0 - 9.1
+        // upgrade/downgrade suite --> always includes simple collation).
+        const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db.getMongo(), "ListIndexesAlwaysIncludesSimpleCollation");
+        return flagDoc && flagDoc.value && MongoRunner.compareBinVersions(lastLTSFCV, flagDoc.version) >= 0;
+    }
+
+    /**
+     * Ensures an index spec includes {locale: "simple"} collation if missing from listIndexes output.
+     *
+     * listIndexes may omit the explicit simple collation in downgrade/upgrade FCV suites where the
+     * relevant feature flag was not enabled in the lastLTS FCV. This helper adds it if needed to
+     * standardize index specs for comparison and correctness across test environments.
+     *
+     * TODO (SERVER-122417): Remove this function once v9.0 branches out.
+     */
+    function addSimpleCollationToIndexIfMissing(db, index) {
+        if (listIndexesIncludesSimpleCollation(db)) {
+            return index;
+        }
+
+        let indexWithSimpleCollation = {...index};
+        if (!index.collation) {
+            indexWithSimpleCollation.collation = {locale: "simple"};
+        }
+        if (index.originalSpec && !index.originalSpec.collation) {
+            indexWithSimpleCollation.originalSpec.collation = {locale: "simple"};
+        }
+        return indexWithSimpleCollation;
+    }
+
+    /**
+     * Ensures the given list of index specs includes {locale: "simple"} collation if missing from
+     * listIndexes output.
+     *
+     * listIndexes may omit the explicit simple collation in downgrade/upgrade FCV suites where the
+     * relevant feature flag was not enabled in the lastLTS FCV. This helper adds it if needed to
+     * standardize index specs for comparison and correctness across test environments.
+     *
+     * TODO (SERVER-122417): Remove this function once v9.0 branches out.
+     */
+    function addSimpleCollationToIndexesIfMissing(db, indexes) {
+        if (listIndexesIncludesSimpleCollation(db)) {
+            return indexes;
+        }
+        return indexes.map((index) => addSimpleCollationToIndexIfMissing(db, index));
+    }
+
     return {
         findByName: getIndexSpecByName,
         findByKeyPattern: getIndexSpecByKeyPattern,
         createSingleIndex: createSingleIndex,
         createIndexAndVerifyWithDrop: createIndexAndVerifyWithDrop,
+        // TODO (SERVER-119573): Remove this utility once listIndexes output is consistent with storage.
+        convertListIndexesResponseToStorageIndexFormat: convertListIndexesResponseToStorageIndexFormat,
+        // TODO (SERVER-122417): Remove these utilities once v9.0 branches out.
+        addSimpleCollationToIndexIfMissing: addSimpleCollationToIndexIfMissing,
+        addSimpleCollationToIndexesIfMissing: addSimpleCollationToIndexesIfMissing,
     };
 })();

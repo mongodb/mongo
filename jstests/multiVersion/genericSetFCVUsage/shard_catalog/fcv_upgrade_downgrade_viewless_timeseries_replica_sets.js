@@ -10,6 +10,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (lastLTSFCV != "8.0") {
     print("Skipping test because last LTS FCV is no longer 8.0");
@@ -31,6 +32,13 @@ assert.commandWorked(coll.insertOne({t: ISODate(), m: 123}));
 
 const expectedViewlessMetadata = coll.getMetadata();
 const expectedIndexes = coll.getIndexes();
+if (!FeatureFlagUtil.isEnabled(db, "ListIndexesAlwaysIncludesSimpleCollation")) {
+    expectedIndexes.map((index) => {
+        if (!index.collation) {
+            index.collation = {locale: "simple"};
+        }
+    });
+}
 
 // Check that the collection can be converted to viewful timeseries and back to viewless.
 function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat}) {
@@ -55,7 +63,16 @@ function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat}) {
         assert.docEq(expectedViewfulMetadata, nodeColl.getMetadata());
         assert.eq(expectedViewlessMetadata.info.uuid, getTimeseriesBucketsColl(nodeColl).getUUID());
     }
-    assert.docEq(expectedIndexes, nodeColl.getIndexes());
+
+    let actualIndexes = nodeColl.getIndexes();
+    if (!FeatureFlagUtil.isEnabled(db, "ListIndexesAlwaysIncludesSimpleCollation")) {
+        actualIndexes.map((index) => {
+            if (!index.collation) {
+                index.collation = {locale: "simple"};
+            }
+        });
+    }
+    assert.docEq(expectedIndexes, actualIndexes);
 
     // The data is still accessible
     assert.eq(2, nodeColl.countDocuments({}));

@@ -441,8 +441,16 @@ void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
 
 std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
     const NamespaceString& nss) const {
-    return listIndexesEmptyListIfMissing(
+    const auto indexes = listIndexesEmptyListIfMissing(
         _opCtx, nss, ListIndexesInclude::kNothing, /*isRawDataRequest=*/true);
+
+    // The listIndexes command always includes a 'collation' field in its output as of SERVER-89953.
+    // However, the caller expects a normalized index specification, in which case the 'collation'
+    // field should be omitted when it represents the simple collation. Apply normalization here to
+    // ensure compatibility with storage index specs.
+    // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs compatible
+    // with the storage format.
+    return IndexCatalog::normalizeIndexSpecsFromListIndexes(indexes);
 }
 
 void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(

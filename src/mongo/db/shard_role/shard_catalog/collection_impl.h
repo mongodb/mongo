@@ -385,7 +385,7 @@ public:
 
     int getCompletedIndexCount() const final;
 
-    BSONObj getIndexSpec(StringData indexName) const final;
+    BSONObj getIndexSpec(StringData indexName, bool expandSimpleCollation) const final;
 
     void getAllIndexes(std::vector<std::string>* names) const final;
 

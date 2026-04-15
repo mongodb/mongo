@@ -185,8 +185,6 @@ public:
 
     /**
      * Sets a RequestMetadataWriter on this connection.
-     *
-     * TODO: support multiple metadata writers.
      */
     virtual void setRequestMetadataWriter(rpc::RequestMetadataWriter writer);
 
@@ -198,8 +196,6 @@ public:
 
     /**
      * Sets a ReplyMetadataReader on this connection.
-     *
-     * TODO: support multiple metadata readers.
      */
     virtual void setReplyMetadataReader(rpc::ReplyMetadataReader reader);
 
@@ -465,7 +461,16 @@ public:
 
     /**
      * Lists indexes on the collection 'nsOrUuid'.
+     *
      * Includes in-progress indexes.
+     *
+     * Returned index specifications are not normalized: the 'collation' field is always included,
+     * even when its value is simple. In contrast, in normalized index specifications, the simple
+     * collation is typically omitted.
+     * For cloning purposes, these index specs can be used directly
+     * with a createIndexes-style command, since normalization will occur automatically on the
+     * server. However, they should not be used to create a new index if the normalization step is
+     * bypassed.
      *
      * If 'includeBuildUUIDs' is true, in-progress index specs will have the following format:
      * {

@@ -37,15 +37,23 @@ const validateCompoundSecondaryIndexes = function (db, coll, clusterKey) {
 const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOptions) {
     const clusterKey = fullCreateOptions.clusteredIndex.key;
 
-    const listIndexes0 = assert.commandWorked(db[collName].runCommand("listIndexes"));
-    const listIndexesClusteredIndex = listIndexes0.cursor.firstBatch[0];
+    const listIndexes0 = db[collName].getIndexes();
+    const listIndexesClusteredIndex = listIndexes0[0];
 
     // Expect listIndexes to append the 'clustered' field to it's clusteredIndex output.
     assert.docEq(listIndexesClusteredIndex.key, clusterKey);
     assert.eq(listIndexesClusteredIndex.clustered, true);
 
     // no-op with the 'clustered' option.
-    assert.commandWorked(db[collName].runCommand({createIndexes: collName, indexes: [listIndexesClusteredIndex]}));
+
+    // Remove the 'collation' field from the clustered index spec, since specifying a collation is
+    // not allowed for clustered indexes. This is because clustered indexes are always getting the
+    // collection's default collation.
+    let clusteredIndexSpec = {...listIndexesClusteredIndex};
+    if (clusteredIndexSpec.collation) {
+        delete clusteredIndexSpec.collation;
+    }
+    assert.commandWorked(db[collName].runCommand({createIndexes: collName, indexes: [clusteredIndexSpec]}));
 
     // no-op without the 'clustered' option.
     assert.commandWorked(db[collName].createIndex(clusterKey));
@@ -65,9 +73,9 @@ const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOption
     );
 
     // The listIndexes output should be unchanged.
-    const listIndexes1 = assert.commandWorked(db[collName].runCommand("listIndexes"));
-    assert.eq(listIndexes1.cursor.firstBatch.length, 1);
-    assert.docEq(listIndexes1.cursor.firstBatch[0], listIndexes0.cursor.firstBatch[0]);
+    const listIndexes1 = db[collName].getIndexes();
+    assert.eq(listIndexes1.length, 1);
+    assert.docEq(listIndexes1[0], listIndexes0[0]);
 };
 
 // It is illegal to drop the clusteredIndex. Verify that the various ways of dropping the

@@ -5,6 +5,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -37,7 +38,7 @@ function makeCorrectCommand(sourceColl, destColl) {
         internalRenameIfOptionsAndIndexesMatch: 1,
         from: sourceColl.getFullName(),
         to: destColl.getFullName(),
-        indexes: destColl.getIndexes(),
+        indexes: IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(destColl.getIndexes()),
         collectionOptions: collectionOptions,
         databaseVersion: dbVersion,
     };

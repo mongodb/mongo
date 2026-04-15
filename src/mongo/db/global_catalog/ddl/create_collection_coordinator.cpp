@@ -2112,9 +2112,16 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
         listIndexes.toBSON(),
         Milliseconds(-1));
 
-    indexes = std::move(uassertStatusOK(swIndexResponse).docs);
+    // The listIndexes command always includes a 'collation' field in its output as of SERVER-89953.
+    // However, the participant shards are expecting a normalized index specification, in which case
+    // the 'collation' field should be omitted when it represents the simple collation. Apply
+    // normalization here to be able to recreate the indexes on the participant shards.
+    // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs compatible
+    // with the storage format.
+    const auto normalizedIndexes = IndexCatalog::normalizeIndexSpecsFromListIndexes(
+        std::move(uassertStatusOK(swIndexResponse).docs));
 
-    return {optionsBob.obj(), std::move(indexes), idIndex};
+    return {optionsBob.obj(), std::move(normalizedIndexes), idIndex};
 }
 
 void CreateCollectionCoordinator::_createCollectionOnParticipants(

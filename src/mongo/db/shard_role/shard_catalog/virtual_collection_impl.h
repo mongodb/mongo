@@ -426,7 +426,7 @@ public:
         return 0;
     }
 
-    BSONObj getIndexSpec(StringData indexName) const final {
+    BSONObj getIndexSpec(StringData indexName, bool expandSimpleCollation) const final {
         return BSONObj();
     }
 

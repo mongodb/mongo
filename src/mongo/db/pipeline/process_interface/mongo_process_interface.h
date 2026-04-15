@@ -288,7 +288,13 @@ public:
 
     /**
      * Returns the complete set of index specifications for the given namespace.
+     *
      * For timeseries collections, returns index specs in their raw format.
+     *
+     * Returned indexes are in normalized form: if the index uses the simple collation, the
+     * 'collation' field is omitted. Note that because of this normalization, these index specs
+     * cannot be passed directly to a createIndexes user-like command because attempting to
+     * normalize an already-normalized spec is not supported.
      */
     virtual std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
                                                const NamespaceString& ns,

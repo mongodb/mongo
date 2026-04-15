@@ -559,7 +559,17 @@ public:
      * collation spec in cases where the index spec specifies a collation, and will add the
      * collection-default collation, if present, in cases where collation is omitted. If the index
      * spec omits the collation and the collection does not have a default, the collation field is
-     * omitted from the spec.
+     * omitted from the spec. Additionally, if the resolved collation is {locale: "simple"}, the
+     * returned normalized spec will not include a collation field.
+     *
+     * Clarification: For a non-normalized index spec, if the collation field is missing, it is
+     * treated as the collection's default collation. For a normalized index spec, if the collation
+     * field is missing, it indicates a simple collation.
+     * TODO (SERVER-119573): Review and update the above paragraph if collation normalization logic
+     * changes.
+     *
+     * WARNING: Do not call this function on an already normalized spec: it may incorrectly apply
+     * the collection’s default collation when a simple collation was explicitly requested.
      *
      * This function throws on error.
      */
@@ -569,6 +579,24 @@ public:
     static std::vector<BSONObj> normalizeIndexSpecs(OperationContext* opCtx,
                                                     const CollectionPtr& collection,
                                                     const std::vector<BSONObj>& indexSpecs);
+
+    /**
+     * Helper function that converts index specs returned by listIndexes into normalized index specs
+     * for storage in the catalog. Index specs from listIndexes always include a collation field,
+     * but normalized specs should omit the collation field when it represents the simple collation
+     * (i.e., {locale: "simple"}).
+     * In summary, this function strips the collation field if it is {locale: "simple"}.
+     * TODO (SERVER-119573): Remove this methods once the catalog stores simple collation
+     * explicitly.
+     *
+     * WARNING: Do not call this function on an already normalized spec: it may incorrectly apply
+     * the collection’s default collation when a simple collation was explicitly requested.
+     */
+    // TODO (SERVER-122859): Remove this helper function once IndexBuildsCoordinator is updated to
+    // always expect an explicit collation in index specs, including when the collation is simple.
+    static std::vector<BSONObj> normalizeIndexSpecsFromListIndexes(
+        const std::vector<BSONObj>& indexSpecs);
+    static BSONObj normalizeIndexSpecFromListIndexes(const BSONObj& indexSpec);
 
     /**
      * Checks if the given index spec could be created in this catalog after normalizing it,

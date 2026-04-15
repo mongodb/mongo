@@ -112,11 +112,20 @@ std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExec
 std::vector<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
                                                                    const NamespaceString& ns,
                                                                    bool includeBuildUUIDs) {
-    return listIndexesEmptyListIfMissing(opCtx,
-                                         ns,
-                                         includeBuildUUIDs ? ListIndexesInclude::kBuildUUID
-                                                           : ListIndexesInclude::kNothing,
-                                         /*isRawDataRequest=*/true);
+
+    const auto indexes = listIndexesEmptyListIfMissing(
+        opCtx,
+        ns,
+        includeBuildUUIDs ? ListIndexesInclude::kBuildUUID : ListIndexesInclude::kNothing,
+        /*isRawDataRequest=*/true);
+
+    // The listIndexes command always includes a 'collation' field in its output as of SERVER-89953.
+    // However, the caller expects a normalized index specification, in which case the 'collation'
+    // field should be omitted when it represents the simple collation. Apply normalization here to
+    // ensure compatibility with storage index specs.
+    // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs compatible
+    // with the storage format.
+    return IndexCatalog::normalizeIndexSpecsFromListIndexes(indexes);
 }
 
 std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsActingAsRouter(

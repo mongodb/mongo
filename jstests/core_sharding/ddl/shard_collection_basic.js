@@ -8,6 +8,7 @@
 
 import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 let kDbName = db.getName();
@@ -402,7 +403,11 @@ db.foo.drop();
 assert.commandWorked(db.createCollection("foo", {collation: {locale: "en_US"}}));
 assert.commandWorked(db.adminCommand({shardCollection: kDbName + ".foo", key: {a: 1}, collation: {locale: "simple"}}));
 let indexSpec = getIndexSpecByName(db.foo, "a_1");
-assert(!indexSpec.hasOwnProperty("collation"));
+
+// TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+indexSpec = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, indexSpec);
+
+assert.eq(indexSpec.collation.locale, "simple");
 
 jsTestLog(
     "shardCollection should succeed for the key pattern {a: 1} if there are two indexes on {a: 1} and one has the simple collation.",
@@ -448,7 +453,11 @@ assert.commandWorked(db.createCollection("foo"));
 assert.commandWorked(sh.shardCollection(kDbName + ".foo", {a: 1}));
 indexSpec = getIndexSpecByName(db.foo, "a_1");
 assert(!indexSpec.hasOwnProperty("unique"), tojson(indexSpec));
-assert(!indexSpec.hasOwnProperty("collation"), tojson(indexSpec));
+
+// TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+indexSpec = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, indexSpec);
+
+assert.eq(indexSpec.collation.locale, "simple", tojson(indexSpec));
 
 jsTestLog('shardCollection() propagates the value for "unique".');
 db.foo.drop();
@@ -477,7 +486,11 @@ assert.commandWorked(db.createCollection("foo"));
 assert.commandFailed(sh.shardCollection(kDbName + ".foo", {a: 1}, false, {collation: {locale: "en_US"}}));
 assert.commandWorked(sh.shardCollection(kDbName + ".foo", {a: 1}, false, {collation: {locale: "simple"}}));
 indexSpec = getIndexSpecByName(db.foo, "a_1");
-assert(!indexSpec.hasOwnProperty("collation"), tojson(indexSpec));
+
+// TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+indexSpec = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, indexSpec);
+
+assert.eq(indexSpec.collation.locale, "simple", tojson(indexSpec));
 
 db.foo.drop();
 assert.commandWorked(db.createCollection("foo", {collation: {locale: "en_US"}}));
@@ -485,4 +498,8 @@ assert.commandFailed(sh.shardCollection(kDbName + ".foo", {a: 1}));
 assert.commandFailed(sh.shardCollection(kDbName + ".foo", {a: 1}, false, {collation: {locale: "en_US"}}));
 assert.commandWorked(sh.shardCollection(kDbName + ".foo", {a: 1}, false, {collation: {locale: "simple"}}));
 indexSpec = getIndexSpecByName(db.foo, "a_1");
-assert(!indexSpec.hasOwnProperty("collation"), tojson(indexSpec));
+
+// TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+indexSpec = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, indexSpec);
+
+assert.eq(indexSpec.collation.locale, "simple", tojson(indexSpec));

@@ -10,6 +10,7 @@
 
 import {validateClusteredCollectionHint} from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collatedName = "clustered_collection_with_collation";
@@ -56,7 +57,7 @@ const expectedCollation = {
 const indexes = collated.getIndexes();
 assert.eq(0, bsonWoCompare(indexes[0].collation, expectedCollation), "Default index doesn't match expected collation");
 
-// No collation spec when it's set to "simple".
+// Collation spec for "simple" is now explicitly included.
 assertDropCollection(db, "simpleCollation");
 assert.commandWorked(
     db.createCollection("simpleCollation", {
@@ -64,8 +65,9 @@ assert.commandWorked(
         collation: {locale: "simple"},
     }),
 );
-const indexSpec = db.simpleCollation.getIndexes()[0];
-assert(!indexSpec.hasOwnProperty("collation"), 'Default index has collation for "simple" locale');
+// TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+const indexSpec = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, db.simpleCollation.getIndexes()[0]);
+assert.eq(indexSpec.collation.locale, "simple", "Default index should have simple collation");
 
 const insertDocuments = function (coll) {
     assert.commandWorked(coll.insert({_id: 5}));

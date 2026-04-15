@@ -48,6 +48,12 @@ enum class MONGO_MOD_NEEDS_REPLACEMENT ListIndexesInclude { kNothing, kBuildUUID
 /**
  * Returns the list of indexes for the given collection.
  *
+ * Returned index specifications are not normalized: the 'collation' field is always included, even
+ * when its value is simple. In contrast, in normalized index specifications, the simple collation
+ * is typically omitted. For cloning purposes, these index specs can be used directly with a
+ * createIndexes-style command, since normalization will occur automatically on the server. However,
+ * they should not be used to create a new index if the normalization step is bypassed.
+ *
  * If 'isRawDataRequest' is true, indexes on timeseries collections are returned as raw bucket
  * indexes (i.e. using internal bucket field names such as {control.min.x: 1, control.max.x: 1})
  * rather than being translated to their user-visible timeseries form (e.g. {x: 1}).
@@ -63,6 +69,12 @@ MONGO_MOD_PRIVATE std::vector<BSONObj> listIndexesInLock(
  * Retrieves all index specifications for the specified collection.
  *
  * If the collection does not exist, returns an empty list.
+ *
+ * Returned index specifications are not normalized: the 'collation' field is always included, even
+ * when its value is simple. In contrast, in normalized index specifications, the simple collation
+ * is typically omitted. For cloning purposes, these index specs can be used directly with a
+ * createIndexes-style command, since normalization will occur automatically on the server. However,
+ * they should not be used to create a new index if the normalization step is bypassed.
  *
  * If 'isRawDataRequest' is true, indexes on timeseries collections are returned as raw bucket
  * indexes (i.e. using internal bucket field names such as {control.min.x: 1, control.max.x: 1})

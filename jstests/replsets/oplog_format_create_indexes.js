@@ -16,7 +16,7 @@ const oplogColl = primary.getDB("local").oplog.rs;
 
 function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
     assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
-    const allIndexes = coll.getIndexes();
+    const allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(coll.getIndexes());
     const indexSpec = IndexCatalogHelpers.findByKeyPattern(allIndexes, keyPattern);
 
     assert.neq(null, indexSpec, "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));

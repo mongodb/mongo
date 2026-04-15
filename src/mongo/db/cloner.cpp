@@ -631,7 +631,20 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
         auto indexSpecs = uassertStatusOK(
             getConn()->runExhaustiveCursorCommand(nss.dbName(), listIndexesCmd.toBSON()));
 
-        collectionIndexSpecs[params.collectionName] = indexSpecs;
+        // The listIndexes command always includes a 'collation' field in its output as of
+        // SERVER-89953.
+        // However, here we are expecting a normalized index specification, in which case the
+        // 'collation' field should be omitted when it represents the simple collation. Apply
+        // normalization here to be able to clone the indexes using the expected format.
+        // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs compatible
+        // with the storage format.
+        std::list<BSONObj> normalizedIndexSpecs;
+        for (const auto& indexSpec : indexSpecs) {
+            normalizedIndexSpecs.emplace_back(
+                IndexCatalog::normalizeIndexSpecFromListIndexes(indexSpec));
+        }
+
+        collectionIndexSpecs[params.collectionName] = normalizedIndexSpecs;
 
         if (params.idIndexSpec.isEmpty()) {
             params.idIndexSpec = _getIdIndexSpec(indexSpecs);

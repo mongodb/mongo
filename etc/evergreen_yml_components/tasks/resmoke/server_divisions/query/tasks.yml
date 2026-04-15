@@ -2701,8 +2701,7 @@ tasks:
           resmoke_args: >-
             --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
             --runNoFeatureFlagTests
-          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev d4c83dd
-
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 68fe9b4
   # jstestfuzz standalone update time-series generational fuzzer ##
   - <<: *jstestfuzz_template
     name: update_timeseries_fuzzer_gen

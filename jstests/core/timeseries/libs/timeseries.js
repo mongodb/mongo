@@ -32,9 +32,9 @@ const bucketReopeningsFailedCounters = Object.freeze({
 export var TimeseriesTest = class {
     static verifyAndDropIndex(coll, shouldHaveOriginalSpec, indexName) {
         const checkIndexSpec = function (spec, userIndex) {
-            assert(spec.hasOwnProperty("v"));
-            assert(spec.hasOwnProperty("name"));
-            assert(spec.hasOwnProperty("key"));
+            assert(spec.hasOwnProperty("v"), indexName);
+            assert(spec.hasOwnProperty("name"), indexName);
+            assert(spec.hasOwnProperty("key"), indexName);
 
             if (userIndex) {
                 assert(!spec.hasOwnProperty("originalSpec"));
@@ -42,13 +42,13 @@ export var TimeseriesTest = class {
             }
 
             if (shouldHaveOriginalSpec) {
-                assert(spec.hasOwnProperty("originalSpec"));
-                assert.eq(spec.v, spec.originalSpec.v);
-                assert.eq(spec.name, spec.originalSpec.name);
-                assert.neq(spec.key, spec.originalSpec.key);
-                assert.eq(spec.collation, spec.originalSpec.collation);
+                assert(spec.hasOwnProperty("originalSpec"), indexName);
+                assert.eq(spec.v, spec.originalSpec.v, indexName);
+                assert.eq(spec.name, spec.originalSpec.name, indexName);
+                assert.neq(spec.key, spec.originalSpec.key, indexName);
+                assert.eq(spec.collation, spec.originalSpec.collation, indexName);
             } else {
-                assert(!spec.hasOwnProperty("originalSpec"));
+                assert(!spec.hasOwnProperty("originalSpec"), indexName);
             }
         };
         let sawIndex = false;

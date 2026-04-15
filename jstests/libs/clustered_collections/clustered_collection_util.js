@@ -1,3 +1,5 @@
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+
 /**
  * Utilities for testing clustered collections.
  */
@@ -67,7 +69,17 @@ export var ClusteredCollectionUtil = class {
     // The clusteredIndex should appear in listIndexes with additional "clustered" field.
     static validateListIndexes(db, collName, createOptions) {
         const fullCreateOptions = ClusteredCollectionUtil.constructFullCreateOptions(createOptions);
-        const listIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
+
+        // TODO (SERVER-119573) Remove this workaround once listIndexes output matches storage format.
+        if (!fullCreateOptions.clusteredIndex.collation) {
+            fullCreateOptions.clusteredIndex.collation = {locale: "simple"};
+        }
+
+        let index = db[collName].getIndexes()[0];
+
+        // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
+        index = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, index);
+
         let extraData = {clustered: true};
         // ttl is not stored on the clusteredIndex but on the collection info. Therefore, we have to
         // add it back in this check to match the getIndexes output.
@@ -75,7 +87,7 @@ export var ClusteredCollectionUtil = class {
             extraData.expireAfterSeconds = createOptions.expireAfterSeconds;
         }
         const expectedListIndexesOutput = Object.extend(extraData, fullCreateOptions.clusteredIndex);
-        assert.docEq(expectedListIndexesOutput, listIndexes.cursor.firstBatch[0]);
+        assert.docEq(expectedListIndexesOutput, index);
     }
 
     static testBasicClusteredCollection(db, collName, clusterKey) {

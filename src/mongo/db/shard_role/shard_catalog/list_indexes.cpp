@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -88,6 +89,11 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
     const bool convertBucketsIndexesToTimeseriesIndexes =
         collection->isTimeseriesCollection() && !isRawDataRequest;
 
+    const bool expandSimpleCollation =
+        feature_flags::gFeatureFlagListIndexesAlwaysIncludesSimpleCollation.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
     if (collection->isClustered() && !collection->isTimeseriesCollection()) {
         BSONObj collation;
         if (auto collator = collection->getDefaultCollator()) {
@@ -96,7 +102,8 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
         auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
             collection->getClusteredInfo().value(),
             collation,
-            collection->getCollectionOptions().expireAfterSeconds);
+            collection->getCollectionOptions().expireAfterSeconds,
+            expandSimpleCollation);
         if (additionalInclude == ListIndexesInclude::kIndexBuildInfo) {
             indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
         } else {
@@ -104,7 +111,7 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
         }
     }
     for (size_t i = 0; i < indexNames.size(); i++) {
-        auto spec = collection->getIndexSpec(indexNames[i]);
+        auto spec = collection->getIndexSpec(indexNames[i], expandSimpleCollation);
         if (convertBucketsIndexesToTimeseriesIndexes) {
             auto timeseriesSpec = timeseries::createTimeseriesIndexFromBucketsIndex(
                 *collection->getTimeseriesOptions(), spec);

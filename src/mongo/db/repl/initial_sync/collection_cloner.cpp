@@ -294,8 +294,16 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
     const auto storageEngine = getGlobalServiceContext()->getStorageEngine();
     // Parse the index specs into their respective state, ready or unfinished.
     for (auto&& spec : indexSpecs) {
-        // Sanitize storage engine options to remove options which might not apply to this node. See
-        // SERVER-68122.
+        // The listIndexes command always includes a 'collation' field in its output as of
+        // SERVER-89953. However, here we are expecting a normalized index specification, in which
+        // case the 'collation' field should be omitted when it represents the simple collation.
+        // Apply normalization here to be able to clone the indexes using the expected format.
+        // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs compatible
+        // with the storage format.
+        spec = IndexCatalog::normalizeIndexSpecFromListIndexes(spec);
+
+        // Sanitize storage engine options to remove options which might not apply to this node.
+        // See SERVER-68122.
         if (auto storageEngineElem = spec.getField(IndexDescriptor::kStorageEngineFieldName)) {
             auto sanitizedStorageEngineOpts =
                 storageEngine->getSanitizedStorageOptionsForSecondaryReplication(

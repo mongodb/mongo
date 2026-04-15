@@ -301,6 +301,13 @@ feature_flags:
         cpp_varname: gFeatureFlagQEPrefixSuffixSearch
         default: false
         fcv_gated: true
+    # TODO (SERVER-122417): Remove this feature flag once v9.0 branches out.
+    featureFlagListIndexesAlwaysIncludesSimpleCollation:
+        description: "Feature flag to enable the listIndexes command to include the collation field in the index specs, even when it is the simple collation."
+        cpp_varname: feature_flags::gFeatureFlagListIndexesAlwaysIncludesSimpleCollation
+        default: true
+        version: 9.0
+        fcv_gated: true
     featureFlagIncludeDeltaHeaderForPhylog:
         description: "Enable including delta headers for phylog pages."
         cpp_varname: gFeatureFlagIncludeDeltaHeaderForPhylog

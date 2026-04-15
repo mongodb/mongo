@@ -62,6 +62,13 @@ class MONGO_MOD_NEEDS_REPLACEMENT ShardKeyValidationBehaviors {
 public:
     virtual ~ShardKeyValidationBehaviors() {}
 
+    /*
+     * Returns index specifications for the collection 'nss'.
+     * Returned indexes are in normalized form: if the index uses the simple collation, the
+     * 'collation' field is omitted. Note that because of this normalization, these index specs
+     * cannot be passed directly to a createIndexes user-like command because attempting to
+     * normalize an already-normalized spec is not supported.
+     */
     virtual std::vector<BSONObj> loadIndexes(const NamespaceString& nss) const = 0;
 
     virtual void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,

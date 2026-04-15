@@ -389,8 +389,19 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         // Check target collection indexes match expected.
         const auto currentIndexes = listIndexesEmptyListIfMissing(
             opCtx, target, ListIndexesInclude::kNothing, /*isRawDataRequest=*/true);
+
+        // The listIndexes command always includes a 'collation' field in each index spec as of
+        // SERVER-89953, even if it has a simple collation. In contrast, `options.originalIndexes`
+        // are normalized specs, which means that the 'collation' field is omitted when it is a
+        // simple collation. Therefore, we normalize the listIndexes output here to enable direct
+        // comparison between both formats.
+        // TODO (SERVER-119573): Remove this normalization once listIndexes output matches storage
+        // format.
+        const auto normalizedCurrentIndexes =
+            IndexCatalog::normalizeIndexSpecsFromListIndexes(currentIndexes);
+
         status = checkTargetCollectionIndexesMatch(
-            target, options.originalIndexes.get(), currentIndexes);
+            target, options.originalIndexes.get(), normalizedCurrentIndexes);
 
         if (!status.isOK()) {
             return status;

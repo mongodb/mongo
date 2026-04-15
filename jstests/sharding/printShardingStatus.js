@@ -132,6 +132,10 @@ config.getCollectionInfos().forEach(function (c) {
             delete i.key;
             delete i.ns;
             delete i.v;
+            if (i.clustered) {
+                // Can't specify the collation for a clustered index.
+                delete i.collation;
+            }
             assert.commandWorked(configCopy.getCollection(c.name).createIndex(key, i));
         });
 });

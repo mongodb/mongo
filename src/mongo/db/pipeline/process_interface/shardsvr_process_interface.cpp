@@ -433,7 +433,7 @@ std::vector<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext
                                                                 const NamespaceString& ns,
                                                                 bool includeBuildUUIDs) {
     sharding::router::CollectionRouter router(opCtx, ns);
-    return router.routeWithRoutingContext(
+    const auto indexes = router.routeWithRoutingContext(
         "ShardServerProcessInterface::getIndexSpecs",
         [&](OperationContext* opCtx, RoutingContext& routingCtx) -> std::vector<BSONObj> {
             StatusWith<Shard::QueryResponse> response =
@@ -444,6 +444,14 @@ std::vector<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext
             uassertStatusOK(response);
             return response.getValue().docs;
         });
+
+    // The listIndexes command always includes a 'collation' field in its output as of SERVER-89953.
+    // However, the caller expects a normalized index specification, in which case the 'collation'
+    // field should be omitted when it represents the simple collation. Apply normalization here to
+    // ensure compatibility with storage index specs.
+    // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs compatible
+    // with the storage format.
+    return IndexCatalog::normalizeIndexSpecsFromListIndexes(indexes);
 }
 
 std::vector<DatabaseName> ShardServerProcessInterface::getAllDatabases(

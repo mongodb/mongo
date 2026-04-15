@@ -325,30 +325,34 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
     std::vector<BSONObj> expectedChunksIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                 << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "key" << BSON("uuid" << 1 << "min" << 1) << "name"
                  << "uuid_1_min_1"
-                 << "unique" << true),
+                 << "unique" << true << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "key" << BSON("uuid" << 1 << "shard" << 1 << "min" << 1) << "name"
                  << "uuid_1_shard_1_min_1"
-                 << "unique" << true),
+                 << "unique" << true << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "key" << BSON("uuid" << 1 << "lastmod" << 1) << "name"
                  << "uuid_1_lastmod_1"
-                 << "unique" << true),
+                 << "unique" << true << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "key" << BSON("uuid" << 1 << "shard" << 1 << "onCurrentShardSince" << 1)
                  << "name"
-                 << "uuid_1_shard_1_onCurrentShardSince_1")};
+                 << "uuid_1_shard_1_onCurrentShardSince_1" << "collation"
+                 << BSON("locale" << "simple"))};
 
     auto expectedShardsIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                 << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
-                 << "host_1")};
+                 << "host_1" << "collation" << BSON("locale" << "simple"))};
     auto expectedTagsIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                 << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
-                 << "ns_1_min_1"),
+                 << "ns_1_min_1" << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "key" << BSON("ns" << 1 << "tag" << 1) << "name"
-                 << "ns_1_tag_1")};
+                 << "ns_1_tag_1" << "collation" << BSON("locale" << "simple"))};
 
     auto foundChunksIndexes =
         assertGet(getIndexes(operationContext(), NamespaceString::kConfigsvrChunksNamespace));
@@ -362,12 +366,13 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
     assertBSONObjsSame(expectedTagsIndexes, foundTagsIndexes);
 
     auto expectedPlacementHistoryIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                 << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "unique" << true << "key" << BSON("nss" << 1 << "timestamp" << -1)
                  << "name"
-                 << "nss_1_timestamp_-1"),
+                 << "nss_1_timestamp_-1" << "collation" << BSON("locale" << "simple")),
         BSON("v" << 2 << "key" << BSON("timestamp" << -1 << "nss" << 1) << "name"
-                 << "timestamp_-1_nss_1")};
+                 << "timestamp_-1_nss_1" << "collation" << BSON("locale" << "simple"))};
     auto foundPlacementHistoryIndexes = assertGet(
         getIndexes(operationContext(), NamespaceString::kConfigsvrPlacementHistoryNamespace));
     assertBSONObjsSame(expectedPlacementHistoryIndexes, foundPlacementHistoryIndexes);

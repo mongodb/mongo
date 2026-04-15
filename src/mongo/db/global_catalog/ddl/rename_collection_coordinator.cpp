@@ -504,7 +504,7 @@ void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
                                      const NamespaceString targetNss,
                                      const std::vector<BSONObj>& expectedIndexes) {
     sharding::router::CollectionRouter router(opCtx, targetNss);
-    const auto currentIndexes = router.routeWithRoutingContext(
+    auto currentIndexes = router.routeWithRoutingContext(
         "checking indexes prerequisites within rename collection coordinator",
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             const auto response = loadIndexesFromAuthoritativeShard(opCtx, routingCtx, targetNss);
@@ -514,6 +514,15 @@ void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
             }
             return uassertStatusOK(response).docs;
         });
+
+    // The listIndexes command always includes a 'collation' field in its output as of SERVER-89953.
+    // However, we are expecting a normalized index specification, in which case the 'collation'
+    // field should be omitted when it represents the simple collation. Apply normalization here to
+    // be able to compare the index specs apropiately.
+    // TODO (SERVER-119573): Remove this normalization once listIndexes returns specs compatible
+    // with the storage format.
+    currentIndexes = IndexCatalog::normalizeIndexSpecsFromListIndexes(currentIndexes);
+
     uassertStatusOK(checkTargetCollectionIndexesMatch(targetNss, expectedIndexes, currentIndexes));
 }
 }  // namespace

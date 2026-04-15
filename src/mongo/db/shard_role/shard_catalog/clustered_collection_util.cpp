@@ -35,6 +35,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
@@ -108,12 +110,16 @@ bool requiresLegacyFormat(const NamespaceString& nss, const CollectionOptions& c
 
 BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
                                        const BSONObj& collation,
-                                       const boost::optional<int64_t>& expireAfterSeconds) {
+                                       const boost::optional<int64_t>& expireAfterSeconds,
+                                       bool extendSimpleCollation) {
     BSONObjBuilder bob;
     collInfo.getIndexSpec().serialize(&bob);
     if (!collation.isEmpty()) {
         bob.append("collation", collation);
+    } else if (extendSimpleCollation) {
+        bob.append(IndexDescriptor::kCollationFieldName, CollationSpec::kSimpleSpec);
     }
+
     if (expireAfterSeconds) {
         bob.append("expireAfterSeconds", expireAfterSeconds.value());
     }

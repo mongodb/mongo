@@ -30,6 +30,7 @@
 
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/assert_util.h"
 
@@ -91,6 +92,50 @@ std::vector<BSONObj> IndexCatalog::normalizeIndexSpecs(OperationContext* opCtx,
     }
 
     return results;
+}
+
+std::vector<BSONObj> IndexCatalog::normalizeIndexSpecsFromListIndexes(
+    const std::vector<BSONObj>& indexSpecs) {
+    std::vector<BSONObj> results;
+    results.reserve(indexSpecs.size());
+
+    for (const auto& indexSpec : indexSpecs) {
+        results.emplace_back(normalizeIndexSpecFromListIndexes(indexSpec));
+    }
+    return results;
+}
+
+BSONObj IndexCatalog::normalizeIndexSpecFromListIndexes(const BSONObj& indexSpec) {
+
+    auto removeSimpleCollationFromBsonObj = [](BSONObj obj) -> BSONObj {
+        if (obj.hasField(IndexDescriptor::kCollationFieldName) &&
+            SimpleBSONObjComparator::kInstance.evaluate(
+                obj[IndexDescriptor::kCollationFieldName].Obj() == CollationSpec::kSimpleSpec)) {
+            return obj.removeField(IndexDescriptor::kCollationFieldName);
+        }
+        return obj;
+    };
+
+    BSONObjBuilder bob;
+
+    // Remove simple collation under 'spec' field
+    constexpr auto kSpecFieldName = "spec"_sd;
+    if (indexSpec.hasField(kSpecFieldName)) {
+        bob.append(kSpecFieldName,
+                   removeSimpleCollationFromBsonObj(indexSpec[kSpecFieldName].Obj()));
+    }
+
+    // Remove simple collation under 'originalSpec' field
+    if (indexSpec.hasField(IndexDescriptor::kOriginalSpecFieldName)) {
+        bob.append(IndexDescriptor::kOriginalSpecFieldName,
+                   removeSimpleCollationFromBsonObj(
+                       indexSpec[IndexDescriptor::kOriginalSpecFieldName].Obj()));
+    }
+
+    // Remove top-level simple collation if exists
+    bob.appendElementsUnique(removeSimpleCollationFromBsonObj(indexSpec));
+
+    return bob.obj();
 }
 
 Status IndexCatalog::canCreateIndex(OperationContext* opCtx,

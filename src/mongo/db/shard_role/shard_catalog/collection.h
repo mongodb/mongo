@@ -632,7 +632,8 @@ public:
 
     virtual int getCompletedIndexCount() const = 0;
 
-    virtual BSONObj getIndexSpec(StringData indexName) const = 0;
+    virtual BSONObj getIndexSpec(StringData indexName,
+                                 bool expandSimpleCollation = false) const = 0;
 
     virtual void getAllIndexes(std::vector<std::string>* names) const = 0;
 

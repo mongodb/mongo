@@ -77,7 +77,8 @@ MONGO_MOD_PUBLIC bool requiresLegacyFormat(const NamespaceString& nss,
 MONGO_MOD_PUBLIC BSONObj
 formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
                                const BSONObj& collation,
-                               const boost::optional<int64_t>& expireAfterSeconds);
+                               const boost::optional<int64_t>& expireAfterSeconds,
+                               bool extendSimpleCollation = false);
 
 /**
  * Returns true if the BSON object matches the collection's cluster key. Caller's should ensure

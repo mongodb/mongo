@@ -1965,13 +1965,43 @@ int CollectionImpl::getCompletedIndexCount() const {
     return num;
 }
 
-BSONObj CollectionImpl::getIndexSpec(StringData indexName) const {
+BSONObj CollectionImpl::getIndexSpec(StringData indexName, bool expandSimpleCollation) const {
     int offset = _metadata->findIndexOffset(indexName);
     invariant(offset >= 0,
               str::stream() << "cannot get index spec for " << indexName << " @ " << getCatalogId()
                             << " : " << _metadata->toBSON());
 
-    return _metadata->indexes[offset].spec;
+    const auto& spec = _metadata->indexes[offset].spec;
+    if (!expandSimpleCollation) {
+        return spec;
+    }
+
+    // TODO (SERVER-119573): Remove manual addition of the 'collation' field here once index specs
+    // in the catalog always include the 'collation' metadata. At that point, explicit insertion
+    // will no longer be needed.
+    BSONObjBuilder bob;
+
+    // Ensure top-level spec has a simple collation if missing.
+    if (!spec.hasField(IndexDescriptor::kCollationFieldName)) {
+        bob.append(IndexDescriptor::kCollationFieldName, CollationSpec::kSimpleSpec);
+    }
+
+    // If 'originalSpec' is present, ensure it contains the 'collation' field setting it to a simple
+    // collation when missing.
+    if (spec.hasField(IndexDescriptor::kOriginalSpecFieldName)) {
+        BSONObj originalSpec = spec[IndexDescriptor::kOriginalSpecFieldName].Obj();
+
+        if (originalSpec.hasField(IndexDescriptor::kCollationFieldName)) {
+            bob.append(IndexDescriptor::kOriginalSpecFieldName, originalSpec);
+        } else {
+            bob.append(IndexDescriptor::kOriginalSpecFieldName,
+                       originalSpec.addFields(BSON(IndexDescriptor::kCollationFieldName
+                                                   << CollationSpec::kSimpleSpec)));
+        }
+    }
+
+    bob.appendElementsUnique(spec);
+    return bob.obj();
 }
 
 void CollectionImpl::getAllIndexes(std::vector<std::string>* names) const {
