@@ -249,10 +249,11 @@ struct Stage {
           scope(scope),
           nextNewScope(nextNewScope),
           isSingleDocumentTransformation(isSingleDocumentTransformation) {}
+
     boost::intrusive_ptr<DocumentSource> documentSource;
     FieldDependencies dependencies;
     // The scope representing visible definitions immediately _after_ this stage. Stages which
-    // do not modify fields just inherit this from the previous stage.
+    // don't modify fields just inherit this from the previous stage.
     ScopeId scope;
     // Points to the next new top-level scope. If this stage introduces a new scope, then
     // scope == nextNewScope. Otherwise this either points to a real scope created by some later
@@ -260,9 +261,6 @@ struct Stage {
     // the graph.
     ScopeId nextNewScope;
     bool isSingleDocumentTransformation;
-    // If this stage has a sub-pipeline (e.g. $lookup, $unionWith), this points to the dependency
-    // graph for that sub-pipeline's stages, owned by Impl::_subpipelineGraphs.
-    DependencyGraph* subpipelineGraph = nullptr;
 };
 
 /**
@@ -541,36 +539,6 @@ public:
         return nullptr;
     }
 
-    DeclaringStageResult getDeclaringStageIncludingSubpipelines(DocumentSource* ds,
-                                                                PathRef path) const {
-        auto stageId = getStageId(ds);
-        auto scopeId = _stages[stageId].scope;
-        auto parsedPath = parsePath(path);
-        FieldList prefix;
-
-        auto [fieldId, type] = lookupField(scopeId, parsedPath, &prefix);
-
-        // If the field is shadowed by a stage with a sub-pipeline (e.g. $lookup),
-        // resolve the remaining suffix path against the sub-pipeline's graph.
-        if (type == FieldMatchType::kShadowed) {
-            ScopeId declaringScopeId = _fields[fieldId].declaringScope;
-            StageId declaringStageId = _scopes[declaringScopeId].stage;
-            if (auto* subGraph = _stages[declaringStageId].subpipelineGraph) {
-                auto suffixPath = skipPathComponents(path, prefix.size() + 1);
-                if (!suffixPath.empty()) {
-                    auto result =
-                        subGraph->getDeclaringStageIncludingSubpipelines(nullptr, suffixPath);
-                    result.srcStages.insert(result.srcStages.begin(),
-                                            _stages[declaringStageId].documentSource);
-                    result.fromSubpipeline = true;
-                    return result;
-                }
-            }
-        }
-
-        return {{getDeclaringStage(ds, path)}};
-    }
-
     bool canPathBeArray(DocumentSource* ds, PathRef path) const {
         auto stageId = getStageId(ds);
         auto scopeId = _stages[stageId].scope;
@@ -583,17 +551,6 @@ public:
             case FieldMatchType::kExact:
                 return canPrefixContainArrays(prefix) || _fields[fieldId].metadata.canFieldBeArray;
             case FieldMatchType::kShadowed: {
-                // If the shadowing field comes from a stage with a sub-pipeline (e.g. $lookup),
-                // resolve the suffix path against the sub-pipeline's graph.
-                ScopeId declaringScopeId = _fields[fieldId].declaringScope;
-                StageId declaringStageId = _scopes[declaringScopeId].stage;
-                if (auto* subGraph = _stages[declaringStageId].subpipelineGraph) {
-                    auto suffixPath = skipPathComponents(path, prefix.size() + 1);
-                    if (!suffixPath.empty()) {
-                        return subGraph->canPathBeArray(nullptr, suffixPath);
-                    }
-                }
-
                 // Check if the shadowing field has an alias to a collection path. If so, resolve
                 // the full path and query the PathArrayness API with it.
                 if (auto* alias = getAlias(fieldId)) {
@@ -618,11 +575,6 @@ public:
         }
 
         MONGO_UNREACHABLE_TASSERT(12266805);
-    }
-
-    const DependencyGraph* getSubpipelineGraph(DocumentSource* ds) const {
-        auto stageId = getStageId(ds);
-        return _stages[stageId].subpipelineGraph;
     }
 
     void recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt = {}) {
@@ -1169,20 +1121,11 @@ private:
         const auto nextNewScopeId = _scopes.getNextId();
         auto scopeId = processScope(dsInfo, stageId, parentScopeId, dependencies);
 
-        auto* ds = documentSource.get();
         _stages.append(Stage{scopeId,
                              std::move(documentSource),
                              std::move(dependencies),
                              dsInfo.isSingleDocumentTransformation(),
                              nextNewScopeId});
-
-        // Build a separate dependency graph for sub-pipelines (e.g. $lookup, $unionWith).
-        // TODO SERVER-124146: Pass the sub-collection's PathArrayness callback so that
-        // canPathBeArray() returns precise results inside subpipelines instead of always true.
-        if (auto* subPipeline = ds->getSubPipeline()) {
-            _subpipelineGraphs.push_back(std::make_unique<DependencyGraph>(*subPipeline));
-            _stages[stageId].subpipelineGraph = _subpipelineGraphs.back().get();
-        }
     }
 
     /**
@@ -1364,15 +1307,6 @@ private:
         absl::erase_if(_aliases,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
 
-        // Remove subpipeline graphs for invalidated stages (always at the tail of the vector).
-        size_t subpipelinesToRemove = 0;
-        for (auto sid = invalidStage; sid < _stages.getNextId(); sid.value++) {
-            if (_stages[sid].subpipelineGraph) {
-                ++subpipelinesToRemove;
-            }
-        }
-        _subpipelineGraphs.resize(_subpipelineGraphs.size() - subpipelinesToRemove);
-
         _stages.eraseFrom(invalidStage);
         _scopes.eraseFrom(invalidScope);
         _fields.eraseFrom(invalidField);
@@ -1437,9 +1371,6 @@ private:
     // (directly or transitively through other aliases).
     absl::flat_hash_map<FieldId, ParsedPath> _aliases;
 
-    // Owns the immediate sub-pipeline dependency graphs for stages in this pipeline.
-    std::vector<std::unique_ptr<DependencyGraph>> _subpipelineGraphs;
-
     // Reference to the complete pipeline.
     const DocumentSourceContainer& _container;
     // Callback to query the Path Arrayness API for the main collection.
@@ -1464,17 +1395,8 @@ boost::intrusive_ptr<mongo::DocumentSource> DependencyGraph::getDeclaringStage(D
     return _impl->getDeclaringStage(ds, path);
 }
 
-DeclaringStageResult DependencyGraph::getDeclaringStageIncludingSubpipelines(DocumentSource* ds,
-                                                                             PathRef path) const {
-    return _impl->getDeclaringStageIncludingSubpipelines(ds, path);
-}
-
 bool DependencyGraph::canPathBeArray(DocumentSource* ds, PathRef path) const {
     return _impl->canPathBeArray(ds, path);
-}
-
-const DependencyGraph* DependencyGraph::getSubpipelineGraph(DocumentSource* ds) const {
-    return _impl->getSubpipelineGraph(ds);
 }
 
 void DependencyGraph::recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt) {
@@ -1568,9 +1490,6 @@ private:
         BSONObjBuilder stageBob = bob.subobjStart(formatStage(stageId));
         serializeScope(stage.scope, stageBob);
         serializeDependencies(stage.dependencies, stageBob);
-        if (stage.subpipelineGraph) {
-            stageBob.append("subpipelineGraph", stage.subpipelineGraph->toBSON());
-        }
     }
 
     void serializeScope(ScopeId scopeId, BSONObjBuilder& bob) {
