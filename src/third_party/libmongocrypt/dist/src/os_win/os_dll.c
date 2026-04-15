@@ -2,9 +2,9 @@
 
 #ifdef _WIN32
 
-#include <mlib/error.h>
-#include <mlib/path.h>
-#include <mlib/str.h>
+#include <mc-mlib/error.h>
+#include <mc-mlib/path.h>
+#include <mc-mlib/str.h>
 
 #include <stdio.h>
 #include <string.h>

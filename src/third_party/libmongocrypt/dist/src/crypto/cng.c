@@ -221,6 +221,7 @@ bool _native_crypto_aes_256_cbc_encrypt(aes_256_args_t args) {
 
     NTSTATUS nt_status;
 
+    ULONG bytes_written = args.bytes_written ? *args.bytes_written : 0u;
     nt_status = BCryptEncrypt(state->key_handle,
                               (PUCHAR)(args.in->data),
                               args.in->len,
@@ -229,8 +230,9 @@ bool _native_crypto_aes_256_cbc_encrypt(aes_256_args_t args) {
                               state->iv_len,
                               args.out->data,
                               args.out->len,
-                              args.bytes_written,
+                              &bytes_written,
                               0);
+    args.bytes_written ? (*args.bytes_written = bytes_written) : (void)0;
 
     if (nt_status != STATUS_SUCCESS) {
         CLIENT_ERR("error initializing cipher: 0x%x", (int)nt_status);
@@ -255,6 +257,7 @@ bool _native_crypto_aes_256_cbc_decrypt(aes_256_args_t args) {
 
     NTSTATUS nt_status;
 
+    ULONG bytes_written = args.bytes_written ? *args.bytes_written : 0u;
     nt_status = BCryptDecrypt(state->key_handle,
                               (PUCHAR)(args.in->data),
                               args.in->len,
@@ -263,8 +266,9 @@ bool _native_crypto_aes_256_cbc_decrypt(aes_256_args_t args) {
                               state->iv_len,
                               args.out->data,
                               args.out->len,
-                              args.bytes_written,
+                              &bytes_written,
                               0);
+    args.bytes_written ? (*args.bytes_written = bytes_written) : (void)0;
 
     if (nt_status != STATUS_SUCCESS) {
         CLIENT_ERR("error initializing cipher: 0x%x", (int)nt_status);
@@ -360,7 +364,7 @@ typedef struct {
 static bool _cng_ctr_crypto_generate(cng_ctr_encrypt_state *state, mongocrypt_status_t *status) {
     BSON_ASSERT(state);
 
-    uint32_t bytesEncrypted = 0;
+    ULONG bytesEncrypted = 0;
     NTSTATUS nt_status = BCryptEncrypt(state->key_handle,
                                        state->input_block,
                                        state->input_block_len,

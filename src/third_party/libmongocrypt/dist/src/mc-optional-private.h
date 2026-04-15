@@ -21,7 +21,7 @@
 #include <stdint.h>
 
 #include "./mc-dec128.h"
-#include "./mlib/int128.h"
+#include "./mc-mlib/int128.h"
 
 typedef struct {
     bool set;

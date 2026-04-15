@@ -20,7 +20,7 @@
 #include "mc-dec128.h"
 #include "mc-optional-private.h"
 #include "mongocrypt-status-private.h"
-#include <mlib/int128.h>
+#include <mc-mlib/int128.h>
 #include <stddef.h> // size_t
 #include <stdint.h>
 

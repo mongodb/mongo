@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
+#include "mc-fle2-encryption-placeholder-private.h"
 #include "mc-rangeopts-private.h"
 
-#include "mc-check-conversions-private.h"
 #include "mc-cmp-private.h"
 #include "mc-range-edge-generation-private.h" // mc_count_leading_zeros_XX
 #include "mc-range-encoding-private.h"        // mc_getTypeInfoXX
@@ -83,6 +83,9 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, mongocrypt_status_
                 return false;
             }
             ro->sparsity = bson_iter_int64(&iter);
+            if (!mc_validate_sparsity(ro->sparsity, status)) {
+                return false;
+            }
         }
         END_IF_FIELD;
 

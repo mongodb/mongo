@@ -778,14 +778,6 @@ bool mongocrypt_ctx_explicit_decrypt_init(mongocrypt_ctx_t *ctx, mongocrypt_bina
         return _mongocrypt_ctx_fail_w_msg(ctx, "invalid msg");
     }
 
-    if (ctx->crypt->log.trace_enabled) {
-        char *msg_val;
-        msg_val = _mongocrypt_new_json_string_from_binary(msg);
-        _mongocrypt_log(&ctx->crypt->log, MONGOCRYPT_LOG_LEVEL_TRACE, "%s (%s=\"%s\")", BSON_FUNC, "msg", msg_val);
-
-        bson_free(msg_val);
-    }
-
     /* Expect msg to be the BSON a document of the form:
        { "v" : (BSON BINARY value of subtype 6) }
     */
@@ -866,12 +858,6 @@ bool mongocrypt_ctx_decrypt_init(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *doc
         return _mongocrypt_ctx_fail_w_msg(ctx, "invalid doc");
     }
 
-    if (ctx->crypt->log.trace_enabled) {
-        char *doc_val;
-        doc_val = _mongocrypt_new_json_string_from_binary(doc);
-        _mongocrypt_log(&ctx->crypt->log, MONGOCRYPT_LOG_LEVEL_TRACE, "%s (%s=\"%s\")", BSON_FUNC, "doc", doc_val);
-        bson_free(doc_val);
-    }
     dctx = (_mongocrypt_ctx_decrypt_t *)ctx;
     ctx->type = _MONGOCRYPT_TYPE_DECRYPT;
     ctx->vtable.finalize = _finalize;

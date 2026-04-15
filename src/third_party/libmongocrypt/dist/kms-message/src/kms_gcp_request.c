@@ -23,7 +23,6 @@
 /* Set a default expiration of 5 minutes for JSON Web Tokens (GCP allows up to
  * one hour) */
 #define JWT_EXPIRATION_SECS 5 * 60
-#define SIGNATURE_LEN 256
 
 kms_request_t *
 kms_gcp_request_oauth_new (const char *host,
@@ -87,7 +86,8 @@ kms_gcp_request_oauth_new (const char *host,
       req->crypto.sign_ctx = opt->crypto.sign_ctx;
    }
 
-   jwt_signature = calloc (1, SIGNATURE_LEN);
+   jwt_signature = calloc (1, KMS_SIGN_RSAES_PKCS1_V1_5_OUTLEN);
+   KMS_ASSERT (jwt_signature);
    if (!req->crypto.sign_rsaes_pkcs1_v1_5 (
           req->crypto.sign_ctx,
           private_key_data,
@@ -100,7 +100,7 @@ kms_gcp_request_oauth_new (const char *host,
    }
 
    jwt_signature_b64url =
-      kms_message_raw_to_b64url (jwt_signature, SIGNATURE_LEN);
+      kms_message_raw_to_b64url (jwt_signature, KMS_SIGN_RSAES_PKCS1_V1_5_OUTLEN);
    if (!jwt_signature_b64url) {
       KMS_ERROR (req, "Failed to base64url encode JWT signature");
       goto done;

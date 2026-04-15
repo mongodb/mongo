@@ -32,12 +32,11 @@
 #endif
 #endif
 
-#include "mc-check-conversions-private.h"
 #include "mongocrypt-dll-private.h"
 #include "mongocrypt-private.h" // CLIENT_ERR
 #include "mongocrypt-util-private.h"
 
-#include "mlib/thread.h"
+#include "mc-mlib/thread.h"
 
 #include <errno.h>
 #include <math.h> // isinf, isnan, isfinite
@@ -153,7 +152,14 @@ bool mc_iter_document_as_bson(const bson_iter_t *iter, bson_t *bson, mongocrypt_
 
 /* Avoid a conversion warning on glibc for isnan, isinf, and isfinite. Refer:
  * MONGOCRYPT-501. */
-MC_BEGIN_CONVERSION_IGNORE
+#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+// gcc 4.6 added support for "diagnostic push".
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
+#endif
 
 bool mc_isnan(double d) {
     return isnan(d);
@@ -167,4 +173,8 @@ bool mc_isfinite(double d) {
     return isfinite(d);
 }
 
-MC_END_CONVERSION_IGNORE
+#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#pragma GCC diagnostic pop
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#endif

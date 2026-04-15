@@ -30,13 +30,14 @@ typedef enum _supported_query_type_flags {
     SUPPORTS_RANGE_PREVIEW_DEPRECATED_QUERIES = 1 << 2,
     // Text search preview query supported
     SUPPORTS_SUBSTRING_PREVIEW_QUERIES = 1 << 3,
-    SUPPORTS_SUFFIX_PREVIEW_QUERIES = 1 << 4,
-    SUPPORTS_PREFIX_PREVIEW_QUERIES = 1 << 5,
+    SUPPORTS_SUFFIX_QUERIES = 1 << 4,
+    SUPPORTS_PREFIX_QUERIES = 1 << 5,
 } supported_query_type_flags;
 
 typedef struct _mc_EncryptedField_t {
     supported_query_type_flags supported_queries;
     _mongocrypt_buffer_t keyId;
+    const char *keyAltName;
     const char *path;
     struct _mc_EncryptedField_t *next;
 } mc_EncryptedField_t;

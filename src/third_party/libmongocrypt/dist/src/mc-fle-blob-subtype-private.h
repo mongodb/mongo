@@ -18,10 +18,8 @@
 #define MC_FLE_BLOB_SUBTYPE_PRIVATE_H
 
 /* FLE Blob Subtype is the first byte of a BSON Binary Subtype 6.
- * FLE1 Blob Subtypes are defined in:
- * https://github.com/mongodb/specifications/blob/master/source/bson-binary-encrypted/binary-encrypted.md
- * FLE2 Blob Subtypes are currently defined in:
- * https://github.com/markbenvenuto/mongo-enterprise-modules/blob/fle2/fle_protocol.md#reference-bindata-6-subtypes.
+ * These are defined by the EncryptedBinDataType enum in:
+ * https://github.com/mongodb/mongo/blob/0d51c5cb6571a14e690c4774bb069d1990fd35b6/src/mongo/crypto/fle_field_schema.idl
  */
 
 typedef enum {

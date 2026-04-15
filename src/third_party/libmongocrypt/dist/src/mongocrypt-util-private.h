@@ -19,7 +19,7 @@
 
 #include "mongocrypt-status-private.h"
 
-#include "mlib/str.h"
+#include "mc-mlib/str.h"
 
 #include <bson/bson.h>
 

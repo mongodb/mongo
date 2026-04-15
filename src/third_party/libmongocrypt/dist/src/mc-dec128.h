@@ -3,9 +3,9 @@
 
 #include <bson/bson.h>
 
-#include <mlib/endian.h>
-#include <mlib/int128.h>
-#include <mlib/macros.h>
+#include <mc-mlib/endian.h>
+#include <mc-mlib/int128.h>
+#include <mc-mlib/macros.h>
 
 // Conditional preprocessor definition set by the usage of an intel_dfp from
 // the ImportDFP.cmake script:

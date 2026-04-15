@@ -17,6 +17,7 @@
 #include <bson/bson.h>
 #include <stdlib.h>
 
+#include "mc-fle2-encryption-placeholder-private.h"
 #include "mc-fle2-find-text-payload-private.h"
 #include "mc-parse-utils-private.h"
 #include "mongocrypt-buffer-private.h"
@@ -315,6 +316,9 @@ bool mc_FLE2FindTextPayload_parse(mc_FLE2FindTextPayload_t *out, const bson_t *i
                 goto fail;
             }
             out->maxContentionFactor = bson_iter_int64(&iter);
+            if (!mc_validate_contention(out->maxContentionFactor, status)) {
+                goto fail;
+            }
         }
         END_IF_FIELD
 

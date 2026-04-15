@@ -16,6 +16,7 @@
 
 #include "mc-textopts-private.h"
 
+#include "mongocrypt-ctx-private.h" // mongocrypt_query_type_t
 #include "mongocrypt-private.h"
 #include "mongocrypt-util-private.h" // mc_bson_type_to_string
 #include "mongocrypt.h"
@@ -243,10 +244,13 @@ static bool append_TextOptsPerIndex(const mc_TextOptsPerIndex_t *txio, bson_t *o
     return true;
 }
 
-bool mc_TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
-                                             const bson_t *v,
-                                             bson_t *out,
-                                             mongocrypt_status_t *status) {
+static bool TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
+                                                 const bson_t *v,
+                                                 bool include_prefix,
+                                                 bool include_suffix,
+                                                 bool include_substring,
+                                                 bson_t *out,
+                                                 mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(txo);
     BSON_ASSERT_PARAM(v);
     BSON_ASSERT_PARAM(out);
@@ -277,7 +281,7 @@ bool mc_TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
         return false;
     }
 
-    if (txo->prefix.set) {
+    if (txo->prefix.set && include_prefix) {
         bson_t insert_spec;
         if (!BSON_APPEND_DOCUMENT_BEGIN(&child, "prefix", &insert_spec)) {
             CLIENT_ERR(ERROR_PREFIX "Error appending to BSON");
@@ -294,7 +298,7 @@ bool mc_TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
         }
     }
 
-    if (txo->suffix.set) {
+    if (txo->suffix.set && include_suffix) {
         bson_t insert_spec;
         if (!BSON_APPEND_DOCUMENT_BEGIN(&child, "suffix", &insert_spec)) {
             CLIENT_ERR(ERROR_PREFIX "Error appending to BSON");
@@ -311,7 +315,7 @@ bool mc_TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
         }
     }
 
-    if (txo->substring.set) {
+    if (txo->substring.set && include_substring) {
         bson_t insert_spec;
         if (!BSON_APPEND_DOCUMENT_BEGIN(&child, "substr", &insert_spec)) {
             CLIENT_ERR(ERROR_PREFIX "Error appending to BSON");
@@ -334,6 +338,48 @@ bool mc_TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
     }
 
     return true;
+}
+
+bool mc_TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
+                                             const bson_t *v,
+                                             bson_t *out,
+                                             mongocrypt_status_t *status) {
+    // FLE2TextSearchInsertSpec for insert includes all query types specified.
+    return TextOpts_to_FLE2TextSearchInsertSpec(txo, v, true, true, true, out, status);
+}
+
+bool mc_TextOpts_to_FLE2TextSearchInsertSpec_for_query(const mc_TextOpts_t *txo,
+                                                       const bson_t *v,
+                                                       mongocrypt_query_type_t query_type,
+                                                       bson_t *out,
+                                                       mongocrypt_status_t *status) {
+    // FLE2TextSearchInsertSpec for query only includes query type specified.
+    bool include_prefix = false;
+    bool include_suffix = false;
+    bool include_substring = false;
+
+    switch (query_type) {
+    case MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_DEPRECATED:
+    case MONGOCRYPT_QUERY_TYPE_RANGE:
+    case MONGOCRYPT_QUERY_TYPE_EQUALITY:
+    default: {
+        CLIENT_ERR("Unexpected query type: %s\n", _mongocrypt_query_type_to_string(query_type));
+        return false;
+    }
+    case MONGOCRYPT_QUERY_TYPE_PREFIX: {
+        include_prefix = true;
+        break;
+    }
+    case MONGOCRYPT_QUERY_TYPE_SUFFIX: {
+        include_suffix = true;
+        break;
+    }
+    case MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW: {
+        include_substring = true;
+        break;
+    }
+    }
+    return TextOpts_to_FLE2TextSearchInsertSpec(txo, v, include_prefix, include_suffix, include_substring, out, status);
 }
 
 #undef ERROR_PREFIX

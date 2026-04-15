@@ -16,6 +16,7 @@
 
 #include <bson/bson.h>
 
+#include "mc-fle2-encryption-placeholder-private.h"
 #include "mc-fle2-insert-update-payload-private-v2.h"
 #include "mc-parse-utils-private.h"
 #include "mongocrypt-buffer-private.h"
@@ -205,8 +206,7 @@ bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
                 CLIENT_ERR("Field 'k' expected to hold an int64");
                 goto fail;
             }
-            if ((contention < 0)) {
-                CLIENT_ERR("Field 'k' must be non-negative, got: %" PRId64, contention);
+            if (!mc_validate_contention(contention, status)) {
                 goto fail;
             }
             out->contentionFactor = contention;
@@ -224,6 +224,9 @@ bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
                 goto fail;
             }
             int64_t sparsity = bson_iter_int64(&iter);
+            if (!mc_validate_sparsity(sparsity, status)) {
+                goto fail;
+            }
             out->sparsity = OPT_I64(sparsity);
         }
         END_IF_FIELD

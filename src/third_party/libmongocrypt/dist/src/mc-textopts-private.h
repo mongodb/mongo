@@ -76,4 +76,11 @@ bool mc_TextOpts_to_FLE2TextSearchInsertSpec(const mc_TextOpts_t *txo,
                                              bson_t *out,
                                              mongocrypt_status_t *status);
 
+enum _mongocrypt_query_type_t; // Forward declare.
+bool mc_TextOpts_to_FLE2TextSearchInsertSpec_for_query(const mc_TextOpts_t *txo,
+                                                       const bson_t *v,
+                                                       enum _mongocrypt_query_type_t query_type,
+                                                       bson_t *out,
+                                                       mongocrypt_status_t *status);
+
 #endif // MC_TEXTOPTS_PRIVATE_H

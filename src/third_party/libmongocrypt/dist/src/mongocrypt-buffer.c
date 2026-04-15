@@ -462,7 +462,7 @@ char *_mongocrypt_buffer_to_hex(_mongocrypt_buffer_t *buf) {
     char *out = hex;
 
     for (uint32_t i = 0; i < buf->len; i++, out += 2) {
-        sprintf(out, "%02X", buf->data[i]);
+        BSON_ASSERT(2 == bson_snprintf(out, 3, "%02X", buf->data[i]));
     }
     return hex;
 }

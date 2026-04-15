@@ -58,6 +58,7 @@ kms_sha256 (void *unused_ctx,
             unsigned char *hash_out)
 {
    EVP_MD_CTX *digest_ctxp = EVP_MD_CTX_new ();
+   KMS_ASSERT (digest_ctxp);
    bool rval = false;
 
    if (1 != EVP_DigestInit_ex (digest_ctxp, EVP_sha256 (), NULL)) {
@@ -108,6 +109,7 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    size_t signature_out_len = 256;
 
    ctx = EVP_MD_CTX_new ();
+   KMS_ASSERT (ctx);
    KMS_ASSERT (private_key_len <= LONG_MAX);
    pkey = d2i_PrivateKey (EVP_PKEY_RSA,
                           NULL,

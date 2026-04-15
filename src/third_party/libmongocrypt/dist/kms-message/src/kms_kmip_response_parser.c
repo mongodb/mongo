@@ -55,6 +55,7 @@ kms_kmip_response_parser_new (void *reserved)
    kms_response_parser_t *parser = kms_response_parser_new ();
 
    parser->kmip = malloc (sizeof (kms_kmip_response_parser_t));
+   KMS_ASSERT (parser->kmip);
    _parser_init (parser->kmip);
 
    return parser;
@@ -119,6 +120,7 @@ kms_kmip_response_parser_get_response (kms_kmip_response_parser_t *parser)
    }
 
    res = calloc (1, sizeof (kms_response_t));
+   KMS_ASSERT (res);
    res->provider = KMS_REQUEST_PROVIDER_KMIP;
    res->kmip.len = (uint32_t) parser->buf->len;
    res->kmip.data = (uint8_t *) kms_request_str_detach (parser->buf);

@@ -491,6 +491,7 @@ static bool _fle2_placeholder_aes_aead_encrypt(_mongocrypt_key_broker_t *kb,
     _mongocrypt_buffer_init_size(&iv, MONGOCRYPT_IV_LEN);
     if (!_mongocrypt_random(crypto, &iv, iv.len, status)) {
         _mongocrypt_buffer_cleanup(&key);
+        _mongocrypt_buffer_cleanup(&iv);
         return false;
     }
 
@@ -728,6 +729,27 @@ fail:
     return false;
 }
 
+static bool _fle2_choose_contention_factor(mongocrypt_t *crypt,
+                                           int64_t maxContentionFactor,
+                                           int64_t *out,
+                                           mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(crypt);
+    BSON_ASSERT_PARAM(out);
+    if (crypt->opts.contention_factor_fn) {
+        if (!crypt->opts.contention_factor_fn(maxContentionFactor + 1, out)) {
+            CLIENT_ERR("contention_factor_fn failed");
+            return false;
+        }
+        if (*out < 0 || *out > maxContentionFactor) {
+            CLIENT_ERR("chosen contentionFactor out of range");
+            return false;
+        }
+        return true;
+    }
+
+    return _mongocrypt_random_int64(crypt->crypto, maxContentionFactor + 1, out, status);
+}
+
 // Shared implementation for insert/update and insert/update ForRange (v2)
 static bool _mongocrypt_fle2_placeholder_to_insert_update_common(_mongocrypt_key_broker_t *kb,
                                                                  mc_FLE2InsertUpdatePayloadV2_t *out,
@@ -749,9 +771,12 @@ static bool _mongocrypt_fle2_placeholder_to_insert_update_common(_mongocrypt_key
 
     out->contentionFactor = 0; // k
     if (placeholder->maxContentionFactor > 0) {
-        /* Choose a random contentionFactor in the inclusive range [0,
+        /* Choose a contentionFactor in the inclusive range [0,
          * placeholder->maxContentionFactor] */
-        if (!_mongocrypt_random_int64(crypto, placeholder->maxContentionFactor + 1, &out->contentionFactor, status)) {
+        if (!_fle2_choose_contention_factor(kb->crypt,
+                                            placeholder->maxContentionFactor,
+                                            &out->contentionFactor,
+                                            status)) {
             goto fail;
         }
     }
@@ -1545,12 +1570,12 @@ static bool _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForTextSearc
     // k
     payload.contentionFactor = 0;
     if (placeholder->maxContentionFactor > 0) {
-        /* Choose a random contentionFactor in the inclusive range [0,
+        /* Choose a contentionFactor in the inclusive range [0,
          * placeholder->maxContentionFactor] */
-        if (!_mongocrypt_random_int64(kb->crypt->crypto,
-                                      placeholder->maxContentionFactor + 1,
-                                      &payload.contentionFactor,
-                                      status)) {
+        if (!_fle2_choose_contention_factor(kb->crypt,
+                                            placeholder->maxContentionFactor,
+                                            &payload.contentionFactor,
+                                            status)) {
             goto fail;
         }
     }

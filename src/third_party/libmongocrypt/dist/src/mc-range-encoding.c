@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "mc-check-conversions-private.h"
 #include "mc-cmp-private.h"
 #include "mc-range-encoding-private.h"
 #include "mongocrypt-private.h"

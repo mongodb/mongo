@@ -284,6 +284,7 @@ kms_kmip_response_get_iv (kms_response_t *res, size_t *datalen) {
       goto fail;
    }
    data = malloc (len);
+   KMS_ASSERT (data);
    memcpy (data, tmp, len);
    *datalen = len;
 
@@ -364,6 +365,7 @@ kms_kmip_response_get_data (kms_response_t *res, size_t *datalen) {
       goto fail;
    }
    data = malloc (len);
+   KMS_ASSERT (data);
    memcpy (data, tmp, len);
    *datalen = len;
 
@@ -477,6 +479,7 @@ kms_kmip_response_get_secretdata (kms_response_t *res, size_t *secretdatalen)
       goto fail;
    }
    secretdata = malloc (len);
+   KMS_ASSERT (secretdata);
    memcpy (secretdata, tmp, len);
    *secretdatalen = len;
 

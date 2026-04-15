@@ -1,8 +1,8 @@
 #ifndef MONGOCRYPT_DLL_PRIVATE_H
 #define MONGOCRYPT_DLL_PRIVATE_H
 
-#include <mlib/error.h>
-#include <mlib/str.h>
+#include <mc-mlib/error.h>
+#include <mc-mlib/str.h>
 
 #include <stdlib.h>
 

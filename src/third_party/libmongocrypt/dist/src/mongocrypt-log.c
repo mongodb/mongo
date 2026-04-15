@@ -26,9 +26,6 @@ void _mongocrypt_log_init(_mongocrypt_log_t *log) {
     _mongocrypt_mutex_init(&log->mutex);
     /* Initially, no log function is set. */
     _mongocrypt_log_set_fn(log, NULL, NULL);
-#ifdef MONGOCRYPT_ENABLE_TRACE
-    log->trace_enabled = (getenv("MONGOCRYPT_TRACE") != NULL);
-#endif
 }
 
 void _mongocrypt_log_cleanup(_mongocrypt_log_t *log) {
@@ -47,7 +44,7 @@ void _mongocrypt_stdout_log_fn(mongocrypt_log_level_t level, const char *message
     case MONGOCRYPT_LOG_LEVEL_ERROR: printf("ERROR"); break;
     case MONGOCRYPT_LOG_LEVEL_WARNING: printf("WARNING"); break;
     case MONGOCRYPT_LOG_LEVEL_INFO: printf("INFO"); break;
-    case MONGOCRYPT_LOG_LEVEL_TRACE: printf("TRACE"); break;
+    case MONGOCRYPT_LOG_LEVEL_TRACE: printf("TRACE"); break; /* UNUSED */
     default: printf("UNKNOWN"); break;
     }
     printf(" %s\n", message);
@@ -68,10 +65,6 @@ void _mongocrypt_log(_mongocrypt_log_t *log, mongocrypt_log_level_t level, const
 
     BSON_ASSERT_PARAM(log);
     BSON_ASSERT_PARAM(format);
-
-    if (level == MONGOCRYPT_LOG_LEVEL_TRACE && !log->trace_enabled) {
-        return;
-    }
 
     va_start(args, format);
     message = bson_strdupv_printf(format, args);

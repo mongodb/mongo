@@ -3,7 +3,7 @@
 
 #include "./user-check.h"
 
-#ifdef _WIN32
+#ifdef _MSC_VER
 #include "./windows-lean.h"
 #else
 #include <pthread.h>
@@ -15,7 +15,7 @@
  * @brief A status object for @ref mlib_call_once.
  */
 typedef struct mlib_once_flag {
-#ifdef _WIN32
+#ifdef _MSC_VER
     INIT_ONCE _native;
 #else
     pthread_once_t _native;
@@ -27,7 +27,7 @@ typedef struct mlib_once_flag {
  * @ref mlib_once_flag object. Can also be used to dynamically initialize or
  * "reset" a flag.
  */
-#ifdef _WIN32
+#ifdef _MSC_VER
 #define MLIB_ONCE_INITIALIZER                                                                                          \
     { ._native = INIT_ONCE_STATIC_INIT }
 #else
@@ -40,7 +40,7 @@ typedef struct mlib_once_flag {
  */
 typedef void (*mlib_init_once_fn_t)(void);
 
-#if defined(_WIN32)
+#if defined(_MSC_VER)
 /**
  * An indirection layer for mlib_once on Windows platforms. Do not use directly.
  */
@@ -68,7 +68,7 @@ static inline BOOL WINAPI _mlib_win32_once_callthru(PINIT_ONCE once, PVOID param
  * @return true on success, false otherwise
  */
 static inline bool mlib_call_once(mlib_once_flag *flag, mlib_init_once_fn_t fn) {
-#ifdef _WIN32
+#if defined(_MSC_VER)
     bool okay = InitOnceExecuteOnce(&flag->_native, &_mlib_win32_once_callthru, &fn, NULL);
     return okay;
 #else

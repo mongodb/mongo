@@ -142,6 +142,9 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    if (!signature_ref) {
       goto cleanup;
    }
+   if (CFDataGetLength(signature_ref) != KMS_SIGN_RSAES_PKCS1_V1_5_OUTLEN) {
+      goto cleanup;
+   }
    memcpy (signature_out,
            CFDataGetBytePtr (signature_ref),
            (size_t) CFDataGetLength (signature_ref));

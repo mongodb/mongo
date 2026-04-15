@@ -435,6 +435,10 @@ bool mongocrypt_setopt_encrypted_field_config_map(mongocrypt_t *crypt, mongocryp
  * the path string is literal "$SYSTEM", then libmongocrypt will defer to the
  * system's library resolution mechanism to find the crypt_shared library.
  *
+ * @warning Use of "$SYSTEM" will search system directories for the
+ * mongo_crypt_v1.(dll,so,dylib) following the search behavior of LoadLibrary
+ * on Windows and dlopen on Unix. Ensure secure deployment of the library.
+ *
  * @note If no crypt_shared dynamic library is found in any of the directories
  * specified by the search paths loaded here, @ref mongocrypt_init() will still
  * succeed and continue to operate without crypt_shared.
@@ -1182,7 +1186,25 @@ MONGOCRYPT_EXPORT
 bool mongocrypt_kms_ctx_feed(mongocrypt_kms_ctx_t *kms, mongocrypt_binary_t *bytes);
 
 /**
- * Indicate a network-level failure.
+ * Feed bytes from the KMS response.
+ *
+ * Feeding more bytes than what has been returned in @ref
+ * mongocrypt_kms_ctx_bytes_needed is an error.
+ *
+ * @param[in] kms The @ref mongocrypt_kms_ctx_t.
+ * @param[in] bytes The bytes to feed. The viewed data is copied. It is valid to
+ * destroy @p bytes with @ref mongocrypt_binary_destroy immediately after.
+ * @param[out] should_retry Whether the KMS request should be retried. Retry in-place
+ * without calling @ref mongocrypt_kms_ctx_fail.
+ * @returns A boolean indicating success. If false, an error status is set.
+ * Retrieve it with @ref mongocrypt_kms_ctx_status
+ */
+MONGOCRYPT_EXPORT
+bool mongocrypt_kms_ctx_feed_with_retry(mongocrypt_kms_ctx_t *kms, mongocrypt_binary_t *bytes, bool *should_retry);
+
+/**
+ * Indicate a network error. Discards all data fed to this KMS context with @ref mongocrypt_kms_ctx_feed.
+ * The @ref mongocrypt_kms_ctx_t may be reused.
  *
  * @param[in] kms The @ref mongocrypt_kms_ctx_t.
  * @return A boolean indicating whether the failed request may be retried.
@@ -1577,9 +1599,11 @@ bool mongocrypt_setopt_key_expiration(mongocrypt_t *crypt, uint64_t cache_expira
 #define MONGOCRYPT_QUERY_TYPE_RANGE_STR "range"
 /// NOTE: "substringPreview" is experimental and may be removed in a future non-major release.
 #define MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_STR "substringPreview"
-/// NOTE: "suffixPreview" is experimental and may be removed in a future non-major release.
-#define MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_STR "suffixPreview"
-/// NOTE: "prefixPreview" is experimental and may be removed in a future non-major release.
-#define MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_STR "prefixPreview"
+/// DEPRECATED: Support for "suffixPreview" has been removed in favor of "suffix"
+#define MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_DEPRECATED_STR "suffixPreview"
+#define MONGOCRYPT_QUERY_TYPE_SUFFIX_STR "suffix"
+/// DEPRECATED: Support for "prefixPreview" has been removed in favor of "suffix"
+#define MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_DEPRECATED_STR "prefixPreview"
+#define MONGOCRYPT_QUERY_TYPE_PREFIX_STR "prefix"
 
 #endif /* MONGOCRYPT_H */

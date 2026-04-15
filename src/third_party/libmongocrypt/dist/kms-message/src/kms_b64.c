@@ -583,6 +583,7 @@ kms_message_raw_to_b64 (const uint8_t *raw, size_t raw_len)
 
    b64_len = (raw_len / 3 + 1) * 4 + 1;
    b64 = malloc (b64_len);
+   KMS_ASSERT (b64);
    memset (b64, 0, b64_len);
    if (-1 == kms_message_b64_ntop (raw, raw_len, b64, b64_len)) {
       free (b64);
@@ -600,6 +601,7 @@ kms_message_b64_to_raw (const char *b64, size_t *out)
 
    b64len = strlen (b64);
    raw = (uint8_t *) malloc (b64len + 1);
+   KMS_ASSERT (raw);
    memset (raw, 0, b64len + 1);
    ret = kms_message_b64_pton (b64, raw, b64len);
    if (ret > 0) {
@@ -642,6 +644,7 @@ kms_message_b64url_to_raw (const char *b64url, size_t *out)
    /* Add four for padding '=' characters. */
    capacity = b64urllen + 4;
    b64 = malloc (capacity);
+   KMS_ASSERT (b64);
    memset (b64, 0, capacity);
    if (-1 ==
        kms_message_b64url_to_b64 (b64url, b64urllen, b64, capacity)) {

@@ -73,14 +73,10 @@
 
 
 /*
- * MONGOCRYPT_ENABLE_TRACE is set from configure to determine if we are
- * compiled with tracing support.
+ * MONGOCRYPT_ENABLE_TRACE is automatically disabled as 
+ * trace logging is no longer supported.
  */
-#define MONGOCRYPT_ENABLE_TRACE @MONGOCRYPT_ENABLE_TRACE@
-
-#if MONGOCRYPT_ENABLE_TRACE != 1
-#  undef MONGOCRYPT_ENABLE_TRACE
-#endif
+#define MONGOCRYPT_ENABLE_TRACE 0
 
 /* clang-format on */
 

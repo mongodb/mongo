@@ -18,6 +18,8 @@
 
 #ifdef KMS_MESSAGE_ENABLE_CRYPTO_CNG
 
+#include "kms_message_private.h"
+
 // tell windows.h not to include a bunch of headers we don't need:
 #define WIN32_LEAN_AND_MEAN
 
@@ -179,6 +181,7 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    }
 
    blob_private = (LPBYTE) calloc (1, blob_private_len);
+   KMS_ASSERT (blob_private);
 
    success = CryptDecodeObjectEx (X509_ASN_ENCODING,
                                   PKCS_PRIVATE_KEY_INFO,
@@ -208,6 +211,7 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    }
 
    raw_private = (LPBYTE) calloc (1, raw_private_len);
+   KMS_ASSERT (raw_private);
 
    success = CryptDecodeObjectEx (X509_ASN_ENCODING,
                                   PKCS_RSA_PRIVATE_KEY,
@@ -234,6 +238,7 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    }
 
    hash_value = calloc (1, SHA_256_HASH_LEN);
+   KMS_ASSERT (hash_value);
 
    if(!kms_sha256 (NULL, input, input_len, hash_value)) {
       goto cleanup;

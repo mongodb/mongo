@@ -35,7 +35,8 @@ hexlify (const uint8_t *buf, size_t len)
    size_t i;
 
    for (i = 0; i < len; i++) {
-      p += sprintf (p, "%02x", buf[i]);
+      KMS_ASSERT (2 == snprintf (p, 3, "%02x", buf[i]));
+      p += 2;
    }
 
    *p = '\0';

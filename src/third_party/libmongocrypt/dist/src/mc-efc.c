@@ -16,7 +16,7 @@
 
 #include "mc-efc-private.h"
 
-#include "mlib/str.h"
+#include "mc-mlib/str.h"
 #include "mongocrypt-private.h"
 #include "mongocrypt-util-private.h" // mc_iter_document_as_bson
 #include <stdint.h>
@@ -35,10 +35,12 @@ static bool _parse_query_type_string(const char *queryType, supported_query_type
         *out = SUPPORTS_RANGE_PREVIEW_DEPRECATED_QUERIES;
     } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_STR), qtv)) {
         *out = SUPPORTS_SUBSTRING_PREVIEW_QUERIES;
-    } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_STR), qtv)) {
-        *out = SUPPORTS_SUFFIX_PREVIEW_QUERIES;
-    } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_STR), qtv)) {
-        *out = SUPPORTS_PREFIX_PREVIEW_QUERIES;
+    } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_DEPRECATED_STR), qtv)
+               || mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUFFIX_STR), qtv)) {
+        *out = SUPPORTS_SUFFIX_QUERIES;
+    } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_DEPRECATED_STR), qtv)
+               || mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_PREFIX_STR), qtv)) {
+        *out = SUPPORTS_PREFIX_QUERIES;
     } else {
         return false;
     }
@@ -80,23 +82,48 @@ _parse_supported_query_types(bson_iter_t *iter, supported_query_type_flags *out,
 /* _parse_field parses and prepends one field document to efc->fields. */
 static bool _parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocrypt_status_t *status) {
     supported_query_type_flags query_types = SUPPORTS_NO_QUERIES;
-    bson_iter_t field_iter;
+    bson_iter_t field_iter, keyid_iter, keyaltname_iter;
 
     BSON_ASSERT_PARAM(efc);
     BSON_ASSERT_PARAM(field);
 
-    if (!bson_iter_init_find(&field_iter, field, "keyId")) {
-        CLIENT_ERR("unable to find 'keyId' in 'field' document");
+    bool has_keyid = false;
+    bool has_keyaltname = false;
+    if (bson_iter_init_find(&keyid_iter, field, "keyId")) {
+        has_keyid = true;
+    }
+    if (bson_iter_init_find(&keyaltname_iter, field, "keyAltName")) {
+        has_keyaltname = true;
+    }
+    if (!(has_keyid || has_keyaltname)) {
+        CLIENT_ERR("unable to find 'keyId' or 'keyAltName' in 'field' document");
         return false;
     }
-    if (!BSON_ITER_HOLDS_BINARY(&field_iter)) {
-        CLIENT_ERR("expected 'fields.keyId' to be type binary, got: %d", (int)bson_iter_type(&field_iter));
+    if (has_keyid && has_keyaltname) {
+        CLIENT_ERR("only one of 'keyId' or 'keyAltName may be in 'field' document");
         return false;
     }
+
     _mongocrypt_buffer_t field_keyid;
-    if (!_mongocrypt_buffer_from_uuid_iter(&field_keyid, &field_iter)) {
-        CLIENT_ERR("unable to parse uuid key from 'fields.keyId'");
-        return false;
+    if (has_keyid) {
+        if (!BSON_ITER_HOLDS_BINARY(&keyid_iter)) {
+            CLIENT_ERR("expected 'fields.keyId' to be type binary, got: %s",
+                       mc_bson_type_to_string(bson_iter_type(&keyid_iter)));
+            return false;
+        }
+        if (!_mongocrypt_buffer_from_uuid_iter(&field_keyid, &keyid_iter)) {
+            CLIENT_ERR("unable to parse uuid key from 'fields.keyId'");
+            return false;
+        }
+    }
+
+    const char *keyAltName = "";
+    if (has_keyaltname) {
+        if (!BSON_ITER_HOLDS_UTF8(&keyaltname_iter)) {
+            CLIENT_ERR("expected 'fields.keyAltName' to be type UTF-8, got: %d", (int)bson_iter_type(&keyaltname_iter));
+            return false;
+        }
+        keyAltName = bson_iter_utf8(&keyaltname_iter, NULL);
     }
 
     const char *field_path;
@@ -151,7 +178,12 @@ static bool _parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocry
 
     /* Prepend a new mc_EncryptedField_t */
     mc_EncryptedField_t *ef = bson_malloc0(sizeof(mc_EncryptedField_t));
-    _mongocrypt_buffer_copy_to(&field_keyid, &ef->keyId);
+    if (has_keyid) {
+        _mongocrypt_buffer_copy_to(&field_keyid, &ef->keyId);
+    }
+    if (has_keyaltname) {
+        ef->keyAltName = bson_strdup(keyAltName);
+    }
     ef->path = bson_strdup(field_path);
     ef->next = efc->fields;
     ef->supported_queries = query_types;
@@ -194,10 +226,23 @@ bool mc_EncryptedFieldConfig_parse(mc_EncryptedFieldConfig_t *efc,
         all_supported_queries |= efc->fields->supported_queries;
     }
 
+    // Check for duplicate keyAltName values
+    for (mc_EncryptedField_t *field1 = efc->fields; field1 != NULL; field1 = field1->next) {
+        if (field1->keyAltName) {
+            for (mc_EncryptedField_t *field2 = field1->next; field2 != NULL; field2 = field2->next) {
+                if (field2->keyAltName) {
+                    if (strcmp(field1->keyAltName, field2->keyAltName) == 0) {
+                        CLIENT_ERR("duplicate keyAltName '%s' found in encrypted field config", field1->keyAltName);
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
     if (!bson_iter_init_find(&iter, efc_bson, "strEncodeVersion")) {
         if (all_supported_queries
-            & (SUPPORTS_SUBSTRING_PREVIEW_QUERIES | SUPPORTS_SUFFIX_PREVIEW_QUERIES
-               | SUPPORTS_PREFIX_PREVIEW_QUERIES)) {
+            & (SUPPORTS_SUBSTRING_PREVIEW_QUERIES | SUPPORTS_SUFFIX_QUERIES | SUPPORTS_PREFIX_QUERIES)) {
             // Has at least one text search query type, set to latest by default.
             efc->str_encode_version = LATEST_STR_ENCODE_VERSION;
         } else {
@@ -229,6 +274,7 @@ void mc_EncryptedFieldConfig_cleanup(mc_EncryptedFieldConfig_t *efc) {
         mc_EncryptedField_t *ptr_next = ptr->next;
         _mongocrypt_buffer_cleanup(&ptr->keyId);
         bson_free((char *)ptr->path);
+        bson_free((char *)ptr->keyAltName);
         bson_free(ptr);
         ptr = ptr_next;
     }

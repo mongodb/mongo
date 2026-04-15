@@ -247,6 +247,7 @@ static inline void mstrm_resize(mstr_mut *s, size_t new_len) {
         // enough to link it to the free() in mstr_free()
         assert(new_len < SIZE_MAX);
         s->raw.data = (char *)realloc((char *)s->raw.data, new_len + 1);
+        assert(s->raw.data);
 #endif
         s->raw.len = new_len;
         assert(new_len >= old_len);

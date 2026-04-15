@@ -58,6 +58,7 @@ kms_sha256_hmac (void *ctx,
                  size_t len,
                  unsigned char *hash_out);
 
+#define KMS_SIGN_RSAES_PKCS1_V1_5_OUTLEN 256
 /* signature_out must be a preallocated buffer of 256 bytes (or greater). */
 bool
 kms_sign_rsaes_pkcs1_v1_5 (void *sign_ctx,

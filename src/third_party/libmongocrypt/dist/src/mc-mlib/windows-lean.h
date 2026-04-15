@@ -7,7 +7,7 @@
 
 #ifdef __has_include
 #if !__has_include(<windows.h>)
-#error "<mlib/windows-lean.h> is only available when <windows.h> in available."
+#error "<mc-mlib/windows-lean.h> is only available when <windows.h> in available."
 #endif
 #endif
 

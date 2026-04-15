@@ -15,6 +15,7 @@
  */
 
 #include "kms_message/kms_kmip_request.h"
+#include "kms_message/kms_response_parser.h"
 #include "mongocrypt-binary-private.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-crypto-private.h"
@@ -518,6 +519,9 @@ static void set_retry(mongocrypt_kms_ctx_t *kms) {
     kms->should_retry = true;
     kms->attempts++;
     kms->sleep_usec = backoff_time_usec(kms->attempts);
+    if (kms->parser) {
+        kms_response_parser_reset(kms->parser);
+    }
 }
 
 /* An AWS KMS context has received full response. Parse out the result or error.
@@ -1120,6 +1124,24 @@ done:
     return ret;
 }
 
+static bool _is_retryable_req(_kms_request_type_t req_type) {
+    // Check if request type is retryable. Some requests are non-idempotent and cannot be safely retried.
+    _kms_request_type_t retryable_types[] = {MONGOCRYPT_KMS_AZURE_OAUTH,
+                                             MONGOCRYPT_KMS_GCP_OAUTH,
+                                             MONGOCRYPT_KMS_AWS_ENCRYPT,
+                                             MONGOCRYPT_KMS_AWS_DECRYPT,
+                                             MONGOCRYPT_KMS_AZURE_WRAPKEY,
+                                             MONGOCRYPT_KMS_AZURE_UNWRAPKEY,
+                                             MONGOCRYPT_KMS_GCP_ENCRYPT,
+                                             MONGOCRYPT_KMS_GCP_DECRYPT};
+    for (size_t i = 0; i < sizeof(retryable_types) / sizeof(retryable_types[0]); i++) {
+        if (retryable_types[i] == req_type) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool mongocrypt_kms_ctx_fail(mongocrypt_kms_ctx_t *kms) {
     if (!kms) {
         return false;
@@ -1138,35 +1160,25 @@ bool mongocrypt_kms_ctx_fail(mongocrypt_kms_ctx_t *kms) {
         return false;
     }
 
-    // Check if request type is retryable. Some requests are non-idempotent and cannot be safely retried.
-    _kms_request_type_t retryable_types[] = {MONGOCRYPT_KMS_AZURE_OAUTH,
-                                             MONGOCRYPT_KMS_GCP_OAUTH,
-                                             MONGOCRYPT_KMS_AWS_ENCRYPT,
-                                             MONGOCRYPT_KMS_AWS_DECRYPT,
-                                             MONGOCRYPT_KMS_AZURE_WRAPKEY,
-                                             MONGOCRYPT_KMS_AZURE_UNWRAPKEY,
-                                             MONGOCRYPT_KMS_GCP_ENCRYPT,
-                                             MONGOCRYPT_KMS_GCP_DECRYPT};
-    bool is_retryable = false;
-    for (size_t i = 0; i < sizeof(retryable_types) / sizeof(retryable_types[0]); i++) {
-        if (retryable_types[i] == kms->req_type) {
-            is_retryable = true;
-            break;
-        }
-    }
-    if (!is_retryable) {
+    if (!_is_retryable_req(kms->req_type)) {
         CLIENT_ERR("KMS request failed due to network error");
         return false;
     }
 
     // Mark KMS context as retryable. Return again in `mongocrypt_ctx_next_kms_ctx`.
     set_retry(kms);
-
-    // Reset intermediate state of parser.
-    if (kms->parser) {
-        kms_response_parser_reset(kms->parser);
-    }
     return true;
+}
+
+bool mongocrypt_kms_ctx_feed_with_retry(mongocrypt_kms_ctx_t *kms, mongocrypt_binary_t *bytes, bool *should_retry) {
+    BSON_ASSERT_PARAM(kms);
+    BSON_ASSERT_PARAM(bytes);
+    BSON_ASSERT_PARAM(should_retry);
+    kms->should_retry = false;
+    *should_retry = false;
+    const bool res = mongocrypt_kms_ctx_feed(kms, bytes);
+    *should_retry = kms->should_retry && kms->retry_enabled;
+    return res;
 }
 
 bool mongocrypt_kms_ctx_feed(mongocrypt_kms_ctx_t *kms, mongocrypt_binary_t *bytes) {
@@ -1176,6 +1188,10 @@ bool mongocrypt_kms_ctx_feed(mongocrypt_kms_ctx_t *kms, mongocrypt_binary_t *byt
 
     mongocrypt_status_t *status = kms->status;
     if (!mongocrypt_status_ok(status)) {
+        return false;
+    }
+    if (kms->should_retry) {
+        CLIENT_ERR("KMS context needs retry. Call mongocrypt_kms_ctx_feed_with_retry instead");
         return false;
     }
 
@@ -1192,16 +1208,6 @@ bool mongocrypt_kms_ctx_feed(mongocrypt_kms_ctx_t *kms, mongocrypt_binary_t *byt
     if (bytes->len > mongocrypt_kms_ctx_bytes_needed(kms)) {
         CLIENT_ERR("KMS response fed too much data");
         return false;
-    }
-
-    if (kms->log && kms->log->trace_enabled) {
-        _mongocrypt_log(kms->log,
-                        MONGOCRYPT_LOG_LEVEL_TRACE,
-                        "%s (%s=\"%.*s\")",
-                        BSON_FUNC,
-                        "bytes",
-                        mongocrypt_binary_len(bytes),
-                        mongocrypt_binary_data(bytes));
     }
 
     if (!kms_response_parser_feed(kms->parser, bytes->data, bytes->len)) {

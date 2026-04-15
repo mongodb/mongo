@@ -143,6 +143,7 @@ kms_request_str_reserve (kms_request_str_t *str, size_t size)
 
       str->size = next_size;
       str->str = realloc (str->str, next_size);
+      KMS_ASSERT(str->str);
    }
 
    return str->str != NULL;
@@ -302,7 +303,7 @@ kms_request_str_append_escaped (kms_request_str_t *str,
          ++out;
          ++str->len;
       } else {
-         sprintf ((char *) out, "%%%02X", *in);
+         KMS_ASSERT (3 == snprintf ((char *) out, 4, "%%%02X", *in));
          out += 3;
          str->len += 3;
       }

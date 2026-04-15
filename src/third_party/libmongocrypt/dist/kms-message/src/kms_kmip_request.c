@@ -31,6 +31,7 @@ copy_writer_buffer (kms_request_t *req, kmip_writer_t *writer)
 
    buf = kmip_writer_get_buffer (writer, &buflen);
    req->kmip.data = malloc (buflen);
+   KMS_ASSERT (req->kmip.data);
    memcpy (req->kmip.data, buf, buflen);
    req->kmip.len = (uint32_t) buflen;
 }
@@ -79,6 +80,7 @@ kms_kmip_request_register_secretdata_new (void *reserved,
    kms_request_t *req;
 
    req = calloc (1, sizeof (kms_request_t));
+   KMS_ASSERT (req);
    req->provider = KMS_REQUEST_PROVIDER_KMIP;
 
    if (len != KMS_KMIP_REQUEST_SECRETDATA_LENGTH) {
@@ -168,6 +170,7 @@ kms_kmip_request_activate_new (void *reserved, const char *unique_identifer)
    kms_request_t *req;
 
    req = calloc (1, sizeof (kms_request_t));
+   KMS_ASSERT (req);
    req->provider = KMS_REQUEST_PROVIDER_KMIP;
 
    writer = kmip_writer_new ();
@@ -224,6 +227,7 @@ kms_kmip_request_get_new (void *reserved, const char *unique_identifer)
    kms_request_t *req;
 
    req = calloc (1, sizeof (kms_request_t));
+   KMS_ASSERT (req);
    req->provider = KMS_REQUEST_PROVIDER_KMIP;
 
    writer = kmip_writer_new ();
@@ -294,6 +298,7 @@ kms_kmip_request_create_new (void *reserved) {
    kms_request_t *req;
 
    req = calloc (1, sizeof (kms_request_t));
+   KMS_ASSERT (req);
    req->provider = KMS_REQUEST_PROVIDER_KMIP;
 
    writer = kmip_writer_new();
@@ -362,6 +367,7 @@ kmip_encrypt_decrypt (const char* unique_identifer, const uint8_t *data, size_t 
    kms_request_t *req;
 
    req = calloc (1, sizeof (kms_request_t));
+   KMS_ASSERT (req);
    req->provider = KMS_REQUEST_PROVIDER_KMIP;
 
    writer = kmip_writer_new();

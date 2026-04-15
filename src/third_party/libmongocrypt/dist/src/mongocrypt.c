@@ -15,9 +15,9 @@
  */
 
 #include "mongocrypt.h"
-#include "mlib/error.h"
-#include "mlib/path.h"
-#include "mlib/thread.h"
+#include "mc-mlib/error.h"
+#include "mc-mlib/path.h"
+#include "mc-mlib/thread.h"
 
 #include <bson/bson.h>
 #include <kms_message/kms_message.h>
@@ -75,28 +75,8 @@ const char *tmp_json(const bson_t *bson) {
 
     memset(storage, 0, 1024);
     json = bson_as_canonical_extended_json(bson, NULL);
-    bson_snprintf(storage, sizeof(storage), "%s", json);
+    BSON_ASSERT(0 < bson_snprintf(storage, sizeof(storage), "%s", json)); // Truncation OK.
     bson_free(json);
-    return (const char *)storage;
-}
-
-const char *tmp_buf(const _mongocrypt_buffer_t *buf) {
-    static char storage[1024];
-    size_t i, n;
-
-    BSON_ASSERT_PARAM(buf);
-
-    memset(storage, 0, 1024);
-    /* capped at two characters per byte, minus 1 for trailing \0 */
-    n = sizeof(storage) / 2 - 1;
-    if (buf->len < n) {
-        n = buf->len;
-    }
-
-    for (i = 0; i < n; i++) {
-        bson_snprintf(storage + (i * 2), 3, "%02x", buf->data[i]);
-    }
-
     return (const char *)storage;
 }
 
@@ -203,20 +183,6 @@ bool mongocrypt_setopt_kms_provider_aws(mongocrypt_t *crypt,
         return false;
     }
 
-    if (crypt->log.trace_enabled) {
-        _mongocrypt_log(&crypt->log,
-                        MONGOCRYPT_LOG_LEVEL_TRACE,
-                        "%s (%s=\"%s\", %s=%d, %s=\"%s\", %s=%d)",
-                        BSON_FUNC,
-                        "aws_access_key_id",
-                        kms_providers->aws_mut.access_key_id,
-                        "aws_access_key_id_len",
-                        aws_access_key_id_len,
-                        "aws_secret_access_key",
-                        kms_providers->aws_mut.secret_access_key,
-                        "aws_secret_access_key_len",
-                        aws_secret_access_key_len);
-    }
     kms_providers->configured_providers |= MONGOCRYPT_KMS_PROVIDER_AWS;
     return true;
 }
@@ -230,47 +196,6 @@ bool mongocrypt_setopt_key_expiration(mongocrypt_t *crypt, uint64_t cache_expira
     }
     crypt->cache_key.expiration = cache_expiration_ms;
     return true;
-}
-
-char *_mongocrypt_new_string_from_bytes(const void *in, int len) {
-    const int max_bytes = 100;
-    const int chars_per_byte = 2;
-    int out_size = max_bytes * chars_per_byte;
-    const unsigned char *src = in;
-    char *out;
-    char *ret;
-
-    out_size += len > max_bytes ? (int)sizeof("...") : 1 /* for null */;
-    out = bson_malloc0((size_t)out_size);
-    BSON_ASSERT(out);
-
-    ret = out;
-
-    for (int i = 0; i < len && i < max_bytes; i++, out += chars_per_byte) {
-        sprintf(out, "%02X", src[i]);
-    }
-
-    sprintf(out, (len > max_bytes) ? "..." : "");
-    return ret;
-}
-
-char *_mongocrypt_new_json_string_from_binary(mongocrypt_binary_t *binary) {
-    bson_t bson;
-    uint32_t len;
-
-    BSON_ASSERT_PARAM(binary);
-
-    if (!_mongocrypt_binary_to_bson(binary, &bson) || !bson_validate(&bson, BSON_VALIDATE_NONE, NULL)) {
-        char *hex;
-        char *full_str;
-
-        BSON_ASSERT(binary->len <= (uint32_t)INT_MAX);
-        hex = _mongocrypt_new_string_from_bytes(binary->data, (int)binary->len);
-        full_str = bson_strdup_printf("(malformed) %s", hex);
-        bson_free(hex);
-        return full_str;
-    }
-    return bson_as_canonical_extended_json(&bson, (size_t *)&len);
 }
 
 bool mongocrypt_setopt_schema_map(mongocrypt_t *crypt, mongocrypt_binary_t *schema_map) {
@@ -360,15 +285,6 @@ bool mongocrypt_setopt_kms_provider_local(mongocrypt_t *crypt, mongocrypt_binary
         return false;
     }
 
-    if (crypt->log.trace_enabled) {
-        char *key_val;
-        BSON_ASSERT(key->len <= (uint32_t)INT_MAX);
-        key_val = _mongocrypt_new_string_from_bytes(key->data, (int)key->len);
-
-        _mongocrypt_log(&crypt->log, MONGOCRYPT_LOG_LEVEL_TRACE, "%s (%s=\"%s\")", BSON_FUNC, "key", key_val);
-        bson_free(key_val);
-    }
-
     _mongocrypt_buffer_copy_from_binary(&kms_providers->local_mut.key, key);
     kms_providers->configured_providers |= MONGOCRYPT_KMS_PROVIDER_LOCAL;
     return true;
@@ -408,9 +324,6 @@ static _loaded_csfle _try_load_csfle(const char *filepath, mongocrypt_status_t *
         // Bad:
         return (_loaded_csfle){.okay = false};
     }
-
-    // Successfully opened DLL
-    _mongocrypt_log(log, MONGOCRYPT_LOG_LEVEL_TRACE, "Loading crypt_shared dynamic library [%s]", filepath);
 
     // Construct the library vtable
     _mongo_crypt_v1_vtable vtable = {.okay = true};
@@ -796,7 +709,6 @@ static bool _csfle_replace_or_take_validate_singleton(mongocrypt_t *crypt, _load
         // Reset the library in the caller so they can't unload the DLL. The DLL
         // is now managed in the global variable.
         found->lib = MCR_DLL_NULL;
-        _mongocrypt_log(&crypt->log, MONGOCRYPT_LOG_LEVEL_TRACE, "Loading new csfle library for the application.");
         have_csfle = true;
         break;
     case LIB_CREATE_FAILED:
@@ -1213,6 +1125,18 @@ bool _mongocrypt_needs_credentials_for_provider(mongocrypt_t *crypt,
     }
 
     return (crypt->opts.kms_providers.need_credentials & (int)provider) != 0;
+}
+
+/* Given a string, populate a bson_value_t for that string */
+void _bson_value_from_string(const char *string, bson_value_t *value) {
+    bson_t *bson;
+    bson_iter_t iter;
+
+    bson = BCON_NEW("key", string);
+    BSON_ASSERT(bson_iter_init_find(&iter, bson, "key"));
+    bson_value_copy(bson_iter_value(&iter), value);
+
+    bson_destroy(bson);
 }
 
 void mongocrypt_setopt_bypass_query_analysis(mongocrypt_t *crypt) {
