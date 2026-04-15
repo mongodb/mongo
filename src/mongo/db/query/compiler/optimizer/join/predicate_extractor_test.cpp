@@ -108,7 +108,7 @@ public:
             auto expectedJoinPred = Expression::parseExpression(
                 expCtx().get(), joinPredBson, expCtx()->variablesParseState);
             auto gotJoinPred = splitExprs->joinPredicates[i];
-            ASSERT_VALUE_EQ(expectedJoinPred->serialize(), gotJoinPred->serialize());
+            ASSERT_VALUE_EQ(expectedJoinPred->serialize(), gotJoinPred.serialize());
             ++i;
         }
 

@@ -82,7 +82,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchE
 
 struct Predicates {
     std::unique_ptr<CanonicalQuery> canonicalQuery;
-    std::vector<boost::intrusive_ptr<const Expression>> joinPredicates;
+    std::vector<JoinPredicateExpr> joinPredicates;
 };
 
 StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp& stage) {
@@ -91,7 +91,7 @@ StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp& stage) 
         auto ds = stage.getResolvedIntrospectionPipeline().peekFront();
         auto match = dynamic_cast<DocumentSourceMatch*>(ds);
         tassert(11317205, "expected $match stage as leading stage in subpipeline", match);
-        // Attempt to split
+        // Attempt to split.
         auto splitRes = splitJoinAndSingleCollectionPredicates(match->getMatchExpression(),
                                                                stage.getLetVariables());
         if (!splitRes.has_value()) {
@@ -205,71 +205,19 @@ void addImplicitEdges(MutableJoinGraph& graph,
     }
 }
 
-// Checked cast which performs a tassert if it fails.
-template <typename U, typename V>
-U tassert_cast(V* v) {
-    auto ret = dynamic_cast<U>(v);
-    if (!ret) {
-        tasserted(11317202, "cast failed");
-    }
-    return ret;
-}
-
-// Compute the field path which the given variable ID refers to in the local collection of a
-// $lookup. We assume that the given a set of let variables from $lookup all are defined to be
-// simple FieldPaths (i.e.are of the form {foo: '$foo'}). This allows us resolve a variable to
-// underlying FieldPath.
-FieldPath localCollectionFieldPath(const std::vector<LetVariable>& letVars, Variables::Id id) {
-    auto varIt =
-        std::find_if(letVars.cbegin(), letVars.cend(), [&id](auto&& var) { return var.id == id; });
-    tassert(
-        11317201, "variable ID not found in given set of let variables", varIt != letVars.cend());
-    auto& var = *varIt;
-    auto localFieldPath = tassert_cast<const ExpressionFieldPath*>(var.expression.get());
-    return localFieldPath->getFieldPathWithoutCurrentPrefix();
-}
-
-// Insert the given join predicates into the given join graph. Assumes that the join predicates are
-// agg expressions of the form {$eq: ['$foreignCollFieldPath', '$$localCollVar']}.
+// Insert the given join predicates into the given join graph.
 Status addExprJoinPredicates(MutableJoinGraph& graph,
-                             const std::vector<boost::intrusive_ptr<const Expression>>& joinPreds,
+                             const std::vector<JoinPredicateExpr>& joinPreds,
                              PathResolver& pathResolver,
-                             const std::vector<LetVariable>& letVars,
                              NodeId foreignNodeId) {
     for (auto&& joinPred : joinPreds) {
-        auto eqNode = tassert_cast<const ExpressionCompare*>(joinPred.get());
-        auto left = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[0].get());
-        auto right = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[1].get());
-
-        boost::optional<PathId> localPath;
-        boost::optional<PathId> foreignPath;
-
-        if (left->isVariableReference()) {
-            // LHS is referencing a field from intermediate join result aka local "collection".
-            // RHS is referencing a field from the foreign collection
-            localPath =
-                pathResolver.resolve(localCollectionFieldPath(letVars, left->getVariableId()));
-            foreignPath =
-                pathResolver.addPath(foreignNodeId, right->getFieldPathWithoutCurrentPrefix());
-        } else if (right->isVariableReference()) {
-            // LHS is referencing a field from the foreign collection.
-            // RHS is referencing a field from intermediate join result aka local "collection".
-            localPath =
-                pathResolver.resolve(localCollectionFieldPath(letVars, right->getVariableId()));
-            foreignPath =
-                pathResolver.addPath(foreignNodeId, left->getFieldPathWithoutCurrentPrefix());
-        } else {
-            // We expect one of the children of the ExpressionCompare to be a variable and the other
-            // to be a field path.
-            MONGO_UNREACHABLE_TASSERT(11317203);
-        }
-
+        auto localPath = pathResolver.resolve(joinPred.localField());
         if (!localPath) {
             return Status(ErrorCodes::BadValue, "Local path could not be resolved");
         }
-
+        PathId foreignPath = pathResolver.addPath(foreignNodeId, joinPred.foreignField());
         auto localNodeId = pathResolver[*localPath].nodeId;
-        graph.addExprEqualityEdge(localNodeId, foreignNodeId, *localPath, *foreignPath);
+        graph.addExprEqualityEdge(localNodeId, foreignNodeId, *localPath, foreignPath);
     }
     return Status::OK();
 }
@@ -402,20 +350,19 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             }
 
             // Add join predicates expressed as $expr in subpipelines to join graph.
-            auto status = addExprJoinPredicates(graph,
-                                                swPreds.getValue().joinPredicates,
-                                                pathResolver,
-                                                lookup->getLetVariables(),
-                                                *foreignNodeId);
+            auto status = addExprJoinPredicates(
+                graph, swPreds.getValue().joinPredicates, pathResolver, *foreignNodeId);
             if (!status.isOK()) {
                 return status;
             }
+
             auto next = suffix->popFront();
             if (prefix->getSources().empty()) {
                 prefix->addInitialSource(std::move(next));
             } else {
                 prefix->pushBack(std::move(next));
             }
+
         } else if (auto* match = dynamic_cast<DocumentSourceMatch*>(stage); match) {
             tassert(11116400, "unexpected $match", !prefix->getSources().empty());
 

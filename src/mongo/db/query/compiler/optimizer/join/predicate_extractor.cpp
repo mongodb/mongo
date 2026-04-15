@@ -98,7 +98,7 @@ struct PredicateExtractor {
     }
 
     boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
-        boost::intrusive_ptr<const Expression> aggExpr) {
+        boost::intrusive_ptr<const Expression> aggExpr, const std::vector<LetVariable>& letVars) {
         // There are three cases we need to handle for splitting agg expressions:
         // 1. ExpressionAnd: Recursively try to split children and aggregate their join and single
         // table predicates.
@@ -109,7 +109,7 @@ struct PredicateExtractor {
             Expression::ExpressionVector vec;
 
             for (auto&& child : andExpr->getChildren()) {
-                auto childRes = splitJoinAndSingleCollectionPredicates(child);
+                auto childRes = splitJoinAndSingleCollectionPredicates(child, letVars);
                 if (!childRes.has_value()) {
                     return boost::none;
                 }
@@ -137,7 +137,7 @@ struct PredicateExtractor {
         if (auto cmp = dynamic_cast<const ExpressionCompare*>(aggExpr.get())) {
             if (isExprEquijoin(cmp)) {
                 return SplitPredicatesResult{
-                    .joinPredicates = {aggExpr},
+                    .joinPredicates = {JoinPredicateExpr::make(cmp, letVars)},
                 };
             }
         }
@@ -155,7 +155,7 @@ struct PredicateExtractor {
 
 
     boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
-        const MatchExpression* matchExpr) {
+        const MatchExpression* matchExpr, const std::vector<LetVariable>& variables) {
         // There are 4 cases we need handle for splitting MatchExpressions:
         // 1. $expr: See 'splitJoinAndSingleCollectionPredicates(Expression)'. This contains
         // potential join and single table predicates.
@@ -167,16 +167,17 @@ struct PredicateExtractor {
         switch (matchExpr->matchType()) {
             case MatchExpression::EXPRESSION: {
                 auto expr = static_cast<const ExprMatchExpression*>(matchExpr);
-                return splitJoinAndSingleCollectionPredicates(expr->getExpression());
+                return splitJoinAndSingleCollectionPredicates(expr->getExpression(), variables);
             }
             case MatchExpression::AND: {
-                std::vector<boost::intrusive_ptr<const Expression>> joinPredicates;
+                std::vector<JoinPredicateExpr> joinPredicates;
                 auto singleTablePreds = std::make_unique<AndMatchExpression>();
 
                 // Recursive calls to split for each child and aggregate join and residual
                 // predicates.
                 for (size_t i = 0; i < matchExpr->numChildren(); ++i) {
-                    auto childRes = splitJoinAndSingleCollectionPredicates(matchExpr->getChild(i));
+                    auto childRes =
+                        splitJoinAndSingleCollectionPredicates(matchExpr->getChild(i), variables);
                     if (!childRes.has_value()) {
                         return boost::none;
                     }
@@ -200,7 +201,8 @@ struct PredicateExtractor {
             case MatchExpression::NOR:
             case MatchExpression::NOT: {
                 for (size_t i = 0; i < matchExpr->numChildren(); ++i) {
-                    auto childRes = splitJoinAndSingleCollectionPredicates(matchExpr->getChild(i));
+                    auto childRes =
+                        splitJoinAndSingleCollectionPredicates(matchExpr->getChild(i), variables);
                     if (!childRes.has_value()) {
                         return boost::none;
                     }
@@ -339,7 +341,51 @@ private:
     std::vector<JoinPredicate> _predicates;
     bool _expressionIsFullyAbsorbed;
 };
+
+// Checked cast which performs a tassert if it fails.
+template <typename U, typename V>
+U tassert_cast(V* v) {
+    auto ret = dynamic_cast<U>(v);
+    if (!ret) {
+        tasserted(11317202, "cast failed");
+    }
+    return ret;
+}
+
+// Compute the field path which the given variable ID refers to in the local collection of a
+// $lookup. We assume that the given a set of let variables from $lookup all are defined to be
+// simple FieldPaths (i.e.are of the form {foo: '$foo'}). This allows us resolve a variable to
+// underlying FieldPath.
+FieldPath localCollectionFieldPath(const std::vector<LetVariable>& letVars, Variables::Id id) {
+    auto varIt =
+        std::find_if(letVars.cbegin(), letVars.cend(), [&id](auto&& var) { return var.id == id; });
+    tassert(
+        11317201, "variable ID not found in given set of let variables", varIt != letVars.cend());
+    auto& var = *varIt;
+    auto localFieldPath = tassert_cast<const ExpressionFieldPath*>(var.expression.get());
+    return localFieldPath->getFieldPathWithoutCurrentPrefix();
+}
+
 }  // namespace
+
+JoinPredicateExpr JoinPredicateExpr::make(const ExpressionCompare* eqNode,
+                                          const std::vector<LetVariable>& letVars) {
+    auto left = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[0].get());
+    auto right = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[1].get());
+
+    if (left->isVariableReference()) {
+        return {localCollectionFieldPath(letVars, left->getVariableId()),
+                right->getFieldPathWithoutCurrentPrefix(),
+                eqNode};
+    }
+
+    tassert(11317203,
+            "Expected a variable & a field path in a join predicate",
+            right->isVariableReference());
+    return {localCollectionFieldPath(letVars, right->getVariableId()),
+            left->getFieldPathWithoutCurrentPrefix(),
+            eqNode};
+}
 
 boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
     const MatchExpression* matchExpr, const std::vector<LetVariable>& variables) {
@@ -358,7 +404,8 @@ boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
         // At this point, we have verified the RHS of the variable refers to a field in the local
         // collection, which can be used to specify a join predicate.
     }
-    return PredicateExtractor{variables}.splitJoinAndSingleCollectionPredicates(matchExpr);
+    return PredicateExtractor{variables}.splitJoinAndSingleCollectionPredicates(matchExpr,
+                                                                                variables);
 }
 
 ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver,

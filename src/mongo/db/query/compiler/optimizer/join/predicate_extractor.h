@@ -36,6 +36,41 @@
 namespace mongo::join_ordering {
 
 /**
+ * Class representing an agg expression of the form {$eq: ['$foreignCollFieldPath',
+ * '$$localCollVar']}, used in join predicate resolution.
+ */
+class JoinPredicateExpr {
+public:
+    /**
+     * Note: this expects 'expr' & 'letVars' to outlive the returned instance. This doesn't take
+     * ownership of either.
+     */
+    static JoinPredicateExpr make(const ExpressionCompare* expr,
+                                  const std::vector<LetVariable>& letVars);
+
+    const FieldPath& localField() const {
+        return _localField;
+    }
+
+    const FieldPath& foreignField() const {
+        return _foreignField;
+    }
+
+    // Used by unit tests.
+    auto serialize() const {
+        return _expr->serialize();
+    }
+
+private:
+    JoinPredicateExpr(FieldPath localField, FieldPath foreignField, const ExpressionCompare* expr)
+        : _localField(std::move(localField)), _foreignField(std::move(foreignField)), _expr(expr) {}
+
+    FieldPath _localField;
+    FieldPath _foreignField;
+    const ExpressionCompare* _expr;
+};
+
+/**
  * Represents the result of splitting a MatchExpression from a $match in the subpipeline of a
  * $lookup into parts representing equijoin predicates and residual single table predicates.
  */
@@ -44,7 +79,7 @@ struct SplitPredicatesResult {
     // {$eq: ['$fieldPathInForeignNSS', '$$varCorrespondingToPathInLocalNSS']}
     // Note that the order of operands is not guaranteed and there may be semantically duplicate
     // entries.
-    std::vector<boost::intrusive_ptr<const Expression>> joinPredicates;
+    std::vector<JoinPredicateExpr> joinPredicates;
     // Residual predicate on the single table which does not contain any correlated predicates. In
     // other terms, this expression is able to be pushed down to the find layer.
     std::unique_ptr<MatchExpression> singleTablePredicates;
