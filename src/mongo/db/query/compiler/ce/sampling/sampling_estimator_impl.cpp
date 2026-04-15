@@ -426,17 +426,16 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
                                    false /* preparingFromCache */);
 
     // Create a PlanExecutor for the execution of the sampling plan.
-    auto exec = std::move(mongo::plan_executor_factory::make(_opCtx,
-                                                             std::move(cq),
-                                                             nullptr /*solution*/,
-                                                             std::move(plan),
-                                                             _collections,
-                                                             QueryPlannerParams::DEFAULT,
-                                                             _nss,
-                                                             std::move(sbeYieldPolicy),
-                                                             false /* isFromPlanCache */,
-                                                             false /* cachedPlanHash */)
-                              .getValue());
+    auto exec = mongo::plan_executor_factory::make(_opCtx,
+                                                   std::move(cq),
+                                                   nullptr /*solution*/,
+                                                   std::move(plan),
+                                                   _collections,
+                                                   QueryPlannerParams::DEFAULT,
+                                                   _nss,
+                                                   std::move(sbeYieldPolicy),
+                                                   false /* isFromPlanCache */,
+                                                   false /* cachedPlanHash */);
 
     // This function call could be a re-sample request, so the previous sample should be cleared.
     _sample.clear();

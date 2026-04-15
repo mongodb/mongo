@@ -162,15 +162,12 @@ public:
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(ss),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                        QueryPlannerParams::DEFAULT);
-        invariant(statusWithPlanExecutor.getStatus());
-        return std::move(statusWithPlanExecutor.getValue());
+        return plan_executor_factory::make(_expCtx,
+                                           std::move(ws),
+                                           std::move(ss),
+                                           coll,
+                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                           QueryPlannerParams::DEFAULT);
     }
 
     // Return a value in the set {-1, 0, 1} to represent the sign of parameter i.  Used to
@@ -254,15 +251,12 @@ public:
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
         // totally) correct.
@@ -674,14 +668,12 @@ public:
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
 
         // We don't get results back since we're sorting some parallel arrays.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         ASSERT_THROWS_CODE(exec->getNext(static_cast<BSONObj*>(nullptr), nullptr),
                            DBException,

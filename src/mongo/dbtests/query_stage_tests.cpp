@@ -112,15 +112,12 @@ public:
         auto ix = std::make_unique<IndexScan>(
             _expCtx.get(), collection, params, ws.get(), filterExpr.get());
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(ix),
-                                        collection,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(ix),
+                                                collection,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         int count = 0;
         PlanExecutor::ExecState state;

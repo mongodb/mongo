@@ -347,14 +347,13 @@ public:
                 root->pushBack(id);
             }
 
-            auto exec = uassertStatusOK(
-                plan_executor_factory::make(expCtx,
-                                            std::move(ws),
-                                            std::move(root),
-                                            boost::none,
-                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                            false, /* whether returned BSON must be owned */
-                                            nss));
+            auto exec = plan_executor_factory::make(expCtx,
+                                                    std::move(ws),
+                                                    std::move(root),
+                                                    boost::none,
+                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                    false, /* whether returned BSON must be owned */
+                                                    nss);
 
             std::vector<mongo::ListIndexesReplyItem> firstBatch;
             FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;

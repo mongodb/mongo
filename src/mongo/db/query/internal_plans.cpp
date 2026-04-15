@@ -189,10 +189,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleColl
         root = std::make_unique<LimitStage>(expCtx.get(), samples, ws.get(), std::move(root));
     }
 
-    auto statusWithPlanExecutor = plan_executor_factory::make(
+    return plan_executor_factory::make(
         expCtx, std::move(ws), std::move(root), collection, yieldPolicy, false);
-    tassert(statusWithPlanExecutor.getStatus());
-    return std::move(statusWithPlanExecutor.getValue());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
@@ -237,14 +235,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     auto cs = _collectionScan(expCtx, ws.get(), params.collection, collScanParams);
 
     // Takes ownership of 'ws' and 'cs'.
-    auto statusWithPlanExecutor = plan_executor_factory::make(expCtx,
-                                                              std::move(ws),
-                                                              std::move(cs),
-                                                              params.collection,
-                                                              params.yieldPolicy,
-                                                              params.plannerOptions);
-    tassert(statusWithPlanExecutor.getStatus());
-    return std::move(statusWithPlanExecutor.getValue());
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(cs),
+                                       params.collection,
+                                       params.yieldPolicy,
+                                       params.plannerOptions);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
@@ -260,15 +256,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     auto cs = _collectionScan(expCtx, ws.get(), coll, params);
 
     // Takes ownership of 'ws' and 'cs'.
-    auto statusWithPlanExecutor =
-        plan_executor_factory::make(expCtx,
-                                    std::move(ws),
-                                    std::move(cs),
-                                    coll,
-                                    yieldPolicy,
-                                    false /* whether owned BSON must be returned */);
-    tassert(statusWithPlanExecutor.getStatus());
-    return std::move(statusWithPlanExecutor.getValue());
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(cs),
+                                       coll,
+                                       yieldPolicy,
+                                       false /* whether owned BSON must be returned */);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithCollectionScan(
@@ -315,15 +308,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
         expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
 
 
-    auto executor = plan_executor_factory::make(expCtx,
-                                                std::move(ws),
-                                                std::move(root),
-                                                coll,
-                                                yieldPolicy,
-                                                false /* whether owned BSON must be returned */
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       coll,
+                                       yieldPolicy,
+                                       false /* whether owned BSON must be returned */
     );
-    invariant(executor.getStatus());
-    return std::move(executor.getValue());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
@@ -342,15 +333,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     std::unique_ptr<PlanStage> root = _indexScan(
         expCtx, ws.get(), coll, indexEntry, startKey, endKey, boundInclusion, direction, options);
 
-    auto executor = plan_executor_factory::make(expCtx,
-                                                std::move(ws),
-                                                std::move(root),
-                                                coll,
-                                                yieldPolicy,
-                                                false /* whether owned BSON must be returned */
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       coll,
+                                       yieldPolicy,
+                                       false /* whether owned BSON must be returned */
     );
-    tassert(executor.getStatus());
-    return std::move(executor.getValue());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithIndexScan(
@@ -384,15 +373,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
         expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
 
 
-    auto executor = plan_executor_factory::make(expCtx,
-                                                std::move(ws),
-                                                std::move(root),
-                                                coll,
-                                                yieldPolicy,
-                                                false /* whether owned BSON must be returned */
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       coll,
+                                       yieldPolicy,
+                                       false /* whether owned BSON must be returned */
     );
-    tassert(executor.getStatus());
-    return std::move(executor.getValue());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::shardKeyIndexScan(
@@ -467,15 +454,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     root = _createAppropriateDeleteStage(
         expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
 
-    auto executor = plan_executor_factory::make(expCtx,
-                                                std::move(ws),
-                                                std::move(root),
-                                                coll,
-                                                yieldPolicy,
-                                                false /* whether owned BSON must be returned */
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       coll,
+                                       yieldPolicy,
+                                       false /* whether owned BSON must be returned */
     );
-    invariant(executor.getStatus());
-    return std::move(executor.getValue());
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWithIdHack(
@@ -500,15 +485,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
                           : std::make_unique<UpdateStage>(
                                 expCtx.get(), params, ws.get(), collection, idHackStage.release()));
 
-    auto executor = plan_executor_factory::make(expCtx,
-                                                std::move(ws),
-                                                std::move(root),
-                                                collection,
-                                                yieldPolicy,
-                                                false /* whether owned BSON must be returned */);
-
-    invariant(executor.getStatus());
-    return std::move(executor.getValue());
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       collection,
+                                       yieldPolicy,
+                                       false /* whether owned BSON must be returned */);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(

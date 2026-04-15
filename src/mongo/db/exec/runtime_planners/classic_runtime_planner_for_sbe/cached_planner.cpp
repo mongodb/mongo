@@ -62,15 +62,15 @@ public:
         auto remoteExplains = cq()->getExpCtx()->getExplain()
             ? search_helpers::getSearchRemoteExplains(cq()->getExpCtxRaw(), cq()->cqPipeline())
             : nullptr;
-        return uassertStatusOK(plan_executor_factory::make(opCtx(),
-                                                           std::move(canonicalQuery),
-                                                           std::move(_candidate),
-                                                           collections(),
-                                                           plannerOptions(),
-                                                           std::move(nss),
-                                                           extractSbeYieldPolicy(),
-                                                           std::move(remoteCursors),
-                                                           std::move(remoteExplains)));
+        return plan_executor_factory::make(opCtx(),
+                                           std::move(canonicalQuery),
+                                           std::move(_candidate),
+                                           collections(),
+                                           plannerOptions(),
+                                           std::move(nss),
+                                           extractSbeYieldPolicy(),
+                                           std::move(remoteCursors),
+                                           std::move(remoteExplains));
     }
 
 

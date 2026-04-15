@@ -378,13 +378,13 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
         auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-        auto planExecutor = uassertStatusOK(
+        auto planExecutor =
             plan_executor_factory::make(std::move(canonicalQuery),
                                         std::move(workingSet),
                                         std::move(collectionScan),
                                         coll,
                                         PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
-                                        QueryPlannerParams::DEFAULT));
+                                        QueryPlannerParams::DEFAULT);
 
         // Make a DocumentSourceCursor.
         ctx()->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
@@ -424,15 +424,13 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
         auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-        auto planExecutor = uassertStatusOK(
+        auto planExecutor =
             plan_executor_factory::make(std::move(canonicalQuery),
                                         std::move(workingSet),
                                         std::move(collectionScan),
                                         coll,
                                         PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
-                                        QueryPlannerParams::DEFAULT
-
-                                        ));
+                                        QueryPlannerParams::DEFAULT);
 
         // Make a DocumentSourceCursor.
         ctx()->setTailableMode(TailableModeEnum::kNormal);
@@ -485,13 +483,13 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
                                                .mayDbProfile(true)
                                                .build(),
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-        auto planExecutor = uassertStatusOK(
+        auto planExecutor =
             plan_executor_factory::make(std::move(canonicalQuery),
                                         std::move(workingSet),
                                         std::move(collectionScan),
                                         coll,
                                         PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED,
-                                        QueryPlannerParams::DEFAULT));
+                                        QueryPlannerParams::DEFAULT);
 
         // Make a DocumentSourceCursor.
         ctx()->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
@@ -530,13 +528,13 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
         auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-        auto planExecutor = uassertStatusOK(
+        auto planExecutor =
             plan_executor_factory::make(std::move(canonicalQuery),
                                         std::move(workingSet),
                                         std::move(collectionScan),
                                         coll,
                                         PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED,
-                                        QueryPlannerParams::DEFAULT));
+                                        QueryPlannerParams::DEFAULT);
 
         // Make a DocumentSourceCursor.
         ctx()->setTailableMode(TailableModeEnum::kNormal);

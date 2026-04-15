@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -60,8 +59,7 @@
 namespace mongo::plan_executor_factory {
 
 /**
- * Creates a new 'PlanExecutor' capable of executing the query 'cq', or a non-OK status if a
- * plan executor could not be created.
+ * Creates a new 'PlanExecutor' capable of executing the query 'cq'.
  *
  * Passing YIELD_AUTO will construct a yielding executor which may yield in the following
  * circumstances:
@@ -71,7 +69,7 @@ namespace mongo::plan_executor_factory {
  *   - While executing the plan inside executePlan().
  *
  * If auto-yielding is enabled, a yield during make() may result in the PlanExecutorImpl being
- * killed, in which case this method will return a non-OK status.
+ * killed, in which case this method will throw.
  *
  * The caller must provide either a non-null value for 'collection, or a non-empty 'nss'
  * NamespaceString but not both.
@@ -79,7 +77,7 @@ namespace mongo::plan_executor_factory {
  * Note that the PlanExecutor will use the ExpressionContext associated with 'cq' and the
  * OperationContext associated with that ExpressionContext.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -98,7 +96,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
  * Note that the PlanExecutor will use the OperationContext associated with the 'expCtx'
  * ExpressionContext.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -108,8 +106,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
     NamespaceString nss = NamespaceString::kEmpty,
     std::unique_ptr<QuerySolution> qs = nullptr);
 
-// TODO: SERVER-86878 Remove `StatusWith` return type from plan_executor_factory::make().
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     OperationContext* opCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -130,7 +127,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
  * If a classicRuntimePlannerStage is passed in, the PlanStage will be eventually passed to a
  * PlanExplainer and which will in turn extract relevant explain data from the classic multiplanner.
  */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<QuerySolution> solution,
@@ -154,7 +151,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
  * plan passed as a 'candidate'. This overload allows callers to pass a pre-existing queue
  * ('stash') of BSON objects or record ids to return to the caller.
  */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     sbe::plan_ranker::CandidatePlan candidate,

@@ -1225,14 +1225,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
         root->pushBack(id);
     }
 
-    return uassertStatusOK(
-        plan_executor_factory::make(expCtx,
-                                    std::move(ws),
-                                    std::move(root),
-                                    boost::none,
-                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                    false, /* whether returned BSON must be owned */
-                                    nss));
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       boost::none,
+                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                       false, /* whether returned BSON must be owned */
+                                       nss);
 }
 
 CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,

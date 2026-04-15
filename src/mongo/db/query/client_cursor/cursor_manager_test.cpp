@@ -96,14 +96,13 @@ protected:
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kTestNss);
         auto workingSet = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), workingSet.get());
-        return unittest::assertGet(
-            plan_executor_factory::make(expCtx,
-                                        std::move(workingSet),
-                                        std::move(queuedDataStage),
-                                        boost::none,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT,
-                                        kTestNss));
+        return plan_executor_factory::make(expCtx,
+                                           std::move(workingSet),
+                                           std::move(queuedDataStage),
+                                           boost::none,
+                                           PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                           QueryPlannerParams::DEFAULT,
+                                           kTestNss);
     }
 
     ClientCursorParams makeParams(OperationContext* opCtx) {

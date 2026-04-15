@@ -214,15 +214,12 @@ public:
         std::unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -283,15 +280,12 @@ public:
         std::unique_ptr<FetchStage> fetchStage =
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         uint64_t peakMemoryBytes = 0;
         for (int i = 0; i < N; ++i) {
@@ -354,15 +348,12 @@ public:
         std::unique_ptr<FetchStage> fetchStage =
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -426,15 +417,12 @@ public:
         std::unique_ptr<FetchStage> fetchStage =
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -494,15 +482,12 @@ public:
         std::unique_ptr<FetchStage> fetchStage =
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         // Only getting results from the a:1 index scan.
         for (int i = 0; i < N; ++i) {
@@ -551,15 +536,12 @@ public:
         std::unique_ptr<FetchStage> fetchStage =
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         for (int i = 0; i < numIndices; ++i) {
             BSONObj obj;
@@ -836,15 +818,12 @@ public:
         auto fetchStage =
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(fetchStage),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -910,15 +889,12 @@ public:
         ms->addChild(
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(ms),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(ms),
+                                                coll,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;

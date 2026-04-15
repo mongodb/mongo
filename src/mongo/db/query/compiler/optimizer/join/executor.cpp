@@ -443,19 +443,19 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // map from join-reordering 'reordered.estimates' can be combined with the estimate map from
     // CBR 'swAccessPlans.getValue().estimate' before creating the executor below.
     // We actually have several canonical queries, so we don't try to pass one in.
-    auto exec = uassertStatusOK(plan_executor_factory::make(opCtx,
-                                                            nullptr /* cq */,
-                                                            std::move(reordered.soln),
-                                                            std::move(planStagesAndData),
-                                                            mca,
-                                                            plannerOptions,
-                                                            mca.getMainCollection()->ns(),
-                                                            std::move(sbeYieldPolicy),
-                                                            false /* isFromPlanCache */,
-                                                            false /* cachedPlanHash */,
-                                                            true /*usedJoinOpt*/,
-                                                            std::move(reordered.estimates),
-                                                            std::move(rejectedPlans)));
+    auto exec = plan_executor_factory::make(opCtx,
+                                            nullptr /* cq */,
+                                            std::move(reordered.soln),
+                                            std::move(planStagesAndData),
+                                            mca,
+                                            plannerOptions,
+                                            mca.getMainCollection()->ns(),
+                                            std::move(sbeYieldPolicy),
+                                            false /* isFromPlanCache */,
+                                            false /* cachedPlanHash */,
+                                            true /*usedJoinOpt*/,
+                                            std::move(reordered.estimates),
+                                            std::move(rejectedPlans));
 
     return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
 }

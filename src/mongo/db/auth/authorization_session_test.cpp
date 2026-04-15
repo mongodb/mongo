@@ -102,14 +102,13 @@ public:
         auto expCtx = ExpressionContextBuilder{}.opCtx(_opCtx).ns(nss).build();
         auto workingSet = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), workingSet.get());
-        return unittest::assertGet(
-            plan_executor_factory::make(expCtx,
-                                        std::move(workingSet),
-                                        std::move(queuedDataStage),
-                                        boost::none,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT,
-                                        nss));
+        return plan_executor_factory::make(expCtx,
+                                           std::move(workingSet),
+                                           std::move(queuedDataStage),
+                                           boost::none,
+                                           PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                           QueryPlannerParams::DEFAULT,
+                                           nss);
     }
 };
 

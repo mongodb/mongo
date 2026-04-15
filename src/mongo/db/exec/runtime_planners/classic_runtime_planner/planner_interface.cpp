@@ -264,19 +264,19 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
     }
     _state = kDisposed;
 
-    return uassertStatusOK(plan_executor_factory::make(opCtx(),
-                                                       std::move(_plannerData.workingSet),
-                                                       std::move(_root),
-                                                       extractQuerySolution(),
-                                                       std::move(canonicalQuery),
-                                                       cq()->getExpCtx(),
-                                                       collections().getMainCollectionAcquisition(),
-                                                       plannerOptions(),
-                                                       std::move(_nss),
-                                                       yieldPolicy(),
-                                                       cachedPlanHash(),
-                                                       replanReason(),
-                                                       std::move(_planExplainerData)));
+    return plan_executor_factory::make(opCtx(),
+                                       std::move(_plannerData.workingSet),
+                                       std::move(_root),
+                                       extractQuerySolution(),
+                                       std::move(canonicalQuery),
+                                       cq()->getExpCtx(),
+                                       collections().getMainCollectionAcquisition(),
+                                       plannerOptions(),
+                                       std::move(_nss),
+                                       yieldPolicy(),
+                                       cachedPlanHash(),
+                                       replanReason(),
+                                       std::move(_planExplainerData));
 }
 
 std::unique_ptr<PlanStage> ClassicPlannerInterface::buildExecutableTree(const QuerySolution& qs) {

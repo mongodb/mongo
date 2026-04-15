@@ -109,16 +109,12 @@ public:
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Takes ownership of 'ws', 'scan', and 'cq'.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(std::move(cq),
-                                        std::move(ws),
-                                        std::move(scan),
-                                        collection(),
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        return std::move(statusWithPlanExecutor.getValue());
+        return plan_executor_factory::make(std::move(cq),
+                                           std::move(ws),
+                                           std::move(scan),
+                                           collection(),
+                                           PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                           QueryPlannerParams::DEFAULT);
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIxscanPlan(BSONObj keyPattern,

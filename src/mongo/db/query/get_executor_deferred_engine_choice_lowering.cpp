@@ -155,17 +155,16 @@ private:
         if (fromCandidate) {
             auto execState = _rankingResult.execState->extractExecState<SbeExecState>();
             execState.sbeCandidate.solution = std::move(solution);
-            return uassertStatusOK(
-                plan_executor_factory::make(_opCtx,
-                                            std::move(_cq),
-                                            std::move(execState.sbeCandidate),
-                                            _collections,
-                                            _rankingResult.plannerParams->providedOptions,
-                                            std::move(nss),
-                                            std::move(execState.sbeYieldPolicy),
-                                            std::move(remoteCursors),
-                                            std::move(remoteExplains),
-                                            _rankingResult.cachedPlanHash));
+            return plan_executor_factory::make(_opCtx,
+                                               std::move(_cq),
+                                               std::move(execState.sbeCandidate),
+                                               _collections,
+                                               _rankingResult.plannerParams->providedOptions,
+                                               std::move(nss),
+                                               std::move(execState.sbeYieldPolicy),
+                                               std::move(remoteCursors),
+                                               std::move(remoteExplains),
+                                               _rankingResult.cachedPlanHash);
         }
 
         auto sbeYieldPolicy =
@@ -192,24 +191,23 @@ private:
         buildRejectedExecutableTreesForExplain(solution.get(), false /*isCountQuery*/);
 
         static const bool isFromSbePlanCache = false;
-        return uassertStatusOK(
-            plan_executor_factory::make(_opCtx,
-                                        std::move(_cq),
-                                        std::move(solution),
-                                        std::move(sbePlanAndData),
-                                        _collections,
-                                        plannerParams()->providedOptions,
-                                        std::move(nss),
-                                        std::move(sbeYieldPolicy),
-                                        isFromSbePlanCache,
-                                        _rankingResult.cachedPlanHash,
-                                        false /*usedJoinOpt*/,
-                                        {} /*estimates*/,
-                                        {} /*rejectedJoinPlans*/,
-                                        std::move(remoteCursors),
-                                        std::move(remoteExplains),
-                                        extractMps(),
-                                        std::move(_rankingResult.maybeExplainData)));
+        return plan_executor_factory::make(_opCtx,
+                                           std::move(_cq),
+                                           std::move(solution),
+                                           std::move(sbePlanAndData),
+                                           _collections,
+                                           plannerParams()->providedOptions,
+                                           std::move(nss),
+                                           std::move(sbeYieldPolicy),
+                                           isFromSbePlanCache,
+                                           _rankingResult.cachedPlanHash,
+                                           false /*usedJoinOpt*/,
+                                           {} /*estimates*/,
+                                           {} /*rejectedJoinPlans*/,
+                                           std::move(remoteCursors),
+                                           std::move(remoteExplains),
+                                           extractMps(),
+                                           std::move(_rankingResult.maybeExplainData));
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeClassicExecutor(
@@ -264,7 +262,7 @@ private:
             buildRejectedExecutableTreesForExplain(solutionPtr, false /*isCountQuery*/);
         }
 
-        return uassertStatusOK(plan_executor_factory::make(
+        return plan_executor_factory::make(
             _opCtx,
             std::move(workingSet),
             std::move(planStage),
@@ -280,7 +278,7 @@ private:
                 ? boost::make_optional<std::string>(
                       std::move(_rankingResult.plannerParams->replanningData->replanReason))
                 : boost::none,
-            std::move(_rankingResult.maybeExplainData)));
+            std::move(_rankingResult.maybeExplainData));
     }
 
     void buildRejectedExecutableTreesForExplain(const QuerySolution* solution,

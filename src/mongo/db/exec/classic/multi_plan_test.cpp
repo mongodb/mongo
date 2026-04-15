@@ -336,15 +336,13 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     ASSERT_EQUALS(mpsPtr->getChildren()[mpsPtr->bestPlanIdx().get()].get(), ixScanRootPtr);
 
     // Takes ownership of arguments other than 'collection'.
-    auto execResult = plan_executor_factory::make(std::move(cq),
-                                                  std::move(sharedWs),
-                                                  std::move(mps),
-                                                  coll,
-                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                  QueryPlannerParams::DEFAULT,
-                                                  nss);
-    ASSERT_OK(execResult);
-    auto exec = std::move(execResult.getValue());
+    auto exec = plan_executor_factory::make(std::move(cq),
+                                            std::move(sharedWs),
+                                            std::move(mps),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT,
+                                            nss);
 
     // Get all our results out.
     int results = 0;
@@ -590,15 +588,13 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     ASSERT_TRUE(mps->bestPlanChosen());
     ASSERT_EQ(getBestPlanRoot(mps.get()), firstPlanPtr);
 
-    auto execResult = plan_executor_factory::make(expCtx.get(),
-                                                  std::move(ws),
-                                                  std::move(mps),
-                                                  coll,
-                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                  QueryPlannerParams::DEFAULT,
-                                                  nss);
-    ASSERT_OK(execResult);
-    auto exec = std::move(execResult.getValue());
+    auto exec = plan_executor_factory::make(expCtx.get(),
+                                            std::move(ws),
+                                            std::move(mps),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT,
+                                            nss);
     BSONObjBuilder bob;
     auto mockVersionInfo = query_tester::MockVersionInfo();
     VersionInfoInterface::enable(&mockVersionInfo);
@@ -867,15 +863,13 @@ TEST_F(QueryStageMultiPlanTest, MPSCanRunTrialsInBatches) {
     ASSERT_EQUALS(mpStats->totalWorks, 22);
 
     // Takes ownership of arguments other than 'collection'.
-    auto execResult = plan_executor_factory::make(std::move(cq),
-                                                  std::move(sharedWs),
-                                                  std::move(mps),
-                                                  coll,
-                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                  QueryPlannerParams::DEFAULT,
-                                                  nss);
-    ASSERT_OK(execResult);
-    auto exec = std::move(execResult.getValue());
+    auto exec = plan_executor_factory::make(std::move(cq),
+                                            std::move(sharedWs),
+                                            std::move(mps),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT,
+                                            nss);
 
     // Get all our results out.
     int results = 0;
@@ -946,15 +940,13 @@ TEST_F(QueryStageMultiPlanTest, MPSRunTrialsEarlyExit) {
     ASSERT_EQUALS(mpStats->totalWorks, 22);
 
     // Takes ownership of arguments other than 'collection'.
-    auto execResult = plan_executor_factory::make(std::move(cq),
-                                                  std::move(sharedWs),
-                                                  std::move(mps),
-                                                  coll,
-                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                  QueryPlannerParams::DEFAULT,
-                                                  nss);
-    ASSERT_OK(execResult);
-    auto exec = std::move(execResult.getValue());
+    auto exec = plan_executor_factory::make(std::move(cq),
+                                            std::move(sharedWs),
+                                            std::move(mps),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT,
+                                            nss);
 
     // Get all our results out.
     int results = 0;

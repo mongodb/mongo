@@ -603,14 +603,13 @@ public:
                     root->pushBack(id);
                 }
 
-                exec = uassertStatusOK(
-                    plan_executor_factory::make(expCtx,
-                                                std::move(ws),
-                                                std::move(root),
-                                                boost::none,
-                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                false, /* whether owned BSON must be returned */
-                                                cursorNss));
+                exec = plan_executor_factory::make(expCtx,
+                                                   std::move(ws),
+                                                   std::move(root),
+                                                   boost::none,
+                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                   false, /* whether owned BSON must be returned */
+                                                   cursorNss);
 
                 long long batchSize = std::numeric_limits<long long>::max();
                 if (listCollRequest.getCursor() && listCollRequest.getCursor()->getBatchSize()) {

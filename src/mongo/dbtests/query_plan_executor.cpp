@@ -140,14 +140,12 @@ public:
             cq->getExpCtxRaw(), coll, csparams, ws.get(), cq->getPrimaryMatchExpression()));
 
         // Hand the plan off to the executor.
-        auto statusWithPlanExecutor = plan_executor_factory::make(std::move(cq),
-                                                                  std::move(ws),
-                                                                  std::move(root),
-                                                                  coll,
-                                                                  yieldPolicy,
-                                                                  QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        return std::move(statusWithPlanExecutor.getValue());
+        return plan_executor_factory::make(std::move(cq),
+                                           std::move(ws),
+                                           std::move(root),
+                                           coll,
+                                           yieldPolicy,
+                                           QueryPlannerParams::DEFAULT);
     }
 
     /**
@@ -182,15 +180,12 @@ public:
             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Hand the plan off to the executor.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(std::move(cq),
-                                        std::move(ws),
-                                        std::move(root),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        return std::move(statusWithPlanExecutor.getValue());
+        return plan_executor_factory::make(std::move(cq),
+                                           std::move(ws),
+                                           std::move(root),
+                                           coll,
+                                           PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                           QueryPlannerParams::DEFAULT);
     }
 
 protected:

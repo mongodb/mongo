@@ -146,15 +146,12 @@ public:
         std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
             _expCtx.get(), collection, params, ws.get(), filterExpr.get());
 
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(ps),
-                                        collection,
-                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                        QueryPlannerParams::DEFAULT);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = plan_executor_factory::make(_expCtx,
+                                                std::move(ws),
+                                                std::move(ps),
+                                                collection,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                QueryPlannerParams::DEFAULT);
 
         // Use the runner to count the number of objects scanned.
         int count = 0;
@@ -430,15 +427,12 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
     std::unique_ptr<PlanStage> ps =
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
-    auto statusWithPlanExecutor =
-        plan_executor_factory::make(_expCtx,
-                                    std::move(ws),
-                                    std::move(ps),
-                                    collection,
-                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                    QueryPlannerParams::DEFAULT);
-    ASSERT_OK(statusWithPlanExecutor.getStatus());
-    auto exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = plan_executor_factory::make(_expCtx,
+                                            std::move(ws),
+                                            std::move(ps),
+                                            collection,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT);
 
     int count = 0;
     PlanExecutor::ExecState state;
@@ -466,15 +460,12 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
     std::unique_ptr<PlanStage> ps =
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
-    auto statusWithPlanExecutor =
-        plan_executor_factory::make(_expCtx,
-                                    std::move(ws),
-                                    std::move(ps),
-                                    collection,
-                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                    QueryPlannerParams::DEFAULT);
-    ASSERT_OK(statusWithPlanExecutor.getStatus());
-    auto exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = plan_executor_factory::make(_expCtx,
+                                            std::move(ws),
+                                            std::move(ps),
+                                            collection,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT);
 
     int count = 0;
     PlanExecutor::ExecState state;
@@ -625,15 +616,12 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
     // Run the rest of the scan and verify the results.
-    auto statusWithPlanExecutor =
-        plan_executor_factory::make(_expCtx,
-                                    std::move(ws),
-                                    std::move(ps),
-                                    collection,
-                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                    QueryPlannerParams::DEFAULT);
-    ASSERT_OK(statusWithPlanExecutor.getStatus());
-    auto exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = plan_executor_factory::make(_expCtx,
+                                            std::move(ws),
+                                            std::move(ps),
+                                            collection,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT);
 
     int count = 0;
     PlanExecutor::ExecState state;
@@ -726,16 +714,12 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanStartAtDeletedRecord) {
     std::unique_ptr<PlanStage> ps =
         std::make_unique<CollectionScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
 
-    auto statusWithPlanExecutor =
-        plan_executor_factory::make(_expCtx,
-                                    std::move(ws),
-                                    std::move(ps),
-                                    coll,
-                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                    QueryPlannerParams::DEFAULT);
-
-    ASSERT_OK(statusWithPlanExecutor.getStatus());
-    auto exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = plan_executor_factory::make(_expCtx,
+                                            std::move(ws),
+                                            std::move(ps),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT);
 
     int count = 0;
     PlanExecutor::ExecState state;

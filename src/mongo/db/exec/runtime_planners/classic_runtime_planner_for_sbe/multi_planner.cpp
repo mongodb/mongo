@@ -96,16 +96,15 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
         auto nss = cq()->nss();
         // Return a classic plan executor which will unspool the data buffered during
         // multi-planning.
-        return uassertStatusOK(
-            plan_executor_factory::make(std::move(canonicalQuery),
-                                        extractWs(),
-                                        std::move(_multiPlanStage),
-                                        collections().getMainCollectionAcquisition(),
-                                        yieldPolicy(),
-                                        plannerOptions(),
-                                        std::move(nss),
-                                        nullptr /* querySolution */,
-                                        cachedPlanHash()));
+        return plan_executor_factory::make(std::move(canonicalQuery),
+                                           extractWs(),
+                                           std::move(_multiPlanStage),
+                                           collections().getMainCollectionAcquisition(),
+                                           yieldPolicy(),
+                                           plannerOptions(),
+                                           std::move(nss),
+                                           nullptr /* querySolution */,
+                                           cachedPlanHash());
     }
 
     // The winning plan did not reach EOF during the trial period, or we were otherwise unable
