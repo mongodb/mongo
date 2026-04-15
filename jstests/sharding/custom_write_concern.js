@@ -8,12 +8,6 @@ import {reconfig} from "jstests/replsets/rslib.js";
 
 const st = new ShardingTest({
     name: "custom_write_concern_test",
-    other: {
-        // TODO SERVER-118767: Remove this once the issue is fixed.
-        // When the balancer is enabled and balancerStop is called, it can cause the test to hang with stepdown suites,
-        // like sharding_csrs_continuous_config_stepdown.
-        enableBalancer: !TestData.runningWithConfigStepdowns,
-    },
     shards: {
         rs0: {
             nodes: [

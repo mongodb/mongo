@@ -27,6 +27,15 @@ ReplSetTest[kOverrideConstructorForRST] = ReplSetTestWithContinuousPrimaryStepdo
 ShardingTest[kOverrideConstructorForST] = class ShardingTestWithContinuousFailover extends (
     ShardingTestWithContinuousPrimaryStepdown
 ) {
+    /**
+     * Override to use a shorter per-attempt timeout with retries, avoiding a
+     * hang from _configsvrBalancerStop's joinCurrentRound() when the config
+     * server is still stabilizing during startup.
+     */
+    _stopBalancerForInit() {
+        retryOnRetryableError(() => this.stopBalancer(10000), 10, 2000, [ErrorCodes.FailedToSatisfyReadPreference]);
+    }
+
     constructor(params) {
         super(params);
         // Set the feature on the test configuration; this will allow js tests to selectively

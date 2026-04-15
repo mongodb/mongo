@@ -2054,6 +2054,13 @@ ShardingTest.prototype.checkShardFilteringMetadata = function() {
 };
 
 /**
+ * Stops the balancer during ShardingTest initialization.
+ */
+ShardingTest.prototype._stopBalancerForInit = function() {
+    this.stopBalancer();
+};
+
+/**
  * Constructs a human-readable string representing a chunk's range.
  */
 function _rangeToString(r) {
@@ -2095,7 +2102,7 @@ function _extendWithShMethods(st) {
  */
 function _configureCluster(st) {
     if (!st._otherParams.enableBalancer) {
-        st.stopBalancer();
+        st._stopBalancerForInit();
     }
 }
 
