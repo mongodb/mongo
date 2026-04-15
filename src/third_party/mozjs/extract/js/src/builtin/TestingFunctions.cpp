@@ -6160,6 +6160,14 @@ static bool Deserialize(JSContext* cx, unsigned argc, Value* vp) {
     }
   }
 
+  if (scope > JS::StructuredCloneScope::SameProcess &&
+      (policy.areIntraClusterClonableSharedObjectsAllowed() ||
+       policy.areSharedMemoryObjectsAllowed())) {
+    JS_ReportErrorASCII(
+        cx, "deserialize in DifferentProcess scope cannot allow shared memory");
+    return false;
+  }
+
   // Clone buffer was already consumed?
   if (!obj->data()) {
     JS_ReportErrorASCII(cx,

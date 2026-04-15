@@ -154,6 +154,9 @@ using namespace js::jit;
 //           register/stack-offset correspond to the low 32-bits, and the
 //           second correspond to the high 32-bits.
 //
+//         INT64_INT32_STACK  [STACK_OFFSET]: (64-bit platform)
+//           Unpacked Int64 value stored in int32_t. Payload is stored at an
+//           offset on the stack.
 
 const RValueAllocation::Layout& RValueAllocation::layoutFromMode(Mode mode) {
   switch (mode) {
@@ -306,6 +309,12 @@ const RValueAllocation::Layout& RValueAllocation::layoutFromMode(Mode mode) {
     case INT64_STACK: {
       static const RValueAllocation::Layout layout = {
           PAYLOAD_STACK_OFFSET, PAYLOAD_NONE, "unpacked int64"};
+      return layout;
+    }
+
+    case INT64_INT32_STACK: {
+      static const RValueAllocation::Layout layout = {
+          PAYLOAD_STACK_OFFSET, PAYLOAD_NONE, "unpacked int64 (int32)"};
       return layout;
     }
 #endif

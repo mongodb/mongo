@@ -52,7 +52,7 @@ cp extract/js/src/_build/js/src/gc/StatsPhasesGenerated.inc extract/js/src/gc
 # mfbt doesn't change by arch or platform, so keep the same unified cpp
 mkdir -p extract/js/src/mfbt
 
-find ./mozilla-release/js/src/_build/mfbt -name "Unified_cpp_mfbt*.cpp" -exec cp '{}' extract/js/src/mfbt ';'
+cp ./mozilla-release/js/src/_build/mfbt/Unified_cpp_mfbt*.cpp extract/js/src/mfbt
 
 SEDOPTION="-i"
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -194,74 +194,70 @@ touch include/vtune/VTuneWrapper.h
 mkdir -p include/wasm
 cp extract/js/src/_build/js/src/wasm/WasmBuiltinModuleGenerated.h include/wasm/
 
-xargs rm -rf<<__XARGS_RM__
-extract/js/src/_build/install_dist_bin.track
-extract/js/src/_build/install_dist_include.track
-extract/js/src/_build/install_dist_private.track
-extract/js/src/_build/install_dist_public.track
-extract/js/src/_build/install__tests.track
-__XARGS_RM__
+rm -rf \
+    extract/js/src/_build/install_dist_bin.track \
+    extract/js/src/_build/install_dist_include.track \
+    extract/js/src/_build/install_dist_private.track \
+    extract/js/src/_build/install_dist_public.track \
+    extract/js/src/_build/install__tests.track \
 
-xargs rm -r<<__XARGS_RM__
-extract/js/src/_build/backend.FasterMakeBackend.in
-extract/js/src/_build/backend.RecursiveMakeBackend.in
-extract/js/src/_build/dist/bin/
-extract/js/src/_build/dist/include/double-conversion/
-extract/js/src/_build/dist/include/fdlibm.h
-extract/js/src/_build/dist/include/js/
-extract/js/src/_build/dist/include/jsapi.h
-extract/js/src/_build/dist/include/js-config.h
-extract/js/src/_build/dist/include/jsfriendapi.h
-extract/js/src/_build/dist/include/jspubtd.h
-extract/js/src/_build/dist/include/jstypes.h
-extract/js/src/_build/dist/include/malloc_decls.h
-extract/js/src/_build/dist/include/mozilla/
-extract/js/src/_build/dist/include/mozjemalloc_types.h
-extract/js/src/_build/dist/include/mozmemory.h
-extract/js/src/_build/dist/include/mozmemory_wrap.h
-extract/js/src/_build/.cargo/
-extract/js/src/_build/config.statusd/
-extract/js/src/_build/faster/
-extract/js/src/_build/js/
-extract/js/src/_build/memory/backend.mk
-extract/js/src/_build/memory/build/
-extract/js/src/_build/memory/Makefile
-extract/js/src/_build/memory/mozalloc/
-extract/js/src/_build/mfbt/backend.mk
-extract/js/src/_build/mfbt/.deps/
-extract/js/src/_build/mfbt/Makefile
-extract/js/src/_build/modules/fdlibm/backend.mk
-extract/js/src/_build/modules/fdlibm/Makefile
-extract/js/src/_build/modules/fdlibm/src/backend.mk
-extract/js/src/_build/modules/fdlibm/src/.deps/
-extract/js/src/_build/modules/fdlibm/src/Makefile
-extract/js/src/_build/mozglue/backend.mk
-extract/js/src/_build/mozglue/build/backend.mk
-extract/js/src/_build/mozglue/build/Makefile
-extract/js/src/_build/mozglue/Makefile
-extract/js/src/_build/mozglue/misc/backend.mk
-extract/js/src/_build/mozglue/misc/.deps/
-extract/js/src/_build/mozglue/misc/Makefile
-extract/js/src/_build/mozinfo.json
-extract/js/src/_build/testing/
-extract/js/src/_build/_tests/mozbase/
-extract/js/src/_build/third_party/
-__XARGS_RM__
+rm -r \
+    extract/js/src/_build/backend.FasterMakeBackend.in \
+    extract/js/src/_build/backend.RecursiveMakeBackend.in \
+    extract/js/src/_build/dist/bin/ \
+    extract/js/src/_build/dist/include/double-conversion/ \
+    extract/js/src/_build/dist/include/fdlibm.h \
+    extract/js/src/_build/dist/include/js/ \
+    extract/js/src/_build/dist/include/jsapi.h \
+    extract/js/src/_build/dist/include/js-config.h \
+    extract/js/src/_build/dist/include/jsfriendapi.h \
+    extract/js/src/_build/dist/include/jspubtd.h \
+    extract/js/src/_build/dist/include/jstypes.h \
+    extract/js/src/_build/dist/include/malloc_decls.h \
+    extract/js/src/_build/dist/include/mozilla/ \
+    extract/js/src/_build/dist/include/mozjemalloc_types.h \
+    extract/js/src/_build/dist/include/mozmemory.h \
+    extract/js/src/_build/dist/include/mozmemory_wrap.h \
+    extract/js/src/_build/.cargo/ \
+    extract/js/src/_build/config.statusd/ \
+    extract/js/src/_build/faster/ \
+    extract/js/src/_build/js/ \
+    extract/js/src/_build/memory/backend.mk \
+    extract/js/src/_build/memory/build/ \
+    extract/js/src/_build/memory/Makefile \
+    extract/js/src/_build/memory/mozalloc/ \
+    extract/js/src/_build/mfbt/backend.mk \
+    extract/js/src/_build/mfbt/.deps/ \
+    extract/js/src/_build/mfbt/Makefile \
+    extract/js/src/_build/modules/fdlibm/backend.mk \
+    extract/js/src/_build/modules/fdlibm/Makefile \
+    extract/js/src/_build/modules/fdlibm/src/backend.mk \
+    extract/js/src/_build/modules/fdlibm/src/.deps/ \
+    extract/js/src/_build/modules/fdlibm/src/Makefile \
+    extract/js/src/_build/mozglue/backend.mk \
+    extract/js/src/_build/mozglue/build/backend.mk \
+    extract/js/src/_build/mozglue/build/Makefile \
+    extract/js/src/_build/mozglue/Makefile \
+    extract/js/src/_build/mozglue/misc/backend.mk \
+    extract/js/src/_build/mozglue/misc/.deps/ \
+    extract/js/src/_build/mozglue/misc/Makefile \
+    extract/js/src/_build/mozinfo.json \
+    extract/js/src/_build/testing/ \
+    extract/js/src/_build/_tests/mozbase/ \
+    extract/js/src/_build/third_party/ \
 
-xargs rm -r<<__XARGS_RM__
-extract/js/src/build
-extract/js/src/devtools/vprof/manifest.mk
-extract/js/src/wasm/moz.build
-extract/js/src/js-confdefs.h.in
-extract/js/src/js-config.h.in
-extract/js/src/js-config.mozbuild
-extract/js/src/js-cxxflags.mozbuild
-extract/js/src/js-standalone.mozbuild
-__XARGS_RM__
+rm -r \
+    extract/js/src/build \
+    extract/js/src/devtools/vprof/manifest.mk \
+    extract/js/src/wasm/moz.build \
+    extract/js/src/js-confdefs.h.in \
+    extract/js/src/js-config.h.in \
+    extract/js/src/js-config.mozbuild \
+    extract/js/src/js-cxxflags.mozbuild \
+    extract/js/src/js-standalone.mozbuild \
 
 # ESR 91.0
-xargs rm -r<<__XARGS_RM__
-extract/js/src/_build
-extract/js/src/make-source-package.py
-extract/js/src/jsshell.msg
-__XARGS_RM__
+rm -r \
+    extract/js/src/_build \
+    extract/js/src/make-source-package.py \
+    extract/js/src/jsshell.msg \

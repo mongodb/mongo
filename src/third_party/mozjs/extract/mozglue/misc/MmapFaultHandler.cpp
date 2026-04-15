@@ -24,10 +24,6 @@ static void MmapSIGBUSHandler(int signum, siginfo_t* info, void* context) {
   MmapAccessScope* mas = sMmapAccessScope.get();
 
   if (mas && mas->IsInsideBuffer(info->si_addr)) {
-    // Temporarily instead of handling the signal, we crash intentionally and
-    // send some diagnostic information to find out why the signal is received.
-    mas->CrashWithInfo(info->si_addr);
-
     // The address is inside the buffer, handle the failure.
     siglongjmp(mas->mJmpBuf, signum);
   }

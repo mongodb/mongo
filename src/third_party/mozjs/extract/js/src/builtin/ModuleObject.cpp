@@ -913,8 +913,9 @@ bool ModuleObject::isInstance(HandleValue value) {
 }
 
 bool ModuleObject::hasCyclicModuleFields() const {
-  // This currently only returns false if we GC during initialization.
-  return !getReservedSlot(CyclicModuleFieldsSlot).isUndefined();
+  bool result = !getReservedSlot(CyclicModuleFieldsSlot).isUndefined();
+  MOZ_ASSERT_IF(result, !hasSyntheticModuleFields());
+  return result;
 }
 
 CyclicModuleFields* ModuleObject::cyclicModuleFields() {
@@ -1496,7 +1497,9 @@ bool ModuleObject::createSyntheticEnvironment(JSContext* cx,
     return false;
   }
 
-  MOZ_ASSERT(env->shape()->propMapLength() == values.length());
+  // We expect one property per synthetic value plus one for the *namespace*
+  // binding.
+  MOZ_ASSERT(env->shape()->propMapLength() == values.length() + 1);
 
   for (uint32_t i = 0; i < values.length(); i++) {
     env->setAliasedBinding(env->firstSyntheticValueSlot() + i, values[i]);
