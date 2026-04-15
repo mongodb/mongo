@@ -555,7 +555,7 @@ server_parameters:
         description: >-
             The maximum number of nodes (1 for base collection + number of $lookup-$unwind pairs)
             allowed for join optimization. Any $lookup-$unwind pairs exceeding this limit will not
-            be included in the join optimization and will be executed in the original order as 
+            be included in the join optimization and will be executed in the original order as
             specifified in the aggregation pipeline.
         set_at: [startup, runtime]
         cpp_varname: internalMaxNodesInJoinGraph
@@ -956,6 +956,16 @@ server_parameters:
         cpp_varname: "internalQueryPlannerPushdownFilterToIxscanForSort"
         cpp_vartype: AtomicWord<bool>
         default: true
+        redact: false
+
+    internalQueryPermitTransformHoist:
+        description: >-
+            When enabled, permits hoisting the independent prefix of a $project or $addFields past
+            the preceding stage.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryPermitTransformHoist"
+        cpp_vartype: AtomicWord<bool>
+        default: false
         redact: false
 # Note for adding additional query knobs:
 #

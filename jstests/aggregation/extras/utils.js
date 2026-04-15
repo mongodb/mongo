@@ -647,3 +647,11 @@ export function stringifyArray(ar, arName = null) {
     str += "]\n";
     return str;
 }
+
+/**
+ * Inserts $_internalInhibitOptimization before each stage in a pipeline, preventing the
+ * optimizer from merging, reordering, or otherwise modifying those stages.
+ */
+export function inhibitOptimizationPerStage(pipeline) {
+    return pipeline.flatMap((stage) => [{$_internalInhibitOptimization: {}}, stage]);
+}

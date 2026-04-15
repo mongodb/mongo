@@ -119,6 +119,8 @@ namespace mongo::rule_based_rewrites::pipeline {
 
 // For high priority rules that e.g. attempt to push a $match as early as possible.
 constexpr double kDefaultPushdownPriority = 100.0;
+// For rules which conditionally hoist computations to allow additional $match pushdown.
+constexpr double kDefaultHoistPriority = 50.0;
 // For rules that e.g. attempt to swap with or absorb an adjacent stage.
 constexpr double kDefaultOptimizeAtPriority = 10.0;
 // For rules that optimize a stage in place.

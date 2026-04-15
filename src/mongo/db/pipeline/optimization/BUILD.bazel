@@ -15,6 +15,7 @@ mongo_cc_library(
         "cr_rules_to_move.cpp",
         "lookup_rules.cpp",
         "match_rules.cpp",
+        "projection_rules.cpp",
         "qe_rules_to_move.cpp",
         "qi_rules_to_move.cpp",
         "qo_rules_to_move.cpp",
