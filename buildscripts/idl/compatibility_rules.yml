@@ -379,6 +379,9 @@ RENAMED_COMPLEX_ACCESS_CHECKS:
 # Parameters removed in 8.0 can remain here indefinitely as they're no longer supported.
 # Parameters removed in later versions should have associated tickets for documentation/deprecation.
 IGNORE_REMOVED_PARAMETERS_LIST:
+  # Renamed from invalidStartLsn* to readLog* in SERVER-123189.
+  - "invalidStartLsnMaxRetries"
+  - "invalidStartLsnRetryDelayMillis"
   # Parameters removed between 8.0.18 and 8.2.4, we are assuming these have been removed long enough
   # to not cause any problems
   # These can be deleted from this list when we no longer check against 8.0 (this should be after we branch 9.0)
