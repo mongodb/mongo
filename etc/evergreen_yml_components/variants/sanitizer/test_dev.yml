@@ -464,8 +464,8 @@ buildvariants:
   # This task is responsible for creating a TSAN AL2023 x86 server binary candidate for
   # disagg-storage-services.
   - name: enterprise-amazon2023-linux-x86-debug-tsan
-    display_name: "* TSAN Enterprise Amazon 2023 Linux x86 disagg-storage-services DEBUG"
-    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
+    display_name: "TSAN Enterprise Amazon 2023 Linux x86 disagg-storage-services DEBUG"
+    tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - amazon2023.3-large
     activate: false
