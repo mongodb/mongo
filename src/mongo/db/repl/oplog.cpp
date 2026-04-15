@@ -587,7 +587,8 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
             LOGV2_ERROR(11006000,
                         "Could not acquire write intent when trying to reserve optime",
                         "opCtx"_attr = opCtx->getOpID(),
-                        "oplogEntry"_attr = oplogEntry->toBSON());
+                        "nss"_attr = oplogEntry->getNss().toStringForErrorMsg(),
+                        "opType"_attr = idl::serialize(oplogEntry->getOpType()));
         }
 
         slot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
