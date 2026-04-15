@@ -96,6 +96,7 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     ClusterRole clusterRole = ClusterRole::None;       // --configsvr/--shardsvr
     MaintenanceMode maintenanceMode;                   // --maintenanceMode
     bool replicaSetConfigShardMaintenanceMode{false};  // --replicaSetConfigShardMaintenanceMode
+    bool configOnly{false};                            // --configOnly (mongos only)
 
     boost::optional<int> proxyPort;       // --proxyPort
     boost::optional<int> priorityPort;    // --priorityPort
