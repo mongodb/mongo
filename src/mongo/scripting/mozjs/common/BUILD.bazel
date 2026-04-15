@@ -31,16 +31,6 @@ TYPES_SRCS = [
     "//src/mongo/scripting/mozjs/common/types:timestamp.cpp",
 ]
 
-# Filegroup for WASI builds - exports source files for compilation in genrules.
-# WASI builds use a stub status.cpp from the wasm package.
-filegroup(
-    name = "wasi_sources",
-    srcs = glob(["*.cpp"]) + TYPES_SRCS + [
-        "//src/mongo/scripting/mozjs/wasm:status.cpp",
-    ],
-    visibility = ["//src/mongo/scripting/mozjs/wasm:__pkg__"],
-)
-
 mongo_cc_library(
     name = "mozjs_common",
     srcs = glob(["*.cpp"]) + TYPES_SRCS,
@@ -57,7 +47,6 @@ mongo_cc_library(
     }),
     srcs_select = [
         {
-            "//bazel/config:wasi": ["//src/mongo/scripting/mozjs/wasm:status.cpp"],
             "//conditions:default": ["//src/mongo/scripting/mozjs/common/types:status.cpp"],
         },
     ],

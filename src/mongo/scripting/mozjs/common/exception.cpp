@@ -45,11 +45,7 @@
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
 #include <js/friend/ErrorMessages.h>
-#ifdef MONGO_MOZJS_WASI_BUILD
-#include "mongo/scripting/mozjs/wasm/engine/error.h"
-#else
 #include <mongo/scripting/mozjs/mongoErrorReportToString.h>
-#endif
 
 namespace mongo {
 namespace mozjs {

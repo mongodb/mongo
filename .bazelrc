@@ -597,9 +597,6 @@ common:public-release-rbe --config=public-release
 common:public-release-rbe --remote_instance_name=release
 common:public-release-rbe --bes_instance_name=release
 
-common --@rules_rust//rust/toolchain/channel=nightly
-common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=true
-
 common --@rules_python//python/config_settings:bootstrap_impl=script
 # https://github.com/bazel-contrib/rules_python/issues/2864
 common --@rules_python//python/config_settings:venvs_site_packages=no
