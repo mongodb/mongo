@@ -41,7 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
-#include "mongo/db/topology/user_write_block/prevent_writes_for_insufficient_disk_space_gen.h"
+#include "mongo/db/topology/user_write_block/block_replica_set_writes_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/stdx/mutex.h"
@@ -55,12 +55,11 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangInPreventWritesForInsufficientDiskSpaceCommand);
+MONGO_FAIL_POINT_DEFINE(hangInBlockReplicaSetWritesCommand);
 
-class PreventWritesForInsufficientDiskSpaceCommand final
-    : public TypedCommand<PreventWritesForInsufficientDiskSpaceCommand> {
+class BlockReplicaSetWritesCommand final : public TypedCommand<BlockReplicaSetWritesCommand> {
 public:
-    using Request = PreventWritesForInsufficientDiskSpace;
+    using Request = BlockReplicaSetWrites;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -85,11 +84,9 @@ public:
             // Only one attempt to change whether writes are blocked may make progress at once
             stdx::lock_guard lock(_mutex);
             {
-                if (MONGO_unlikely(
-                        hangInPreventWritesForInsufficientDiskSpaceCommand.shouldFail())) {
-                    LOGV2(12096400,
-                          "hangInPreventWritesForInsufficientDiskSpaceCommand failpoint enabled");
-                    hangInPreventWritesForInsufficientDiskSpaceCommand.pauseWhileSet(opCtx);
+                if (MONGO_unlikely(hangInBlockReplicaSetWritesCommand.shouldFail())) {
+                    LOGV2(12096400, "hangInBlockReplicaSetWritesCommand failpoint enabled");
+                    hangInBlockReplicaSetWritesCommand.pauseWhileSet(opCtx);
                 }
 
                 uassert(ErrorCodes::InvalidOptions,
@@ -100,20 +97,20 @@ public:
             if (request().getEnabled()) {
                 // Enable write blocking
                 UserWritesRecoverableCriticalSectionService::get(opCtx)
-                    ->acquireRecoverableCriticalSectionPreventingWrites(
+                    ->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
                         opCtx,
                         UserWritesRecoverableCriticalSectionService::
-                            kPreventWritesForInsufficientDiskSpaceNamespace,
+                            kBlockReplicaSetWritesNamespace,
                         request().getAllowDeletions(),
                         request().getReason());
 
             } else {
                 // Disable write blocking
                 UserWritesRecoverableCriticalSectionService::get(opCtx)
-                    ->releaseRecoverableCriticalSectionPreventingWrites(
+                    ->releaseRecoverableCriticalSectionBlockingReplicaSetWrites(
                         opCtx,
                         UserWritesRecoverableCriticalSectionService::
-                            kPreventWritesForInsufficientDiskSpaceNamespace,
+                            kBlockReplicaSetWritesNamespace,
                         request().getReason());
             }
         }
@@ -131,14 +128,14 @@ public:
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForPrivilege(Privilege{
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::preventWritesForInsufficientDiskSpace}));
+                            ActionType::blockReplicaSetWrites}));
         }
 
         stdx::mutex _mutex;
     };
 };
-MONGO_REGISTER_COMMAND(PreventWritesForInsufficientDiskSpaceCommand)
-    .requiresFeatureFlag(feature_flags::gFeatureFlagPreventWritesForInsufficientDiskSpace)
+MONGO_REGISTER_COMMAND(BlockReplicaSetWritesCommand)
+    .requiresFeatureFlag(feature_flags::gFeatureFlagBlockReplicaSetWrites)
     .forShard();
 }  // namespace
 }  // namespace mongo

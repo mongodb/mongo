@@ -987,7 +987,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/ddl:internal_rename_if_options_and_indexes_match_gen",
         "//src/mongo/db/topology/cluster_parameters:get_cluster_parameter_command.cpp",
         "//src/mongo/db/topology/cluster_parameters:set_cluster_parameter_command.cpp",
-        "//src/mongo/db/topology/user_write_block:prevent_writes_for_insufficient_disk_space_command.cpp",
+        "//src/mongo/db/topology/user_write_block:block_replica_set_writes_command.cpp",
         "//src/mongo/db/topology/user_write_block:set_user_write_block_mode_command.cpp",
     ],
     deps = [
@@ -1060,7 +1060,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries_sharded_cluster",
-        "//src/mongo/db/topology/user_write_block:prevent_writes_for_insufficient_disk_space_idl",
+        "//src/mongo/db/topology/user_write_block:block_replica_set_writes_idl",
         "//src/mongo/db/topology/user_write_block:set_user_write_block_mode_idl",
         "//src/mongo/db/topology/user_write_block:user_writes_recoverable_critical_section",
         "//src/mongo/db/transaction:transaction_api",

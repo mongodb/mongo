@@ -6468,9 +6468,9 @@ export const authCommandsLib = {
             ],
         },
         {
-            testname: "preventWritesForInsufficientDiskSpace",
+            testname: "blockReplicaSetWrites",
             command: {
-                preventWritesForInsufficientDiskSpace: 1,
+                blockReplicaSetWrites: 1,
                 enabled: false,
                 allowDeletions: false,
                 reason: "InsufficientDiskSpace",
@@ -6478,14 +6478,14 @@ export const authCommandsLib = {
             skipTest: (conn) => {
                 return (
                     !FixtureHelpers.isReplSet(conn.getDB(adminDbName)) ||
-                    !isFeatureEnabled(conn, "featureFlagPreventWritesForInsufficientDiskSpace")
+                    !isFeatureEnabled(conn, "featureFlagBlockReplicaSetWrites")
                 );
             },
             testcases: [
                 {
                     runOnDb: adminDbName,
                     roles: roles_clusterManager,
-                    privileges: [{resource: {cluster: true}, actions: ["preventWritesForInsufficientDiskSpace"]}],
+                    privileges: [{resource: {cluster: true}, actions: ["blockReplicaSetWrites"]}],
                 },
             ],
         },

@@ -50,7 +50,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
-#include "mongo/db/topology/user_write_block/prevent_writes_critical_section_document_gen.h"
+#include "mongo/db/topology/user_write_block/replica_set_writes_critical_section_document_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_critical_section_document_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -82,7 +82,7 @@ inline StringData reasonText(const boost::optional<UserWritesBlockReasonEnum>& r
     return idl::serialize(reason.value_or(UserWritesBlockReasonEnum::kUnspecified));
 }
 
-inline StringData reasonText(const PreventWritesReasonEnum& reason) {
+inline StringData reasonText(const ReplicaSetWritesBlockReasonEnum& reason) {
     return idl::serialize(reason);
 }
 
@@ -187,9 +187,8 @@ void releaseCriticalSection(OperationContext* opCtx,
 const NamespaceString UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace =
     NamespaceString::kEmpty;
 
-const NamespaceString
-    UserWritesRecoverableCriticalSectionService::kPreventWritesForInsufficientDiskSpaceNamespace =
-        NamespaceString::kEmpty;
+const NamespaceString UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace =
+    NamespaceString::kEmpty;
 
 UserWritesRecoverableCriticalSectionService* UserWritesRecoverableCriticalSectionService::get(
     ServiceContext* serviceContext) {
@@ -467,9 +466,7 @@ void UserWritesRecoverableCriticalSectionService::
                 "reason"_attr = reasonText(reason));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace ||
-              nss ==
-                  UserWritesRecoverableCriticalSectionService::
-                      kPreventWritesForInsufficientDiskSpaceNamespace);
+              nss == UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     releaseCriticalSection<UserWriteBlockingCriticalSectionDocument>(
@@ -519,102 +516,108 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
         return true;
     });
 
-    // Recover the persisted prevent-writes critical section documents and restore the state into
-    // memory
-    PersistentTaskStore<PreventWritesCriticalSectionDocument> preventWritesStore(
-        NamespaceString::kPreventWritesCriticalSectionsNamespace);
-    preventWritesStore.forEach(
-        opCtx, BSONObj{}, [&opCtx](const PreventWritesCriticalSectionDocument& doc) {
+    // Recover the persisted replica set writes critical section documents and restore the
+    // state into memory
+    PersistentTaskStore<ReplicaSetWriteBlockingCriticalSectionDocument> replicaSetWritesStore(
+        NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
+    replicaSetWritesStore.forEach(
+        opCtx, BSONObj{}, [&opCtx](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
             invariant(doc.getNss().isEmpty());
             // TODO(SERVER-120970): restore the state into memory
             return true;
         });
 
-    LOGV2_DEBUG(
-        6351913, 2, "Recovered both user writes and prevent-writes recoverable critical sections");
+    LOGV2_DEBUG(6351913,
+                2,
+                "Recovered both user writes and replica set writes recoverable critical sections");
 }
 
-void UserWritesRecoverableCriticalSectionService::acquireRecoverableCriticalSectionPreventingWrites(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    bool allowDeletions,
-    PreventWritesReasonEnum reason) {
+void UserWritesRecoverableCriticalSectionService::
+    acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        bool allowDeletions,
+        ReplicaSetWritesBlockReasonEnum reason) {
 
     LOGV2_DEBUG(12096704,
                 3,
-                "Acquiring prevent-writes recoverable critical section",
+                "Acquiring replica set writes recoverable critical section",
                 logAttrs(nss),
                 "enabled"_attr = "true",
                 "allowDeletions"_attr = "false",
                 "reason"_attr = reasonText(reason));
 
-    invariant(nss == kPreventWritesForInsufficientDiskSpaceNamespace);
+    invariant(nss == kBlockReplicaSetWritesNamespace);
 
-    acquireCriticalSection<PreventWritesCriticalSectionDocument>(
+    acquireCriticalSection<ReplicaSetWriteBlockingCriticalSectionDocument>(
         opCtx,
-        NamespaceString::kPreventWritesCriticalSectionsNamespace,
+        NamespaceString::kReplicaSetWritesCriticalSectionsNamespace,
         nss,
         MODE_X,
-        "AcquirePreventWritesCS"_sd,
-        [&](const PreventWritesCriticalSectionDocument& collCSDoc) {
-            uassert(
-                ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot acquire prevent-writes critical section with different "
-                                 "options than the already existing one. enabled: true, current: "
-                              << collCSDoc.getEnabled(),
-                collCSDoc.getEnabled());
+        "AcquireReplicaSetWritesCS"_sd,
+        [&](const ReplicaSetWriteBlockingCriticalSectionDocument& collCSDoc) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream()
+                        << "Cannot acquire replica set writes critical section with different "
+                           "options than the already existing one. enabled: true, current: "
+                        << collCSDoc.getEnabled(),
+                    collCSDoc.getEnabled());
 
-            uassert(
-                ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot acquire prevent-writes critical section with different "
-                                 "options than the already existing one. allowDeletions: "
-                              << allowDeletions << ", current: " << collCSDoc.getAllowDeletions(),
-                collCSDoc.getAllowDeletions() == allowDeletions);
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream()
+                        << "Cannot acquire replica set writes critical section with different "
+                           "options than the already existing one. allowDeletions: "
+                        << allowDeletions << ", current: " << collCSDoc.getAllowDeletions(),
+                    collCSDoc.getAllowDeletions() == allowDeletions);
 
-            uassert(
-                ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot acquire prevent-writes critical section with different "
-                                 "options than the already existing one. reason: "
-                              << reasonText(reason)
-                              << ", current: " << reasonText(collCSDoc.getPreventWritesReason()),
-                collCSDoc.getPreventWritesReason() == reason);
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream()
+                        << "Cannot acquire replica set writes critical section with different "
+                           "options than the already existing one. reason: "
+                        << reasonText(reason)
+                        << ", current: " << reasonText(collCSDoc.getReplicaSetWritesBlockReason()),
+                    collCSDoc.getReplicaSetWritesBlockReason() == reason);
         },
         [&]() {
-            PreventWritesCriticalSectionDocument newDoc(nss);
+            ReplicaSetWriteBlockingCriticalSectionDocument newDoc(nss);
             newDoc.setEnabled(true);
             newDoc.setAllowDeletions(allowDeletions);
-            newDoc.setPreventWritesReason(reason);
+            newDoc.setReplicaSetWritesBlockReason(reason);
             return newDoc;
         });
 
     LOGV2_DEBUG(12096705,
                 2,
-                "Acquired prevent-writes recoverable critical section",
+                "Acquired replica set writes recoverable critical section",
                 logAttrs(nss),
                 "enabled"_attr = "true",
                 "allowDeletions"_attr = allowDeletions,
                 "reason"_attr = reasonText(reason));
 }
 
-void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSectionPreventingWrites(
-    OperationContext* opCtx, const NamespaceString& nss, PreventWritesReasonEnum reason) {
+void UserWritesRecoverableCriticalSectionService::
+    releaseRecoverableCriticalSectionBlockingReplicaSetWrites(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        ReplicaSetWritesBlockReasonEnum reason) {
 
     LOGV2_DEBUG(
-        12096406, 3, "Releasing prevent-writes recoverable critical section", logAttrs(nss));
+        12096406, 3, "Releasing replica set writes recoverable critical section", logAttrs(nss));
 
-    invariant(nss == kPreventWritesForInsufficientDiskSpaceNamespace);
+    invariant(nss == kBlockReplicaSetWritesNamespace);
 
-    releaseCriticalSection<PreventWritesCriticalSectionDocument>(
+    releaseCriticalSection<ReplicaSetWriteBlockingCriticalSectionDocument>(
         opCtx,
-        NamespaceString::kPreventWritesCriticalSectionsNamespace,
+        NamespaceString::kReplicaSetWritesCriticalSectionsNamespace,
         nss,
-        "ReleasePreventWritesCS"_sd,
-        [&](const PreventWritesCriticalSectionDocument& doc) {
+        "ReleaseReplicaSetWritesCS"_sd,
+        [&](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot release with different reason",
-                    doc.getPreventWritesReason() == reason);
+                    doc.getReplicaSetWritesBlockReason() == reason);
         });
 
-    LOGV2_DEBUG(12096407, 2, "Released prevent-writes recoverable critical section", logAttrs(nss));
+    LOGV2_DEBUG(
+        12096407, 2, "Released replica set writes recoverable critical section", logAttrs(nss));
 }
 }  // namespace mongo

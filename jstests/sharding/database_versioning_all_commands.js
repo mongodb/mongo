@@ -1320,7 +1320,7 @@ const allTestCases = {
         planCacheListFilters: {skip: "TODO"},
         planCacheSetFilter: {skip: "TODO"},
         prepareTransaction: {skip: "TODO"},
-        preventWritesForInsufficientDiskSpace: {skip: "not on a user database", conditional: true},
+        blockReplicaSetWrites: {skip: "not on a user database", conditional: true},
         profile: {skip: "TODO"},
         reIndex: {skip: "TODO"},
         reapLogicalSessionCacheNow: {skip: "TODO"},

@@ -32,11 +32,11 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/topology/user_write_block/prevent_writes_reason.idl"
+    - "mongo/db/topology/user_write_block/replica_set_writes_block_reason.idl"
 
 structs:
-    PreventWritesForInsufficientDiskSpaceRequest:
-        description: "preventWritesForInsufficientDiskSpace command request"
+    BlockReplicaSetWritesRequest:
+        description: "blockReplicaSetWrites command request"
         strict: true
         fields:
             enabled:
@@ -51,16 +51,16 @@ structs:
                     are blocked with a specific reason, subsequent attempts to block or unblock
                     writes with a different reason will fail. To unblock writes, the same reason
                     that was used to enable blocking must be specified."
-                type: PreventWritesReason
+                type: replicaSetWritesBlockReason
 
 commands:
-    prevent_writes_for_insufficient_disk_space:
+    block_replica_set_writes:
         description: "Set whether preventing writes due to insufficient disk space is enabled."
         api_version: ""
         namespace: ignored
-        command_name: preventWritesForInsufficientDiskSpace
-        cpp_name: PreventWritesForInsufficientDiskSpace
+        command_name: blockReplicaSetWrites
+        cpp_name: blockReplicaSetWrites
         reply_type: OkReply
         strict: true
         chained_structs:
-            PreventWritesForInsufficientDiskSpaceRequest: PreventWritesForInsufficientDiskSpaceRequest
+            BlockReplicaSetWritesRequest: BlockReplicaSetWritesRequest

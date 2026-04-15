@@ -15,7 +15,7 @@ filters:
   - "getlog*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "prevent_writes_for_insufficient_disk_space.js":
+  - "block_replica_set_writes.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
   - "filemd5.js":

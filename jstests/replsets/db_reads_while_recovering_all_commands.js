@@ -391,7 +391,7 @@ const allCommands = {
     planCacheListFilters: {skip: isNotAUserDataRead},
     planCacheSetFilter: {skip: isNotAUserDataRead},
     prepareTransaction: {skip: isPrimaryOnly},
-    preventWritesForInsufficientDiskSpace: {skip: isPrimaryOnly},
+    blockReplicaSetWrites: {skip: isPrimaryOnly},
     profile: {skip: isPrimaryOnly},
     reapLogicalSessionCacheNow: {skip: isNotAUserDataRead},
     recipientForgetMigration: {skip: isPrimaryOnly},

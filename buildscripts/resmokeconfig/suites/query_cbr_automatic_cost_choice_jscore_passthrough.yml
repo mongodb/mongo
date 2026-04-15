@@ -46,8 +46,8 @@ selector:
     # TODO SERVER-99091 re-enable this test to get coverage of switching between plan ranker modes.
     - jstests/core/query/query_knob_correctness_pbt.js
 
-    # Per-shard write block is not supported on standalone.
-    - jstests/core/administrative/prevent_writes_for_insufficient_disk_space.js
+    # Shard level user writes block is not supported on standalone.
+    - jstests/core/administrative/block_replica_set_writes.js
 
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR

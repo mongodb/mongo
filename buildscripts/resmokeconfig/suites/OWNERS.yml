@@ -255,3 +255,12 @@ filters:
   - "v1index_jscore_passthrough.yml":
     approvers:
       - 10gen/query
+  - "core_ese.yml":
+    approvers:
+      - 10gen/server-security
+  - "core_heap_profiling.yml":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "session_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-transactions

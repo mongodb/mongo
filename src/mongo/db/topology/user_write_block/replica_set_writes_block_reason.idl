@@ -34,8 +34,8 @@ imports:
     - "mongo/db/basic_types.idl"
 
 enums:
-    PreventWritesReason:
-        description: The reason for blocking writes on a specific shard.
+    replicaSetWritesBlockReason:
+        description: The reason for blocking writes on a replica set.
         type: string
         values:
             kInsufficientDiskSpace: "InsufficientDiskSpace"

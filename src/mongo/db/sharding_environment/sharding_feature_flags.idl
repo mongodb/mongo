@@ -262,8 +262,8 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection
         default: false
         fcv_gated: true
-    featureFlagPreventWritesForInsufficientDiskSpace:
-        description: "Feature flag to enable blocking writes on a specific shard in case of insufficient disk space"
-        cpp_varname: feature_flags::gFeatureFlagPreventWritesForInsufficientDiskSpace
+    featureFlagBlockReplicaSetWrites:
+        description: "Feature flag to enable blocking writes on a specific replica set"
+        cpp_varname: feature_flags::gFeatureFlagBlockReplicaSetWrites
         default: false
         fcv_gated: true

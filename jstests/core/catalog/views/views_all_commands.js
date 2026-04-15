@@ -597,7 +597,7 @@ let viewsCommandTests = {
     planCacheListFilters: {command: {planCacheListFilters: "view"}, expectFailure: true},
     planCacheSetFilter: {command: {planCacheSetFilter: "view"}, expectFailure: true},
     prepareTransaction: {skip: isUnrelated},
-    preventWritesForInsufficientDiskSpace: {skip: isUnrelated},
+    blockReplicaSetWrites: {skip: isUnrelated},
     profile: {skip: isUnrelated},
     recreateRangeDeletionTasks: {skip: isUnrelated},
     refineCollectionShardKey: {skip: isUnrelated},

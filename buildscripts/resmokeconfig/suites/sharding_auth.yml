@@ -41,8 +41,8 @@ selector:
     - jstests/sharding/set_user_write_block_mode.js
     # Skip because this suite sets roleGraphInvalidationIsFatal to true and this test does not enable test commands
     - jstests/sharding/drop_config_db.js
-    # Skip because this suite implicitly authenticates as clusterManager, which allows to set/unset per-shard write blocking.
-    - jstests/sharding/prevent_writes_for_insufficient_disk_space.js
+    # Skip because this suite implicitly authenticates as clusterManager, which allows to set/unset replica set writes blocking.
+    - jstests/sharding/block_replica_set_writes.js
 
 executor:
   archive:
