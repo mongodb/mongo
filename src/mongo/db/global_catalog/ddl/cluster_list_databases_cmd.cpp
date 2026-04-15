@@ -163,8 +163,15 @@ public:
                                        AuthorizationSession* as,
                                        RequestType& cmd) {
             std::vector<ListDatabasesReplyItem> items;
+
+            // TODO (SERVER-60746): Once SERVER-60746 is resolved, remove the explicit
+            // ReadPreferenceSetting parameter to use the default read preference for
+            // catalogClient()->getAllDBs().
+            // This workaround avoids fetching stale information until the issue is addressed.
             std::vector<DatabaseType> databases = Grid::get(opCtx)->catalogClient()->getAllDBs(
-                opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+                opCtx,
+                repl::ReadConcernLevel::kSnapshotReadConcern,
+                ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
             std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
             auto addIfMatches = [&](ListDatabasesReplyItem item) {
@@ -202,9 +209,15 @@ public:
             // { filter: matchExpression }.
             auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON());
 
+            // TODO (SERVER-60746): Once SERVER-60746 is resolved, remove the explicit
+            // ReadPreferenceSetting parameter to use the default read preference for
+            // catalogClient()->getAllDBs(). This workaround avoids fetching stale information until
+            // the issue is addressed.
             std::vector<DatabaseType> databasesSnapshotBefore =
                 Grid::get(opCtx)->catalogClient()->getAllDBs(
-                    opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+                    opCtx,
+                    repl::ReadConcernLevel::kSnapshotReadConcern,
+                    ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
             int attempts = 0;
             std::vector<AsyncRequestsSender::Response> responses;
@@ -219,9 +232,15 @@ public:
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kIdempotent);
 
+                // TODO (SERVER-60746): Once SERVER-60746 is resolved, remove the explicit
+                // ReadPreferenceSetting parameter to use the default read preference for
+                // catalogClient()->getAllDBs().
+                // This workaround avoids fetching stale information until the issue is addressed.
                 std::vector<DatabaseType> databasesSnapshotAfter =
                     Grid::get(opCtx)->catalogClient()->getAllDBs(
-                        opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+                        opCtx,
+                        repl::ReadConcernLevel::kSnapshotReadConcern,
+                        ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
                 // Broadcasting a `listDatabases` command to all shards can miss a database that is
                 // being moved via movePrimary if the movePrimary operation runs concurrently with

@@ -62,8 +62,10 @@ DatabaseType ShardingCatalogClientMock::getDatabase(OperationContext* opCtx,
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
-std::vector<DatabaseType> ShardingCatalogClientMock::getAllDBs(OperationContext* opCtx,
-                                                               repl::ReadConcernLevel readConcern) {
+std::vector<DatabaseType> ShardingCatalogClientMock::getAllDBs(
+    OperationContext* opCtx,
+    repl::ReadConcernLevel readConcern,
+    const boost::optional<ReadPreferenceSetting>& readPref) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 

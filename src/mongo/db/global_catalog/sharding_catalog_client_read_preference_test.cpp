@@ -139,6 +139,38 @@ protected:
         ASSERT_EQ(dbt.getDbName(), actualDbNames[0]);
     }
 
+    void assertReadPreferenceForGetAllDBs(
+        ReadPreference expectedReadPreference,
+        const boost::optional<ReadPreferenceSetting>& readPrefOverride = boost::none) {
+        DatabaseType dbt(DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                         kShardId1,
+                         DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+
+        auto future = launchAsync([&] {
+            return catalogClient()->getAllDBs(
+                operationContext(), repl::ReadConcernLevel::kSnapshotReadConcern, readPrefOverride);
+        });
+
+        onFindCommand([this, dbt, expectedReadPreference](const RemoteCommandRequest& request) {
+            auto opMsg = static_cast<OpMsgRequest>(request);
+            auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
+
+            BSONObjBuilder o;
+            ReadPreferenceSetting(expectedReadPreference).toContainingBSON(&o);
+            o.append(rpc::kReplSetMetadataFieldName, 1);
+
+            ASSERT_BSONOBJ_EQ(o.obj(), request.metadata);
+            ASSERT_EQ(NamespaceString::kConfigDatabasesNamespace,
+                      query->getNamespaceOrUUID().nss());
+
+            return vector<BSONObj>{dbt.toBSON()};
+        });
+
+        const auto& actualDbs = future.default_timed_get();
+        ASSERT_EQ(1, actualDbs.size());
+        ASSERT_EQ(dbt.getDbName(), actualDbs[0].getDbName());
+    }
+
 private:
     void _assertClusterParameter(bool expectedMustAlwaysUseNearest) {
         auto* param =
@@ -238,6 +270,34 @@ TEST_F(ShardingCatalogClientReadPreferenceWithNoCachedDataInShardRegistry,
     resetClusterParameter();
 
     assertReadPreferenceForCatalogQuery(ReadPreference::PrimaryPreferred);
+}
+
+TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
+       GetAllDBsOverridesPrimaryOnlyReadPreference) {
+    setClusterParameter(false /* mustAlwaysUseNearest */);
+
+    // With a config shard the default would be PrimaryPreferred, but the explicit override
+    // should force PrimaryOnly.
+    assertReadPreferenceForGetAllDBs(ReadPreference::PrimaryOnly,
+                                     ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+}
+
+TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
+       GetAllDBsUsesDefaultReadPreferenceWhenNoOverride) {
+    setClusterParameter(false /* mustAlwaysUseNearest */);
+
+    // Without an override, getAllDBs should use the default PrimaryPreferred for config shard.
+    assertReadPreferenceForGetAllDBs(ReadPreference::PrimaryPreferred);
+}
+
+TEST_F(ShardingCatalogClientReadPreferenceWithoutConfigShardTest,
+       GetAllDBsOverridesPrimaryOnlyReadPreference) {
+    setClusterParameter(false /* mustAlwaysUseNearest */);
+
+    // Without a config shard the default would be Nearest, but the explicit override
+    // should force PrimaryOnly.
+    assertReadPreferenceForGetAllDBs(ReadPreference::PrimaryOnly,
+                                     ReadPreferenceSetting{ReadPreference::PrimaryOnly});
 }
 
 }  // namespace

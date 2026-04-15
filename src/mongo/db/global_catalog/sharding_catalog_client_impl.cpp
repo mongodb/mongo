@@ -504,16 +504,19 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
     return uassertStatusOK(std::move(result)).value;
 }
 
-std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(OperationContext* opCtx,
-                                                               repl::ReadConcernLevel readConcern) {
-    auto dbs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                       getConfigReadPreference(opCtx),
-                                                       readConcern,
-                                                       NamespaceString::kConfigDatabasesNamespace,
-                                                       BSONObj(),
-                                                       BSONObj(),
-                                                       boost::none))
-                   .value;
+std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(
+    OperationContext* opCtx,
+    repl::ReadConcernLevel readConcern,
+    const boost::optional<ReadPreferenceSetting>& readPref) {
+    auto dbs =
+        uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
+                                                readPref.value_or(getConfigReadPreference(opCtx)),
+                                                readConcern,
+                                                NamespaceString::kConfigDatabasesNamespace,
+                                                BSONObj(),
+                                                BSONObj(),
+                                                boost::none))
+            .value;
 
     std::vector<DatabaseType> databases;
     databases.reserve(dbs.size());

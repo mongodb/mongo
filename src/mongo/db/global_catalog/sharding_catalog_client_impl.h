@@ -109,8 +109,10 @@ public:
                              const DatabaseName& db,
                              repl::ReadConcernLevel readConcernLevel) override;
 
-    std::vector<DatabaseType> getAllDBs(OperationContext* opCtx,
-                                        repl::ReadConcernLevel readConcern) override;
+    std::vector<DatabaseType> getAllDBs(
+        OperationContext* opCtx,
+        repl::ReadConcernLevel readConcern,
+        const boost::optional<ReadPreferenceSetting>& readPref = boost::none) override;
 
     CollectionType getCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,

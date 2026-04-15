@@ -73,10 +73,6 @@ class LogicalTime;
  * All implementations of this interface should go directly to the persistent backing store
  * and should avoid doing any caching of their own. The caching is delegated to a parallel
  * read-only view of the catalog, which is maintained by a higher level code.
- *
- * TODO: For now this also includes some methods that write the sharding catalog metadata.  Those
- * should eventually all be moved to ShardingCatalogManager as catalog manipulation operations
- * move to be run on the config server primary.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClient {
     ShardingCatalogClient(const ShardingCatalogClient&) = delete;
@@ -119,12 +115,22 @@ public:
                                      repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
-     * Retrieves all databases in a cluster.
+     * Retrieves all databases in a cluster by querying the config.databases collection on the
+     * config server. The query is issued with the given 'readConcern' and an afterClusterTime
+     * set to the currently known configTime, which ensures causal consistency with previously
+     * observed config server operations.
+     *
+     * If 'readPref' is not specified, the read preference is determined by the cluster topology:
+     * PrimaryPreferred for clusters with a config shard, Nearest for dedicated config servers.
+     * Using Nearest is safe in this case because the afterClusterTime guarantee ensures the
+     * targeted secondary has replicated up to at least the configTime.
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual std::vector<DatabaseType> getAllDBs(OperationContext* opCtx,
-                                                repl::ReadConcernLevel readConcern) = 0;
+    virtual std::vector<DatabaseType> getAllDBs(
+        OperationContext* opCtx,
+        repl::ReadConcernLevel readConcern,
+        const boost::optional<ReadPreferenceSetting>& readPref = boost::none) = 0;
 
     /**
      * Retrieves the metadata for a given collection, if it exists.
