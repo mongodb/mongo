@@ -40,6 +40,55 @@ __wt_fill_hex(const uint8_t *src, size_t src_max, uint8_t *dest, size_t dest_max
 }
 
 /*
+ * __wt_log_data_dump --
+ *     Log a preamble message followed by a hex dump of a data buffer in 1KB chunks.
+ */
+void
+__wt_log_data_dump(WT_SESSION_IMPL *session, const void *data, size_t size, const char *fmt, ...)
+  WT_GCC_FUNC_ATTRIBUTE((cold)) WT_GCC_FUNC_ATTRIBUTE((format(printf, 4, 5)))
+{
+    WT_DECL_ITEM(preamble);
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+    size_t chunk, i, nchunks;
+
+    WT_ERR_MSG_CHK(session, __wt_scr_alloc(session, 0, &preamble), "preamble buffer allocation");
+    WT_VA_ARGS_BUF_FORMAT(session, preamble, fmt, false);
+
+    if (size == 0) {
+        __wt_errx(session, "%.*s: empty buffer, no dump available", (int)preamble->size,
+          (char *)preamble->data);
+        goto err;
+    }
+
+    WT_ERR_MSG_CHK(session, __wt_scr_alloc(session, 4 * 1024, &tmp), "hex buffer allocation");
+
+    nchunks = size / 1024 + (size % 1024 == 0 ? 0 : 1);
+#define DATA_DUMP_MAX_SIZE (64 * 1024) /* Avoid run-away dumps. */
+    for (chunk = i = 0;;) {
+        WT_ERR_MSG_CHK(session, __wt_buf_catfmt(session, tmp, "%02x ", ((const uint8_t *)data)[i]),
+          "hex format");
+        if (++i >= size || i % 1024 == 0) {
+            __wt_errx(session, "%.*s: (chunk %" WT_SIZET_FMT " of %" WT_SIZET_FMT "): %.*s",
+              (int)preamble->size, (char *)preamble->data, ++chunk, nchunks, (int)tmp->size,
+              (char *)tmp->data);
+            if (i >= size)
+                break;
+            if (i >= DATA_DUMP_MAX_SIZE) {
+                __wt_errx(session, "%.*s: data dump truncated after %" WT_SIZET_FMT " bytes",
+                  (int)preamble->size, (char *)preamble->data, i);
+                break;
+            }
+            WT_ERR_MSG_CHK(session, __wt_buf_set(session, tmp, "", 0), "hex buffer reset");
+        }
+    }
+
+err:
+    __wt_scr_free(session, &preamble);
+    __wt_scr_free(session, &tmp);
+}
+
+/*
  * __wt_raw_to_hex --
  *     Convert a chunk of data to a nul-terminated printable hex string.
  */

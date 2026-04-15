@@ -60,10 +60,10 @@ functions:
               export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(dirname $(/opt/mongodbtoolchain/v5/bin/clang -print-file-name=libclang_rt.asan.so))"
               export TESTUTIL_BYPASS_ASAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ MSan ]]; then
-              export MSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export MSAN_OPTIONS="$COMMON_SAN_OPTIONS"
               export TESTUTIL_MSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ TSan ]]; then
-              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS"
               export TESTUTIL_TSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
               export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"
@@ -1682,7 +1682,7 @@ variables:
       - func: "format test script"
         vars:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-          format_test_script_args: -t 360
+          format_test_script_args: -t 360 -- debug.realloc_exact=0
 
   - &race-condition-stress-asan-test
     exec_timeout_secs: 25200

@@ -62,46 +62,6 @@ err:
 }
 
 /*
- * __wt_bm_corrupt_dump --
- *     Dump a block into the log in 1KB chunks.
- */
-int
-__wt_bm_corrupt_dump(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t objectid, wt_off_t offset,
-  uint32_t size, uint32_t checksum) WT_GCC_FUNC_ATTRIBUTE((cold))
-{
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-    size_t chunk, i, nchunks;
-
-#define WT_CORRUPT_FMT "{%" PRIu32 ": %" PRIuMAX ", %" PRIu32 ", %#" PRIx32 "}"
-    if (buf->size == 0) {
-        __wt_errx(session, WT_CORRUPT_FMT ": empty buffer, no dump available", objectid,
-          (uintmax_t)offset, size, checksum);
-        return (0);
-    }
-
-    WT_RET(__wt_scr_alloc(session, 4 * 1024, &tmp));
-
-    nchunks = buf->size / 1024 + (buf->size % 1024 == 0 ? 0 : 1);
-    for (chunk = i = 0;;) {
-        WT_ERR(__wt_buf_catfmt(session, tmp, "%02x ", ((uint8_t *)buf->data)[i]));
-        if (++i == buf->size || i % 1024 == 0) {
-            __wt_errx(session,
-              WT_CORRUPT_FMT ": (chunk %" WT_SIZET_FMT " of %" WT_SIZET_FMT "): %.*s", objectid,
-              (uintmax_t)offset, size, checksum, ++chunk, nchunks, (int)tmp->size,
-              (char *)tmp->data);
-            if (i == buf->size)
-                break;
-            WT_ERR(__wt_buf_set(session, tmp, "", 0));
-        }
-    }
-
-err:
-    __wt_scr_free(session, &tmp);
-    return (ret);
-}
-
-/*
  * __wt_bm_corrupt --
  *     Report a block has been corrupted, external API.
  */
@@ -120,7 +80,9 @@ __wt_bm_corrupt(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t
     /* Crack the cookie, dump the block. */
     WT_ERR(__wt_block_addr_unpack(
       session, bm->block, addr, addr_size, &objectid, &offset, &size, &checksum));
-    WT_ERR(__wt_bm_corrupt_dump(session, tmp, objectid, offset, size, checksum));
+    __wt_log_data_dump(session, tmp->data, tmp->size,
+      "corrupt dump: {%" PRIu32 ": %" PRIuMAX ", %" PRIu32 ", %#" PRIx32 "}", objectid,
+      (uintmax_t)offset, size, checksum);
 
 err:
     __wt_scr_free(session, &tmp);
@@ -329,7 +291,9 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
          * Dump the corrupted block for analysis prior to bitflip detection in case detection takes
          * too long.
          */
-        WT_IGNORE_RET(__wt_bm_corrupt_dump(session, buf, objectid, offset, size, checksum));
+        __wt_log_data_dump(session, buf->data, buf->size,
+          "corrupt dump: {%" PRIu32 ": %" PRIuMAX ", %" PRIu32 ", %#" PRIx32 "}", objectid,
+          (uintmax_t)offset, size, checksum);
 
         /* Dump the free disk space. */
         __fs_free_space_dump(session, block);

@@ -289,6 +289,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 WT_STAT_CONN_INCR(session, checkpoint_pages_visited_internal);
             else
                 WT_STAT_CONN_INCR(session, checkpoint_pages_visited_leaf);
+            if (WT_SESSION_IS_CHECKPOINT(session))
+                ++conn->ckpt.progress.pages_visited;
 
             /*
              * Check if the page is dirty. Add a barrier between the check and taking a reference to
