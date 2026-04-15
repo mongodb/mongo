@@ -98,6 +98,7 @@ check_txn_updates(std::string const &label, WT_SESSION_IMPL *session_impl, bool 
             case WT_TXN_OP_REF_DELETE:
             case WT_TXN_OP_TRUNCATE_COL:
             case WT_TXN_OP_TRUNCATE_ROW:
+            case WT_TXN_OP_FOLLOWER_TRUNCATE:
                 break;
             case WT_TXN_OP_BASIC_COL:
             case WT_TXN_OP_BASIC_ROW:

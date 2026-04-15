@@ -757,6 +757,31 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
+ * __wt_txn_truncate --
+ *     Mark a WT_TRUNCATE object modified by the current transaction.
+ */
+static WT_INLINE int
+__wt_txn_truncate(WT_SESSION_IMPL *session, WT_TRUNCATE *t)
+{
+    WT_TXN *txn;
+    WT_TXN_OP *op;
+
+    txn = session->txn;
+
+    WT_ASSERT(session, __wt_process.disagg_fast_truncate_2026 == true);
+
+    if (F_ISSET(txn, WT_TXN_READONLY))
+        WT_RET_MSG(session, WT_ROLLBACK, "Attempt to update in a read-only transaction");
+
+    WT_RET(__txn_next_op(session, &op));
+    op->type = WT_TXN_OP_FOLLOWER_TRUNCATE;
+    t->txn_id = session->txn->time_point.id;
+
+    op->u.follower_truncate.t = t;
+    return (0);
+}
+
+/*
  * __wt_op_modify --
  *     Initialize a transaction operation for a prepared update.
  */

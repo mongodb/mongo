@@ -429,6 +429,8 @@ struct __wt_time_aggregate;
 typedef struct __wt_time_aggregate WT_TIME_AGGREGATE;
 struct __wt_time_window;
 typedef struct __wt_time_window WT_TIME_WINDOW;
+struct __wt_truncate;
+typedef struct __wt_truncate WT_TRUNCATE;
 struct __wt_truncate_info;
 typedef struct __wt_truncate_info WT_TRUNCATE_INFO;
 struct __wt_txn;

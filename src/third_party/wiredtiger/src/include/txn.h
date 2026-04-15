@@ -242,7 +242,8 @@ typedef enum __wt_txn_type {
     WT_TXN_OP_INMEM_ROW,
     WT_TXN_OP_REF_DELETE,
     WT_TXN_OP_TRUNCATE_COL,
-    WT_TXN_OP_TRUNCATE_ROW
+    WT_TXN_OP_TRUNCATE_ROW,
+    WT_TXN_OP_FOLLOWER_TRUNCATE
 } WT_TXN_TYPE;
 
 typedef enum {
@@ -290,6 +291,11 @@ struct __wt_txn_op {
             WT_ITEM start, stop;
             WT_TXN_TRUNC_MODE mode;
         } truncate_row;
+
+        /* WT_TXN_FOLLOWER_TRUNCATE */
+        struct {
+            WT_TRUNCATE *t;
+        } follower_truncate;
     } u;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

@@ -943,7 +943,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         uri = self.uri if uri is None else uri
         return self.retryEBUSY(session, lambda: session.drop(uri, config), **kwargs)
 
-    def verifyUntilSuccess(self, session=None, uri=None, config=None, **kwargs):
+    def verifyUntilSuccess(self, session=None, uri=None, config="strict=true", **kwargs):
         session = self.session if session is None else session
         uri = self.uri if uri is None else uri
         return self.retryEBUSY(session, lambda: session.verify(uri, config), **kwargs)

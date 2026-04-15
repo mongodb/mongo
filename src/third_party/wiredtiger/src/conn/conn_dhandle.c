@@ -212,6 +212,8 @@ __wt_conn_dhandle_alloc(WT_SESSION_IMPL *session, const char *uri, const char *c
     } else if (WT_PREFIX_MATCH(uri, "layered:")) {
         WT_RET(__wt_calloc_one(session, &layered));
         dhandle = (WT_DATA_HANDLE *)layered;
+        TAILQ_INIT(&layered->truncateqh);
+        WT_RET(__wt_rwlock_init(session, &layered->truncate_lock));
         __wt_atomic_store_enum_relaxed(&dhandle->type, WT_DHANDLE_TYPE_LAYERED);
     } else if (WT_PREFIX_MATCH(uri, "table:")) {
         WT_RET(__wt_calloc_one(session, &table));

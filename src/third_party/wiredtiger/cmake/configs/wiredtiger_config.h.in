@@ -172,6 +172,9 @@
 /* Define to 1 to support standalone build. */
 #cmakedefine WT_STANDALONE_BUILD 1
 
+/* Define to 1 to build disaggregate fast truncate POC. */
+#cmakedefine WT_DISAGG_FAST_TRUNCATE_BUILD 0
+
 #ifndef _DARWIN_USE_64_BIT_INODE
 # define _DARWIN_USE_64_BIT_INODE 1
 #endif

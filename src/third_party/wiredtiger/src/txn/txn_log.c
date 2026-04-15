@@ -176,6 +176,7 @@ __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
     case WT_TXN_OP_INMEM_COL:
     case WT_TXN_OP_REF_DELETE:
     case WT_TXN_OP_TRUNCATE_COL:
+    case WT_TXN_OP_FOLLOWER_TRUNCATE:
         break;
 
     case WT_TXN_OP_BASIC_ROW:
@@ -284,6 +285,7 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     case WT_TXN_OP_INMEM_COL:
     case WT_TXN_OP_INMEM_ROW:
     case WT_TXN_OP_REF_DELETE:
+    case WT_TXN_OP_FOLLOWER_TRUNCATE:
         /* Nothing to log, we're done. */
         break;
     case WT_TXN_OP_BASIC_COL:

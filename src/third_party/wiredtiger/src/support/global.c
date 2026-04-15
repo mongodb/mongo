@@ -353,6 +353,10 @@ __global_once(void)
 #ifdef WT_STANDALONE_BUILD
     __wt_process.tiered_shared_2023 = true;
 #endif
+
+#ifdef WT_DISAGG_FAST_TRUNCATE_BUILD
+    __wt_process.disagg_fast_truncate_2026 = true;
+#endif
 }
 
 /*

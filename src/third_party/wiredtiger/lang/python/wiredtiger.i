@@ -746,6 +746,8 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %exception wiredtiger_version;
 %exception diagnostic_build;
 %exception standalone_build;
+%exception disagg_fast_truncate_build;
+
 
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
@@ -1426,6 +1428,17 @@ int standalone_build() {
 }
 %}
 int standalone_build();
+
+%{
+int disagg_fast_truncate_build() {
+#ifdef WT_DISAGG_FAST_TRUNCATE_BUILD
+	return 1;
+#else
+	return 0;
+#endif
+}
+%}
+int disagg_fast_truncate_build();
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;

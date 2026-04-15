@@ -700,7 +700,11 @@ __wti_block_off_free(
     else if (ret == WT_NOTFOUND)
         ret = __block_merge(session, block, &block->live.discard, offset, size);
 
-    /* Increment the free block statistic when not running salvage. */
+    /*
+     * Salvage is a corruption repair operation. Including it in the block_free stat would create
+     * misleading spikes unrelated to workload behavior, making the stat unreliable for monitoring
+     * normal user driven activity.
+     */
     if (!F_ISSET(S2BT(session), WT_BTREE_SALVAGE)) {
         WT_STAT_DSRC_INCR(session, block_free);
     }

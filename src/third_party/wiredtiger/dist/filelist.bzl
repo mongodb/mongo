@@ -206,7 +206,8 @@ WT_FILELIST = ['src/block/block_addr.c',
  'src/txn/txn.c',
  'src/txn/txn_log.c',
  'src/txn/txn_recover.c',
- 'src/txn/txn_timestamp.c']
+ 'src/txn/txn_timestamp.c',
+ 'src/txn/txn_truncate.c']
 
 WT_FILELIST_ARM64_HOST = ['src/checksum/arm64/crc32-arm64.c']
 

@@ -27,6 +27,7 @@ has_key(WT_TXN_TYPE type)
     case (WT_TXN_OP_REF_DELETE):
     case (WT_TXN_OP_TRUNCATE_COL):
     case (WT_TXN_OP_TRUNCATE_ROW):
+    case (WT_TXN_OP_FOLLOWER_TRUNCATE):
         return (false);
     case (WT_TXN_OP_BASIC_COL):
     case (WT_TXN_OP_BASIC_ROW):

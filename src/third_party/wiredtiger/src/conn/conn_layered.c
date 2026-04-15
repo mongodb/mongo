@@ -1153,6 +1153,7 @@ static int
 __disagg_abandon_checkpoint(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     WT_DISAGGREGATED_STORAGE *disagg;
 
     conn = S2C(session);
@@ -1180,10 +1181,15 @@ __disagg_abandon_checkpoint(WT_SESSION_IMPL *session)
      * checkpoint completion record and drop all later records. If there are no more updates after
      * the last complete checkpoint, the function would have no effect.
      */
-    WT_RET(disagg->npage_log->page_log->pl_abandon_checkpoint(
-      disagg->npage_log->page_log, &session->iface));
+    ret = disagg->npage_log->page_log->pl_abandon_checkpoint(
+      disagg->npage_log->page_log, &session->iface);
 
-    return (0);
+    if (ret == 0)
+        WT_STAT_CONN_INCR(session, disagg_abandon_checkpoint_succeed);
+    else
+        WT_STAT_CONN_INCR(session, disagg_abandon_checkpoint_failed);
+
+    return (ret);
 }
 
 /*
@@ -1396,6 +1402,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
 
     /* Reconfigure-only settings. */
     if (reconfig) {
+        WT_STAT_CONN_INCR(session, disagg_conn_reconfig);
 
         /* Pick up a new checkpoint (followers only). */
         WT_ERR_NOTFOUND_OK(
