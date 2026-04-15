@@ -520,7 +520,7 @@
     },
     "//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl%setup_mongo_windows_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "dHLyfzMhaUTIIP7LsjQxVGJHz6n+z1RfQNYH+/O+1Iw=",
+        "bzlTransitiveDigest": "dTkPBS74jWiliNeqZtye2TPIbqNdPymmbroA6UepKwA=",
         "usagesDigest": "n0o7oj+Qsfc72uhUPqYhsJpUeTzxSeQBSih56V3nmlw=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

@@ -359,12 +359,11 @@ def setup_vc_env_vars(repository_ctx, vc_path, envvars = [], allow_empty = False
 
     # Getting Windows SDK version set by user.
     # Only supports VC 2017 & 2019 and VC 2015 with full VS installation.
-    winsdk_version = _get_winsdk_full_version(repository_ctx)
+    winsdk_version = _ensure_winsdk_is_available(repository_ctx, _get_winsdk_full_version(repository_ctx))
     if winsdk_version and not _is_support_winsdk_selection(repository_ctx, vc_path):
-        auto_configure_warning(("BAZEL_WINSDK_FULL_VERSION=%s is ignored, " +
-                                "because standalone Visual C++ Build Tools 2015 doesn't support specifying Windows " +
-                                "SDK version, please install the full VS 2015 or use VC 2017/2019.") % winsdk_version)
-        winsdk_version = ""
+        auto_configure_fail(("BAZEL_WINSDK_FULL_VERSION=%s requires a Visual Studio installation whose " +
+                             "VCVARSALL.BAT supports Windows SDK selection. Please install VS 2017 or newer " +
+                             "(or a full VS 2015 installation that supports SDK selection).") % winsdk_version)
 
     # Get VC version set by user. Only supports VC 2017 & 2019.
     vcvars_ver = ""
@@ -393,6 +392,15 @@ def setup_vc_env_vars(repository_ctx, vc_path, envvars = [], allow_empty = False
 
     if not allow_empty:
         _check_env_vars(env_map, cmd, expected = envvars)
+    if winsdk_version:
+        configured_winsdk_version = _normalize_winsdk_full_version(env_map.get("WindowsSDKVersion"))
+        if configured_winsdk_version != winsdk_version:
+            auto_configure_fail(
+                ("VCVARSALL.BAT configured Windows SDK %s instead of the requested %s.\n" +
+                 "If you need to use a different installed SDK, pass " +
+                 "--repo_env=BAZEL_WINSDK_FULL_VERSION=<sdk-version> on the Bazel command line.") %
+                (configured_winsdk_version or "<unset>", winsdk_version),
+            )
     return env_map
 
 def _check_env_vars(env_map, cmd, expected):
@@ -436,7 +444,28 @@ def _get_vc_full_version(repository_ctx, vc_path):
 
 def _get_winsdk_full_version(repository_ctx):
     """Return the value of BAZEL_WINSDK_FULL_VERSION if defined, otherwise an empty string."""
-    return _get_env_var(repository_ctx, "BAZEL_WINSDK_FULL_VERSION", default = "")
+    return _normalize_winsdk_full_version(_get_env_var(repository_ctx, "BAZEL_WINSDK_FULL_VERSION", default = ""))
+
+def _normalize_winsdk_full_version(winsdk_version):
+    return (winsdk_version or "").strip().rstrip("\\/")
+
+def _get_winsdk_lib_dir(winsdk_version):
+    return "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\%s" % winsdk_version
+
+def _ensure_winsdk_is_available(repository_ctx, winsdk_version):
+    winsdk_version = _normalize_winsdk_full_version(winsdk_version)
+    if not winsdk_version:
+        return winsdk_version
+
+    winsdk_lib_dir = _get_winsdk_lib_dir(winsdk_version)
+    if not repository_ctx.path(winsdk_lib_dir).exists:
+        auto_configure_fail(
+            ("Requested Windows SDK %s was not found at %s.\n" +
+             "Install that SDK or choose a different installed SDK with " +
+             "--repo_env=BAZEL_WINSDK_FULL_VERSION=<sdk-version>.") %
+            (winsdk_version, winsdk_lib_dir),
+        )
+    return winsdk_version
 
 def _find_msvc_tools(repository_ctx, vc_path, target_arch = "x64"):
     """Find the exact paths of the build tools in MSVC for the given target. Doesn't %-escape the result."""
@@ -940,6 +969,14 @@ and install the ALT component that matches to compiler version %s""" % full_vers
 def has_win_sdk_installed(repository_ctx, vars):
     winsdk_dir = vars["WINDOWSSDKDIR"] or ""
     if winsdk_dir == "" or not repository_ctx.path(winsdk_dir).exists:
-        auto_configure_fail("Windows SDK is not installed. Please run the Visual Studio Installer and install Windows SDK 11.")
+        winsdk_version = _get_winsdk_full_version(repository_ctx)
+        if winsdk_version:
+            auto_configure_fail(
+                ("Windows SDK %s could not be configured.\n" +
+                 "Make sure %s exists or pick a different installed SDK with " +
+                 "--repo_env=BAZEL_WINSDK_FULL_VERSION=<sdk-version>.") %
+                (winsdk_version, _get_winsdk_lib_dir(winsdk_version)),
+            )
+        auto_configure_fail("Windows SDK is not installed. Please run the Visual Studio Installer and install a Windows SDK.")
 
 ###
