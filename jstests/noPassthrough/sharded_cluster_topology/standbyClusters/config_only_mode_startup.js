@@ -1,28 +1,31 @@
 /**
  * Tests that mongos can start up with --configOnly pointed at a plain (non-configsvr) replica set
  * and that this flag can be set via command line or config file.
+ *
+ * @tags: [
+ *   # The StandbyClusterTestFixture restarts nodes and expects persisted metadata to be preserved.
+ *   requires_persistence,
+ * ]
  */
 
-import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {StandbyClusterTestFixture} from "jstests/noPassthrough/libs/sharded_cluster_topology/standby_cluster_test_fixture.js";
 import {writeJSONConfigFile} from "jstests/libs/command_line/test_parsed_options.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 describe("config-only mode startup", function () {
     before(function () {
-        this.rs = new ReplSetTest({nodes: 1});
-        this.rs.startSet();
-        this.rs.initiate();
-
-        // We insert a document into the replica set to mimic the cluster ID on the config server
-        // since the mongoS requires this to complete startup. On a normal standby cluster, this
-        // would already exist since the config server has full metadata.
-        assert.commandWorked(
-            this.rs.getPrimary().getDB("config").getCollection("version").insert({clusterId: ObjectId()}),
-        );
+        this.fixture = new StandbyClusterTestFixture({
+            name: "config_only_mode_startup",
+            shards: 1,
+            rs: {nodes: 1},
+            config: {nodes: 1},
+        });
+        this.fixture.transitionToStandby();
+        this.rs = this.fixture.standbyRS;
     });
 
     after(function () {
-        this.rs.stopSet();
+        this.fixture.teardown();
     });
 
     it("Command line options", function () {
