@@ -1,0 +1,32 @@
+### Overrides for rate-limited replica set suites ###
+
+- name: rate_limiter_mongod_params
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            # Replica set members should never shed load from each other. Setting
+            # retries to 0 acts as a canary: if any internal RS communication
+            # unexpectedly hits the rate limiter, the test fails immediately.
+            defaultClientMaxRetryAttempts: 0
+            failpoint.failIngressRequestRateLimiting:
+              mode:
+                activationProbability: 0.25
+            # Sourced from https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs#L77-L119
+            ingressRequestRateLimiterApplicationExemptions: >
+              {"appNames":["MongoDB Internal Client",
+                          "NetworkInterfaceTL-ReplNetwork",
+                          "NetworkInterfaceTL-ReplCoordExternNetwork",
+                          "NetworkInterfaceTL-ReplNodeDbWorkerNetwork",
+                          "NetworkInterfaceTL-ReplicaSetMonitor-TaskExecutor",
+                          "NetworkInterfaceTL-HelloMe-TaskExecutor",
+                          "NetworkInterfaceTL-AddShardCoordinator-TaskExecutor",
+                          "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
+                          "NetworkInterfaceTL-StandaloneNetwork",
+                          "NetworkInterfaceTL-ShardingDDLCoordinatorNetwork"]}
+
+- name: rate_limiter_shell_override
+  value:
+    eval: >-
+      await import("jstests/libs/override_methods/implicitly_retry_on_overload_errors.js")

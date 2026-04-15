@@ -1,0 +1,9 @@
+# This suite tests the core JS tests against a replica set with the rate limiter enabled.
+# The purpose is to verify that the rate limiter can be enabled without issue when proper
+# client retry behavior is in place. With automatic retries enabled, no rate limit errors
+# should bubble up to the test.
+base_suite: replica_sets_jscore_passthrough_base
+overrides:
+  - "replica_set_rate_limiter.rate_limiter_mongod_params"
+eval:
+  - "replica_set_rate_limiter.rate_limiter_shell_override"

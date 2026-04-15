@@ -49,6 +49,9 @@ filters:
   - "generated_suites/*execution_control*":
     approvers:
       - 10gen/server-workload-resilience
+  - "generated_suites/*rate_limited.yml":
+    approvers:
+      - 10gen/server-workload-resilience
   - "generated_suites/transitioning_replica_sets_jscore_passthrough.yml":
     approvers:
       - 10gen/server-catalog-and-routing

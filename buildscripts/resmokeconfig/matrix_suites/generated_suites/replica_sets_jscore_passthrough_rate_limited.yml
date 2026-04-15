@@ -1,0 +1,77 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_jscore_passthrough_rate_limited.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/implicitly_retry_on_overload_errors.js")
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        defaultClientMaxRetryAttempts: 0
+        enableTestCommands: 1
+        failpoint.failIngressRequestRateLimiting:
+          mode:
+            activationProbability: 0.25
+        ingressRequestRateLimiterApplicationExemptions:
+          "{\"appNames\":[\"MongoDB\
+          \ Internal Client\",\n            \"NetworkInterfaceTL-ReplNetwork\",\n\
+          \            \"NetworkInterfaceTL-ReplCoordExternNetwork\",\n          \
+          \  \"NetworkInterfaceTL-ReplNodeDbWorkerNetwork\",\n            \"NetworkInterfaceTL-ReplicaSetMonitor-TaskExecutor\"\
+          ,\n            \"NetworkInterfaceTL-HelloMe-TaskExecutor\",\n          \
+          \  \"NetworkInterfaceTL-AddShardCoordinator-TaskExecutor\",\n          \
+          \  \"NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork\",\n        \
+          \    \"NetworkInterfaceTL-StandaloneNetwork\",\n            \"NetworkInterfaceTL-ShardingDDLCoordinatorNetwork\"\
+          ]}\n"
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
+    num_nodes: 2
+  hooks:
+    - class: RunQueryStats
+      skip_tags:
+        - inspects_command_opcounters
+        - known_query_shape_computation_problem
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/query/awaitdata_getmore_cmd.js
+    - jstests/core/administrative/current_op/currentop.js
+    - jstests/core/administrative/fsync/fsync.js
+    - jstests/core/txns/prepare_conflict.js
+    - jstests/core/txns/prepare_conflict_aggregation_behavior.js
+    - jstests/core/timeseries/write/timeseries_update_multi.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - requires_profiling
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

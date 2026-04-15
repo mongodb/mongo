@@ -37,7 +37,7 @@ filters:
   - "injected_catalog_metadata.yml":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
-  - "ingress_request_rate_limiter.yml":
+  - "*rate_limiter*.yml":
     approvers:
       - 10gen/server-workload-resilience
   - "fcv_upgrade_downgrade.yml":

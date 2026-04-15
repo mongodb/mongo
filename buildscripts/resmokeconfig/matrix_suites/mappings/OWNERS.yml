@@ -103,6 +103,9 @@ filters:
   - "*execution_control*":
     approvers:
       - 10gen/server-workload-resilience
+  - "*rate_limited*":
+    approvers:
+      - 10gen/server-workload-resilience
   - "transitioning_replica_sets_jscore_passthrough.yml":
     approvers:
       - 10gen/server-catalog-and-routing
