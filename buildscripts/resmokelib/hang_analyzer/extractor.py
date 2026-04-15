@@ -157,6 +157,16 @@ def filter_core_dumps(
     return interesting
 
 
+def _get_free_disk_bytes(path: str = ".") -> int:
+    """Return the number of free bytes on the filesystem containing `path`."""
+    return shutil.disk_usage(path).free
+
+
+# 1 GiB – enough headroom for binaries, debugsymbols, OTel traces, and
+# other artifacts that are downloaded / generated in parallel.
+_DISK_RESERVE_BYTES = 1 * (1024**3)
+
+
 @TRACER.start_as_current_span("core_analyzer.download_core_dumps")
 def download_core_dumps(
     root_logger: Logger,
@@ -184,6 +194,7 @@ def download_core_dumps(
         return True
 
     core_dumps_found = 0
+    core_dumps_skipped_disk_space = 0
     core_dumps_dir = os.path.join(download_dir, "core-dumps")
     os.makedirs(core_dumps_dir, exist_ok=True)
     current_span = get_default_current_span()
@@ -191,6 +202,25 @@ def download_core_dumps(
         file_name = artifact.url.split("/")[-1]
         extracted_name, _ = os.path.splitext(file_name)
         extract_path = os.path.join(core_dumps_dir, extracted_name)
+
+        free_bytes = _get_free_disk_bytes(download_dir)
+        if free_bytes < _DISK_RESERVE_BYTES:
+            remaining = len(core_dump_artifacts) - core_dumps_found - core_dumps_skipped_disk_space
+            root_logger.warning(
+                "Low disk space (%.2f GiB free, %.2f GiB reserve). "
+                "Skipping remaining %d core dump(s).",
+                free_bytes / (1024**3),
+                _DISK_RESERVE_BYTES / (1024**3),
+                remaining,
+            )
+            core_dumps_skipped_disk_space += remaining
+            current_span.set_attributes(
+                {
+                    "core_dumps_skipped_disk_space": core_dumps_skipped_disk_space,
+                    "core_dumps_free_bytes_at_skip": free_bytes,
+                }
+            )
+            break
 
         with TRACER.start_as_current_span(
             "core_analyzer.download_core_dump",
