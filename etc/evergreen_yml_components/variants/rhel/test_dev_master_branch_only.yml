@@ -535,7 +535,7 @@ buildvariants:
           - rhel8.8-large
       - name: .query_fuzzer
       - name: .replica_sets !.large
-      - name: .resharding_fuzzer
+      - name: .resharding_fuzzer !.requires_extra_system_deps
       - name: .rollbackfuzzer
       - name: secondary_reads_passthrough_gen
       - name: .sharding .txns

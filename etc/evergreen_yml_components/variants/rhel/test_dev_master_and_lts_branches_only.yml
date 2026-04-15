@@ -183,7 +183,7 @@ buildvariants:
         distros:
           - rhel8.8-medium
       - name: .replica_sets .encrypt
-      - name: .resharding_fuzzer
+      - name: .resharding_fuzzer !.requires_extra_system_deps
       - name: .rollbackfuzzer
       - name: .sharding .txns
       - name: sharding_gen
