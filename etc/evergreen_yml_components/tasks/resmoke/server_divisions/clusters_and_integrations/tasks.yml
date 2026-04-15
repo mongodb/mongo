@@ -3411,6 +3411,27 @@ tasks:
           suite: disagg_resharding_fuzzer
 
   - <<: *jstestfuzz_template
+    name: disagg_resharding_fuzzer_idempotency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "resharding_fuzzer",
+        "require_npm",
+        "random_name",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 5
+          npm_command: resharding-fuzzer
+          jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no
+          suite: disagg_resharding_fuzzer_idempotency
+
+  - <<: *jstestfuzz_template
     name: disagg_move_collection_fuzzer_gen
     tags:
       [
