@@ -271,13 +271,15 @@ public:
     public:
         LiteParsedExpanded(std::string stageName,
                            AggStageAstNodeHandle astNode,
-                           const NamespaceString& nss)
+                           const NamespaceString& nss,
+                           std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr)
             // NOTE: There is no original BSON since this stage is created from an AST node
             // desugared without BSON.
             : LiteParsedDocumentSource(BSON(stageName << BSONObj())),
               _astNode(std::move(astNode)),
               _properties(_astNode->getProperties()),
-              _nss(nss) {}
+              _nss(nss),
+              _ifrContext(std::move(ifrContext)) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
             return std::make_unique<ExpandedStageParams>(_astNode->clone());
@@ -328,7 +330,7 @@ public:
 
         std::unique_ptr<LiteParsedDocumentSource> clone() const override {
             return std::make_unique<LiteParsedExpanded>(
-                getParseTimeName(), _astNode->clone(), _nss);
+                getParseTimeName(), _astNode->clone(), _nss, _ifrContext);
         }
 
         bool hasExtensionVectorSearchStage() const override;
@@ -360,6 +362,7 @@ public:
         AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;
         const NamespaceString _nss;
+        std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
     };
 
     // Construction of a source or transform stage that expanded from a desugar stage. This stage
@@ -367,8 +370,10 @@ public:
     // responsibility comes from the desugar stage it expanded from.
     static boost::intrusive_ptr<DocumentSourceExtensionOptimizable> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, AggStageAstNodeHandle astNode) {
-        if (expCtx->getInUnionWith() &&
-            !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+        auto ifrCtx = expCtx->getIfrContext();
+        auto hybridSearchFlagEnabled = ifrCtx &&
+            ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+        if (expCtx->getInUnionWith() && !hybridSearchFlagEnabled) {
             const auto stageName = std::string(astNode->getName());
             // Throw the IFR retry error for extension $vectorSearch in $unionWith if the feature
             // flag is not enabled.

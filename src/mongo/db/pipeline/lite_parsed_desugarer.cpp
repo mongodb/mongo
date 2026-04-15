@@ -31,7 +31,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
-// TODO SERVER-120179 Remove when the feature flag is enabled.
 #include "mongo/db/query/query_feature_flags_gen.h"
 
 namespace mongo {
@@ -55,9 +54,10 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
         // that the subpipeline was modified, we will need to potentially reparse the full pipeline
         // from LPP - stages with subpipelines should pass the desugared LP subpipelines through
         // StageParams.
-        // TODO SERVER-120179 Remove the feature flag guard when the feature flag is enabled.
-        // TODO SERVER-121320 Check the value of the hybrid search field using the IFR context.
-        if (feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+        // TODO SERVER-121094 Remove when feature flag is removed.
+        auto hybridSearchFlagEnabled = ifrContext &&
+            ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+        if (hybridSearchFlagEnabled) {
             auto& subpipelines = stage.getMutableSubPipelines();
             for (auto& subpipelineLpp : subpipelines) {
                 modified |= LiteParsedDesugarer::desugar(&subpipelineLpp, ifrContext);

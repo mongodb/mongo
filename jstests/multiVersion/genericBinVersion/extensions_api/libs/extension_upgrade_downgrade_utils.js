@@ -68,7 +68,7 @@ export function wrapOptionsWithViewsAndUnionWithFeatureFlag(baseOptions) {
         ...baseOptions,
         setParameter: {
             ...baseOptions.setParameter,
-            featureFlagExtensionViewsAndUnionWith: true,
+            featureFlagExtensionsInsideHybridSearch: true,
         },
     };
 }
@@ -156,7 +156,7 @@ export function assertExtensionVectorSearchInUnionWithUsed(primaryConn) {
 }
 
 export function assertVectorSearchInUnionWithBasedOnFeatureFlag(primaryConn) {
-    if (FeatureFlagUtil.isPresentAndEnabled(primaryConn, "ExtensionViewsAndUnionWith")) {
+    if (FeatureFlagUtil.isPresentAndEnabled(primaryConn, "ExtensionsInsideHybridSearch")) {
         assertExtensionVectorSearchInUnionWithUsed(primaryConn);
     } else {
         assertLegacyVectorSearchInUnionWithUsed(primaryConn);

@@ -160,10 +160,12 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
             auto unionWithPipeline = Pipeline::create(initialStagesInInputPipeline, pExpCtx);
             std::vector<BSONObj> bsonPipeline = unionWithPipeline->serializeToBson();
 
-            // TODO SERVER-120179 Remove the feature flag guard and the createFromBson path.
             // TODO SERVER-121091 This should have been moved into the LiteParsedDesugarer so the
             // check should be redundant.
-            if (feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+            auto ifrCtx = pExpCtx->getIfrContext();
+            auto hybridSearchFlagEnabled = ifrCtx &&
+                ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+            if (hybridSearchFlagEnabled) {
                 auto unionNss = pExpCtx->getUserNss();
                 UnionWithStageParams params(
                     std::move(unionNss), std::move(bsonPipeline), false, true, BSONElement());

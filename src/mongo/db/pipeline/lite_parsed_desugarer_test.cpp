@@ -96,8 +96,6 @@ public:
 
 }  // namespace
 
-// TODO SERVER-121320 Define an IFR context for each test and replace the nullptr callsites in
-// LiteParsedDesugarer::desugar() with it.
 class LiteParsedDesugarerTest : public AggregationContextFixture {
 public:
     LiteParsedDesugarerTest() : LiteParsedDesugarerTest(_nss) {}
@@ -202,6 +200,8 @@ protected:
         extension::sdk::shared_test_stages::MidADescriptor::make()};
     extension::sdk::ExtensionAggStageDescriptorAdapter _midBDescriptor{
         extension::sdk::shared_test_stages::MidBDescriptor::make()};
+    std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext =
+        std::make_shared<IncrementalFeatureRolloutContext>();
 };
 
 TEST_F(LiteParsedDesugarerTest, NoopOnEmptyPipeline) {
@@ -210,7 +210,7 @@ TEST_F(LiteParsedDesugarerTest, NoopOnEmptyPipeline) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 0);
 
-    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     ASSERT_EQ(lpp.getStages().size(), 0);
 }
@@ -223,7 +223,7 @@ TEST_F(LiteParsedDesugarerTest, NoopOnNonExpandableStages) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 2);
 
-    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 2);
@@ -245,7 +245,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 1);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
         auto& stages = lpp.getStages();
         ASSERT_EQ(stages.size(), 1);
@@ -262,7 +262,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 3);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
         // Expect: [$project, $match, $project].
         auto& stages = lpp.getStages();
@@ -282,7 +282,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 2);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
         // Expect: [$match, $project].
         auto& stages = lpp.getStages();
@@ -301,7 +301,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandableToHostParseStage) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 2);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
         // Expect: [$project, $match].
         auto& stages = lpp.getStages();
@@ -326,7 +326,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandToExtAst) {
         LiteParsedPipeline lpp(_nss, pipelineStages);
         ASSERT_EQ(lpp.getStages().size(), 1);
 
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
         auto& stages = lpp.getStages();
         ASSERT_EQ(stages.size(), 1);
@@ -364,11 +364,11 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandToExtAst) {
         };
 
         // First desugar pass.
-        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+        ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
         checkLiteParsedPipelineShape(lpp);
 
         // Second desugar pass should be a no-op.
-        ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+        ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
         checkLiteParsedPipelineShape(lpp);
     }
 }
@@ -385,7 +385,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsSingleExpandToExtParseOnly) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 1);
@@ -409,7 +409,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsRecursiveTopToLeaves) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 4);
@@ -447,7 +447,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMixedToMultipleStagesSplicingIntoPipeline
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 3);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // Expect [$project, extNoOp, extNoOp, $match, $idLookup, $project].
     auto& stages = lpp.getStages();
@@ -486,7 +486,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMultipleExpandablesSequentially) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
     ASSERT_EQ(lpp.getStages().size(), 2);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // Expect [LeafC, LeafD, LeafA, LeafB].
     auto& stages = lpp.getStages();
@@ -513,8 +513,8 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMultipleExpandablesSequentially) {
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
-    // TODO SERVER-120179 Remove when the feature flag is enabled.
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -524,7 +524,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
     LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON(extStageName << BSONObj())})});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // Main pipeline unchanged: [$lookup].
     auto& stages = lpp.getStages();
@@ -536,15 +536,12 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
     unregisterParser(extStageName);
 }
 
-// TODO SERVER-120179 Remove when the feature flag is enabled.
-TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenFeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith",
-                                                     false};
+TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) {
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
 
-    // Create [$lookup] with subpipeline [$expandToHostParse]. With the flag disabled, subpipeline
+    // Create [$lookup] with subpipeline [$expandToHostParse]. With a null IFR context, subpipeline
     // desugaring is skipped, so the subpipeline should remain unchanged.
     LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON(extStageName << BSONObj())})});
     ASSERT_EQ(lpp.getStages().size(), 1);
@@ -563,22 +560,22 @@ TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenFeatureFlagDisable
 }
 
 TEST_F(LiteParsedDesugarerTest, NoopOnLookupSubpipelineWithNonExpandableStages) {
-    // TODO SERVER-120179 Remove when the feature flag is enabled.
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
     // Create [$lookup] with subpipeline [$match]. No expandable stages, desugar should return
     // false.
     LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON("$match" << BSON("a" << 1))})});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // Subpipeline unchanged: [$match].
     assertSubpipelineStageIsMatch(lpp.getStages()[0].get(), 0, 0);
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineAndTopLevelExpandableStage) {
-    // TODO SERVER-120179 Remove when the feature flag is enabled.
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -590,7 +587,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineAndTopLevelExpandableStage) {
                             BSON(extStageName << BSONObj())});
     ASSERT_EQ(lpp.getStages().size(), 2);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // Main pipeline: [$lookup, $match] (expandToHostParse expanded to $match).
     auto& stages = lpp.getStages();
@@ -604,8 +601,8 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineAndTopLevelExpandableStage) {
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsAllSubpipelinesInFacetStage) {
-    // TODO SERVER-120179 Remove when the feature flag is enabled.
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -618,7 +615,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsAllSubpipelinesInFacetStage) {
                                                            << BSON_ARRAY(expandStage)))});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // Main pipeline unchanged: [$facet].
     auto& stages = lpp.getStages();
@@ -632,8 +629,8 @@ TEST_F(LiteParsedDesugarerTest, DesugarsAllSubpipelinesInFacetStage) {
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
-    // TODO SERVER-120179 Remove when the feature flag is enabled.
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -648,7 +645,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
                                           << "pipeline" << BSON_ARRAY(lookupStage)))});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // Main pipeline unchanged: [$unionWith].
     auto& stages = lpp.getStages();
@@ -671,7 +668,8 @@ TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
 // the lifted content will be [$match] (desugared). If outermost-first, we'd lift
 // [$expandToHostParse].
 TEST_F(LiteParsedDesugarerTest, DesugaringOrderInnermostFirst) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
     registerParser(std::string(kLiftSubpipelineStageName), LiftSubpipelineLiteParsed::parse);
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
@@ -687,7 +685,7 @@ TEST_F(LiteParsedDesugarerTest, DesugaringOrderInnermostFirst) {
     LiteParsedPipeline lpp(_nss, pipelineStages);
 
     ASSERT_EQ(lpp.getStages().size(), 1);
-    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, nullptr));
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
 
     // The lift stage was replaced with its subpipeline contents. With innermost-first ordering,
     // those contents were desugared before the lift, so we get [$match] not [$expandToHostParse].

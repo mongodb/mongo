@@ -172,7 +172,7 @@ LiteParsedList DocumentSourceExtensionOptimizable::LiteParsedExpandable::expandI
         },
         [&](AggStageAstNodeHandle handle) {
             outExpanded.emplace_back(std::make_unique<LiteParsedExpanded>(
-                std::string(handle->getName()), std::move(handle), nss));
+                std::string(handle->getName()), std::move(handle), nss, options.ifrContext));
         });
 
     return outExpanded;
@@ -228,7 +228,9 @@ DocumentSourceExtensionOptimizable::LiteParsedExpanded::getFirstStageViewApplica
 
 void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
     const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces) {
-    if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+    auto hybridSearchFlagEnabled = _ifrContext &&
+        _ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (!hybridSearchFlagEnabled) {
         // Only $vectorSearch and $search/$searchMeta support IFR kickback on views.
         // All other extension stages are banned on views when the feature flag is disabled.
         uassert(ErrorCodes::NotImplemented,

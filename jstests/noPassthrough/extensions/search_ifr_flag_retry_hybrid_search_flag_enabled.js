@@ -1,15 +1,15 @@
 /**
  * This test ensures that $search and $searchMeta correctly skip invoking the IFR flag kickback
- * retry when featureFlagExtensionViewsAndUnionWith is enabled. It tests views, $unionWith on
+ * retry when featureFlagExtensionsInsideHybridSearch is enabled. It tests views, $unionWith on
  * collections, and $unionWith on views.
  *
  * Only tests featureFlagSearchExtension=true (extension path). The legacy $search path behaves
- * identically regardless of featureFlagExtensionViewsAndUnionWith and is already covered by
+ * identically regardless of featureFlagExtensionsInsideHybridSearch and is already covered by
  * search_ifr_flag_retry.js.
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionViewsAndUnionWith,
+ *   featureFlagExtensionsInsideHybridSearch,
  *   featureFlagSearchExtension,
  * ]
  */
@@ -58,7 +58,7 @@ function runSearchViewTest(conn, shardingTest, isSearchMeta) {
 
 /**
  * Runs $search or $searchMeta inside a $unionWith subpipeline on a collection.
- * No kickback should occur since featureFlagExtensionViewsAndUnionWith is enabled.
+ * No kickback should occur since featureFlagExtensionsInsideHybridSearch is enabled.
  */
 function runUnionWithSearchStageTests(conn, shardingTest, isSearchMeta) {
     const {coll} = createTestView(conn, shardingTest);
@@ -92,7 +92,7 @@ function runUnionWithSearchStageTests(conn, shardingTest, isSearchMeta) {
 
 /**
  * Runs $search or $searchMeta inside a $unionWith subpipeline targeting a view.
- * No kickback should occur since featureFlagExtensionViewsAndUnionWith is enabled.
+ * No kickback should occur since featureFlagExtensionsInsideHybridSearch is enabled.
  */
 function runUnionWithOnViewSearchTests(conn, shardingTest, isSearchMeta) {
     const {coll} = createTestView(conn, shardingTest);
@@ -126,7 +126,7 @@ function runUnionWithOnViewSearchTests(conn, shardingTest, isSearchMeta) {
 
 /**
  * Runs $unionWith targeting a view whose pipeline contains $search or $searchMeta.
- * No kickback should occur since featureFlagExtensionViewsAndUnionWith is enabled.
+ * No kickback should occur since featureFlagExtensionsInsideHybridSearch is enabled.
  */
 function runUnionWithOnViewWithSearchInViewDefinitionTests(conn, shardingTest, isSearchMeta) {
     const {testDb, coll} = createTestView(conn, shardingTest);

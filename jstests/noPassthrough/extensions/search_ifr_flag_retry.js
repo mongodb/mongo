@@ -280,5 +280,5 @@ withExtensionsAndMongot(
     // TODO SERVER-123557: Add sharded topology testing.
     ["standalone"],
     {},
-    {setParameter: {featureFlagExtensionViewsAndUnionWith: false, featureFlagExtensionsInsideHybridSearch: false}},
+    {setParameter: {featureFlagExtensionsInsideHybridSearch: false}},
 );

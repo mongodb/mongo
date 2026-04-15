@@ -2548,9 +2548,10 @@ void testViewPolicyHelper(const NamespaceString& nss,
     auto* astNodeImplPtr = static_cast<ConfigurableViewPolicyTestAstNode*>(astNodeImpl.get());
     auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(std::move(astNodeImpl));
     auto handle = AggStageAstNodeHandle{astNode};
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
 
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
-        ConfigurableViewPolicyTestAstNode::kStageName, std::move(handle), nss);
+        ConfigurableViewPolicyTestAstNode::kStageName, std::move(handle), nss, ifrContext);
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.collection"_sd);
@@ -2600,9 +2601,10 @@ void runViewPipelineValidatorCallback(const std::vector<BSONObj>& viewPipeline) 
     auto astNodeImpl = std::make_unique<ViewPipelineValidatorTestAstNode>();
     auto handle =
         AggStageAstNodeHandle{new sdk::ExtensionAggStageAstNodeAdapter(std::move(astNodeImpl))};
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
 
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
-        ViewPipelineValidatorTestAstNode::kStageName, std::move(handle), nss);
+        ViewPipelineValidatorTestAstNode::kStageName, std::move(handle), nss, ifrContext);
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.coll"_sd);
@@ -2614,7 +2616,8 @@ void runViewPipelineValidatorCallback(const std::vector<BSONObj>& viewPipeline) 
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDefaultPrependAndCallback) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(_nss,
@@ -2625,7 +2628,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDoNothingAndCallback) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(_nss,
@@ -2636,7 +2640,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        ViewPipelineValidatorAcceptsOnlyMatchAddFieldsSetStages) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
 
     // Valid: $match and $addFields (and $set) are allowed.
     runViewPipelineValidatorCallback({BSON("$match" << BSON("x" << 1))});
@@ -2650,7 +2655,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, ViewPipelineValidatorRejectsDisallowedStages) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                     true};
 
     ASSERT_THROWS(runViewPipelineValidatorCallback({BSON("$project" << BSON("x" << 1))}),
                   AssertionException);

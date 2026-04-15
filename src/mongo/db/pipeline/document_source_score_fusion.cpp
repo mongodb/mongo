@@ -141,7 +141,10 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelection
 
         // If featureFlagExtensionsInsideHybridSearch is not enabled, perform IFR kickback
         // for any input pipeline that has an extension $vectorSearch or $search stage.
-        if (!feature_flags::gFeatureFlagExtensionsInsideHybridSearch.checkEnabled()) {
+        auto ifrCtx = pExpCtx->getIfrContext();
+        auto hybridSearchFlagEnabled = ifrCtx &&
+            ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+        if (!hybridSearchFlagEnabled) {
             // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
             // scoreFusion pipelines.
             search_helpers::throwIfrKickbackIfNecessary(

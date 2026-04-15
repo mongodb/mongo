@@ -1,7 +1,7 @@
 /**
  * This test ensures that $vectorSearch works against views, within $unionWith on collections,
  * within $unionWith on views, and inside $rankFusion/$scoreFusion subpipelines, and that the IFR flag kickback retry is invoked to fall back
- * to legacy vector search when featureFlagExtensionViewsAndUnionWith is disabled.
+ * to legacy vector search when featureFlagExtensionsInsideHybridSearch is disabled.
  *
  * @tags: [ featureFlagExtensionsAPI ]
  */
@@ -307,7 +307,6 @@ withExtensionsAndMongot(
     {shards: kNumShards},
     {
         setParameter: {
-            featureFlagExtensionViewsAndUnionWith: false,
             featureFlagExtensionsInsideHybridSearch: false,
         },
     },

@@ -110,8 +110,11 @@ DocumentSourceContainer unionWithStageParamsToDocumentSourceFn(
     auto* typedParams = dynamic_cast<UnionWithStageParams*>(stageParams.get());
     tassert(11786200, "Expected UnionWithStageParams for unionWith stage", typedParams != nullptr);
 
-    // TODO SERVER-120179 Remove when the feature flag is enabled by default.
-    if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+    // TODO SERVER-121094 Remove when feature flag is removed.
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (!hybridSearchFlagEnabled) {
         return {DocumentSourceUnionWith::createFromBson(typedParams->getOriginalBson(), expCtx)};
     }
 

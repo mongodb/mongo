@@ -7,7 +7,7 @@
  * The stage serializes the view pipeline in its BSON so shards receive it when mongos sends the
  * pipeline; thus every document (including from shards and merge) has the field.
  *
- * @tags: [featureFlagExtensionsAPI, featureFlagExtensionViewsAndUnionWith]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch]
  */
 
 import {before, describe, it} from "jstests/libs/mochalite.js";

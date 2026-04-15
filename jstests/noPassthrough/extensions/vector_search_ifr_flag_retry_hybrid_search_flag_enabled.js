@@ -1,13 +1,13 @@
 /**
  * This test ensures that $vectorSearch correctly skips invoking the IFR flag kickback retry when
- * featureFlagExtensionViewsAndUnionWith is enabled. It tests views, $unionWith on collections,
+ * featureFlagExtensionsInsideHybridSearch is enabled. It tests views, $unionWith on collections,
  * and $unionWith on views.
  *
  * It also tests that $rankFusion and $scoreFusion with $vectorSearch subpipelines use
  * legacy vector search via the IFR kickback retry mechanism when
  * featureFlagExtensionsInsideHybridSearch is disabled.
  *
- * @tags: [ featureFlagExtensionsAPI, featureFlagExtensionViewsAndUnionWith ]
+ * @tags: [ featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch ]
  */
 import {getParameter, setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {
@@ -54,7 +54,7 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
     // Get the current feature flag value to determine if we expect extension or legacy $vectorSearch to be used.
     const expectExtension = getParameter(conn, "featureFlagVectorSearchExtension").value;
 
-    // There should have been no retries since featureFlagExtensionViewsAndUnionWith is enabled.
+    // There should have been no retries since featureFlagExtensionsInsideHybridSearch is enabled.
     // If the extension is used, we expect extension $vectorSearch; otherwise legacy.
     // 2 queries (explain + aggregate) per shard.
     const expectedLegacyDelta = expectExtension ? 0 : 2 * numNodes;
@@ -85,7 +85,7 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
 
 /**
  * Runs the vector search tests within a $unionWith on a collection.
- * When featureFlagExtensionViewsAndUnionWith is enabled, no kickback retry should occur.
+ * When featureFlagExtensionsInsideHybridSearch is enabled, no kickback retry should occur.
  *
  * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
  * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
@@ -120,7 +120,7 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
     // Get the current feature flag value to determine if we expect extension or legacy $vectorSearch.
     const expectExtension = getParameter(conn, "featureFlagVectorSearchExtension").value;
 
-    // There should have been no retries since featureFlagExtensionViewsAndUnionWith is enabled.
+    // There should have been no retries since featureFlagExtensionsInsideHybridSearch is enabled.
     // 1 aggregate query per shard.
     const expectedLegacyDelta = expectExtension ? 0 : numNodes;
     const expectedExtensionDelta = expectExtension ? numNodes : 0;
@@ -145,7 +145,7 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
 
 /**
  * Runs $vectorSearch within a $unionWith on a view.
- * When featureFlagExtensionViewsAndUnionWith is enabled, no kickback retry should occur.
+ * When featureFlagExtensionsInsideHybridSearch is enabled, no kickback retry should occur.
  *
  * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
  * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
@@ -161,7 +161,7 @@ function runUnionWithOnViewVectorSearchTests(conn, mongotMock, featureFlagValue,
     const numNodes = shardingTest ? kNumShards : 1;
 
     // Set up MongotMock cursor for aggregate query.
-    // When querying $unionWith on a view with featureFlagExtensionViewsAndUnionWith enabled,
+    // When querying $unionWith on a view with featureFlagExtensionsInsideHybridSearch enabled,
     // the mongot command includes viewName and view fields.
     setUpMongotMockForVectorSearch(mongotMock, {
         vectorSearchQuery,
@@ -183,7 +183,7 @@ function runUnionWithOnViewVectorSearchTests(conn, mongotMock, featureFlagValue,
     // Get the current feature flag value to determine if we expect extension or legacy $vectorSearch.
     const expectExtension = getParameter(conn, "featureFlagVectorSearchExtension").value;
 
-    // There should have been no retries since featureFlagExtensionViewsAndUnionWith is enabled.
+    // There should have been no retries since featureFlagExtensionsInsideHybridSearch is enabled.
     // 1 aggregate query per shard.
     const expectedLegacyDelta = expectExtension ? 0 : numNodes;
     const expectedExtensionDelta = expectExtension ? numNodes : 0;
@@ -227,15 +227,15 @@ function runTests(conn, mongotMock, shardingTest = null) {
 
     // Run hybrid search tests ($rankFusion/$scoreFusion with $vectorSearch subpipelines).
     // These trigger the IFR kickback retry when featureFlagExtensionsInsideHybridSearch is disabled.
+    setParameterOnAllNonConfigNodes(conn, "featureFlagExtensionsInsideHybridSearch", false);
     runHybridSearchTests(conn, mongotMock, true, shardingTest);
     runHybridSearchTests(conn, mongotMock, false, shardingTest);
+    setParameterOnAllNonConfigNodes(conn, "featureFlagExtensionsInsideHybridSearch", true);
 }
 
-// We don't have to manually enable featureFlagExtensionViewsAndUnionWith since the test will only run if it's enabled.
-withExtensionsAndMongot(
-    {"libvector_search_extension.so": {}},
-    runTests,
-    ["standalone", "sharded"],
-    {shards: kNumShards},
-    {setParameter: {featureFlagExtensionsInsideHybridSearch: false}},
-);
+// featureFlagExtensionsInsideHybridSearch is enabled by default (required by the test tag).
+// Hybrid search tests dynamically disable it in runTests() since $rankFusion/$scoreFusion
+// kickback retries only fire when the flag is off.
+withExtensionsAndMongot({"libvector_search_extension.so": {}}, runTests, ["standalone", "sharded"], {
+    shards: kNumShards,
+});

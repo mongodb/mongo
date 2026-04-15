@@ -153,7 +153,10 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateRankedSelection
 
         // If featureFlagExtensionsInsideHybridSearch is not enabled, perform IFR kickback
         // for any input pipeline that has an extension $vectorSearch or $search stage.
-        if (!feature_flags::gFeatureFlagExtensionsInsideHybridSearch.checkEnabled()) {
+        auto ifrCtx = pExpCtx->getIfrContext();
+        auto hybridSearchFlagEnabled = ifrCtx &&
+            ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+        if (!hybridSearchFlagEnabled) {
             // TODO SERVER-115791: Implement support for extension $vectorSearch stages in
             // rankFusion pipelines.
             search_helpers::throwIfrKickbackIfNecessary(

@@ -1500,7 +1500,11 @@ Status ClusterAggregate::runAggregate(
             // these extensions are not eligible to run on views. If we do not implement this
             // optimization, we will eventually throw the IFR flag kickback retry and end up
             // restarting ClusterAggregate again.
-            if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+            // TODO SERVER-121094 Remove when feature flag is removed.
+            auto hybridSearchFlagEnabled = ifrContext &&
+                ifrContext->getSavedFlagValue(
+                    feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+            if (!hybridSearchFlagEnabled) {
                 if (ifrContext->getSavedFlagValue(
                         feature_flags::gFeatureFlagVectorSearchExtension)) {
                     state.ifrFlagsToDisableOnRetries.insert(

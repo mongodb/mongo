@@ -75,8 +75,8 @@ inline bool isExtensionMongotPipeline(
     }
     const auto& firstStageBson = pipeline[0];
     using detail::is;
-    // Note we don't need to worry about/consult 'featureFlagExtensionViewsAndUnionWith' because the
-    // extension will enforce this behavior by toggling its IFR flag and retrying, so thankfully
+    // Note we don't need to worry about/consult 'featureFlagExtensionsInsideHybridSearch' because
+    // the extension will enforce this behavior by toggling its IFR flag and retrying, so thankfully
     // this is enough, and we don't need to understand what context this BSON appears in (w.r.t.
     // views or sub-pipelines).
     if (is<DocumentSourceVectorSearch>(firstStageBson)) {
@@ -111,10 +111,10 @@ inline bool isMongotPipeline(const std::shared_ptr<IncrementalFeatureRolloutCont
     if (is<DocumentSourceVectorSearch>(firstStageBson)) {
         // Return true if the $vectorSearch implementation would be the legacy
         // DocumentSourceVectorSearch-based implementation. Note we don't need to worry
-        // about/consult 'featureFlagExtensionViewsAndUnionWith' because the extension will enforce
-        // this behavior by toggling 'gFeatureFlagVectorSearchExtension' and retrying, so thankfully
-        // this is enough, and we don't need to understand what context this BSON appears in (w.r.t.
-        // views or sub-pipelines).
+        // about/consult 'featureFlagExtensionsInsideHybridSearch' because the extension will
+        // enforce this behavior by toggling 'gFeatureFlagVectorSearchExtension' and retrying, so
+        // thankfully this is enough, and we don't need to understand what context this BSON appears
+        // in (w.r.t. views or sub-pipelines).
         return !detail::hasMongotExtension(serverGlobalParams.extensions) ||
             !ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension);
     } else if (is<DocumentSourceSearch>(firstStageBson) ||
