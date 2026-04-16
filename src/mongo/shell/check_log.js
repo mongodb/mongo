@@ -78,11 +78,13 @@ function checkContainsOnce(connOrFile, msg) {
     return false;
 }
 
-function checkContainsOnceJson(connOrFile, id, attrsDict, severity = null) {
+function checkContainsOnceJson(connOrFile, ids, attrsDict, severity = null) {
     const logMessages = getGlobalLog(connOrFile);
     if (logMessages === null) {
         return false;
     }
+
+    ids = Array.isArray(ids) ? ids : [ids];
 
     for (let logMsg of logMessages) {
         let obj;
@@ -93,7 +95,11 @@ function checkContainsOnceJson(connOrFile, id, attrsDict, severity = null) {
             throw ex;
         }
 
-        if (compareLogs(obj, id, severity, null, attrsDict)) {
+        if (
+            ids.some((id) => {
+                return compareLogs(obj, id, severity, null, attrsDict);
+            })
+        ) {
             return true;
         }
     }
@@ -250,13 +256,13 @@ function containsLog(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryInterv
     return logMsg;
 }
 
-function containsJson(connOrFile, id, attrsDict, timeoutMillis = 5 * 60 * 1000) {
+function containsJson(connOrFile, ids, attrsDict, timeoutMillis = 5 * 60 * 1000) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     assert.soon(
         function () {
-            return checkContainsOnceJson(connOrFile, id, attrsDict);
+            return checkContainsOnceJson(connOrFile, ids, attrsDict);
         },
-        "Could not find log entries containing the following id: " + id + ", and attrs: " + tojson(attrsDict),
+        "Could not find log entries containing the following ids: " + ids + " and attrs: " + tojson(attrsDict),
         timeoutMillis,
         300,
         {runHangAnalyzer: false},

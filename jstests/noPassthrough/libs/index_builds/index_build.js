@@ -822,7 +822,7 @@ export const ResumableIndexBuildTest = class {
 
         // Wait for the index builds to reach the hangBeforeBuildingIndex failpoint.
         for (const indexName of indexNamesFlat) {
-            checkLog.containsJson(primary, 4940900, {
+            checkLog.containsJson(primary, [4940900, 10978300], {
                 buildUUID: function (uuid) {
                     return uuid && uuid["uuid"]["$uuid"] === extractUUIDFromObject(indexes[indexName].buildUUID);
                 },
