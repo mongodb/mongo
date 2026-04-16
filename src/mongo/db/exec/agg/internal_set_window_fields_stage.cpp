@@ -84,6 +84,19 @@ void InternalSetWindowFieldsStage::initialize() {
         _executableOutputs[wfs.fieldName] =
             WindowFunctionExec::create(pExpCtx.get(), &_iterator, wfs, _sortBy, &_memoryTracker);
     }
+
+    auto projSpec = std::make_unique<projection_executor::InclusionNode>(
+        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
+    _constExprs.reserve(_outputFields.size());
+    _orderedExecs.reserve(_outputFields.size());
+    for (auto&& outputField : _outputFields) {
+        auto constExpr = ExpressionConstant::create(pExpCtx.get(), Value{});
+        _constExprs.push_back(constExpr);
+        _orderedExecs.push_back(_executableOutputs[outputField.fieldName].get());
+        projSpec->addExpressionForPath(FieldPath(outputField.fieldName), std::move(constExpr));
+    }
+    _projExec = std::make_unique<projection_executor::AddFieldsProjectionExecutor>(
+        pExpCtx, std::move(projSpec));
 }
 
 DocumentSource::GetNextResult InternalSetWindowFieldsStage::doGetNext() {
@@ -105,18 +118,17 @@ DocumentSource::GetNextResult InternalSetWindowFieldsStage::doGetNext() {
         return DocumentSource::GetNextResult::makeEOF();
     }
 
+    tassert(12369900,
+            "_constExprs and _outputFields must have the same size",
+            _constExprs.size() == _outputFields.size() &&
+                _orderedExecs.size() == _outputFields.size());
+
     // Populate the output document with the result from each window function.
-    auto projSpec = std::make_unique<projection_executor::InclusionNode>(
-        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
-    for (auto&& outputField : _outputFields) {
+    for (size_t i = 0; i < _outputFields.size(); ++i) {
         try {
             // If we hit a uassert while evaluating expressions on user data, delete the temporary
             // table before aborting the operation.
-            auto& fieldName = outputField.fieldName;
-            projSpec->addExpressionForPath(
-                FieldPath(fieldName),
-                ExpressionConstant::create(pExpCtx.get(),
-                                           _executableOutputs[fieldName]->getNext(*curDoc)));
+            _constExprs[i]->setValue(_orderedExecs[i]->getNext(*curDoc));
         } catch (const DBException&) {
             _iterator.finalize();
             throw;
@@ -161,11 +173,7 @@ DocumentSource::GetNextResult InternalSetWindowFieldsStage::doGetNext() {
             break;
     }
 
-    // Avoid using the factory 'create' on the executor since we don't want to re-parse.
-    auto projExec = std::make_unique<projection_executor::AddFieldsProjectionExecutor>(
-        pExpCtx, std::move(projSpec));
-
-    return projExec->applyProjection(*curDoc);
+    return _projExec->applyProjection(*curDoc);
 }
 
 void InternalSetWindowFieldsStage::doDispose() {
