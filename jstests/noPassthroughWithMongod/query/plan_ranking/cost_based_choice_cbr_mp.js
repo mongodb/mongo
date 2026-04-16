@@ -3,6 +3,7 @@ import {
     assertPlanCosted,
     assertPlanNotCosted,
     getCBRConfig,
+    getExpectedWorksPerPlan,
     getMultiplanningBatchSize,
     setCBRConfig,
 } from "jstests/libs/query/cbr_utils.js";
@@ -217,14 +218,64 @@ try {
     });
 
     // (2) "AutomaticCE chooses MP because plan contains inestimable node(s)"
+    // $text creates inestimable TEXT stages but also forces the text index, so a plain conjunction
+    // would produce only one plan. Using $or lets branches be planned independently: the $text
+    // branch uses the text index while other branches have competing index choices, giving us
+    // multiple candidate plans that all contain inestimable nodes.
+    const queryWithCBRInestimableNodes = {
+        "$or": [{"f1": {"$ne": 72}}, {"s2": {"$regex": "text_"}}, {"$text": {"$search": "text_77"}}],
+    };
+    const queryWithCBRInestimableNodesSort = {"_id": 1};
+
     checkRanker({
         qID: "2.1",
         cName: "20k",
-        query: {"$or": [{"f1": {"$ne": 72}}, {"s2": {"$regex": "text_"}}, {"$text": {"$search": "text_77"}}]},
-        order: {"_id": 1},
+        query: queryWithCBRInestimableNodes,
+        order: queryWithCBRInestimableNodesSort,
         mpEndCond: mpEndConditions.kSinglePlan,
         ranker: rankerStrategies.kMP,
     });
+
+    // When case 2 falls back to MP, the remaining trials must run so the plan is cached with a
+    // sufficient number of works (not just the brief estimation phase works).
+    {
+        const coll20k = db[collName("20k")];
+
+        // This sub-test reads the plan cache, so ensure it is enabled.
+        const prevDisablePlanCache = assert.commandWorked(
+            db.adminCommand({getParameter: 1, internalQueryDisablePlanCache: 1}),
+        ).internalQueryDisablePlanCache;
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
+
+        try {
+            // The first $or branch ({f1: {$ne: 72}}) has 2 candidate plans.
+            const expectedWorks = getExpectedWorksPerPlan(db, coll20k, 2);
+
+            coll20k.getPlanCache().clear();
+            coll20k.find(queryWithCBRInestimableNodes).sort(queryWithCBRInestimableNodesSort).toArray();
+
+            const entries = coll20k.getPlanCache().list();
+            // Only the first $or branch goes through multi-planning, producing the single cache
+            // entry.
+            assert.eq(entries.length, 1, "Expected exactly one plan cache entry. " + tojson(entries));
+
+            const entry = entries[0];
+            assert.eq(entry.isActive, false);
+            assert.eq(
+                entry.works,
+                expectedWorks,
+                "Plan cache entry works should equal the full MP trial budget. " +
+                    "Got works=" +
+                    entry.works +
+                    ", expected=" +
+                    expectedWorks,
+            );
+        } finally {
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: prevDisablePlanCache}),
+            );
+        }
+    }
 
     // (3) AutomaticCE chooses CBR because of very low productivity
     checkRanker({

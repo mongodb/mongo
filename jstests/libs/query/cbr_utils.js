@@ -91,6 +91,28 @@ export function getMultiplanningBatchSize() {
     }
 }
 
+/**
+ * Computes the per-plan MP trial budget (max works per plan) using the same formula as the server:
+ *   collFraction = min(collFractionParam, totalCollFractionParam / numPlans)
+ *   maxWorksPerPlan = max(evalWorksParam, collFraction * numRecords)
+ */
+export function getExpectedWorksPerPlan(db, coll, numPlans) {
+    const params = assert.commandWorked(
+        db.adminCommand({
+            getParameter: 1,
+            internalQueryPlanEvaluationWorks: 1,
+            internalQueryPlanEvaluationCollFraction: 1,
+            internalQueryPlanTotalEvaluationCollFraction: 1,
+        }),
+    );
+    const numRecords = coll.count();
+    const collFraction = Math.min(
+        params.internalQueryPlanEvaluationCollFraction,
+        params.internalQueryPlanTotalEvaluationCollFraction / numPlans,
+    );
+    return Math.max(params.internalQueryPlanEvaluationWorks, collFraction * numRecords);
+}
+
 export function getCBRConfig(db) {
     const config = assert.commandWorked(
         db.adminCommand({

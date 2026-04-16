@@ -77,11 +77,19 @@ CostEstimate estimateCBRCost(const CanonicalQuery& query,
 }
 
 /**
- * This function can be called after any number of multi-plan trial works to pick the best plan
- * based on whatever information was collected so far. The function is mostly a wrapper for
- * pickBestPlan, and the logic that extracts the best plan from the MultiPlanner.
+ * Optionally run remaining MP trials, then pick the best plan based on whatever information was
+ * collected so far. The function is mostly a wrapper for pickBestPlan, and the logic that extracts
+ * the best plan from the MultiPlanner.
  */
-StatusWith<PlanRankingResult> getBestMPPlan(classic_runtime_planner::MultiPlanner& mp) {
+StatusWith<PlanRankingResult> getBestMPPlan(
+    classic_runtime_planner::MultiPlanner& mp,
+    boost::optional<trial_period::TrialPhaseConfig> remainingTrialConfig = boost::none) {
+    if (remainingTrialConfig) {
+        auto status = mp.runTrials(*remainingTrialConfig);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
     auto status = mp.pickBestPlan();
     if (!status.isOK()) {
         return status;
@@ -139,7 +147,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     // TODO SERVER-115645 use the child of LIMIT/SORT nodes to estimate plan productivity
     // bool hasBlockingStage = false;
     for (auto& soln : solutions) {
-        // TODO: for blocking stages use the productivity of the child node
+        // TODO SERVER-115645: for blocking stages use the productivity of the child node
         // if (soln->hasBlockingStage) {
         //     hasBlockingStage = true;
         // }
@@ -168,7 +176,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     // see comment in MultiPlanStage::estimateAllPlans
     if (skipCount > 0) {
         constexpr double guessedProductivity = 0.3;
-        // TODO: Add extra works for the skip, but not too many. Can be made smarter.
+        // Add extra works for the skip, but not too many.
         size_t extraSkipWorks = std::min(skipCount / guessedProductivity, 5.0 * numWorksPerPlanEst);
         numWorksPerPlanEst += extraSkipWorks;
     }
@@ -184,7 +192,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     }
     auto stats = mp.getSpecificStats();
     if (stats->earlyExit) {
-        // TODO: We choose MP in order to avoid planning time regressions.
+        // We choose MP in order to avoid planning time regressions.
         // Choosing MP due to full batch may miss good plans due to data skew or blocking plans.
         LOGV2_INFO(11306807,
                    "AutomaticCE chooses MP (1)",
@@ -203,7 +211,10 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         LOGV2_INFO(12023300,
                    "AutomaticCE chooses MP (2)",
                    "Reason"_attr = " because plan contains inestimable node(s)");
-        return getBestMPPlan(mp);
+        return getBestMPPlan(mp,
+                             trial_period::TrialPhaseConfig{
+                                 .maxNumWorksPerPlan = numWorksPerPlanMP - numWorksPerPlanEst,
+                                 .targetNumResults = numResultsMP});
     }
     auto estRes = estResWithStatus.getValue();
     tassert(11306805,
@@ -258,26 +269,15 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                "minRequiredImprovementRatio"_attr = minRequiredImprovementRatio);
 
     if (maxAchievableImprovementRatio < minRequiredImprovementRatio) {
-        // CBR is not sufficiently better than remaining MP - use MP
-        size_t remainingWorks = numWorksPerPlanMP - numWorksPerPlanEst;
-        trialConfig.maxNumWorksPerPlan = remainingWorks;
-        trialConfig.targetNumResults = numResultsMP;
-        trialStatus = mp.runTrials(trialConfig);
-        if (!trialStatus.isOK()) {
-            return trialStatus;
-        }
-        stats = mp.getSpecificStats();
         LOGV2_INFO(11306802,
                    "AutomaticCE chooses MP (4)",
                    "Reason"_attr = "the required improvement is not achievable",
                    "Condition"_attr =
                        "maxAchievableImprovementRatio < minRequiredImprovementRatio");
-        LOGV2_INFO(11306801,
-                   "Result from finishing MP: ",
-                   "remainingWorks"_attr = remainingWorks,
-                   "actualNumWorksPerPlanRem"_attr = stats->totalWorks / numSolutions,
-                   "exitStatus"_attr = stats->earlyExit);
-        return getBestMPPlan(mp);
+        return getBestMPPlan(mp,
+                             trial_period::TrialPhaseConfig{
+                                 .maxNumWorksPerPlan = numWorksPerPlanMP - numWorksPerPlanEst,
+                                 .targetNumResults = numResultsMP});
     }
 
     // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
