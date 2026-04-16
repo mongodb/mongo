@@ -71,7 +71,7 @@ bool shouldSaveCursor(OperationContext* opCtx,
     // an empty collection. Right now we do not keep a cursor if the collection
     // has zero records.
     if (findCommand.getTailable()) {
-        return collection && collection->numRecords(opCtx) != 0U;
+        return collection && !collection->isEmpty(opCtx);
     }
 
     return !exec->isEOF();
