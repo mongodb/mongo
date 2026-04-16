@@ -1,5 +1,6 @@
 /**
- * A property-based test that asserts the correctness of queries with $group/$lookup followed by $match.
+ * A property-based test that asserts the correctness of queries where $match and projection stages are mixed together
+ * with $group/$lookup.
  *
  * @tags: [
  * query_intensive_pbt,

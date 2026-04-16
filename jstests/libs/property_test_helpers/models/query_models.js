@@ -33,6 +33,11 @@ export const addFieldsConstArb = fc.tuple(fieldArb, leafParameterArb).map(functi
 export const addFieldsVarArb = fc.tuple(fieldArb, dollarFieldArb).map(function ([destField, sourceField]) {
     return {$addFields: {[destField]: sourceField}};
 });
+// $replaceRoot projection
+export const replaceRootArb = fc.tuple(assignableFieldArb, dollarFieldArb).map(function ([destField, sourceField]) {
+    // We use $$ROOT to keep the overall schema in order to better cooperate with other stages.
+    return {$replaceRoot: {newRoot: {$mergeObjects: ["$$ROOT", {[destField]: sourceField}]}}};
+});
 
 /*
  * Generates a random $sort, with [1, maxNumSortComponents] sort components.
@@ -143,7 +148,17 @@ export function getTrySbeRestrictedPushdownEligibleAggPipelineArb(
     {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
 ) {
     // This list is ordered from simplest to most complex. This works best for fast check minimization.
-    const stages = [getMatchArb(), groupArb, getEqLookupArb(foreignCollName)];
+    const stages = [
+        simpleProjectArb,
+        multipleFieldProjectArb,
+        getMatchArb(),
+        addFieldsConstArb,
+        computedProjectArb,
+        addFieldsVarArb,
+        replaceRootArb,
+        groupArb,
+        getEqLookupArb(foreignCollName),
+    ];
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
 }
 
@@ -164,6 +179,7 @@ export function getTrySbeEnginePushdownEligibleAggPipelineArb(
         addFieldsConstArb,
         computedProjectArb,
         addFieldsVarArb,
+        replaceRootArb,
         getSortArb(),
         groupArb,
         getEqLookupArb(fc.constantFrom(foreignCollName)),
