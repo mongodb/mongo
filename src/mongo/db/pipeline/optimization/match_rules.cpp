@@ -191,7 +191,7 @@ DocumentSource::GetModPathsReturn buildModPaths(PipelineRewriteContext& ctx,
         return stageBeforePrev
             ? ctx.getDependencyGraph().canPathBeArray(stageBeforePrev, path)
             // If 'prev' is the first stage, look up from the Path Arrayness API directly.
-            : ctx.getPathArrayness().canPathBeArray(FieldRef(path), &ctx.getExpCtx());
+            : ctx.getExpCtx().canMainCollPathBeArray(FieldRef(path));
     };
 
     return toGetModPathsReturn(withArraynessInfo(prev, canPathBeArray));
@@ -299,12 +299,11 @@ bool introduceArrayTypeFilteringToMatch(PipelineRewriteContext& ctx) {
         StatusWithMatchExpression copyME = MatchExpressionParser::parse(bsonObj, &ctx.getExpCtx());
         std::unique_ptr<MatchExpression> me(std::move(copyME.getValue()));
 
-        auto pathArrayness = ctx.getPathArrayness();
         auto query = match.getQuery();
         for (const auto& elem : query) {
             auto typeExpr = std::make_unique<TypeMatchExpression>(
                 StringData(elem.fieldNameStringData()), MatcherTypeSet(BSONType::array));
-            if (pathArrayness.canPathBeArray(elem.fieldNameStringData(), &ctx.getExpCtx())) {
+            if (ctx.getExpCtx().canMainCollPathBeArray(FieldPath(elem.fieldNameStringData()))) {
                 additionalFilter->add(std::move(typeExpr));
             } else {
                 additionalFilter->add(std::make_unique<NotMatchExpression>(std::move(typeExpr)));

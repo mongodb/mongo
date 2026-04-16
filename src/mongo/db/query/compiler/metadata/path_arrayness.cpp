@@ -197,4 +197,15 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
     // Recursively invoke the remaining path.
     _children.at(fieldNameToInsert).insertPath(path, multikeyPath, ++depth, isFullRebuild);
 }
+
+bool PathArrayness::hasInvalidatedPaths(const MonotonicallyIncreasingFieldPathSet& nonArrayPaths,
+                                        const PathArrayness& current) {
+    for (const auto& path : nonArrayPaths) {
+        if (current._root.canPathBeArray(path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace mongo

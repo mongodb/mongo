@@ -174,8 +174,8 @@ public:
         kForcePlanCache,    // Query is being cached even if it has a single plan
     };
 
-    // TODO: variables are heavily used everywhere, move these inside ExpressionContextParams at
-    // some point
+    // TODO SERVER-123287: variables are heavily used everywhere, move these inside
+    // ExpressionContextParams at some point
     Variables variables;
     VariablesParseState variablesParseState;
 
@@ -1014,25 +1014,64 @@ public:
         return (this->_params.mainCollPathArrayness != nullptr);
     }
 
-    const PathArrayness& getMainCollPathArrayness() const {
-        // mainCollPathArrayness will be unset in cases where we do not do a collection acquisition,
-        // e.g. if running on a 'mongos'. In this case, we return an empty instance of
-        // 'PathArrayness' that denotes all paths as arrays.
-        if (!_params.mainCollPathArrayness) {
-            return PathArrayness::emptyPathArrayness();
-        }
-        return *_params.mainCollPathArrayness;
+    const PathArrayness* getMainCollPathArrayness_forTest() const {
+        return _params.mainCollPathArrayness.get();
     }
 
-    const PathArrayness& getSecondaryCollPathArrayness(const NamespaceString& nss) const {
-        auto it = _params.secondaryCollsPathArrayness.find(nss);
-        // If we do not find a PathArrayness mapped to the secondary namespace we return a
-        // conservative guarantee. This could happen if running on a 'mongos'.
-        if (it == _params.secondaryCollsPathArrayness.end()) {
-            return PathArrayness::emptyPathArrayness();
+    bool canMainCollPathBeArray(const FieldPath& path) {
+        if (!_params.mainCollPathArrayness) {
+            // mainCollPathArrayness will be unset in cases where we do not do a collection
+            // acquisition, e.g. if running on a 'mongos'. In this case, denote all paths as arrays.
+            return true;
         }
-        tassert(11344300, "PathArrayness should not be a nullptr", it->second);
-        return *it->second;
+        bool result = _params.mainCollPathArrayness->canPathBeArray(path, this);
+        if (!result) {
+            _mainCollNonArrayPaths.insert(path);
+        }
+        return result;
+    }
+
+    bool canMainCollPathBeArray(const FieldRef& path) {
+        StatusWith<FieldPath> maybeFieldPath =
+            fieldPathWithValidationStatus(std::string(path.dottedField()));
+        if (!maybeFieldPath.isOK()) {
+            return true;
+        }
+        return canMainCollPathBeArray(maybeFieldPath.getValue());
+    }
+
+    const MonotonicallyIncreasingFieldPathSet& mainCollNonArrayPaths() const {
+        return _mainCollNonArrayPaths;
+    }
+
+    bool canSecondaryCollPathBeArray(const NamespaceString& nss, const FieldPath& path) {
+        auto it = _params.secondaryCollsPathArrayness.find(nss);
+        if (it == _params.secondaryCollsPathArrayness.end() || it->second == nullptr) {
+            // If we do not find a PathArrayness mapped to the secondary namespace we return a
+            // conservative guarantee. This could happen if running on a 'mongos'.
+            return true;
+        }
+        bool result = it->second->canPathBeArray(path, this);
+        if (!result) {
+            _secondaryCollsNonArrayPaths[nss].insert(path);
+        }
+        return result;
+    }
+
+    bool canSecondaryCollPathBeArray(const NamespaceString& nss, const FieldRef& path) {
+        StatusWith<FieldPath> maybeFieldPath =
+            fieldPathWithValidationStatus(std::string(path.dottedField()));
+        if (!maybeFieldPath.isOK()) {
+            return true;
+        }
+        return canSecondaryCollPathBeArray(nss, maybeFieldPath.getValue());
+    }
+
+    const MonotonicallyIncreasingFieldPathSet& secondaryCollNonArrayPaths(
+        const NamespaceString& nss) const {
+        static const MonotonicallyIncreasingFieldPathSet kEmpty;
+        auto it = _secondaryCollsNonArrayPaths.find(nss);
+        return it != _secondaryCollsNonArrayPaths.end() ? it->second : kEmpty;
     }
 
 protected:
@@ -1188,6 +1227,10 @@ protected:
     };
 
     ExpressionContextParams _params;
+
+    MonotonicallyIncreasingFieldPathSet _mainCollNonArrayPaths;
+    stdx::unordered_map<NamespaceString, MonotonicallyIncreasingFieldPathSet>
+        _secondaryCollsNonArrayPaths;
 
     /**
      * Construct an expression context using ExpressionContextParams. Consider using

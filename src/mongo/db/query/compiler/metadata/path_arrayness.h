@@ -35,9 +35,32 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/util/modules.h"
 
+#include <set>
+
 namespace mongo {
 
 class ExpressionContext;
+
+/**
+ * A monotonically-increasing set of FieldPaths. Supports insertion and iteration but not removal.
+ */
+class MonotonicallyIncreasingFieldPathSet {
+public:
+    void insert(const FieldPath& path) {
+        _paths.insert(path);
+    }
+
+    auto begin() const {
+        return _paths.begin();
+    }
+
+    auto end() const {
+        return _paths.end();
+    }
+
+private:
+    std::set<FieldPath> _paths;
+};
 
 /**
  * Data structure representing arrayness of field paths.
@@ -50,6 +73,14 @@ public:
     PathArrayness() {}
 
     ~PathArrayness() = default;
+
+    /**
+     * Returns true if any path in 'nonArrayPaths' is now possibly-array in 'current'. Used during
+     * yield restore to detect invalidated assumptions. The 'nonArrayPaths' set is maintained
+     * per-query on the ExpressionContext, not on the shared PathArrayness instance.
+     */
+    static bool hasInvalidatedPaths(const MonotonicallyIncreasingFieldPathSet& nonArrayPaths,
+                                    const PathArrayness& current);
 
     /**
      * Returns a reference to an empty PathArrayness instance. This represents the conservative

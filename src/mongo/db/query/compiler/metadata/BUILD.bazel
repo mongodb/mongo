@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_fuzztest", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -72,6 +72,17 @@ mongo_cc_unit_test(
     deps = [
         ":path_arrayness",
         ":path_arrayness_test_helpers",
+        "//src/mongo/db:expression_context_builder",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "path_arrayness_fuzz_test",
+    srcs = ["path_arrayness_fuzz_test.cpp"],
+    deps = [
+        ":path_arrayness",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/pipeline:expression_context_for_test",
     ],

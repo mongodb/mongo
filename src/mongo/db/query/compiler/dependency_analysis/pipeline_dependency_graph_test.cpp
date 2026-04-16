@@ -70,7 +70,7 @@ protected:
         pipeline->getContext()->setPathArrayness(pathArrayness);
         stages.assign(pipeline->getSources().begin(), pipeline->getSources().end());
         canPathBeArray = [this](StringData path) -> bool {
-            return pathArrayness->canPathBeArray(FieldRef(path), pipeline->getContext().get());
+            return pipeline->getContext()->canMainCollPathBeArray(FieldPath(path));
         };
         graph = std::make_unique<DependencyGraph>(pipeline->getSources(), canPathBeArray);
     }

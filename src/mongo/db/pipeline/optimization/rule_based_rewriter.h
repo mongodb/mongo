@@ -216,11 +216,8 @@ public:
         return std::next(_itr) == _container.end();
     }
 
-    const PathArrayness& getPathArrayness() {
-        return _expCtx.getMainCollPathArrayness();
-    }
-
     const mongo::pipeline::dependency_graph::DependencyGraph& getDependencyGraph() const;
+
 
     ExpressionContext& getExpCtx() {
         return _expCtx;

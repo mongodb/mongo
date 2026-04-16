@@ -1620,8 +1620,7 @@ namespace {
 /// Wrapper for the PathArrayness API passed into the graph as CanPathBeArray.
 struct CanMainCollPathBeArray {
     bool operator()(StringData path) const {
-        const auto& pathArrayness = expCtx.getMainCollPathArrayness();
-        return pathArrayness.canPathBeArray(FieldRef(path), &expCtx);
+        return expCtx.canMainCollPathBeArray(FieldRef(path));
     }
     ExpressionContext& expCtx;
 };
