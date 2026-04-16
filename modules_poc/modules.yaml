@@ -1114,6 +1114,7 @@ replication.replication_coordinator:
     jira: Replication
     fully_marked: true
   files:
+    - src/mongo/db/repl/*optime_observer*
     - src/mongo/db/repl/*replication_coordinator*
     - src/mongo/db/repl/*external_state*
     - src/mongo/db/repl/*heartbeat*

@@ -581,6 +581,27 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "optime_observer",
+    hdrs = [
+        "optime_observer.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "optime_observer_dispatcher",
+    hdrs = [
+        "optime_observer_dispatcher.h",
+    ],
+    deps = [
+        ":optime_observer",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "roll_back_local_operations",
     srcs = ["roll_back_local_operations.cpp"],
     deps = [
@@ -1880,6 +1901,18 @@ mongo_cc_unit_test(
         "//src/mongo/unittest:task_executor_proxy",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "optime_observer_dispatcher_test",
+    srcs = [
+        "optime_observer_dispatcher_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":optime_observer_dispatcher",
+        "//src/mongo/db:server_base",
     ],
 )
 
