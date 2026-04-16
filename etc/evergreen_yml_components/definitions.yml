@@ -3841,6 +3841,7 @@ functions:
           - "-c"
           - "sudo dnf -y install java-17-amazon-corretto-devel wget unzip"
     - *git_get_shallow_streams_project
+    - *restore_git_history_and_tags
     - *add_git_tag
     - *kill_processes
     - *cleanup_environment
@@ -4055,6 +4056,7 @@ functions:
     - command: manifest.load
     - *f_expansions_write
     - *git_get_shallow_streams_project
+    - *restore_git_history_and_tags
     - *add_git_tag
     - *kill_processes
     - *cleanup_environment
