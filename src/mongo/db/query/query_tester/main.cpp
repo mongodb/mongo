@@ -319,6 +319,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto loadOpt = false;
     auto mongoURIString = boost::optional<std::string>{};
     auto mode = ModeOption::Compare;  // Default.
+    auto modeExplicitlySet = false;
     auto optimizationsOff = false;
     auto outOpt = WriteOutOptions::kNone;
     auto populateAndExit = false;
@@ -344,6 +345,7 @@ int queryTesterMain(const int argc, const char** const argv) {
         } else if (parsedArgs[argNum] == "--mode") {
             assertNextArgExists(parsedArgs, argNum, "--mode");
             mode = stringToModeOption(parsedArgs[argNum + 1]);
+            modeExplicitlySet = true;
             ++argNum;
         } else if (parsedArgs[argNum] == "--opt-off") {
             optimizationsOff = true;
@@ -406,6 +408,12 @@ int queryTesterMain(const int argc, const char** const argv) {
         } else {
             exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
         }
+    }
+
+    // If --out is specified without an explicit --mode, default to run mode since writing out
+    // results is only meaningful when running (not comparing).
+    if (outOpt != WriteOutOptions::kNone && !modeExplicitlySet) {
+        mode = ModeOption::Run;
     }
 
     if (!mongoURIString) {
