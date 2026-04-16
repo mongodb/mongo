@@ -318,6 +318,7 @@ class TestSkyExclusionChecks(unittest.TestCase):
                         "CLAUDE.md",
                         ".github/CODEOWNERS",
                         "monguard/**",
+                        "etc/evergreen_yml_components/**",
                     ])
                     """
                 )
@@ -344,6 +345,7 @@ class TestSkyExclusionChecks(unittest.TestCase):
                         "CLAUDE.md",
                         ".github/CODEOWNERS",
                         "monguard/**",
+                        "etc/evergreen_yml_components/**",
                     ])
                     """
                 )

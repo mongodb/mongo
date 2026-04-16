@@ -34,6 +34,7 @@ def make_workflow(workflow_name, destination_url, source_ref, destination_ref):
             "CLAUDE.md",
             ".github/CODEOWNERS",
             "monguard/**",
+            "etc/evergreen_yml_components/**",
         ]),
         authoring = authoring.pass_thru("MongoDB <mongodb@mongodb.com>"),
         mode = "ITERATIVE",
