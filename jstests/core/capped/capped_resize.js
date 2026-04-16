@@ -37,11 +37,11 @@ let resetCappedCollection = function (extra) {
 
     // With a capped collection capacity of 25KB, we should have 2 documents.
     insertDocs();
-    let stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, initialDocSize);
-    assert.lte(stats.size, extra.size);
+    assert.eq(cappedColl.count(), initialDocSize);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, extra.size);
 
     // Check the size and max document limits.
+    let stats = assert.commandWorked(cappedColl.stats());
     assert.eq(stats.maxSize, extra.size);
     if (extra.max) {
         assert.eq(stats.max, extra.max);
@@ -72,23 +72,20 @@ let verifyLimitUpdate = function (updates) {
     // Increase the size of the capped collection and we should see more documents in the
     // collection.
     verifyLimitUpdate({cappedSize: doubleMaxSize});
-    let stats = assert.commandWorked(cappedColl.stats());
-    assert.gt(stats.count, initialDocSize);
-    assert.lte(stats.size, doubleMaxSize);
+    assert.gt(cappedColl.count(), initialDocSize);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, doubleMaxSize);
 
     // Decrease the size parameter of the capped collection and see that documents are removed.
     verifyLimitUpdate({cappedSize: maxSize});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, initialDocSize);
-    assert.lte(stats.size, maxSize);
+    assert.eq(cappedColl.count(), initialDocSize);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, maxSize);
 
     // We used to not allow resizing the size of a capped collection below 4096 bytes. This
     // restriction was lifted in SERVER-67036.
     // We should see a reduction in collection size and count relative to the previous test case.
     verifyLimitUpdate({cappedSize: 256});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.lt(stats.count, initialDocSize);
-    assert.lt(stats.size, maxSize);
+    assert.lt(cappedColl.count(), initialDocSize);
+    assert.lt(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, maxSize);
 
     // We expect the resizing of a capped collection to fail when maxSize <= 0 and maxSize >
     // maxSizeCeiling.
@@ -113,25 +110,21 @@ let verifyLimitUpdate = function (updates) {
     // Increase the size of the capped collection and we should see more documents in the
     // collection.
     verifyLimitUpdate({cappedMax: doubleMaxDocs});
-    let stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, doubleMaxDocs);
+    assert.eq(cappedColl.count(), doubleMaxDocs);
 
     // Decrease the size parameter of the capped collection and see that documents are removed.
     verifyLimitUpdate({cappedMax: maxDocs});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, maxDocs);
+    assert.eq(cappedColl.count(), maxDocs);
 
     // Setting the maxDocs size to <= 0, we expect the cappedSize to be the only limiting factor.
     const negativeMax = -1 * maxDocs;
     verifyLimitUpdate({cappedMax: negativeMax});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.gt(stats.count, initialDocSize);
-    assert.lte(stats.size, doubleMaxSize);
+    assert.gt(cappedColl.count(), initialDocSize);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, doubleMaxSize);
 
     verifyLimitUpdate({cappedMax: 0});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.gt(stats.count, initialDocSize);
-    assert.lte(stats.size, doubleMaxSize);
+    assert.gt(cappedColl.count(), initialDocSize);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, doubleMaxSize);
 })();
 
 (function updateSizeAndMaxLimits() {
@@ -140,25 +133,21 @@ let verifyLimitUpdate = function (updates) {
 
     // Increasing both limits, we should see double the documents.
     verifyLimitUpdate({cappedSize: doubleMaxSize, cappedMax: doubleMaxDocs});
-    let stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, doubleMaxDocs);
-    assert.gt(stats.size, maxSize);
+    assert.eq(cappedColl.count(), doubleMaxDocs);
+    assert.gt(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, maxSize);
 
     // Decreasing both limits, we should see less documents.
     verifyLimitUpdate({cappedSize: maxSize, cappedMax: maxDocs});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, maxDocs);
-    assert.lte(stats.size, maxSize);
+    assert.eq(cappedColl.count(), maxDocs);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, maxSize);
 
     // Increasing the size limit, but keeping the max low should have no effect.
     verifyLimitUpdate({cappedSize: doubleMaxSize, cappedMax: maxDocs});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, maxDocs);
-    assert.lte(stats.size, doubleMaxSize);
+    assert.eq(cappedColl.count(), maxDocs);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, doubleMaxSize);
 
     // Increasing the max limit, but keeping the size limit lower should have no effect.
     verifyLimitUpdate({cappedSize: maxSize, cappedMax: doubleMaxDocs});
-    stats = assert.commandWorked(cappedColl.stats());
-    assert.eq(stats.count, initialDocSize);
-    assert.lte(stats.size, maxSize);
+    assert.eq(cappedColl.count(), initialDocSize);
+    assert.lte(testDB.runCommand({dataSize: cappedColl.getFullName()}).size, maxSize);
 })();

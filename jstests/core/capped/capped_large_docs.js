@@ -28,6 +28,5 @@ for (let i = 0; i < 5; i++) {
 }
 
 // With a capped collection capacity of 25MB, we should have 2 documents.
-const stats = assert.commandWorked(coll.stats());
-assert.eq(2, stats.count);
-assert(stats.size <= maxSize);
+assert.eq(coll.count(), 2);
+assert.lte(db.runCommand({dataSize: coll.getFullName()}).size, maxSize);
