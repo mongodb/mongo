@@ -69,40 +69,11 @@ auto& flushFailureCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.flush.failureCount", .role = ClusterRole::None}});
 
-auto& flushTimeMsMinGauge = MetricsService::instance().createInt64Gauge(
-    MetricNames::kReplicatedFastCountFlushTimeMsMin,
-    "Minimum flush duration in milliseconds across all replicated fast count flushes",
-    MetricUnit::kMilliseconds,
-    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.flushTime.min",
-                                                .role = ClusterRole::None}});
-
-auto& flushTimeMsMaxGauge = MetricsService::instance().createInt64Gauge(
-    MetricNames::kReplicatedFastCountFlushTimeMsMax,
-    "Maximum flush duration in milliseconds across all replicated fast count flushes",
-    MetricUnit::kMilliseconds,
-    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.flushTime.max",
-                                                .role = ClusterRole::None}});
-
 auto& flushTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
     MetricNames::kReplicatedFastCountFlushTimeMsTotal,
     "Total flush duration in milliseconds across all replicated fast count flushes",
     MetricUnit::kMilliseconds,
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.flushTime.total",
-                                                .role = ClusterRole::None}});
-
-// Aggregate metrics for the min/max number of documents inserted or updated during one flush.
-auto& flushedDocsMinGauge = MetricsService::instance().createInt64Gauge(
-    MetricNames::kReplicatedFastCountFlushedDocsMin,
-    "Minimum number of documents written in a single replicated fast count flush",
-    MetricUnit::kEvents,
-    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.flushedDocs.min",
-                                                .role = ClusterRole::None}});
-
-auto& flushedDocsMaxGauge = MetricsService::instance().createInt64Gauge(
-    MetricNames::kReplicatedFastCountFlushedDocsMax,
-    "Maximum number of documents written in a single replicated fast count flush",
-    MetricUnit::kEvents,
-    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.flushedDocs.max",
                                                 .role = ClusterRole::None}});
 
 // The total number of documents written during flushes.
@@ -161,17 +132,7 @@ void ReplicatedFastCountMetrics::recordFlush(Date_t startTime, size_t batchSize)
 
     flushSuccessCounter.add(1);
     flushTimeMsTotalCounter.add(elapsedMs);
-    flushTimeMsMaxGauge.set(std::max(flushTimeMsMaxGauge.value(), elapsedMs));
-    _flushTimeMsMinPlaceholder.storeRelaxed(
-        std::min(_flushTimeMsMinPlaceholder.loadRelaxed(), elapsedMs));
-    flushTimeMsMinGauge.set(_flushTimeMsMinPlaceholder.loadRelaxed());
-
-    const int64_t docs = static_cast<int64_t>(batchSize);
-    flushedDocsTotalCounter.add(docs);
-    flushedDocsMaxGauge.set(std::max(flushedDocsMaxGauge.value(), docs));
-    _flushedDocsMinPlaceholder.storeRelaxed(
-        std::min(_flushedDocsMinPlaceholder.loadRelaxed(), docs));
-    flushedDocsMinGauge.set(_flushedDocsMinPlaceholder.loadRelaxed());
+    flushedDocsTotalCounter.add(static_cast<int64_t>(batchSize));
 }
 
 void ReplicatedFastCountMetrics::incrementFlushFailureCount() {

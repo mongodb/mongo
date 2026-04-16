@@ -59,13 +59,6 @@ public:
     void incrementUpdateCount();
 
     void addWriteTimeMsTotal(int64_t ms);
-
-private:
-    // Placeholder atomics for tracking the running minimum across flushes. Since flushTimeMinGauge
-    // and flushedDocsMinGauge are initialized to 0, we compare the first flush duration to these
-    // placeholders to ensure that the aforementioned gauges do not forever remain set to 0.
-    Atomic<int64_t> _flushTimeMsMinPlaceholder{std::numeric_limits<int64_t>::max()};
-    Atomic<int64_t> _flushedDocsMinPlaceholder{std::numeric_limits<int64_t>::max()};
 };
 
 /**

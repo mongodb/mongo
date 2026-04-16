@@ -60,8 +60,6 @@ describe("fast count server status metric", function () {
                     const metrics = getMetrics(this.db);
                     return (
                         metrics.flush.successCount >= 1 &&
-                        metrics.flushTime.min >= 0 &&
-                        metrics.flushTime.max >= 500 &&
                         metrics.flushTime.total >= 500 &&
                         metrics.writeTime.total >= 0
                     );
@@ -78,12 +76,7 @@ describe("fast count server status metric", function () {
             assert.soon(
                 () => {
                     const metrics = getMetrics(this.db);
-                    return (
-                        metrics.flush.successCount >= 2 &&
-                        metrics.flushTime.min < 500 &&
-                        metrics.flushTime.max >= 500 &&
-                        metrics.flushTime.total >= 600
-                    );
+                    return metrics.flush.successCount >= 2 && metrics.flushTime.total >= 600;
                 },
                 () => `Expected flush time metrics after second flush, got ${tojson(getMetrics(this.db))}`,
                 kServerStatusAssertTimeoutMs,
@@ -133,7 +126,7 @@ describe("fast count server status metric", function () {
                     // TODO SERVER-122992: Enforce correct update / inserts.
                     // metrics.insertCount >= 1 &&
                     // metrics.updateCount >= 1 &&
-                    metrics.flushedDocs.min >= 1 && metrics.flushedDocs.max >= 5 && metrics.flushedDocs.total >= 6
+                    metrics.flushedDocs.total >= 6
                 );
             },
             () => `Expected write and flushed docs metrics, got ${tojson(getMetrics(this.db))}`,

@@ -54,10 +54,6 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
 
     for (const auto& gaugeName : {
              MetricNames::kReplicatedFastCountIsRunning,
-             MetricNames::kReplicatedFastCountFlushTimeMsMin,
-             MetricNames::kReplicatedFastCountFlushTimeMsMax,
-             MetricNames::kReplicatedFastCountFlushedDocsMin,
-             MetricNames::kReplicatedFastCountFlushedDocsMax,
          }) {
         EXPECT_EQ(capturer.readInt64Gauge(gaugeName), 0);
     }
@@ -99,21 +95,6 @@ TEST(ReplicatedFastCountMetricsTest, FlushSuccessCounterIncrementsViaRecordFlush
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushSuccessCount), 2);
 }
 
-TEST(ReplicatedFastCountMetricsTest, FlushTimeMsMinMaxAndTotalUpdatedViaRecordFlush) {
-    OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
-    metrics.recordFlush(Date_t::now() - Milliseconds(10),
-                        /*batchSize=*/3);
-
-    // After a single flush, min and max should both equal the elapsed time (>= 10ms).
-    const int64_t minVal = capturer.readInt64Gauge(MetricNames::kReplicatedFastCountFlushTimeMsMin);
-    const int64_t maxVal = capturer.readInt64Gauge(MetricNames::kReplicatedFastCountFlushTimeMsMax);
-    EXPECT_GE(minVal, 10);
-    EXPECT_EQ(minVal, maxVal);
-    EXPECT_GE(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushTimeMsTotal), 10);
-}
-
-
 TEST(ReplicatedFastCountMetricsTest, FlushFailureCounterIncrement) {
     OtelMetricsCapturer capturer;
     ReplicatedFastCountMetrics metrics;
@@ -149,23 +130,7 @@ TEST(ReplicatedFastCountMetricsTest, WriteMsTimeTotalAdd) {
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWriteTimeMsTotal), 106);
 }
 
-TEST(ReplicatedFastCountMetricsTest, FlushTimeMsMinAndMaxTrackAcrossMultipleFlushes) {
-    OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
-    metrics.recordFlush(Date_t::now() - Milliseconds(10),
-                        /*batchSize=*/1);
-    metrics.recordFlush(Date_t::now() - Milliseconds(100),
-                        /*batchSize=*/5);
-
-    const int64_t minVal = capturer.readInt64Gauge(MetricNames::kReplicatedFastCountFlushTimeMsMin);
-    const int64_t maxVal = capturer.readInt64Gauge(MetricNames::kReplicatedFastCountFlushTimeMsMax);
-    EXPECT_GE(maxVal, 100);
-    EXPECT_LT(minVal, maxVal);
-    EXPECT_GE(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushTimeMsTotal),
-              minVal + maxVal);
-}
-
-TEST(ReplicatedFastCountMetricsTest, FlushedDocsMinMaxAndTotalUpdatedAfterFlushes) {
+TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {
     OtelMetricsCapturer capturer;
     ReplicatedFastCountMetrics metrics;
     metrics.recordFlush(Date_t::now() - Milliseconds(1),
@@ -175,8 +140,6 @@ TEST(ReplicatedFastCountMetricsTest, FlushedDocsMinMaxAndTotalUpdatedAfterFlushe
     metrics.recordFlush(Date_t::now() - Milliseconds(1),
                         /*batchSize=*/1);
 
-    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountFlushedDocsMin), 1);
-    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountFlushedDocsMax), 7);
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 11);
 }
 
