@@ -295,6 +295,11 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
         default: false
         fcv_gated: true
+    featureFlagResumablePrimaryDrivenIndexBuilds:
+        description: "Enable resumability on primary-driven index builds."
+        cpp_varname: feature_flags::gResumablePrimaryDrivenIndexBuilds
+        default: false
+        fcv_gated: true
     featureFlagContainerWrites:
         description: "Enable support for container write oplog entries."
         cpp_varname: feature_flags::gContainerWrites
