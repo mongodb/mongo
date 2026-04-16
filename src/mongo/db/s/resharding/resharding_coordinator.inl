@@ -1744,7 +1744,9 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
                                             reshardedCollectionPlacement);
 
     // Update the in memory state
-    installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
+    installCoordinatorDocOnStateTransition(
+        opCtx.get(),
+        resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
 }
 
 void ReshardingCoordinator::_generateCommitNotificationForChangeStreams(
