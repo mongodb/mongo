@@ -189,12 +189,12 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFet
     ThreadPool::Options threadPoolOptions(std::move(threadPoolLimits));
 
     auto prefix = "ReshardingOplogFetcher"_sd;
-    threadPoolOptions.threadNamePrefix = prefix + "-";
-    threadPoolOptions.poolName = prefix + "ThreadPool";
+    threadPoolOptions.threadNamePrefix = std::string{prefix} + "-";
+    threadPoolOptions.poolName = std::string{prefix} + "ThreadPool";
 
     auto executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
-        executor::makeNetworkInterface(prefix + "Network"));
+        executor::makeNetworkInterface(std::string{prefix} + "Network"));
 
     executor->startup();
     return executor;
@@ -210,8 +210,8 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollecti
     ThreadPool::Options threadPoolOptions(std::move(threadPoolLimits));
 
     auto prefix = "ReshardingCollectionCloner"_sd;
-    threadPoolOptions.threadNamePrefix = prefix + "-";
-    threadPoolOptions.poolName = prefix + "ThreadPool";
+    threadPoolOptions.threadNamePrefix = std::string{prefix} + "-";
+    threadPoolOptions.poolName = std::string{prefix} + "ThreadPool";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName, getGlobalServiceContext()->getService());
         auto* client = Client::getCurrent();
@@ -220,7 +220,7 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollecti
 
     auto executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
-        executor::makeNetworkInterface(prefix + "Network"));
+        executor::makeNetworkInterface(std::string{prefix} + "Network"));
 
     executor->startup();
     return executor;

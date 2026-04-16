@@ -2322,7 +2322,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // Empty temporary collections generate createIndexes oplog entry even if the node
     // supports 2 phase index build.
     const auto createIndexesDocument =
-        queryOplog(BSON("ns" << renamedNss.db_forTest() + ".$cmd" << "o.createIndexes"
+        queryOplog(BSON("ns" << std::string{renamedNss.db_forTest()} + ".$cmd" << "o.createIndexes"
                              << BSON("$exists" << true) << "o.name" << "b_1"));
     const auto tmpCollName =
         createIndexesDocument.getObjectField("o").getStringField("createIndexes");
@@ -2433,13 +2433,13 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
     // Confirm that startIndexBuild and abortIndexBuild oplog entries have been written to the
     // oplog.
     auto indexStartDocument =
-        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd" << "o.startIndexBuild" << nss.coll()
-                             << "o.indexes.0.name"
+        queryOplog(BSON("ns" << std::string(nss.db_forTest()) + ".$cmd" << "o.startIndexBuild"
+                             << nss.coll() << "o.indexes.0.name"
                              << "a_1"));
     auto indexStartTs = indexStartDocument["ts"].timestamp();
     auto indexAbortDocument =
-        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd" << "o.abortIndexBuild" << nss.coll()
-                             << "o.indexes.0.name"
+        queryOplog(BSON("ns" << std::string(nss.db_forTest()) + ".$cmd" << "o.abortIndexBuild"
+                             << nss.coll() << "o.indexes.0.name"
                              << "a_1"));
     auto indexAbortTs = indexAbortDocument["ts"].timestamp();
 
@@ -2953,7 +2953,7 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
 
     const Timestamp systemViewsCreateTs =
         queryOplog(BSON("op" << "c"
-                             << "ns" << (viewNss.db_forTest() + ".$cmd") << "o.create"
+                             << "ns" << (std::string(viewNss.db_forTest()) + ".$cmd") << "o.create"
                              << "system.views"))["ts"]
             .timestamp();
     const Timestamp viewCreateTs = queryOplog(BSON("op" << "i"

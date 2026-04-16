@@ -182,7 +182,7 @@ TEST_F(RnpContextTest, VerifyFooExtensionWithReadNDocumentsSignatureFails) {
 
     const std::string fooExtensionPath = test_util::getExtensionPath(kTestFooLibExtensionName);
     const std::string mongotExtensionSignaturePath =
-        test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName) + ".sig";
+        std::string{test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName)} + ".sig";
     ASSERT_THROWS_CODE(ctx.verifyDetachedSignature(fooExtensionPath, mongotExtensionSignaturePath),
                        AssertionException,
                        11528917);

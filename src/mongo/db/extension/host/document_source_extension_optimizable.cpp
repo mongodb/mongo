@@ -581,7 +581,7 @@ stdx::unordered_map<std::string, std::vector<PipelineRewriteRule>>
 void DocumentSourceExtensionOptimizable::registerStageRules(
     StringData stageName, const std::vector<extension::PipelineRewriteRule>& rules) {
     auto [_, inserted] = _extensionRuleRegistry.emplace(stageName, rules);
-    tassert(12201405, "Rules already registered for stage: " + stageName, inserted);
+    tassert(12201405, "Rules already registered for stage: " + std::string{stageName}, inserted);
 }
 
 // static

@@ -109,7 +109,8 @@ BSONObj makeDatabaseQuery(const DatabaseName& dbName, const DatabaseVersion& dbV
     // Making the dbVersion timestamp part of the query ensures idempotency.
     return BSON(DatabaseType::kDbNameFieldName
                 << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())
-                << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kTimestampFieldName
+                << std::string{DatabaseType::kVersionFieldName} + "." +
+                    std::string{DatabaseVersion::kTimestampFieldName}
                 << dbVersion.getTimestamp());
 }
 

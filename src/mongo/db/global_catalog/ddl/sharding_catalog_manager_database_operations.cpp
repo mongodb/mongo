@@ -254,7 +254,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                 // Include the version in the update filter to be resilient to potential
                 // network retries and delayed messages.
                 for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
-                    const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
+                    const auto dottedFieldName =
+                        std::string{DatabaseType::kVersionFieldName} + "." + std::string{fieldName};
                     bsonBuilder.appendAs(fieldValue, dottedFieldName);
                 }
                 return bsonBuilder.obj();
@@ -279,8 +280,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                     // Include the version in the update filter to be resilient to potential
                     // network retries and delayed messages.
                     for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
-                        const auto dottedFieldName =
-                            DatabaseType::kVersionFieldName + "." + fieldName;
+                        const auto dottedFieldName = std::string{DatabaseType::kVersionFieldName} +
+                            "." + std::string{fieldName};
                         bsonBuilder.appendAs(fieldValue, dottedFieldName);
                     }
                     return bsonBuilder.obj();

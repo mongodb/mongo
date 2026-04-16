@@ -686,7 +686,7 @@ protected:
         auto opCtx = cc().makeOperationContext();
 
         const NamespaceString localNSS = NamespaceString::makeLocalCollection(
-            "unreplicated_local_collection"_sd + UUID::gen().toString());
+            std::string{"unreplicated_local_collection"} + UUID::gen().toString());
         ASSERT_FALSE(localNSS.isReplicated());
         ASSERT_TRUE(repl::ReplicationCoordinator::get(opCtx.get())
                         ->isOplogDisabledFor(opCtx.get(), localNSS));

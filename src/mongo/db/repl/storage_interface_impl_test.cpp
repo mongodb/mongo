@@ -100,7 +100,8 @@ NamespaceString makeNamespace(StringData suffix = "") {
     std::string prefix =
         fmt::format("local.{}_{}", unittest::getSuiteName(), unittest::getTestName());
     return NamespaceString::createNamespaceString_forTest(
-        prefix.substr(0, NamespaceString::MaxUserNsCollectionLen - suffix.length()) + suffix);
+        prefix.substr(0, NamespaceString::MaxUserNsCollectionLen - suffix.length()) +
+        std::string(suffix));
 }
 
 /**

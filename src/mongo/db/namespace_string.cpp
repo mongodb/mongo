@@ -30,6 +30,7 @@
 #include "mongo/db/namespace_string.h"
 
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -338,7 +339,7 @@ bool NamespaceString::isOutStageTmpCollection() const {
 // TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer
 // exist.
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
-    return {dbName(), std::string{kTimeseriesBucketsCollectionPrefix} + coll()};
+    return {dbName(), fmt::format("{}{}", kTimeseriesBucketsCollectionPrefix, coll())};
 }
 
 // TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer

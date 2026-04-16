@@ -63,7 +63,7 @@ namespace {
 class ExpressionWalkerTest : public AggregationContextFixture {
 protected:
     auto jsonToPipeline(StringData jsonArray) {
-        const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
+        const auto inputBson = fromjson("{pipeline: " + std::string{jsonArray} + "}");
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);

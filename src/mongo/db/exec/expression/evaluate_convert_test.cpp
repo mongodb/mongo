@@ -2833,13 +2833,13 @@ TEST_F(EvaluateConvertTest, ConvertStringToIntOverflowWithOnError) {
     const auto onErrorValue = "><(((((>"_sd;
 
     auto spec = fromjson("{$convert: {input: '" + std::to_string(kIntMax + 1) +
-                         "', to: 'int', onError: '" + onErrorValue + "'}}");
+                         "', to: 'int', onError: '" + std::string(onErrorValue) + "'}}");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
     spec = fromjson("{$convert: {input: '" + std::to_string(kIntMin - 1) +
-                    "', to: 'int', onError: '" + onErrorValue + "'}}");
+                    "', to: 'int', onError: '" + std::string(onErrorValue) + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
@@ -2919,7 +2919,7 @@ TEST_F(EvaluateConvertTest, ConvertStringToLongWithOnError) {
     longMaxPlusOneAsString = longMaxPlusOneAsString.substr(0, longMaxPlusOneAsString.find('.'));
 
     auto spec = fromjson("{$convert: {input: '" + longMaxPlusOneAsString +
-                         "', to: 'long', onError: '" + onErrorValue + "'}}");
+                         "', to: 'long', onError: '" + std::string(onErrorValue) + "'}}");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
@@ -2928,17 +2928,19 @@ TEST_F(EvaluateConvertTest, ConvertStringToLongWithOnError) {
     longMinMinusOneAsString = longMinMinusOneAsString.substr(0, longMinMinusOneAsString.find('.'));
 
     spec = fromjson("{$convert: {input: '" + longMinMinusOneAsString + "', to: 'long', onError: '" +
-                    onErrorValue + "'}}");
+                    std::string(onErrorValue) + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
-    spec = fromjson("{$convert: {input: '5.5', to: 'long', onError: '" + onErrorValue + "'}}");
+    spec = fromjson("{$convert: {input: '5.5', to: 'long', onError: '" + std::string(onErrorValue) +
+                    "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
-    spec = fromjson("{$convert: {input: '5.0', to: 'long', onError: '" + onErrorValue + "'}}");
+    spec = fromjson("{$convert: {input: '5.0', to: 'long', onError: '" + std::string(onErrorValue) +
+                    "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
@@ -3180,23 +3182,25 @@ TEST_F(EvaluateConvertTest, ConvertStringToDoubleWithOnError) {
     const auto onErrorValue = "><(((((>"_sd;
 
     auto spec = fromjson("{$convert: {input: '" + kDoubleOverflow.toString() +
-                         "', to: 'double', onError: '" + onErrorValue + "'}}");
+                         "', to: 'double', onError: '" + std::string(onErrorValue) + "'}}");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
     spec = fromjson("{$convert: {input: '" + kDoubleNegativeOverflow.toString() +
-                    "', to: 'double', onError: '" + onErrorValue + "'}}");
+                    "', to: 'double', onError: '" + std::string(onErrorValue) + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
-    spec = fromjson("{$convert: {input: '.5.', to: 'double', onError: '" + onErrorValue + "'}}");
+    spec = fromjson("{$convert: {input: '.5.', to: 'double', onError: '" +
+                    std::string(onErrorValue) + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
-    spec = fromjson("{$convert: {input: '5.5f', to: 'double', onError: '" + onErrorValue + "'}}");
+    spec = fromjson("{$convert: {input: '5.5f', to: 'double', onError: '" +
+                    std::string(onErrorValue) + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
@@ -3431,14 +3435,14 @@ TEST_F(EvaluateConvertTest, ConvertStringToDecimalWithOnError) {
     auto expCtx = getExpCtx();
     const auto onErrorValue = "><(((((>"_sd;
 
-    auto spec =
-        fromjson("{$convert: {input: '1E6145', to: 'decimal', onError: '" + onErrorValue + "'}}");
+    auto spec = fromjson("{$convert: {input: '1E6145', to: 'decimal', onError: '" +
+                         std::string(onErrorValue) + "'}}");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
-    spec =
-        fromjson("{$convert: {input: '-1E-6177', to: 'decimal', onError: '" + onErrorValue + "'}}");
+    spec = fromjson("{$convert: {input: '-1E-6177', to: 'decimal', onError: '" +
+                    std::string(onErrorValue) + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
@@ -3556,19 +3560,19 @@ TEST_F(EvaluateConvertTest, ConvertStringToOIDWithOnError) {
 
     auto spec =
         fromjson("{$convert: {input: 'InvalidHexButSizeCorrect', to: 'objectId', onError: '" +
-                 onErrorValue + "'}}");
+                 std::string{onErrorValue} + "'}}");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
-    spec = fromjson("{$convert: {input: 'InvalidSize', to: 'objectId', onError: '" + onErrorValue +
-                    "'}}");
+    spec = fromjson("{$convert: {input: 'InvalidSize', to: 'objectId', onError: '" +
+                    std::string{onErrorValue} + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
 
     spec = fromjson("{$convert: {input: '0x123456789abcdef123456789', to: 'objectId', onError: '" +
-                    onErrorValue + "'}}");
+                    std::string{onErrorValue} + "'}}");
     convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::string);
@@ -3667,8 +3671,8 @@ TEST_F(EvaluateConvertTest, ConvertStringToDateWithOnError) {
     auto expCtx = getExpCtx();
     const auto onErrorValue = "(-_-)"_sd;
 
-    auto spec =
-        fromjson("{$convert: {input: '$path1', to: 'date', onError: '" + onErrorValue + "'}}");
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'date', onError: '" +
+                         std::string(onErrorValue) + "'}}");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto result = convertExp->evaluate({{"path1", Value("Not a date"_sd)}}, &expCtx->variables);
@@ -3686,8 +3690,8 @@ TEST_F(EvaluateConvertTest, ConvertStringToDateWithOnNull) {
     auto expCtx = getExpCtx();
     const auto onNullValue = "(-_-)"_sd;
 
-    auto spec =
-        fromjson("{$convert: {input: '$path1', to: 'date', onNull: '" + onNullValue + "'}}");
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'date', onNull: '" +
+                         std::string(onNullValue) + "'}}");
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto result = convertExp->evaluate({}, &expCtx->variables);

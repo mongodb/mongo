@@ -72,6 +72,7 @@
 #include <boost/range/const_iterator.hpp>
 #include <boost/range/iterator_range_core.hpp>
 #include <boost/type_index/type_index_facade.hpp>
+#include <fmt/format.h>
 
 using namespace std::literals::string_literals;
 
@@ -240,7 +241,8 @@ MongoURI::OptionsMap addTXTOptions(MongoURI::OptionsMap options,
     }
 
     if (txtRecords.size() > 1) {
-        uasserted(ErrorCodes::FailedToParse, "Encountered multiple TXT records for: "s + url);
+        uasserted(ErrorCodes::FailedToParse,
+                  fmt::format("Encountered multiple TXT records for: {}", url));
     }
 
     auto txtOptions = parseOptions(txtRecords.front(), url);

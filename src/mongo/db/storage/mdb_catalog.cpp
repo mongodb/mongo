@@ -386,8 +386,8 @@ BSONObj MDBCatalog::_buildOrphanedCatalogEntryObjAndNs(
     std::string identNs = ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
 
-    *nss = NamespaceStringUtil::deserialize(DatabaseName::kLocal,
-                                            NamespaceString::kOrphanCollectionPrefix + identNs);
+    *nss = NamespaceStringUtil::deserialize(
+        DatabaseName::kLocal, std::string{NamespaceString::kOrphanCollectionPrefix} + identNs);
     *ns = NamespaceStringUtil::serializeForCatalog(*nss);
     BSONObjBuilder catalogEntryBuilder;
     catalogEntryBuilder.append("ident", ident);

@@ -231,7 +231,7 @@ TEST(GeoParser, parseGeoJSONPolygon) {
 }
 
 TEST(GeoParser, parseGeoJSONPolygonStrictSphere) {
-    string crs = "crs:{ type: 'name', properties:{name:'" + CRS_STRICT_WINDING + "'}}";
+    string crs = "crs:{ type: 'name', properties:{name:'" + std::string{CRS_STRICT_WINDING} + "'}}";
     PolygonWithCRS polygon;
     BSONObj bigSimplePolygon = fromjson(
         "{'type':'Polygon', 'coordinates':[ "

@@ -350,14 +350,15 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
             MODE_IS);
 
         uassert(ErrorCodes::NamespaceNotFound,
-                "Collection " + invocation.getColl() + " not found",
+                "Collection " + std::string{invocation.getColl()} + " not found",
                 coll.exists());
         uuid = coll.uuid();
         nss = coll.nss();
     } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>& ex) {
         // Collection acquisition fails with 'CommandNotSupportedOnView' if the namespace is
         // referring to a regular view (not a timeseries view).
-        ex.addContext(invocation.getColl() + " is a view hence 'dbcheck' is not supported.");
+        ex.addContext(std::string{invocation.getColl()} +
+                      " is a view hence 'dbcheck' is not supported.");
         throw;
     }
 

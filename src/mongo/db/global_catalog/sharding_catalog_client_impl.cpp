@@ -295,7 +295,7 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     const auto buildUnionWithFn = [&](bool incremental) {
         const auto lastmodEpochMatch = Doc{{incremental ? "$eq" : "$ne", sinceVersion.epoch()}};
 
-        const auto letExpr = Doc{{"local_uuid", "$" + CollectionType::kUuidFieldName}};
+        const auto letExpr = Doc{{"local_uuid", "$" + std::string{CollectionType::kUuidFieldName}}};
 
         const auto uuidExpr =
             Arr{Value{"$" + ChunkType::collectionUUID.name()}, Value{"$$local_uuid"_sd}};
@@ -326,7 +326,8 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
                                      nss, SerializationContext::stateDefault())}}}}},
                  Value{Doc{{"$match", Doc{{CollectionType::kEpochFieldName, lastmodEpochMatch}}}}},
                  Value{Doc{{"$lookup", lookupPipeline}}},
-                 Value{Doc{{"$unwind", Doc{{"path", "$" + chunksLookupOutputFieldName}}}}},
+                 Value{Doc{
+                     {"$unwind", Doc{{"path", "$" + std::string{chunksLookupOutputFieldName}}}}}},
                  Value{Doc{
                      {"$project", Doc{{"_id", false}, {chunksLookupOutputFieldName, true}}}}}}}};
     };

@@ -255,11 +255,11 @@ TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsToCopy) {
     runPhaseTransitionTest(PhaseTransitionTestCase{
         .initialPhase = CoordinatorStateEnum::kCloning,
         .transitionFn = [&]() { _dao->updateNumberOfDocsToCopy(_opCtx, shardToNumDocsCopied); },
-        .set = BSON(ReshardingCoordinatorDocument::kDonorShardsFieldName + ".0." +
-                        DonorShardEntry::kDocumentsToCopyFieldName
+        .set = BSON(std::string(ReshardingCoordinatorDocument::kDonorShardsFieldName) + ".0." +
+                        std::string(DonorShardEntry::kDocumentsToCopyFieldName)
                     << 100
-                    << ReshardingCoordinatorDocument::kDonorShardsFieldName + ".1." +
-                        DonorShardEntry::kDocumentsToCopyFieldName
+                    << std::string(ReshardingCoordinatorDocument::kDonorShardsFieldName) + ".1." +
+                        std::string(DonorShardEntry::kDocumentsToCopyFieldName)
                     << 200)});
 }
 
@@ -301,11 +301,11 @@ TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsCopiedFinal) {
         .initialPhase = CoordinatorStateEnum::kBlockingWrites,
         .transitionFn =
             [&]() { _dao->updateNumberOfDocsCopiedFinal(_opCtx, shardToNumDocsCopiedFinal); },
-        .set = BSON(ReshardingCoordinatorDocument::kDonorShardsFieldName + ".0." +
-                        DonorShardEntry::kDocumentsFinalFieldName
+        .set = BSON(std::string(ReshardingCoordinatorDocument::kDonorShardsFieldName) + ".0." +
+                        std::string(DonorShardEntry::kDocumentsFinalFieldName)
                     << 100
-                    << ReshardingCoordinatorDocument::kDonorShardsFieldName + ".1." +
-                        DonorShardEntry::kDocumentsFinalFieldName
+                    << std::string(ReshardingCoordinatorDocument::kDonorShardsFieldName) + ".1." +
+                        std::string(DonorShardEntry::kDocumentsFinalFieldName)
                     << 200)});
 }
 

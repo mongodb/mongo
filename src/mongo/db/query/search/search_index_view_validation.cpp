@@ -88,7 +88,7 @@ void validateVariables(StringData value) {
     // Check for any of the banned variables in the value.
     bool containsBannedVariable =
         std::any_of(bannedVariables.begin(), bannedVariables.end(), [&value](StringData variable) {
-            return value.find("$$" + variable) != std::string::npos;
+            return value.find("$$" + std::string{variable}) != std::string::npos;
         });
 
     uassert(10623004,

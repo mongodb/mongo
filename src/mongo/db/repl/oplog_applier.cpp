@@ -164,8 +164,8 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount,
                                                StringData name,
                                                bool isKillableByStepdown) {
     ThreadPool::Options options;
-    options.threadNamePrefix = name + "-";
-    options.poolName = name + "ThreadPool";
+    options.threadNamePrefix = std::string{name} + "-";
+    options.poolName = std::string{name} + "ThreadPool";
     options.minThreads = std::min(getMinThreadCountForReplWorkerPool(), threadCount);
     options.maxThreads = threadCount;
     options.onCreateThread = [isKillableByStepdown](const std::string&) {

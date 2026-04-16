@@ -66,8 +66,8 @@ namespace {
  */
 static const std::unique_ptr<MatchExpression> closedBucketFilter =
     std::make_unique<NotMatchExpression>(std::make_unique<EqualityMatchExpression>(
-        StringData(timeseries::kBucketControlFieldName + "." +
-                   timeseries::kBucketControlClosedFieldName),
+        StringData(std::string{timeseries::kBucketControlFieldName} + "." +
+                   std::string{timeseries::kBucketControlClosedFieldName}),
         Value(true)));
 
 /**
@@ -84,8 +84,9 @@ bool isFieldFirstElementOfDottedPathField(StringData field, StringData metaField
  */
 std::string getRenamedField(StringData field) {
     size_t dotIndex = field.find('.');
-    return dotIndex != std::string::npos ? "meta" + field.substr(dotIndex, field.size() - dotIndex)
-                                         : "meta";
+    return dotIndex != std::string::npos
+        ? "meta" + std::string{field.substr(dotIndex, field.size() - dotIndex)}
+        : "meta";
 }
 
 void assertQueryFieldIsMetaField(bool isMetaField, StringData metaField) {

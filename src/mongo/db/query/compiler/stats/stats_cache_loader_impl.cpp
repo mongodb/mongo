@@ -54,7 +54,7 @@ namespace mongo::stats {
 SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx,
                                                          const StatsPathString& statsPath) {
 
-    std::string statsColl(kStatsPrefix + "." + statsPath.first.coll());
+    std::string statsColl(std::string{kStatsPrefix} + "." + std::string{statsPath.first.coll()});
 
     const auto statsNss = NamespaceStringUtil::deserialize(statsPath.first.dbName(), statsColl);
     DBDirectClient client(opCtx);

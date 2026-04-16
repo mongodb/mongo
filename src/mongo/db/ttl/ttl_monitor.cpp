@@ -715,8 +715,8 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
     bool passTargetMet = false;
 
     auto timeSeriesOptions = collectionPtr->getTimeseriesOptions();
-    std::string timeField =
-        std::string{timeseries::kControlMaxFieldNamePrefix} + timeSeriesOptions->getTimeField();
+    std::string timeField = std::string{timeseries::kControlMaxFieldNamePrefix} +
+        std::string{timeSeriesOptions->getTimeField()};
     LTEMatchExpression filter(boost::optional<StringData>{timeField},
                               Value{at - Seconds(expireAfterSeconds)});
 

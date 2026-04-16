@@ -263,8 +263,8 @@ boost::intrusive_ptr<DocumentSource> calculateFinalScoreMetadata(
     for (const auto& pipelineName : pipelineNames) {
         allInputScores.push_back(ExpressionFieldPath::createPathFromString(
             expCtx.get(),
-            RankFusionPipelineBuilder::kRankFusionInternalFieldsName + "." + pipelineName +
-                "_score",
+            std::string{RankFusionPipelineBuilder::kRankFusionInternalFieldsName} + "." +
+                pipelineName + "_score",
             expCtx->variablesParseState));
     }
 

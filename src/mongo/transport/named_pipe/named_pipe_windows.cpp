@@ -124,7 +124,7 @@ void NamedPipeOutput::close() {
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
-    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath),
+    : _pipeAbsolutePath(std::string{kDefaultPipePath} + pipeRelativePath),
       _pipe(INVALID_HANDLE_VALUE),
       _isOpen(false),
       _isGood(false),

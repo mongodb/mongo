@@ -267,7 +267,7 @@ TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCol
 
     // Virtual collections are not persisted to the local catalog.
     VirtualCollectionOptions virtualCollectionOptions;
-    const auto url = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pipe1";
+    const auto url = std::string(ExternalDataSourceMetadata::kUrlProtocolFile) + "named_pipe1";
     virtualCollectionOptions.dataSources.emplace_back(
         url, StorageTypeEnum::pipe, FileTypeEnum::bson);
     CollectionOptions collectionOptions;
@@ -509,7 +509,8 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         ASSERT_TRUE(db);
 
         auto model = "tmp%%%%"_sd;
-        pcre::Regex re(_nss.db_forTest() + "\\.tmp[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]",
+        pcre::Regex re(std::string(_nss.db_forTest()) +
+                           "\\.tmp[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]",
                        pcre::ANCHORED | pcre::ENDANCHORED);
 
         auto nss1 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
@@ -560,7 +561,7 @@ TEST_F(
             "abcdefghijklmnopqrstuvwxyz"_sd;
         for (const auto c : charsToChooseFrom) {
             NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-                _nss.dbName(), model.substr(0, model.find('%')) + std::string(1U, c));
+                _nss.dbName(), std::string(model.substr(0, model.find('%'))) + std::string(1U, c));
             WriteUnitOfWork wuow(_opCtx.get());
             ASSERT_TRUE(db->createCollection(_opCtx.get(), nss));
             wuow.commit();

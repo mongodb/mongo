@@ -272,11 +272,12 @@ long long BalancerStatsRegistry::getCollNumOrphanDocsFromDiskIfNeeded(
         std::vector<BSONObj> pipeline;
         pipeline.push_back(
             BSON("$match" << BSON(RangeDeletionTask::kCollectionUuidFieldName << collectionUUID)));
-        pipeline.push_back(BSON(
-            "$group" << BSON("_id"
-                             << "numOrphans"
-                             << "count"
-                             << BSON("$sum" << "$" + RangeDeletionTask::kNumOrphanDocsFieldName))));
+        pipeline.push_back(
+            BSON("$group" << BSON(
+                     "_id" << "numOrphans"
+                           << "count"
+                           << BSON("$sum" << "$" +
+                                       std::string{RangeDeletionTask::kNumOrphanDocsFieldName}))));
         AggregateCommandRequest aggRequest(NamespaceString::kRangeDeletionNamespace, pipeline);
         auto swCursor = DBClientCursor::fromAggregationRequest(
             &client, aggRequest, false /* secondaryOk */, true /* useExhaust */);
@@ -396,10 +397,11 @@ void BalancerStatsRegistry::_loadOrphansCount(OperationContext* opCtx) {
      * 	}
      */
     static const BSONObj groupStage{BSON(
-        "$group" << BSON("_id" << "$" + RangeDeletionTask::kCollectionUuidFieldName
-                               << kNumOrphanDocsLabel
-                               << BSON("$sum" << "$" + RangeDeletionTask::kNumOrphanDocsFieldName)
-                               << kNumRangeDeletionTasksLabel << BSON("$count" << BSONObj())))};
+        "$group" << BSON(
+            "_id" << "$" + std::string{RangeDeletionTask::kCollectionUuidFieldName}
+                  << kNumOrphanDocsLabel
+                  << BSON("$sum" << "$" + std::string{RangeDeletionTask::kNumOrphanDocsFieldName})
+                  << kNumRangeDeletionTasksLabel << BSON("$count" << BSONObj())))};
     AggregateCommandRequest aggRequest{NamespaceString::kRangeDeletionNamespace, {groupStage}};
 
     DBDirectClient client{opCtx};

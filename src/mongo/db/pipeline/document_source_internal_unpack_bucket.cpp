@@ -239,13 +239,13 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
         updatedPattern.push_back(entry);
         if (lastpointTimeField && entry.fieldPath->fullPath() == lastpointTimeField.value()) {
             updatedPattern.back().fieldPath =
-                FieldPath((entry.isAscending ? timeseries::kControlMinFieldNamePrefix
-                                             : timeseries::kControlMaxFieldNamePrefix) +
+                FieldPath(std::string{entry.isAscending ? timeseries::kControlMinFieldNamePrefix
+                                                        : timeseries::kControlMaxFieldNamePrefix} +
                           lastpointTimeField.value());
             updatedPattern.push_back(SortPattern::SortPatternPart{
                 entry.isAscending,
-                FieldPath((entry.isAscending ? timeseries::kControlMaxFieldNamePrefix
-                                             : timeseries::kControlMinFieldNamePrefix) +
+                FieldPath(std::string{entry.isAscending ? timeseries::kControlMaxFieldNamePrefix
+                                                        : timeseries::kControlMinFieldNamePrefix} +
                           lastpointTimeField.value()),
                 nullptr});
         } else {
@@ -380,10 +380,10 @@ boost::intrusive_ptr<Expression> handleDateTruncRewrite(
 
     // If the bucket boundaries align, we should rewrite $dateTrunc to use the minimum
     // timeField stored in the control field.
-    auto date = ExpressionFieldPath::createPathFromString(pExpCtx.get(),
-                                                          timeseries::kControlMinFieldNamePrefix +
-                                                              timeField,
-                                                          pExpCtx->variablesParseState);
+    auto date = ExpressionFieldPath::createPathFromString(
+        pExpCtx.get(),
+        std::string{timeseries::kControlMinFieldNamePrefix} + timeField,
+        pExpCtx->variablesParseState);
     return make_intrusive<ExpressionDateTrunc>(pExpCtx.get(),
                                                date,
                                                dateExprChildren[1 /*_kUnit */].get(),
@@ -514,9 +514,9 @@ std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
     auto thenExpr = ExpressionFieldPath::createPathFromString(
         pExpCtx, controlCountField, pExpCtx->variablesParseState);
 
-    auto elseExpr =
-        BSON("$size" << BSON("$objectToArray" << "$" + timeseries::kDataFieldNamePrefix +
-                                 bucketUnpacker.getTimeField()));
+    auto elseExpr = BSON("$size" << BSON("$objectToArray" << "$" +
+                                             std::string{timeseries::kDataFieldNamePrefix} +
+                                             bucketUnpacker.getTimeField()));
     auto argument = ExpressionCond::create(
         pExpCtx,
         std::move(ifExpr),

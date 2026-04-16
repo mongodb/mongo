@@ -188,12 +188,12 @@ bool matchesBSONObj(const InternalBucketGeoWithinMatchExpression* expr, const BS
     // If it goes through an array, return true to avoid dealing with implicit array traversal.
     // If it goes through a scalar, return true to avoid dealing with mixed types.
     auto controlMinElmOptional =
-        derefPath(obj, timeseries::kControlMinFieldNamePrefix + expr->getField());
+        derefPath(obj, std::string{timeseries::kControlMinFieldNamePrefix} + expr->getField());
     if (!controlMinElmOptional) {
         return true;
     }
     auto controlMaxElmOptional =
-        derefPath(obj, timeseries::kControlMaxFieldNamePrefix + expr->getField());
+        derefPath(obj, std::string{timeseries::kControlMaxFieldNamePrefix} + expr->getField());
     if (!controlMaxElmOptional) {
         return true;
     }

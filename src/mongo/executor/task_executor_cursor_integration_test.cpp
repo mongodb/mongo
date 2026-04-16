@@ -354,7 +354,10 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
         // the cursor. The command is blocked on the remote host and does not return until after the
         // destructor for `tec` returns.
         auto beforeStats = getCreatedAndOpenConnectionStats(
-            executor(), "NetworkInterfaceTL-" + kNetworkInterfaceInstanceName, target, usingGRPC);
+            executor(),
+            fmt::format("NetworkInterfaceTL-{}", kNetworkInterfaceInstanceName),
+            target,
+            usingGRPC);
         createdBefore = beforeStats.first;
         openBefore = beforeStats.second;
     }
@@ -370,7 +373,10 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
         "Timed out waiting for connections to become idle.");
 
     auto [createdAfter, openAfter] = getCreatedAndOpenConnectionStats(
-        executor(), "NetworkInterfaceTL-" + kNetworkInterfaceInstanceName, target, usingGRPC);
+        executor(),
+        fmt::format("NetworkInterfaceTL-{}", kNetworkInterfaceInstanceName),
+        target,
+        usingGRPC);
 
     // Check to see that our connection stats did not change.
     if (!usingGRPC) {

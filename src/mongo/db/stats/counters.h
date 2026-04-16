@@ -891,8 +891,7 @@ private:
         ValidatorCounter(const ValidatorCounter&) = delete;
 
         static Counter64& makeMetric(StringData name, StringData leaf) {
-            return *MetricBuilder<Counter64>{std::string{"commands."} + name + ".validator." +
-                                             leaf};
+            return *MetricBuilder<Counter64>{fmt::format("commands.{}.validator.{}", name, leaf)};
         }
 
         Counter64& totalCounter;

@@ -42,6 +42,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -50,14 +51,14 @@ const std::string kTimeseriesTimeFieldName("tm");
 const std::string kTimeseriesMetaFieldName("mm");
 const std::string kSubField1Name(".subfield1");
 const std::string kSubField2Name(".subfield2");
-const std::string kControlMinTimeFieldName(timeseries::kControlMinFieldNamePrefix +
+const std::string kControlMinTimeFieldName(std::string(timeseries::kControlMinFieldNamePrefix) +
                                            kTimeseriesTimeFieldName);
-const std::string kControlMaxTimeFieldName(timeseries::kControlMaxFieldNamePrefix +
+const std::string kControlMaxTimeFieldName(std::string(timeseries::kControlMaxFieldNamePrefix) +
                                            kTimeseriesTimeFieldName);
 const std::string kTimeseriesSomeDataFieldName("somedatafield");
-const std::string kControlMinSomeDataFieldName(timeseries::kControlMinFieldNamePrefix +
+const std::string kControlMinSomeDataFieldName(std::string(timeseries::kControlMinFieldNamePrefix) +
                                                kTimeseriesSomeDataFieldName);
-const std::string kControlMaxSomeDataFieldName(timeseries::kControlMaxFieldNamePrefix +
+const std::string kControlMaxSomeDataFieldName(std::string(timeseries::kControlMaxFieldNamePrefix) +
                                                kTimeseriesSomeDataFieldName);
 
 /**
@@ -217,10 +218,16 @@ TEST(TimeseriesIndexSchemaConversionTest, DescendingMetadataIndexSpecConversion)
 // {mm.subfield1: 1, mm.subfield2: 1} <=> {meta.subfield1: 1, mm.subfield2: 1}
 TEST(TimeseriesIndexSchemaConversionTest, MetadataCompoundIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
-    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName + kSubField1Name
-                                       << 1 << kTimeseriesMetaFieldName + kSubField2Name << 1);
-    BSONObj bucketsIndexSpec = BSON(timeseries::kBucketMetaFieldName + kSubField1Name
-                                    << 1 << timeseries::kBucketMetaFieldName + kSubField2Name << 1);
+    BSONObj timeseriesIndexSpec =
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}", kTimeseriesMetaFieldName, kSubField1Name), 1)
+            .append(fmt::format("{}{}", kTimeseriesMetaFieldName, kSubField2Name), 1)
+            .obj();
+    BSONObj bucketsIndexSpec =
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}", timeseries::kBucketMetaFieldName, kSubField1Name), 1)
+            .append(fmt::format("{}{}", timeseries::kBucketMetaFieldName, kSubField2Name), 1)
+            .obj();
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
@@ -229,10 +236,16 @@ TEST(TimeseriesIndexSchemaConversionTest, MetadataCompoundIndexSpecConversion) {
 TEST(TimeseriesIndexSchemaConversionTest, TimeAndMetadataCompoundIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
     BSONObj timeseriesIndexSpec =
-        BSON(kTimeseriesTimeFieldName << 1 << kTimeseriesMetaFieldName + kSubField1Name << 1);
+        BSONObjBuilder{}
+            .append(kTimeseriesTimeFieldName, 1)
+            .append(fmt::format("{}{}", kTimeseriesMetaFieldName, kSubField1Name), 1)
+            .obj();
     BSONObj bucketsIndexSpec =
-        BSON(kControlMinTimeFieldName << 1 << kControlMaxTimeFieldName << 1
-                                      << timeseries::kBucketMetaFieldName + kSubField1Name << 1);
+        BSONObjBuilder{}
+            .append(kControlMinTimeFieldName, 1)
+            .append(kControlMaxTimeFieldName, 1)
+            .append(fmt::format("{}{}", timeseries::kBucketMetaFieldName, kSubField1Name), 1)
+            .obj();
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
@@ -241,10 +254,16 @@ TEST(TimeseriesIndexSchemaConversionTest, TimeAndMetadataCompoundIndexSpecConver
 TEST(TimeseriesIndexSchemaConversionTest, MetadataAndTimeCompoundIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
     BSONObj timeseriesIndexSpec =
-        BSON(kTimeseriesMetaFieldName + kSubField1Name << 1 << kTimeseriesTimeFieldName << 1);
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}", kTimeseriesMetaFieldName, kSubField1Name), 1)
+            .append(kTimeseriesTimeFieldName, 1)
+            .obj();
     BSONObj bucketsIndexSpec =
-        BSON(timeseries::kBucketMetaFieldName + kSubField1Name << 1 << kControlMinTimeFieldName << 1
-                                                               << kControlMaxTimeFieldName << 1);
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}", timeseries::kBucketMetaFieldName, kSubField1Name), 1)
+            .append(kControlMinTimeFieldName, 1)
+            .append(kControlMaxTimeFieldName, 1)
+            .obj();
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
@@ -322,15 +341,24 @@ TEST(TimeseriesIndexSchemaConversionTest, ManyFieldCompoundIndexSpecConversion) 
 
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
     BSONObj timeseriesIndexSpec =
-        BSON(kTimeseriesMetaFieldName + kSubField1Name
-             << 1 << kTimeseriesMetaFieldName + kSubField2Name << 1
-             << kTimeseriesMetaFieldName + ".foo" << 1 << kTimeseriesMetaFieldName + ".bar" << 1
-             << kTimeseriesMetaFieldName + ".baz" << 1 << kTimeseriesTimeFieldName << 1);
-    BSONObj bucketsIndexSpec =
-        BSON(kMetaFieldName + kSubField1Name
-             << 1 << kMetaFieldName + kSubField2Name << 1 << kMetaFieldName + ".foo" << 1
-             << kMetaFieldName + ".bar" << 1 << kMetaFieldName + ".baz" << 1
-             << kControlMinTimeFieldName << 1 << kControlMaxTimeFieldName << 1);
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}", kTimeseriesMetaFieldName, kSubField1Name), 1)
+
+            .append(fmt::format("{}{}", kTimeseriesMetaFieldName, kSubField2Name), 1)
+            .append(fmt::format("{}.foo", kTimeseriesMetaFieldName), 1)
+            .append(fmt::format("{}.bar", kTimeseriesMetaFieldName), 1)
+            .append(fmt::format("{}.baz", kTimeseriesMetaFieldName), 1)
+            .append(kTimeseriesTimeFieldName, 1)
+            .obj();
+    BSONObj bucketsIndexSpec = BSONObjBuilder{}
+                                   .append(fmt::format("{}{}", kMetaFieldName, kSubField1Name), 1)
+                                   .append(fmt::format("{}{}", kMetaFieldName, kSubField2Name), 1)
+                                   .append(fmt::format("{}.foo", kMetaFieldName), 1)
+                                   .append(fmt::format("{}.bar", kMetaFieldName), 1)
+                                   .append(fmt::format("{}.baz", kMetaFieldName), 1)
+                                   .append(kControlMinTimeFieldName, 1)
+                                   .append(kControlMaxTimeFieldName, 1)
+                                   .obj();
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
@@ -348,7 +376,7 @@ TEST(TimeseriesIndexSchemaConversionTest, HashedMetadataIndexSpecConversion) {
 TEST(TimeseriesIndexSchemaConversionTest, WildcardMetadataIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
     BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName + ".$**" << 1);
-    BSONObj bucketsIndexSpec = BSON(timeseries::kBucketMetaFieldName + ".$**" << 1);
+    BSONObj bucketsIndexSpec = BSON(fmt::format("{}.$**", timeseries::kBucketMetaFieldName) << 1);
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
@@ -356,9 +384,14 @@ TEST(TimeseriesIndexSchemaConversionTest, WildcardMetadataIndexSpecConversion) {
 // {"mm.subfield1.$**": 1} <=> {"meta.subfield1.$**": 1}
 TEST(TimeseriesIndexSchemaConversionTest, WildcardMetadataSubfieldIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
-    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName + kSubField1Name + ".$**" << 1);
+    BSONObj timeseriesIndexSpec =
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}.$**", kTimeseriesMetaFieldName, kSubField1Name), 1)
+            .obj();
     BSONObj bucketsIndexSpec =
-        BSON(timeseries::kBucketMetaFieldName + kSubField1Name + ".$**" << 1);
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}.$**", timeseries::kBucketMetaFieldName, kSubField1Name), 1)
+            .obj();
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }

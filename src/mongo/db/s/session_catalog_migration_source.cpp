@@ -295,14 +295,14 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
     // non-retryable writes since they only support transactions and those transactions are not
     // retryable so there is no need to transfer their write history to the recipient.
     findRequest.setFilter(BSON(
-        "$or" << BSON_ARRAY(
-            BSON((SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnUUIDFieldName)
-                 << BSON("$exists" << false))
-            << BSON("$and" << BSON_ARRAY(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
-                                               LogicalSessionId::kTxnNumberFieldName)
-                                              << BSON("$exists" << true)
-                                              << SessionTxnRecord::kStateFieldName
-                                              << "committed"))))));
+        "$or" << BSON_ARRAY(BSON((std::string{SessionTxnRecord::kSessionIdFieldName} + "." +
+                                  std::string{LogicalSessionId::kTxnUUIDFieldName})
+                                 << BSON("$exists" << false))
+                            << BSON("$and" << BSON_ARRAY(BSON(
+                                        (std::string{SessionTxnRecord::kSessionIdFieldName} + "." +
+                                         std::string{LogicalSessionId::kTxnNumberFieldName})
+                                        << BSON("$exists" << true)
+                                        << SessionTxnRecord::kStateFieldName << "committed"))))));
     // Sort the records in descending of the session id (_id) field so that the records for internal
     // sessions with highest txnNumber are returned first. This enables us to avoid migrating
     // internal sessions for retryable writes with txnNumber lower than the highest txnNumber.

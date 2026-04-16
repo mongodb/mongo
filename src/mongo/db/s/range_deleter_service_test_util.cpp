@@ -233,11 +233,13 @@ void verifyProcessingFlag(OperationContext* opCtx,
                           bool processingExpected) {
     DBDirectClient client(opCtx);
 
-    const auto query = BSON(
-        RangeDeletionTask::kCollectionUuidFieldName
-        << uuidColl << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
-        << range.getMax());
+    const auto query =
+        BSON(RangeDeletionTask::kCollectionUuidFieldName
+             << uuidColl
+             << fmt::format("{}.{}", RangeDeletionTask::kRangeFieldName, ChunkRange::kMinFieldName)
+             << range.getMin()
+             << fmt::format("{}.{}", RangeDeletionTask::kRangeFieldName, ChunkRange::kMaxFieldName)
+             << range.getMax());
 
     FindCommandRequest findRequest{NamespaceString::kRangeDeletionNamespace};
     findRequest.setFilter(query);

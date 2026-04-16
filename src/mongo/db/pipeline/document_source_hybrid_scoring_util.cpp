@@ -130,7 +130,7 @@ StringMap<double> validateWeights(
         tassert(9967501,
                 "There must be at least some invalid weights when there are more weights "
                 "than input pipelines to " +
-                    stageName,
+                    std::string{stageName},
                 !invalidWeights.empty());
         // Fail query.
         uasserted(
@@ -304,7 +304,7 @@ Status isSelectionStage(const BSONObj& bsonStage) {
     // If here, then the stage was not a valid hybrid search selection stage.
     return Status(
         ErrorCodes::Error::BadValue,
-        fieldName +
+        std::string{fieldName} +
             " is not a selection stage because it modifies or transforms the input documents.");
 }
 

@@ -1120,7 +1120,7 @@ public:
     auto jsonToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& nss,
                         StringData jsonArray) {
-        const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
+        const auto inputBson = fromjson(fmt::format("{{pipeline: {}}}", jsonArray));
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);

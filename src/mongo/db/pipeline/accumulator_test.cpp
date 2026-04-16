@@ -720,7 +720,7 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
     const auto n = Value(2);
     auto mkdoc = [](Value a) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
+                          << a << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << a));
     };
 
     OperationsType bottomCasesAscending{
@@ -783,11 +783,11 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
     const auto n1 = Value(1);
     auto mkdoc = [](Value a) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
+                          << a << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << a));
     };
     auto mkdoc2 = [](int a, Value b) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << b << (AccumulatorN::kFieldNameSortFields + "0") << a));
+                          << b << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << a));
     };
     OperationsType cases{
         // Basic tests.
@@ -923,11 +923,11 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
     const auto n1 = Value(1);
     auto mkdoc = [](Value a) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
+                          << a << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << a));
     };
     auto mkdoc2 = [](int a, Value b) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << b << (AccumulatorN::kFieldNameSortFields + "0") << a));
+                          << b << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << a));
     };
     OperationsType cases{
         // Basic tests.
@@ -1070,13 +1070,13 @@ TEST(Accumulators, TopBottomNMultiSortPattern) {
     const auto n = Value(3);
     auto mkdoc = [](int32_t a, int32_t b) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << (a * 10 + b) << (AccumulatorN::kFieldNameSortFields + "0") << a
-                          << (AccumulatorN::kFieldNameSortFields + "1") << b));
+                          << (a * 10 + b) << (std::string(AccumulatorN::kFieldNameSortFields) + "0")
+                          << a << (std::string(AccumulatorN::kFieldNameSortFields) + "1") << b));
     };
     auto mkdoc2 = [](Value output, Value a, Value b) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << output << (AccumulatorN::kFieldNameSortFields + "0") << a
-                          << (AccumulatorN::kFieldNameSortFields + "1") << b));
+                          << output << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << a
+                          << (std::string(AccumulatorN::kFieldNameSortFields) + "1") << b));
     };
 
     OperationsType cases{
@@ -1182,7 +1182,7 @@ TEST(Accumulators, TopBottomNSortArray) {
 
     auto mkdoc = [](int32_t id, Value arr) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << id << (AccumulatorN::kFieldNameSortFields + "0") << arr));
+                          << id << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << arr));
     };
     OperationsType topCases{{{mkdoc(1, arr1), mkdoc(2, arr2), mkdoc(3, arr3)},
                              {Value(std::vector<Value>{Value(1), Value(2)})}}};
@@ -1228,7 +1228,7 @@ TEST(Accumulators, TopBottomSingle) {
     const auto n = Value(1);
     auto mkdoc = [](Value a) {
         return Value(BSON(AccumulatorN::kFieldNameOutput
-                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
+                          << a << (std::string(AccumulatorN::kFieldNameSortFields) + "0") << a));
     };
 
     const BSONObj ascSort = BSON("a" << 1);
@@ -1335,7 +1335,8 @@ struct TopBottomNRemoveTest : public AggregationContextFixture {
     template <typename SortKeyType>
     void add(SortKeyType sortKey, int output) {
         auto v = Value(BSON(AccumulatorN::kFieldNameOutput
-                            << output << (AccumulatorN::kFieldNameSortFields + "0") << sortKey));
+                            << output << (std::string(AccumulatorN::kFieldNameSortFields) + "0")
+                            << sortKey));
         _acc->process(v, false);
         _q.push(v);
     }

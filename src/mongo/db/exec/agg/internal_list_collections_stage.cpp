@@ -123,7 +123,7 @@ void InternalListCollectionsStage::_buildCollectionsToReplyForDb(
             auto fieldName = elem.fieldNameStringData();
             if (fieldName == ListCollectionsReplyItem::kNameFieldName) {
                 const auto& collName = elem.valueStringDataSafe();
-                const auto& nssStr = dbNameStr + "." + collName;
+                const auto& nssStr = dbNameStr + "." + std::string{collName};
                 builder.append("ns", nssStr);
                 builder.append("db", dbNameStr);
             } else {

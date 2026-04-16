@@ -354,8 +354,8 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
     ThreadPool::Options threadPoolOptions(getThreadPoolLimits());
 
     // Now add the options that are fixed for all PrimaryOnlyServices.
-    threadPoolOptions.threadNamePrefix = getServiceName() + "-";
-    threadPoolOptions.poolName = getServiceName() + "ThreadPool";
+    threadPoolOptions.threadNamePrefix = std::string{getServiceName()} + "-";
+    threadPoolOptions.poolName = std::string{getServiceName()} + "ThreadPool";
     threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
         Client::initThread(threadName, getGlobalServiceContext()->getService());
         auto client = Client::getCurrent();
@@ -375,7 +375,8 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
 
     _executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(threadPoolOptions),
-        executor::makeNetworkInterface(getServiceName() + "Network", nullptr, std::move(hookList)));
+        executor::makeNetworkInterface(
+            std::string{getServiceName()} + "Network", nullptr, std::move(hookList)));
     _setHasExecutor(lk);
 
     _executor->startup();

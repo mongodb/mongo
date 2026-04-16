@@ -254,8 +254,10 @@ TEST_F(TimeseriesRewritesTest, TranslateIndexHint) {
 
     ASSERT(request.getHint().has_value());
     const auto rewrittenIndex =
-        BSON(timeseries::kControlMinFieldNamePrefix + std::string{_timeField}
-             << 1 << timeseries::kControlMaxFieldNamePrefix + std::string{_timeField} << 1);
+        BSONObjBuilder{}
+            .append(fmt::format("{}{}", timeseries::kControlMinFieldNamePrefix, _timeField), 1)
+            .append(fmt::format("{}{}", timeseries::kControlMaxFieldNamePrefix, _timeField), 1)
+            .obj();
     ASSERT_BSONOBJ_EQ(request.getHint().get(), rewrittenIndex);
 }
 

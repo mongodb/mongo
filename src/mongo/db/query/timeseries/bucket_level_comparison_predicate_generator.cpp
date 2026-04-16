@@ -166,10 +166,10 @@ std::unique_ptr<MatchExpression> createTypeEqualityPredicate(
 
     // Assume that we're generating a predicate on "a.b"
     for (size_t i = 0; i < matchExprField.getPathLength(); i++) {
-        auto minPath =
-            std::string{timeseries::kControlMinFieldNamePrefix} + matchExprField.getSubpath(i);
-        auto maxPath =
-            std::string{timeseries::kControlMaxFieldNamePrefix} + matchExprField.getSubpath(i);
+        auto minPath = std::string{timeseries::kControlMinFieldNamePrefix} +
+            std::string{matchExprField.getSubpath(i)};
+        auto maxPath = std::string{timeseries::kControlMaxFieldNamePrefix} +
+            std::string{matchExprField.getSubpath(i)};
 
         // This whole block adds
         // {$expr: {$ne: [{$type: "$control.min.a"}, {$type: "$control.max.a"}]}}
@@ -280,9 +280,9 @@ BucketLevelComparisonPredicateGeneratorBase::createTightPredicate(
                                              "can't create tight predicate on non-time field")
                     .tightPredicate};
     }
-    auto minPath = std::string{timeseries::kControlMinFieldNamePrefix} + matchExprPath;
+    auto minPath = std::string{timeseries::kControlMinFieldNamePrefix} + std::string{matchExprPath};
     const StringData minPathStringData(minPath);
-    auto maxPath = std::string{timeseries::kControlMaxFieldNamePrefix} + matchExprPath;
+    auto maxPath = std::string{timeseries::kControlMaxFieldNamePrefix} + std::string{matchExprPath};
     const StringData maxPathStringData(maxPath);
 
     switch (matchExpr->matchType()) {
@@ -345,9 +345,11 @@ BucketLevelComparisonPredicateGeneratorBase::createLoosePredicate(
                     .loosePredicate};
     }
     const bool isTimeField = (matchExprPath == _params.bucketSpec.timeField());
-    const auto minPath = std::string{timeseries::kControlMinFieldNamePrefix} + matchExprPath;
+    const auto minPath =
+        std::string{timeseries::kControlMinFieldNamePrefix} + std::string{matchExprPath};
     const StringData minPathStringData(minPath);
-    const auto maxPath = std::string{timeseries::kControlMaxFieldNamePrefix} + matchExprPath;
+    const auto maxPath =
+        std::string{timeseries::kControlMaxFieldNamePrefix} + std::string{matchExprPath};
     const StringData maxPathStringData(maxPath);
 
     if (isTimeField) {

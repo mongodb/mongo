@@ -141,7 +141,7 @@ Status FileRotateSink::rotate(bool rename,
     for (auto& file : _impl->files) {
         const std::string& filename = file.first;
         if (rename) {
-            std::string renameTarget = filename + renameSuffix;
+            std::string renameTarget = fmt::format("{}{}", filename, renameSuffix);
 
             auto targetExists = [&]() -> StatusWith<bool> {
                 try {

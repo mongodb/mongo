@@ -40,7 +40,7 @@ std::string AggJoinModelFixture::toString(const std::unique_ptr<Pipeline>& pipel
 }
 
 std::vector<BSONObj> AggJoinModelFixture::pipelineFromJsonArray(StringData jsonArray) {
-    auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
+    auto inputBson = fromjson("{pipeline: " + std::string(jsonArray) + "}");
     ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
     std::vector<BSONObj> rawPipeline;
     for (auto&& stageElem : inputBson["pipeline"].Array()) {

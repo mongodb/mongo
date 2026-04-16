@@ -1375,9 +1375,9 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
                                     NamespaceString::kConfigsvrPlacementHistoryNamespace,
                                     {NamespaceString::kConfigsvrPlacementHistoryNamespace});
 
-    pipeline.addStage<DocumentSourceGroup>(
-        BSON("_id" << "$" + NamespacePlacementType::kNssFieldName << "mostRecentTimestamp"
-                   << BSON("$max" << "$" + NamespacePlacementType::kTimestampFieldName)));
+    pipeline.addStage<DocumentSourceGroup>(BSON(
+        "_id" << "$" + std::string{NamespacePlacementType::kNssFieldName} << "mostRecentTimestamp"
+              << BSON("$max" << "$" + std::string{NamespacePlacementType::kTimestampFieldName})));
     pipeline.addStage<DocumentSourceMatch>(
         BSON("_id" << BSON("$ne" << NamespaceStringUtil::serialize(
                                ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,

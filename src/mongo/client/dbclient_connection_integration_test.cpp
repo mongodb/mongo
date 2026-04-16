@@ -69,7 +69,7 @@ public:
     void tearDown() override {
         // resmoke hangs if there are any ops still running on the server, so try to clean up after
         // ourselves.
-        auto conn = makeConn(kAppName + "-cleanup");
+        auto conn = makeConn(std::string{kAppName} + "-cleanup");
 
         BSONObj currOp;
         if (!conn->runCommand(DatabaseName::kAdmin, BSON("currentOp" << 1), currOp))

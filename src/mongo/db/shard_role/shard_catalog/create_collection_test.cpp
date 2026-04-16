@@ -732,8 +732,8 @@ TEST_F(CreateCollectionTest,
     ASSERT_FALSE(coll.getCollectionPtr()->areRecordIdsReplicated());
 }
 
-const auto kValidUrl1 = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pipe1"s;
-const auto kValidUrl2 = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pipe2"s;
+const auto kValidUrl1 = std::string(ExternalDataSourceMetadata::kUrlProtocolFile) + "named_pipe1"s;
+const auto kValidUrl2 = std::string(ExternalDataSourceMetadata::kUrlProtocolFile) + "named_pipe2"s;
 
 TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithOneSource) {
     NamespaceString vcollNss = NamespaceString::createNamespaceString_forTest("myDb", "vcoll.name");

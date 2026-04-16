@@ -80,7 +80,7 @@ protected:
         return BSONObjBuilder{}
             .append("v", IndexConfig::kLatestIndexVersion)
             .append("key", BSON(fieldName << 1))
-            .append("name", fieldName + "_1")
+            .append("name", fmt::format("{}_1", fieldName))
             .append("unique", unique)
             .obj();
     }

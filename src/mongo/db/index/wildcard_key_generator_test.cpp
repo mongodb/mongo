@@ -1185,10 +1185,11 @@ TEST_F(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
     auto tsVal = "{'$timestamp': {'t': 1, 'i': 100}}"_sd;
     auto undefVal = "{'$undefined': true}"_sd;
 
-    auto inputDoc =
-        fromjson("{a: [1, null, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: " + dateVal +
-                 ", e: [4, " + oidVal + "]}, [6, 7, {f: 8}]], g: {h: {i: " + tsVal +
-                 ", j: [10, {k: 11}, {k: [" + undefVal + "]}], k: 12.0}}, l: 'string'}");
+    auto inputDoc = fromjson(
+        "{a: [1, null, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: " + std::string(dateVal) +
+        ", e: [4, " + std::string(oidVal) +
+        "]}, [6, 7, {f: 8}]], g: {h: {i: " + std::string(tsVal) + ", j: [10, {k: 11}, {k: [" +
+        std::string(undefVal) + "]}], k: 12.0}}, l: 'string'}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
                                     fromjson("{'': 'a', '': null}"),
@@ -1197,13 +1198,13 @@ TEST_F(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
                                     fromjson("{'': 'a.c', '': 2}"),
                                     fromjson("{'': 'a.c', '': 'owt'}"),
                                     fromjson("{'': 'a.d', '': 3}"),
-                                    fromjson("{'': 'a.d', '': " + dateVal + "}"),
+                                    fromjson("{'': 'a.d', '': " + std::string(dateVal) + "}"),
                                     fromjson("{'': 'a.e', '': 4}"),
-                                    fromjson("{'': 'a.e', '': " + oidVal + "}"),
-                                    fromjson("{'': 'g.h.i', '': " + tsVal + "}"),
+                                    fromjson("{'': 'a.e', '': " + std::string(oidVal) + "}"),
+                                    fromjson("{'': 'g.h.i', '': " + std::string(tsVal) + "}"),
                                     fromjson("{'': 'g.h.j', '': 10}"),
                                     fromjson("{'': 'g.h.j.k', '': 11}"),
-                                    fromjson("{'': 'g.h.j.k', '': " + undefVal + "}"),
+                                    fromjson("{'': 'g.h.j.k', '': " + std::string(undefVal) + "}"),
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'gnirts'}")});
 

@@ -42,6 +42,7 @@
 #include <ostream>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -52,7 +53,8 @@ Status& Status::addContext(StringData reasonPrefix) {
     if (!isOK()) {
         boost::intrusive_ptr oldInfo = std::move(_error);
         const Status::ErrorInfo& e = *oldInfo;
-        _error = _createErrorInfo(e.code, reasonPrefix + causedBy(e.reason), e.extra);
+        _error = _createErrorInfo(
+            e.code, fmt::format("{}{}", reasonPrefix, causedBy(e.reason)), e.extra);
     }
     return *this;
 }

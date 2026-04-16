@@ -561,7 +561,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
             auto&& children = node->getChildVector();
             if (!std::all_of(children->begin(), children->end(), [&](auto&& child) {
-                    const auto newPath = std::string{fullPathToNode} + child->path();
+                    const auto newPath = std::string{fullPathToNode} + std::string{child->path()};
                     return _compatible(keyPatternElt,
                                        index,
                                        keyPatternIdx,

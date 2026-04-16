@@ -104,9 +104,9 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueEnforce) {
     auto collection = getCollectionExclusive(opCtx, nss);
     ASSERT(collection.exists());
     auto indexKey = BSON("a" << 1);
-    auto spec =
-        BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                 << (indexKey.firstElementFieldNameStringData() + "_1") << "unique" << true);
+    auto spec = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
+                         << (std::string(indexKey.firstElementFieldNameStringData()) + "_1")
+                         << "unique" << true);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
     auto fromMigrate = false;
@@ -126,9 +126,9 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueRelax) {
     auto collection = getCollectionExclusive(opCtx, nss);
     ASSERT(collection.exists());
     auto indexKey = BSON("a" << 1);
-    auto spec =
-        BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                 << (indexKey.firstElementFieldNameStringData() + "_1") << "unique" << true);
+    auto spec = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
+                         << (std::string(indexKey.firstElementFieldNameStringData()) + "_1")
+                         << "unique" << true);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kRelax;
     auto fromMigrate = false;
@@ -147,7 +147,7 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexAlreadyExists) {
     ASSERT(collection.exists());
     auto indexKey = BSON("a" << 1);
     auto spec = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                         << (indexKey.firstElementFieldNameStringData() + "_1"));
+                         << (std::string(indexKey.firstElementFieldNameStringData()) + "_1"));
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
     auto fromMigrate = false;
@@ -172,9 +172,9 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictEnforce) {
     ASSERT(collection.exists());
     auto indexKey = BSON("a" << 1);
     auto spec1 = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                          << (indexKey.firstElementFieldNameStringData() + "_1"));
+                          << (std::string(indexKey.firstElementFieldNameStringData()) + "_1"));
     auto spec2 = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                          << (indexKey.firstElementFieldNameStringData() + "_2"));
+                          << (std::string(indexKey.firstElementFieldNameStringData()) + "_2"));
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
     auto fromMigrate = false;
@@ -200,9 +200,9 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictRelax) {
     ASSERT(collection.exists());
     auto indexKey = BSON("a" << 1);
     auto spec1 = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                          << (indexKey.firstElementFieldNameStringData() + "_1"));
+                          << (std::string(indexKey.firstElementFieldNameStringData()) + "_1"));
     auto spec2 = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                          << (indexKey.firstElementFieldNameStringData() + "_2"));
+                          << (std::string(indexKey.firstElementFieldNameStringData()) + "_2"));
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kRelax;
     auto fromMigrate = false;

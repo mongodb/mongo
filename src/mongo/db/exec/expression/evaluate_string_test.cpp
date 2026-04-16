@@ -694,11 +694,11 @@ TEST(ExpressionTrimTest, ShouldRejectInvalidUTFInCharsArgument) {
         evaluateNamedArgExpression(
             "$trim", Document{{"input", "ab∃"_sd}, {"chars", stringWithExtraContinuationByte}}),
         AssertionException);
-    ASSERT_THROWS(
-        evaluateNamedArgExpression("$ltrim",
-                                   Document{{"input", "a" + twoThirdsOfExistsSymbol + "b∃"},
-                                            {"chars", stringWithExtraContinuationByte}}),
-        AssertionException);
+    ASSERT_THROWS(evaluateNamedArgExpression(
+                      "$ltrim",
+                      Document{{"input", "a" + std::string(twoThirdsOfExistsSymbol) + "b∃"},
+                               {"chars", stringWithExtraContinuationByte}}),
+                  AssertionException);
 }
 
 TEST(ExpressionTrimTest, ShouldIgnoreUTF8InputWithTruncatedCodePoint) {
@@ -706,39 +706,41 @@ TEST(ExpressionTrimTest, ShouldIgnoreUTF8InputWithTruncatedCodePoint) {
 
     // We are OK producing invalid UTF-8 if the input string was invalid UTF-8, so if the truncated
     // code point is in the middle and we never examine it, it should work fine.
-    ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression(
-            "$rtrim",
-            Document{{"input", "abc" + twoThirdsOfExistsSymbol + "edf∃"}, {"chars", "∃"_sd}}),
-        Value("abc" + twoThirdsOfExistsSymbol + "edf"));
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
+                        "$rtrim",
+                        Document{{"input", "abc" + std::string(twoThirdsOfExistsSymbol) + "edf∃"},
+                                 {"chars", "∃"_sd}}),
+                    Value("abc" + std::string(twoThirdsOfExistsSymbol) + "edf"));
 
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
                         "$trim", Document{{"input", twoThirdsOfExistsSymbol}, {"chars", "∃"_sd}}),
                     Value(twoThirdsOfExistsSymbol));
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
-            "$rtrim", Document{{"input", "abc" + twoThirdsOfExistsSymbol}, {"chars", "∃"_sd}}),
-        Value("abc" + twoThirdsOfExistsSymbol));
+            "$rtrim",
+            Document{{"input", "abc" + std::string(twoThirdsOfExistsSymbol)}, {"chars", "∃"_sd}}),
+        Value("abc" + std::string(twoThirdsOfExistsSymbol)));
 }
 
 TEST(ExpressionTrimTest, ShouldNotTrimUTF8InputWithTrailingExtraContinuationBytes) {
     const auto stringWithExtraContinuationByte = "\xE2\x88\x83\x83"_sd;
 
-    ASSERT_VALUE_EQ(
-        evaluateNamedArgExpression(
-            "$trim",
-            Document{{"input", stringWithExtraContinuationByte + "edf∃"}, {"chars", "∃"_sd}}),
-        Value("\x83" + "edf"_sd));
     ASSERT_VALUE_EQ(evaluateNamedArgExpression(
                         "$trim",
-                        Document{{"input", "abc" + stringWithExtraContinuationByte + "edf∃"},
+                        Document{{"input", std::string(stringWithExtraContinuationByte) + "edf∃"},
                                  {"chars", "∃"_sd}}),
-                    Value("abc" + stringWithExtraContinuationByte + "edf"_sd));
+                    Value("\x83" + std::string("edf"_sd)));
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
             "$trim",
-            Document{{"input", "Abc" + stringWithExtraContinuationByte}, {"chars", "∃"_sd}}),
-        Value("Abc" + stringWithExtraContinuationByte));
+            Document{{"input", "abc" + std::string(stringWithExtraContinuationByte) + "edf∃"},
+                     {"chars", "∃"_sd}}),
+        Value("abc" + std::string(stringWithExtraContinuationByte) + std::string("edf"_sd)));
+    ASSERT_VALUE_EQ(evaluateNamedArgExpression(
+                        "$trim",
+                        Document{{"input", "Abc" + std::string(stringWithExtraContinuationByte)},
+                                 {"chars", "∃"_sd}}),
+                    Value("Abc" + std::string(stringWithExtraContinuationByte)));
     ASSERT_VALUE_EQ(
         evaluateNamedArgExpression(
             "$rtrim", Document{{"input", stringWithExtraContinuationByte}, {"chars", "∃"_sd}}),

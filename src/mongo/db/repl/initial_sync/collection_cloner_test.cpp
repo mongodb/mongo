@@ -457,7 +457,8 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsScheduleDBWorkFailed) {
     auto timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" + _nss.ns_forTest() + "'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" +
+                 std::string(_nss.ns_forTest()) + "'}"));
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
@@ -494,7 +495,8 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsCallbackCanceled) {
     auto timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" + _nss.ns_forTest() + "'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" +
+                 std::string(_nss.ns_forTest()) + "'}"));
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
@@ -537,7 +539,8 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsFailed) {
     auto timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" + _nss.ns_forTest() + "'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" +
+                 std::string(_nss.ns_forTest()) + "'}"));
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
@@ -1080,7 +1083,8 @@ TEST_F(CollectionClonerTestResumable, RecordIdsReplicatedFindProjects) {
     auto timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" + _nss.ns_forTest() + "'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" +
+                 std::string(_nss.ns_forTest()) + "'}"));
 
     // Create a cloner that tries to replicate recordIds.
     CollectionOptions options;

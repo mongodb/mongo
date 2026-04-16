@@ -4334,7 +4334,7 @@ TEST_F(OplogApplierImplTest,
         return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
 
-    auto testNs = "test." + unittest::getSuiteName() + "_" + unittest::getTestName();
+    auto testNs = fmt::format("test.{}_{}", unittest::getSuiteName(), unittest::getTestName());
 
     // Create a sequence of 3 'insert' ops that can't be grouped because they are from different
     // namespaces.

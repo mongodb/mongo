@@ -218,10 +218,12 @@ void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
         getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
         timestamp);
 
-    bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName,
+    bob.append(metricsPrefix +
+                   std::string{ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName},
                recipientCtx.getTotalNumDocuments() ? *recipientCtx.getTotalNumDocuments()
                                                    : metrics->getDocumentsProcessedCount());
-    bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName,
+    bob.append(metricsPrefix +
+                   std::string{ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName},
                recipientCtx.getTotalDocumentSize() ? *recipientCtx.getTotalDocumentSize()
                                                    : metrics->getBytesWrittenCount());
 }
@@ -1759,9 +1761,9 @@ BSONObj ReshardingRecipientService::RecipientStateMachine::_makeQueryForCoordina
             {
                 elemMatchBuilder.append(RecipientShardEntry::kIdFieldName, shardId);
 
-                BSONObjBuilder mutableStateBuilder(
-                    elemMatchBuilder.subobjStart(RecipientShardEntry::kMutableStateFieldName + "." +
-                                                 RecipientShardContext::kStateFieldName));
+                BSONObjBuilder mutableStateBuilder(elemMatchBuilder.subobjStart(
+                    std::string{RecipientShardEntry::kMutableStateFieldName} + "." +
+                    std::string{RecipientShardContext::kStateFieldName}));
                 {
                     BSONArrayBuilder inBuilder(mutableStateBuilder.subarrayStart("$in"));
                     for (const auto& state : it->second) {
@@ -1792,9 +1794,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_updateC
             {
                 BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
                 {
-                    setBuilder.append(ReshardingCoordinatorDocument::kRecipientShardsFieldName +
-                                          ".$." + RecipientShardEntry::kMutableStateFieldName,
-                                      _recipientCtx.toBSON());
+                    setBuilder.append(
+                        std::string{ReshardingCoordinatorDocument::kRecipientShardsFieldName} +
+                            ".$." + std::string{RecipientShardEntry::kMutableStateFieldName},
+                        _recipientCtx.toBSON());
                 }
             }
 
@@ -1858,12 +1861,14 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
         if (cloneDetails) {
             setBuilder.append(ReshardingRecipientDocument::kCloneTimestampFieldName,
                               cloneDetails->cloneTimestamp);
-            setBuilder.append(ReshardingRecipientDocument::kMetricsFieldName + "." +
-                                  ReshardingRecipientMetrics::kApproxBytesToCopyFieldName,
-                              cloneDetails->approxBytesToCopy);
-            setBuilder.append(ReshardingRecipientDocument::kMetricsFieldName + "." +
-                                  ReshardingRecipientMetrics::kApproxDocumentsToCopyFieldName,
-                              cloneDetails->approxDocumentsToCopy);
+            setBuilder.append(
+                std::string{ReshardingRecipientDocument::kMetricsFieldName} + "." +
+                    std::string{ReshardingRecipientMetrics::kApproxBytesToCopyFieldName},
+                cloneDetails->approxBytesToCopy);
+            setBuilder.append(
+                std::string{ReshardingRecipientDocument::kMetricsFieldName} + "." +
+                    std::string{ReshardingRecipientMetrics::kApproxDocumentsToCopyFieldName},
+                cloneDetails->approxDocumentsToCopy);
 
             BSONArrayBuilder donorShardsArrayBuilder;
             for (const auto& donor : cloneDetails->donorShards) {

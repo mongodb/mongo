@@ -297,9 +297,10 @@ TEST_F(SignatureValidatorTest, InsecureModeValidatingFooExtensionWithReadNDocume
                                std::filesystem::copy_options::overwrite_existing);
 
     // 2) Copy foo extension's signature file to the extension path.
-    const std::filesystem::path kExtensionSignaturePath = extensionPath + ".sig";
+    const std::filesystem::path kExtensionSignaturePath = std::string(extensionPath) + ".sig";
 
-    std::filesystem::copy_file(test_util::getExtensionPath(kTestFooLibExtensionName) + ".sig",
+    std::filesystem::copy_file(std::string{test_util::getExtensionPath(kTestFooLibExtensionName)} +
+                                   ".sig",
                                kExtensionSignaturePath,
                                std::filesystem::copy_options::overwrite_existing);
 
@@ -310,10 +311,10 @@ TEST_F(SignatureValidatorTest, InsecureModeValidatingFooExtensionWithReadNDocume
     // 4) Swap out the signature file with the contents of a different extension's signature
     // file.
     std::filesystem::remove(kExtensionSignaturePath);
-    std::filesystem::copy_file(test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName) +
-                                   ".sig",
-                               kExtensionSignaturePath,
-                               std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file(
+        std::string{test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName)} + ".sig",
+        kExtensionSignaturePath,
+        std::filesystem::copy_options::overwrite_existing);
     // 5) Validating foo extension with the wrong signature file fails.
     ASSERT_THROWS_CODE(signatureValidator.validateExtensionSignature(extensionName, extensionPath),
                        AssertionException,
@@ -334,9 +335,10 @@ TEST_F(SignatureValidatorTest, InsecureModeValidatingFooExtensionWithInvalidKeyF
                                std::filesystem::copy_options::overwrite_existing);
 
     // 2) Copy foo extension's signature file to the extension path.
-    const std::filesystem::path extensionSignaturePath = extensionPath + ".sig";
+    const std::filesystem::path extensionSignaturePath = std::string{extensionPath} + ".sig";
 
-    std::filesystem::copy_file(test_util::getExtensionPath(kTestFooLibExtensionName) + ".sig",
+    std::filesystem::copy_file(std::string{test_util::getExtensionPath(kTestFooLibExtensionName)} +
+                                   ".sig",
                                extensionSignaturePath,
                                std::filesystem::copy_options::overwrite_existing);
 

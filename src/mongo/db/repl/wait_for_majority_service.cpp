@@ -74,7 +74,7 @@ constexpr static auto kCancelClientName = "WaitForMajorityServiceCanceler";
 
 std::unique_ptr<ThreadPool> makeThreadPool(StringData readOrWrite) {
     ThreadPool::Options options;
-    options.poolName = "WaitForMajorityService" + readOrWrite + "ThreadPool";
+    options.poolName = "WaitForMajorityService" + std::string{readOrWrite} + "ThreadPool";
     options.minThreads = 0;
     // This service must have the ability to use at least two background threads. If it is limited
     // to one, than if that thread is blocking waiting on an opTime, any cancellations cannot be
@@ -110,10 +110,10 @@ void WaitForMajorityServiceImplBase::startup(ServiceContext* ctx) {
     stdx::lock_guard lk(_mutex);
     invariant(_state == State::kNotStarted);
     _pool = makeThreadPool(_getReadOrWrite());
-    _waitForMajorityClient =
-        ClientStrand::make(ctx->getService()->makeClient(kWaitClientName + _getReadOrWrite()));
-    _waitForMajorityCancellationClient =
-        ClientStrand::make(ctx->getService()->makeClient(kCancelClientName + _getReadOrWrite()));
+    _waitForMajorityClient = ClientStrand::make(ctx->getService()->makeClient(
+        std::string{kWaitClientName} + std::string{_getReadOrWrite()}));
+    _waitForMajorityCancellationClient = ClientStrand::make(ctx->getService()->makeClient(
+        std::string{kCancelClientName} + std::string{_getReadOrWrite()}));
     _backgroundWorkComplete = _periodicallyWaitForMajority();
     _pool->startup();
     _state = State::kRunning;

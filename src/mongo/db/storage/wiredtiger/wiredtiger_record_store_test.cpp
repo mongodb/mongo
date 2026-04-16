@@ -701,7 +701,7 @@ TEST(WiredTigerRecordStoreTest, CreateOnExistingIdentFails) {
 
     const std::string ns = "testRecordStore";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-    const std::string uri = WiredTigerUtil::kTableUriPrefix + ns;
+    const std::string uri = std::string(WiredTigerUtil::kTableUriPrefix) + ns;
     bool isReplSet = false;
     bool shouldRecoverFromOplogAsStandalone =
         repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
@@ -743,7 +743,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
 
     const std::string ns = "testRecordStore";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-    const std::string uri = WiredTigerUtil::kTableUriPrefix + ns;
+    const std::string uri = std::string(WiredTigerUtil::kTableUriPrefix) + ns;
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = KeyFormat::String;
     wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
@@ -966,7 +966,7 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveSameConfiguration) {
     const auto config =
         WiredTigerRecordStore::generateCreateString(nss.toString_forTest(), wtTableConfig);
     const std::string ident = "uniqueIdentifierForTableFile";
-    const std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
+    const std::string uri = std::string(WiredTigerUtil::kTableUriPrefix) + ident;
 
     // First creation of table with the ident succeeds.
     WiredTigerRecoveryUnit* ru =
@@ -992,7 +992,7 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveDifferentConfiguratio
     const std::string config =
         WiredTigerRecordStore::generateCreateString(nss.toString_forTest(), wtTableConfig);
     const std::string ident = "uniqueIdentifierForTableFile";
-    const std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
+    const std::string uri = std::string(WiredTigerUtil::kTableUriPrefix) + ident;
 
     // First creation of a table with the ident succeeds.
     WiredTigerRecoveryUnit* ru =

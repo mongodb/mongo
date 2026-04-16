@@ -228,8 +228,8 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
             reasons += " Index has a non-simple collation.";
         }
         if (!reasons.empty()) {
-            allReasons =
-                " Index " + idx["name"] + " cannot be used for sharding because [" + reasons + " ]";
+            allReasons = " Index " + idx["name"].str() + " cannot be used for sharding because [" +
+                reasons + " ]";
         }
     }
 
@@ -358,12 +358,13 @@ void validateTimeseriesShardKey(StringData timeFieldName,
                                      "(numbers only).",
                     elem.isNumber());
         } else {
-            uassert(5914001,
-                    str::stream() << "only the time field or meta field can be "
-                                     "part of shard key pattern",
-                    metaFieldName &&
-                        (elem.fieldNameStringData() == *metaFieldName ||
-                         elem.fieldNameStringData().starts_with(*metaFieldName + ".")));
+            uassert(
+                5914001,
+                str::stream() << "only the time field or meta field can be "
+                                 "part of shard key pattern",
+                metaFieldName &&
+                    (elem.fieldNameStringData() == *metaFieldName ||
+                     elem.fieldNameStringData().starts_with(std::string{*metaFieldName} + ".")));
         }
     }
 }
@@ -387,7 +388,8 @@ bool isRawTimeseriesShardKey(const TimeseriesOptions& tsOptions, const BSONObj& 
         const auto& fieldName = elem.fieldNameStringData();
         if (fieldName == timeFieldName ||
             (metaFieldName &&
-             (fieldName == *metaFieldName || fieldName.starts_with(*metaFieldName + ".")))) {
+             (fieldName == *metaFieldName ||
+              fieldName.starts_with(std::string{*metaFieldName} + ".")))) {
             return false;
         }
     }

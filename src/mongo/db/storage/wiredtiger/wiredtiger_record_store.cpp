@@ -177,17 +177,17 @@ std::variant<WiredTigerIntegerKeyedContainer, WiredTigerStringKeyedContainer>
 WiredTigerRecordStore::_makeContainer(Params& params) {
     switch (params.keyFormat) {
         case KeyFormat::Long: {
-            auto container =
-                WiredTigerIntegerKeyedContainer(std::make_shared<Ident>(params.ident),
-                                                WiredTigerUtil::kTableUriPrefix + params.ident,
-                                                WiredTigerUtil::genTableId());
+            auto container = WiredTigerIntegerKeyedContainer(
+                std::make_shared<Ident>(params.ident),
+                std::string{WiredTigerUtil::kTableUriPrefix} + params.ident,
+                WiredTigerUtil::genTableId());
             return container;
         }
         case KeyFormat::String: {
-            auto container =
-                WiredTigerStringKeyedContainer(std::make_shared<Ident>(params.ident),
-                                               WiredTigerUtil::kTableUriPrefix + params.ident,
-                                               WiredTigerUtil::genTableId());
+            auto container = WiredTigerStringKeyedContainer(
+                std::make_shared<Ident>(params.ident),
+                std::string{WiredTigerUtil::kTableUriPrefix} + params.ident,
+                WiredTigerUtil::genTableId());
             return container;
         }
     }
@@ -723,8 +723,10 @@ int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
         return dataSize();
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
-    auto result = WiredTigerUtil::getStatisticsValue(
-        *session, "statistics:" + getURI(), "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
+    auto result = WiredTigerUtil::getStatisticsValue(*session,
+                                                     "statistics:" + std::string{getURI()},
+                                                     "statistics=(size)",
+                                                     WT_STAT_DSRC_BLOCK_SIZE);
     uassertStatusOK(result.getStatus());
 
     return result.getValue();

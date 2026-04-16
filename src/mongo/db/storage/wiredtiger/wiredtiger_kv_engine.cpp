@@ -1738,7 +1738,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const rss::PersistenceProvider& 
 
     boost::optional<boost::filesystem::path> identFilePath = getDataFilePathForIdent(ident);
     if (!identFilePath) {
-        return {ErrorCodes::UnknownError, "Data file for ident " + ident + " not found"};
+        return {ErrorCodes::UnknownError, fmt::format("Data file for ident {} not found", ident)};
     }
 
     boost::system::error_code ec;
@@ -3215,8 +3215,10 @@ BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storag
         }
     }
 
-    const std::string disaggConfigString = "disaggregated=(storage_tier=" + serializedValue + ")" +
-        (value == StorageTierLevelEnum::cold ? ",leaf_page_max=128KB" : "");
+    const std::string disaggConfigString =
+        fmt::format("disaggregated=(storage_tier={}){}",
+                    serializedValue,
+                    value == StorageTierLevelEnum::cold ? ",leaf_page_max=128KB" : "");
 
     const auto newConfigString =
         (configString ? WiredTigerUtil::concatConfigs(disaggConfigString, *configString)

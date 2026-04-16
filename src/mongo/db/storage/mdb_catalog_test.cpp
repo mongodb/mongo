@@ -132,7 +132,7 @@ TEST_F(MDBCatalogTest, BuildCatalogEntryObjAndNsEquivalence) {
     std::string identNs = "test-Ident";
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     auto expectedNss = NamespaceStringUtil::deserialize(
-        DatabaseName::kLocal, NamespaceString::kOrphanCollectionPrefix + identNs);
+        DatabaseName::kLocal, std::string(NamespaceString::kOrphanCollectionPrefix) + identNs);
     auto expectedNs = NamespaceStringUtil::serializeForCatalog(expectedNss);
     durable_catalog::CatalogEntryMetaData md =
         durable_catalog::internal::createMetaDataForNewCollection(expectedNss, optionsWithUUID);
