@@ -121,4 +121,28 @@ inline bool gtestColorDefaulted() {
     return str::equalCaseInsensitive(GTEST_FLAG_GET(color), "auto");
 }
 
+/**
+ * Prints mongo-specific exception info to the file. Returns true when the current exception is
+ * caught by the ActiveExceptionWitness.
+ */
+inline bool printExceptionInfo(FILE* file) {
+    if (!std::current_exception())
+        return false;
+
+    auto diag = [&](StringData info) {
+        fmt::println(file, "Exception encountered, extra info:");
+        fmt::println(file, "{}", info);
+        fmt::println(file, "");
+    };
+
+    auto info = activeExceptionInfo();
+    if (info) {
+        diag(info->description);
+    } else {
+        diag("Unknown exception encountered.");
+        return false;
+    }
+    return true;
+}
+
 }  // namespace mongo::unittest::details

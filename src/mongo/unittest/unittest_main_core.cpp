@@ -260,6 +260,20 @@ void installEnhancedReporter(EnhancedReporter::Options options) {
     listeners.Append(enhanced.release());
 }
 
+class MongoExceptionPrinter : public testing::EmptyTestEventListener {
+public:
+    void OnTestPartResult(const testing::TestPartResult& res) override {
+        details::printExceptionInfo(stdout);
+        fflush(stdout);
+        printStackTrace();
+    }
+};
+
+void installMongoReporter() {
+    auto& listeners = testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(new MongoExceptionPrinter);
+}
+
 /**
  * Convert the vector to C-style argv to call google init functions. These might consume
  * some elements, so we rebuild the vector after.
@@ -394,11 +408,13 @@ boost::optional<ExitCode> MainProgress::_parseAndAcceptOptions() {
         getAutoUpdateConfig() = std::move(auc);
     }
 
-    if (uto.enhancedReporter.value_or(false)) {
-        if (!isDeathTestChild()) {
+    if (!isDeathTestChild()) {
+        if (uto.enhancedReporter.value_or(false)) {
             EnhancedReporter::Options ero;
             ero.showEachTest = uto.showEachTest.value_or(ero.showEachTest);
             installEnhancedReporter(ero);
+        } else {
+            installMongoReporter();
         }
     }
     return {};

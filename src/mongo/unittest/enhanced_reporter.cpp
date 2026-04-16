@@ -82,7 +82,7 @@ namespace {
 namespace posix_compat {
 
 #if _WIN32
-// TODO(gtest): Reenable output buffering on Windows.
+// TODO(SERVER-124130): Reenable output buffering on Windows.
 #define ENHANCED_REPORTER_BUFFERING_ENABLED 0
 #else
 #define ENHANCED_REPORTER_BUFFERING_ENABLED 1
@@ -143,7 +143,7 @@ constexpr auto kSourceLocation = kDim | kUnderline;
 // Note: summary() is message() without the stack trace.
 // And by then we should have our fancy cpptrace stack traces to use instead.
 // When we have them, only print them if there are frames on top of `TestBody()`.
-// TODO(gtest): Once we have cpptrace stack traces, so we should print them if
+// TODO(SERVER-124130): Once we have cpptrace stack traces, so we should print them if
 // there are frames on top of `TestBody()`.
 StringData stripMessage(StringData message) {
     StringData s = message;
@@ -230,7 +230,7 @@ public:
             static_cast<ssize_t>(footer.size())) {
             return;
         }
-        // TODO(gtest): find a way to print the error code in signal-handler-safe fashion.
+        // TODO(SERVER-124130): find a way to print the error code in signal-handler-safe fashion.
     }
 
 private:
@@ -241,8 +241,8 @@ private:
 
 /**
  * Copies contents of a file to stdout. Safe to call from inside signal handlers.
- * TODO(gtest): find a way to augment the context of the error messages in signal-handler-safe
- * fashion.
+ * TODO(SERVER-124130): find a way to augment the context of the error messages in
+ * signal-handler-safe fashion.
  */
 SystemCallResult printFileToStdoutSignalHandlerSafe(const std::filesystem::path& path) noexcept {
     char buffer[4096];
@@ -286,31 +286,6 @@ SystemCallResult printFileToStdoutSignalHandlerSafe(const std::filesystem::path&
 }
 
 #endif  // ENHANCED_REPORTER_BUFFERING_ENABLED
-
-bool addExceptionInfo(auto&& buf) {
-    if (!std::current_exception())
-        return false;
-
-    auto diag = [&](StringData type, StringData info) {
-        fmt::println(buf, "Exception encountered, extra info:");
-        fmt::println(buf, "{}: {}", type, info);
-        fmt::println(buf, "");
-    };
-
-    try {
-        throw;
-    } catch (const DBException& e) {
-        diag("DBException", e.toString());
-    } catch (const boost::exception& e) {
-        diag("boost::exception", boost::diagnostic_information(e));
-    } catch (const std::exception& e) {
-        diag("std::exception", e.what());
-    } catch (...) {
-        diag("unknown", "?");
-        return false;
-    }
-    return true;
-}
 
 }  // namespace
 
@@ -468,10 +443,10 @@ private:
     void _styleMessage(std::string& message) {
         // Add bold for most important prefixes. This catches a subset of the
         // lines highlighted by the next regex.
-        // TODO(gtest): might be better to process linewise and add some logic that examines
+        // TODO(SERVER-124130): might be better to process linewise and add some logic that examines
         // the prefix to decide how to highlight it. But for now, using regex substitution is
         // simpler.
-        // TODO(gtest): consider whether alternatives to pcre may be more advantageous.
+        // TODO(SERVER-124130): consider whether alternatives to pcre may be more advantageous.
         {
             static const auto re =
                 pcre::Regex(R"(^( *(?:Actual|Which is|Function call)): (.*)$)", pcre::MULTILINE);
@@ -532,7 +507,7 @@ void EnhancedReporter::Impl::OnTestProgramStart(const testing::UnitTest& unitTes
     _env = &unitTest;
     _defaultListener->OnTestProgramStart(unitTest);
     note("Using mongo output format. Set --enhancedReporter=false to disable.");
-    // TODO(gtest): Consider removing this debug output before merging to master.
+    // TODO(SERVER-124130): Consider removing this debug output before merging to master.
     note(fmt::format("Stdout is {} TTY and {}running in bazel. {} colorize and {} emit a spinner.",
                      details::stdoutIsTty() ? "a" : "not a",
                      details::inBazelTest() ? "" : "not ",
@@ -593,7 +568,7 @@ void EnhancedReporter::Impl::OnTestStart(const testing::TestInfo& testInfo) {
         // Anything printed after this will overwrite the spinner, so
         // keep it short so that it will be fully overwritten.
         // This will be less important once we capture mongo logs.
-        // TODO(gtest): add compact test name
+        // TODO(SERVER-124130): add compact test name
         fmt::print("  {} {}\r",
                    _style(kBold, spinner[_testCount % spinner.size()]),
                    _style(kDim, fmt::format("[{} of {}]", _testCount, _env->test_to_run_count())));
@@ -636,7 +611,7 @@ void EnhancedReporter::Impl::OnTestPartResult(const testing::TestPartResult& res
             break;
     }
 
-    if (addExceptionInfo(_buffer))
+    if (details::printExceptionInfo(_buffer))
         return;
 
     auto message = std::string{stripMessage(res.message())};
@@ -645,7 +620,7 @@ void EnhancedReporter::Impl::OnTestPartResult(const testing::TestPartResult& res
     }
     fmt::println(_buffer, "{}", message);
 
-    // TODO(gtest): check if there is a caught exception using current_exception() and
+    // TODO(SERVER-124130): check if there is a caught exception using current_exception() and
     // extract more data, such as the code for DBException, or the precise type for other
     // exceptions. If summary() is just about the exception we can replace it, otherwise,
     // we can print extra info after the summary.
