@@ -65,7 +65,8 @@ def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") ->
         if line
     }
 
-    return list(file_set)
+    # Downstream formatters expect real paths; dropped/deleted files can still appear in git diffs.
+    return [file for file in file_set if os.path.exists(file)]
 
 
 def run_rules_lint(

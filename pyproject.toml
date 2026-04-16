@@ -46,6 +46,11 @@ cxxfilt = { version = "*", optional = true }
 pympler = { version = "*", optional = true }
 pyright = "1.1.393"
 
+[[tool.poetry.source]]
+name = "mdb-build-public"
+url = "https://mdb-build-public.s3.amazonaws.com/rapidyaml_wheels/simple/"
+priority = "explicit"
+
 [tool.poetry.group.aws.dependencies]
 boto3 = "^1.34.156"
 botocore = "^1.34.156"
@@ -76,8 +81,10 @@ tenacity = "^9.0.0"
 
 # specifically rapidyaml is broken on atlas distros with powercycle.
 # current we exclude this when running poetry install in powercycle.
+# Use the S3 simple index so Poetry can pick a matching wheel or fall back to
+# the sdist when a wheel is unavailable for the current platform.
 [tool.poetry.group.powercycle-incompatible.dependencies]
-rapidyaml = {git = "https://github.com/mongodb-forks/rapidyaml.git@master", rev = "a5d485fd44719e1c03e059177fc1f695fc462b66", markers = "platform_system != 'Windows'"}
+rapidyaml = { version = "==0.9.0.post0", source = "mdb-build-public", markers = "python_version == '3.13'" }
 
 [tool.poetry.group.export.dependencies]
 pipx = "1.6.0"
