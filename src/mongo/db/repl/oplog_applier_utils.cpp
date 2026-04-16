@@ -661,6 +661,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
 
                 LOGV2_FATAL_CONTINUE(21237,
                                      "Error applying operation",
+                                     "opTime"_attr = op->getOpTime(),
                                      "oplogEntry"_attr = redact(op->toBSONForLogging()),
                                      "error"_attr = causedBy(redact(status)));
                 return status;
@@ -672,6 +673,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                                  "keyPattern"_attr = info->getKeyPattern(),
                                  "keyValue"_attr = redact(info->getDuplicatedKeyValue()),
                                  "error"_attr = redact(e.reason()),
+                                 "opTime"_attr = op->getOpTime(),
                                  "oplogEntry"_attr = redact(op->toBSONForLogging()));
             return e.toStatus();
         } catch (const DBException& e) {
@@ -691,6 +693,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
             LOGV2_FATAL_CONTINUE(21238,
                                  "Writer worker caught exception",
                                  "error"_attr = redact(e),
+                                 "opTime"_attr = op->getOpTime(),
                                  "oplogEntry"_attr = redact(op->toBSONForLogging()));
             return e.toStatus();
         }
