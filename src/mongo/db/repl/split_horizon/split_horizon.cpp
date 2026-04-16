@@ -116,7 +116,7 @@ SplitHorizon::ForwardMapping computeForwardMappings(
                                         << typeName(horizonObj.type()));
             } else if (horizonName == SplitHorizon::kDefaultHorizon) {
                 uasserted(ErrorCodes::BadValue,
-                          "Horizon name \"" + std::string{SplitHorizon::kDefaultHorizon} +
+                          "Horizon name \"" + SplitHorizon::kDefaultHorizon +
                               "\" is reserved for internal mongodb usage");
             } else if (horizonName == "") {
                 uasserted(ErrorCodes::BadValue, "Horizons cannot have empty names");

@@ -108,19 +108,16 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
                     str::stream() << "Method must be either " << kLocfMethod << " or "
                                   << kLinearInterpolateMethod,
                     methodStr == kLocfMethod || methodStr == kLinearInterpolateMethod);
-            auto&& fullMethodStr = methodStr == kLinearInterpolateMethod
-                ? "$" + std::string{methodStr} + "Fill"
-                : "$" + std::string{methodStr};
-            setWindowFieldsOutputSpec.append(fieldName,
-                                             BSON(fullMethodStr << "$" + std::string{fieldName}));
+            auto&& fullMethodStr =
+                methodStr == kLinearInterpolateMethod ? "$" + methodStr + "Fill" : "$" + methodStr;
+            setWindowFieldsOutputSpec.append(fieldName, BSON(fullMethodStr << "$" + fieldName));
             needSetWindowFields = true;
         }
         if (auto&& unparsedValueExpr = parsedSpec.getValue()) {
             // Value fields are BSONAnyType.
             auto valueElem = unparsedValueExpr.value().getElement();
             BSONObj fullFieldSpec =
-                BSON(fieldName << BSON("$ifNull"
-                                       << BSON_ARRAY("$" + std::string{fieldName} << valueElem)));
+                BSON(fieldName << BSON("$ifNull" << BSON_ARRAY("$" + fieldName << valueElem)));
             addFieldsSpec.appendElements(fullFieldSpec);
         }
     }
@@ -171,7 +168,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     if (auto&& partitionByFields = spec.getPartitionByFields()) {
         MutableDocument partitionBySpec;
         for (const auto& fieldName : partitionByFields.value()) {
-            partitionBySpec.setNestedField(fieldName, Value("$" + std::string{fieldName}));
+            partitionBySpec.setNestedField(fieldName, Value("$" + fieldName));
         }
         if (needSetWindowFields)
             setWindowFieldsSpec.append("partitionBy", partitionBySpec.freeze().toBson());

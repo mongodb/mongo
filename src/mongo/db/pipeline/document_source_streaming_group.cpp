@@ -121,13 +121,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
     const auto& monotonicIdFieldsElem = obj.getField(kMonotonicIdFieldsSpecField);
     uassert(7026702,
             "streaming group must specify an array of monotonic id fields " +
-                std::string{kMonotonicIdFieldsSpecField},
+                kMonotonicIdFieldsSpecField,
             monotonicIdFieldsElem.type() == BSONType::array);
     const auto& monotonicIdFields = monotonicIdFieldsElem.Array();
     const auto& idFieldNames = groupStage->_groupProcessor->getIdFieldNames();
     if (idFieldNames.empty()) {
         uassert(7026703,
-                "if there is no explicit id fields, " + std::string{kMonotonicIdFieldsSpecField} +
+                "if there is no explicit id fields, " + kMonotonicIdFieldsSpecField +
                     " must contain a single \"_id\" string",
                 monotonicIdFields.size() == 1 &&
                     monotonicIdFields[0].valueStringDataSafe() == "_id"_sd);
@@ -136,7 +136,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
         groupStage->_monotonicExpressionIndexes.reserve(monotonicIdFields.size());
         for (const auto& fieldNameElem : monotonicIdFields) {
             uassert(7026704,
-                    std::string{kMonotonicIdFieldsSpecField} + " elements must be strings",
+                    kMonotonicIdFieldsSpecField + " elements must be strings",
                     fieldNameElem.type() == BSONType::string);
             StringData fieldName = fieldNameElem.valueStringData();
             auto it = std::find(idFieldNames.begin(), idFieldNames.end(), fieldName);

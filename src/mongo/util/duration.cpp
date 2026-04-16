@@ -32,14 +32,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
-#include <fmt/format.h>
-
 namespace mongo {
 
 template <typename Period>
 BSONObj Duration<Period>::toBSON() const {
     BSONObjBuilder builder;
-    builder.append(fmt::format("duration{}", mongoUnitSuffix()), count());
+    builder.append("duration" + mongoUnitSuffix(), count());
     return builder.obj();
 }
 

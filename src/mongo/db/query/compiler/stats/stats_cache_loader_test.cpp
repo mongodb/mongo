@@ -115,8 +115,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
 
     // Initalize stats collection.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "stats");
-    std::string statsColl(std::string(StatsCacheLoader::kStatsPrefix) + "." +
-                          std::string(nss.coll()));
+    std::string statsColl(StatsCacheLoader::kStatsPrefix + "." + nss.coll());
     NamespaceString statsNss =
         NamespaceString::createNamespaceString_forTest(nss.db_forTest(), statsColl);
     createStatsCollection(statsNss);
@@ -190,8 +189,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
 
     // Initalize stats collection.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "stats");
-    std::string statsColl(std::string(StatsCacheLoader::kStatsPrefix) + "." +
-                          std::string(nss.coll()));
+    std::string statsColl(StatsCacheLoader::kStatsPrefix + "." + nss.coll());
     NamespaceString statsNss =
         NamespaceString::createNamespaceString_forTest(nss.db_forTest(), statsColl);
     createStatsCollection(statsNss);

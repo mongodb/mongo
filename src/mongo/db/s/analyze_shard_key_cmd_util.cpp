@@ -149,11 +149,11 @@ constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 const std::string kOrphanDocsWarningMessage =
     "Due to performance reasons, the analyzeShardKey command does not filter out orphan documents "
     "when calculating metrics about the characteristics of the shard key. Therefore, if \"" +
-    std::string{KeyCharacteristicsMetrics::kNumOrphanDocsFieldName} + "\" is large relative to \"" +
-    std::string{KeyCharacteristicsMetrics::kNumDocsTotalFieldName} +
+    KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
+    KeyCharacteristicsMetrics::kNumDocsTotalFieldName +
     "\", you may want to rerun the command at some other time to get more accurate \"" +
-    std::string{KeyCharacteristicsMetrics::kNumDistinctValuesFieldName} + "\" and \"" +
-    std::string{KeyCharacteristicsMetrics::kMostCommonValuesFieldName} + "\" metrics.";
+    KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
+    KeyCharacteristicsMetrics::kMostCommonValuesFieldName + "\" metrics.";
 
 /**
  * Validates that exactly one of 'sampleRate' and 'sampleSize' is specified.
@@ -235,11 +235,10 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
         // Use a temporary field name since it is invalid to group by a field name that contains
         // dots.
         const auto origFieldName = element.fieldNameStringData();
-        const auto tempFieldName = std::string{kIndexKeyFieldName} + std::to_string(fieldNum);
-        groupByBuilder.append(
-            tempFieldName,
-            BSON("$getField" << BSON("field" << origFieldName << "input"
-                                             << ("$" + std::string{kIndexKeyFieldName}))));
+        const auto tempFieldName = kIndexKeyFieldName + std::to_string(fieldNum);
+        groupByBuilder.append(tempFieldName,
+                              BSON("$getField" << BSON("field" << origFieldName << "input"
+                                                               << ("$" + kIndexKeyFieldName))));
         if (ShardKeyPattern::isHashedPatternEl(hintIndexKey.getField(origFieldName))) {
             origHashedFieldName.emplace(origFieldName);
             tempHashedFieldName.emplace(tempFieldName);
@@ -254,17 +253,15 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
     // $topN.
     pipeline.push_back(BSON(
         "$group" << BSON(
-            "_id" << BSONNULL << kNumDocsFieldName
-                  << BSON("$sum" << ("$" + std::string{kFrequencyFieldName}))
+            "_id" << BSONNULL << kNumDocsFieldName << BSON("$sum" << ("$" + kFrequencyFieldName))
                   << kNumDistinctValuesFieldName << BSON("$sum" << 1) << kMostCommonValuesFieldName
-                  << BSON("$topN" << BSON(
-                              "n" << numMostCommonValues << "sortBy"
-                                  << BSON(kFrequencyFieldName << -1) << "output"
-                                  << BSON("_id" << "$_id" << kFrequencyFieldName
-                                                << ("$" + std::string{kFrequencyFieldName})))))));
+                  << BSON("$topN" << BSON("n" << numMostCommonValues << "sortBy"
+                                              << BSON(kFrequencyFieldName << -1) << "output"
+                                              << BSON("_id" << "$_id" << kFrequencyFieldName
+                                                            << ("$" + kFrequencyFieldName)))))));
 
     // Unwind "mostCommonValues" to return each shard value in its own document.
-    pipeline.push_back(BSON("$unwind" << ("$" + std::string{kMostCommonValuesFieldName})));
+    pipeline.push_back(BSON("$unwind" << ("$" + kMostCommonValuesFieldName)));
 
     // If the supporting index is hashed and the hashed field is one of the shard key fields, look
     // up the corresponding values by doing a $lookup with $toHashedIndexKey. Replace "_id"
@@ -273,10 +270,9 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
         invariant(tempHashedFieldName);
 
         pipeline.push_back(
-            BSON("$set" << BSON("_id" << ("$" + std::string{kMostCommonValuesFieldName} + "._id")
-                                      << kFrequencyFieldName
-                                      << ("$" + std::string{kMostCommonValuesFieldName} + "." +
-                                          std::string{kFrequencyFieldName}))));
+            BSON("$set" << BSON(
+                     "_id" << ("$" + kMostCommonValuesFieldName + "._id") << kFrequencyFieldName
+                           << ("$" + kMostCommonValuesFieldName + "." + kFrequencyFieldName))));
         pipeline.push_back(BSON("$unset" << kMostCommonValuesFieldName));
 
         BSONObjBuilder letBuilder;
@@ -301,12 +297,10 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
         pipeline.push_back(BSON("$set" << BSON(kDocFieldName << BSON("$first" << "$docs"))));
         pipeline.push_back(BSON("$unset" << BSON_ARRAY("docs" << "_id")));
     } else {
-        pipeline.push_back(
-            BSON("$set" << BSON(kIndexKeyFieldName
-                                << ("$" + std::string{kMostCommonValuesFieldName} + "._id")
-                                << kFrequencyFieldName
-                                << ("$" + std::string{kMostCommonValuesFieldName} + "." +
-                                    std::string{kFrequencyFieldName}))));
+        pipeline.push_back(BSON(
+            "$set" << BSON(kIndexKeyFieldName
+                           << ("$" + kMostCommonValuesFieldName + "._id") << kFrequencyFieldName
+                           << ("$" + kMostCommonValuesFieldName + "." + kFrequencyFieldName))));
         pipeline.push_back(BSON("$unset" << BSON_ARRAY(kMostCommonValuesFieldName << "_id")));
     }
 
@@ -1054,10 +1048,9 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
             "Expected to have set the afterClusterTime since there is at least one split point "
             "document to insert",
             !splitPointsAfterClusterTime.isNull());
-    auto splitPointsFilter =
-        BSON((std::string{AnalyzeShardKeySplitPointDocument::kIdFieldName} + "." +
-              std::string{AnalyzeShardKeySplitPointId::kAnalyzeShardKeyIdFieldName})
-             << analyzeShardKeyId);
+    auto splitPointsFilter = BSON((AnalyzeShardKeySplitPointDocument::kIdFieldName + "." +
+                                   AnalyzeShardKeySplitPointId::kAnalyzeShardKeyIdFieldName)
+                                  << analyzeShardKeyId);
     return {std::move(splitPointsFilter), splitPointsAfterClusterTime};
 }
 

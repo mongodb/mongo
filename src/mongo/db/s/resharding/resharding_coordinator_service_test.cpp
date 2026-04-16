@@ -608,23 +608,21 @@ public:
 
         auto donorShards = coordDoc.getDonorShards();
 
-        auto keyPre = [](StringData suffix) {
-            return fmt::format("{}.$[].mutableState.{}",
-                               ReshardingCoordinatorDocument::kDonorShardsFieldName,
-                               suffix);
-        };
+        BSONObj updates = BSON(
+            "$set" << BSON(
+                ReshardingCoordinatorDocument::kDonorShardsFieldName + ".$[].mutableState.state"
+                << idl::serialize(DonorStateEnum::kDonatingInitialData)
+                << ReshardingCoordinatorDocument::kDonorShardsFieldName +
+                    ".$[].mutableState.minFetchTimestamp"
+                << _cloneTimestamp
+                << ReshardingCoordinatorDocument::kDonorShardsFieldName +
+                    ".$[].mutableState.bytesToClone"
+                << static_cast<int64_t>(totalApproxBytesToClone / donorShards.size())
+                << ReshardingCoordinatorDocument::kDonorShardsFieldName +
+                    ".$[].mutableState.documentsToClone"
+                << static_cast<int64_t>(totalApproxDocumentsToClone / donorShards.size())));
 
-        BSONObjBuilder updates;
-        {
-            BSONObjBuilder{updates.subobjStart("$set")}
-                .append(keyPre("state"), idl::serialize(DonorStateEnum::kDonatingInitialData))
-                .append(keyPre("minFetchTimestamp"), _cloneTimestamp)
-                .append(keyPre("bytesToClone"),
-                        static_cast<long long>(totalApproxBytesToClone / donorShards.size()))
-                .append(keyPre("documentsToClone"),
-                        static_cast<long long>(totalApproxDocumentsToClone / donorShards.size()));
-        }
-        updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates.obj());
+        updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
 
     void makeRecipientsFinishedCloningWithAssert(OperationContext* opCtx) {
@@ -632,9 +630,9 @@ public:
         ASSERT_NE(coordDoc.getMetrics()->getDocumentCopy()->getStart(), Date_t::min());
 
         BSONObj updates = BSON(
-            "$set" << BSON(std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
-                               ".$[].mutableState.state"
-                           << idl::serialize(RecipientStateEnum::kApplying)));
+            "$set" << BSON(
+                ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
+                << idl::serialize(RecipientStateEnum::kApplying)));
 
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
@@ -645,18 +643,18 @@ public:
                    coordDoc.getMetrics()->getOplogApplication()->getStop());
 
         BSONObj updates = BSON(
-            "$set" << BSON(std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
-                               ".$[].mutableState.state"
-                           << idl::serialize(RecipientStateEnum::kStrictConsistency)));
+            "$set" << BSON(
+                ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
+                << idl::serialize(RecipientStateEnum::kStrictConsistency)));
 
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
 
     void makeDonorsProceedToDone(OperationContext* opCtx, UUID reshardingUUID) {
-        BSONObj updates =
-            BSON("$set" << BSON(std::string(ReshardingCoordinatorDocument::kDonorShardsFieldName) +
-                                    ".$[].mutableState.state"
-                                << idl::serialize(DonorStateEnum::kDone)));
+        BSONObj updates = BSON(
+            "$set" << BSON(
+                ReshardingCoordinatorDocument::kDonorShardsFieldName + ".$[].mutableState.state"
+                << idl::serialize(DonorStateEnum::kDone)));
 
         updateCoordinatorDoc(opCtx, reshardingUUID, updates);
     }
@@ -676,9 +674,9 @@ public:
 
     void makeRecipientsProceedToDone(OperationContext* opCtx, UUID reshardingUUID) {
         BSONObj updates = BSON(
-            "$set" << BSON(std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
-                               ".$[].mutableState.state"
-                           << idl::serialize(RecipientStateEnum::kDone)));
+            "$set" << BSON(
+                ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
+                << idl::serialize(RecipientStateEnum::kDone)));
 
         updateCoordinatorDoc(opCtx, reshardingUUID, updates);
     }
@@ -703,14 +701,13 @@ public:
         BSONObjBuilder tmpBuilder;
         abortReasonStatus.serialize(&tmpBuilder);
 
-        BSONObj updates =
-            BSON("$set" << BSON(
-                     std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
-                         ".$[].mutableState.state"
-                     << idl::serialize(RecipientStateEnum::kError)
-                     << std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
-                         ".$[].mutableState.abortReason"
-                     << tmpBuilder.obj()));
+        BSONObj updates = BSON(
+            "$set" << BSON(
+                ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
+                << idl::serialize(RecipientStateEnum::kError)
+                << ReshardingCoordinatorDocument::kRecipientShardsFieldName +
+                    ".$[].mutableState.abortReason"
+                << tmpBuilder.obj()));
 
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }

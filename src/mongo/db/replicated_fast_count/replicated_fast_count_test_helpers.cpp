@@ -333,7 +333,7 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
             }
             default: {
                 FAIL(std::string("Unexpected opType for observed fast-count applyOps entry: ") +
-                     std::string{idl::serialize(innerEntry.getOpType())});
+                     idl::serialize(innerEntry.getOpType()));
                 break;
             }
         }
@@ -433,7 +433,7 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
             }
             default: {
                 FAIL(std::string("Unexpected opType for inputted fast-count applyOps entry: ") +
-                     std::string{idl::serialize(innerEntry.getOpType())});
+                     idl::serialize(innerEntry.getOpType()));
                 break;
             }
         }

@@ -1366,9 +1366,9 @@ BSONObj ReshardingDonorService::DonorStateMachine::_makeQueryForCoordinatorUpdat
             {
                 elemMatchBuilder.append(DonorShardEntry::kIdFieldName, shardId);
 
-                BSONObjBuilder mutableStateBuilder(elemMatchBuilder.subobjStart(
-                    std::string{DonorShardEntry::kMutableStateFieldName} + "." +
-                    std::string{DonorShardContext::kStateFieldName}));
+                BSONObjBuilder mutableStateBuilder(
+                    elemMatchBuilder.subobjStart(DonorShardEntry::kMutableStateFieldName + "." +
+                                                 DonorShardContext::kStateFieldName));
                 {
                     BSONArrayBuilder inBuilder(mutableStateBuilder.subarrayStart("$in"));
                     for (const auto& state : it->second) {
@@ -1400,10 +1400,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
             {
                 BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
                 {
-                    setBuilder.append(
-                        std::string{ReshardingCoordinatorDocument::kDonorShardsFieldName} + ".$." +
-                            std::string{DonorShardEntry::kMutableStateFieldName},
-                        _donorCtx.toBSON());
+                    setBuilder.append(ReshardingCoordinatorDocument::kDonorShardsFieldName + ".$." +
+                                          DonorShardEntry::kMutableStateFieldName,
+                                      _donorCtx.toBSON());
                 }
             }
 

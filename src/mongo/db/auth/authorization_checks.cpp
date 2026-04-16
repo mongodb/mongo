@@ -389,7 +389,7 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(OperationContext* opCtx,
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             invariant((!(liteParsedDocSource->requiresAuthzChecks() && currentPrivs.empty())),
                       "Must specify authorization checks for this stage: " +
-                          std::string{pipelineStage.firstElementFieldNameStringData()} +
+                          pipelineStage.firstElementFieldNameStringData() +
                           " or manually opt out by overriding requiresAuthzChecks to false");
         }
     }

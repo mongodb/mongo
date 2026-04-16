@@ -130,8 +130,7 @@ mongo::BSONObj translateIndexSpecFromLogicalToBuckets(OperationContext* opCtx,
             if (auto collatorSpec = origIndex[NewIndexSpec::kCollationFieldName]) {
                 uasserted(ErrorCodes::IndexOptionsConflict,
                           std::string{"On a time-series collection, partialFilterExpression and "} +
-                              std::string{NewIndexSpec::kCollationFieldName} +
-                              " arguments are incompatible");
+                              NewIndexSpec::kCollationFieldName + " arguments are incompatible"_sd);
             }
             // Since no collation was specified in the command, we know the index collation will
             // match the collection's collation.
@@ -196,7 +195,7 @@ mongo::BSONObj translateIndexSpecFromLogicalToBuckets(OperationContext* opCtx,
 
                 if (metaField &&
                     (keyElem.fieldNameStringData() == *metaField ||
-                     keyElem.fieldNameStringData().starts_with(std::string{*metaField} + "."))) {
+                     keyElem.fieldNameStringData().starts_with(*metaField + "."))) {
                     continue;
                 }
 

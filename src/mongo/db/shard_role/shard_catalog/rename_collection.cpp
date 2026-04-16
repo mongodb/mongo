@@ -104,7 +104,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -480,8 +479,7 @@ acquireLocksForRenameCollectionWithinDBForApplyOps(OperationContext* opCtx,
             std::string collectionNameModel = "tmp%%%%%.renameCollection";
             if (source.isTimeseriesBucketsCollection()) {
                 collectionNameModel =
-                    std::string{NamespaceString::kTimeseriesBucketsCollectionPrefix} +
-                    collectionNameModel;
+                    NamespaceString::kTimeseriesBucketsCollectionPrefix + collectionNameModel;
             }
             return makeUniqueCollectionName(opCtx, target.dbName(), collectionNameModel);
         }();
@@ -853,9 +851,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                 std::string collectionNameModel = "tmp%%%%%.renameCollection";
                 if (source.isTimeseriesBucketsCollection()) {
                     collectionNameModel =
-                        fmt::format("{}{}",
-                                    NamespaceString::kTimeseriesBucketsCollectionPrefix,
-                                    collectionNameModel);
+                        NamespaceString::kTimeseriesBucketsCollectionPrefix + collectionNameModel;
                 }
                 return makeUniqueCollectionName(opCtx, target.dbName(), collectionNameModel);
             }();

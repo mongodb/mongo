@@ -307,7 +307,7 @@ void _authenticate(OperationContext* opCtx, AuthenticationSession* session, Stri
         return _authenticateX509(opCtx, session);
     }
 #endif
-    uasserted(ErrorCodes::BadValue, "Unsupported mechanism: " + std::string{mechanism});
+    uasserted(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
 }
 
 auth::SaslPayload generateSaslPayload(const boost::optional<StringData>& user,

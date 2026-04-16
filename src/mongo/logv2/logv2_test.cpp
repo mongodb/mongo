@@ -678,7 +678,7 @@ TEST_F(LogV2TypesTest, Numeric) {
             ASSERT_EQUALS(text->back(), fmt::format("{}", value));
             validateJSON(value);
 
-            // We should have been able to use std::make_signed here but it is broken on
+            // TODO: We should have been able to use std::make_signed here but it is broken on
             // Visual Studio 2017 and 2019
             using T = decltype(value);
             if constexpr (std::is_same_v<T, unsigned long long>) {
@@ -967,8 +967,7 @@ TEST_F(LogV2TypesTest, UUID) {
 TEST_F(LogV2TypesTest, BoostOptional) {
     LOGV2(20028, "boost::optional empty {name}", "name"_attr = boost::optional<bool>());
     ASSERT_EQUALS(text->back(),
-                  std::string("boost::optional empty ") +
-                      std::string{constants::kNullOptionalString});
+                  std::string("boost::optional empty ") + constants::kNullOptionalString);
     ASSERT(mongo::fromjson(json->back())
                .getField(kAttributesFieldName)
                .Obj()
@@ -1028,13 +1027,13 @@ TEST_F(LogV2TypesTest, Duration) {
     ASSERT_EQUALS(mongo::fromjson(json->back())
                       .getField(kAttributesFieldName)
                       .Obj()
-                      .getField("name" + std::string{ms.mongoUnitSuffix()})
+                      .getField("name" + ms.mongoUnitSuffix())
                       .Int(),
                   ms.count());
     ASSERT_EQUALS(BSONObj(bson->back().data())
                       .getField(kAttributesFieldName)
                       .Obj()
-                      .getField("name" + std::string{ms.mongoUnitSuffix()})
+                      .getField("name" + ms.mongoUnitSuffix())
                       .Long(),
                   ms.count());
 }

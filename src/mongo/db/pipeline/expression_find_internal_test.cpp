@@ -69,7 +69,7 @@ protected:
             getExpCtxRaw(),
             ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState),
             ExpressionFieldPath::parse(getExpCtxRaw(),
-                                       fmt::format("$${}", kProjectionPostImageVarName),
+                                       "$$" + kProjectionPostImageVarName,
                                        getExpCtx()->variablesParseState),
             path,
             std::move(matchExpr));
@@ -83,7 +83,7 @@ protected:
         auto expr = make_intrusive<ExpressionInternalFindSlice>(
             getExpCtxRaw(),
             ExpressionFieldPath::parse(getExpCtxRaw(),
-                                       fmt::format("$${}", kProjectionPostImageVarName),
+                                       "$$" + kProjectionPostImageVarName,
                                        getExpCtx()->variablesParseState),
             path,
             skip,

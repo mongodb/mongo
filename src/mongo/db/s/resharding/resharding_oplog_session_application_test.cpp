@@ -434,7 +434,7 @@ private:
     // Used for pre/post image oplog entry lookup.
     const ShardId _donorShardId{"donor-0"};
     const NamespaceString _oplogBufferNss = NamespaceString::createNamespaceString_forTest(
-        std::string(NamespaceString::kReshardingLocalOplogBufferPrefix) + _donorShardId.toString());
+        NamespaceString::kReshardingLocalOplogBufferPrefix + _donorShardId.toString());
 
     service_context_test::ShardRoleOverride _shardRole;
 };

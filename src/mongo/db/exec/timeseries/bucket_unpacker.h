@@ -244,11 +244,11 @@ public:
     }
 
     std::string getMinField(StringData field) const {
-        return std::string{kControlMinFieldNamePrefix} + std::string{field};
+        return std::string{kControlMinFieldNamePrefix} + field;
     }
 
     std::string getMaxField(StringData field) const {
-        return std::string{kControlMaxFieldNamePrefix} + std::string{field};
+        return std::string{kControlMaxFieldNamePrefix} + field;
     }
 
     bool getUsesExtendedRange() const {

@@ -260,8 +260,7 @@ void processSampledDiffs(OperationContext* opCtx,
     BSONArrayBuilder orArrayBuilder(orBuilder.subarrayStart("$or"));
     for (const auto& element : shardKey.toBSON()) {
         const auto shardKeyFieldName = element.fieldNameStringData();
-        const auto path = std::string{SampledQueryDiffDocument::kDiffFieldName} + "." +
-            std::string{shardKeyFieldName};
+        const auto path = SampledQueryDiffDocument::kDiffFieldName + "." + shardKeyFieldName;
         orArrayBuilder.append(BSON(path << BSON("$exists" << true)));
 
         size_t startIndex = 0;
@@ -274,8 +273,8 @@ void processSampledDiffs(OperationContext* opCtx,
             BSONObjBuilder andBuilder;
             BSONArrayBuilder andArrayBuilder(andBuilder.subarrayStart("$and"));
             const auto shardKeyPrefixFieldName = shardKeyFieldName.substr(0, lastDotIndex);
-            const auto prefixPath = std::string{SampledQueryDiffDocument::kDiffFieldName} + "." +
-                std::string{shardKeyPrefixFieldName};
+            const auto prefixPath =
+                SampledQueryDiffDocument::kDiffFieldName + "." + shardKeyPrefixFieldName;
             andArrayBuilder.append(BSON(prefixPath << BSON("$exists" << true)));
             andArrayBuilder.append(BSON(prefixPath << BSON("$not" << BSON("$type" << "object"))));
             andArrayBuilder.done();

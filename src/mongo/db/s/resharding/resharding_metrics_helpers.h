@@ -83,24 +83,22 @@ MONGO_MOD_PUBLIC void onCriticalSectionError(OperationContext* opCtx, const Stal
 template <typename T>
 std::string getMetricsPrefix() {
     static_assert(isStateDocument<T>);
-    return std::string{T::kMetricsFieldName} + ".";
+    return T::kMetricsFieldName + ".";
 }
 
 template <typename T>
 std::string getIntervalPrefix(StringData intervalFieldName) {
-    return getMetricsPrefix<T>() + std::string{intervalFieldName} + ".";
+    return getMetricsPrefix<T>() + intervalFieldName + ".";
 }
 
 template <typename T>
 std::string getIntervalStartFieldName(StringData intervalFieldName) {
-    return getIntervalPrefix<T>(intervalFieldName) +
-        std::string{ReshardingMetricsTimeInterval::kStartFieldName};
+    return getIntervalPrefix<T>(intervalFieldName) + ReshardingMetricsTimeInterval::kStartFieldName;
 }
 
 template <typename T>
 std::string getIntervalEndFieldName(StringData intervalFieldName) {
-    return getIntervalPrefix<T>(intervalFieldName) +
-        std::string{ReshardingMetricsTimeInterval::kStopFieldName};
+    return getIntervalPrefix<T>(intervalFieldName) + ReshardingMetricsTimeInterval::kStopFieldName;
 }
 
 }  // namespace resharding_metrics

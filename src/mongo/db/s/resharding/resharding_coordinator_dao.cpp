@@ -344,10 +344,9 @@ BSONObjBuilder ReshardingCoordinatorDao::_documentsCopyUpdateBuilder(
             auto it = documents.find(shardId);
             if (it != documents.end()) {
                 int64_t numberOfDocuments = it->second;
-                setBuilder.append(
-                    std::string{ReshardingCoordinatorDocument::kDonorShardsFieldName} + "." +
-                        std::to_string(i) + "." + std::string{numberOfDocsFieldName},
-                    numberOfDocuments);
+                setBuilder.append(ReshardingCoordinatorDocument::kDonorShardsFieldName + "." +
+                                      std::to_string(i) + "." + numberOfDocsFieldName,
+                                  numberOfDocuments);
             }
         }
     }

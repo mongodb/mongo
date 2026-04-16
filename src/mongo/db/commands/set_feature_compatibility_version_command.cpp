@@ -197,8 +197,8 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
     const auto opCtxShared = cc().makeOperationContext();
     auto* const opCtx = opCtxShared.get();
 
-    const auto kVersionTimestampFieldName = std::string{DatabaseType::kVersionFieldName} + "." +
-        std::string{DatabaseVersion::kTimestampFieldName};
+    const auto kVersionTimestampFieldName = std::string{} + DatabaseType::kVersionFieldName + "." +
+        DatabaseVersion::kTimestampFieldName;
 
     const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
 

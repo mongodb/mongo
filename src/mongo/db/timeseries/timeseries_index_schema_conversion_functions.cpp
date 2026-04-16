@@ -165,7 +165,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             }
 
             // Time-series indexes on sub-documents of the 'metaField' are allowed.
-            if (elem.fieldNameStringData().starts_with(std::string{*metaField} + ".")) {
+            if (elem.fieldNameStringData().starts_with(*metaField + ".")) {
                 builder.appendAs(elem,
                                  str::stream()
                                      << timeseries::kBucketMetaFieldName << "."
@@ -272,8 +272,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
                 continue;
             }
 
-            if (elem.fieldNameStringData().starts_with(
-                    std::string{timeseries::kBucketMetaFieldName} + ".")) {
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 builder.appendAs(elem,
                                  str::stream() << *metaField << "."
                                                << elem.fieldNameStringData().substr(
@@ -282,8 +281,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
             }
         }
 
-        if (elem.fieldNameStringData().starts_with(std::string{timeseries::kBucketDataFieldName} +
-                                                   ".") &&
+        if (elem.fieldNameStringData().starts_with(timeseries::kBucketDataFieldName + ".") &&
             elem.valueStringDataSafe() == IndexNames::GEO_2DSPHERE_BUCKET) {
             builder.append(
                 elem.fieldNameStringData().substr(timeseries::kBucketDataFieldName.size() + 1),
@@ -433,8 +431,7 @@ boost::optional<BSONObj> createBucketsIndexSpecFromBucketsShardKeySpec(
             }
 
             // Time-series indexes on sub-documents of the 'metaField' are allowed.
-            if (elem.fieldNameStringData().starts_with(
-                    std::string{timeseries::kBucketMetaFieldName} + ".")) {
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 builder.append(elem);
                 continue;
             }
@@ -537,8 +534,7 @@ bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
                 continue;
             }
 
-            if (elem.fieldNameStringData().starts_with(
-                    std::string{timeseries::kBucketMetaFieldName} + ".")) {
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 continue;
             }
         }
@@ -579,7 +575,7 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
 
         if (metaField) {
             if (name == timeseries::kBucketMetaFieldName ||
-                name.starts_with(std::string{timeseries::kBucketMetaFieldName} + ".")) {
+                name.starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 return false;
             }
         }
@@ -643,7 +639,7 @@ boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCt
                                                           const IndexCatalog* indexCatalog,
                                                           const TimeseriesOptions& tsOptions) {
     const std::string controlTimeField =
-        std::string{timeseries::kControlMinFieldNamePrefix} + std::string{tsOptions.getTimeField()};
+        std::string{timeseries::kControlMinFieldNamePrefix} + tsOptions.getTimeField();
 
     // Populate a vector of index key fields which we check against existing indexes.
     boost::container::small_vector<std::string, 2> expectedPrefix;

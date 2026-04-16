@@ -101,8 +101,7 @@ void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collecti
                                 decision == tdps::Decision::Maybe &&
                                     !tdps::haveArrayAlongBucketDataPath(
                                         obj,
-                                        std::string(timeseries::kDataFieldNamePrefix) +
-                                            std::string{userField}));
+                                        std::string(timeseries::kDataFieldNamePrefix) + userField));
                     }
                     userFieldsChecked.emplace(userField);
                 }

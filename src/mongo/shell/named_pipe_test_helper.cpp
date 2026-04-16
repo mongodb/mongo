@@ -114,7 +114,7 @@ BSONObj NamedPipeHelper::readFromPipes(const std::vector<std::string>& pipeRelat
     VirtualCollectionOptions vopts;
     for (const std::string& pipeRelativePath : pipeRelativePaths) {
         ExternalDataSourceMetadata meta(
-            (std::string{ExternalDataSourceMetadata::kUrlProtocolFile} + pipeRelativePath),
+            (ExternalDataSourceMetadata::kUrlProtocolFile + pipeRelativePath),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
         vopts.dataSources.emplace_back(meta);

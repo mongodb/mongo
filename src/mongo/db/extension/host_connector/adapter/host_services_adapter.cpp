@@ -65,7 +65,7 @@ namespace mongo::extension::host_connector {
 
         // Call the host's tassert implementation.
         tasserted(exceptionInfo.getErrorCode(),
-                  "Extension encountered error: " + std::string{exceptionInfo.getMessage()});
+                  "Extension encountered error: " + exceptionInfo.getMessage());
     });
 }
 

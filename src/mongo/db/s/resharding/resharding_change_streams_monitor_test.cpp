@@ -395,20 +395,18 @@ public:
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(
         const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
-        return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestExecutor" +
-                                 std::string{descSuffix});
+        return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestExecutor" + descSuffix);
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeCleanupTaskExecutor(
         const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
-        return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestCleanupExecutor" +
-                                 std::string{descSuffix});
+        return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestCleanupExecutor" + descSuffix);
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeMarkKilledTaskExecutor(
         const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
         return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestMarkKilledExecutor" +
-                                 std::string{descSuffix});
+                                 descSuffix);
     }
 
 private:

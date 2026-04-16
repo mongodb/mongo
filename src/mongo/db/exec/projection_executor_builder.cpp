@@ -96,7 +96,7 @@ auto makeProjectionPostImageExpression(const ProjectionExecutorVisitorData<Execu
     return data.rootReplacementExpression
         ? data.rootReplacementExpression
         : ExpressionFieldPath::parse(data.expCtx.get(),
-                                     "$$" + std::string{kProjectionPostImageVarName},
+                                     "$$" + kProjectionPostImageVarName,
                                      data.expCtx->variablesParseState);
 }
 

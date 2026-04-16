@@ -146,7 +146,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
               "Expected a $-prefixed window function"s +
                   (obj.firstElementFieldNameStringData().empty()
                        ? ""s
-                       : ", "s + std::string{obj.firstElementFieldNameStringData()}));
+                       : ", "s + obj.firstElementFieldNameStringData()));
 }
 
 void Expression::registerParser(std::string functionName,

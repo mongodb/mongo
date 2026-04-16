@@ -39,8 +39,6 @@
 #include <ostream>
 #include <vector>
 
-#include <fmt/format.h>
-
 namespace mongo {
 using MetaType = DocumentMetadataFields::MetaType;
 
@@ -148,8 +146,7 @@ DocumentMetadataFields& DocumentMetadataFields::operator=(DocumentMetadataFields
 
 MetaType DocumentMetadataFields::parseMetaType(StringData name) {
     const auto iter = kMetaNameToMetaType.find(name);
-    uassert(
-        17308, fmt::format("Unsupported $meta field: {}", name), iter != kMetaNameToMetaType.end());
+    uassert(17308, "Unsupported $meta field: " + name, iter != kMetaNameToMetaType.end());
     return iter->second;
 }
 
