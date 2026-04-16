@@ -1120,6 +1120,17 @@ const allTestCases = {
         _shardsvrRenameIndexMetadata: {skip: "TODO"},
         _shardsvrReshardCollection: {skip: "TODO"},
         _shardsvrReshardDonorInitialize: {skip: "TODO"},
+        _shardsvrReshardDonorRecipientsFinishedCloning: {
+            run: {
+                sendsDbVersion: false,
+                runsAgainstAdminDb: true,
+                command: function (dbName, collName) {
+                    return {
+                        _shardsvrReshardDonorRecipientsFinishedCloning: UUID(),
+                    };
+                },
+            },
+        },
         _shardsvrReshardRecipientInitialize: {skip: "TODO"},
         _shardsvrReshardRecipientClone: {skip: "TODO"},
         _shardsvrReshardRecipientCriticalSectionStarted: {

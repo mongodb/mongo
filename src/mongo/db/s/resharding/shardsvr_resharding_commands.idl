@@ -136,6 +136,18 @@ commands:
                 type: ReshardingApproxCopySize
                 description: "Not meant to be used directly. Only use internal fields."
 
+    _shardsvrReshardDonorRecipientsFinishedCloning:
+        description:
+            "The internal command sent by the coordinator to donor shards to notify them that
+            all recipients have finished cloning."
+        command_name: _shardsvrReshardDonorRecipientsFinishedCloning
+        cpp_name: ShardsvrReshardDonorRecipientsFinishedCloning
+        type: uuid
+        strict: false
+        namespace: type
+        reply_type: OkReply
+        api_version: ""
+
     _shardsvrReshardRecipientCriticalSectionStarted:
         description:
             "The internal command run by coordinator against recipients to notify them that the

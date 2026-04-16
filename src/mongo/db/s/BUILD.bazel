@@ -560,6 +560,7 @@ mongo_cc_library(
         "shardsvr_abort_reshard_collection_command.cpp",
         "shardsvr_get_stats_for_balancing_command.cpp",
         "shardsvr_move_range_command.cpp",
+        "shardsvr_reshard_donor_recipients_finished_cloning_cmd.cpp",
         "shardsvr_reshard_recipient_clone_cmd.cpp",
         "shardsvr_reshard_recipient_critical_section_started_cmd.cpp",
         "shardsvr_resharding_donor_fetch_final_collection_stats_command.cpp",

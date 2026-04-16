@@ -142,6 +142,7 @@ const allCommands = {
     _shardsvrReshardCollection: {skip: isAnInternalCommand},
     _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
     _shardsvrReshardDonorInitialize: {skip: isAnInternalCommand},
+    _shardsvrReshardDonorRecipientsFinishedCloning: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientInitialize: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientClone: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientCriticalSectionStarted: {skip: isAnInternalCommand},
