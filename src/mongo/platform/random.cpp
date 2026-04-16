@@ -94,30 +94,14 @@ struct Buffer {
 #if defined(SECURE_RANDOM_BCRYPT)
 class Source {
 public:
-    Source() {
-        auto ntstatus = ::BCryptOpenAlgorithmProvider(
-            &_algHandle, BCRYPT_RNG_ALGORITHM, MS_PRIMITIVE_PROVIDER, 0);
-        if (ntstatus != STATUS_SUCCESS) {
-            LOGV2_ERROR(23822,
-                        "Failed to open crypto algorithm provider while creating secure random "
-                        "object; NTSTATUS: {ntstatus}",
-                        "ntstatus"_attr = ntstatus);
-            fassertFailed(28815);
-        }
-    }
-
-    ~Source() {
-        auto ntstatus = ::BCryptCloseAlgorithmProvider(_algHandle, 0);
-        if (ntstatus != STATUS_SUCCESS) {
-            LOGV2_WARNING(23821,
-                          "Failed to close crypto algorithm provider destroying secure random "
-                          "object; NTSTATUS: {ntstatus}",
-                          "ntstatus"_attr = ntstatus);
-        }
-    }
-
     size_t refill(uint8_t* buf, size_t n) {
-        auto ntstatus = ::BCryptGenRandom(_algHandle, reinterpret_cast<PUCHAR>(buf), n, 0);
+        // Use BCRYPT_USE_SYSTEM_PREFERRED_RNG to avoid calling BCryptOpenAlgorithmProvider.
+        // Opening a provider acquires BCrypt's internal critical section and may trigger a DLL
+        // load, which can deadlock against Windows' loader lock (LdrpDrainWorkQueue) when this
+        // runs during thread-local storage initialization on a newly created thread. Passing a
+        // NULL algorithm handle with this flag bypasses the provider machinery entirely.
+        auto ntstatus = ::BCryptGenRandom(
+            nullptr, reinterpret_cast<PUCHAR>(buf), n, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
         if (ntstatus != STATUS_SUCCESS) {
             LOGV2_ERROR(
                 23823,
@@ -127,9 +111,6 @@ public:
         }
         return n;
     }
-
-private:
-    BCRYPT_ALG_HANDLE _algHandle;
 };
 #endif  // SECURE_RANDOM_BCRYPT
 
