@@ -141,6 +141,8 @@ public:
     void onReadDuringCriticalSection();
     void onWriteDuringCriticalSection();
 
+    void notifyAllRecipientsDoneCloning();
+
     SharedSemiFuture<void> awaitCriticalSectionAcquired();
 
     SharedSemiFuture<void> awaitCriticalSectionPromoted();
@@ -165,6 +167,15 @@ public:
      * this donor. Throws an error if verification is not enabled.
      */
     SharedSemiFuture<int64_t> awaitChangeStreamsMonitorCompleted();
+
+    /**
+     * Returns a Future fulfilled once the donor transitions into
+     * DonorStateEnum::kDonatingOplogEntries, or fulfilled with an error if the donor fails before
+     * reaching that state.
+     */
+    SharedSemiFuture<void> awaitInDonatingOplogEntries() const {
+        return _inDonatingOplogEntries.getFuture();
+    }
 
     /**
      * Returns a Future fulfilled once the donor locally persists its final state before the
@@ -363,6 +374,8 @@ private:
     // ascending order, such that the first promise below will be the first promise fulfilled -
     // fulfillment order is not necessarily maintained if the operation gets aborted.
     SharedPromise<void> _allRecipientsDoneCloning;
+
+    SharedPromise<void> _inDonatingOplogEntries;
 
     SharedPromise<void> _allRecipientsDoneApplying;
 

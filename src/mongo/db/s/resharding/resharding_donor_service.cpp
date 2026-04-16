@@ -308,6 +308,13 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       }()) {
     invariant(_externalState);
 
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (_donorCtx.getState() >= DonorStateEnum::kDonatingOplogEntries) {
+            ensureFulfilledPromise(lk, _inDonatingOplogEntries);
+        }
+    }
+
     if (_changeStreamsMonitorCtx) {
         invariant(_metadata.getPerformVerification());
 
@@ -409,6 +416,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
 
             {
                 stdx::lock_guard<stdx::mutex> lk(_mutex);
+                ensureFulfilledPromise(lk, _inDonatingOplogEntries, status);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorStarted, status);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
                 ensureFulfilledPromise(lk, _critSecWasAcquired, status);
@@ -611,6 +619,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runMandatoryCle
 
                 stdx::lock_guard<stdx::mutex> lk(_mutex);
 
+                ensureFulfilledPromise(lk, _inDonatingOplogEntries, statusForPromise);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorStarted, statusForPromise);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, statusForPromise);
                 ensureFulfilledPromise(lk, _critSecWasAcquired, statusForPromise);
@@ -729,6 +738,11 @@ void ReshardingDonorService::DonorStateMachine::onWriteDuringCriticalSection() {
 
 void ReshardingDonorService::DonorStateMachine::onReadDuringCriticalSection() {
     _metrics->onReadDuringCriticalSection();
+}
+
+void ReshardingDonorService::DonorStateMachine::notifyAllRecipientsDoneCloning() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
 }
 
 SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalSectionAcquired() {
@@ -874,8 +888,11 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
                                                  _cancelState->getAbortOrStepdownToken());
         })
         .thenRunOn(**executor)
-        .then(
-            [this, factory]() { _transitionState(DonorStateEnum::kDonatingOplogEntries, factory); })
+        .then([this, factory]() {
+            _transitionState(DonorStateEnum::kDonatingOplogEntries, factory);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            ensureFulfilledPromise(lk, _inDonatingOplogEntries);
+        })
         .onCompletion([=, this](Status status) {
             if (!status.isOK()) {
                 LOGV2_ERROR(8639700,

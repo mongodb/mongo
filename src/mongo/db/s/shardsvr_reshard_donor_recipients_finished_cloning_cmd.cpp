@@ -79,6 +79,9 @@ public:
             LOGV2(10758401,
                   "Resharding donor received recipientsFinishedCloning command",
                   "reshardingUUID"_attr = uuid());
+
+            (*machine)->notifyAllRecipientsDoneCloning();
+            (*machine)->awaitInDonatingOplogEntries().get();
         }
 
     private:

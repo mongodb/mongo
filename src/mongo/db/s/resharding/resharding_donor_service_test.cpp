@@ -59,6 +59,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -372,7 +373,13 @@ public:
     void notifyRecipientsDoneCloning(OperationContext* opCtx,
                                      DonorStateMachine& donor,
                                      const ReshardingDonorDocument& donorDoc) {
-        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kApplying);
+        if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
+                .isEnabledAndIgnoreFCVUnsafe()) {
+            donor.notifyAllRecipientsDoneCloning();
+            ASSERT_OK(donor.awaitInDonatingOplogEntries().waitNoThrow(opCtx));
+        } else {
+            _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kApplying);
+        }
     }
 
     void notifyToStartBlockingWrites(OperationContext* opCtx,
