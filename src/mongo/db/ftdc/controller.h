@@ -41,6 +41,7 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -81,15 +82,15 @@ public:
     /*
      * Set whether the controller is enabled, and collects data.
      *
-     * Returns ErrorCodes::FTDCPathNotSet if no log path has been specified for FTDC. This occurs
-     * in MongoS in some situations since MongoS is not required to have a storage directory like
-     * MongoD does.
+     * Returns ErrorCodes::FTDCPathNotSet if no log path has been specified for FTDC. This
+     * occurs in MongoS in some situations since MongoS is not required to have a storage
+     * directory like MongoD does.
      */
     Status setEnabled(bool enabled);
 
     /**
-     * Set the frequency of metadata capture. Metadata will be captured once every `freq` times FTDC
-     * data is collected.
+     * Set the frequency of metadata capture. Metadata will be captured once every `freq` times
+     * FTDC data is collected.
      */
     void setMetadataCaptureFrequency(std::uint64_t freq);
 
@@ -109,8 +110,8 @@ public:
     void setMaxFileSizeBytes(std::uint64_t size);
 
     /**
-     * Set the maximum number of samples to store in a metric chunk. Larger numbers enable better
-     * compression at the cost of allowing more data to be lost in the event of a crash.
+     * Set the maximum number of samples to store in a metric chunk. Larger numbers enable
+     * better compression at the cost of allowing more data to be lost in the event of a crash.
      */
     void setMaxSamplesPerArchiveMetricChunk(size_t size);
 
@@ -134,7 +135,8 @@ public:
      * lose info on compression. Collects as or less frequently than PeriodicCollector.
      *
      * `role` is used to disambiguate role-specific collectors with colliding names.
-     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
+     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or
+     * `ClusterRole::None`.
      */
     void addPeriodicMetadataCollector(std::unique_ptr<FTDCCollectorInterface> collector,
                                       ClusterRole role);
@@ -143,7 +145,8 @@ public:
      * Add a metric collector to collect periodically (e.g., serverStatus).
      *
      * `role` is used to disambiguate role-specific collectors with colliding names.
-     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
+     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or
+     * `ClusterRole::None`.
      */
     void addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
 
@@ -153,7 +156,8 @@ public:
      * why the "on rotate" terminology is used.
      *
      * `role` is used to disambiguate role-specific collectors with colliding names.
-     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
+     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or
+     * `ClusterRole::None`.
      */
     void addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
 
@@ -195,6 +199,8 @@ private:
      * Do periodic statistics collection, and all other work on the background thread.
      */
     void doLoop(Service* service);
+
+    void logCollectionError(Status error);
 
 private:
     /**
@@ -272,6 +278,9 @@ private:
 
     // Whether or not to use the multiversion schema for FTDC files.
     UseMultiServiceSchema _multiServiceSchema;
+
+    logv2::SeveritySuppressor _serverStatusSectionsLogSeverity{
+        Minutes{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
 }  // namespace mongo

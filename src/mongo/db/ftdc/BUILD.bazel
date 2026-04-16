@@ -42,6 +42,8 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/ftdc:ftdc_controller_idl",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/third_party/s2",
         "//src/third_party/zlib",
@@ -195,6 +197,17 @@ mongo_idl_library(
 mongo_idl_library(
     name = "ftdc_server_idl",
     src = "ftdc_server.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "ftdc_controller_idl",
+    src = "ftdc_controller.idl",
     idl_deps = [
         "//src/mongo/db:basic_types_idl_gen",
     ],

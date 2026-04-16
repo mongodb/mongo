@@ -37,8 +37,10 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_controller_gen.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -50,6 +52,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -57,6 +61,12 @@
 
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(ftdcThrowBSONObjectTooLarge);
+
+namespace {
+auto& totalDiscardedSamples = *MetricBuilder<Counter64>("ftdc.totalDiscardedSamples");
+}  // namespace
 
 Status FTDCController::setEnabled(bool enabled) {
     stdx::lock_guard<Latch> lock(_mutex);
@@ -291,25 +301,57 @@ void FTDCController::doLoop(Service* service) try {
             iassert(_mgr->rotate(client));
         }
 
-        auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
+        try {
+            if (MONGO_unlikely(ftdcThrowBSONObjectTooLarge.shouldFail())) {
+                uasserted(ErrorCodes::BSONObjectTooLarge,
+                          "Injected BSONObjectTooLarge exception for testing");
+            }
+            auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
+            Status s = _mgr->writeSampleAndRotateIfNeeded(
+                client, std::get<0>(collectSample), std::get<1>(collectSample));
 
-        Status s = _mgr->writeSampleAndRotateIfNeeded(
-            client, std::get<0>(collectSample), std::get<1>(collectSample));
+            uassertStatusOK(s);
 
-        uassertStatusOK(s);
-
-        // Store a reference to the most recent document from the periodic collectors
-        {
-            stdx::lock_guard<Latch> lock(_mutex);
-            _mostRecentPeriodicDocument = std::get<0>(collectSample);
+            // Store a reference to the most recent document from the periodic collectors
+            {
+                stdx::lock_guard<Latch> lock(_mutex);
+                _mostRecentPeriodicDocument = std::get<0>(collectSample);
+            }
+        } catch (const DBException& e) {
+            logCollectionError(e.toStatus());
+            // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
+            // catch the code directly because it does not have a definition in error_codes.yml.
+            if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
+                gDiagnosticDataCollectionDiscardLargeSamples.load()) {
+                totalDiscardedSamples.increment();
+                continue;
+            }
+            throw;
+        } catch (...) {
+            logCollectionError(exceptionToStatus());
+            throw;
         }
 
         if (--metadataCaptureFrequencyCountdown == 0) {
             metadataCaptureFrequencyCountdown = _config.metadataCaptureFrequency;
-            auto collectSample = _periodicMetadataCollectors.collect(client, _multiServiceSchema);
-            Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
-                client, std::get<0>(collectSample), std::get<1>(collectSample));
-            iassert(s);
+            try {
+                auto collectSample =
+                    _periodicMetadataCollectors.collect(client, _multiServiceSchema);
+                Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
+                    client, std::get<0>(collectSample), std::get<1>(collectSample));
+                iassert(s);
+
+            } catch (const DBException& e) {
+                logCollectionError(e.toStatus());
+                // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
+                // catch the code directly because it does not have a definition in error_codes.yml.
+                if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
+                    gDiagnosticDataCollectionDiscardLargeSamples.load()) {
+                    totalDiscardedSamples.increment();
+                    continue;
+                }
+                throw;
+            }
         }
     }
 } catch (...) {
@@ -317,6 +359,13 @@ void FTDCController::doLoop(Service* service) try {
                 "Exception thrown in full-time diagnostic data capture subsystem. Terminating the "
                 "process because diagnostics cannot be captured.",
                 "exception"_attr = exceptionToStatus());
+}
+
+void FTDCController::logCollectionError(Status error) {
+    LOGV2_DEBUG(11558500,
+                _serverStatusSectionsLogSeverity().toInt(),
+                "Encountered an error while collecting an FTDC sample",
+                "error"_attr = error);
 }
 
 }  // namespace mongo
