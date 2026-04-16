@@ -46,6 +46,7 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -181,9 +182,12 @@ std::vector<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                    const NamespaceStringOrUUID& nss,
                                                    ListIndexesInclude additionalInclude,
                                                    bool isRawDataRequest) {
-    const auto collection = acquireCollectionMaybeLockFree(
+    // TODO SERVER-104759: switch to normal acquireCollection once 9.0 becomes last LTS
+    auto [collection, _] = timeseries::acquireCollectionWithBucketsLookup(
         opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead),
+        LockMode::MODE_IS);
     if (!collection.exists()) {
         return {};
     }

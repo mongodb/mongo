@@ -327,9 +327,12 @@ bool NamespaceString::isSystemStatsCollection() const {
     return coll().starts_with(kStatisticsCollectionPrefix);
 }
 
-bool NamespaceString::isOutTmpBucketsCollection() const {
-    return isTimeseriesBucketsCollection() &&
-        getTimeseriesViewNamespace().coll().starts_with(kOutTmpCollectionPrefix);
+bool NamespaceString::isOutStageTmpCollection() const {
+    // TODO SERVER-111600: Remove the check on timeseries buckets once 9.0 becomes the last LTS
+    // and all timeseries collections are viewless.
+    return coll().starts_with(kOutTmpCollectionPrefix) ||
+        (isTimeseriesBucketsCollection() &&
+         getTimeseriesViewNamespace().coll().starts_with(kOutTmpCollectionPrefix));
 }
 
 // TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer

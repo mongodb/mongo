@@ -592,6 +592,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:catalog_helper",
         "//src/mongo/db/timeseries:timeseries_2dsphere_index_version_lookup",
+        "//src/mongo/db/timeseries:timeseries_constants",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/update:update_document_diff",

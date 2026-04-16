@@ -732,14 +732,16 @@ BSONObj CommonMongodProcessInterface::getCollectionOptionsLocally(OperationConte
 
     if (acquisition.isView()) {
         const auto view = acquisition.getView().getViewDefinition();
-        if (view.timeseries()) {
-            return getCollectionOptionsLocally(opCtx, nss.makeTimeseriesBucketsNamespace());
-        }
         BSONObjBuilder bob;
         bob.append("viewOn", view.viewOn().coll());
         bob.append("pipeline", view.pipeline());
         if (view.defaultCollator()) {
             bob.append("collation", view.defaultCollator()->getSpec().toBSON());
+        }
+        // TODO SERVER-123282: Stop hand-crafting this BSON and use
+        // listCollections internally instead.
+        if (view.timeseries()) {
+            bob.append("timeseries", true);
         }
         return bob.obj();
     }

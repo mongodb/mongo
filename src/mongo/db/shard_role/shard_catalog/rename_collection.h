@@ -37,6 +37,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -154,5 +155,14 @@ MONGO_MOD_NEEDS_REPLACEMENT void validateAndRunRenameCollection(
  */
 MONGO_MOD_PARENT_PRIVATE void uassertCannotRenameViewlessTimeseriesAcrossDBsDuringDowngrade(
     OperationContext* opCtx, const CollectionPtr& sourceColl, const NamespaceString& target);
+
+/**
+ * Check if a timeseries collection has been through an upgrade/downgrade cycle between when the
+ * caller snapshotted the original collection options and the current state. Throws
+ * InterruptedDueToTimeseriesUpgradeDowngrade if a format change is detected.
+ */
+void checkTimeseriesUpgradeDowngrade(OperationContext* opCtx,
+                                     const CollectionOrViewAcquisition& sourceAcquisition,
+                                     const CollectionOrViewAcquisition& targetAcquisition);
 
 }  // namespace mongo

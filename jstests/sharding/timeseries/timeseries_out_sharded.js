@@ -481,13 +481,14 @@ function timeseriesDefaultIndex() {
     assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7406103);
 })();
 
-// TODO SERVER-111600: Remove this test once only viewless timeseries exists
 (function testCannotHaveConflictingViews() {
     // Tests that an error is raised if a conflicting view exists.
     assert.commandWorked(testDB.createCollection("view_out", {viewOn: "out"}));
     const pipeline = [{$out: {db: testDB.getName(), coll: "view_out", timeseries: {timeField: "time"}}}];
-    assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268700);
-    assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268700);
+    // TODO SERVER-111600: Remove 7268700 error code once 9.0 becomes last LTS.
+    // This error was thrown by older versions when $out used timeseries options with the out collection being a non-timeseries view.
+    assert.throwsWithCode(() => inColl.aggregate(pipeline), [ErrorCodes.CommandNotSupportedOnView, 7268700]);
+    assert.throwsWithCode(() => observerInColl.aggregate(pipeline), [ErrorCodes.CommandNotSupportedOnView, 7268700]);
 })();
 
 (function testCannotRunWithRawData() {

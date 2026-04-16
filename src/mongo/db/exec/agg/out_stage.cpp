@@ -33,8 +33,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/writer_util.h"
-#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 
@@ -86,7 +86,7 @@ void OutStage::doDispose() {
             pExpCtx->getMongoProcessInterface()->dropTempCollection(cleanupOpCtx.get(), dropNs);
         } catch (const DBException& e) {
             LOGV2_WARNING(7466203,
-                          "Unexpected error dropping temporary collection; drop will complete "
+                          "Unexpected error dropping temporary $out collection; drop will complete "
                           "on next server restart",
                           "error"_attr = redact(e.toString()),
                           "coll"_attr = dropNs);
@@ -101,7 +101,7 @@ void OutStage::doDispose() {
             // non-timeseries collection at the view namespace. Drop it to avoid leaving
             // temp collections behind.
             // TODO SERVER-111600: Remove this once 9.0 is LTS and all timeseries are viewless.
-            if (_timeseries && !_viewlessTimeseriesEnabled) {
+            if (_tempNs.isTimeseriesBucketsCollection()) {
                 dropCollectionCmd(_tempNs.getTimeseriesViewNamespace());
             }
             break;
@@ -110,7 +110,7 @@ void OutStage::doDispose() {
             // must drop the buckets collection.
             // TODO SERVER-92272 Update this to only drop the collection iff a time-series view
             // doesn't exist.
-            if (_timeseries && !_viewlessTimeseriesEnabled) {
+            if (_outIsLegacyTimeseries) {
                 auto collType = pExpCtx->getMongoProcessInterface()->getCollectionType(
                     cleanupOpCtx.get(), _outputNs);
                 if (collType != query_shape::CollectionType::kTimeseries) {
@@ -131,40 +131,93 @@ void OutStage::doDispose() {
     }
 }
 
-void OutStage::retrieveTemporaryCollectionUUID() {
+void OutStage::retrieveOriginalOutCollInfo() {
     try {
-        auto collInfo = pExpCtx->getMongoProcessInterface()->getCollectionInfoFromPrimary(
-            pExpCtx->getOperationContext(), _tempNs);
-        uassert(11281693,
-                fmt::format("Found unexpected metadata for $out temporary collection. "
-                            "Collection Namespace: '{}', Collection Info: {}",
-                            _tempNs.toStringForErrorMsg(),
-                            collInfo.toBSON().toString()),
-                collInfo.getInfo() && collInfo.getInfo()->getUuid());
-        _tempNsUUID = collInfo.getInfo()->getUuid();
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        ex.addContext("Temporary collection disappeared during execution of $out collection");
-        throw;
-    } catch (DBException& ex) {
-        ex.addContext("Error while fetching $out temporary collection UUID");
-        throw;
+        // Save the original collection options and index specs so we can check they didn't change
+        // during computation.
+        auto originalOptions = pExpCtx->getMongoProcessInterface()->getCollectionOptions(
+            pExpCtx->getOperationContext(), _outputNs);
+        auto isLegacyTimeseries = false;
+
+        // TODO SERVER-111600: remove this translation logic once 9.0 is last LTS and all timeseries
+        // are viewless
+        //
+        // A legacy timeseries view has "timeseries" but no "uuid" in its options. We need to
+        // resolve it to the underlying system.buckets collection. Retries handle the race where
+        // the buckets collection is dropped/recreated between lookups.
+        auto isLegacyTimeseriesView = [](const BSONObj& opts) {
+            return !opts.isEmpty() && opts.hasField("timeseries") && !opts.hasField("uuid");
+        };
+
+        for (int remainingAttempts = kMaxCatalogRetryAttempts;
+             isLegacyTimeseriesView(originalOptions);) {
+            uassert(11281630,
+                    fmt::format("Exhausted all attempts to resolve legacy timeseries view to "
+                                "underlying system buckets collection for namespace '{}'",
+                                _outputNs.toStringForErrorMsg()),
+                    remainingAttempts-- > 0);
+
+            const auto bucketsNss = _outputNs.makeTimeseriesBucketsNamespace();
+            auto bucketsOptions = pExpCtx->getMongoProcessInterface()->getCollectionOptions(
+                pExpCtx->getOperationContext(), bucketsNss);
+            if (bucketsOptions.isEmpty()) {
+                // The system.buckets collection disappeared — re-read the view.
+                originalOptions = pExpCtx->getMongoProcessInterface()->getCollectionOptions(
+                    pExpCtx->getOperationContext(), _outputNs);
+            } else {
+                originalOptions = std::move(bucketsOptions);
+                isLegacyTimeseries = true;
+            }
+        }
+
+        if (!originalOptions.isEmpty()) {
+            // When rawData operations are not supported (FCV < 8.2), getIndexSpecs cannot
+            // resolve timeseries indexes through the user-facing namespace, so we must
+            // explicitly target the underlying system.buckets collection.
+            auto outputNsForFetchingIndexes = originalOptions.hasField("timeseries") &&
+                    !gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                        VersionContext::getDecoration(pExpCtx->getOperationContext()),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+                ? _outputNs.makeTimeseriesBucketsNamespace()
+                : _outputNs;
+            auto originalIndexes =
+                pExpCtx->getMongoProcessInterface()->getIndexSpecs(pExpCtx->getOperationContext(),
+                                                                   outputNsForFetchingIndexes,
+                                                                   false /* includeBuildUUIDs */);
+
+            // The uuid field is considered an option, but cannot be passed to createCollection.
+            originalOptions = originalOptions.removeField("uuid");
+
+            // Use the original options to correctly determine if we are writing to a time-series
+            // collection. We must set _originalOutCollInfo before calling validateTimeseries(),
+            // since it reads _originalOutCollInfo->options.
+            _originalOutCollInfo.emplace(OriginalCollectionInfo{
+                std::move(originalOptions), std::move(originalIndexes), isLegacyTimeseries});
+        }
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        LOGV2_DEBUG(7585601,
+                    5,
+                    "Database for $out target collection doesn't exist. Assuming default indexes "
+                    "and options");
     }
 }
 
 void OutStage::createTemporaryCollection() {
-    BSONObjBuilder createCommandOptions;
-    if (_timeseries) {
-        // Append the original collection options without the 'validator' and 'clusteredIndex'
-        // fields since these fields are invalid with the 'timeseries' field and will be
-        // recreated when the timeseries collection is created.
-        _originalOutOptions.isEmpty()
-            ? createCommandOptions << DocumentSourceOutSpec::kTimeseriesFieldName
-                                   << _timeseries->toBSON()
-            : createCommandOptions.appendElementsUnique(
-                  _originalOutOptions.removeFields(StringDataSet{"clusteredIndex", "validator"}));
-    } else {
-        createCommandOptions.appendElementsUnique(_originalOutOptions);
-    }
+    auto createCommandOptions = [&] {
+        BSONObjBuilder builder;
+        if (_timeseries) {
+            // Append the original collection options without the 'validator' and 'clusteredIndex'
+            // fields since these fields are invalid with the 'timeseries' field and will be
+            // recreated when the timeseries collection is created.
+            !_originalOutCollInfo
+                ? builder << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON()
+                : builder.appendElementsUnique(_originalOutCollInfo->options.removeFields(
+                      StringDataSet{"clusteredIndex", "validator"}));
+        } else if (_originalOutCollInfo) {
+            builder.appendElementsUnique(_originalOutCollInfo->options);
+        }
+        return builder.obj();
+    }();
 
     auto targetShard = [&]() -> boost::optional<ShardId> {
         if (auto fpTarget = outImplictlyCreateDBOnSpecificShard.scoped();
@@ -178,11 +231,74 @@ void OutStage::createTemporaryCollection() {
         }
     }();
 
+    _outIsLegacyTimeseries = [&] {
+        if (!_timeseries) {
+            return false;
+        }
+        // If the original out collection exists, the temporary collection should be of the same
+        // type.
+        if (_originalOutCollInfo) {
+            return _originalOutCollInfo->isLegacyTimeseries;
+        }
+        // If the original out collection does not exist, we create the temporary either as viewful
+        // or viewless according to the feature flag.
+        return !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    }();
+
+    //  Note that this temporary collection name is used by MongoMirror and thus should not be
+    //  changed without consultation.
+    _tempNs = makeBucketNsIfLegacyTimeseries(NamespaceStringUtil::deserialize(
+        _outputNs.dbName(),
+        str::stream() << NamespaceString::kOutTmpCollectionPrefix << UUID::gen()));
+
     // Set the enum state to 'kTmpCollExists' first, because 'createTempCollection' can throw
     // after constructing the collection.
     _tmpCleanUpState = OutCleanUpProgress::kTmpCollExists;
-    pExpCtx->getMongoProcessInterface()->createTempCollection(
-        pExpCtx->getOperationContext(), _tempNs, createCommandOptions.done(), targetShard);
+
+    for (int remainingAttempts = kMaxCatalogRetryAttempts; remainingAttempts--;) {
+        try {
+            LOGV2_DEBUG(11281650,
+                        3,
+                        "Creating $out temp collection",
+                        "isTimeseriesOp"_attr = !!_timeseries,
+                        "originalOutExists"_attr = !!_originalOutCollInfo,
+                        "originalOutIsLegacyTimeseries"_attr =
+                            _originalOutCollInfo && _originalOutCollInfo->isLegacyTimeseries,
+                        "tempNss"_attr = _tempNs,
+                        "outIsLegacyTimeseries"_attr = _outIsLegacyTimeseries);
+
+            pExpCtx->getMongoProcessInterface()->createTempCollection(
+                pExpCtx->getOperationContext(), _tempNs, createCommandOptions, targetShard);
+            break;
+        } catch (DBException& ex) {
+            if (ex.code() != timeseries::kLegacyTimeseriesTempCollectionCreationError) {
+                ex.addContext("Creation of temporary $out collection failed");
+                throw;
+            }
+            if (remainingAttempts <= 0) {
+                ex.addContext("Exhausted retry attempts while creating $out temporary collection");
+                throw;
+            }
+            // The output collection's timeseries type may have changed during an FCV
+            // transition. Toggle and retry with the translated namespace.
+            _outIsLegacyTimeseries = !_outIsLegacyTimeseries;
+            _tempNs = _tempNs.isTimeseriesBucketsCollection()
+                ? _tempNs.getTimeseriesViewNamespace()
+                : _tempNs.makeTimeseriesBucketsNamespace();
+        }
+    }
+
+    // If we started with an existing out collection that was either viewful or viewless timeseries
+    // and then we discover that the temporary was created as a different timeseries type, it means
+    // an FCV upgrade/downgrade happened in the middle. Raise a retriable error.
+    uassert(ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
+            fmt::format("The metadata of timeseries collection '{}' changed due to an "
+                        "FCV transition during the execution of $out operation",
+                        _outputNs.toStringForErrorMsg()),
+            !_originalOutCollInfo ||
+                _originalOutCollInfo->isLegacyTimeseries == _outIsLegacyTimeseries);
+
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitAfterTempCollectionCreation,
         pExpCtx->getOperationContext(),
@@ -195,6 +311,108 @@ void OutStage::createTemporaryCollection() {
     // The create command does not return the UUID of the newly created collection thus we need to
     // explicitly fetch it.
     retrieveTemporaryCollectionUUID();
+
+    LOGV2_DEBUG(11281651,
+                3,
+                "Created $out temp collection",
+                "isTimeseriesOp"_attr = !!_timeseries,
+                "originalOutExists"_attr = !!_originalOutCollInfo,
+                "originalOutIsLegacyTimeseries"_attr =
+                    _originalOutCollInfo && _originalOutCollInfo->isLegacyTimeseries,
+                "tempNss"_attr = _tempNs,
+                "tempUUID"_attr = *_tempNsUUID,
+                "outIsLegacyTimeseries"_attr = _outIsLegacyTimeseries);
+
+    if (!_originalOutCollInfo || _originalOutCollInfo->indexes.empty()) {
+        return;
+    }
+
+    // Copy the indexes of the output collection to the temp collection.
+    try {
+        auto targetNsForCreateIndex = _tempNs;
+        if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                VersionContext::getDecoration(pExpCtx->getOperationContext()),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // Since the indexes we get from the target collection are already translated to be on
+            // the fields of the bucket documents, we need to perform the recreation of those
+            // indexes on the temp collection as a rawData operation to avoid erroneously
+            // translating the indexes a second time.
+            isRawDataOperation(pExpCtx->getOperationContext()) = true;
+
+            if (_outIsLegacyTimeseries) {
+                // If we can use rawData then we always use the main timeseries namespace, never the
+                // internal system.buckets.
+                targetNsForCreateIndex = _tempNs.getTimeseriesViewNamespace();
+            }
+        }
+
+        pExpCtx->getMongoProcessInterface()->createIndexesOnEmptyCollection(
+            pExpCtx->getOperationContext(), targetNsForCreateIndex, _originalOutCollInfo->indexes);
+
+        // Reset rawData to false for the rest of the operation
+        isRawDataOperation(pExpCtx->getOperationContext()) = false;
+    } catch (DBException& ex) {
+        ex.addContext("Copying indexes for $out failed");
+        throw;
+    }
+}
+
+void OutStage::retrieveTemporaryCollectionUUID() {
+    auto targetTempNs = _tempNs;
+    for (int remainingAttempts = kMaxCatalogRetryAttempts; remainingAttempts--;) {
+        boost::optional<ListCollectionsReplyItem> optCollInfo;
+        try {
+            optCollInfo = pExpCtx->getMongoProcessInterface()->getCollectionInfoFromPrimary(
+                pExpCtx->getOperationContext(), targetTempNs);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // optCollInfo remains boost::none
+        } catch (DBException& ex) {
+            ex.addContext("Error while fetching $out temporary collection UUID");
+            throw;
+        }
+
+        if (optCollInfo && optCollInfo->getInfo() && optCollInfo->getInfo()->getUuid()) {
+            _tempNsUUID = optCollInfo->getInfo()->getUuid();
+            uassert(ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
+                    fmt::format(
+                        "The metadata of temporary timeseries collection '{}' changed due to an "
+                        "FCV transition during the execution of $out operation",
+                        _tempNs.toStringForErrorMsg()),
+                    targetTempNs == _tempNs);
+            return;
+        }
+
+        LOGV2_DEBUG(11281692,
+                    2,
+                    "$out temp collection info retrieval attempt",
+                    "remainingAttempts"_attr = remainingAttempts,
+                    "targetTempNs"_attr = targetTempNs.toStringForErrorMsg(),
+                    "listCollectionReplyItem"_attr = optCollInfo);
+
+        if (_timeseries && remainingAttempts > 0) {
+            // If this is a timeseries $out, the temp collection may have been converted from
+            // viewful to viewless (or vice-versa) during an FCV transition. Check if the
+            // translated namespace holds the temp collection.
+            targetTempNs = targetTempNs.isTimeseriesBucketsCollection()
+                ? targetTempNs.getTimeseriesViewNamespace()
+                : targetTempNs.makeTimeseriesBucketsNamespace();
+            continue;
+        }
+
+        if (!optCollInfo) {
+            uasserted(
+                ErrorCodes::NamespaceNotFound,
+                fmt::format(
+                    "Temporary collection '{}' disappeared during execution of $out collection",
+                    _tempNs.toStringForErrorMsg()));
+        } else {
+            uasserted(11281693,
+                      fmt::format("Found unexpected metadata for $out temporary collection. "
+                                  "Collection Namespace: '{}', Collection Info: {}",
+                                  targetTempNs.toStringForErrorMsg(),
+                                  optCollInfo->toBSON().toString()));
+        }
+    }
 }
 
 void OutStage::initialize() {
@@ -203,75 +421,24 @@ void OutStage::initialize() {
     // target collection if it exists. We will write all results into a temporary collection, then
     // rename the temporary collection to be the target collection once we are done.
 
-    try {
-        // Save the original collection options and index specs so we can check they didn't change
-        // during computation.
-        _originalOutOptions =
-            // The uuid field is considered an option, but cannot be passed to createCollection.
-            pExpCtx->getMongoProcessInterface()
-                ->getCollectionOptions(pExpCtx->getOperationContext(),
-                                       makeBucketNsIfLegacyTimeseries(_outputNs))
-                .removeField("uuid");
+    retrieveOriginalOutCollInfo();
 
-        // Use '_originalOutOptions' to correctly determine if we are writing to a time-series
-        // collection.
-        _timeseries = validateTimeseries();
-        _originalIndexes = pExpCtx->getMongoProcessInterface()->getIndexSpecs(
-            pExpCtx->getOperationContext(),
-            makeBucketNsIfLegacyTimeseries(_outputNs),
-            false /* includeBuildUUIDs */);
+    _timeseries = validateTimeseries();
 
-        // Check if it's capped to make sure we have a chance of succeeding before we do all the
-        // work. If the collection becomes capped during processing, the collection options will
-        // have changed, and the $out will fail.
-        uassert(17152,
-                fmt::format("namespace '{}' is capped so it can't be used for {}",
-                            _outputNs.toStringForErrorMsg(),
-                            _commonStats.stageTypeStr),
-                _originalOutOptions["capped"].eoo());
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        LOGV2_DEBUG(7585601,
-                    5,
-                    "Database for $out target collection doesn't exist. Assuming default indexes "
-                    "and options");
-    }
-
-    //  Note that this temporary collection name is used by MongoMirror and thus should not be
-    //  changed without consultation.
-    _tempNs = makeBucketNsIfLegacyTimeseries(NamespaceStringUtil::deserialize(
-        _outputNs.dbName(),
-        str::stream() << NamespaceString::kOutTmpCollectionPrefix << UUID::gen()));
+    // Check if it's capped to make sure we have a chance of succeeding before we do all the
+    // work. If the collection becomes capped during processing, the collection options will
+    // have changed, and the $out will fail.
+    uassert(17152,
+            fmt::format("namespace '{}' is capped so it can't be used for {}",
+                        _outputNs.toStringForErrorMsg(),
+                        _commonStats.stageTypeStr),
+            !_originalOutCollInfo || _originalOutCollInfo->options["capped"].eoo());
 
     uassert(7406100,
             "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
             feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
 
     createTemporaryCollection();
-
-    if (_originalIndexes.empty()) {
-        return;
-    }
-
-    // Copy the indexes of the output collection to the temp collection.
-    try {
-        if (_timeseries && _viewlessTimeseriesEnabled) {
-            // Since the indexes we get from the target collection are already translated to be on
-            // the fields of the bucket documents, we need to perform the recreation of those
-            // indexes on the temp collection as a rawData operation to avoid erroneously
-            // translating the indexes a second time.
-            isRawDataOperation(pExpCtx->getOperationContext()) = true;
-        }
-
-        pExpCtx->getMongoProcessInterface()->createIndexesOnEmptyCollection(
-            pExpCtx->getOperationContext(), _tempNs, _originalIndexes);
-
-        // Reset rawData to false for the rest of the operation in case we set it for viewless
-        // timeseries
-        isRawDataOperation(pExpCtx->getOperationContext()) = false;
-    } catch (DBException& ex) {
-        ex.addContext("Copying indexes for $out failed");
-        throw;
-    }
 }
 
 void OutStage::finalize() {
@@ -290,7 +457,7 @@ void OutStage::finalize() {
     // This could lead us to an unsupported state (a buckets collection with no view). To minimize
     // the chance this happens, we should ensure that view creation is tried immediately after the
     // rename succeeds.
-    if (_timeseries && !_viewlessTimeseriesEnabled) {
+    if (_outIsLegacyTimeseries) {
         createTimeseriesView();
     }
 
@@ -313,7 +480,12 @@ void OutStage::flush(BatchedCommandRequest bcr, BatchedObjects batch) {
 
     if (_timeseries) {
         for (const auto& writeError : pExpCtx->getMongoProcessInterface()->insertTimeseries(
-                 pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch)) {
+                 pExpCtx,
+                 _tempNs.isTimeseriesBucketsCollection() ? _tempNs.getTimeseriesViewNamespace()
+                                                         : _tempNs,
+                 std::move(insertCommand),
+                 _writeConcern,
+                 targetEpoch)) {
             uassertStatusOK(writeError.getStatus());
         }
     } else {
@@ -387,7 +559,8 @@ void OutStage::checkTemporaryCollectionUUIDNotChanged() {
 
     if (resolvedNs != _tempNs) {
 
-        // TODO SERVER-111600: Remove this function once 9.0 is LTS and all timeseries are viewless
+        // TODO SERVER-111600: Remove this function once 9.0 is last LTS and all timeseries are
+        // viewless
         if (resolvedNs.isTimeseriesBucketsCollection() || _tempNs.isTimeseriesBucketsCollection()) {
             uasserted(
                 ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
@@ -417,17 +590,35 @@ void OutStage::renameTemporaryCollection() {
             LOGV2(7585602,
                   "Hanging aggregation due to 'outWaitBeforeTempCollectionRename' failpoint");
         });
-    pExpCtx->getMongoProcessInterface()->renameIfOptionsAndIndexesHaveNotChanged(
-        pExpCtx->getOperationContext(),
-        _tempNs,
-        outputNs,
-        true /* dropTarget */,
-        false /* stayTemp */,
-        _originalOutOptions,
-        _originalIndexes);
+
+    LOGV2_DEBUG(11281653,
+                3,
+                "Renaming temporary $out collection",
+                "isTimeseriesOp"_attr = !!_timeseries,
+                "originalOutExists"_attr = !!_originalOutCollInfo,
+                "originalOutIsLegacyTimeseries"_attr =
+                    _originalOutCollInfo && _originalOutCollInfo->isLegacyTimeseries,
+                "tempNss"_attr = _tempNs,
+                "tempUUID"_attr = *_tempNsUUID,
+                "outNss"_attr = outputNs,
+                "outIsLegacyTimeseries"_attr = _outIsLegacyTimeseries);
+
+    try {
+        pExpCtx->getMongoProcessInterface()->renameIfOptionsAndIndexesHaveNotChanged(
+            pExpCtx->getOperationContext(),
+            _tempNs,
+            outputNs,
+            true /* dropTarget */,
+            false /* stayTemp */,
+            _originalOutCollInfo ? _originalOutCollInfo->options : BSONObj{},
+            _originalOutCollInfo ? _originalOutCollInfo->indexes : std::vector<BSONObj>{});
+    } catch (DBException& ex) {
+        ex.addContext("Failed to rename temporary $out collection");
+        throw;
+    }
 }
 
-// TODO SERVER-111600: Remove this function once 9.0 is LTS
+// TODO SERVER-111600: Remove this function once 9.0 is last LTS and all timeseries are viewless
 void OutStage::createTimeseriesView() {
     _tmpCleanUpState = OutCleanUpProgress::kRenameComplete;
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -447,13 +638,14 @@ void OutStage::createTimeseriesView() {
         pExpCtx->getOperationContext(), _outputNs, cmd.done(), *_timeseries);
 }
 
-// TODO SERVER-111600: Remove this function once 9.0 is LTS
+// TODO SERVER-111600: Remove this function once 9.0 is last LTS and all timeseries are viewless
 NamespaceString OutStage::makeBucketNsIfLegacyTimeseries(const NamespaceString& ns) {
-    return _timeseries && !_viewlessTimeseriesEnabled ? ns.makeTimeseriesBucketsNamespace() : ns;
+    return _outIsLegacyTimeseries ? ns.makeTimeseriesBucketsNamespace() : ns;
 }
 
 std::shared_ptr<TimeseriesOptions> OutStage::validateTimeseries() {
-    const BSONElement targetTimeseriesElement = _originalOutOptions["timeseries"];
+    const BSONElement targetTimeseriesElement =
+        _originalOutCollInfo ? _originalOutCollInfo->options["timeseries"] : BSONElement{};
     std::shared_ptr<TimeseriesOptions> targetTSOpts;
     if (targetTimeseriesElement) {
         tassert(
@@ -466,18 +658,6 @@ std::shared_ptr<TimeseriesOptions> OutStage::validateTimeseries() {
     // namespace is a time-series collection, then we will use the target collection time-series
     // options, and treat this operation as a write to time-series collection.
     if (!_timeseries) {
-        // Must update '_originalOutOptions' to be on the buckets namespace if this is a legacy
-        // timeseries collection, since previously we didn't know we will be writing a time-series
-        // collection.
-        if (targetTSOpts) {
-            _originalOutOptions =
-                pExpCtx->getMongoProcessInterface()
-                    ->getCollectionOptions(pExpCtx->getOperationContext(),
-                                           _viewlessTimeseriesEnabled
-                                               ? _outputNs
-                                               : _outputNs.makeTimeseriesBucketsNamespace())
-                    .removeField("uuid");
-        }
         return targetTSOpts;
     }
 
@@ -487,10 +667,7 @@ std::shared_ptr<TimeseriesOptions> OutStage::validateTimeseries() {
     // concurrent view or collection creation during each step of its execution.
     uassert(7268700,
             "Cannot create a time-series collection from a non time-series collection or view.",
-            targetTSOpts ||
-                pExpCtx->getMongoProcessInterface()->getCollectionType(
-                    pExpCtx->getOperationContext(), _outputNs) ==
-                    query_shape::CollectionType::kNonExistent);
+            targetTSOpts || !_originalOutCollInfo);
 
     // If the user did specify 'timeseries' options and the target namespace is a time-series
     // collection, then the time-series options should match.

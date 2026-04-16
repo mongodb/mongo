@@ -65,13 +65,7 @@ public:
         : WriterStage<BSONObj>(stageName.data(), pExpCtx, std::move(outputNs)),
           _writeConcern(pExpCtx->getOperationContext()->getWriteConcern()),
           _timeseries(timeseries),
-          _mergeShardId(std::move(mergeShardId)) {
-        // TODO(SERVER-112816): The viewless timeseries feature flag should not be checked here,
-        // since $out has no FCV stability guarantee (and we can't acquire an Operation FCV,
-        // because it does not support long-running operations yet.)
-        _viewlessTimeseriesEnabled = gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-            VersionContext(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    }
+          _mergeShardId(std::move(mergeShardId)) {}
 
 private:
     void doDispose() override;
@@ -94,20 +88,25 @@ private:
     void createTemporaryCollection();
 
     /**
-     * Fetches the UUID of the temporary collection from the primary and stores it in _tempNsUUID.
+     * Retrieves the UUID of the temporary collection and populates the _tempNsUUID field.
      */
     void retrieveTemporaryCollectionUUID();
 
     /**
-     * Verifies that the temporary collection UUID has not changed since it was first stored,
-     * to detect drops or renames during $out execution.
+     * Checks that the temporary collection has not been changed during execution of $out.
+     *
+     * Throws InterruptedDueToTimeseriesUpgradeDowngrade if the temporary collection is timeseries
+     * and has been upgraded/downgraded during execution of $out.
+     *
+     * Throws NamespaceNotFound if the temporary collection has been removed.
      */
     void checkTemporaryCollectionUUIDNotChanged();
 
+
     /**
-     * Runs a renameCollection from the temporary namespace to the user requested namespace. Returns
-     * nothing, but if the function returns, we assume the rename has succeeded and the temporary
-     * namespace no longer exists.
+     * Runs a renameCollection from the temporary namespace to the user requested namespace.
+     * Returns nothing, but if the function returns, we assume the rename has succeeded and the
+     * temporary namespace no longer exists.
      */
     void renameTemporaryCollection();
 
@@ -117,6 +116,12 @@ private:
      * If the function returns, we assume the view is created.
      */
     void createTimeseriesView();
+
+    /**
+     * Retrieves and stores the original output collection's options, indexes, and UUID. Must be
+     * called before validateTimeseries() since it populates '_originalOutCollInfo'.
+     */
+    void retrieveOriginalOutCollInfo();
 
     void initialize() override;
 
@@ -148,6 +153,8 @@ private:
      */
     std::shared_ptr<TimeseriesOptions> validateTimeseries();
 
+    static constexpr int kMaxCatalogRetryAttempts = 5;
+
     // Stash the writeConcern of the original command as the operation context may change by the
     // time we start to flush writes. This is because certain aggregations (e.g. $exchange)
     // establish cursors with batchSize 0 then run subsequent getMore's which use a new operation
@@ -155,11 +162,16 @@ private:
     // respect the writeConcern of the original command.
     WriteConcernOptions _writeConcern;
 
-    // Holds on to the original collection options and index specs so we can check they didn't
-    // change during computation. For time-series collections these values will be translated for
-    // the raw buckets.
-    BSONObj _originalOutOptions;
-    std::vector<BSONObj> _originalIndexes;
+    // Holds on to the original collection options and index specs so we can check they
+    // didn't change during computation. For time-series collections these values will be
+    // translated for the raw buckets.
+    struct OriginalCollectionInfo {
+        BSONObj options;
+        std::vector<BSONObj> indexes;
+        // TODO SERVER-111600: remove this once 9.0 becomes last LTS
+        bool isLegacyTimeseries;
+    };
+    boost::optional<OriginalCollectionInfo> _originalOutCollInfo;
 
     // The temporary namespace for the $out writes.
     NamespaceString _tempNs;
@@ -179,9 +191,12 @@ private:
 
     boost::optional<ShardId> _mergeShardId;
 
-    // TODO SERVER-111600: Remove this variable and all references to it.
-    // Set if CreateViewlessTimseriesCollections feature flag is enabled
-    bool _viewlessTimeseriesEnabled;
+    // True when the temporary and final out collection must be created
+    // as legacy timeseries collections.
+    //
+    // TODO SERVER-111600: Remove this variable and all references to it once
+    // 9.0 becomes last LTS and all timeseries collections are viewless
+    bool _outIsLegacyTimeseries = false;
 };
 
 }  // namespace mongo::exec::agg

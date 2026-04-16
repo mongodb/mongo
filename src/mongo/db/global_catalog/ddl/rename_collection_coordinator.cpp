@@ -70,6 +70,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/shard_role/shard_catalog/rename_collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -595,6 +596,23 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             "databases",
                             fromNss.db_forSharding() == toNss.db_forSharding() ||
                                 (!_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID()));
+
+                    {
+                        auto acquisitions =
+                            makeAcquisitionMap(acquireCollectionsOrViewsMaybeLockFree(
+                                opCtx,
+                                {CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                     opCtx,
+                                     fromNss,
+                                     AcquisitionPrerequisites::OperationType::kRead),
+                                 CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                     opCtx,
+                                     toNss,
+                                     AcquisitionPrerequisites::OperationType::kRead)}));
+
+                        checkTimeseriesUpgradeDowngrade(
+                            opCtx, acquisitions.at(fromNss), acquisitions.at(toNss));
+                    }
 
                     {
                         AutoGetCollection coll{

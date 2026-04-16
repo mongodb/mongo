@@ -364,6 +364,9 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.dbName());
     const auto& sourceColl = acquisitions.at(source).getCollectionPtr();
     const auto& targetColl = acquisitions.at(target).getCollectionPtr();
+
+    checkTimeseriesUpgradeDowngrade(opCtx, acquisitions.at(source), acquisitions.at(target));
+
     // While acquireCollectionsOrViews can validate expected UUIDs (if provided via fromOpCtx),
     // we perform the validation separately here after acquisition. This preserves the exact
     // order of CollectionUUIDMismatchInfo in the reply for backward compatibility.
@@ -1011,6 +1014,52 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
 }  // namespace
 
+// TODO SERVER-111600: Remove this check once 9.0 is last LTS and all timeseries are viewless.
+// Detect if a timeseries collection has been through an upgrade/downgrade cycle between when the
+// caller snapshotted the original collection options and when it called
+// internalRenameIfOptionsMatch. This check is only performed when the request comes from
+// internalRenameIfOptionsMatch and the originalCollectionOptions contain timeseries. An FCV
+// transition in that window can cause timeseries collections to switch between view-based and
+// viewless formats.
+void checkTimeseriesUpgradeDowngrade(OperationContext* opCtx,
+                                     const CollectionOrViewAcquisition& sourceAcquisition,
+                                     const CollectionOrViewAcquisition& targetAcquisition) {
+    // Only perform the upgrade/downgrade check when the rename originates from $out (i.e. the
+    // source is a $out stage tmp collection). A regular client rename over a legacy timeseries
+    // view should not raise InterruptedDueToTimeseriesUpgradeDowngrade.
+    if (!sourceAcquisition.nss().isOutStageTmpCollection()) {
+        return;
+    }
+
+    auto checkAcquisition = [&](const CollectionOrViewAcquisition& acquisition) {
+        const auto& nss = acquisition.nss();
+        bool timeseriesFormatChanged = false;
+        // If the namespace resolved to a timeseries view, the collection was downgraded from
+        // viewless to view-based format during the operation.
+        if (acquisition.isView() && acquisition.getView().getViewDefinition().timeseries()) {
+            tassert(11281601,
+                    fmt::format("Unexpected timeseries view on system.buckets namespace '{}'",
+                                nss.toStringForErrorMsg()),
+                    !nss.isTimeseriesBucketsCollection());
+            timeseriesFormatChanged = true;
+        } else if (nss.isTimeseriesBucketsCollection() && !acquisition.collectionExists()) {
+            // If the namespace is a system.buckets namespace but no longer exists, check whether
+            // a viewless timeseries collection now exists on the main namespace — indicating an
+            // upgrade from view-based to viewless format during the operation.
+            auto catalog = CollectionCatalog::get(opCtx);
+            timeseriesFormatChanged = !!catalog->establishConsistentCollection(
+                opCtx, nss.getTimeseriesViewNamespace(), boost::none);
+        }
+        uassert(ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
+                fmt::format("Operation on collection '{}' was interrupted due to a time-series "
+                            "metadata change during FCV transition. Retry the operation.",
+                            nss.toStringForErrorMsg()),
+                !timeseriesFormatChanged);
+    };
+    checkAcquisition(sourceAcquisition);
+    checkAcquisition(targetAcquisition);
+}
+
 void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     const NamespaceString& sourceNs,
                                                     const NamespaceString& targetNs,
@@ -1023,17 +1072,21 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
 Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
                                          const BSONObj& expectedOptions,
                                          const BSONObj& currentOptions) {
-    // We do not include the UUID field in the options comparison. It is ok if the target collection
-    // was dropped and recreated, as long as the new target collection has the same options and
-    // indexes as the original one did. This is mainly to support concurrent $out to the same
-    // collection.
-    if (SimpleBSONObjComparator::kInstance.evaluate(expectedOptions.removeField("uuid") !=
-                                                    currentOptions.removeField("uuid"))) {
+
+    // We do not include the UUID field in the options comparison. It is ok if the target
+    // collection was dropped and recreated, as long as the new target collection has the same
+    // options and indexes as the original one did. This is mainly to support concurrent $out to
+    // the same collection.
+    auto compExpectedOptions = expectedOptions.removeField("uuid");
+    auto compCurrentOptions = currentOptions.removeField("uuid");
+
+    if (SimpleBSONObjComparator::kInstance.evaluate(compExpectedOptions != compCurrentOptions)) {
         return Status(ErrorCodes::CommandFailed,
-                      str::stream() << "collection options of target collection "
-                                    << targetNss.toStringForErrorMsg()
-                                    << " changed during processing. Original options: "
-                                    << expectedOptions << ", new options: " << currentOptions);
+                      fmt::format("Collection options of target collection '{}' changed during "
+                                  "processing. Original options: {}, new options: {}",
+                                  targetNss.toStringForErrorMsg(),
+                                  compExpectedOptions.toString(),
+                                  compCurrentOptions.toString()));
     };
     return Status::OK();
 }
@@ -1122,7 +1175,7 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             "renaming system.users collection or renaming to system.users is not allowed",
             !source.isSystemDotUsers() && !target.isSystemDotUsers());
 
-    if (!source.isOutTmpBucketsCollection() && source.isTimeseriesBucketsCollection()) {
+    if (!source.isOutStageTmpCollection() && source.isTimeseriesBucketsCollection()) {
         uassert(ErrorCodes::IllegalOperation,
                 "Renaming system.buckets collections is not allowed",
                 AuthorizationSession::get(opCtx->getClient())

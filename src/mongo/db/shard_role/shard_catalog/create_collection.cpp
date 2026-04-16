@@ -852,6 +852,21 @@ void _createTimeseriesCollection(
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx));
 
+    // This uassert is used to signal $out that is attempting to create a legacy timeseries temp
+    // collection when we are already in FCV 9.0. $out has special logic to catch this and switch to
+    // viewless creation.
+    //
+    // TODO SERVER-118970 remove once 9.0 becomes last LTS and all timeseries collection will be
+    // viewless.
+    uassert(
+        timeseries::kLegacyTimeseriesTempCollectionCreationError,
+        fmt::format(
+            "Received illegal create for temporary timeseries collection request on legacy system "
+            "buckets namespace '{}' when viewless timeseries feature flag is enabled",
+            ns.toStringForErrorMsg()),
+        !viewlessTimeseriesEnabled || !ns.isTimeseriesBucketsCollection() ||
+            !ns.isOutStageTmpCollection());
+
     tassert(12128910,
             fmt::format("Received illegal create timeseries collection request on legacy system "
                         "buckets namespace '{}' when viewless timeseries feature flag is enabled",

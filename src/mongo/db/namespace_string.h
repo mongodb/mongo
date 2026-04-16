@@ -551,10 +551,10 @@ public:
     bool isSystemStatsCollection() const;
 
     /**
-     * Returns true if the collection starts with "system.buckets.tmp.agg_out". Used for $out to
-     * time-series collections.
+     * Returns true if the collection is a temporary $out collection. Matches both viewless
+     * ("tmp.agg_out") and legacy ("system.buckets.tmp.agg_out") timeseries namespaces.
      */
-    bool isOutTmpBucketsCollection() const;
+    bool isOutStageTmpCollection() const;
 
     /**
      * Returns the time-series buckets namespace for this view.
@@ -897,7 +897,7 @@ inline StringData nsToDatabaseSubstring(StringData ns) {
 /**
  * "database.a.b.c" -> "database"
  *
- * TODO: make this return a StringData
+ * TODO SERVER-123310: make this return a StringData
  */
 inline std::string nsToDatabase(StringData ns) {
     return std::string{nsToDatabaseSubstring(ns)};

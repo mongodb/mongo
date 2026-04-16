@@ -85,6 +85,13 @@ static constexpr StringData kControlFieldNameDocDiff = "scontrol"_sd;
 static constexpr StringData kMinFieldNameDocDiff = "smin"_sd;
 static constexpr StringData kMaxFieldNameDocDiff = "smax"_sd;
 
+// Error code used to signal $out that it is attempting to create a legacy timeseries temp
+// collection when viewless timeseries is enabled. $out catches this and retries with the
+// viewless namespace.
+// TODO SERVER-118970 remove once 9.0 becomes last LTS and all timeseries collections will be
+// viewless.
+static constexpr int kLegacyTimeseriesTempCollectionCreationError = 11281600;
+
 inline const StringDataSet kAllowedCollectionCreationOptions{
     CreateCommand::kStorageEngineFieldName,
     CreateCommand::kIndexOptionDefaultsFieldName,

@@ -40,7 +40,7 @@ assert.commandWorked(st.s.adminCommand({moveCollection: lookUpColl.getFullName()
 // that $out is trying to replace is on the primary shard. Because we have the 'timeseries' option,
 // which requires a view, $out will run on the primary shard. So to avoid this and force $out to run
 // on the non-primary shard, we must input a $lookup stage first.
-function validateAggOutFailed(createCommand) {
+function validateAggOutFailed(createCommand, expectedErrors) {
     assert(testDB[kOutCollName].drop());
     assert.commandWorked(testDB.runCommand(createCommand));
     assert.commandWorked(st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kPrimary}));
@@ -56,7 +56,12 @@ function validateAggOutFailed(createCommand) {
         {$out: {db: kDbName, coll: kOutCollName, timeseries: {timeField: "t"}}},
     ];
 
-    assert.throwsWithCode(() => sourceColl.aggregate(kPipeline, {comment: kPipelineComment}), 7268700);
+    assert.throwsWithCode(
+        () => sourceColl.aggregate(kPipeline, {comment: kPipelineComment}),
+        expectedErrors,
+        [],
+        `Aggregation did not fail as expected. Source coll: '${sourceColl.getFullName()}' Pipeline: ${tojson(kPipeline)}`,
+    );
 
     // Confirm the aggregation ran on the other shard using the profiler.
     let profileFilter = {
@@ -74,7 +79,11 @@ function validateAggOutFailed(createCommand) {
     assert.sameMembers([kSourceCollName, kLookUpCollName, kOutCollName], collections, tojson(collections));
 }
 
-validateAggOutFailed({create: kOutCollName});
-validateAggOutFailed({create: kOutCollName, viewOn: kLookUpCollName, pipeline: [{$project: {val: 1}}]});
+validateAggOutFailed({create: kOutCollName}, [7268700]);
+// TODO SERVER-111600: Remove error code 7268700 once 9.0 becomes last LTS.
+validateAggOutFailed({create: kOutCollName, viewOn: kLookUpCollName, pipeline: [{$project: {val: 1}}]}, [
+    ErrorCodes.CommandNotSupportedOnView,
+    7268700,
+]);
 
 st.stop();
