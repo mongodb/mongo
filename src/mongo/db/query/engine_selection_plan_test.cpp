@@ -30,7 +30,12 @@
 #include "mongo/db/query/engine_selection_plan.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -42,47 +47,89 @@ public:
         : nss(NamespaceString::createNamespaceString_forTest("testdb.coll")) {}
 
     std::unique_ptr<QuerySolution> makeDistinctScanPlan(BSONObj indexKeys) {
-        auto distinct = std::make_unique<DistinctNode>(nss, buildSimpleIndexEntry(indexKeys));
-        auto solution = std::make_unique<QuerySolution>();
-        solution->setRoot(std::move(distinct));
-        return solution;
+        return makePlan(std::make_unique<DistinctNode>(nss, buildSimpleIndexEntry(indexKeys)));
     }
 
     std::unique_ptr<QuerySolution> makeIndexScanFetchPlan(BSONObj indexKeys) {
-        auto indexScan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(indexKeys));
-        auto fetch = std::make_unique<FetchNode>(std::move(indexScan), nss);
+        return makePlan(makeFetchIxScanNode(indexKeys));
+    }
 
+    std::unique_ptr<QuerySolution> makePlan(std::unique_ptr<QuerySolutionNode> root) {
         auto solution = std::make_unique<QuerySolution>();
-        solution->setRoot(std::move(fetch));
+        solution->setRoot(std::move(root));
         return solution;
+    }
+
+    std::unique_ptr<QuerySolutionNode> makeFetchIxScanNode(BSONObj indexKeys) {
+        auto indexScan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(indexKeys));
+        return std::make_unique<FetchNode>(std::move(indexScan), nss);
+    }
+
+    std::unique_ptr<QuerySolutionNode> makeOrFetchIxScanNode(size_t numBranches) {
+        auto orNode = std::make_unique<OrNode>();
+        orNode->dedup = false;
+
+        for (size_t i = 0; i < numBranches; ++i) {
+            orNode->children.emplace_back(makeFetchIxScanNode(fromjson("{a: 1}")));
+        }
+
+        return orNode;
+    }
+
+    std::unique_ptr<QuerySolutionNode> makeSentinelNode(std::unique_ptr<QuerySolutionNode> child) {
+        auto sentinel = std::make_unique<SentinelNode>();
+        sentinel->children.emplace_back(std::move(child));
+        return sentinel;
+    }
+
+    std::unique_ptr<QuerySolutionNode> makeFetchSortIxScanNode(BSONObj indexKeys,
+                                                               BSONObj sortPattern) {
+        auto indexScan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(indexKeys));
+        auto sort = std::make_unique<SortNodeDefault>(
+            std::move(indexScan), sortPattern, 0, LimitSkipParameterization::Disabled);
+        return std::make_unique<FetchNode>(std::move(sort), nss);
+    }
+
+    std::unique_ptr<QuerySolutionNode> makeProjectFetchIxScanNode(
+        boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj indexKeys, BSONObj projectionObj) {
+        auto projection = projection_ast::parseAndAnalyze(
+            expCtx, projectionObj, ProjectionPolicies::findProjectionPolicies());
+        return std::make_unique<ProjectionNodeDefault>(
+            makeFetchIxScanNode(indexKeys), nullptr, std::move(projection));
+    }
+
+    std::unique_ptr<QuerySolutionNode> makeLookupUnwindNode(
+        std::unique_ptr<QuerySolutionNode> child) {
+        auto nssForeign = NamespaceString::createNamespaceString_forTest("testdb.collForeign");
+
+        std::vector<std::unique_ptr<QuerySolutionNode>> children;
+        children.emplace_back(std::move(child));
+        children.emplace_back(std::make_unique<CollectionScanNode>(nssForeign));
+
+        return std::make_unique<EqLookupNode>(std::move(children),
+                                              nssForeign,
+                                              FieldPath("b"),
+                                              FieldPath("c"),
+                                              FieldPath("a"),
+                                              EqLookupNode::LookupStrategy::kHashJoin,
+                                              false,
+                                              false,
+                                              boost::none);
     }
 
 protected:
     NamespaceString nss;
 };
 
-TEST_F(EngineSelectionPlanFixture, LookupUnwind) {
-    auto nssLocal = NamespaceString::createNamespaceString_forTest("testdb.collLocal");
-    auto nssForeign = NamespaceString::createNamespaceString_forTest("testdb.collForeign");
-
+// Test selection of IXSCAN + FETCH + LU plans.
+TEST_F(EngineSelectionPlanFixture, LookupUnwindFetchIxScanSelection) {
     BSONObj indexFields = fromjson("{a: 1}");
-    std::vector<std::unique_ptr<QuerySolutionNode>> children;
-    children.emplace_back(
-        std::make_unique<IndexScanNode>(nssLocal, buildSimpleIndexEntry(indexFields)));
-    children.emplace_back(std::make_unique<CollectionScanNode>(nssForeign));
-    auto lookupUnwind = std::make_unique<EqLookupNode>(std::move(children),
-                                                       nssForeign,
-                                                       FieldPath("b"),
-                                                       FieldPath("c"),
-                                                       FieldPath("a"),
-                                                       EqLookupNode::LookupStrategy::kHashJoin,
-                                                       false,
-                                                       false,
-                                                       boost::none);
-    auto solution = std::make_unique<QuerySolution>();
-    solution->setRoot(std::move(lookupUnwind));
+    auto sentinel = makeSentinelNode(makeFetchIxScanNode(indexFields));
+    const auto* dataAccessNode = sentinel->children[0].get();
+    auto lookupUnwind = makeLookupUnwindNode(std::move(sentinel));
+    auto solution = makePlan(std::move(lookupUnwind));
 
-    EngineSelectionResult result = engineSelectionForPlan(solution.get());
+    EngineSelectionResult result = engineSelectionForPlan(solution.get(), dataAccessNode);
     ASSERT_EQ(result.engine, EngineChoice::kSbe);
     ASSERT_EQ(result.planPushdownRoot, solution->root());
 }
@@ -138,15 +185,92 @@ TEST_F(EngineSelectionPlanFixture, AndSortedEligibility) {
     ASSERT_FALSE(isPlanSbeEligible(solution.get()));
 }
 
-// Test selection of FETCH + IXSCAN plans.
+// Test selection of IXSCAN + FETCH plans.
 TEST_F(EngineSelectionPlanFixture, FetchIxScanSelection) {
     BSONObj indexFields = fromjson("{a: 1}");
 
-    std::unique_ptr<QuerySolution> solution = makeIndexScanFetchPlan(indexFields);
+    auto sentinel = makeSentinelNode(makeFetchIxScanNode(indexFields));
+    const auto* dataAccessNode = sentinel->children[0].get();
+    std::unique_ptr<QuerySolution> solution = makePlan(std::move(sentinel));
 
-    EngineSelectionResult result = engineSelectionForPlan(solution.get());
+    EngineSelectionResult result = engineSelectionForPlan(solution.get(), dataAccessNode);
     ASSERT_EQ(result.engine, EngineChoice::kClassic);
     ASSERT_EQ(result.planPushdownRoot, nullptr);
+}
+
+// Test selection of IXSCAN + FETCH + OR + LU plans.
+TEST_F(EngineSelectionPlanFixture, LookupUnwindOrFetchIxScanSelection) {
+    auto runTest = [this](int numBranches, EngineChoice engine) {
+        auto sentinel = makeSentinelNode(makeOrFetchIxScanNode(numBranches));
+        const auto* dataAccessNode = sentinel->children[0].get();
+        auto solution = makePlan(makeLookupUnwindNode(std::move(sentinel)));
+
+        EngineSelectionResult result = engineSelectionForPlan(solution.get(), dataAccessNode);
+        ASSERT_EQ(result.engine, engine);
+        ASSERT_EQ(result.planPushdownRoot,
+                  engine == EngineChoice::kClassic ? nullptr : solution->root());
+    };
+    runTest(1, EngineChoice::kSbe);
+    runTest(3, EngineChoice::kSbe);
+    runTest(101, EngineChoice::kClassic);
+}
+
+// Test selection of IXSCAN + SORT + FETCH + LU + PROJECT + MATCH plans.
+TEST_F(EngineSelectionPlanFixture, MatchProjectLookupUnwindFetchSortIxScanSelection) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    auto sentinel =
+        makeSentinelNode(makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}")));
+    const auto* dataAccessNode = sentinel->children[0].get();
+    auto lookupUnwindNode = makeLookupUnwindNode(std::move(sentinel));
+
+    auto projection = projection_ast::parseAndAnalyze(
+        expCtx, fromjson("{computedA: '$a'}"), ProjectionPolicies::addFieldsProjectionPolicies());
+    auto project = std::make_unique<ProjectionNodeDefault>(
+        std::move(lookupUnwindNode), nullptr, std::move(projection));
+
+    auto matchNode = std::make_unique<MatchNode>(std::move(project),
+                                                 unittest::assertGet(MatchExpressionParser::parse(
+                                                     fromjson("{computedA: {$gte: 0}}"), expCtx)));
+
+    auto solution = makePlan(std::move(matchNode));
+
+    EngineSelectionResult result = engineSelectionForPlan(solution.get(), dataAccessNode);
+    ASSERT_EQ(result.engine, EngineChoice::kSbe);
+    ASSERT_EQ(result.planPushdownRoot, solution->root());
+}
+
+// Test selection of IXSCAN + FETCH + PROJECT + GROUP + LU plans.
+TEST_F(EngineSelectionPlanFixture, GroupLookupUnwindProjectFetchIxScanSelection) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    auto sentinel = makeSentinelNode(
+        makeProjectFetchIxScanNode(expCtx, fromjson("{a: 1}"), fromjson("{a: 1, _id: 0}")));
+    const auto* dataAccessNode = sentinel->children[0].get();
+
+    auto countSpec = fromjson("{count: {$count: {}}}");
+    VariablesParseState vps = expCtx->variablesParseState;
+    auto groupNode = std::make_unique<GroupNode>(
+        std::move(sentinel),
+        ExpressionConstant::create(expCtx.get(), Value(BSONNULL)),
+        std::vector<AccumulationStatement>{AccumulationStatement::parseAccumulationStatement(
+            expCtx.get(), countSpec["count"], vps)},
+        false,
+        false,
+        true);
+    const auto* groupNodePtr = groupNode.get();
+
+    auto lookupUnwindNode = makeLookupUnwindNode(std::move(groupNode));
+
+    auto solution = makePlan(std::move(lookupUnwindNode));
+
+    EngineSelectionResult result = engineSelectionForPlan(solution.get(), dataAccessNode);
+    ASSERT_EQ(result.engine, EngineChoice::kSbe);
+    ASSERT_EQ(result.planPushdownRoot, groupNodePtr);
 }
 
 }  // namespace mongo

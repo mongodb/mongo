@@ -48,7 +48,8 @@ bool isPlanSbeEligible(const QuerySolution* solution);
 /**
  * Returns the engine of choice for executing the specified query plan.
  */
-EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution);
+EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
+                                             const QuerySolutionNode* dataAccessNode);
 
 /**
  * Returns true iff 'keyPattern' has fields A and B where all of the following hold

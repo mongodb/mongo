@@ -63,8 +63,9 @@ private:
 };
 
 template <class Rule, class N>
-concept HasPreVisit =
-    requires(Rule& rule, RuleEngine& engine, const N& node) { rule.preVisit(engine, node); };
+concept HasPreVisit = requires(Rule& rule, RuleEngine& engine, const N& node, size_t index) {
+    rule.preVisit(engine, node, index);
+};
 
 template <class Rule, class N>
 concept HasPostVisit =
@@ -74,11 +75,11 @@ template <class Rule>
 concept HasFinish = requires(Rule& rule, RuleEngine& engine) { rule.finish(engine); };
 
 template <class Rule, class N>
-void callPreVisit(Rule& rule, RuleEngine& engine, const N& node) {
+void callPreVisit(Rule& rule, RuleEngine& engine, const N& node, size_t index) {
     if constexpr (HasPreVisit<Rule, N>) {
         if (engine.hasMatch())
             return;
-        rule.preVisit(engine, node);
+        rule.preVisit(engine, node, index);
     }
 }
 
@@ -141,7 +142,7 @@ void visit(F&& f, const QuerySolutionNode& node) {
  *
  * class MyRule {
  *    void finish(RuleEngine& engine);
- *    void preVisit(RuleEngine& engine, const QuerySolutionNode& node);
+ *    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index);
  *    void postVisit(RuleEngine& engine, const QuerySolutionNode& node);
  * };
  *
@@ -155,20 +156,21 @@ void visit(F&& f, const QuerySolutionNode& node) {
  *
  * class MyRule2 {
  * public:
- *    void preVisit(RuleEngine& engine, const IndexScanNode& node);     // (1)
- *    void preVisit(RuleEngine& engine, const QuerySolutionNode& node); // (2)
+ *    void preVisit(RuleEngine& engine, const IndexScanNode& node, size_t index);     // (1)
+ *    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index); // (2)
  * };
  */
 template <class... Rules>
 const QuerySolutionNode* treeSearch(const QuerySolutionNode* root, Rules&&... rules) {
     RuleEngine engine;
-    std::function<void(const QuerySolutionNode*)> walk = [&](const QuerySolutionNode* node) {
-        visit([&](const auto& node) { (callPreVisit(rules, engine, node), ...); }, *node);
+    std::function<void(const QuerySolutionNode*, size_t)> walk = [&](const QuerySolutionNode* node,
+                                                                     size_t index) {
+        visit([&](const auto& node) { (callPreVisit(rules, engine, node, index), ...); }, *node);
         if (engine.hasMatch())
             return;
 
-        for (const auto& child : node->children) {
-            walk(child.get());
+        for (size_t i = 0; i < node->children.size(); ++i) {
+            walk(node->children[i].get(), i);
             if (engine.hasMatch())
                 return;
         }
@@ -176,54 +178,273 @@ const QuerySolutionNode* treeSearch(const QuerySolutionNode* root, Rules&&... ru
         visit([&](const auto& node) { (callPostVisit(rules, engine, node), ...); }, *node);
     };
 
-    walk(root);
+    walk(root, 0);
     (callFinish(rules, engine), ...);
 
     return engine.getMatchedNode();
 }
 
 /**
- * Returns 'true' if the query solution tree at 'node' matches any of the rules defined by 'rules'.
+ * Returns 'true' if the query solution tree at 'root' matches any of the rules defined by 'rules'.
  */
 template <class... Rules>
 bool treeMatchesAny(const QuerySolutionNode* root, Rules&&... rules) {
     return treeSearch(root, std::forward<Rules>(rules)...) != nullptr;
 }
 
-/**
- * This rule matches when:
- * 1. There is at least one LOOKUP_UNWIND in the tree.
- *
- * TODO SERVER-117922: Implement this rule.
- */
-class LookupUnwindRule {
-public:
-    void preVisit(RuleEngine& engine, const EqLookupNode& node) {
-        if (node.unwindSpec) {
-            engine.match(&node);
-        }
+struct Range {
+    size_t min;
+    size_t max;  // Exclusive.
+
+    Range() : Range(0) {}
+    Range(size_t index) : min(index), max(index + 1) {}
+    explicit Range(size_t amin, size_t amax) : min(amin), max(amax) {}
+
+    bool contains(size_t childIndex) const {
+        return childIndex >= min && childIndex < max;
     }
 };
 
 /**
- * This pattern matches when SBE must be used for the input plan. The matched node points to the top
- * of the section that will be pushed down to SBE.
+ * This is a configurable rule that can match any tree pattern detectable by a state machine.
  *
- * For example, when we receive a $LU query with a disabled data access plan for a LU stage, the top
- * of the SBE section will point to the next SBE-eligible stage. Otherwise, if there are no disabled
- * data access plans, we match the entire tree.
+ * To obtain a match, all the possible paths from root to leaf have to end in a matching state in
+ * the state machine (similar to an all-paths NFA). This is a useful property for recognizing nodes
+ * that have multiple branches.
+ */
+class StateMachineRule {
+public:
+    StateMachineRule() {
+        // Create the special states. User-defined states come after them.
+        _states.resize(kMaxReservedState);
+
+        // Set start state.
+        _stack.push(kStart);
+    }
+
+    int getStartState() const {
+        return kStart;
+    }
+
+    /**
+     * Creates a new state that transitions from 'state' when the machine receives the specified
+     * node. Depending on how it is used, this can be the building block for both sequences and
+     * alternations on the pattern being recognized.
+     *
+     * The state created is returned as an out parameter in 'state', so that the callers can chain
+     * sequences more easily.
+     */
+    int addState(int state, StageType stage, Range allowedChildren) {
+        validateState(state);
+        int nextState = allocState();
+        validateState(nextState);
+
+        StateSpec& spec = _states[state];
+        auto res = spec.edges.emplace(stage, Edge{allowedChildren, nextState});
+        // If this triggers, it means we're trying to add two transitions with the same node type to
+        // the same state. NFAs allow this, but it'd complicate our implementation and provide worse
+        // performance.
+        tassert(
+            12308402, "Engine selection state machine doesn't have unique transitions", res.second);
+
+        return nextState;
+    }
+
+    void addMatch(int state) {
+        validateState(state);
+        _states[state].isMatch = true;
+    }
+
+    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index) {
+        // Consume this QSN node and transition the state of the current root to leaf path.
+        step(node.getType(), index);
+
+        const bool isLeaf = node.children.empty();
+        // If any root to leaf path ends in a non-matching state, it means the pattern didn't
+        // recognize that branch. Once we unwind the traversal, we will reject the candidate tree.
+        if (isLeaf && !isMatch()) {
+            _allBranchesMatch = false;
+        }
+    }
+
+    void postVisit(RuleEngine& engine, const QuerySolutionNode& node) {
+        // Unwind the state so that we can keep matching other branches.
+        _stack.pop();
+
+        // Once we finish traversal, we match if all the branches were recognized.
+        if (_stack.size() == 1 && _allBranchesMatch) {
+            engine.match(&node);
+        }
+    }
+
+private:
+    enum {
+        kNotMatch = 0,
+        kStart = 1,
+        kMaxReservedState = 2,
+    };
+
+    struct Edge {
+        Range allowedChildren;
+        int nextState;
+    };
+
+    struct StateSpec {
+        // Transitions allowed from this state.
+        std::map<StageType, Edge> edges;
+        bool isMatch = false;
+    };
+
+    int allocState() {
+        int state = _states.size();
+        _states.emplace_back();
+        return state;
+    }
+
+    void validateState(int state) const {
+        tassert(
+            12308401, "Invalid tree recognition state", state < static_cast<int>(_states.size()));
+    }
+
+    void validateStack() const {
+        tassert(12308403, "Invalid engine selection stack state", !_stack.empty());
+    }
+
+    bool isMatch() const {
+        return currentState().isMatch;
+    }
+
+    const StateSpec& currentState() const {
+        validateStack();
+        validateState(_stack.top());
+        return _states[_stack.top()];
+    }
+
+    void step(StageType stage, size_t index) {
+        const StateSpec& state = currentState();
+
+        auto it = state.edges.find(stage);
+        if (it != state.edges.end() && it->second.allowedChildren.contains(index)) {
+            // We have a partial match, so we transition to the next state.
+            _stack.push(it->second.nextState);
+        } else {
+            // There's no match in this node or its children, so we transition to the not match
+            // state. Once we reach the leaf nodes of this subtree, they will set
+            // _allBranchesMatch=false.
+            _stack.push(kNotMatch);
+        }
+    }
+
+    void dumpStates() {
+        for (size_t i = 0; i < _states.size(); ++i) {
+            std::cout << "State " << i << ":";
+            if (i == kStart)
+                std::cout << " [START]";
+            if (i == kNotMatch)
+                std::cout << " [NOT_MATCH]";
+            if (_states[i].isMatch)
+                std::cout << " [MATCH]";
+            std::cout << std::endl;
+
+            for (const auto& [stage, edge] : _states[i].edges) {
+                const auto& range = edge.allowedChildren;
+                const auto& nextState = edge.nextState;
+                std::cout << "  Stage " << stage << " [" << range.min << ", " << range.max
+                          << ") -> State " << nextState << std::endl;
+            }
+        }
+    }
+
+    // State of each active frame in the QSN recursion. This is an useful state machine extension
+    // for unwinding when exploring several branches.
+    std::stack<int> _stack;
+    // State machine description (very similar to a graph). The std::vector index provides the state
+    // numbers and each state specification (vertex) contains the configured transitions (edges).
+    std::vector<StateSpec> _states;
+    bool _allBranchesMatch = true;
+};
+
+static_assert(HasPreVisit<StateMachineRule, QuerySolutionNode>);
+static_assert(HasPostVisit<StateMachineRule, QuerySolutionNode>);
+
+StateMachineRule makeLookupUnwindRule() {
+    static constexpr int kMaxBranchesInSbe = 100;
+
+    StateMachineRule sm;
+    int state = sm.getStartState();
+
+    // Collscan
+    {
+        state = sm.addState(sm.getStartState(), STAGE_COLLSCAN, 0);
+        sm.addMatch(state);
+    }
+
+    const int fetch_state = sm.addState(sm.getStartState(), STAGE_FETCH, 0);
+
+    // Ixscan + Fetch
+    {
+        state = sm.addState(fetch_state, STAGE_IXSCAN, 0);
+        sm.addMatch(state);
+    }
+
+    // Ixscan + Sort + Fetch
+    {
+        state = sm.addState(fetch_state, STAGE_SORT_DEFAULT, 0);
+        state = sm.addState(state, STAGE_IXSCAN, 0);
+        sm.addMatch(state);
+    }
+
+    // Ixscan + Or + Fetch
+    {
+        state = sm.addState(fetch_state, STAGE_OR, 0);
+        state = sm.addState(state, STAGE_IXSCAN, Range(0, kMaxBranchesInSbe));
+        sm.addMatch(state);
+    }
+
+    // Ixscan + Fetch + Or
+    {
+        state = sm.addState(sm.getStartState(), STAGE_OR, 0);
+        state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
+        state = sm.addState(state, STAGE_IXSCAN, 0);
+        sm.addMatch(state);
+    }
+
+    // Ixscan + SortedMerge + Fetch
+    {
+        state = sm.addState(fetch_state, STAGE_SORT_MERGE, 0);
+        state = sm.addState(state, STAGE_IXSCAN, Range(0, kMaxBranchesInSbe));
+        sm.addMatch(state);
+    }
+
+    // Ixscan + Fetch + SortedMerge
+    {
+        state = sm.addState(sm.getStartState(), STAGE_SORT_MERGE, 0);
+        state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
+        state = sm.addState(state, STAGE_IXSCAN, 0);
+        sm.addMatch(state);
+    }
+    return sm;
+}
+
+/**
+ * This pattern matches when SBE must be used for the input plan. The matched node points to the
+ * top of the section that will be pushed down to SBE.
+ *
+ * For example, when we receive a $LU query with a disabled data access plan for a LU stage, the
+ * top of the SBE section will point to the next SBE-eligible stage. Otherwise, if there are no
+ * disabled data access plans, we match the entire tree.
  *
  */
 class PlanPushdownSelector {
 public:
     PlanPushdownSelector(bool containsLuPattern) : _containsLuPattern(containsLuPattern) {}
 
-    void preVisit(RuleEngine&, const GroupNode& node) {
+    void preVisit(RuleEngine&, const GroupNode& node, size_t) {
         preVisitBase(node);
         _enableSbe = true;
     }
 
-    void preVisit(RuleEngine&, const EqLookupNode& node) {
+    void preVisit(RuleEngine&, const EqLookupNode& node, size_t) {
         preVisitBase(node);
 
         if (!node.unwindSpec) {
@@ -247,7 +468,7 @@ public:
         }
     }
 
-    void preVisit(RuleEngine& engine, const QuerySolutionNode& node) {
+    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t) {
         preVisitBase(node);
     }
 
@@ -287,7 +508,7 @@ static_assert(HasFinish<PlanPushdownSelector>);
  */
 class DistinctScanRule {
 public:
-    void preVisit(RuleEngine& engine, const DistinctNode& node) {
+    void preVisit(RuleEngine& engine, const DistinctNode& node, size_t) {
         engine.match(&node);
     }
 };
@@ -300,7 +521,7 @@ static_assert(HasPreVisit<DistinctScanRule, DistinctNode>);
  */
 class HashedIndexScanPatternRule {
 public:
-    void preVisit(RuleEngine& engine, const IndexScanNode& node) {
+    void preVisit(RuleEngine& engine, const IndexScanNode& node, size_t) {
         if (indexHasHashedPathPrefixOfNonHashedPath(node.index.keyPattern)) {
             engine.match(&node);
         }
@@ -317,7 +538,7 @@ public:
     explicit IndexNameRule_ForTest(StringData targetIndexName)
         : _targetIndexName(targetIndexName) {}
 
-    void preVisit(RuleEngine& engine, const IndexScanNode& node) {
+    void preVisit(RuleEngine& engine, const IndexScanNode& node, size_t) {
         if (node.index.identifier.catalogName == _targetIndexName) {
             engine.match(&node);
         }
@@ -334,10 +555,10 @@ static_assert(HasPreVisit<IndexNameRule_ForTest, IndexScanNode>);
  */
 class AndHashOrSortedRule {
 public:
-    void preVisit(RuleEngine& engine, const AndSortedNode& node) {
+    void preVisit(RuleEngine& engine, const AndSortedNode& node, size_t) {
         engine.match(&node);
     }
-    void preVisit(RuleEngine& engine, const AndHashNode& node) {
+    void preVisit(RuleEngine& engine, const AndHashNode& node, size_t) {
         engine.match(&node);
     }
 };
@@ -350,7 +571,8 @@ bool isPlanSbeEligible(const QuerySolution* solution) {
         solution->root(), DistinctScanRule(), HashedIndexScanPatternRule(), AndHashOrSortedRule());
 }
 
-EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution) {
+EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
+                                             const QuerySolutionNode* dataAccessNode) {
     LOGV2_DEBUG(11986305,
                 1,
                 "Plan-based engine selection logic invoked.",
@@ -369,7 +591,7 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution) {
         }
     }
 
-    bool containsLuPattern = treeMatchesAny(solution->root(), LookupUnwindRule());
+    bool containsLuPattern = treeMatchesAny(dataAccessNode, makeLookupUnwindRule());
     const QuerySolutionNode* planPushdownRoot =
         treeSearch(solution->root(), PlanPushdownSelector(containsLuPattern));
 

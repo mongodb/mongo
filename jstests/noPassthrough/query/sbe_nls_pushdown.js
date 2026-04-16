@@ -5,7 +5,7 @@
  *
  */
 import {aggPlanHasStage, getEngine} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const conn = MongoRunner.runMongod({
@@ -57,7 +57,7 @@ const logPlanInfo = (exampleLabel, explainResult, paramsAsJson) => {
  * Asserts getEngine and per-stage Classic/SBE placement match 'expected'.
  */
 const assertPlan = (label, explainResult, expected, ctx) => {
-    assert.eq(expected.engine, getEngine(explainResult), `${label} engine ${ctx}`);
+    assert.eq(getEngine(explainResult), expected.engine, `${label} engine ${ctx}`);
     for (const [stage, expectClassic] of Object.entries(expected.inClassic)) {
         assert.eq(
             expectClassic,
@@ -69,6 +69,7 @@ const assertPlan = (label, explainResult, expected, ctx) => {
 
 function runAllExamples() {
     const sbeFull = checkSbeFullFeatureFlagEnabled(db);
+    const isDeferredGetExecutor = isDeferredGetExecutorEnabled(db);
 
     for (const flags of [
         {
@@ -85,6 +86,7 @@ function runAllExamples() {
         const params = {internalQueryFrameworkControl: "trySbeRestricted", ...flags};
         const allOn = flags.featureFlagSbeNonLeadingMatch;
         const useSbe = sbeFull || allOn;
+        const useSbeForEx3Plan = useSbe && !isDeferredGetExecutor;
         const ctx = tojson(params);
 
         runWithParamsAllNonConfigNodes(db, params, () => {
@@ -131,8 +133,8 @@ function runAllExamples() {
                     "ex3",
                     plan,
                     {
-                        engine: useSbe ? "sbe" : "classic",
-                        inClassic: {"$group": !useSbe, "$lookup": !useSbe},
+                        engine: useSbeForEx3Plan ? "sbe" : "classic",
+                        inClassic: {"$group": !useSbeForEx3Plan, "$lookup": !useSbeForEx3Plan},
                     },
                     ctx,
                 );

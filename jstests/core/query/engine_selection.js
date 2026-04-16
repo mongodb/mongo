@@ -70,36 +70,54 @@ const ixScanFetchUnionShape = [
 
 // SORT shapes
 const sortedIxScanShape = [{$sort: {a: 1}}];
+const collScanSortShape = [{$match: {c: 1}}, {$sort: {c: 1}}];
 // Since there is no index on `c`, all queries with a sort on `c` will have a SORT stage.
-const ixScanSortStage = [{$match: {a: 1}}, {$sort: {c: 1}}];
+const ixScanFetchSortShape = [{$match: {a: 1}}, {$sort: {c: 1}}];
 const ixScanUnionSortShape = [{$match: {$or: [{a: 1}, {b: 1}]}}, {$sort: {c: 1}}];
 // ixscan - sort - fetch requires a compound index. We'll use different fields to not affect
 // the other cases. This query uses ixscan - sort - fetch because the `z` field is in the index,
 // but not in ascending order to satisfy the sort.
 const ixScanSortFetchShape = [{$match: {y: {$gt: 5}}}, {$sort: {z: 1}}];
+const ixScanSortSkipFetchShape = [{$match: {y: {$gt: 5}}}, {$sort: {z: 1}}, {$skip: 1}];
+
+// SKIP shapes
+const ixScanSkipFetchShape = [{$match: {a: 1}}, {$skip: 1}];
 
 const allShapes = [
     collscanShape,
+    collScanSortShape,
     basicIxScanShape,
     ixScanUnionOnSameIndexShape,
     ixScanUnionFetchShape,
     ixScanFetchUnionShape,
     sortedIxScanShape,
-    ixScanSortStage,
+    ixScanFetchSortShape,
     ixScanUnionSortShape,
     ixScanSortFetchShape,
+    ixScanSortSkipFetchShape,
+    ixScanSkipFetchShape,
 ];
 
 // The stages we'll be working with to trigger SBE or classic.
 // The term `neutral` is used to indicate a stage does not affect SBE eligibility. It has no impact on the plan shape used.
-const neutralProject = {$project: {array: 1}};
-const neutralMatch = {$match: {array: 1}};
-const group = {$group: {_id: null}};
+const neutralProject = {$project: {array: 0}};
+const match = {$match: {array: 1}};
+// If $group doesn't depend on the whole document, a projection is inserted in the data access plan. So using $$CURRENT here prevents this stage from altering the plan shapes.
+const group = {$group: {_id: "$$CURRENT"}};
 const lookup = {$lookup: {from: foreignColl.getName(), as: "array", localField: "a", foreignField: "a"}};
 const lookupUnwind = [lookup, {$unwind: "$array"}];
 
-// Currently if $LU is SBE-eligible, it is enabled for all plan shapes.
-const shapesThatTriggerLookupUnwind = allShapes;
+// The deferred exec path only enables certain LU plan shapes.
+const shapesThatTriggerLookupUnwind = ffGetExecutorDeferredEngineChoice
+    ? allShapes.filter(
+          (p) =>
+              p !== collScanSortShape &&
+              p !== ixScanFetchSortShape &&
+              p !== ixScanUnionSortShape &&
+              p !== ixScanSortSkipFetchShape &&
+              p !== ixScanSkipFetchShape,
+      )
+    : allShapes;
 
 // Our test cases. Each object contains an aggregation pipeline, and a field listing which plan
 // shapes would trigger SBE usage. The aggregation will be run with different plan shapes and use
@@ -114,7 +132,7 @@ const shapesThatTriggerLookupUnwind = allShapes;
 const aggregationTests = [
     // These cases should only use SBE when SBE is fully enabled.
     {
-        agg: [neutralMatch],
+        agg: [match],
         planShapesThatTriggerSbe: [],
         pushDownPattern: [false],
     },
@@ -124,7 +142,7 @@ const aggregationTests = [
         pushDownPattern: [false],
     },
     {
-        agg: [neutralProject, neutralMatch],
+        agg: [neutralProject, match],
         planShapesThatTriggerSbe: [],
         pushDownPattern: [false, false],
     },
@@ -136,13 +154,7 @@ const aggregationTests = [
         pushDownPattern: [true],
     },
     {
-        agg: [neutralMatch, group],
-        planShapesThatTriggerSbe: allShapes,
-        // Both stages will always be pushed down to SBE.
-        pushDownPattern: [true, true],
-    },
-    {
-        agg: [group, neutralMatch],
+        agg: [group, match],
         planShapesThatTriggerSbe: allShapes,
         pushDownPattern: [true, ffSbeNonLeadingMatch],
     },
@@ -176,7 +188,6 @@ const aggregationTests = [
         planShapesThatTriggerSbe: allShapes,
         pushDownPattern: [true, true],
     },
-    // In the future, these cases may or may not use SBE, depending on the plan shape.
     {
         // We have to group $lookup-$unwind together to reflect how the document sources will
         // represent these stages. They will always be represented by one stage, and pushed down
@@ -186,13 +197,7 @@ const aggregationTests = [
         pushDownPattern: [ffSbeEqLookupUnwind],
     },
     {
-        agg: [neutralMatch, lookupUnwind],
-        planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        // The match only gets pushed down if the lookup gets pushed down.
-        pushDownPattern: [ffSbeEqLookupUnwind, ffSbeEqLookupUnwind],
-    },
-    {
-        agg: [lookupUnwind, neutralMatch],
+        agg: [lookupUnwind, match],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
         pushDownPattern: [ffSbeEqLookupUnwind, ffSbeNonLeadingMatch],
     },
@@ -200,6 +205,16 @@ const aggregationTests = [
         agg: [lookupUnwind, neutralProject],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
         pushDownPattern: [ffSbeEqLookupUnwind, ffSbeTransformStages],
+    },
+    {
+        agg: [lookupUnwind, lookup],
+        planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
+        pushDownPattern: [ffSbeEqLookupUnwind, true],
+    },
+    {
+        agg: [lookupUnwind, group],
+        planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
+        pushDownPattern: [ffSbeEqLookupUnwind, true],
     },
     {
         agg: [lookup, lookupUnwind],
@@ -212,7 +227,7 @@ const aggregationTests = [
         pushDownPattern: [true, ffSbeEqLookupUnwind],
     },
     {
-        agg: [lookup, neutralMatch, lookupUnwind],
+        agg: [lookup, match, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
         pushDownPattern: [true, ffSbeNonLeadingMatch, ffSbeEqLookupUnwind],
     },
@@ -222,7 +237,7 @@ const aggregationTests = [
         pushDownPattern: [true, ffSbeTransformStages, ffSbeEqLookupUnwind],
     },
     {
-        agg: [group, neutralMatch, lookupUnwind],
+        agg: [group, match, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
         pushDownPattern: [true, ffSbeNonLeadingMatch, ffSbeEqLookupUnwind],
     },
@@ -284,12 +299,6 @@ function testWithAllPlanShapes(test) {
 
         // Assert the correct engine is used and stages are pushed down for the pipeline.
         assertEngineUsed(test, [...shape, ...flatAgg], expectedEngine);
-
-        // Add neutral stages after the initial match, and we should still see the same engine
-        // being used.
-        for (const neutralStage of [neutralProject, neutralMatch]) {
-            assertEngineUsed(test, [...shape, neutralStage, ...flatAgg], expectedEngine);
-        }
     }
 }
 

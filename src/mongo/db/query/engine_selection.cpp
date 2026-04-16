@@ -170,8 +170,9 @@ EngineChoice shouldUseRegularSbeDeferredEngineSelection(
         return EngineChoice::kSbe;
     }
 
+    const QuerySolutionNode* dataAccessNode = solution->root();
     extendSolutionWithPipelineFn();
-    return engineSelectionForPlan(solution).engine;
+    return engineSelectionForPlan(solution, dataAccessNode).engine;
 }
 
 /**
