@@ -60,7 +60,6 @@ std::unique_ptr<PlanRankingStrategy> makeStrategy(
             return std::make_unique<CBRPlanRankingStrategy>();
         }
         case RankerMode::kAutomaticCE: {
-            // TODO SERVER-111770. Finalise values and names.
             switch (autoStrategy) {
                 case AutoStrategy::kCBRForNoMultiplanningResults: {
                     return std::make_unique<CBRForNoMPResultsStrategy>();

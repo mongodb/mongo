@@ -50,7 +50,6 @@ enums:
             kSamplingCE: "samplingCE"
             kHeuristicCE: "heuristicCE"
 
-    # TODO SERVER-111770. Finalise values and names.
     QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode:
         description: "Enum for possible values for QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode."
         type: string
@@ -738,7 +737,6 @@ server_parameters:
             expr: QueryPlanRankerModeEnum::kAutomaticCE
         redact: false
 
-    # TODO SERVER-111770. Finalise names.
     automaticCEPlanRankingStrategy:
         description: "Controls the plan ranking strategy to use when automaticCE is selected as internalQueryCBRCEMode"
         set_at: [startup, runtime]
