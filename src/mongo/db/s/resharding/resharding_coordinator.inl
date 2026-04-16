@@ -48,7 +48,6 @@
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
-#include "mongo/db/version_context.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -157,10 +156,6 @@ ReshardingCoordinator::ReshardingCoordinator(
       _serviceContext(serviceContext),
       _metrics{ReshardingMetrics::initializeFrom(coordinatorDoc, _serviceContext)},
       _metadata(coordinatorDoc.getCommonReshardingMetadata()),
-      _forwardableOpMetadata(
-          _metadata.getForwardableOpMetadata().map([](const ForwardableOperationMetadata& f) {
-              return f.withVersionContextPropagation_UNSAFE();
-          })),
       _coordinatorDoc(coordinatorDoc),
       _coordinatorDao(resharding::ReshardingCoordinatorDao(coordinatorDoc.getReshardingUUID())),
       _markKilledExecutor{resharding::makeThreadPoolForMarkKilledExecutor(
@@ -286,8 +281,7 @@ void markCompleted(const Status& status, ReshardingMetrics* metrics) {
 CancelableOperationContext ReshardingCoordinator::_makeOperationContext() const {
     return resharding::makeReshardingOperationContext(*_cancelableOpCtxFactory,
                                                       _coordinatorDoc.getState() >=
-                                                          CoordinatorStateEnum::kBlockingWrites,
-                                                      _forwardableOpMetadata);
+                                                          CoordinatorStateEnum::kBlockingWrites);
 }
 
 Status ReshardingCoordinator::_getEffectiveStatus(Status status) const {
@@ -437,7 +431,6 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                            auto span = _startSpan(
                                telemetryCtx, "ReshardingCoordinator::_awaitAllRecipientsCloning");
                            if (resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
-                                   resharding::getVersionContextOrDefault(_forwardableOpMetadata),
                                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                                _tellAllRecipientsToClone(executor);
                            } else {
@@ -477,9 +470,10 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                telemetryCtx,
                                "ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
                            _tellAllDonorsToRefresh(executor);
+                           // TODO (SERVER-92437) Avoid ignoring FCV for feature flag check once
+                           // resharding starts storing what FCV it was started with.
                            if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
-                                   .isEnabled(resharding::getVersionContextOrDefault(
-                                                  _forwardableOpMetadata),
+                                   .isEnabled(kVersionContextIgnored_UNSAFE,
                                               serverGlobalParams.featureCompatibility
                                                   .acquireFCVSnapshot())) {
                                _tellAllRecipientsCriticalSectionStarted(executor);

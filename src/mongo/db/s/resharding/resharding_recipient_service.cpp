@@ -319,10 +319,6 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _serviceContext(serviceContext),
       _metrics{ReshardingMetrics::initializeFrom(recipientDoc, _serviceContext)},
       _metadata{recipientDoc.getCommonReshardingMetadata()},
-      _forwardableOpMetadata{
-          _metadata.getForwardableOpMetadata().map([](const ForwardableOperationMetadata& f) {
-              return f.withVersionContextPropagation_UNSAFE();
-          })},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _oplogBatchTaskCount{recipientDoc.getOplogBatchTaskCount()},
       _skipCloningAndApplying{recipientDoc.getSkipCloningAndApplying().value_or(false)},
@@ -373,8 +369,8 @@ CancelableOperationContext ReshardingRecipientService::RecipientStateMachine::_m
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _recipientCtx.getState();
     }();
-    return resharding::makeReshardingOperationContext(
-        *factory, state >= RecipientStateEnum::kApplying, _forwardableOpMetadata);
+    return resharding::makeReshardingOperationContext(*factory,
+                                                      state >= RecipientStateEnum::kApplying);
 }
 
 ExecutorFuture<void>
@@ -804,7 +800,6 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
     auto driveCloneViaRefresh = !resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
-        resharding::getVersionContextOrDefault(_forwardableOpMetadata),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (driveCloneViaRefresh && coordinatorState >= CoordinatorStateEnum::kCloning) {
@@ -2351,7 +2346,6 @@ void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup
     }
 
     if (!resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
-            resharding::getVersionContextOrDefault(_forwardableOpMetadata),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         _recipientCtx.getState() <= RecipientStateEnum::kAwaitingFetchTimestamp) {
         return;
