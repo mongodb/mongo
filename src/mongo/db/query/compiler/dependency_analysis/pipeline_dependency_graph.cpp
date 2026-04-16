@@ -528,6 +528,15 @@ public:
     boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage(DocumentSource* ds,
                                                                   PathRef path) const {
         auto stageId = getStageId(ds);
+        if (ds) {
+            // We want the stage that last defined the path (before 'ds'). A null document source
+            // denotes one past the end, so we don't shift back in that case.
+            stageId.value--;
+        }
+        if (!stageId) {
+            return nullptr;
+        }
+
         auto scopeId = _stages[stageId].scope;
         auto parsedPath = parsePath(path);
         if (auto [fieldId, _] = lookupField(scopeId, parsedPath); fieldId) {

@@ -69,9 +69,10 @@ public:
     DependencyGraph& operator=(DependencyGraph&&) noexcept;
 
     /**
-     * Return the stage which last modified the path visible from the given DocumentSource. The
-     * stage must have either declared, modified or removed the path. If nullptr, the path is
-     * unmodified and assumed to originate from the pipeline input.
+     * Return the stage which last modified the path visible from the given DocumentSource. If no
+     * DocumentSource is given, returns the stage which last modified the path in the whole
+     * pipeline. The stage must have either declared, modified or removed the path. If nullptr, the
+     * path is unmodified and assumed to originate from the pipeline input.
      *
      * For example, the following stages all modify the path 'a'.
      * - {$set: {a: 1}}
