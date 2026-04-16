@@ -177,7 +177,11 @@ public:
         // concurrent unit test runs. Tests that exercise spilling must opt in via
         // Options{}.enableSpillEngine().
         if (!storageGlobalParams.enableSpillEngine) {
-            invariant(TestingProctor::instance().isEnabled());
+            if (!TestingProctor::instance().isEnabled()) {
+                fasserted(12410200,
+                          Status(ErrorCodes::InvalidOptions,
+                                 "Spill engine can only be disabled in test mode"));
+            }
             LOGV2(12254500, "Spill engine disabled");
         } else {
             boost::system::error_code ec;
