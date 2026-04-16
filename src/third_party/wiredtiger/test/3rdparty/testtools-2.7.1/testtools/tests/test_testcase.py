@@ -716,7 +716,7 @@ class TestAssertions(TestCase):
         b = {'Thatcher': 'One who mends roofs of straw',
              'Major': 'A military officer, ranked below colonel',
              'Blair': 'To shout loudly',
-             'Brown': 'The colour of healthy human faeces'}
+             'Brown': 'The color of healthy human faeces'}
         expected_error = '\n'.join([
             '!=:',
             'reference = %s' % pformat(a),

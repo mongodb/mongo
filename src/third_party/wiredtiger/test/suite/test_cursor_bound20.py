@@ -112,7 +112,7 @@ class test_cursor_bound20(bound_base):
         self.assertEqual(index_cursor.search_near(), 0)
         self.assertEqual(index_cursor.get_key(), self.check_key(MAX_FIXED_STRING))
 
-        # Test basic search scnarios.
+        # Test basic search scenarios.
         index_cursor.set_key(MAX_FIXED_STRING)
         self.assertEqual(index_cursor.search(), 0)
         self.assertEqual(index_cursor.get_key(), self.check_key(MAX_FIXED_STRING))
@@ -165,7 +165,7 @@ class test_cursor_bound20(bound_base):
         index_cursor.set_key(MAX_BYTE_ARRAY)
         self.assertEqual(index_cursor.search_near(), 0)
 
-        # Test basic search scnarios.
+        # Test basic search scenarios.
         index_cursor.set_key(MAX_BYTE_ARRAY)
         self.assertEqual(index_cursor.search(), 0)
         self.assertEqual(index_cursor.get_key(), MAX_BYTE_ARRAY)

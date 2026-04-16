@@ -33,7 +33,7 @@ import wiredtiger, wttest
 
 # test_shared_cache01.py
 #    Checkpoint tests
-# Test shared cache shared amongst multiple connections.
+# Test shared cache shared among multiple connections.
 class test_shared_cache01(wttest.WiredTigerTestCase):
 
     uri = 'table:test_shared_cache01'

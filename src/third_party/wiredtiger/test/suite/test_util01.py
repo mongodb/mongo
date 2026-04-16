@@ -38,7 +38,7 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     Note that we don't test dumping {key,value}_format that are integer
     here.  That's because the integer values are encoded and we don't
     want to duplicate the encoding/decoding algorithms.  Integer dump
-    is tested implicity by test_util02 (which loads dumps created
+    is tested implicitly by test_util02 (which loads dumps created
     in various ways).
     """
 

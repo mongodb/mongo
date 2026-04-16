@@ -142,7 +142,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             def tryregen():
                 self.session.checkpoint('name=' + self.checkpoint_name)
             # This produces EBUSY, but self.raisesBusy() from wttest does not work.
-            # Including "dropped" in the expected message is not optimal, since we are't
+            # Including "dropped" in the expected message is not optimal, since we aren't
             # dropping the checkpoint (that regenerating it drops it first is an internal
             # detail) but I guess it can't be helped.
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

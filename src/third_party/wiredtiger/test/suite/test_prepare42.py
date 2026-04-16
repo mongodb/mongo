@@ -51,7 +51,7 @@ class test_prepare42(test_prepare_preserve_prepare_base):
             cursor.insert()
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(21))
 
-        # Insret key 20 with a prepared update prepared_id=1
+        # Insert key 20 with a prepared update prepared_id=1
         session_prepare = self.conn.open_session()
         cursor_prepare = session_prepare.open_cursor(self.uri)
         session_prepare.begin_transaction()

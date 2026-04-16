@@ -38,7 +38,7 @@ We highlight the most important configuration options here:
 | **`use_timestamp`**              | If true (the default), create the checkpoint as of the last stable timestamp if timestamps are in use, or with all committed updates if there is no stable timestamp set. If false, always generate a checkpoint with all committed updates, ignoring any stable timestamp |
 
 > **Note:** **`eviction_checkpoint_target`** is another important parameter in the eviction module.
-> It is intended to leverage the multithreaded behaviour of the eviction server to write out dirty
+> It is intended to leverage the multithreaded behavior of the eviction server to write out dirty
 > pages before proceeding with checkpoint
 
 ## Checkpoint operation

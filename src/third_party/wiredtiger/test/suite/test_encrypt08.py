@@ -71,7 +71,7 @@ class test_encrypt08(wttest.WiredTigerTestCase):
 
     # Do not use conn_config to set the encryption, because that sets
     # the encryption during open when we don't have control and can't
-    # catch exceptions. Instead we'll let the frameork open without
+    # catch exceptions. Instead we'll let the framework open without
     # encryption and then reopen ourselves. This seems to behave as
     # desired (we get the intended errors from inside the encryptor)
     # even though one might expect it to fail because it's reopening

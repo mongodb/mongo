@@ -30,7 +30,7 @@ import os, sys, time, wiredtiger, wttest
 from helper_disagg import disagg_test_class
 
 # test_layered07.py
-#    Start a second WT that becomes leader and checke that content appears in the first.
+#    Start a second WT that becomes leader and checks that content appears in the first.
 @disagg_test_class
 class test_layered07(wttest.WiredTigerTestCase):
     nitems = 500

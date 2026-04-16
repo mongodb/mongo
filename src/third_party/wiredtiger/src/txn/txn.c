@@ -2376,7 +2376,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     /* Represents the read timestamp of the oldest active reader.*/
     WT_STATP_CONN_SET(
       session, stats, txn_timestamp_oldest_active_read, oldest_active_read_timestamp);
-    /* Represents the lag of the oldest reader  with respect to the oldest timestamp, if any. */
+    /* Represents the lag of the oldest reader with respect to the oldest timestamp, if any. */
     WT_STATP_CONN_SET(session, stats, txn_pinned_timestamp_reader_lag, oldest_reader_lag);
 
     /* Fetch the global timestamp values for debugging purposes.*/

@@ -34,7 +34,7 @@
 from compact_util import compact_util
 from wtscenario import make_scenarios
 
-# Test compact behaviour with overflow values.
+# Test compact behavior with overflow values.
 class test_compact03(compact_util):
 
     uri='table:test_compact03'

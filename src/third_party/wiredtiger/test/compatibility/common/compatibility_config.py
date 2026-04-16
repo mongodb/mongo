@@ -34,11 +34,11 @@ import re
 from compatibility_version import WTVersion
 from typing import List
 
-# The branches we use for the testing. We support special branch name 'this' that refers to the
+# The branches we use for testing. We support special branch name 'this' that refers to the
 # current branch. This is useful when debugging a compatibility issue on the current branch, but it
 # should not be enabled when testing on Evergreen.
 
-# To make this branches compatitable with existing "compatibility_test_for_releases.sh", the
+# To make this branches compatible with existing "compatibility_test_for_releases.sh", the
 # version is imported from the bash file of "meta/versions.sh"
 
 class WTBranches:
@@ -56,14 +56,14 @@ class WTBranches:
             match = re.search(r'export\s+'+name+r'\s*=\s*"([^"]*)"', content)
             if match:
                 versions = match.group(1)
-                # This is designed to compatitate with multi-line variable define
+                # This is designed to be compatible with multi-line variable define
                 versions:List[str] = versions.replace('\n', '').replace('\\', '').split()
-                # Versions are constructured from str to WTVersions
+                # Versions are constructed from str to WTVersions
                 versions:List[WTVersion] = [WTVersion(version) for version in versions]
                 # Following 'if' is used to filter out invalid branches
                 versions = [version for version in versions if version]
                 setattr(self, name, versions)
-        # the following "not self" is equivelent to self.__bool__()
+        # the following "not self" is equivalent to self.__bool__()
         # the purpose here is to make sure all expected variables are found
         if not self:
             raise Exception("Failed to extract versions from " + bash_script)

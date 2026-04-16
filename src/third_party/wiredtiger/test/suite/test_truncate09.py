@@ -102,15 +102,15 @@ class test_truncate09(wttest.WiredTigerTestCase):
         # Restart, testing RTS on the copy.
         simulate_crash_restart(self, ".", "RESTART")
 
-        # Search for a key in the truncated range which is stabilised, hence should not find it.
+        # Search for a key in the truncated range which is stabilized, hence should not find it.
         cursor = self.session.open_cursor(uri)
         cursor.set_key(simple_key(cursor, 30000))
         self.assertNotEqual(cursor.search(), 0)
 
-        # Search for a key in the truncated range which is not stabilised, hence should find it.
+        # Search for a key in the truncated range which is not stabilized, hence should find it.
         cursor.set_key(simple_key(cursor, 60000))
         self.assertEqual(cursor.search(), 0)
 
-        # Search for a removed key which is not stabilised, hence should find it.
+        # Search for a removed key which is not stabilized, hence should find it.
         cursor.set_key(simple_key(cursor, 75000))
         self.assertEqual(cursor.search(), 0)

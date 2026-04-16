@@ -4,20 +4,20 @@ The WiredTiger Memory Model Test performs a series of operations that, depending
 may generate out-of-order memory accesses that are visible to the code.
 
 It is not a 'pass or fail' type of test. It is a technology demo and testbed for what can occur with
-out-of-order memory accesses, and clearly shows in concrete form the differences in behaviour
+out-of-order memory accesses, and clearly shows in concrete form the differences in behavior
 between the ARM64 and x86_64 memory models.
 
-This test was inspired, in part, by the work at https://preshing.com/20120515/memory-reordering-caught-in-the-act/, 
+This test was inspired, in part, by the work at https://preshing.com/20120515/memory-reordering-caught-in-the-act/,
 which is worth reading to understand these tests.
 
 ## The Tests
 
-Memory Model Test runs a series of tests. Each test has two threads which are accessing shared variables. 
+Memory Model Test runs a series of tests. Each test has two threads which are accessing shared variables.
 
 All shared variables are set to 0 before each test.
 
 There are two broad groups of tests:
-- Group 1: 
+- Group 1:
   - Each thread writes 1 to a shared variable (`x` for thread 1, and `y` for thread 2),
     and then reads from the other shared variable (`y` for thread 1, and `x` for thread 2)
   - Variants of the test are run with no barriers, with one barrier or atomic, or with two barriers or atomics
@@ -36,7 +36,7 @@ There are two broad groups of tests:
 * (optional) CMake and ninja
 
 By default, the Memory Model Tool will use the C++ 20 `std::binary_semaphore`. Unfortunately, this class is not
-available in all compilers that say they support C++ 20. If necessary, define the `AVOID_CPP20_SEMAPHORE` macro to 
+available in all compilers that say they support C++ 20. If necessary, define the `AVOID_CPP20_SEMAPHORE` macro to
 use the `basic_semaphore` class included in this project instead of `std::binary_semaphore`.
 
 ### Build
@@ -53,13 +53,13 @@ There are two options:
 - Use `g++` directly.
 
   For Ubuntu on Evergreen, first ensure that the correct C++ compiler is on the path:
-  
+
   ```
   export "PATH=/opt/mongodbtoolchain/v5/bin:$PATH"
   ```
 
   On both Mac or Evergreen, compile using g++.
- 
+
   - For C++ 20:
     ```
     g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++20 -Wall -Werror
@@ -68,13 +68,13 @@ There are two options:
     ```
     g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++17 -Wall -Werror -DAVOID_CPP20_SEMAPHORE
     ```
-  
+
 
 Some tests use compiler barriers to prevent the compiler re-ordering memory accesses during optimisation.
 
 Note: if you get compile errors related to `#include <semaphore>` or semaphores in general,
-then check that you are using both the correct compiler and compiling for C++ 20, 
-or use the `AVOID_CPP20_SEMAPHORE` macro to use the local `basic_semaphore`. 
+then check that you are using both the correct compiler and compiling for C++ 20,
+or use the `AVOID_CPP20_SEMAPHORE` macro to use the local `basic_semaphore`.
 
 The test uses the C++ semaphore library as it is supported on both Mac and Ubuntu.
 
@@ -92,9 +92,9 @@ and is therefore not of great value. Note that the messages from each thread pai
 
 ### Expected results:
 
-Each test displays if/when out of order operations are possible. 
+Each test displays if/when out of order operations are possible.
 
-Some tests should never show out of order operations because of either the correct use of memory barriers/atomics, 
+Some tests should never show out of order operations because of either the correct use of memory barriers/atomics,
 or the processor design. If any of these tests report out of order operations, then that is an error.
 
 Some tests **can** report out of order operations, but that does not mean they **will** report them.
@@ -167,8 +167,8 @@ Here is an example of the output from running the tool on an ubuntu2004-arm64-sm
 
 Note that out-of-order operations are occurring:
 * much less frequently (by approx 3 orders of magnitude) compared to the example above from a Mac Studio with an M1 Max ARM processor.
-* in all but one of scenarios where they are possible on an ARM64. 
-  * It is unclear why the Group 2 test '_Test writes and reads, with barrier between writes_' is not showing any out-of-order 
+* in all but one of scenarios where they are possible on an ARM64.
+  * It is unclear why the Group 2 test '_Test writes and reads, with barrier between writes_' is not showing any out-of-order
     operations when they are possible on ARM64, but it could be they are too rare to show up.
 
 ```
@@ -212,4 +212,4 @@ Total of 41 out of orders detected out of 100000000 iterations (4.1e-05%) in tes
 # References
 
 - This test was inspired by the work at https://preshing.com/20120515/memory-reordering-caught-in-the-act/
-- [Memory barrier use example](https://developer.arm.com/documentation/den0042/a/Memory-Ordering/Memory-barriers/Memory-barrier-use-example) 
+- [Memory barrier use example](https://developer.arm.com/documentation/den0042/a/Memory-Ordering/Memory-barriers/Memory-barrier-use-example)

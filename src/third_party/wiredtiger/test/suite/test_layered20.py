@@ -31,7 +31,7 @@ from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_stora
 from wtscenario import make_scenarios
 
 # test_layered20.py
-# Test 32 consective deltas
+# Test 32 consecutive deltas
 
 @disagg_test_class
 class test_layered20(wttest.WiredTigerTestCase):

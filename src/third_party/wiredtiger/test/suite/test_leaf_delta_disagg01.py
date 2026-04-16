@@ -177,7 +177,7 @@ class test_leaf_delta_disagg01(wttest.WiredTigerTestCase):
         self.delta3_vals = ["d3"] * 3
         self.verify_leaf_delta()
 
-    # Test deltas having duplicate keys, the latest delta should overwrite all ealier deltas for a
+    # Test deltas having duplicate keys, the latest delta should overwrite all earlier deltas for a
     # given key.
     def test_delta_duplicate_keys(self):
         self.base_ids = [i for i in range(1, 11)]

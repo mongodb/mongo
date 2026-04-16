@@ -41,7 +41,7 @@ from wtscenario import make_scenarios
 #
 # It checks that the immediately written values can be read back, but the interesting part is
 # whether they read back correctly after forcing eviction, which will RLE-encode the duplicates
-# and read them back. There are many opportunities for the interaction betwee RLE groups and
+# and read them back. There are many opportunities for the interaction between RLE groups and
 # history store accesses to go off the rails.
 class test_hs26(wttest.WiredTigerTestCase):
     conn_config = ''

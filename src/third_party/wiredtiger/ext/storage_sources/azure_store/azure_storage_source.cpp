@@ -160,7 +160,7 @@ azure_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
         return ENOMEM;
     }
 
-    // Initialise references to azure storage source, wt fs and home directory.
+    // Initialize references to azure storage source, wt fs and home directory.
     azure_fs->store = azure_storage;
     azure_fs->wt_fs = wt_file_system;
     azure_fs->home_dir = session->connection->get_home(session->connection);
@@ -705,7 +705,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
       azure_storage->wt_api, nullptr, config, "verbose.tiered", &v);
 
     azure_storage->verbose = WT_VERBOSE_ERROR;
-    // Initialise logger for the storage source.
+    // Initialize logger for the storage source.
     if (ret == 0 && v.val >= WT_VERBOSE_ERROR && v.val <= WT_VERBOSE_DEBUG_5) {
         azure_storage->verbose = v.val;
         azure_storage->log->set_wt_verbosity_level(azure_storage->verbose);

@@ -28,7 +28,7 @@
 #	This calculation is done separately per thread.
 # wtperf_graph.svg --
 #	A function call graph showing what functions call each other. The edges
-#	are labelled and coloured proportionally to represent the ratio of time
+#	are labelled and colored proportionally to represent the ratio of time
 #	spent in each function call.
 # wtperf_flame.svg --
 #	A graph visualising stack traces and the time spent within each stack

@@ -112,7 +112,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         for i in range(1, nkeys):
             key = nrows + i
             if cursor.set_key(ds.key(key)) != 0:
-                # It is not guarranteed that salvage recovers all the data in the table. Therefore
+                # It is not guaranteed that salvage recovers all the data in the table. Therefore
                 # perform a search and increment number of keys once search is successful.
                 search_result = cursor.search()
                 if search_result == 0:
@@ -158,7 +158,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(timestamp_early))
         cursor.close()
 
-        # Set the stable/oldest timstamps.
+        # Set the stable/oldest timestamps.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(timestamp_early))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(timestamp_early))
 

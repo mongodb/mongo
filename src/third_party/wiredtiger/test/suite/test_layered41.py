@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_layered41.py
-#   Test dupicate key return values.
+#   Test duplicate key return values.
 
 import wttest, wiredtiger
 from helper_disagg import disagg_test_class, gen_disagg_storages

@@ -779,7 +779,7 @@ class test_layered84(wttest.WiredTigerTestCase):
         keys_before, got_conflict = self.walk_next_collect(cursor)
         self.assertTrue(got_conflict, "Expected prepared conflict at key 3")
 
-        # Roll back: the overwrite is cancelled; key 3 reverts to its committed value.
+        # Roll back: the overwrite is canceled; key 3 reverts to its committed value.
         self.rollback_prepared(prepare_session, prepare_cursor)
 
         keys_after, _ = self.walk_next_collect(cursor)
@@ -820,7 +820,7 @@ class test_layered84(wttest.WiredTigerTestCase):
         keys_before, got_conflict = self.walk_prev_collect(cursor)
         self.assertTrue(got_conflict, "Expected prepared conflict at key 3")
 
-        # Roll back: the overwrite is cancelled; key 3 reverts to its committed value.
+        # Roll back: the overwrite is canceled; key 3 reverts to its committed value.
         self.rollback_prepared(prepare_session, prepare_cursor)
 
         keys_after, _ = self.walk_prev_collect(cursor)

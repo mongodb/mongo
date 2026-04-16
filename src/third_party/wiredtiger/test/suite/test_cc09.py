@@ -71,7 +71,7 @@ class test_cc09(test_cc_base):
         self.session.checkpoint()
 
         # Bump the oldest timestamp to make some of the previously inserted data globally
-        # visible. This makes any time window informaton associated with that data obsolete and
+        # visible. This makes any time window information associated with that data obsolete and
         # eligible for cleanup.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2 * nrows // 3))
 

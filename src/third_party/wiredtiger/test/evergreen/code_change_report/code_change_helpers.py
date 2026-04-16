@@ -79,7 +79,7 @@ def read_complexity_data(complexity_data_path: str) -> list:
     return complexity_data
 
 
-# preprocess_complexity_data normalises file paths in complexity data and includes only functions in the output
+# preprocess_complexity_data normalizes file paths in complexity data and includes only functions in the output
 def preprocess_complexity_data(complexity_data: list) -> dict:
     preprocessed_complexity_data = dict()
 

@@ -1652,7 +1652,7 @@ async def get_statistics_by_category(
     config for this tool to work.
 
     When to use this tool:
-        - To analyse performance metrics for a specific subsystem
+        - To analyze performance metrics for a specific subsystem
         - To get cache, eviction, checkpoint, or transaction statistics
         - To focus on file-level statistics for a specific table
     """
@@ -1858,7 +1858,7 @@ async def rollback_to_stable(
     closed or reset before calling this.
 
     When to use this tool:
-        - To test rollback-to-stable behaviour
+        - To test rollback-to-stable behavior
         - To restore the database to a known-good state
         - To discard uncommitted or unstable changes
     """

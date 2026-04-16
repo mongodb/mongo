@@ -43,7 +43,7 @@ class test_eviction03(eviction_util, suite_subprocess):
         return outfilename
 
     def derive_avg_disk_footprint(self, filename):
-        # Filename contains the output from verfify dump_pages which contains the space taken on
+        # Filename contains the output from verify dump_pages which contains the space taken on
         # disk by each internal and leaf pages.
         file = open(filename, 'r')
         res = re.findall(r'dsk_mem_size: (\d+)', file.read(), re.DOTALL)
@@ -87,7 +87,7 @@ class test_eviction03(eviction_util, suite_subprocess):
         # Close the connection, this will checkpoint the data and write everything to disk.
         self.close_conn()
 
-        # Dump the data using the wt utlity and derive the average disk footprint. Store the values
+        # Dump the data using the wt utility and derive the average disk footprint. Store the values
         # to compare them later, after the cleanup.
         avg_disk_footprint_values = []
         for i in range(ntables):
@@ -98,7 +98,7 @@ class test_eviction03(eviction_util, suite_subprocess):
             avg_disk_footprint = self.derive_avg_disk_footprint(filename)
             avg_disk_footprint_values.append(avg_disk_footprint)
 
-        # The new connection is configured in a way to maximise the number of pages that can be
+        # The new connection is configured in a way to maximize the number of pages that can be
         # cleaned up.
         self.reopen_conn(config="heuristic_controls=[eviction_obsolete_tw_pages_dirty_max=10000]")
 

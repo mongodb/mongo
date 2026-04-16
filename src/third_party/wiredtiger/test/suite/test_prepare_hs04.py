@@ -159,7 +159,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         self.search_keys_timestamp_and_ignore(ds, txn_config, prepare_conflict_msg, True)
 
         # If commit is True then commit the transactions and simulate a crash which would
-        # eventualy rollback transactions.
+        # eventually rollback transactions.
         if self.commit == True:
             # Commit the prepared_transactions with timestamp 30.
             for j in range (0, self.nsessions):
@@ -194,7 +194,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         txn_config = 'read_timestamp=' + self.timestamp_str(20) + ',ignore_prepare=false'
         self.search_keys_timestamp_and_ignore(ds, txn_config, None)
 
-        # If commit is true then the commit_tramsactions was called and we will expect prepare_value.
+        # If commit is true then the commit_transactions was called and we will expect prepare_value.
         if self.commit == True:
             txn_config = 'read_timestamp=' + self.timestamp_str(30) + ',ignore_prepare=true'
             # Search keys with timestamp 30, ignore_prepare=true and expect the cursor value to be prepare_value.

@@ -118,8 +118,8 @@ class test_layered39(wttest.WiredTigerTestCase):
         (ret, last_lsn) = page_log.pl_get_last_lsn(self.session)
         self.assertEqual(ret, 0)
 
-        # Update the materialised lsn
-        self.pr(f'Finalise the last materialised lsn = {last_lsn}')
+        # Update the materialized lsn
+        self.pr(f'Finalize the last materialized lsn = {last_lsn}')
         page_log.pl_set_last_materialized_lsn(self.session, last_lsn)
         self.conn.set_context_uint(wiredtiger.WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, last_lsn)
 
@@ -130,8 +130,8 @@ class test_layered39(wttest.WiredTigerTestCase):
         (ret, last_lsn) = page_log.pl_get_last_lsn(self.session)
         self.assertEqual(ret, 0)
 
-        # Update the last materialised lsn
-        self.pr(f'Finalise the last materialised lsn = {last_lsn}')
+        # Update the last materialized lsn
+        self.pr(f'Finalize the last materialized lsn = {last_lsn}')
         page_log.pl_set_last_materialized_lsn(self.session, last_lsn)
         self.conn.set_context_uint(wiredtiger.WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, last_lsn)
 

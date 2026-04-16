@@ -88,7 +88,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         self.assertEqual(delta_count, 0,
             f"Expected no deltas with delta_pct=20, but got {delta_count}")
 
-        # The data volume hasn't changed  same nrows, same val_size.
+        # The data volume hasn't changed, same nrows, same val_size.
         # The checkpoint size should stay near the baseline, not grow to ~3x.
         self.pr(f"Final: {final}, Baseline: {baseline}, multiple of baseline: {final/baseline:.1f}x")
         self.assertLess(final, baseline * 2,

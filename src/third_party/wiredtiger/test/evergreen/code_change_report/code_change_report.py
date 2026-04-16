@@ -64,49 +64,49 @@ def get_non_zero_count(value_list: list):
     return non_zero_count
 
 
-# get_html_colour converts a count and a total into a colour code for highlighting
-def get_html_colour(count: int, total: int):
-    colour = ""
+# get_html_color converts a count and a total into a color code for highlighting
+def get_html_color(count: int, total: int):
+    color = ""
     if count == 0:
-        colour = "LightPink"
+        color = "LightPink"
     elif count == total:
-        colour = "PaleGreen"
+        color = "PaleGreen"
     else:
-        colour = "SandyBrown"
+        color = "SandyBrown"
 
-    return colour
+    return color
 
 
-# get_complexity_html_colour converts a complexity value into an html colour string for highlighting.
-def get_complexity_html_colour(complexity: int):
-    colour = ""
+# get_complexity_html_color converts a complexity value into an html color string for highlighting.
+def get_complexity_html_color(complexity: int):
+    color = ""
     if complexity <= 10:
-        colour = "PaleGreen"
+        color = "PaleGreen"
     elif complexity <= 20:
-        colour = "Orange"
+        color = "Orange"
     elif complexity <= 50:
-        colour = "LightPink"
+        color = "LightPink"
     else:
-        colour = "#eb98e8"  # Light purple
+        color = "#eb98e8"  # Light purple
 
-    return colour
+    return color
 
 
-# get_coverage_html_colour converts a code coverage value into an html colour string for highlighting.
-def get_coverage_html_colour(coverage_percent: int):
-    colour = ""
+# get_coverage_html_color converts a code coverage value into an html color string for highlighting.
+def get_coverage_html_color(coverage_percent: int):
+    color = ""
     if coverage_percent >= 80:
-        colour = "PaleGreen"
+        color = "PaleGreen"
     elif coverage_percent >= 60:
-        colour = "Orange"
+        color = "Orange"
     else:
-        colour = "LightPink"
+        color = "LightPink"
 
-    return colour
+    return color
 
 
-# centred_text centres html text
-def centred_text(text):
+# centered_text centers html text
+def centered_text(text):
     return "<p style=\"text-align: center\">{}</p>\n".format(text)
 
 
@@ -115,15 +115,15 @@ def right_text(text):
     return "<p style=\"text-align: right\">{}</p>\n".format(text)
 
 
-def line_number_to_text(code_colour, line_number):
+def line_number_to_text(code_color, line_number):
     if line_number > 0:
-        return "    <p style=\"background-color:{};text-align: right\">{}</p>\n".format(code_colour, line_number)
+        return "    <p style=\"background-color:{};text-align: right\">{}</p>\n".format(code_color, line_number)
     else:
         return ""
 
 
-def value_as_centred_text(code_colour, value):
-    return "    <p style=\"background-color:{};text-align: center\">{}</p>\n".format(code_colour, value)
+def value_as_centered_text(code_color, value):
+    return "    <p style=\"background-color:{};text-align: center\">{}</p>\n".format(code_color, value)
 
 
 # generate_summary_table generates the summary table as html
@@ -152,14 +152,14 @@ def generate_summary_table(code_change_info: dict) -> list:
     summary_table.append("  </tr>\n")
     summary_table.append("    <tr><td>Branch coverage</td><td>{}</td></tr>\n".format(branch_coverage_string))
     summary_table.append("    <tr><td>Covered branches</td><td>{}</td></tr>\n".format(
-        centred_text(summary_info['num_branches_covered'])))
+        centered_text(summary_info['num_branches_covered'])))
     summary_table.append(
-        "    <tr><td>Total branches</td><td>{}</td></tr>\n".format(centred_text(summary_info['num_branches'])))
+        "    <tr><td>Total branches</td><td>{}</td></tr>\n".format(centered_text(summary_info['num_branches'])))
     summary_table.append("    <tr><td>Line coverage</td><td>{}</td></tr>\n".format(line_coverage_string))
     summary_table.append(
-        "    <tr><td>Covered lines</td><td>{}</td></tr>\n".format(centred_text(summary_info['num_lines_covered'])))
+        "    <tr><td>Covered lines</td><td>{}</td></tr>\n".format(centered_text(summary_info['num_lines_covered'])))
     summary_table.append(
-        "    <tr><td>Total lines</td><td>{}</td></tr>\n".format(centred_text(summary_info['num_lines'])))
+        "    <tr><td>Total lines</td><td>{}</td></tr>\n".format(centered_text(summary_info['num_lines'])))
     summary_table.append("</table>\n")
 
     return summary_table
@@ -191,7 +191,7 @@ def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool) -
             if not first_line_for_file:
                 seperator = "--------"
                 report.append("  <tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td></td><td></td></tr>\n".
-                              format(centred_text(seperator), centred_text(seperator),
+                              format(centered_text(seperator), centered_text(seperator),
                                      right_text(seperator), right_text(seperator)))
             first_line_for_file = False
 
@@ -200,7 +200,7 @@ def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool) -
                 new_lineno = line['new_lineno']
                 old_lineno = line['old_lineno']
                 content = line['content']
-                code_colour = code_unhighlighted
+                code_color = code_unhighlighted
                 plus_minus = "="
                 strikethrough = False
                 if new_lineno > 0 > old_lineno:
@@ -213,7 +213,7 @@ def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool) -
                     count = line['count']
                     if count >= 0 and is_useful_line(content):
                         count_str = str(count)
-                        code_colour = get_html_colour(count, count)
+                        code_color = get_html_color(count, count)
                 report.append("  <tr>\n")
                 report.append("    <td>{}</td>\n".format(right_text(count_str)))
                 if 'branches' in line:
@@ -222,7 +222,7 @@ def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool) -
                     num_branches = len(branches)
                     if num_branches > 0:
                         non_zero_count = get_non_zero_count(branch_info)
-                        code_colour = get_html_colour(non_zero_count, num_branches)
+                        code_color = get_html_color(non_zero_count, num_branches)
                         report.append("    <td>\n")
                         report.append("      <details>\n")
                         report.append("      <summary>\n")
@@ -254,14 +254,14 @@ def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool) -
                     report.append("    <td></td>\n")
 
                 report.append("    <td>{}</td>\n".format(line_number_to_text(code_unhighlighted, old_lineno)))
-                report.append("    <td>{}</td>\n".format(line_number_to_text(code_colour, new_lineno)))
-                report.append("    <td>{}</td>\n".format(centred_text(plus_minus)))
+                report.append("    <td>{}</td>\n".format(line_number_to_text(code_color, new_lineno)))
+                report.append("    <td>{}</td>\n".format(centered_text(plus_minus)))
                 report.append("    <td>\n")
                 if strikethrough:
                     report.append("    <del>\n")
                 report.append("      <p style=\"background-color:{};font-family:\'Courier New\',sans-serif;"
                               "white-space:pre\">{}</p>\n".format(
-                    code_colour, html.escape(line['content'], quote=True)))
+                    code_color, html.escape(line['content'], quote=True)))
                 if strikethrough:
                     report.append("    </del>\n")
                 report.append("    <td>\n")
@@ -286,7 +286,7 @@ def change_string(old_value: int, new_value: int) -> str:
 
 # describe_complexity_categories generates an html table describing the complexity categories
 def describe_complexity_categories() -> list:
-    code_colour_ = get_complexity_html_colour(1)
+    code_color_ = get_complexity_html_color(1)
     description = list()
     description.append("<table class=\"center\">\n")
     description.append("<tr>\n")
@@ -296,24 +296,24 @@ def describe_complexity_categories() -> list:
         "<th><a href='https://en.wikipedia.org/wiki/Cyclomatic_complexity#Interpretation'>Risk evaluation</a></th>\n")
     description.append("</tr>\n")
     description.append("<tr><td> {} </td><td> Simple procedure, little risk </td></tr>\n".
-                       format(value_as_centred_text(get_complexity_html_colour(1), "1-10")))
+                       format(value_as_centered_text(get_complexity_html_color(1), "1-10")))
     description.append("<tr><td> {} </td><td> More complex, moderate risk   </td></tr>\n".
-                       format(value_as_centred_text(get_complexity_html_colour(11), "11-20")))
+                       format(value_as_centered_text(get_complexity_html_color(11), "11-20")))
     description.append("<tr><td> {} </td><td> Complex, high risk            </td></tr>\n".
-                       format(value_as_centred_text(get_complexity_html_colour(21), "21-50")))
+                       format(value_as_centered_text(get_complexity_html_color(21), "21-50")))
     description.append("<tr><td> {} </td><td> Untestable code, very high risk    </td></tr>\n".
-                       format(value_as_centred_text(get_complexity_html_colour(51), ">50")))
+                       format(value_as_centered_text(get_complexity_html_color(51), ">50")))
     description.append("</table>\n")
     return description
 
 
-# coverage_string converts a coverage value and a total into a colour-coded html string
+# coverage_string converts a coverage value and a total into a color-coded html string
 def coverage_string(covered: int, total: int) -> str:
     string = ""
     if total > 0:
         coverage_percent = int(covered / total * 100)
-        colour = get_coverage_html_colour(coverage_percent=coverage_percent)
-        string = value_as_centred_text(colour, "{}% ({} of {})".format(coverage_percent, covered, total))
+        color = get_coverage_html_color(coverage_percent=coverage_percent)
+        string = value_as_centered_text(color, "{}% ({} of {})".format(coverage_percent, covered, total))
     return string
 
 
@@ -341,14 +341,14 @@ def generate_changed_function_table(changed_functions: dict) -> list:
             function_info = functions_info[function]
             complexity = int(function_info['complexity'])
             prev_complexity = -1
-            code_colour = get_complexity_html_colour(complexity)
-            complexity_string = value_as_centred_text(code_colour, complexity)
+            code_color = get_complexity_html_color(complexity)
+            complexity_string = value_as_centered_text(code_color, complexity)
             prev_complexity_string = ""
             complexity_change_string = ""
             if 'prev_complexity' in function_info:
                 prev_complexity = int(function_info['prev_complexity'])
-                code_colour = get_complexity_html_colour(prev_complexity)
-                prev_complexity_string = value_as_centred_text(code_colour, prev_complexity)
+                code_color = get_complexity_html_color(prev_complexity)
+                prev_complexity_string = value_as_centered_text(code_color, prev_complexity)
                 complexity_change_string = change_string(old_value=prev_complexity, new_value=complexity)
 
             num_lines_in_function = int(function_info["num_lines_in_function"])
@@ -378,12 +378,12 @@ def generate_changed_function_table(changed_functions: dict) -> list:
             report.append("    <td>{}</td>\n".format(complexity_string))
             report.append("    <td>{}</td>\n".format(complexity_change_string))
             report.append("    <td>{}</td>\n".format(prev_complexity_string))
-            report.append("    <td>{}</td>\n".format(centred_text(branch_coverage_string)))
-            report.append("    <td>{}</td>\n".format(centred_text(uncovered_complexity_string)))
-            report.append("    <td>{}</td>\n".format(centred_text(lines_in_function)))
-            report.append("    <td>{}</td>\n".format(centred_text(lines_change_string)))
-            report.append("    <td>{}</td>\n".format(centred_text(prev_lines_in_function_string)))
-            report.append("    <td>{}</td>\n".format(centred_text(line_coverage_string)))
+            report.append("    <td>{}</td>\n".format(centered_text(branch_coverage_string)))
+            report.append("    <td>{}</td>\n".format(centered_text(uncovered_complexity_string)))
+            report.append("    <td>{}</td>\n".format(centered_text(lines_in_function)))
+            report.append("    <td>{}</td>\n".format(centered_text(lines_change_string)))
+            report.append("    <td>{}</td>\n".format(centered_text(prev_lines_in_function_string)))
+            report.append("    <td>{}</td>\n".format(centered_text(line_coverage_string)))
             report.append("  </tr>\n")
     report.append("</table>\n")
 
@@ -457,7 +457,7 @@ def generate_html_report_as_text(code_change_info: dict, verbose: bool):
     report.append("<p>")
 
     report.append("<h2 style=\"text-align: center\">Code Change Details</h2>\n")
-    report.append(centred_text("Only data on files in the 'src' directory is shown below<p>\n"))
+    report.append(centered_text("Only data on files in the 'src' directory is shown below<p>\n"))
 
     report.extend(generate_summary_table(code_change_info=code_change_info))
     report.append("<p>")

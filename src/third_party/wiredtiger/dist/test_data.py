@@ -187,28 +187,28 @@ operation_tracker = enabled_config_true + component_config + tracking_config
 #
 workload_manager = enabled_config_true + component_config + [
     Config('background_compact_config', '',r'''
-        Config that specifies if background compaction is enabled and its behaviour.''',
+        Config that specifies if background compaction is enabled and its behavior.''',
         type='category', subconfig=background_compact_thread_config),
     Config('checkpoint_config', '',r'''
-        Config that specifies if the checkpoint thread is enabled and its behaviour.''',
+        Config that specifies if the checkpoint thread is enabled and its behavior.''',
         type='category', subconfig=checkpoint_operation_thread_config),
     Config('custom_config', '',r'''
-        Config that specifies the number of custom_operation threads and their behaviour.''',
+        Config that specifies the number of custom_operation threads and their behavior.''',
         type='category', subconfig=custom_operation_thread_config),
     Config('insert_config', '', r'''
-        Config that specifies the number of insert_operation threads and their behaviour.''',
+        Config that specifies the number of insert_operation threads and their behavior.''',
         type='category', subconfig=update_insert_thread_config),
     Config('populate_config', '', r'''
         Config that specifies how the database will be populated initially.''',
         type='category', subconfig=populate_config),
     Config('remove_config', '',r'''
-        Config that specifies the number of remove_operation threads and their behaviour.''',
+        Config that specifies the number of remove_operation threads and their behavior.''',
         type='category', subconfig=remove_thread_config),
     Config('read_config', '', r'''
-        Config that specifies the number of read_operation threads and their behaviour.''',
+        Config that specifies the number of read_operation threads and their behavior.''',
         type='category', subconfig=read_thread_config),
     Config('update_config', '',r'''
-        Config that specifies the number of update_operation threads and their behaviour.''',
+        Config that specifies the number of update_operation threads and their behavior.''',
         type='category', subconfig=update_insert_thread_config),
 ]
 

@@ -141,7 +141,7 @@ class VariableContext(object):
         setattr(self, key, value)
 
 ################################################################
-# Changable parameters
+# Changeable parameters
 # We expect these values to evolve as tests are added or modified.
 
 # Generally, system calls must be wrapped in an ASSERT_XX() "macro".
@@ -632,7 +632,7 @@ class Runner:
         #  0   :  comparison op ("EQ")
         #  1   :  function call name "close"
         #  2   :  function call args "(fd)"
-        #  3   :  comparitor "0"
+        #  3   :  comparator "0"
         m = re.match(assertpat, runline)
         if m:
             if m.groups()[1] != gotcall:

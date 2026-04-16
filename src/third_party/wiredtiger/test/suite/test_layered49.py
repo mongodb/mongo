@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# Test we don't revome the user tombstones from the ingest table until they are included in a checkpoint.
+# Test we don't remove the user tombstones from the ingest table until they are included in a checkpoint.
 
 @disagg_test_class
 class test_layered49(wttest.WiredTigerTestCase):

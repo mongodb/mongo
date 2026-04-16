@@ -105,7 +105,7 @@ class test_cursor_bound19(bound_base):
         self.assertEqual(index_cursor.search_near(), -1)
         self.assertEqual(index_cursor.get_key(), self.check_key(40))
 
-        # Test basic search scnarios.
+        # Test basic search scenarios.
         index_cursor.set_key(self.gen_key(20))
         self.assertEqual(index_cursor.search(), wiredtiger.WT_NOTFOUND)
 

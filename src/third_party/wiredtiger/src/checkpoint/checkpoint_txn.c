@@ -527,9 +527,10 @@ __checkpoint_update_evict_triggers_start(
       __wt_atomic_load_double_relaxed(&evict->eviction_dirty_trigger);
     saved_triggers->original_updates_trigger =
       __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger);
+
     /*
-     * FIXME-WT-16613: We should be using compare-and-swap instructions to set these triggers,
-     * alternatively holding a reconfig lock when we are performing these modifications.
+     * FIXME-WT-17015 We should update how eviction triggers are accessed so they are consistently
+     * modified and read.
      */
 
     /*
@@ -543,6 +544,7 @@ __checkpoint_update_evict_triggers_start(
       &evict->eviction_dirty_trigger, saved_triggers->new_dirty_trigger);
     __wt_atomic_store_double_relaxed(
       &evict->eviction_updates_trigger, saved_triggers->new_updates_trigger);
+
     saved_triggers->applied = true;
 }
 
@@ -570,44 +572,27 @@ __checkpoint_update_evict_triggers_end(
     bool restore_updates_trigger =
       WT_ABS(current_updates_trigger - saved_triggers->new_updates_trigger) < DBL_EPSILON;
 
+    /*
+     * FIXME-WT-17015 We should update how eviction triggers are accessed so they are consistently
+     * modified and read.
+     */
+
+    /*
+     * Save back the original cache trigger values.
+     */
     if (!restore_dirty_trigger)
         __wt_verbose_warning(session, WT_VERB_CHECKPOINT, "%s",
           "Dirty trigger was modified during checkpoint, not reverting to original value");
+    else
+        __wt_atomic_store_double_relaxed(
+          &evict->eviction_dirty_trigger, saved_triggers->original_dirty_trigger);
 
     if (!restore_updates_trigger)
         __wt_verbose_warning(session, WT_VERB_CHECKPOINT, "%s",
           "Updates trigger was modified during checkpoint, not reverting to original value");
-
-    /* If we modified the values, return them to their previous states in increments. */
-    if (restore_updates_trigger || restore_dirty_trigger) {
-        double dirty_trigger_delta =
-          (current_dirty_trigger - saved_triggers->new_dirty_trigger) / 5.0;
-        double updates_trigger_delta =
-          (current_updates_trigger - saved_triggers->new_updates_trigger) / 5.0;
-        for (int i = 0; i < 4; i++) {
-            /*
-             * FIXME-WT-16613: We should be using compare-and-swap instructions to set these
-             * triggers, alternatively holding a reconfig lock when we are performing these
-             * modifications.
-             */
-            if (restore_dirty_trigger)
-                __wt_atomic_store_double_relaxed(
-                  &evict->eviction_dirty_trigger, current_dirty_trigger + dirty_trigger_delta);
-            if (restore_updates_trigger)
-                __wt_atomic_store_double_relaxed(&evict->eviction_updates_trigger,
-                  current_updates_trigger + updates_trigger_delta);
-            __wt_sleep(0, 200 * WT_THOUSAND);
-        }
-    }
-
-    /*
-     * Be paranoid about math calculations and floating point manipulation, save back exactly the
-     * original values as a final step.
-     */
-    __wt_atomic_store_double_relaxed(
-      &evict->eviction_dirty_trigger, saved_triggers->original_dirty_trigger);
-    __wt_atomic_store_double_relaxed(
-      &evict->eviction_updates_trigger, saved_triggers->original_updates_trigger);
+    else
+        __wt_atomic_store_double_relaxed(
+          &evict->eviction_updates_trigger, saved_triggers->original_updates_trigger);
 }
 
 /*
@@ -1868,7 +1853,8 @@ err:
          */
         WT_DHANDLE_CLEAR(session);
         WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_ROLLBACK);
-        WT_TRET(__wt_txn_rollback(session, NULL, false));
+        WT_TRET_MSG(session, __wt_txn_rollback(session, NULL, false), "%s",
+          "Checkpoint transaction rollback failed");
     }
 
     /*
@@ -1879,8 +1865,10 @@ err:
         WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_LOG);
         if (ret == 0 && F_ISSET(CUR2BT(session->meta_cursor), WT_BTREE_SKIP_CKPT))
             idle = true;
-        WT_TRET(__wt_checkpoint_log(session, true,
-          (ret == 0 && !idle) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_CLEANUP, NULL));
+        WT_TRET_MSG(session,
+          __wt_checkpoint_log(session, true,
+            (ret == 0 && !idle) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_CLEANUP, NULL),
+          "%s", "Checkpoint log operation failed");
     }
 
     /*
@@ -1892,13 +1880,13 @@ err:
       conn->disaggregated_storage.num_meta_put_at_ckpt_begin ==
         conn->disaggregated_storage.num_meta_put &&
       ckpt_tmp_ts != conn->disaggregated_storage.last_checkpoint_timestamp) {
+        __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "%s",
+          "Update requested for disaggregated storage checkpoint metadata because the stable "
+          "timestamp advanced");
         if (conn->key_provider != NULL)
             WT_TRET(__wt_disagg_put_crypt_helper(session));
         WT_TRET(__wt_disagg_put_checkpoint_meta(
           session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_tmp_ts));
-        __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "%s",
-          "Updated disaggregated storage checkpoint metadata because the stable timestamp "
-          "advanced");
     }
 
     /*
@@ -2890,7 +2878,8 @@ err:
             __wt_verbose_error(session, WT_VERB_CHECKPOINT,
               "checkpoint failed with error code %d before block manager checkpoint resolve", ret);
 #endif
-        WT_TRET(bm->checkpoint_resolve(bm, session, ret != 0));
+        WT_TRET_MSG(session, bm->checkpoint_resolve(bm, session, ret != 0), "%s",
+          "Checkpoint resolve failed");
 
         /*
          * If in disaggregated mode, discard the root page associated with checkpoints that are
@@ -2911,7 +2900,9 @@ err:
                  * the discard logic would also need to be reconsidered.
                  */
                 if (F_ISSET(ckpt_temp, WT_CKPT_DELETE) && ckpt_temp->raw.data)
-                    WT_TRET(bm->free(bm, session, ckpt_temp->raw.data, ckpt_temp->raw.size, true));
+                    WT_TRET_MSG(session,
+                      bm->free(bm, session, ckpt_temp->raw.data, ckpt_temp->raw.size, true), "%s",
+                      "Checkpoint root page discard failed");
             }
         }
     }

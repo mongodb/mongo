@@ -87,7 +87,7 @@ class test_drop03(wttest.WiredTigerTestCase):
         self.verify_value(self.uri, self.session, 'key: bbb', 'value: bbb')
 
         # Check that the transaction needs to be rolled back by failing to commit it.
-        self.prout("commit_transaction fails and rollsback.")
+        self.prout("commit_transaction fails and rolls back.")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                                      lambda: self.session.commit_transaction(),
                                      "/transaction requires rollback: Invalid argument/")

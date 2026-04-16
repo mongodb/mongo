@@ -1904,7 +1904,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
      * of a hot backup.
      *
      * In addition, in disagg mode, we should create the lock file regardless
-     * of whether the  WiredTiger file exists or not because WiredTiger file may
+     * of whether the WiredTiger file exists or not because WiredTiger file may
      * not be there.
      */
     exist = false;

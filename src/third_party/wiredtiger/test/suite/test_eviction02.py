@@ -69,11 +69,11 @@ class test_eviction02(eviction_util):
             self.session.checkpoint()
 
             # Bump the oldest timestamp to make some of the previously inserted data globally
-            # visible. This makes any time window informaton associated with that data obsolete and
+            # visible. This makes any time window information associated with that data obsolete and
             # eligible for cleanup.
             self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(num_keys // 2))
 
-            # Eviction should perform clean eviction here which triggers the assessement of obsolete
+            # Eviction should perform clean eviction here which triggers the assessment of obsolete
             # time window information.
             self.evict_cursor_tw_cleanup(uri, num_keys)
 

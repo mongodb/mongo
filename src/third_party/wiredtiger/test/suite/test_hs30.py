@@ -47,7 +47,7 @@ from wtscenario import make_scenarios
 # writing, very extensively). It does not appear possible to read the values from the
 # history store directly (at runtime) in case (1): starting a read transaction after
 # the update transaction commits will not read the old values, and starting a read
-# transction before the update transaction commits (and waiting for it) is not really
+# transaction before the update transaction commits (and waiting for it) is not really
 # different from case (2).
 #
 # However, case (2) to date is not tested elsewhere. This test checks case (2).

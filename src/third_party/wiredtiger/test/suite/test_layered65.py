@@ -88,7 +88,7 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         cursor_follow.close()
 
-        # Make the prepred update stable.
+        # Make the prepared update stable.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
         self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
 
@@ -148,7 +148,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         self.session_follow.rollback_transaction(f"rollback_timestamp={self.timestamp_str(30)}")
         cursor_follow.close()
 
-        # Make the prepred update stable.
+        # Make the prepared update stable.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
         self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
 
@@ -259,7 +259,7 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         cursor_follow.close()
 
-        # Make the prepred update stable.
+        # Make the prepared update stable.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
         self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
 
@@ -278,7 +278,7 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         stat_cursor = session_follow2.open_cursor('statistics:' + uri)
         garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
-        # The keys are garbaged collected from the disk image.
+        # The keys are garbage collected from the disk image.
         self.assertEqual(garbage_collected_update_chain, 0)
 
         # The update before the prepared update should be garbage collected from the disk image.
@@ -317,7 +317,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         cursor_follow[2] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
-        # Make the prepred update stable.
+        # Make the prepared update stable.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(10)}")
         self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(10)}")
 
@@ -345,7 +345,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         self.session_follow.rollback_transaction(f"rollback_timestamp={self.timestamp_str(30)}")
         cursor_follow.close()
 
-        # Make the prepred update stable.
+        # Make the prepared update stable.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
         self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
 
@@ -363,7 +363,7 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         stat_cursor = self.session_follow.open_cursor('statistics:' + uri)
         garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
-        # The keys are garbaged collected from the disk image.
+        # The keys are garbage collected from the disk image.
         self.assertEqual(garbage_collected_update_chain, 0)
 
         # The update before the prepared update should be garbage collected from the disk image.
@@ -447,7 +447,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         cursor_follow[1] = "value2"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
 
-        # Make the prepred update stable on primary.
+        # Make the prepared update stable on primary.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
         # Mark the committed update globally visible on standby.
         self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(40)},oldest_timestamp={self.timestamp_str(40)}")

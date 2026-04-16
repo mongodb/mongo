@@ -32,7 +32,7 @@ from wtbound import bound_base
 from wiredtiger import stat
 
 # test_cursor_bound08.py
-# Test that the statistics added for cursor bound API are appropiately incremented for all different cursor
+# Test that the statistics added for cursor bound API are appropriately incremented for all different cursor
 # operations and edge cases.
 class test_cursor_bound08(bound_base):
     conn_config = 'statistics=(all)'

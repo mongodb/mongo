@@ -910,6 +910,8 @@ err:
     /* Increment the cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size, false);
     (void)__wt_atomic_add_uint64_relaxed(&cache->pages_inmem, 1);
+    if (!WT_PAGE_IS_INTERNAL(page))
+        (void)__wt_atomic_add_uint64_relaxed(&cache->pages_inmem_leaf, 1);
     if (__wt_conn_is_disagg(session)) {
         if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
             (void)__wt_atomic_add_uint64_relaxed(&cache->pages_inmem_ingest, 1);

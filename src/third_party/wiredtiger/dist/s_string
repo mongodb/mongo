@@ -23,7 +23,7 @@ type aspell > /dev/null 2>&1 || {
 #    Run aspell with the correct mode for a given file type.
 run_aspell_for() {
     case "$1" in
-    *.yml|*.yaml)
+    *.yml|*.yaml|*.py)
         # aspell's built-in --mode=comment is broken
         # (see https://github.com/GNUAspell/aspell/issues/505). This combines the
         # workaround from that issue with the filters defined in comment.amf to
@@ -72,6 +72,7 @@ l=$(
     find bench dist examples ext src test tools/checksum_bitflip -name '*.[chsy]' | grep -v 'test/3rdparty'
     find src -name '*.in'
     find test -name '*.cpp' | grep -v 'test/3rdparty'
+    find test -name '*.py' | grep -v 'test/3rdparty'
     find test -name '*.yml' | grep -v 'test/3rdparty'
   } | filter_if_fast
 )

@@ -76,7 +76,7 @@ The Code Change Details section contains the lines code in the git diff:
   * A small triangle: clicking the small triangle will toggle the display of per-branch coverage information
   * Text: _n_ of _m_ means that n out of m branches were covered. Note that uncovered branches are common in macros.
   * A scale: this shows branch coverage graphically. 
-    The colour of the scale will be green for 100% branch coverage, red otherwise. 
+    The color of the scale will be green for 100% branch coverage, red otherwise. 
 * The +-= column:
   * **+** means an added line
   * **-** means a deleted line
@@ -84,7 +84,7 @@ The Code Change Details section contains the lines code in the git diff:
   * Note, a changed line shows as a pair of an added line and a deleted line.
 * The code column:
   * Deleted lines are displayed in ~~strikethrough~~
-  * Lines of code are coloured based on the line and branch coverage:
+  * Lines of code are colored based on the line and branch coverage:
     * Green means 100% branch coverage
     * Red means no coverage at all
     * Amber means partial branch coverage (ie some branches are covered, but not others)

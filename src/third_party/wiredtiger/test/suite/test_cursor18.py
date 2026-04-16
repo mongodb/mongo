@@ -633,7 +633,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(keys[0])
         self.assertEqual(version_cursor.search(), 0)
 
-        # By default version cursor cannot iterate accross multiple keys
+        # By default version cursor cannot iterate across multiple keys
         if not self.cross_key_config:
             keys = [1]
 

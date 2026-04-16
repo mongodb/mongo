@@ -30,7 +30,7 @@ function_desc = False
 # contents verbatim.
 block = False
 
-# The literal contents of the current block comment. If we realise halfway
+# The literal contents of the current block comment. If we realize halfway
 # through the comment that it's not a block comment then we'll just print this
 # out and pretend none of this ever happened.
 comment = str()

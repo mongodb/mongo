@@ -31,7 +31,7 @@ from prepare_util import test_prepare_preserve_prepare_base
 
 # Tests checkpoint behavior for rolled back prepared transactions with tombstones:
 # - Write aborted prepared tombstones as prepared if prepared timestamp is stable but rollback timestamp is not stable
-# - Skip writing aborted prepared tobstone if rollback timestamp is stable
+# - Skip writing aborted prepared tombstone if rollback timestamp is stable
 
 class test_prepare33(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare32'

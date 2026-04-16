@@ -375,6 +375,8 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
     /* Update bytes and pages evicted. */
     (void)__wt_atomic_add_uint64_relaxed(&cache->bytes_evict, memory_footprint);
     (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted, 1);
+    if (!WT_PAGE_IS_INTERNAL(page))
+        (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted_leaf, 1);
     if (is_disagg) {
         if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
             (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted_ingest, 1);

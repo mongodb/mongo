@@ -47,7 +47,7 @@ class test_tiered03(wttest.WiredTigerTestCase, TieredConfigMixin):
     scenarios = wtscenario.make_scenarios(storage_sources, record_count_scenarios,\
          prune=100, prunelong=500)
 
-    absolute_bucket_dir = None  # initialied in conn_config to an absolute path
+    absolute_bucket_dir = None  # initialized in conn_config to an absolute path
 
     def conn_config(self):
         bucket_ret = self.bucket

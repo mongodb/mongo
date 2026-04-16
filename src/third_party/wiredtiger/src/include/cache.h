@@ -93,9 +93,11 @@ struct __wt_cache {
     wt_shared uint64_t pages_dirty_leaf_stable;
     wt_shared uint64_t pages_evicted;
     wt_shared uint64_t pages_evicted_ingest;
+    wt_shared uint64_t pages_evicted_leaf;
     wt_shared uint64_t pages_evicted_stable;
     wt_shared uint64_t pages_inmem;
     wt_shared uint64_t pages_inmem_ingest;
+    wt_shared uint64_t pages_inmem_leaf;
     wt_shared uint64_t pages_inmem_stable;
 
     u_int overhead_pct; /* Cache percent adjustment */

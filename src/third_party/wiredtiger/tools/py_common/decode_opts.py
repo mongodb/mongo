@@ -39,7 +39,7 @@ class DecodeOptions:
     # Treat the input as a fragment with no WT file header.
     fragment: bool = False
 
-    # --- Decode behaviour ---
+    # --- Decode behavior ---
     # Input comes from disaggregated storage.
     disagg: bool = False
     # Skip reading/processing cell data (print headers only).

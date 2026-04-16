@@ -93,7 +93,7 @@ class test_live_restore01(backup_base):
         # Specify an empty path string.
         self.expect_failure("live_restore=(enabled=true,path=\"\")", "/No such file or directory/")
 
-        # Specify a non existant path.
+        # Specify a nonexistent path.
         self.expect_failure("live_restore=(enabled=true,path=\"fake.fake.fake\")", "/fake.fake.fake/")
 
         # Specify the max number of threads

@@ -124,7 +124,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         start_usage = self.get_non_page_image_memory_usage()
 
         # Whenever we request something out of cache of timestamp 2, we should
-        # be reading it straight from the history store without initialising a full
+        # be reading it straight from the history store without initializing a full
         # update chain of every version of the data.
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
         for i in range(1, self.nrows):

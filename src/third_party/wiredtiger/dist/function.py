@@ -138,7 +138,7 @@ def function_args(name, line):
     # For example, the following lines cannot be sorted alphabetically:
     #    WT_BTREE *btree = S2BT(session);
     #    WT_BM *bm = btree->bm;
-    # So, in the presence of initialisation, terminate the parse.
+    # So, in the presence of initialization, terminate the parse.
     if re.search('=', line):
         return False,0
 

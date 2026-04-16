@@ -73,7 +73,7 @@ class test_layered59(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Do another checkpoint
         self.session.checkpoint()
 
-        # Verfiy that we haven't written any internal page delta
+        # Verify that we haven't written any internal page delta
         stat_cursor = self.session.open_cursor('statistics:' + uri)
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_internal][2], 0)
         stat_cursor.close()
@@ -110,7 +110,7 @@ class test_layered59(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Do another checkpoint
         self.session.checkpoint()
 
-        # Verfiy that we haven't written any internal page delta
+        # Verify that we haven't written any internal page delta
         stat_cursor = self.session.open_cursor('statistics:' + uri)
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_internal][2], 0)
         stat_cursor.close()
@@ -150,7 +150,7 @@ class test_layered59(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Do another checkpoint
         self.session.checkpoint()
 
-        # Verfiy that we haven't written any internal page delta
+        # Verify that we haven't written any internal page delta
         stat_cursor = self.session.open_cursor('statistics:' + uri)
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_internal][2], 0)
         stat_cursor.close()

@@ -36,7 +36,7 @@ import os, shutil
 
 # test_bug029.py
 #
-# Test that WT correctly propogates the most recent checkpoint time
+# Test that WT correctly propagates the most recent checkpoint time
 # across restarts. We validate this by reproducing the original bug
 # from WT-9457: frequent checkpoints pushed the checkpoint clock time
 # into the future such that immediately after a restart a backup could

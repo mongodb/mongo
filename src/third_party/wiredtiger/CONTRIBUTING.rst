@@ -116,7 +116,7 @@ existing example in the source code and copy it.
   and initialized where they are first used, i.e. the scope of each variable
   should be as limited as possible.
 * Initializing a variable at the time it is declared should be preferred
-  to declaring separately from initialisation.
+  to declaring separately from initialization.
 * For the cases where the initialization isn't required, but a
   compiler wants it, tag them with this comment
   ``/* -Werror=maybe-uninitialized */``

@@ -164,7 +164,7 @@ def set_long_run(islong):
 def prune_scenarios(scenes, default_count = -1, long_count = -1):
     """
     Use listed probabilities for pruning the list of scenarios.
-    That is, the highest probability (value of P in the scendario)
+    That is, the highest probability (value of P in the scenario)
     are chosen more often.  With just one argument, only scenarios
     with P > .5 are returned half the time, etc. A second argument
     limits the number of scenarios. When a third argument is present,

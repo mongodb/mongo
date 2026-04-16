@@ -171,7 +171,7 @@ class test_import08(test_import_base):
         # and the test will fail.
         #
         # If we use the new scheme and compare with the btree specific base write gen that was
-        # supplied in the metadata, we will realise that it was from the previous run and wipe the
+        # supplied in the metadata, we will realize that it was from the previous run and wipe the
         # IDs meaning that all records will be visible.
         self.check(self.uri, self.keys, self.values)
 

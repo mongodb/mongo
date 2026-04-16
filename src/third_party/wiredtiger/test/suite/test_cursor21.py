@@ -65,7 +65,7 @@ class test_cursor21(wttest.WiredTigerTestCase):
         reposition_count = self.get_stat(stat.conn.cursor_reposition, self.session)
         if self.reposition:
             count = reposition_count - count
-            # Ensure that the reposition stat is greater than 0, indicating that repositon happened.
+            # Ensure that the reposition stat is greater than 0, indicating that reposition happened.
             self.assertGreater(count, 0)
         else:
             self.assertEqual(reposition_count, 0)

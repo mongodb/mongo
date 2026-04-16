@@ -30,7 +30,7 @@ import wttimestamp
 
 # Note: Parameter variant is used to select a set of values. One example usage is as follows:
 # 1. Use transaction A to fill a table with variant 1. Commit transaction A.
-# 2. Use transaction B to fill the same table with variant 2. Do not commit tranasation B.
+# 2. Use transaction B to fill the same table with variant 2. Do not commit transaction B.
 # 3. Use transaction C to check the table with variant 1.
 # 4. Commit transaction B.
 # 5. Use transaction D to check the table with variant 2. Commit transaction D.

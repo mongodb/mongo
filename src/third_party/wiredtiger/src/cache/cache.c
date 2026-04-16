@@ -148,6 +148,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(
       session, stats, cache_bytes_image_stable, __wt_cache_bytes_image_stable(cache));
     WT_STATP_CONN_SET(session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
+    WT_STATP_CONN_SET(session, stats, cache_pages_inuse_leaf, __wt_cache_pages_inuse_leaf(cache));
     WT_STATP_CONN_SET(
       session, stats, cache_pages_inuse_ingest, __wt_cache_pages_inuse_ingest(cache));
     WT_STATP_CONN_SET(

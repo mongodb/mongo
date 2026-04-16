@@ -210,7 +210,7 @@ class test_layered31(wttest.WiredTigerTestCase):
         self.reset_cursors(follower_cursors)
         follower_cursors = self.scan_data_follower(value_prefix3, 0, first_read, cursors=follower_cursors)
 
-        # Make a change on the leader, and propogate to the follower.
+        # Make a change on the leader, and propagate to the follower.
         value_prefix4 = 'ddd'
         self.put_data(value_prefix4)
 
@@ -235,7 +235,7 @@ class test_layered31(wttest.WiredTigerTestCase):
         self.reset_cursors(follower_cursors)
         follower_cursors = self.scan_data_follower(value_prefix4, 0, first_read, cursors=follower_cursors)
 
-        # Make a change on the leader, and propogate to the follower.
+        # Make a change on the leader, and propagate to the follower.
         value_prefix5 = 'eee'
         self.put_data(value_prefix5)
 

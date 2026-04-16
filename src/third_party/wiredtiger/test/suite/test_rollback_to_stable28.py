@@ -141,8 +141,8 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
         simulate_crash_restart(self, ".", "RESTART")
 
         # As we've created a new DB connection post-shutdown, the connection-wide
-        # base write gen should eventually initialise from the previous checkpoint's base 'write_gen' during the recovery process
-        # ('write_gen'+1). This should be reflected in the initialisation of the 'run_write_gen' field of the newest
+        # base write gen should eventually initialize from the previous checkpoint's base 'write_gen' during the recovery process
+        # ('write_gen'+1). This should be reflected in the initialization of the 'run_write_gen' field of the newest
         # checkpoint post-recovery. As the recovery/rts process updates our pages, we'd also expect the latest checkpoint's
         # 'write_gen' to again be greater than its 'run_write_gen'.
         recovery_write_gen, recovery_run_write_gen = self.parse_write_gen("file:test_debug_mode10.wt")

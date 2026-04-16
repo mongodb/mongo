@@ -92,7 +92,7 @@ class test_pretty_hex_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(True, len(hex) == len(pretty_hex),
             'Hex and pretty_hex output must have the same number of lines.')
 
-        # Next analyse the pretty hex dump line by line
+        # Next analyze the pretty hex dump line by line
         data_started = False
         value_line = False
         for h, p, px in zip(hex, pretty, pretty_hex):

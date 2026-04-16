@@ -113,6 +113,6 @@ class test_txn24(wttest.WiredTigerTestCase):
 
         bytes_evicted_new = self.get_stat(wiredtiger.stat.conn.capacity_bytes_evict)
 
-        # Before commiting the long running transaction check whether any bytes were written to disk s part of eviciton.
+        # Before committing the long running transaction check whether any bytes were written to disk s part of eviction.
         self.assertGreater((bytes_evicted_new - bytes_evicted), 0)
         self.session.commit_transaction()

@@ -31,7 +31,7 @@ from wtbackup import backup_base
 from compact_util import compact_util
 
 # test_compact11.py
-# Verify background compaction and incremental backup behaviour. The block modifications bits in an
+# Verify background compaction and incremental backup behavior. The block modifications bits in an
 # incremental backup should never be cleared when background compact is working on tables.
 class test_compact11(backup_base, compact_util):
     backup_incr = "BACKUP_INCR"

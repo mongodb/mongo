@@ -1,12 +1,12 @@
 # How to use cppsuite
-This README demonstrates the process to create and run a cppsuite test from scratch. As an example, we will create a new test `multi_size_inserts` that performs transactions that are either within or greater than the database cache size.  
+This README demonstrates the process to create and run a cppsuite test from scratch. As an example, we will create a new test `multi_size_inserts` that performs transactions that are either within or greater than the database cache size.
 We will cover the steps to [create your new test](#creating-a-new-test), [configure it](#configuring-tests), and finally [run the test](#running-tests).
 
 ## Creating a new test
-New tests are created using the [create_test.sh](./create_test.sh) script in the root directory. This script takes the test name as its only argument, so we will call it with:  
-`./create_test.sh multi_size_inserts`  
+New tests are created using the [create_test.sh](./create_test.sh) script in the root directory. This script takes the test name as its only argument, so we will call it with:
+`./create_test.sh multi_size_inserts`
 
-This will create two new files: the `.cpp` file `tests/multi_size_inserts.cpp` and the configuration file `configs/multi_size_inserts_default.txt`. Working with these files is covered below.  
+This will create two new files: the `.cpp` file `tests/multi_size_inserts.cpp` and the configuration file `configs/multi_size_inserts_default.txt`. Working with these files is covered below.
 
 *Note: `s_all` is called as part of `create_test.sh` which automatically updates some boilerplate sections of the test framework based on the contents of `test_data.py`. If you want to change the name of an existing test you will need to also update it in `test_data.py` and then call `s_all` manually.*
 
@@ -15,12 +15,12 @@ Having generated these two files we now need to modify them to define our test.
 
 ### The `.cpp` file
 
-The `.cpp` file allows users to define the behaviour of database operations for their test. This file is cloned from [test_template.cpp](tests/test_template.cpp) on creation and by default will do nothing as all functions are stubbed.
+The `.cpp` file allows users to define the behavior of database operations for their test. This file is cloned from [test_template.cpp](tests/test_template.cpp) on creation and by default will do nothing as all functions are stubbed.
 
 #### Defining workloads
 In our example test `multi_size_inserts` we will first update the functions that define `insert` and `populate`.
 The default behavior of populate (implemented in [database_operation.cpp](./src/main/database_operation.cpp)) will create the table in the database, so we can delete the stubbed implementation of `populate` and make sure that it is defined in the [configuration file](#the-configuration-file) later.
-When cppsuite executes the test it will create threads that run the `insert_operation` function.  
+When cppsuite executes the test it will create threads that run the `insert_operation` function.
 
 Initially, the insert function is stubbed as follows:
 ```cpp
@@ -57,7 +57,7 @@ insert_operation(thread_worker *tw) override final
         // Each transaction should have target_op_count insert operations. This value is set in the configuration file
         for(int i = 0; i < tw->txn.get_target_op_count(); ++i) {
             tw->sleep();
-    
+
             // Populate the key and value with random strings. We only use the size of the value in this test
             const std::string key = random_generator::instance().generate_pseudo_random_string(tw->key_size);
             const std::string value = random_generator::instance().generate_pseudo_random_string(value_size_bytes);
@@ -79,7 +79,7 @@ insert_operation(thread_worker *tw) override final
 
 
 #### Saving validation data
-The `set_tracking_cursor` function defines what data is saved by the operation tracker. 
+The `set_tracking_cursor` function defines what data is saved by the operation tracker.
 In our example test we will save the timestamp, transaction ID, key and value size.
 
 ```cpp
@@ -97,7 +97,7 @@ set_tracking_cursor(WT_SESSION *session, const tracking_operation &operation, co
 *Note: We also need to specify the key-value format of the tracking table where we save test data. This is covered [below](#the-configuration-file).*
 
 ##### Performing validation
-When the test finishes the framework calls the `validate` function in which users can perform any checks they want. 
+When the test finishes the framework calls the `validate` function in which users can perform any checks they want.
 
 In our test `multi_size_inserts` the 10MB updates are too large for cache and not be written ([see below](#the-configuration-file) for how to configure cache size). As such we will check that any update made with a value size of 1KB is present in the database, and any update with a value size of 10MB is not present:
 
@@ -141,7 +141,7 @@ validate(bool tracking_enabled, const std::string &operation_table_name, const s
 
 ### The configuration file
 
-The configuration file manages cppsuite level configuration for the test such as the total runtime of the test and the behaviour of the different components in the test. To see what fields can be set please refer to [test_data.py](../../dist/test_data.py).  
+The configuration file manages cppsuite level configuration for the test such as the total runtime of the test and the behavior of the different components in the test. To see what fields can be set please refer to [test_data.py](../../dist/test_data.py).
 In our `multi_size_inserts_default.txt` file we define our test to run for 15 seconds, have a cache of 10MB, and create 10 insert threads. Each thread runs `insert_operation` where each transaction contains between 5 and 10 inserts and performs one insert every 10 milliseconds.
 We define the operation tracker key and value formats to match the types of the data we save in `set_tracking_cursor` [above](#saving-validation-data). The types that can be used are found [here](https://source.wiredtiger.com/develop/schema.html#schema_format_types).
 
@@ -176,10 +176,10 @@ Sometimes users may want to use the same test workload but run it at different i
 
 
 ## Running tests
-Having written our test we can now run it. Compile WiredTiger and then navigate to the `<build_dir>/test/cppsuite` folder.  
+Having written our test we can now run it. Compile WiredTiger and then navigate to the `<build_dir>/test/cppsuite` folder.
 
-The `./run` binary executes the test. Further details are provided via the `-h` help flag, but the most common usage is 
-`./run -t multi_size_inserts -f configs/multi_size_inserts_default.txt -l 2`.  
+The `./run` binary executes the test. Further details are provided via the `-h` help flag, but the most common usage is
+`./run -t multi_size_inserts -f configs/multi_size_inserts_default.txt -l 2`.
 
 In this command the `-t` flag tells cppsuite to use the `test/multi_size_inserts.cpp` test configuration, the `-f` flag to use the `configs/multi_size_inserts_default.txt` cppsuite configuration, and the `-l` flag to run the test with level 2 verbosity. Further details on log levels can be [found here](./README.md#logging).
 

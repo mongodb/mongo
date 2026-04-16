@@ -11,7 +11,7 @@ create_test_executable(target SOURCES <source files>
 )
 
 Defines a C/CXX test executable binary. This helper does the necessary
-initialisation to ensure the correct flags and libraries are used when
+initialization to ensure the correct flags and libraries are used when
 compiling the test executable.
 
 Parameters:

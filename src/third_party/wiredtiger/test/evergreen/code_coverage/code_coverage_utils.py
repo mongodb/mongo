@@ -147,7 +147,7 @@ def setup_build_dirs(build_dir_base, parallel, setup_task_list):
     diff = end_time - start_time
 
     logging.debug("Finished setup and took {} seconds".format(diff.total_seconds()))
-    # Copy compiled base build directory into the other build directores.
+    # Copy compiled base build directory into the other build directories.
     logging.debug("Copying base build directory {} into the other build directories.".format(base_build_dir))
     for build_dir in build_dirs_list[1:]:
         shutil.copytree(base_build_dir, build_dir)

@@ -20,6 +20,17 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_pages_inuse_leaf --
+ *     Return the number of leaf pages in use.
+ */
+static WT_INLINE uint64_t
+__wt_cache_pages_inuse_leaf(WT_CACHE *cache)
+{
+    return (__wt_atomic_load_uint64_relaxed(&cache->pages_inmem_leaf) -
+      __wt_atomic_load_uint64_relaxed(&cache->pages_evicted_leaf));
+}
+
+/*
  * __wt_cache_pages_inuse_ingest --
  *     Return the number of pages in use for the ingest btrees.
  */

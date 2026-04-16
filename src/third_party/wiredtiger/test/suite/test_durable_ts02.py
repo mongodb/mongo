@@ -74,7 +74,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         Commented out for now: the system panics if we fail after preparing a transaction.
 
         # Scenario: 1
-        # Check to see commit timestamp > durable timestamap, returns error.
+        # Check to see commit timestamp > durable timestamp, returns error.
         session.begin_transaction()
         self.assertEqual(cursor.next(), 0)
         for i in range(1, 10):

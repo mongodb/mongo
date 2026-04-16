@@ -245,7 +245,7 @@ class test_layered79(wttest.WiredTigerTestCase):
         self.session_follow.commit_transaction()
         cursor_follow_ingest.close()
 
-        # Ensure the on-page value is not prnable
+        # Ensure the on-page value is not prunable
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(1)}')
         self.conn_follow.set_timestamp(f'stable_timestamp={self.timestamp_str(1)}')
 

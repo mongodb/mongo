@@ -69,7 +69,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
         # Move the stable timestamp.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
-        # Insert a value at timetamp 6
+        # Insert a value at timestamp 6
         self.session.begin_transaction()
         cursor[1] = self.value2
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(6))
