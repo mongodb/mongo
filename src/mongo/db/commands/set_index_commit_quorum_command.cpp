@@ -36,6 +36,7 @@
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
@@ -92,6 +93,13 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            const auto& provider =
+                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+            uassert(ErrorCodes::CommandNotSupported,
+                    str::stream() << "setIndexCommitQuorum is not supported in this storage mode: "
+                                  << provider.name(),
+                    !provider.mustUsePrimaryDrivenIndexBuilds());
+
             uassertStatusOK(
                 IndexBuildsCoordinator::get(opCtx)->setCommitQuorum(opCtx,
                                                                     request().getNamespace(),

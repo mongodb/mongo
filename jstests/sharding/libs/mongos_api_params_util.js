@@ -14,6 +14,7 @@ import {
 } from "jstests/sharding/libs/last_lts_mongos_commands.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -1983,6 +1984,17 @@ export let MongosAPIParametersUtil = (function () {
         ]) {
             for (const testCase of cases) {
                 if (testCase.skip) continue;
+
+                // TODO SERVER-124143: Re-evaluate this check after test is updated to account for commands incompatible with disaggregated storage.
+                if (
+                    testCase.commandName == "setIndexCommitQuorum" &&
+                    PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                        st.s0.getDB("db"),
+                        "mustUsePrimaryDrivenIndexBuilds",
+                        true,
+                    )
+                )
+                    continue;
 
                 for (let runOrExplain of [testCase.run, testCase.explain]) {
                     if (runOrExplain === undefined) continue;
