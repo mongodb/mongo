@@ -73,7 +73,7 @@ if (!ErrorCodes.isInterruption(res.code)) {
 assert.commandFailedWithCode(
     db.adminCommand({
         bulkWrite: 1,
-        ops: [{insert: 0, document: {skey: "MongoDB"}}],
+        ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}],
         nsInfo: [{ns: "test.coll"}],
         cursor: {batchSize: 1024},
         bypassDocumentValidation: true,
@@ -91,8 +91,8 @@ assert.commandFailedWithCode(
     db.adminCommand({
         bulkWrite: 1,
         ops: [
-            {insert: 2, document: {skey: "MongoDB"}},
-            {insert: 0, document: {skey: "MongoDB"}},
+            {insert: 2, document: {_id: 2, skey: "MongoDB"}},
+            {insert: 0, document: {_id: 0, skey: "MongoDB"}},
         ],
         nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}],
     }),
@@ -111,7 +111,7 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 // Missing nsInfo
-assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}]}), [
+assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}]}), [
     ErrorCodes.IDLFailedToParse,
 ]);
 
@@ -122,7 +122,7 @@ assert.eq(coll1.find().itcount(), 0);
 assert.commandFailedWithCode(
     db.adminCommand({
         bulkWrite: 1,
-        ops: [{insert: "test", document: {skey: "MongoDB"}}],
+        ops: [{insert: "test", document: {_id: 0, skey: "MongoDB"}}],
         nsInfo: [{ns: "test.coll"}],
     }),
     [ErrorCodes.TypeMismatch],
@@ -140,7 +140,7 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: ["test"]}),
+    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}], nsInfo: ["test"]}),
     [ErrorCodes.TypeMismatch],
 );
 
@@ -155,7 +155,7 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 assert.commandFailedWithCode(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: "test"}),
+    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}], nsInfo: "test"}),
     [ErrorCodes.TypeMismatch],
 );
 
@@ -287,7 +287,7 @@ res = db.adminCommand({
     ops: [
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-        {insert: 1, document: {skey: "MongoDB"}},
+        {insert: 1, document: {_id: 1, skey: "MongoDB"}},
     ],
     nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}],
 });
@@ -314,7 +314,7 @@ res = db.adminCommand({
     ops: [
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-        {insert: 1, document: {skey: "MongoDB"}},
+        {insert: 1, document: {_id: 0, skey: "MongoDB"}},
     ],
     nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}],
     ordered: false,
@@ -370,7 +370,7 @@ cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 0, idx: 2, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
 coll.drop();
 
-coll.insert({skey: "MongoDB"});
+coll.insert({_id: 0, skey: "MongoDB"});
 
 // Test constants is not supported on non-pipeline update.
 // In all versions with a value that's present ("MongoDB").

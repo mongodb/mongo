@@ -16,7 +16,11 @@ coll.drop();
 coll1.drop();
 
 // Make sure a properly formed request has successful result.
-let res = db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: "test.coll"}]});
+let res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [{insert: 0, document: {_id: 1, skey: "MongoDB"}}],
+    nsInfo: [{ns: "test.coll"}],
+});
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
@@ -34,8 +38,8 @@ coll.drop();
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
-        {insert: 0, document: {skey: "MongoDB"}},
-        {insert: 0, document: {skey: "MongoDB"}},
+        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 2, skey: "MongoDB"}},
     ],
     nsInfo: [{ns: "test.coll"}],
 });
