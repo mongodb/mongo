@@ -31,6 +31,15 @@ filters:
   - "change_streams*":
     approvers:
       - 10gen/query-execution-change-streams
+  - "core_ese_gcm.yml":
+    approvers:
+      - 10gen/server-security
+  - "replica_sets_ese.yml":
+    approvers:
+      - 10gen/server-security
+  - "replica_sets_ese_gcm.yml":
+    approvers:
+      - 10gen/server-security
   - "core_minimum_batch_size.yml":
     approvers:
       - 10gen/query-execution

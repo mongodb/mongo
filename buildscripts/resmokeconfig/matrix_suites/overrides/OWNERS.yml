@@ -79,3 +79,6 @@ filters:
   - "minimum_batch_size.yml":
     approvers:
       - 10gen/query-execution
+  - "encryption.yml":
+    approvers:
+      - 10gen/server-security
