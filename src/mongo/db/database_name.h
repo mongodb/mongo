@@ -377,7 +377,7 @@ protected:
     DatabaseName(boost::optional<TenantId> tenantId, StringData dbString)
         : _data(Storage::make(std::move(tenantId), dbString)) {
         uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in a db name: " + dbString,
+                fmt::format("'.' is an invalid character in a db name: {}", dbString),
                 dbString.find('.') == std::string::npos);
         uassert(ErrorCodes::InvalidNamespace,
                 "database names cannot have embedded null characters",
@@ -607,7 +607,7 @@ protected:
                             bool hasTenant,
                             const char* tenantData) {
             uassert(ErrorCodes::InvalidNamespace,
-                    "Collection names cannot start with '.': " + collectionName,
+                    fmt::format("Collection names cannot start with '.': {}", collectionName),
                     collectionName.empty() || collectionName[0] != '.');
             uassert(ErrorCodes::InvalidNamespace,
                     "namespaces cannot have embedded null characters",

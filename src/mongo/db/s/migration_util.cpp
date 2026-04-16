@@ -159,11 +159,14 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
-    return BSON(
-        RangeDeletionTask::kCollectionUuidFieldName
-        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
-        << range.getMax());
+    return BSON(RangeDeletionTask::kCollectionUuidFieldName
+                << collectionUuid
+                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                    std::string{ChunkRange::kMinFieldName}
+                << range.getMin()
+                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                    std::string{ChunkRange::kMaxFieldName}
+                << range.getMax());
 }
 
 // TODO SERVER-103838 Remove this function and replace any call with 'coordinatorDoc.toBSON()'

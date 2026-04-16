@@ -50,7 +50,7 @@ using Entry = FlatBSONStore<MinMaxElement, BSONElementValueBuffer>::Entry;
 std::string concatFieldNames(const MinMaxStore::Obj& obj) {
     return std::accumulate(
         obj.begin(), obj.end(), std::string(), [](std::string accum, const MinMaxElement& elem) {
-            return std::move(accum) + elem.fieldName();
+            return std::move(accum) + std::string(elem.fieldName());
         });
 }
 

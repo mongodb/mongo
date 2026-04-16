@@ -165,7 +165,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
 
             if (resource.isAnySystemBucketsCollectionInAnyDB() ||
                 (resource.isExactSystemBucketsCollection() && resource.dbNameToMatch() == dbName)) {
-                collectionNames.emplace(systemBucketsDot +
+                collectionNames.emplace(std::string{systemBucketsDot} +
                                         std::string{resource.collectionToMatch()});
             }
         }

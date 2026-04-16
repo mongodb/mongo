@@ -350,7 +350,7 @@ public:
                 // Unable to parse the mode argument.
                 uassertStatusOK(modeSW.getStatus().withContext(
                     str::stream() << "Could not parse " +
-                        repl::ApplyOps::kOplogApplicationModeFieldName));
+                        std::string{repl::ApplyOps::kOplogApplicationModeFieldName}));
             }
             oplogApplicationMode = modeSW.getValue();
         } else if (status != ErrorCodes::NoSuchKey) {

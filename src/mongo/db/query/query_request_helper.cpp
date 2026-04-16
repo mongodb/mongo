@@ -94,7 +94,7 @@ Status validateGetMoreCollectionName(StringData collectionName) {
     }
     if (collectionName[0] == '.') {
         return Status(ErrorCodes::InvalidNamespace,
-                      "Collection names cannot start with '.': " + collectionName);
+                      "Collection names cannot start with '.': " + std::string{collectionName});
     }
     if (collectionName.find('\0') != std::string::npos) {
         return Status(ErrorCodes::InvalidNamespace,

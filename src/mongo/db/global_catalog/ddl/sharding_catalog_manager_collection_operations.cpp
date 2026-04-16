@@ -591,14 +591,16 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
         NamespaceString::kConfigsvrCollectionsNamespace,
         [this, &nss, &timeseriesParameters, &bucketsMayHaveMixedSchemaData, &shardIds](
             OperationContext* opCtx, TxnNumber txnNumber) {
-            auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
-                TypeCollectionTimeseriesFields::kGranularityFieldName;
-            auto bucketSpanFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
-                TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName;
-            auto bucketRoundingFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
-                TypeCollectionTimeseriesFields::kBucketRoundingSecondsFieldName;
-            auto mixedSchemaFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
-                TypeCollectionTimeseriesFields::kTimeseriesBucketsMayHaveMixedSchemaDataFieldName;
+            auto granularityFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
+                "." + std::string{TypeCollectionTimeseriesFields::kGranularityFieldName};
+            auto bucketSpanFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
+                "." + std::string{TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName};
+            auto bucketRoundingFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
+                "." + std::string{TypeCollectionTimeseriesFields::kBucketRoundingSecondsFieldName};
+            auto mixedSchemaFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
+                "." +
+                std::string{TypeCollectionTimeseriesFields::
+                                kTimeseriesBucketsMayHaveMixedSchemaDataFieldName};
 
             BSONObjBuilder updateBob;
 

@@ -250,14 +250,17 @@ public:
                 setBuilder.append(
                     doc::kStartTimeFieldName,
                     BSON("$cond" << BSON(
-                             "if" << BSON("$or" << BSON_ARRAY(
-                                              BSON("$ne" << BSON_ARRAY(("$" + doc::kModeFieldName)
-                                                                       << idl::serialize(mode)))
-                                              << BSON("$ne" << BSON_ARRAY(
-                                                          ("$" + doc::kCollectionUuidFieldName)
-                                                          << collUuid))))
-                                  << "then" << currentTime << "else"
-                                  << ("$" + doc::kStartTimeFieldName))));
+                             "if"
+                             << BSON("$or" << BSON_ARRAY(
+                                         BSON("$ne"
+                                              << BSON_ARRAY(("$" + std::string{doc::kModeFieldName})
+                                                            << idl::serialize(mode)))
+                                         << BSON("$ne" << BSON_ARRAY(
+                                                     ("$" +
+                                                      std::string{doc::kCollectionUuidFieldName})
+                                                     << collUuid))))
+                             << "then" << currentTime << "else"
+                             << ("$" + std::string{doc::kStartTimeFieldName}))));
                 updates.push_back(BSON("$set" << setBuilder.obj()));
                 updates.push_back(BSON("$unset" << doc::kStopTimeFieldName));
                 request.setUpdate(write_ops::UpdateModification(updates));

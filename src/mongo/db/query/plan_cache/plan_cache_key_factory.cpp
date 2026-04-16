@@ -75,7 +75,7 @@ void encodeIndexabilityRecursive(const MatchExpression* tree,
         if (parentPath.empty()) {
             path = tree->path();
         } else {
-            fullPath = std::string{parentPath} + "." + tree->path();
+            fullPath = std::string{parentPath} + "." + std::string{tree->path()};
             path = fullPath;
         }
     } else {

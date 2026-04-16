@@ -2489,7 +2489,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnCollectionW
     ASSERT(rewrittenMatchExpression);
 
     const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
+        std::string{DocumentSourceChangeStream::kRegexAllDBs} + "\\." + "news" + "$";
     const std::string secondCmdNs = "news.$cmd";
 
     auto rewrittenPredicate = rewrittenMatchExpression->serialize();
@@ -2541,7 +2541,7 @@ TEST_F(ChangeStreamRewriteTest,
     ASSERT(rewrittenMatchExpression);
 
     const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
+        std::string{DocumentSourceChangeStream::kRegexAllDBs} + "\\." + "news" + "$";
     const std::string secondCmdNs = "news.$cmd";
 
     auto rewrittenPredicate = rewrittenMatchExpression->serialize();
@@ -2689,9 +2689,9 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithEmptyNinExpression) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$ns', {db: '" + expCtx->getNamespaceString().db_forTest() +
-                 "', coll: '" + expCtx->getNamespaceString().coll() + "'}]}}");
+    auto expr = fromjson("{$expr: {$eq: ['$ns', {db: '" +
+                         std::string{expCtx->getNamespaceString().db_forTest()} + "', coll: '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "'}]}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -2764,7 +2764,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
 TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
     auto expCtx = getExpCtx();
     auto expr = fromjson("{$expr: {$eq: ['$ns', {db: '" +
-                         expCtx->getNamespaceString().db_forTest() + "'}]}}");
+                         std::string{expCtx->getNamespaceString().db_forTest()} + "'}]}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -2836,8 +2836,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnDbFieldPath) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$ns.db', '" + expCtx->getNamespaceString().coll() + "']}}");
+    auto expr = fromjson("{$expr: {$eq: ['$ns.db', '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -2866,8 +2866,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnDbFieldPath) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$ns.coll', '" + expCtx->getNamespaceString().coll() + "']}}");
+    auto expr = fromjson("{$expr: {$eq: ['$ns.coll', '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -2937,8 +2937,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnInvalidFieldPath) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$ns.test', '" + expCtx->getNamespaceString().coll() + "']}}");
+    auto expr = fromjson("{$expr: {$eq: ['$ns.test', '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -3442,7 +3442,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnCollectionWithRege
     ASSERT(rewrittenMatchExpression);
 
     const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
+        std::string{DocumentSourceChangeStream::kRegexAllDBs} + "\\." + "news" + "$";
 
     auto rewrittenPredicate = rewrittenMatchExpression->serialize();
     ASSERT_BSONOBJ_EQ(
@@ -3464,7 +3464,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnCollectionWithReg
     ASSERT(rewrittenMatchExpression);
 
     const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
+        std::string{DocumentSourceChangeStream::kRegexAllDBs} + "\\." + "news" + "$";
 
     auto rewrittenPredicate = rewrittenMatchExpression->serialize();
     ASSERT_BSONOBJ_EQ(
@@ -3557,9 +3557,9 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithEmptyNinExpression) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnFullObject) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$to', {db: '" + expCtx->getNamespaceString().db_forTest() +
-                 "', coll: '" + expCtx->getNamespaceString().coll() + "'}]}}");
+    auto expr = fromjson("{$expr: {$eq: ['$to', {db: '" +
+                         std::string{expCtx->getNamespaceString().db_forTest()} + "', coll: '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "'}]}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -3597,8 +3597,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnFullObject) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnDbFieldPath) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$to.db', '" + expCtx->getNamespaceString().db_forTest() + "']}}");
+    auto expr = fromjson("{$expr: {$eq: ['$to.db', '" +
+                         std::string{expCtx->getNamespaceString().db_forTest()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -3632,8 +3632,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnDbFieldPath) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnCollFieldPath) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$to.coll', '" + expCtx->getNamespaceString().coll() + "']}}");
+    auto expr = fromjson("{$expr: {$eq: ['$to.coll', '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -3667,8 +3667,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnCollFieldPath) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidFieldPath) {
     auto expCtx = getExpCtx();
-    auto expr =
-        fromjson("{$expr: {$eq: ['$to.test', '" + expCtx->getNamespaceString().coll() + "']}}");
+    auto expr = fromjson("{$expr: {$eq: ['$to.test', '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -3685,7 +3685,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidFieldPath) {
 TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidDbSubFieldPath) {
     auto expCtx = getExpCtx();
     auto expr = fromjson("{$expr: {$eq: ['$to.db.test', '" +
-                         expCtx->getNamespaceString().db_forTest() + "']}}");
+                         std::string{expCtx->getNamespaceString().db_forTest()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
@@ -3701,8 +3701,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidDbSubFieldPath) {
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidCollSubFieldPath) {
     auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$to.coll.test', '" + expCtx->getNamespaceString().coll() +
-                         "']}}");
+    auto expr = fromjson("{$expr: {$eq: ['$to.coll.test', '" +
+                         std::string{expCtx->getNamespaceString().coll()} + "']}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
     ASSERT_OK(statusWithMatchExpression.getStatus());
 

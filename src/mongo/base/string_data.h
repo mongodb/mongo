@@ -345,15 +345,6 @@ inline std::string& operator+=(std::string& a, StringData b) {
     return a += std::string_view{b};
 }
 
-/** Not supported by `std::string_view`. */
-inline std::string operator+(std::string a, StringData b) {
-    return a += b;
-}
-/** Not supported by `std::string_view`. */
-inline std::string operator+(StringData a, std::string b) {
-    return b.insert(0, std::string_view{a});
-}
-
 /**
  * Converts `StringData` -> `std::string_view`.
  * `std::string_view` is banned in favor of `StringData`.

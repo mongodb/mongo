@@ -101,7 +101,7 @@ pid_t spawn(StringData filename, PerfMode mode) {
     pidStream << getpid();
     auto pidString = pidStream.str();
 
-    auto profile_name = filename + ((mode == PerfMode::record) ? ".data" : ".txt");
+    auto profile_name = std::string{filename} + ((mode == PerfMode::record) ? ".data" : ".txt");
     pid_t pid = fork();
     switch (pid) {
         case -1:

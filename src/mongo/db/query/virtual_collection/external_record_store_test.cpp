@@ -60,6 +60,8 @@
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
+
 namespace mongo {
 namespace {
 
@@ -287,7 +289,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
     VirtualCollectionOptions vopts;
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         ExternalDataSourceMetadata meta(
-            (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
+            fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
         vopts.dataSources.emplace_back(meta);
@@ -381,7 +383,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
     VirtualCollectionOptions vopts;
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         ExternalDataSourceMetadata meta(
-            (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
+            fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
         vopts.dataSources.emplace_back(meta);
@@ -469,7 +471,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
     VirtualCollectionOptions vopts;
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         ExternalDataSourceMetadata meta(
-            (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
+            fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
         vopts.dataSources.emplace_back(meta);
@@ -552,7 +554,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
     VirtualCollectionOptions vopts;
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         ExternalDataSourceMetadata meta(
-            (ExternalDataSourceMetadata::kUrlProtocolFile + pipePaths[pipeIdx]),
+            fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePaths[pipeIdx]),
             StorageTypeEnum::pipe,
             FileTypeEnum::bson);
         vopts.dataSources.emplace_back(meta);

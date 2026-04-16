@@ -140,7 +140,7 @@ private:
 
 protected:
     const std::string kCollection = "testColl";
-    const std::string kNss = kDB + "." + kCollection;
+    const std::string kNss = std::string(kDB) + "." + kCollection;
 };
 
 class UpdateCommandTest : public CommandMirroringTest {
@@ -382,7 +382,7 @@ TEST_F(BulkWriteTest, SingleQueryInUpdateOpWithHintCollationSort) {
 
 TEST_F(BulkWriteTest, MultipleUpdateOpsAndNamespaces) {
     const std::string kCollection2 = "testColl2";
-    const std::string kNss2 = kDB + "." + kCollection2;
+    const std::string kNss2 = std::string(kDB) + "." + kCollection2;
 
     auto bulkWriteArgs = {
         BSON("ops" << BSON_ARRAY(

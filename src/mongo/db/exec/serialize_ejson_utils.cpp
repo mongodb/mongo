@@ -341,7 +341,7 @@ auto rethrowWithErrorCode(Callable&& c, StringData msg) -> decltype(auto) {
 Value parseOid(const Value& value) {
     uassertValueType(kOid, value, BSONType::string);
     uassert(ErrorCodes::ConversionFailure,
-            kOid + " must be a 24 character hexadecimal string",
+            std::string{kOid} + " must be a 24 character hexadecimal string",
             value.getStringData().size() == 24);
     auto oid = rethrowWithErrorCode<ErrorCodes::ConversionFailure>(
         [&value] { return OID(value.getStringData()); }, "$oid value must be a valid objectId");
@@ -358,7 +358,7 @@ Value parseNumberInt(const Value& value) {
     int numberInt{0};
     auto ret = NumberParser{}(value.getStringData(), &numberInt);
     uassert(ErrorCodes::ConversionFailure,
-            kNumberInt + " value must be a string specifying an integer",
+            std::string{kNumberInt} + " value must be a string specifying an integer",
             ret.isOK());
     return Value(numberInt);
 }
@@ -368,7 +368,7 @@ Value parseNumberLong(const Value& value) {
     long long numberLong{0};
     auto ret = NumberParser{}(value.getStringData(), &numberLong);
     uassert(ErrorCodes::ConversionFailure,
-            kNumberLong + " value must be a string specifying an integer",
+            std::string{kNumberLong} + " value must be a string specifying an integer",
             ret.isOK());
     return Value(numberLong);
 }
@@ -455,8 +455,9 @@ Value parseUuid(const Value& value) {
     uassertValueType(kUuid, value, BSONType::string);
 
     auto uuid = UUID::parse(value.getStringData());
-    uassert(
-        ErrorCodes::ConversionFailure, kUuid + " value must be a valid UUID string", uuid.isOK());
+    uassert(ErrorCodes::ConversionFailure,
+            std::string{kUuid} + " value must be a valid UUID string",
+            uuid.isOK());
     return Value(uuid.getValue());
 }
 
@@ -540,7 +541,7 @@ Value parseDbPointer(const Value& value) {
     auto idVal = doc[kId];
     uassertValueType(kDbPointer, kId, idVal, BSONType::string);
     uassert(ErrorCodes::ConversionFailure,
-            kId + " must be a 24 character hexadecimal string",
+            std::string{kId} + " must be a 24 character hexadecimal string",
             idVal.getStringData().size() == 24);
 
     uassert(
@@ -566,13 +567,14 @@ Value parseDate(const Value& value) {
 
     if (value.getType() == BSONType::string) {
         auto date = dateFromISOString(value.getStringData());
-        uassert(
-            ErrorCodes::ConversionFailure, kDate + " must be a valid ISO-8601 string", date.isOK());
+        uassert(ErrorCodes::ConversionFailure,
+                std::string{kDate} + " must be a valid ISO-8601 string",
+                date.isOK());
         return Value(date.getValue());
     }
 
     uassert(ErrorCodes::ConversionFailure,
-            kDate + " must be a 64-bit signed integer as a string",
+            std::string{kDate} + " must be a 64-bit signed integer as a string",
             value.getDocument()[kNumberLong].getType() == BSONType::string &&
                 value.getDocument().computeSize() == 1);
     return Value(Date_t::fromMillisSinceEpoch(deserializeFromExtendedJson(value).getLong()));
@@ -581,7 +583,7 @@ Value parseDate(const Value& value) {
 Value parseMinKey(const Value& value) {
     uassertValueType(kMinKey, value, BSONType::numberInt);
     uassert(ErrorCodes::ConversionFailure,
-            kMinKey + " value must be the integer 1",
+            std::string{kMinKey} + " value must be the integer 1",
             value.getInt() == 1);
     return Value(MINKEY);
 }
@@ -589,14 +591,16 @@ Value parseMinKey(const Value& value) {
 Value parseMaxKey(const Value& value) {
     uassertValueType(kMaxKey, value, BSONType::numberInt);
     uassert(ErrorCodes::ConversionFailure,
-            kMaxKey + " value must be the integer 1",
+            std::string{kMaxKey} + " value must be the integer 1",
             value.getInt() == 1);
     return Value(MAXKEY);
 }
 
 Value parseUndefined(const Value& value) {
     uassertValueType(kUndefined, value, BSONType::boolean);
-    uassert(ErrorCodes::ConversionFailure, kUndefined + " value must be true", value.getBool());
+    uassert(ErrorCodes::ConversionFailure,
+            std::string{kUndefined} + " value must be true",
+            value.getBool());
     return Value(BSONUndefined);
 }
 

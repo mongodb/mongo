@@ -516,7 +516,8 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     // Build the oplog filter to match the required internal op types.
     BSONArrayBuilder internalOpTypeOrBuilder;
     for (const auto& eventName : internalOpTypes) {
-        internalOpTypeOrBuilder.append(BSON("o2." + eventName << BSON("$exists" << true)));
+        internalOpTypeOrBuilder.append(
+            BSON("o2." + std::string{eventName} << BSON("$exists" << true)));
     }
 
     // Finalize the array of $or filter predicates.

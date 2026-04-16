@@ -39,6 +39,7 @@
 
 #include <string>
 
+#include <fmt/format.h>
 #include <openssl/opensslv.h>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -293,7 +294,8 @@ void validateTokenFromKeys(JWKManagerTest* instance,
                            const auto validTokenSignature) {
     RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
 
-    auto validToken = validTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature;
+    auto validToken =
+        fmt::format("{}.{}.{}", validTokenHeader, validTokenBody, validTokenSignature);
 
     instance->jwksFetcher()->setKeys(getTestJWKSet());
     JWSValidatedToken validatedToken(instance->jwkManager(), validToken);
@@ -321,19 +323,19 @@ TEST_F(JWKManagerTest, validateTokenFromKeysRS) {
 
 TEST_F(JWKManagerTest, failsWithExpiredTokenRS) {
     auto expiredToken =
-        expiredTokenHeaderRS + "."_sd + expiredTokenBodyRS + "."_sd + expiredTokenSignatureRS;
+        fmt::format("{}.{}.{}", expiredTokenHeaderRS, expiredTokenBodyRS, expiredTokenSignatureRS);
     validateJWKManagerWithToken(this, expiredToken);
 }
 
 TEST_F(JWKManagerTest, failsWithModifiedTokenRS) {
     auto modifiedToken =
-        validTokenHeaderRS + "."_sd + validTokenBodyRS + "."_sd + validTokenSignatureRS + "a"_sd;
+        fmt::format("{}.{}.{}a", validTokenHeaderRS, validTokenBodyRS, validTokenSignatureRS);
     validateJWKManagerWithToken(this, modifiedToken);
 }
 
 TEST_F(JWKManagerTest, failsWithModifiedHeaderForADifferentKeyRS) {
     auto modifiedToken =
-        modifiedTokenHeaderRS + "."_sd + validTokenBodyRS + "."_sd + validTokenSignatureRS;
+        fmt::format("{}.{}.{}", modifiedTokenHeaderRS, validTokenBodyRS, validTokenSignatureRS);
     validateJWKManagerWithToken(this, modifiedToken);
 }
 
@@ -343,19 +345,19 @@ TEST_F(JWKManagerTest, validateTokenFromKeysPS) {
 
 TEST_F(JWKManagerTest, failsWithExpiredTokenPS) {
     auto expiredToken =
-        expiredTokenHeaderPS + "."_sd + expiredTokenBodyPS + "."_sd + expiredTokenSignaturePS;
+        fmt::format("{}.{}.{}", expiredTokenHeaderPS, expiredTokenBodyPS, expiredTokenSignaturePS);
     validateJWKManagerWithToken(this, expiredToken);
 }
 
 TEST_F(JWKManagerTest, failsWithModifiedTokenPS) {
     auto modifiedToken =
-        validTokenHeaderPS + "."_sd + validTokenBodyPS + "."_sd + validTokenSignaturePS + "a"_sd;
+        fmt::format("{}.{}.{}a", validTokenHeaderPS, validTokenBodyPS, validTokenSignaturePS);
     validateJWKManagerWithToken(this, modifiedToken);
 }
 
 TEST_F(JWKManagerTest, failsWithModifiedHeaderForADifferentKeyPS) {
     auto modifiedToken =
-        modifiedTokenHeaderPS + "."_sd + validTokenBodyPS + "."_sd + validTokenSignaturePS;
+        fmt::format("{}.{}.{}", modifiedTokenHeaderPS, validTokenBodyPS, validTokenSignaturePS);
     validateJWKManagerWithToken(this, modifiedToken);
 }
 
@@ -365,14 +367,14 @@ TEST_F(JWKManagerTest, validateTokenFromKeysES256) {
 }
 
 TEST_F(JWKManagerTest, failsWithExpiredTokenES256) {
-    auto expiredToken = expiredTokenHeaderES256 + "."_sd + expiredTokenBodyES256 + "."_sd +
-        expiredTokenSignatureES256;
+    auto expiredToken = fmt::format(
+        "{}.{}.{}", expiredTokenHeaderES256, expiredTokenBodyES256, expiredTokenSignatureES256);
     validateJWKManagerWithToken(this, expiredToken);
 }
 
 TEST_F(JWKManagerTest, failsWithModifiedTokenES256) {
-    auto modifiedToken = validTokenHeaderES256 + "."_sd + validTokenBodyES256 + "."_sd +
-        validTokenSignatureES256 + "a"_sd;
+    auto modifiedToken = fmt::format(
+        "{}.{}.{}a", validTokenHeaderES256, validTokenBodyES256, validTokenSignatureES256);
     validateJWKManagerWithToken(this, modifiedToken);
 }
 
@@ -382,14 +384,14 @@ TEST_F(JWKManagerTest, validateTokenFromKeysES384) {
 }
 
 TEST_F(JWKManagerTest, failsWithExpiredTokenES384) {
-    auto expiredToken = expiredTokenHeaderES384 + "."_sd + expiredTokenBodyES384 + "."_sd +
-        expiredTokenSignatureES384;
+    auto expiredToken = fmt::format(
+        "{}.{}.{}", expiredTokenHeaderES384, expiredTokenBodyES384, expiredTokenSignatureES384);
     validateJWKManagerWithToken(this, expiredToken);
 }
 
 TEST_F(JWKManagerTest, failsWithModifiedTokenES384) {
-    auto modifiedToken = validTokenHeaderES384 + "."_sd + validTokenBodyES384 + "."_sd +
-        validTokenSignatureES384 + "a"_sd;
+    auto modifiedToken = fmt::format(
+        "{}.{}.{}a", validTokenHeaderES384, validTokenBodyES384, validTokenSignatureES384);
     validateJWKManagerWithToken(this, modifiedToken);
 }
 
@@ -412,7 +414,7 @@ constexpr auto kTenancyTokenSignature =
     "CY8OAzS465iOjbD4-9NbHiNo4wWOPrLDOHtepxKkYFiAnbFISWZ85Vvxe8QbrxpuqxrPxEQEZGmIqXSjU4IXY2GDBo6Q";
 TEST_F(JWKManagerTest, testTenancyExpectPrefix) {
     auto tenancyToken =
-        kTenancyTokenHeader + "."_sd + kTenancyTokenBody + "."_sd + kTenancyTokenSignature;
+        fmt::format("{}.{}.{}", kTenancyTokenHeader, kTenancyTokenBody, kTenancyTokenSignature);
     BSONObj keys = getTestJWKSet();
 
     auto bodyString = base64url::decode(kTenancyTokenBody);
@@ -520,7 +522,7 @@ TEST_F(JWKManagerTest, getLastAttemptedFetchTime) {
     auto initialLastAttemptedFetchTime = jwksFetcher()->getLastAttemptedFetchTime();
     getClock()->advance(Seconds{3});
     auto validCustomKey2Token =
-        validTokenHeaderRS + "."_sd + validTokenBodyRS + "."_sd + validTokenSignatureRS;
+        fmt::format("{}.{}.{}", validTokenHeaderRS, validTokenBodyRS, validTokenSignatureRS);
     ASSERT_DOES_NOT_THROW(JWSValidatedToken(jwkManager(), validCustomKey2Token));
     ASSERT_LT(initialLastAttemptedFetchTime, jwksFetcher()->getLastAttemptedFetchTime());
 
@@ -529,8 +531,8 @@ TEST_F(JWKManagerTest, getLastAttemptedFetchTime) {
     // still advance.
     initialLastAttemptedFetchTime = jwksFetcher()->getLastAttemptedFetchTime();
     getClock()->advance(Seconds{3});
-    auto validECToken =
-        validTokenHeaderES256 + "."_sd + validTokenBodyES256 + "."_sd + validTokenSignatureES256;
+    auto validECToken = fmt::format(
+        "{}.{}.{}", validTokenHeaderES256, validTokenBodyES256, validTokenSignatureES256);
     ASSERT_THROWS(JWSValidatedToken(jwkManager(), validECToken), DBException);
     ASSERT_LT(initialLastAttemptedFetchTime, jwksFetcher()->getLastAttemptedFetchTime());
 

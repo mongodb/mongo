@@ -248,7 +248,7 @@ boost::intrusive_ptr<DocumentSource> buildSetMetadataStageForMinMaxScalerOutput(
             "Expected normalization to be minMaxScaler",
             spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
 
-    const std::string dollarScore = "$" + kInternalMinMaxScalerNormalizationField;
+    const std::string dollarScore = "$" + std::string{kInternalMinMaxScalerNormalizationField};
     auto scoreExpression = Expression::parseOperand(
         expCtx.get(), BSON("" << dollarScore).firstElement(), expCtx->variablesParseState);
     return buildSetMetadataStageFromExpression(expCtx, std::move(scoreExpression));
@@ -375,7 +375,7 @@ boost::intrusive_ptr<DocumentSource> setScoreDetailsMetadata(
             pExpCtx.get(),
             BSON("value" << BSON("$meta" << "score") << "description"
                          << scoreScoreDetailsDescription << "rawScore"
-                         << ("$" + kInternalRawScoreField) << "normalization"
+                         << ("$" + std::string{kInternalRawScoreField}) << "normalization"
                          << getNormalizationString(spec.getNormalization()) << "weight"
                          << spec.getWeight() << "expression"
                          << hybrid_scoring_util::score_details::stringifyExpression(spec.getScore())

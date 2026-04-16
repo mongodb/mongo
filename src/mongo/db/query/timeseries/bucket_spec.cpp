@@ -117,7 +117,7 @@ BucketSpec::BucketPredicate BucketSpec::handleIneligible(IneligiblePredicatePoli
             uasserted(
                 5916301,
                 "Error translating non-metadata time-series predicate to operate on buckets: " +
-                    message + ": " + matchExpr->serialize().toString());
+                    std::string{message} + ": " + matchExpr->serialize().toString());
         case IneligiblePredicatePolicy::kIgnore:
             return {};
     }
@@ -324,10 +324,10 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         if (assumeNoMixedSchemaData) {
             // We know that every field that appears in an event will also appear in the min/max.
             auto result = std::make_unique<AndMatchExpression>();
-            result->add(std::make_unique<ExistsMatchExpression>(
-                StringData(std::string{kControlMinFieldNamePrefix} + matchExpr->path())));
-            result->add(std::make_unique<ExistsMatchExpression>(
-                StringData(std::string{kControlMaxFieldNamePrefix} + matchExpr->path())));
+            result->add(std::make_unique<ExistsMatchExpression>(StringData(
+                std::string{kControlMinFieldNamePrefix} + std::string{matchExpr->path()})));
+            result->add(std::make_unique<ExistsMatchExpression>(StringData(
+                std::string{kControlMaxFieldNamePrefix} + std::string{matchExpr->path()})));
             return {std::move(result), nullptr};
         } else {
             // At time of writing, we only pass 'kError' when creating a partial index, and

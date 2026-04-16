@@ -2061,7 +2061,7 @@ void QETextSearchCrudTest::verifyESCEntriesForString(StringData testString,
     auto doc = BSON(kTestFieldName << testString);
     if (padding) {
         ASSERT(qtype.has_value());  // padding values must always have a query type
-        doc = BSON(kTestFieldName << (testString + "\xff"));
+        doc = BSON(kTestFieldName << (std::string{testString} + "\xff"));
     }
     auto element = doc.firstElement();
 

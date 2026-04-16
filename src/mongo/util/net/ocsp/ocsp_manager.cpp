@@ -118,7 +118,7 @@ Future<std::vector<uint8_t>> OCSPManager::requestStatus(std::vector<uint8_t> dat
     }
 
     auto pf = makePromiseFuture<DataBuilder>();
-    std::string uri("http://" + responderURI);
+    std::string uri("http://" + std::string{responderURI});
 
     _pool->schedule([this,
                      purpose,

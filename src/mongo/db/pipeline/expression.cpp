@@ -1811,7 +1811,8 @@ Value ExpressionFieldPath::serialize(const SerializationOptions& options) const 
         } else if (path.getPathLength() > 1 && Variables::isBuiltin(_variable)) {
             // The first component of this path is a system variable, so keep that and redact
             // the rest.
-            return Value(prefix + path.front() + "." + options.serializeFieldPath(path.tail()));
+            return Value(prefix + std::string{path.front()} + "." +
+                         options.serializeFieldPath(path.tail()));
         }
     }
     return Value(prefix + options.serializeFieldPath(path));
@@ -1862,7 +1863,7 @@ std::unique_ptr<Expression> ExpressionFieldPath::copyWithSubstitution(
             // Remove the path components of 'oldName' from 'path'.
             const auto& suffix = (path == oldName)
                 ? ""
-                : "." + path.dottedSubstring(oldName.numParts(), path.numParts());
+                : "." + std::string{path.dottedSubstring(oldName.numParts(), path.numParts())};
             return std::unique_ptr<Expression>(new ExpressionFieldPath(
                 getExpressionContext(), "CURRENT." + rename.second + suffix, getVariableId()));
         }
@@ -1973,15 +1974,17 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStreamsFeatureFlag(
     bool streamsEnabled = expCtx->shouldParserAllowStreams();
     // $meta: "stream" is only supported when the ff is enabled.
     uassert(9692105,
-            ExpressionMeta::kParseErrPrefix + typeName,
+            ExpressionMeta::kParseErrPrefix + std::string{typeName},
             type != DocumentMetadataFields::kStream || streamsEnabled);
 
     // Field path is only supported when the ff is enabled.
-    uassert(9692110, ExpressionMeta::kParseErrPrefix + typeName, !optionalPath || streamsEnabled);
+    uassert(9692110,
+            ExpressionMeta::kParseErrPrefix + std::string{typeName},
+            !optionalPath || streamsEnabled);
 
     // Field path is only supported with $meta: "stream.<path>".
     uassert(9692106,
-            ExpressionMeta::kParseErrPrefix + typeName,
+            ExpressionMeta::kParseErrPrefix + std::string{typeName},
             !optionalPath || type == DocumentMetadataFields::kStream);
 }
 
@@ -1991,13 +1994,15 @@ ExpressionMeta::ParseMetaTypeResult ExpressionMeta::_parseMetaType(ExpressionCon
     if (size_t idx = typeName.find_first_of('.');
         idx != StringData::npos && expCtx->shouldParserAllowStreams()) {
         // An optional path is supported for { $meta: "stream.<path>" }
-        uassert(9692107, ExpressionMeta::kParseErrPrefix + typeName, idx + 1 < typeName.size());
+        uassert(9692107,
+                ExpressionMeta::kParseErrPrefix + std::string{typeName},
+                idx + 1 < typeName.size());
         fieldPath = typeName.substr(idx + 1);
         try {
             // Make sure the field path is valid.
             FieldPath path{std::string{*fieldPath}};
         } catch (DBException&) {
-            uasserted(9692111, ExpressionMeta::kParseErrPrefix + typeName);
+            uasserted(9692111, ExpressionMeta::kParseErrPrefix + std::string{typeName});
         }
         typeName = typeName.substr(0, idx);
     }

@@ -328,8 +328,8 @@ bool BucketLevelIdPredicateGenerator::generateIdPredicates(const ExpressionConte
         pExpCtx,
         bucketSpec,
         bucketMaxSpanSeconds,
-        std::string{timeseries::kControlMinFieldNamePrefix + bucketSpec.timeField()},
-        std::string{timeseries::kControlMaxFieldNamePrefix + bucketSpec.timeField()},
+        std::string{timeseries::kControlMinFieldNamePrefix} + std::string{bucketSpec.timeField()},
+        std::string{timeseries::kControlMaxFieldNamePrefix} + std::string{bucketSpec.timeField()},
         matchExpr,
     };
 

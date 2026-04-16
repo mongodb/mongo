@@ -190,8 +190,8 @@ private:
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
         return toStringForLogging(_sourceNss.dbName()) + " db: { " + stage->getName() +
-            ": UUID(\"" + _sourceDbAndUuid.uuid().toString() + "\") coll: " + _sourceNss.coll() +
-            " }";
+            ": UUID(\"" + _sourceDbAndUuid.uuid().toString() +
+            "\") coll: " + std::string{_sourceNss.coll()} + " }";
     }
 
     /**

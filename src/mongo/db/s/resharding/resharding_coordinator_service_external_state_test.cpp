@@ -213,23 +213,27 @@ public:
                 ASSERT_EQ(pipeline.size(), 3);
                 ASSERT_BSONOBJ_EQ(
                     pipeline[0],
-                    BSON(
-                        "$match" << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
-                                          ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
-                                         << reshardingUUID)));
+                    BSON("$match" << BSON(
+                             fmt::format("{}.{}",
+                                         ReshardingRecipientResumeData::kIdFieldName,
+                                         ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
+                             << reshardingUUID)));
                 ASSERT_BSONOBJ_EQ(
                     pipeline[1],
                     BSON("$group" << BSON(
                              "_id"
                              << BSONNULL << "pairs"
                              << BSON("$push" << BSON(
-                                         "k" << ("$" + ReshardingRecipientResumeData::kIdFieldName +
-                                                 "." +
-                                                 ReshardingRecipientResumeDataId::kShardIdFieldName)
-                                             << "v"
-                                             << ("$" +
-                                                 ReshardingRecipientResumeData::
-                                                     kDocumentsCopiedFieldName))))));
+                                         "k"
+                                         << fmt::format(
+                                                "${}.{}",
+                                                ReshardingRecipientResumeData::kIdFieldName,
+                                                ReshardingRecipientResumeDataId::kShardIdFieldName)
+
+                                         << "v"
+                                         << fmt::format("${}",
+                                                        ReshardingRecipientResumeData::
+                                                            kDocumentsCopiedFieldName))))));
                 ASSERT_BSONOBJ_EQ(
                     pipeline[2],
                     BSON("$project" << BSON("_id" << 0 << "documentsCopied"

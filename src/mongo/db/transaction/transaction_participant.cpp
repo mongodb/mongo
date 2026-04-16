@@ -429,8 +429,8 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
             FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
             findRequest.setFilter(
                 BSON(SessionTxnRecord::kParentSessionIdFieldName << parentLsid.toBSON()));
-            findRequest.setSort(BSON((SessionTxnRecord::kSessionIdFieldName + "." +
-                                      LogicalSessionId::kTxnNumberFieldName)
+            findRequest.setSort(BSON((std::string{SessionTxnRecord::kSessionIdFieldName} + "." +
+                                      std::string{LogicalSessionId::kTxnNumberFieldName})
                                      << -1));
             findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
             findRequest.setLimit(1);
@@ -3569,11 +3569,12 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
         try {
             performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
                 FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
-                findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
-                                           << parentTxnParticipant._sessionId().toBSON()
-                                           << (SessionTxnRecord::kSessionIdFieldName + "." +
-                                               LogicalSessionId::kTxnNumberFieldName)
-                                           << BSON("$gte" << *activeRetryableWriteTxnNumber)));
+                findRequest.setFilter(
+                    BSON(SessionTxnRecord::kParentSessionIdFieldName
+                         << parentTxnParticipant._sessionId().toBSON()
+                         << (std::string{SessionTxnRecord::kSessionIdFieldName} + "." +
+                             std::string{LogicalSessionId::kTxnNumberFieldName})
+                         << BSON("$gte" << *activeRetryableWriteTxnNumber)));
                 findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
                 findRequest.setHint(
                     BSON("$hint" << MongoDSessionCatalog::kConfigTxnsPartialIndexName));

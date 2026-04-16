@@ -130,7 +130,7 @@ TEST(PcreUtilTest, QuoteMeta) {
         };
         auto note = fmt::format("{} => {}", hexdump(in), hexdump(out));
         if (shouldEscape) {
-            ASSERT_EQ(out, "\\" + in) << note;
+            ASSERT_EQ(out, fmt::format("\\{}", in)) << note;
         } else {
             ASSERT_EQ(out, in) << note;
         }

@@ -5803,7 +5803,7 @@ public:
                                  kMyShardName,
                                  DatabaseVersion{}})});
 
-        static const std::string kSentPipeJson = "[{$merge: {into: {db: '" + kDBName +
+        static const std::string kSentPipeJson = "[{$merge: {into: {db: '" + std::string{kDBName} +
             "', coll: 'outColl'}, on: '_id', "
             "whenMatched: 'merge', whenNotMatched: 'insert', "
             "allowMergeOnNullishValues: true}}]";
@@ -5830,7 +5830,7 @@ TEST_F(PipelineOptimizationsShardMerger, Out) {
 
     doTest("[{$out: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
-           "[{$out: {coll: 'outColl', db: '" + kDBName + "'}}]" /*mergePipeJson*/,
+           "[{$out: {coll: 'outColl', db: '" + std::string(kDBName) + "'}}]" /*mergePipeJson*/,
            kMyShardName /* mergeShardId */);
 };
 
@@ -5850,7 +5850,7 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
                              DatabaseVersion{UUID::gen(), timestamp}})});
     doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
-           "[{$merge: {into: {db: '" + kDBName +
+           "[{$merge: {into: {db: '" + std::string(kDBName) +
                "', coll: 'outColl'}, on: '_id', "
                "whenMatched: 'merge', whenNotMatched: 'insert', "
                "allowMergeOnNullishValues: true}}]" /*mergePipeJson*/,

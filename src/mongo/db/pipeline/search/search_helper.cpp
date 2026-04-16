@@ -717,10 +717,10 @@ void promoteStoredSourceOrAddIdLookup(
         // {$replaceRoot: {newRoot: {$ifNull: ["$storedSource", "$$ROOT"]}}
         // 'storedSource' is not always present in the document from mongot. If it's present, use it
         // as the root. Otherwise keep the original document.
-        BSONObj replaceRootSpec =
-            BSON("$replaceRoot" << BSON(
-                     "newRoot" << BSON(
-                         "$ifNull" << BSON_ARRAY("$" + kProtocolStoredFieldsName << "$$ROOT"))));
+        BSONObj replaceRootSpec = BSON(
+            "$replaceRoot" << BSON(
+                "newRoot" << BSON("$ifNull" << BSON_ARRAY(
+                                      "$" + std::string{kProtocolStoredFieldsName} << "$$ROOT"))));
         desugaredPipeline.push_back(
             DocumentSourceReplaceRoot::createFromBson(replaceRootSpec.firstElement(), expCtx));
         // Note: No shard filtering is done for storedSource. The isolation

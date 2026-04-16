@@ -541,11 +541,11 @@ void MongoDSessionCatalog::set(ServiceContext* service,
 BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
     NewIndexSpec index;
     index.setV(int(IndexConfig::kLatestIndexVersion));
-    index.setKey(BSON(
-        SessionTxnRecord::kParentSessionIdFieldName
-        << 1
-        << (SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnNumberFieldName)
-        << 1 << SessionTxnRecord::kSessionIdFieldName << 1));
+    index.setKey(BSON(SessionTxnRecord::kParentSessionIdFieldName
+                      << 1
+                      << (std::string{SessionTxnRecord::kSessionIdFieldName} + "." +
+                          std::string{LogicalSessionId::kTxnNumberFieldName})
+                      << 1 << SessionTxnRecord::kSessionIdFieldName << 1));
     index.setName(MongoDSessionCatalog::kConfigTxnsPartialIndexName);
     index.setPartialFilterExpression(BSON("parentLsid" << BSON("$exists" << true)));
     return index.toBSON();

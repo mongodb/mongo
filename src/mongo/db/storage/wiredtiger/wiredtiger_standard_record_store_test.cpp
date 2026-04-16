@@ -84,7 +84,7 @@ TEST(WiredTigerRecordStoreTest, UpdateLargeUnloggedRecordAndReadBack) {
 
     const std::string ns = "updateLargeUnloggedRecordAndReadBack";
     const std::string ident = "collection-updateLargeUnloggedRecordAndReadBack";
-    const std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
+    const std::string uri = std::string(WiredTigerUtil::kTableUriPrefix) + ident;
 
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = KeyFormat::Long;
@@ -143,7 +143,7 @@ TEST(WiredTigerRecordStoreTest, UpdateLargeUnloggedRecordAndReadBack) {
 
 TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     WiredTigerHarnessHelper harnessHelper;
-    std::string indexUri = WiredTigerUtil::kTableUriPrefix + "myindex";
+    std::string indexUri = std::string(WiredTigerUtil::kTableUriPrefix) + "myindex";
     WiredTigerSizeStorer ss(&harnessHelper.connection(), indexUri);
 
     std::unique_ptr<RecordStore> rs(harnessHelper.newRecordStore());
@@ -256,7 +256,7 @@ protected:
     WiredTigerHarnessHelper harnessHelper;
     WiredTigerSizeStorer sizeStorer{&harnessHelper.connection(),
                                     std::string{WiredTigerUtil::kTableUriPrefix} +
-                                        ident::kSizeStorer};
+                                        std::string(ident::kSizeStorer)};
     std::unique_ptr<RecordStore> rs;
     std::string ident;
     std::string uri;
@@ -382,7 +382,7 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
 
     WiredTigerSizeStorer sizeStorer(&harnessHelper.connection(),
                                     std::string{WiredTigerUtil::kTableUriPrefix} +
-                                        ident::kSizeStorer);
+                                        std::string(ident::kSizeStorer));
     WiredTigerSession session{&harnessHelper.connection()};
 
     // As the operation was rolled back, numRecords and dataSize should be for the first op only. If

@@ -46,6 +46,7 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace diff_tree {
@@ -279,8 +280,8 @@ public:
         if (_subDiffIdx != _node.getSubDiffs().size()) {
             auto&& [fieldName, child] = _node.getSubDiffs()[_subDiffIdx];
 
-            BSONObjBuilder childBuilder =
-                _bob.subobjStart(std::string(1, doc_diff::kSubDiffSectionFieldPrefix) + fieldName);
+            BSONObjBuilder childBuilder = _bob.subobjStart(fmt::format(
+                "{}{}", std::string(1, doc_diff::kSubDiffSectionFieldPrefix), fieldName));
             ++_subDiffIdx;
             return makeSubNodeFrameHelper(child, std::move(childBuilder));
         }

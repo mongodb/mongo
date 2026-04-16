@@ -139,7 +139,7 @@ std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData s
 #if !defined(MONGO_CONFIG_SSL) || MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     return "";
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    return std::string{prefix} + SSLeay_version(SSLEAY_VERSION) + suffix;
+    return fmt::format("{}{}{}", prefix, SSLeay_version(SSLEAY_VERSION), suffix);
 #endif
 }
 

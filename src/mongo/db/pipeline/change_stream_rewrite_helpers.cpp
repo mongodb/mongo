@@ -920,7 +920,8 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 // and apply the unmodified regex directly to it. First get a reference to the
                 // relevant field in the oplog entry.
                 const std::string exprFieldRef = "$" +
-                    (fieldName == "db" ? nsField : (!nsFieldIsCmdNs ? nsField : *collNameField));
+                    std::string{fieldName == "db" ? nsField
+                                                  : (!nsFieldIsCmdNs ? nsField : *collNameField)};
 
                 // Wrap the field in an expression to return MISSING if the field is not a string,
                 // since this expression may execute on CRUD oplog entries with clashing fieldnames.

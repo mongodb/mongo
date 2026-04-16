@@ -157,7 +157,7 @@ protected:
         const std::deque<DocumentSource::GetNextResult>& configCacheChunksData,
         const TestOptions& testOptions) {
         _sourceNss = NamespaceString::createNamespaceString_forTest(
-            "testDb"_sd + std::to_string(_sourceDbNum++), "testColl"_sd);
+            std::string("testDb"_sd) + std::to_string(_sourceDbNum++), "testColl"_sd);
         _sourceUUID = UUID::gen();
         _tempNss = resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
         _reshardingUUID = UUID::gen();
@@ -387,7 +387,7 @@ private:
     const DatabaseVersion _sourceDbVersion{UUID::gen(), Timestamp(1, 1)};
     int _sourceDbNum;
 
-    const HostAndPort _myHostAndPort{kMyShardName + ":123"};
+    const HostAndPort _myHostAndPort{kMyShardName.toString() + ":123"};
 
 
     // Initialized at the start of each test case.

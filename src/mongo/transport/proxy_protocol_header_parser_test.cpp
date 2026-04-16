@@ -84,7 +84,7 @@ boost::optional<ProxiedEndpoints> parseStringExpectSuccess(StringData s) {
 
     // Also test that adding garbage to the end doesn't increase the bytesParsed amount.
     const boost::optional<ParserResults> possibleResultsWithGarbage =
-        parseProxyProtocolHeader(s + "garbage", false);
+        parseProxyProtocolHeader(std::string{s} + "garbage", false);
     ASSERT_TRUE(possibleResultsWithGarbage);
     const ParserResults resultsWithGarbage = *possibleResultsWithGarbage;
     ASSERT_THAT(resultsWithGarbage.bytesParsed, Eq(s.size()));

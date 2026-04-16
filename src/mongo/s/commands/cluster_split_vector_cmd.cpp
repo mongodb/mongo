@@ -70,7 +70,7 @@ std::string rangeString(const BSONObj& min, const BSONObj& max) {
 std::string shardSetString(const std::set<ShardId>& shardIds) {
     std::string result = "[";
     for (auto& shardid : shardIds) {
-        result += shardid + ", ";
+        result += shardid.toString() + ", ";
     }
     return result += "]";
 }

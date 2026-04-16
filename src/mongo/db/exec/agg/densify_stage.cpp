@@ -462,7 +462,7 @@ void InternalDensifyStage::initializeState() {
         // Otherwise create a partition expression we can use to generate partition keys.
         MutableDocument partitionExpr;
         for (auto&& p : _partitions) {
-            partitionExpr.setNestedField(p.fullPath(), Value{"$"_sd + p.fullPath()});
+            partitionExpr.setNestedField(p.fullPath(), Value{"$" + p.fullPath()});
         }
         _partitionExpr = ExpressionObject::parse(
             pExpCtx.get(), partitionExpr.freeze().toBson(), pExpCtx->variablesParseState);

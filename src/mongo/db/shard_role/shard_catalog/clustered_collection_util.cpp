@@ -59,7 +59,7 @@ void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
         if (clusterKey == "_id") {
             indexSpec.setName(IndexConstants::kIdIndexName);
         } else {
-            indexSpec.setName(clusterKey + "_1");
+            indexSpec.setName(std::string{clusterKey} + "_1");
         }
     }
 }

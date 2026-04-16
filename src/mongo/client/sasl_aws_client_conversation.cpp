@@ -144,7 +144,7 @@ awsIam::AWSCredentials SaslAWSClientConversation::_getEc2Credentials() const {
         StringData token = toString(getToken);
 
         headers.clear();
-        headers.push_back("X-aws-ec2-metadata-token: " + token);
+        headers.push_back("X-aws-ec2-metadata-token: " + std::string{token});
         httpClient->setHeaders(headers);
 
         // Retrieve the role attached to the EC2 instance
@@ -183,7 +183,7 @@ awsIam::AWSCredentials SaslAWSClientConversation::_getEcsCredentials(StringData 
         httpClient->allowInsecureHTTP(true);
 
         // Retrieve the security token attached to the ECS task
-        DataBuilder getRoleResult = httpClient->get(getDefaultECSHost() + relativeUri);
+        DataBuilder getRoleResult = httpClient->get(getDefaultECSHost() + std::string{relativeUri});
 
         StringData getRoleOutput = toString(getRoleResult);
 

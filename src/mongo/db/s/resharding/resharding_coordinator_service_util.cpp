@@ -420,13 +420,15 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             {
                 BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
                 {
-                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
-                                          TypeCollectionReshardingFields::kStateFieldName,
-                                      idl::serialize(nextState));
+                    setBuilder.append(
+                        std::string{CollectionType::kReshardingFieldsFieldName} + "." +
+                            std::string{TypeCollectionReshardingFields::kStateFieldName},
+                        idl::serialize(nextState));
 
-                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
-                                          TypeCollectionReshardingFields::kDonorFieldsFieldName,
-                                      donorFields.toBSON());
+                    setBuilder.append(
+                        std::string{CollectionType::kReshardingFieldsFieldName} + "." +
+                            std::string{TypeCollectionReshardingFields::kDonorFieldsFieldName},
+                        donorFields.toBSON());
 
                     setBuilder.append(CollectionType::kUpdatedAtFieldName,
                                       opCtx->getServiceContext()->getPreciseClockSource()->now());

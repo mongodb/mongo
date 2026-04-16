@@ -218,7 +218,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
             str::stream() << "Unable to parse geoNear query: " << exprStatus.reason(),
             exprStatus.isOK());
     tassert(5860204,
-            "Unexpected GeoNearExpression field name after asNearQuery(): "_sd + nearExpr.field,
+            "Unexpected GeoNearExpression field name after asNearQuery(): " + nearExpr.field,
             nearExpr.field == ""_sd);
 
     DocumentSourceContainer replacement;

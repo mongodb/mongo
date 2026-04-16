@@ -100,7 +100,7 @@ TEST_F(ValidateStateTest, EnforceOnNamespaceIfReplicatedFastCountFFOff) {
 
     for (auto& dbName : dbNames) {
         const NamespaceString nss =
-            NamespaceString::createNamespaceString_forTest(dbName + ".validateState");
+            NamespaceString::createNamespaceString_forTest(std::string{dbName} + ".validateState");
         ValidateState validateState(operationContext(), nss, kValidationOptionsEnforceFastCount);
         EXPECT_EQ(validateState.shouldEnforceFastCount(operationContext()), true);
     }

@@ -470,7 +470,7 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
             if (coll && coll->getTimeseriesOptions()) {
                 const std::string controlTimeField =
                     std::string{timeseries::kControlMinFieldNamePrefix} +
-                    coll->getTimeseriesOptions()->getTimeField();
+                    std::string{coll->getTimeseriesOptions()->getTimeField()};
                 if (tagMinKeyElement.fieldNameStringData() == controlTimeField) {
                     uassert(ErrorCodes::InvalidOptions,
                             str::stream() << "time field cannot be specified in the zone range for "

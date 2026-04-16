@@ -48,6 +48,7 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 struct _timelib_error_container;
 struct _timelib_time;
@@ -407,10 +408,11 @@ private:
                 fmt::format("Expected width to be in the [1, 4] range, but found {}", width),
                 1 <= width && width <= 4);
         if ((number < 0) || (number > 9999))
-            return Status{ErrorCodes::Error{18537},
-                          "Could not convert date to string: date component was outside "
-                          "the supported range of 0-9999: "_sd +
-                              std::to_string(number)};
+            return Status{
+                ErrorCodes::Error{18537},
+                fmt::format("Could not convert date to string: date component was outside "
+                            "the supported range of 0-9999: {}",
+                            number)};
 
         int digits = 1;
 

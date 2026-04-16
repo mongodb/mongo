@@ -1038,8 +1038,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                         collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
 
                     if (!indexEntry) {
-                        std::string msg = "cannot find index " + indexName + " for ns " +
-                            entry.getNss().toStringForErrorMsg();
+                        std::string msg = "cannot find index " + std::string{indexName} +
+                            " for ns " + entry.getNss().toStringForErrorMsg();
                         const auto logEntry =
                             dbCheckHealthLogEntry(secondaryIndexCheckParameters,
                                                   entry.getNss(),

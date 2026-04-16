@@ -227,7 +227,7 @@ Status checkHashedShardKeyRange(const ChunkRange& range, const KeyPattern& shard
  */
 Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, StringData timeField) {
     const std::string controlTimeField =
-        std::string{timeseries::kControlMinFieldNamePrefix} + timeField;
+        std::string{timeseries::kControlMinFieldNamePrefix} + std::string{timeField};
     const BSONElement minRangeControlTimeField = range.getMin().getField(controlTimeField);
     const BSONElement maxRangeControlTimeField = range.getMax().getField(controlTimeField);
     if ((minRangeControlTimeField && minRangeControlTimeField.type() != BSONType::minKey) ||

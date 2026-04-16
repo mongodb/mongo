@@ -257,11 +257,15 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx,
     // relies on the executor only having a single thread and that thread being solely responsible
     // for deleting the range deletion task document.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    const auto query = BSON(
-        RangeDeletionTask::kCollectionUuidFieldName
-        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
-        << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
+    const auto query =
+        BSON(RangeDeletionTask::kCollectionUuidFieldName
+             << collectionUuid
+             << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                 std::string{ChunkRange::kMinFieldName}
+             << range.getMin()
+             << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                 std::string{ChunkRange::kMaxFieldName}
+             << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
     auto count = store.count(opCtx, query);
 
     uassert(ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist,
@@ -278,11 +282,15 @@ void markRangeDeletionTaskAsProcessing(OperationContext* opCtx,
                                        const UUID& collectionUuid,
                                        const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    const auto query = BSON(
-        RangeDeletionTask::kCollectionUuidFieldName
-        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
-        << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
+    const auto query =
+        BSON(RangeDeletionTask::kCollectionUuidFieldName
+             << collectionUuid
+             << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                 std::string{ChunkRange::kMinFieldName}
+             << range.getMin()
+             << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                 std::string{ChunkRange::kMaxFieldName}
+             << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
 
     static const auto update =
         BSON("$set" << BSON(RangeDeletionTask::kProcessingFieldName
@@ -314,11 +322,14 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
-    return BSON(
-        RangeDeletionTask::kCollectionUuidFieldName
-        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
-        << range.getMax());
+    return BSON(RangeDeletionTask::kCollectionUuidFieldName
+                << collectionUuid
+                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                    std::string{ChunkRange::kMinFieldName}
+                << range.getMin()
+                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                    std::string{ChunkRange::kMaxFieldName}
+                << range.getMax());
 }
 
 // Add `migrationId` to the query filter in order to be resilient to delayed network retries: only
@@ -504,12 +515,14 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
         // action is 'unset the pending field'.
         auto& uuid = deletionTask.getCollectionUuid();
         auto& range = deletionTask.getRange();
-        auto upsertQuery =
-            BSON(RangeDeletionTask::kCollectionUuidFieldName
-                 << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
-                 << range.getMin()
-                 << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
-                 << range.getMax());
+        auto upsertQuery = BSON(RangeDeletionTask::kCollectionUuidFieldName
+                                << uuid
+                                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                                    std::string{ChunkRange::kMinFieldName}
+                                << range.getMin()
+                                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                                    std::string{ChunkRange::kMaxFieldName}
+                                << range.getMax());
         // Remove _id because it's an immutable field so it can't be part of an update.
         // But include it as part of the upsert because the _id field is expected to be a uuid
         // (as opposed to the default OID) in case a new document is inserted.
@@ -588,10 +601,13 @@ void removeAllPersistentTasksForCollection(OperationContext* opCtx, const UUID& 
 
 BSONObj overlappingRangeDeletionsQuery(const ChunkRange& range, const UUID& uuid) {
     return BSON(RangeDeletionTask::kCollectionUuidFieldName
-                << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+                << uuid
+                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                    std::string{ChunkRange::kMinFieldName}
                 << LT << range.getMax()
-                << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName << GT
-                << range.getMin());
+                << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                    std::string{ChunkRange::kMaxFieldName}
+                << GT << range.getMin());
 }
 
 size_t checkForConflictingDeletions(OperationContext* opCtx,
@@ -612,9 +628,11 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
             const auto sameBoundsAlreadyCovered =
                 BSON(RangeDeletionTask::kCollectionUuidFieldName
                      << deletionTask.getCollectionUuid()
-                     << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+                     << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                         std::string{ChunkRange::kMinFieldName}
                      << deletionTask.getRange().getMin()
-                     << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+                     << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                         std::string{ChunkRange::kMaxFieldName}
                      << deletionTask.getRange().getMax());
             if (store.count(opCtx, sameBoundsAlreadyCovered) > 0) {
                 return;
@@ -722,11 +740,14 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
                                          const UUID& collectionUuid,
                                          const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    const auto query = BSON(
-        RangeDeletionTask::kCollectionUuidFieldName
-        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
-        << range.getMax());
+    const auto query = BSON(RangeDeletionTask::kCollectionUuidFieldName
+                            << collectionUuid
+                            << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                                std::string{ChunkRange::kMinFieldName}
+                            << range.getMin()
+                            << std::string{RangeDeletionTask::kRangeFieldName} + "." +
+                                std::string{ChunkRange::kMaxFieldName}
+                            << range.getMax());
     auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
 
     hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(opCtx);

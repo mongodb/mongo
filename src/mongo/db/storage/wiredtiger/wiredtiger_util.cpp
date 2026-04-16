@@ -113,7 +113,7 @@ using std::string;
 std::string WiredTigerUtil::buildTableUri(StringData ident) {
     invariant(ident.find(kTableUriPrefix) == string::npos);
     invariant(ident::isValidIdent(ident), ident);
-    return kTableUriPrefix + std::string{ident};
+    return std::string{kTableUriPrefix} + std::string{ident};
 }
 
 void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerSession& session,
@@ -170,7 +170,7 @@ StatusWith<std::string> WiredTigerUtil::getSourceMetadata(WiredTigerSession& ses
     };
 
     // Look up the config for the single colgroup for the table
-    auto colgroupUri = std::string("colgroup:") + uri.substr(strlen("table:"));
+    auto colgroupUri = std::string("colgroup:") + std::string{uri.substr(strlen("table:"))};
     auto colgroupMetadata = _getMetadata(cursor, colgroupUri);
     if (!colgroupMetadata.isOK())
         return colgroupMetadata.getStatus();

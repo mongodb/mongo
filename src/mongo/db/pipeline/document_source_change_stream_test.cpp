@@ -722,7 +722,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterFor
     BSONObj filter = [&]() {
         BSONArrayBuilder bab;
         for (auto& eventName : expectedEvents) {
-            bab.append(BSON("o2." + eventName << BSON("$exists" << true)));
+            bab.append(BSON("o2." + std::string{eventName} << BSON("$exists" << true)));
         }
         bab.done();
         return BSON(
@@ -3010,7 +3010,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
         {"applyOps",
          Value{std::vector<Document>{
              Document{{"op", "c"_sd},
-                      {"ns", nss.db_forTest() + ".$cmd"},
+                      {"ns", std::string(nss.db_forTest()) + ".$cmd"},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"create", nss.coll()}, {"idIndex", idIndexDef}}}},
                       {"ts", Timestamp(0, 1)}},
@@ -3020,7 +3020,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
                       {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
              Document{
                  {"op", "c"_sd},
-                 {"ns", nss.db_forTest() + ".$cmd"},
+                 {"ns", std::string(nss.db_forTest()) + ".$cmd"},
                  {"ui", UUID::gen()},
                  // Operation on another collection which should be skipped.
                  {"o", Value{Document{{"create", "otherCollection"_sd}, {"idIndex", idIndexDef}}}}},

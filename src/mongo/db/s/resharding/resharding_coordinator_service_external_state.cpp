@@ -388,10 +388,10 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
     //    {_id: {reshardingUUID: <uuid>, shardId: <string>}, documentsCopied: <long>, ...},
     //    ...
     // ]
-    pipeline.push_back(
-        BSON("$match" << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
-                               ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
-                              << reshardingUUID)));
+    pipeline.push_back(BSON(
+        "$match" << BSON((std::string{ReshardingRecipientResumeData::kIdFieldName} + "." +
+                          std::string{ReshardingRecipientResumeDataId::kReshardingUUIDFieldName})
+                         << reshardingUUID)));
     // Combine the docs into one doc with an array of donorShardId and documentsCopied pairs. This
     // is to avoid needing to run getMore commands when there are more than 'batchSize' (defaults to
     // 100) donor shards.
@@ -401,14 +401,16 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
     // ]
     pipeline.push_back(BSON(
         "$group" << BSON(
-            "_id" << BSONNULL << "pairs"
-                  << BSON(
-                         "$push" << BSON(
-                             "k" << ("$" + ReshardingRecipientResumeData::kIdFieldName + "." +
-                                     ReshardingRecipientResumeDataId::kShardIdFieldName)
-                                 << "v"
-                                 << ("$" +
-                                     ReshardingRecipientResumeData::kDocumentsCopiedFieldName))))));
+            "_id"
+            << BSONNULL << "pairs"
+            << BSON("$push" << BSON(
+                        "k" << ("$" + std::string{ReshardingRecipientResumeData::kIdFieldName} +
+                                "." +
+                                std::string{ReshardingRecipientResumeDataId::kShardIdFieldName})
+                            << "v"
+                            << ("$" +
+                                std::string{
+                                    ReshardingRecipientResumeData::kDocumentsCopiedFieldName}))))));
     // Transform the array of pairs into an object.
     // {
     //    documentsCopied: {

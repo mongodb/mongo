@@ -135,7 +135,7 @@ constexpr auto kIndexAlreadyExists = "index already exists"_sd;
  * Appends 'message' to the 'note' component of the response.
  */
 void appendMessageToNoteField(CreateIndexesReply* reply, StringData message) {
-    std::string noteCopy = reply->getNote() ? (*reply->getNote() + "\n\n") : "";
+    std::string noteCopy = reply->getNote() ? (std::string{*reply->getNote()} + "\n\n") : "";
     noteCopy += message;
     // setNote() will internally make its own copy.
     reply->setNote(StringData(noteCopy));

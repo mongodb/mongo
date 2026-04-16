@@ -191,7 +191,7 @@ void DbCheckTest::createIndex(OperationContext* opCtx, const BSONObj& indexKey) 
 
     ASSERT_EQ(1, indexKey.nFields()) << kNss.toStringForErrorMsg() << "/" << indexKey;
     auto spec = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
-                         << (indexKey.firstElementFieldNameStringData() + "_1"));
+                         << (std::string(indexKey.firstElementFieldNameStringData()) + "_1"));
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;

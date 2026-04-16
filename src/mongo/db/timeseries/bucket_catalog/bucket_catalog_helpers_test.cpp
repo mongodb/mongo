@@ -106,9 +106,10 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& tim
         normalizedMetadata = BSONObj{builder.bb().release()};
     }
 
-    auto controlMinTimePath = std::string{kControlMinFieldNamePrefix} + options.getTimeField();
-    auto maxDataTimeFieldPath = std::string{kDataFieldNamePrefix} + options.getTimeField() + "." +
-        std::to_string(gTimeseriesBucketMaxCount - 1);
+    auto controlMinTimePath =
+        std::string{kControlMinFieldNamePrefix} + std::string(options.getTimeField());
+    auto maxDataTimeFieldPath = std::string{kDataFieldNamePrefix} +
+        std::string(options.getTimeField()) + "." + std::to_string(gTimeseriesBucketMaxCount - 1);
 
     // Generate an aggregation request to find a suitable bucket to reopen.
     auto aggregationPipeline = generateReopeningPipeline(
