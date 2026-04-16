@@ -29,6 +29,26 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "durable_size_metadata_gen",
+    src = "durable_size_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "durable_size_metadata_idl",
+    srcs = [
+        ":durable_size_metadata_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
 mongo_cc_library(
     name = "replicated_fast_count_metrics",
     srcs = [

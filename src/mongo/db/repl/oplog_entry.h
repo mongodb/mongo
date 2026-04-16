@@ -60,6 +60,7 @@
 #include <iosfwd>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -89,6 +90,13 @@ constexpr StringData kNewPrimaryMsg = "new primary"_sd;
  * multi-document transaction that has been committed. This field is in-memory only.
  */
 constexpr StringData kExtractedCommitTransactionTimestampField = "commitTransactionTimestamp"_sd;
+
+/**
+ * Variant type stored in the top-level `m` field of an oplog entry. Single operations (insert,
+ * update, delete) carry a `SingleOpSizeMetadata`. The `commitTransaction` oplog entry has a vector
+ * of `MultiOpSizeMetadata`, one entry per collection touched by the transaction.
+ */
+using OplogEntrySizeMetadata = std::variant<std::vector<MultiOpSizeMetadata>, SingleOpSizeMetadata>;
 
 inline void setVersionContextIfHasOperationFCV(DurableReplOperation& op,
                                                const VersionContext& vCtx) {

@@ -2303,6 +2303,98 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_NoopOplogEntry) {
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
 }
 
+TEST_F(OplogEntryTest, SizeMetadataSingleOpRoundTrip) {
+    const int32_t opSizeBytes = 42;
+    SingleOpSizeMetadata expectedSizeMetadata;
+    expectedSizeMetadata.setSz(opSizeBytes);
+
+    const BSONObj oplogEntryBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "i");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("wall", Date_t());
+        bob.append("o", BSON("_id" << 1));
+        bob.append("m", expectedSizeMetadata.toBSON());
+        return bob.obj();
+    }();
+
+    const auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogEntryBson));
+    const auto& parsedSizeMetadata = entry.getSizeMetadata();
+    ASSERT_TRUE(parsedSizeMetadata.has_value());
+    const auto* parsedSingleOpSizeMetadata =
+        std::get_if<SingleOpSizeMetadata>(&parsedSizeMetadata.value());
+    ASSERT_NE(parsedSingleOpSizeMetadata, nullptr);
+    EXPECT_EQ(expectedSizeMetadata.getSz(), parsedSingleOpSizeMetadata->getSz());
+}
+
+TEST_F(OplogEntryTest, SizeMetadataMultiOpRoundTrip) {
+    MultiOpSizeMetadata expectedMeta1;
+    expectedMeta1.setUuid(UUID::gen());
+    expectedMeta1.setSz(100);
+    expectedMeta1.setCt(3);
+
+    MultiOpSizeMetadata expectedMeta2;
+    expectedMeta2.setUuid(UUID::gen());
+    expectedMeta2.setSz(200);
+    expectedMeta2.setCt(5);
+
+    const BSONObj oplogEntryBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "c");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("wall", Date_t());
+        bob.append("o", BSON("commitTransaction" << 1));
+        BSONArrayBuilder mArr(bob.subarrayStart("m"));
+        mArr.append(expectedMeta1.toBSON());
+        mArr.append(expectedMeta2.toBSON());
+        mArr.done();
+        return bob.obj();
+    }();
+
+    const auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogEntryBson));
+    const auto& parsedSizeMetadata = entry.getSizeMetadata();
+    ASSERT_TRUE(parsedSizeMetadata.has_value());
+    const auto* parsedMultiOpSizeMetadata =
+        std::get_if<std::vector<MultiOpSizeMetadata>>(&parsedSizeMetadata.value());
+    ASSERT_NE(parsedMultiOpSizeMetadata, nullptr);
+    ASSERT_EQ(parsedMultiOpSizeMetadata->size(), 2u);
+
+    EXPECT_EQ(expectedMeta1.getUuid(), (*parsedMultiOpSizeMetadata)[0].getUuid());
+    EXPECT_EQ(expectedMeta1.getSz(), (*parsedMultiOpSizeMetadata)[0].getSz());
+    EXPECT_EQ(expectedMeta1.getCt(), (*parsedMultiOpSizeMetadata)[0].getCt());
+
+    EXPECT_EQ(expectedMeta2.getUuid(), (*parsedMultiOpSizeMetadata)[1].getUuid());
+    EXPECT_EQ(expectedMeta2.getSz(), (*parsedMultiOpSizeMetadata)[1].getSz());
+    EXPECT_EQ(expectedMeta2.getCt(), (*parsedMultiOpSizeMetadata)[1].getCt());
+}
+
+TEST_F(OplogEntryTest, SizeMetadataMultiOpEmptyArray) {
+    const BSONObj oplogEntryBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "c");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("wall", Date_t());
+        bob.append("o", BSON("commitTransaction" << 1));
+        BSONArrayBuilder mArr(bob.subarrayStart("m"));
+        mArr.done();
+        return bob.obj();
+    }();
+
+    const auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogEntryBson));
+    const auto& parsedSizeMetadata = entry.getSizeMetadata();
+    ASSERT_TRUE(parsedSizeMetadata.has_value());
+    const auto* parsedMultiOpSizeMetadata =
+        std::get_if<std::vector<MultiOpSizeMetadata>>(&parsedSizeMetadata.value());
+    ASSERT_NE(parsedMultiOpSizeMetadata, nullptr);
+    ASSERT_EQ(parsedMultiOpSizeMetadata->size(), 0);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

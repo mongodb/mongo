@@ -1035,7 +1035,7 @@ protected:
 };
 
 repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
-    repl::OplogEntrySizeMetadata m;
+    SingleOpSizeMetadata m;
     m.setSz(replicatedSizeDelta);
     return m;
 }

@@ -204,6 +204,13 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
         return boost::none;
     }
 
+    // Only the `SingleOpSizeMetadata` form applies to CRUD operations where the count delta is
+    // inferred by the operation type.
+    const auto* perOpMd = std::get_if<SingleOpSizeMetadata>(&sizeMd.value());
+    if (!perOpMd) {
+        return boost::none;
+    }
+
     if (!isReplicatedFastCountEligible(oplogEntry.getNss())) {
         LOGV2_DEBUG(12369400,
                     3,
@@ -232,7 +239,7 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
                           << "' which tracks replicated size and count",
             oplogEntry.getUuid().has_value());
 
-    const int32_t sizeDelta = sizeMd->getSz();
+    const int32_t sizeDelta = perOpMd->getSz();
     const int32_t countDelta = computeCountDeltaForOp(opType);
     return CollectionSizeCount{.size = sizeDelta, .count = countDelta};
 }

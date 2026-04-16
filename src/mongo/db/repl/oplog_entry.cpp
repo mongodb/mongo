@@ -103,7 +103,18 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
         builder.append(OplogEntryBase::kObject2FieldName, p.o2Field.value());
     }
     if (p.sizeMetadata) {
-        builder.append(OplogEntryBase::kSizeMetadataFieldName, p.sizeMetadata.value().toBSON());
+        std::visit(OverloadedVisitor{[&](const SingleOpSizeMetadata& m) {
+                                         builder.append(OplogEntryBase::kSizeMetadataFieldName,
+                                                        m.toBSON());
+                                     },
+                                     [&](const std::vector<MultiOpSizeMetadata>& ms) {
+                                         BSONArrayBuilder arr(builder.subarrayStart(
+                                             OplogEntryBase::kSizeMetadataFieldName));
+                                         for (const auto& m : ms) {
+                                             arr.append(m.toBSON());
+                                         }
+                                     }},
+                   p.sizeMetadata.value());
     }
     if (p.isUpsert) {
         invariant(p.o2Field);

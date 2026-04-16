@@ -108,6 +108,7 @@ idl_generator(
         "//src/mongo/db:record_id_gen",
         "//src/mongo/db:version_context_gen",
         "//src/mongo/db/pipeline:value_gen",
+        "//src/mongo/db/replicated_fast_count:durable_size_metadata_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
@@ -130,6 +131,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/replicated_fast_count:durable_size_metadata_idl",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
 )

@@ -448,9 +448,11 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
 }
 
 void assertReplicatedSizeCountMeta(const repl::OplogEntry& oplogEntry, int32_t expectedSizeDelta) {
-    const auto entrySizeMeta = oplogEntry.getSizeMetadata();
+    const auto& entrySizeMeta = oplogEntry.getSizeMetadata();
     ASSERT_TRUE(entrySizeMeta.has_value());
-    ASSERT_EQ(entrySizeMeta->getSz(), expectedSizeDelta);
+    const auto* perOpMeta = std::get_if<SingleOpSizeMetadata>(&entrySizeMeta.value());
+    ASSERT_NE(perOpMeta, nullptr);
+    EXPECT_EQ(perOpMeta->getSz(), expectedSizeDelta);
 }
 
 void assertOpMatchesSpec(const repl::OplogEntry& oplogEntry, const OpValidationSpec& entrySpec) {
@@ -528,7 +530,7 @@ absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps
 namespace mongo::replicated_fast_count::test_helpers {
 namespace {
 repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
-    repl::OplogEntrySizeMetadata m;
+    SingleOpSizeMetadata m;
     m.setSz(replicatedSizeDelta);
     return m;
 }
