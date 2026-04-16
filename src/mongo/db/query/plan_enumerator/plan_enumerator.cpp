@@ -467,11 +467,6 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
                Indexability::isBoundsGeneratingNot(node) ||
                (MatchExpression::AND == node->matchType())) {
         // Map from idx id to children that have a pred over it.
-
-        // TODO: The index intersection logic could be simplified if we could iterate over these
-        // maps in a known order. Currently when iterating over these maps we have to impose an
-        // ordering on each individual pair of indices in order to make sure that the
-        // enumeration results are order-independent. See SERVER-12196.
         IndexToPredMap idxToFirst;
         IndexToPredMap idxToNotFirst;
 
@@ -1361,7 +1356,7 @@ bool PlanEnumerator::prepSubNodes(MatchExpression* node,
                 // that the entire AND cannot be indexed either.
                 return false;
             }
-        } else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
+        } else if (Indexability::isBoundsGeneratingElemMatchObject(child)) {
             PrepMemoContext childContext;
             childContext.elemMatchExpr = child;
             childContext.outsidePreds = context.outsidePreds;
