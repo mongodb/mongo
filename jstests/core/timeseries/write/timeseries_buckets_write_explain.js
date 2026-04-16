@@ -27,10 +27,12 @@ const time = new Date("2024-01-01T00:00:00Z");
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
 
-// TODO SERVER-122590: Investigate NamespaceNotSharded error on explain of sharded timeseries concurrent with viewless timeseries upgrade/downgrade.
+// TODO(SERVER-114324): Remove this test exclusion
+// The two phase write protocol may throw NamespaceNotSharded error on explain of sharded timeseries concurrent with viewless timeseries upgrade/downgrade
+// due to the tracked namespace switching from "myts" to "system.buckets.ts", with "myts" becoming untracked (or vice versa).
 if (runningWithViewlessTimeseriesUpgradeDowngrade(db) && isShardedTimeseries(coll)) {
     jsTest.log.info(
-        "Skipping test due to NamespaceNotSharded error on explain of sharded timeseries concurrent with viewless timeseries upgrade/downgrade (SERVER-122590).",
+        "Skipping test due to NamespaceNotSharded error on explain of sharded timeseries concurrent with viewless timeseries upgrade/downgrade (SERVER-122590 / SERVER-114324).",
     );
     quit();
 }
