@@ -12,6 +12,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps, getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const minWiredTigerCacheSizeGB = 0.256;
@@ -87,7 +88,7 @@ let compressedBuckets = timeseriesStats.numCompressedBuckets;
 // Ensure we have not closed any buckets due to size or cache pressure.
 assert.eq(bucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
 assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
-assert.eq(timeseriesStats.bucketCount, belowCardinalityThreshold, formatStatsLog(timeseriesStats));
+assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), belowCardinalityThreshold);
 
 // We insert enough data to cause buckets to roll over due to their size exceeding the maximum
 // bucket size. Because the cardinality is below the threshold at which the maximum bucket size

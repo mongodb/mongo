@@ -12,6 +12,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps, getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const defaultBucketMaxSize = 128000; //  125 KB
@@ -86,7 +87,7 @@ const initializeBuckets = function (numOfBuckets = 1) {
     expectedBucketCount++;
 
     let timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
-    assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
+    assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), expectedBucketCount);
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, numBucketsClosedDueToSize, formatStatsLog(timeseriesStats));
     assert.eq(
         timeseriesStats.numBucketsClosedDueToCachePressure,
@@ -105,7 +106,7 @@ const initializeBuckets = function (numOfBuckets = 1) {
     numCompressedBuckets++;
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
-    assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
+    assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), expectedBucketCount);
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, numBucketsClosedDueToSize, formatStatsLog(timeseriesStats));
     assert.eq(
         timeseriesStats.numBucketsClosedDueToCachePressure,
@@ -134,7 +135,7 @@ const initializeBuckets = function (numOfBuckets = 1) {
     numCompressedBuckets++;
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
-    assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
+    assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), expectedBucketCount);
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, numBucketsClosedDueToSize, formatStatsLog(timeseriesStats));
     assert.eq(
         timeseriesStats.numBucketsClosedDueToCachePressure,
@@ -169,7 +170,7 @@ const initializeBuckets = function (numOfBuckets = 1) {
     }
 
     let timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
-    assert.eq(timeseriesStats.bucketCount, bucketCount, formatStatsLog(timeseriesStats));
+    assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), bucketCount);
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
     assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
     // We expect this insert to cause the bucket to close due to cache pressure since it will exceed
@@ -183,7 +184,7 @@ const initializeBuckets = function (numOfBuckets = 1) {
     assert.commandWorked(coll.insert(doc));
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
-    assert.eq(timeseriesStats.bucketCount, bucketCount + 1, formatStatsLog(timeseriesStats));
+    assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), bucketCount + 1);
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
     assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure, 1, formatStatsLog(timeseriesStats));
 })();

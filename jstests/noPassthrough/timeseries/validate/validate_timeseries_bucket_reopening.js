@@ -7,6 +7,7 @@
  *
  * @tags: [requires_replication]
  */
+import {getTimeseriesCollForRawOps, getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -91,7 +92,7 @@ const validateBucketReopening = function (metaFieldName = null) {
     } else {
         // When no metaField is specified, all measurements fit in one bucket since there is no need
         // to close buckets due to metadata.
-        assert.eq(stats.timeseries["bucketCount"], 1, "Timeseries stats: " + tojson(stats));
+        assert.eq(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), 1);
     }
 
     // Finally, validate the collection and ensure there are no inconsistencies.
