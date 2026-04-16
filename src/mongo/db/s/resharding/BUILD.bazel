@@ -71,6 +71,7 @@ mongo_cc_library(
         ":recipient_document_gen",
     ],
     deps = [
+        "//src/mongo/db/s:forwardable_operation_metadata",
         "//src/mongo/s:common_s",
     ],
 )

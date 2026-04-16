@@ -350,6 +350,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/metadata_consistency_validation:metadata_consistency_types_idl",
         "//src/mongo/db/matcher:path",
         "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/s:forwardable_operation_metadata",
         "//src/mongo/db/shard_role/ddl:coll_mod_command_idl",
         "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",

@@ -51,12 +51,14 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -602,9 +604,23 @@ double calculateExponentialMovingAverage(double prevAvg, double currVal, double 
  * Constructs a CancelableOperationContext, optionally marking it as non-deprioritizable.
  * Used by resharding components to ensure operations within (or approaching) the critical
  * section are not deprioritized by execution admission control.
+ *
+ * If ForwardableOperationMetadata is provided, it will be set on the new opCtx.
  */
 CancelableOperationContext makeReshardingOperationContext(
-    const HierarchicalCancelableOperationContextFactory& factory, bool nonDeprioritizable);
+    const HierarchicalCancelableOperationContextFactory& factory,
+    bool nonDeprioritizable,
+    const boost::optional<ForwardableOperationMetadata>& fom = boost::none);
+
+/**
+ * Extracts the VersionContext from an optional ForwardableOperationMetadata, falling back to
+ * "no Operation FCV" when it is absent.
+ *
+ * NOTE: The returned VersionContext is tied to the lifetime of the resharding coordinator.
+ * Using it after the resharding coordinator has finished is incorrect, as it won't serialize with
+ * setFCV.
+ */
+VersionContext getVersionContextOrDefault(const boost::optional<ForwardableOperationMetadata>& fom);
 
 }  // namespace resharding
 }  // namespace mongo

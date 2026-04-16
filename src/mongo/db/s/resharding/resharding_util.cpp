@@ -66,6 +66,7 @@
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/otel/telemetry_context_holder.h"
@@ -598,6 +599,18 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
         commonMetadata.setProvenance(*request.getProvenance());
     }
 
+    // Snapshot the FCV at operation start so that feature flags are evaluated consistently for the
+    // entire operation lifetime, even across FCV transitions. If the opCtx already carries an OFCV,
+    // capture that; otherwise fall back to the global snapshot.
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ForwardableOperationMetadata fom(opCtx);
+    if (!fom.getVersionContext() &&
+        feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
+                                                               fcv)) {
+        fom.setVersionContext(VersionContext{fcv});
+    }
+    commonMetadata.setForwardableOpMetadata(std::move(fom));
+
     coordinatorDoc.setSourceKey(collEntry.getKeyPattern().toBSON());
     coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
     coordinatorDoc.setZones(request.getZones());
@@ -611,8 +624,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     auto performVerification = request.getPerformVerification();
     if (!performVerification.has_value() &&
         resharding::gFeatureFlagReshardingVerification.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            VersionContext::getDecoration(opCtx), fcv)) {
         performVerification = true;
     }
     coordinatorDoc.setPerformVerification(performVerification);
@@ -621,8 +633,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setRelaxed(request.getRelaxed());
 
     if (!resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            VersionContext::getDecoration(opCtx), fcv)) {
         uassert(ErrorCodes::InvalidOptions,
                 "Resharding with numSamplesPerChunk is not enabled, reject numSamplesPerChunk "
                 "parameter",
@@ -773,13 +784,28 @@ double calculateExponentialMovingAverage(double prevAvg, double currVal, double 
 }
 
 CancelableOperationContext makeReshardingOperationContext(
-    const HierarchicalCancelableOperationContextFactory& factory, bool nonDeprioritizable) {
-    return factory.makeOperationContext(&cc(), [nonDeprioritizable](OperationContext* opCtx) {
+    const HierarchicalCancelableOperationContextFactory& factory,
+    bool nonDeprioritizable,
+    const boost::optional<ForwardableOperationMetadata>& fom) {
+    return factory.makeOperationContext(&cc(), [nonDeprioritizable, fom](OperationContext* opCtx) {
         if (nonDeprioritizable) {
             ExecutionAdmissionContext::get(opCtx).setTaskType(
                 opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable);
         }
+        if (fom) {
+            fom->setOn(opCtx);
+        }
     });
+}
+
+VersionContext getVersionContextOrDefault(
+    const boost::optional<ForwardableOperationMetadata>& fom) {
+    // TODO(SERVER-99655): Simplify when 9.0 is last LTS and we always have a FOM with
+    // VersionContext.
+    if (fom) {
+        return fom->getVersionContext().value_or(VersionContext());
+    }
+    return VersionContext();
 }
 
 }  // namespace resharding

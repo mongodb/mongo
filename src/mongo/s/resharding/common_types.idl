@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/db/keypattern.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
     - "mongo/db/sharding_environment/sharding_types.idl"
 
 enums:
@@ -97,7 +98,7 @@ structs:
     CommonReshardingMetadata:
         description: "Immutable metadata shared across all node types for a resharding operation."
         mod_visibility: private
-        generate_comparison_operators: true
+        generate_comparison_operators: false
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
         # before the upgrade or downgrade can complete.
@@ -144,6 +145,13 @@ structs:
                 type: object_owned
                 optional: true
                 description: "Tracing context for distributed tracing across all participants."
+            forwardableOpMetadata:
+                type: ForwardableOperationMetadata
+                description: >-
+                    Operation metadata (including the FCV snapshot) captured when the resharding
+                    operation was initiated. Used to evaluate feature flags consistently throughout
+                    the operation lifetime, even across FCV transitions (e.g. downgrades).
+                optional: true
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."

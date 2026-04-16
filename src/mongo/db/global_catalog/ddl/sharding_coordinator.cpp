@@ -76,19 +76,6 @@ ShardingCoordinatorMetadata extractShardingCoordinatorMetadata(const BSONObj& co
                                               IDLParserContext("ShardingCoordinatorMetadata"));
 }
 
-// Enables propagation of the versionContext (OFCV) to sub-operations of this ShardingCoordinator
-// for network calls. For ShardingCoordinator, this is safe since their metadata is persisted to
-// disk, which allows setFCV to drain them before it proceeding to the metadata cleanup phase.
-ForwardableOperationMetadata enableVersionContextPropagation(
-    ForwardableOperationMetadata forwardableOperationMetadata) {
-    // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled on lastLTS
-    if (const auto& vCtx = forwardableOperationMetadata.getVersionContext()) {
-        forwardableOperationMetadata.setVersionContext(vCtx->withPropagationAcrossShards_UNSAFE());
-    }
-
-    return forwardableOperationMetadata;
-}
-
 ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
                                          std::string name,
                                          const BSONObj& coorDoc)
@@ -98,7 +85,9 @@ ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
       _recoveredFromDisk(extractShardingCoordinatorMetadata(coorDoc).getRecoveredFromDisk()),
       _forwardableOpMetadata(
           extractShardingCoordinatorMetadata(coorDoc).getForwardableOpMetadata().map(
-              enableVersionContextPropagation)),
+              [](const ForwardableOperationMetadata& f) {
+                  return f.withVersionContextPropagation_UNSAFE();
+              })),
       _firstExecution(!_recoveredFromDisk),
       _externalState(_service->createExternalState()) {}
 
