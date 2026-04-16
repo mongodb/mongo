@@ -498,7 +498,17 @@ int FlowControl::getNumTickets(Date_t now) {
         // variables here.
     }
 
-    ret = std::max(ret, gFlowControlMinTicketsPerSecond.load());
+    int scaledFloor = gFlowControlMinTicketsPerSecond.load();
+    if (gFlowControlScaleMinTicketsByLocksPerOp.load() && scaledFloor > 0) {
+        // Scale the floor by locksPerOp so that batched operations (e.g., insertMany) don't
+        // amplify the effective minimum throughput. Without this, insertMany(100) with floor=100
+        // allows ~10,000 ops/s; with scaling, the floor is ~100 ops/s regardless of batch size.
+        // The hard minimum of 1 prevents complete write stalls from `floor * locksPerOp`
+        // truncating to 0 when locksPerOp is very small. If the user explicitly configures
+        // flowControlMinTicketsPerSecond=0 (no floor), we respect that intent and skip scaling.
+        scaledFloor = std::max(1, static_cast<int>(scaledFloor * locksPerOp));
+    }
+    ret = std::max(ret, scaledFloor);
 
     LOGV2_DEBUG(22220,
                 DEBUG_LOG_LEVEL,

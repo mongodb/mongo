@@ -83,6 +83,14 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
+    flowControlScaleMinTicketsByLocksPerOp:
+        description: "If true, scales the flowControlMinTicketsPerSecond floor by the locksPerOp ratio to prevent batch operations from amplifying the effective minimum throughput."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: "gFlowControlScaleMinTicketsByLocksPerOp"
+        default: false
+        redact: false
+
     flowControlDecayConstant:
         description: "The rate at which flow control will throttle based on how lagged the commit point is in time relative to the flow control threshold."
         set_at: [startup, runtime]
