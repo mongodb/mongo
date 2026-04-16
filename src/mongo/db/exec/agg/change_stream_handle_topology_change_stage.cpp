@@ -34,6 +34,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/change_stream_topology_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/query/exec/shard_tag.h"
@@ -168,15 +169,20 @@ std::vector<RemoteCursor> ChangeStreamHandleTopologyChangeStage::establishShardC
         return {};
     }
 
-    // We must start the new cursor from the moment at which the shard became visible.
-    const LogicalTime shardAddedTime = LogicalTime{
-        newShardDetectedObj[DocumentSourceChangeStream::kClusterTimeField].getTimestamp()};
+    // Start the new cursor at the max of (shardAddedTime + 1) and the current high water mark.
+    // Without this, opening a stream at a future startAtOperationTime and then adding a shard would
+    // open the new cursor at the shard-added time, causing the PBRT to regress and pre-future
+    // events to leak through.
+    const Timestamp shardAddedTime =
+        newShardDetectedObj[DocumentSourceChangeStream::kClusterTimeField].getTimestamp();
+    const Timestamp highWaterMarkTime =
+        ResumeToken::parse(_mergeCursors->getHighWaterMark()).getClusterTime();
+    const LogicalTime shardAddedLogicalTime{shardAddedTime};
+    const Timestamp cursorStartTime =
+        std::max(shardAddedLogicalTime.addTicks(1).asTimestamp(), highWaterMarkTime);
 
     auto cmdObj = change_stream::topology_helpers::createUpdatedCommandForNewShard(
-        pExpCtx,
-        shardAddedTime.addTicks(1).asTimestamp(),
-        _originalAggregateCommand,
-        boost::none /* changeStreamVersion */);
+        pExpCtx, cursorStartTime, _originalAggregateCommand, boost::none /* changeStreamVersion */);
 
     const bool allowPartialResults = false;  // partial results are not allowed
     return establishCursors(
