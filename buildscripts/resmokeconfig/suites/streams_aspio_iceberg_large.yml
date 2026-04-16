@@ -4,8 +4,6 @@ selector:
   roots:
     - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_smallrows.js
     - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_official.js
-    # TODO(SERVER-122755): Move this elsewhere
-    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/s3_emit_benchmark_tpcc.js
     - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_speed_test.js
     - src/mongo/db/modules/enterprise/jstests/streams/aspio/pubsub/pubsub_benchmark_tpcc.js
 

@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
     - src/mongo/db/modules/*/jstests/streams/azure_blob_local/azure_parallel_heavy.js
+    - src/mongo/db/modules/enterprise/jstests/streams/azure_blob_local/azure_emit_benchmark_tpcc.js
 
 executor:
   fixture:
