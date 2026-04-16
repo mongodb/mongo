@@ -283,6 +283,14 @@ function timeseriesDefaultIndex() {
     assert.eq(indexSpecs.filter((index) => index.name == "usage_guest_1").length, 1);
 })();
 
+// TODO(SERVER-111600): Remove once $out on a different DB routed by a stale router can not fail to converge in multiversion suites (SERVER-123635).
+const isV82OrLower =
+    TestData.multiversionBinVersion &&
+    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(TestData.multiversionBinVersion), "8.2") <= 0;
+if (isV82OrLower) {
+    TestData.pinToSingleMongos = true;
+}
+
 (function testTimeseriesOutWithNonExistingDatabase() {
     // Drop both collections.
     dropOutCollections();
@@ -298,6 +306,10 @@ function timeseriesDefaultIndex() {
     inColl.aggregate(timeseriesPipeline);
     assert.eq(300, destDB[outColl.getName()].find().itcount());
 })();
+
+if (isV82OrLower) {
+    TestData.pinToSingleMongos = false;
+}
 
 (function testCannotCreateTimeseriesCollFromNonTimeseriesColl() {
     // Drop both collections.
