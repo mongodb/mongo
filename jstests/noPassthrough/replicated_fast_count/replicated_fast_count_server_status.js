@@ -17,21 +17,6 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // default value is 10 minutes, but server status updates should never take that long.
 const kServerStatusAssertTimeoutMs = 10_000; // 10 sec
 
-// OTel server status keys use the format "<metric_name>_<unit>"
-const kIsRunning = "replicated_fast_count.is_running_events";
-const kFlushSuccessCount = "replicated_fast_count.flush.success_count_events";
-const kFlushFailureCount = "replicated_fast_count.flush.failure_count_events";
-const kFlushTimeMsMin = "replicated_fast_count.flush_time.min_milliseconds";
-const kFlushTimeMsMax = "replicated_fast_count.flush_time.max_milliseconds";
-const kFlushTimeMsTotal = "replicated_fast_count.flush_time.total_milliseconds";
-const kFlushedDocsMin = "replicated_fast_count.flushed_docs.min_events";
-const kFlushedDocsMax = "replicated_fast_count.flushed_docs.max_events";
-const kFlushedDocsTotal = "replicated_fast_count.flushed_docs.total_events";
-const kEmptyUpdateCount = "replicated_fast_count.empty_update_count_events";
-const kInsertCount = "replicated_fast_count.insert_count_operations";
-const kUpdateCount = "replicated_fast_count.update_count_operations";
-const kWriteTimeMsTotal = "replicated_fast_count.write_time.total_milliseconds";
-
 /**
  * Returns a function that triggers a flush of ReplicatedFastCountManager and waits for it to
  * complete. Can be called an arbitrary number of times within a single test.
@@ -49,10 +34,10 @@ function makeForceFlush(db, delay = 0) {
 }
 
 /**
- * Returns the OTel server status metrics.
+ * Returns the replicatedFastCount server status metrics subtree.
  */
 function getMetrics(db) {
-    return db.serverStatus().otelMetrics;
+    return db.serverStatus().metrics?.replicatedFastCount ?? {};
 }
 
 describe("fast count server status metric", function () {
@@ -74,11 +59,11 @@ describe("fast count server status metric", function () {
                 () => {
                     const metrics = getMetrics(this.db);
                     return (
-                        metrics[kFlushSuccessCount] >= 1 &&
-                        metrics[kFlushTimeMsMin] >= 0 &&
-                        metrics[kFlushTimeMsMax] >= 500 &&
-                        metrics[kFlushTimeMsTotal] >= 500 &&
-                        metrics[kWriteTimeMsTotal] >= 0
+                        metrics.flush.successCount >= 1 &&
+                        metrics.flushTime.min >= 0 &&
+                        metrics.flushTime.max >= 500 &&
+                        metrics.flushTime.total >= 500 &&
+                        metrics.writeTime.total >= 0
                     );
                 },
                 () => `Expected flush time metrics after 500ms delay, got ${tojson(getMetrics(this.db))}`,
@@ -94,10 +79,10 @@ describe("fast count server status metric", function () {
                 () => {
                     const metrics = getMetrics(this.db);
                     return (
-                        metrics[kFlushSuccessCount] >= 2 &&
-                        metrics[kFlushTimeMsMin] < 500 &&
-                        metrics[kFlushTimeMsMax] >= 500 &&
-                        metrics[kFlushTimeMsTotal] >= 600
+                        metrics.flush.successCount >= 2 &&
+                        metrics.flushTime.min < 500 &&
+                        metrics.flushTime.max >= 500 &&
+                        metrics.flushTime.total >= 600
                     );
                 },
                 () => `Expected flush time metrics after second flush, got ${tojson(getMetrics(this.db))}`,
@@ -112,10 +97,7 @@ describe("fast count server status metric", function () {
         failpoint.wait();
 
         assert.soon(
-            () => {
-                const metrics = getMetrics(this.db);
-                return metrics[kFlushFailureCount] == 1;
-            },
+            () => getMetrics(this.db).flush.failureCount == 1,
             () => `Expected flushFailureCount to be incremented, got ${tojson(getMetrics(this.db))}}`,
             kServerStatusAssertTimeoutMs,
         );
@@ -123,7 +105,7 @@ describe("fast count server status metric", function () {
 
     it("empty update", function () {
         const metrics = getMetrics(this.db);
-        assert.eq(metrics[kEmptyUpdateCount], 0, metrics);
+        assert.eq(metrics.emptyUpdateCount, 0, metrics);
     });
 
     it("collection write and flush size", function () {
@@ -149,9 +131,9 @@ describe("fast count server status metric", function () {
                 const metrics = getMetrics(this.db);
                 return (
                     // TODO SERVER-122992: Enforce correct update / inserts.
-                    // metrics[kInsertCount] >= 1 &&
-                    // metrics[kUpdateCount] >= 1 &&
-                    metrics[kFlushedDocsMin] >= 1 && metrics[kFlushedDocsMax] >= 5 && metrics[kFlushedDocsTotal] >= 6
+                    // metrics.insertCount >= 1 &&
+                    // metrics.updateCount >= 1 &&
+                    metrics.flushedDocs.min >= 1 && metrics.flushedDocs.max >= 5 && metrics.flushedDocs.total >= 6
                 );
             },
             () => `Expected write and flushed docs metrics, got ${tojson(getMetrics(this.db))}`,
@@ -175,13 +157,13 @@ describe("is running", function () {
         // isRunning is not yet set (startup() has not been called), so the OTel gauge has not
         // been written and the key may be absent. Either absent or 0 is correct here.
         const metrics = getMetrics(this.db);
-        assert.neq(metrics[kIsRunning], 1, metrics);
+        assert.neq(metrics.isRunning, 1, metrics);
     });
 
     it("after step up", function () {
         this.rst.initiate();
         const metrics = getMetrics(this.db);
-        assert.eq(metrics[kIsRunning], 1, metrics);
+        assert.eq(metrics.isRunning, 1, metrics);
     });
 
     it("after step down", function () {
@@ -191,7 +173,7 @@ describe("is running", function () {
         this.db.adminCommand({replSetStepDown: 60, force: true});
 
         assert.soon(
-            () => getMetrics(this.db)[kIsRunning] != 1,
+            () => getMetrics(this.db).isRunning != 1,
             () => `Expected isRunning to not be 1 after stepdown, got ${tojson(getMetrics(this.db))}`,
             kServerStatusAssertTimeoutMs,
         );

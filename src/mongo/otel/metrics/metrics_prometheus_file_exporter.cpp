@@ -76,21 +76,24 @@ Counter<int64_t>& successfulWritesCounter = MetricsService::instance().createInt
     MetricNames::kPrometheusFileExporterWrites,
     "The number of times the Prometheus file exporter succeeded writing out new metrics.",
     MetricUnit::kEvents,
-    {.inServerStatus = true});
+    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "prometheusFileExporter.writes",
+                                                .role = ClusterRole::None}});
 
 Counter<int64_t>& failedWritesCounter = MetricsService::instance().createInt64Counter(
     MetricNames::kPrometheusFileExporterWritesFailed,
     "The number of times the Prometheus file exporter attempted to write out new metrics but "
     "failed for some reason.",
     MetricUnit::kEvents,
-    {.inServerStatus = true});
+    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "prometheusFileExporter.failedWrites",
+                                                .role = ClusterRole::None}});
 
 Counter<int64_t>& skippedWritesCounter = MetricsService::instance().createInt64Counter(
     MetricNames::kPrometheusFileExporterWritesSkipped,
     "The number of times the Prometheus file exporter writer thread did not attempt to write out a "
     "set of metrics before the OTel framework provided a new set of metrics to write.",
     MetricUnit::kEvents,
-    {.inServerStatus = true});
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "prometheusFileExporter.skippedWrites", .role = ClusterRole::None}});
 
 /**
  * Exports Opentelemetry metrics in Prometheus format to a file. This exports all metrics to the

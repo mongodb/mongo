@@ -50,8 +50,7 @@ using otel::metrics::MetricNames;
 using otel::metrics::OtelMetricsCapturer;
 
 TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
-    OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
+    otel::metrics::OtelMetricsCapturer capturer;
 
     for (const auto& gaugeName : {
              MetricNames::kReplicatedFastCountIsRunning,

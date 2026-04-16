@@ -177,7 +177,8 @@ auto& connectionsProcessedCounter = otel::metrics::MetricsService::instance().cr
     otel::metrics::MetricNames::kConnectionsProcessed,
     "Total number of ingress connections processed (accepted or rejected)",
     otel::metrics::MetricUnit::kConnections,
-    {.inServerStatus = true});
+    {.serverStatusOptions = otel::metrics::ServerStatusOptions{
+         .dottedPath = "network.connectionsProcessed", .role = ClusterRole::None}});
 
 auto& openConnectionsGauge = otel::metrics::MetricsService::instance().createInt64Gauge(
     otel::metrics::MetricNames::kOpenConnections,

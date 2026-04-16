@@ -238,7 +238,7 @@ private:
         std::string description;
         MetricUnit unit;
         // If false, this metric will be skipped when exporting to server status.
-        bool inServerStatus;  // TODO (SERVER-123242): Remove.
+        bool inServerStatus;  // TODO (SERVER-123617): Remove.
         boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
         boost::optional<std::vector<double>> histogramBucketBoundaries = boost::none;
 
