@@ -90,7 +90,7 @@ TimeseriesTest.run((insert) => {
         ),
     );
     assert.eq(4, coll.find({"meta": "a"}).toArray().length);
-    assert.eq(1, coll.stats().timeseries.bucketCount, coll.stats().timeseries);
+    assert.eq(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), 1);
     assert.eq(0, coll.find({"meta": "b"}).toArray().length);
     assert.commandWorked(
         getTimeseriesCollForRawOps(coll).deleteMany(

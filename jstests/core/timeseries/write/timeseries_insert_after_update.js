@@ -16,7 +16,7 @@
  *   assumes_stable_collection_uuid,
  * ]
  */
-import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -64,10 +64,10 @@ TimeseriesTest.run((insert) => {
     assert(stats.timeseries);
     if (TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
         assert.eq(buckets.length, 2, buckets);
-        assert.eq(stats.timeseries["bucketCount"], 2);
+        assert.eq(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), 2);
         assert.eq(stats.timeseries["numBucketsReopened"], prevNumBucketsReopened + 1);
     } else {
-        assert.gte(buckets.length, 2, buckets);
+        assert.gte(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), 2);
         assert.gte(stats.timeseries["bucketCount"], 2);
         // TODO(SERVER-123053): Assert `>= prevNumBucketsReopened + 1` once we don't fail to find re-opening candidates due to viewless timeseries downgrade.
         assert.gte(stats.timeseries["numBucketsReopened"], prevNumBucketsReopened);

@@ -35,7 +35,7 @@ const resetCollection = function () {
 const checkIfBucketReopened = function (measurement, willCreateBucket = false, willReopenBucket = false) {
     let stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
-    const prevBucketCount = TimeseriesTest.getStat(stats.timeseries, "bucketCount");
+    const prevBucketCount = getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec);
     const prevExpectedReopenedBuckets = TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened");
 
     const expectedReopenedBuckets = willReopenBucket ? prevExpectedReopenedBuckets + 1 : prevExpectedReopenedBuckets;
@@ -45,12 +45,12 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     stats = assert.commandWorked(coll.stats());
     assert.hasFields(stats, ["timeseries"]);
     if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
-        assert.gte(stats.timeseries["bucketCount"], expectedBucketCount);
+        assert.gte(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), expectedBucketCount);
         // The bucket re-opened more than expected due to retries
         // TODO(SERVER-123053): Assert `>= expectedReopenedBuckets` once we don't fail to find re-opening candidates due to viewless timeseries downgrade.
         assert.gte(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), prevExpectedReopenedBuckets);
     } else {
-        assert.eq(stats.timeseries["bucketCount"], expectedBucketCount);
+        assert.eq(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), expectedBucketCount);
         assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
     }
 };
