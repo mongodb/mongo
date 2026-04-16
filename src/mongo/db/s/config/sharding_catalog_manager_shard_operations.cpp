@@ -106,7 +106,9 @@
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/server_options.h"
@@ -1497,25 +1499,6 @@ void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
     uassertStatusOK(addShard(opCtx, &shardName, configConnString, true));
 }
 
-boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
-    OperationContext* opCtx, const std::vector<NamespaceString>& collections) {
-    for (const auto& nss : collections) {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        if (!autoColl) {
-            // Can't find the collection, so it must not have data.
-            continue;
-        }
-
-        if (!autoColl->isEmpty(opCtx)) {
-            LOGV2(9022300, "removeShard: found non-empty local collection", logAttrs(nss));
-            RemoveShardProgress progress{
-                RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, 0, nss};
-            return {progress};
-        }
-    }
-
-    return boost::none;
-}
 
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
@@ -1662,19 +1645,16 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         }
 
         // The config server may be added as a shard again, so we locally drop its drained
-        // sharded collections to enable that without user intervention. But we have to wait for
-        // the range deleter to quiesce to give queries and stale routers time to discover the
-        // migration, to match the usual probabilistic guarantees for migrations.
-        auto pendingRangeDeletions = [opCtx]() {
-            PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-            return static_cast<long long>(store.count(opCtx, BSONObj()));
-        }();
-        if (pendingRangeDeletions > 0) {
-            LOGV2(7564600,
-                  "removeShard: waiting for range deletions",
-                  "pendingRangeDeletions"_attr = pendingRangeDeletions);
-
-            return {RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, pendingRangeDeletions};
+        // sharded collections to enable that without user intervention. We wait for
+        // orphanCleanupDelaySecs as a best effort since creation of latest non pending range
+        // deletion task.
+        auto task = topology_change_helpers::getLatestNonProcessingRangeDeletionTask(opCtx);
+        if (task && !topology_change_helpers::checkOrphanCleanupDelayElapsed(opCtx, *task)) {
+            return {RemoveShardProgress::PENDING_DATA_CLEANUP,
+                    boost::none,
+                    boost::none,
+                    boost::none,
+                    task};
         }
     }
 
@@ -1693,9 +1673,9 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // The counters: `shardedChunks`, `totalCollections`, and `databases` are used to present
     // the ongoing status to the user. Additionally, `totalChunks` on the shard is checked for
     // safety, as it is a critical point in the removeShard process, to ensure that a non-empty
-    // shard is not removed. For example the number of unsharded collections might be inaccurate due
-    // to $listClusterCatalog potentially returning an incorrect list of shards during concurrent
-    // DDL operations.
+    // shard is not removed. For example the number of unsharded collections might be inaccurate
+    // due to $listClusterCatalog potentially returning an incorrect list of shards during
+    // concurrent DDL operations.
     if (drainingProgress.totalChunks > 0 || drainingProgress.shardedChunks > 0 ||
         drainingProgress.totalCollections > 0 || drainingProgress.databases > 0) {
         // Still more draining to do
@@ -1711,32 +1691,17 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     if (shardId == ShardId::kConfigServerId) {
-        // Drop all tracked databases locally now that all user data has been drained so the config
-        // server can transition back to catalog shard mode without requiring users to manually drop
-        // them.
+        // Drop all tracked databases locally now that all user data has been drained so the
+        // config server can transition back to catalog shard mode without requiring users to
+        // manually drop them.
 
-        // First, verify all collections we would drop are empty. In normal operation, a collection
-        // may still have data because of a sharded drop (which non-atomically updates metadata
-        // before dropping user data). If this state persists, manual intervention will be required
-        // to complete the transition, so we don't accidentally delete real data.
         auto trackedDBs =
             _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
-
-        LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = name);
 
         for (auto&& db : trackedDBs) {
             tassert(7783700,
                     "Cannot drop admin or config database from the config server",
                     !db.getDbName().isConfigDB() && !db.getDbName().isAdminDB());
-
-            auto collections = [&] {
-                Lock::DBLock dbLock(opCtx, db.getDbName(), MODE_S);
-                auto catalog = CollectionCatalog::get(opCtx);
-                return catalog->getAllCollectionNamesFromDb(opCtx, db.getDbName());
-            }();
-            if (auto pendingDataCleanupState = checkCollectionsAreEmpty(opCtx, collections)) {
-                return *pendingDataCleanupState;
-            }
         }
 
         // Now actually drop the databases; each request must either succeed or resolve into a
@@ -1751,33 +1716,32 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
         }
 
-        // Also drop the sessions collection, which we assume is the only sharded collection in the
-        // config database.
-        if (auto pendingDataCleanupState =
-                checkCollectionsAreEmpty(opCtx, {NamespaceString::kLogicalSessionsNamespace})) {
-            return *pendingDataCleanupState;
-        }
-
+        // Also drop the sessions collection and range deletions collections.
         DBDirectClient client(opCtx);
-        BSONObj result;
+        BSONObj sessionsResult, rangeDeletionsResult;
         if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
                                    ShardingCatalogClient::kLocalWriteConcern,
-                                   &result)) {
-            uassertStatusOK(getStatusFromCommandResult(result));
+                                   &sessionsResult)) {
+            uassertStatusOK(getStatusFromCommandResult(sessionsResult));
+        }
+        if (!client.dropCollection(NamespaceString::kRangeDeletionNamespace,
+                                   ShardingCatalogClient::kLocalWriteConcern,
+                                   &rangeDeletionsResult)) {
+            uassertStatusOK(getStatusFromCommandResult(rangeDeletionsResult));
         }
     }
 
     // Draining is done, now finish removing the shard.
     LOGV2(21949, "Going to remove shard", "shardId"_attr = name);
 
-    // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
-    // so that no add/remove shard operation and its set cluster cardinality parameter operation can
-    // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the remove shard operation since
-    // setting a cluster parameter requires taking this lock.
+    // Take the cluster cardinality parameter lock and the shard membership lock in exclusive
+    // mode so that no add/remove shard operation and its set cluster cardinality parameter
+    // operation can interleave with the ones below. Release the shard membership lock before
+    // initiating the _configsvrSetClusterParameter command after finishing the remove shard
+    // operation since setting a cluster parameter requires taking this lock.
     Lock::ExclusiveLock clusterCardinalityParameterLock(opCtx, _kClusterCardinalityParameterLock);
-    // Synchronize the control shard selection, the shard's document removal, and the topology time
-    // update to exclude potential race conditions in case of concurrent add/remove shard
+    // Synchronize the control shard selection, the shard's document removal, and the topology
+    // time update to exclude potential race conditions in case of concurrent add/remove shard
     // operations.
     shardMembershipLock.lock();
 
@@ -1807,16 +1771,16 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     shardMembershipLock.unlock();
 
-    // Unset the addOrRemoveShardInProgress cluster parameter. Note that _removeShardInTransaction
-    // has already waited for the commit to be majority-acknowledged.
+    // Unset the addOrRemoveShardInProgress cluster parameter. Note that
+    // _removeShardInTransaction has already waited for the commit to be majority-acknowledged.
     if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         unblockDDLCoordinators(opCtx);
     }
     unblockDDLCoordinatorsGuard.dismiss();
 
-    // The shard which was just removed must be reflected in the shard registry, before the replica
-    // set monitor is removed, otherwise the shard would be referencing a dropped RSM.
+    // The shard which was just removed must be reflected in the shard registry, before the
+    // replica set monitor is removed, otherwise the shard would be referencing a dropped RSM.
     Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
     if (shardId != ShardId::kConfigServerId) {
@@ -1869,9 +1833,9 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
 
         BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
         bool canAppendToDoc = true;
-        // The dbsToMove and collectionsToMove arrays will be truncated accordingly if they exceed
-        // the 16MB BSON limitation. The offset for calculation is set to 10K to reserve place for
-        // other attributes.
+        // The dbsToMove and collectionsToMove arrays will be truncated accordingly if they
+        // exceed the 16MB BSON limitation. The offset for calculation is set to 10K to reserve
+        // place for other attributes.
         int reservationOffsetBytes = 10 * 1024 + dbs.len();
 
         const auto maxUserSize = std::invoke([&] {
@@ -1938,14 +1902,11 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
         case RemoveShardProgress::PENDING_DATA_CLEANUP: {
             result.append("msg", "waiting for data to be cleaned up");
             result.append("state", "pendingDataCleanup");
-            result.append("pendingRangeDeletions", *shardDrainingStatus.pendingRangeDeletions);
-            if (shardDrainingStatus.firstNonEmptyCollection) {
-                // We only check for non-empty collections if there are no pending range deletions,
-                // so only include it if it's set to avoid reporting false negatives.
-                result.append(
-                    "firstNonEmptyCollection",
-                    NamespaceStringUtil::serialize(*shardDrainingStatus.firstNonEmptyCollection,
-                                                   SerializationContext::stateDefault()));
+            if (shardId == ShardId::kConfigServerId) {
+                result.append("pendingRangeDeletionTask",
+                              shardDrainingStatus.pendingRangeDeletionTask->toBSON());
+            } else if (shardDrainingStatus.pendingRangeDeletions) {
+                result.append("pendingRangeDeletions", *shardDrainingStatus.pendingRangeDeletions);
             }
             break;
         }
@@ -2198,8 +2159,8 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
     LOGV2(6538600, "Pulling cluster parameters from new shard");
 
     // We can safely query the cluster parameters because the replica set must have been started
-    // with --shardsvr in order to add it into the cluster, and in this mode no setClusterParameter
-    // can be called on the replica set directly.
+    // with --shardsvr in order to add it into the cluster, and in this mode no
+    // setClusterParameter can be called on the replica set directly.
     auto tenantIds =
         uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, shard, _executorForAddShard.get()));
 
@@ -2327,9 +2288,9 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
         BSONObj(),
         boost::none));
 
-    // If this is the first shard being added, and no cluster parameters have been set, then this
-    // can be seen as a replica set to shard conversion -- absorb all of this shard's cluster
-    // parameters. Otherwise, push our cluster parameters to the shard.
+    // If this is the first shard being added, and no cluster parameters have been set, then
+    // this can be seen as a replica set to shard conversion -- absorb all of this shard's
+    // cluster parameters. Otherwise, push our cluster parameters to the shard.
     if (shardsDocs.docs.empty()) {
         bool clusterParameterDocsEmpty = std::all_of(
             configSvrClusterParameterDocs.begin(),
@@ -2373,8 +2334,9 @@ void ShardingCatalogManager::_addShardInTransaction(
     }
 
     // 2. Set up and run the commit statements
-    // TODO SERVER-81582: generate batches of transactions to insert the database/placementHistory
-    // and collection/placementHistory before adding the shard in config.shards.
+    // TODO SERVER-81582: generate batches of transactions to insert the
+    // database/placementHistory and collection/placementHistory before adding the shard in
+    // config.shards.
     auto transactionChain = [opCtx, &newShard, &databasesInNewShard, &collectionsInNewShard](
                                 const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
         write_ops::InsertCommandRequest insertShardEntry(NamespaceString::kConfigsvrShardsNamespace,
@@ -2512,7 +2474,8 @@ void ShardingCatalogManager::_addShardInTransaction(
         txn.run(opCtx, transactionChain);
     }
 
-    // 3. Reuse the existing notification object to also broadcast the event of successful commit.
+    // 3. Reuse the existing notification object to also broadcast the event of successful
+    // commit.
     notification.setPhase(CommitPhaseEnum::kSuccessful);
     notification.setPrimaryShard(boost::none);
     const auto notificationOutcome =
