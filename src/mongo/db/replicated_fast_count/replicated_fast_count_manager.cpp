@@ -49,6 +49,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
 MONGO_FAIL_POINT_DEFINE(failDuringFlush);
+MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
 
 }  // namespace
 
@@ -276,7 +277,7 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
         if (MONGO_unlikely(failDuringFlush.shouldFail())) {
             uasserted(12311500, "Injected failure in _doFlush for testing");
         }
-
+        hangBeforePersistingNewFastCountEntries.pauseWhileSet();
         if (_useLegacyFlush) {
             _flushDirtyMetadata(opCtx, dirtyMetadata);
         } else {
