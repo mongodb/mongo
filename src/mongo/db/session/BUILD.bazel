@@ -118,6 +118,7 @@ idl_generator(
         ":logical_session_id_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/db/replicated_fast_count:durable_size_metadata_gen",
     ],
 )
 

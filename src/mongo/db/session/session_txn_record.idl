@@ -39,6 +39,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/replicated_fast_count/durable_size_metadata.idl"
 
 enums:
     DurableTxnState:
@@ -95,3 +96,10 @@ structs:
                 description: "List of namespaces, affected by the transaction. Only written for prepared transactions"
                 type: array<namespacestring>
                 optional: true
+            m:
+                cpp_name: sizeMetadata
+                type: array<MultiOpSizeMetadata>
+                optional: true
+                description:
+                    "Stores the cumulative size and count deltas for each collection touched by the
+                    transaction."
