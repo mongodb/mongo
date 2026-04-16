@@ -137,6 +137,40 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
     return result;
 }
 
+void ExecutionAdmissionContext::setTaskType(OperationContext* opCtx, TaskType newType) {
+    const auto currentType = getTaskType();
+    const auto currentPrio = getPriority();
+
+    dassert(currentType == newType || currentType == TaskType::Default);
+    dassert(currentPrio == AdmissionContext::Priority::kExempt ||
+            currentPrio == AdmissionContext::Priority::kNormal);
+    dassert(!opCtx->inMultiDocumentTransaction());
+
+    _taskType.store(newType);
+    if (newType == TaskType::NonDeprioritizable) {
+        markedNonDeprioritizable();
+    }
+
+    // There is no need for mutex here, because the thread <-> operation context (and
+    // ExecutionAdmissionContext) is a 1 to 1 relation.
+    // Nobody should update the ExecutionAdmissionContext's counter from a different thread (sharing
+    // opCtx is prohibited).
+    const auto recursionCount = ++_scopedTaskTypeModifierRecursion;
+    if (recursionCount < 1) {
+        LOGV2_WARNING(12096800,
+                      "Inconsistency in _scopedTaskTypeModifierRecursion count. Resetting it to 1.",
+                      "recursionCount"_attr = recursionCount);
+        dassert(false);
+        _scopedTaskTypeModifierRecursion = 1;
+    }
+
+    LOGV2_DEBUG(12043501,
+                1,
+                "Changing task type on ExecutionAdmissionContext",
+                "oldValue"_attr = to_string(currentType),
+                "newValue"_attr = to_string(newType));
+}
+
 void ExecutionAdmissionContext::recordExecutionAcquisition(AdmissionContext::Priority priority) {
     if (!_shouldRecordStats()) {
         return;
@@ -238,35 +272,7 @@ bool ExecutionAdmissionContext::_shouldRecordStats() {
 admission::execution_control::ScopedTaskTypeModifierBase::ScopedTaskTypeModifierBase(
     OperationContext* opCtx, ExecutionAdmissionContext::TaskType newType)
     : _opCtx(opCtx) {
-    const auto currentType = ExecutionAdmissionContext::get(_opCtx).getTaskType();
-    const auto currentPrio = ExecutionAdmissionContext::get(_opCtx).getPriority();
-
-    dassert(currentType == newType || currentType == ExecutionAdmissionContext::TaskType::Default);
-    dassert(currentPrio == AdmissionContext::Priority::kExempt ||
-            currentPrio == AdmissionContext::Priority::kNormal);
-    dassert(!_opCtx->inMultiDocumentTransaction());
-
-    ExecutionAdmissionContext::get(_opCtx)._taskType.store(newType);
-
-    // There is no need for mutex here, because the thread <-> operation context (and
-    // ExecutionAdmissionContext) is a 1 to 1 relation.
-    // Nobody should update the ExecutionAdmissionContext's counter from a different thread (sharing
-    // opCtx is prohibited).
-    const auto recursionCount =
-        ++ExecutionAdmissionContext::get(_opCtx)._scopedTaskTypeModifierRecursion;
-    if (recursionCount < 1) {
-        LOGV2_WARNING(12096800,
-                      "Inconsistency in _scopedTaskTypeModifierRecursion count. Resetting it to 1.",
-                      "recursionCount"_attr = recursionCount);
-        dassert(false);
-        ExecutionAdmissionContext::get(_opCtx)._scopedTaskTypeModifierRecursion = 1;
-    }
-
-    LOGV2_DEBUG(12043501,
-                1,
-                "Changing task type on ExecutionAdmissionContext",
-                "oldValue"_attr = to_string(currentType),
-                "newValue"_attr = to_string(newType));
+    ExecutionAdmissionContext::get(_opCtx).setTaskType(_opCtx, newType);
 }
 
 admission::execution_control::ScopedTaskTypeModifierBase::~ScopedTaskTypeModifierBase() {
@@ -295,8 +301,6 @@ admission::execution_control::ScopedTaskTypeBackground::ScopedTaskTypeBackground
 
 admission::execution_control::ScopedTaskTypeNonDeprioritizable::ScopedTaskTypeNonDeprioritizable(
     OperationContext* opCtx)
-    : ScopedTaskTypeModifierBase(opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable) {
-    ExecutionAdmissionContext::get(opCtx).markedNonDeprioritizable();
-}
+    : ScopedTaskTypeModifierBase(opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable) {}
 
 }  // namespace mongo

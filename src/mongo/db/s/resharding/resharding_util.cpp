@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -763,6 +764,16 @@ double calculateExponentialMovingAverage(double prevAvg, double currVal, double 
                           << smoothingFactor,
             smoothingFactor < 1);
     return (1 - smoothingFactor) * prevAvg + smoothingFactor * currVal;
+}
+
+CancelableOperationContext makeReshardingOperationContext(
+    const HierarchicalCancelableOperationContextFactory& factory, bool nonDeprioritizable) {
+    auto opCtx = cc().makeOperationContext();
+    if (nonDeprioritizable) {
+        ExecutionAdmissionContext::get(&*opCtx).setTaskType(
+            &*opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable);
+    }
+    return factory.makeCancelable(std::move(opCtx));
 }
 
 }  // namespace resharding

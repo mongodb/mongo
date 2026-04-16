@@ -151,6 +151,12 @@ public:
     }
 
     /**
+     * Sets the task type. Most callers should prefer the scoped objects below, but this helper
+     * is available for places that would like to set the value for the whole life of the opCtx.
+     */
+    void setTaskType(OperationContext* opCtx, TaskType newType);
+
+    /**
      * Records that a ticket was acquired. Increments the appropriate admission counter
      * (normal or low priority) for the current bucket based on the provided priority.
      */

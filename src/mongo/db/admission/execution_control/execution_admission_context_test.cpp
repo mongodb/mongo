@@ -201,14 +201,40 @@ TEST_P(ScopedTaskTypeTest, TaskTypeWorksWithExemptPriority) {
     ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kExempt);
 }
 
-class ScopedTaskTypeFixedTest : public ServiceContextTest {
+class TaskTypeTest : public ServiceContextTest {
 protected:
     ExecutionAdmissionContext& getAdmCtx(OperationContext* opCtx) {
         return ExecutionAdmissionContext::get(opCtx);
     }
 };
 
-TEST_F(ScopedTaskTypeFixedTest, NonDeprioritizableSetsMarkedFlag) {
+TEST_F(TaskTypeTest, SetTaskTypeNonDeprioritizable) {
+    auto opCtx = makeOperationContext();
+    ASSERT_FALSE(getAdmCtx(opCtx.get()).getMarkedNonDeprioritizable());
+    getAdmCtx(opCtx.get()).setTaskType(opCtx.get(), TaskType::NonDeprioritizable);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+}
+
+TEST_F(TaskTypeTest, MultipleCalls) {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setTaskType(opCtx.get(), TaskType::NonDeprioritizable);
+    getAdmCtx(opCtx.get()).setTaskType(opCtx.get(), TaskType::NonDeprioritizable);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+}
+
+TEST_F(TaskTypeTest, SetterPlusScoped) {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setTaskType(opCtx.get(), TaskType::NonDeprioritizable);
+    ASSERT_TRUE(getAdmCtx(opCtx.get()).getMarkedNonDeprioritizable());
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+    {
+        ScopedTaskTypeNonDeprioritizable nd(opCtx.get());
+        ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+    }
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+}
+
+TEST_F(TaskTypeTest, NonDeprioritizableSetsMarkedFlag) {
     auto opCtx = makeOperationContext();
     ASSERT_FALSE(getAdmCtx(opCtx.get()).getMarkedNonDeprioritizable());
 
@@ -221,7 +247,7 @@ TEST_F(ScopedTaskTypeFixedTest, NonDeprioritizableSetsMarkedFlag) {
     ASSERT_TRUE(getAdmCtx(opCtx.get()).getMarkedNonDeprioritizable());
 }
 
-TEST_F(ScopedTaskTypeFixedTest, SequentialDifferentTypes) {
+TEST_F(TaskTypeTest, SequentialDifferentTypes) {
     auto opCtx = makeOperationContext();
 
     {
@@ -238,22 +264,34 @@ TEST_F(ScopedTaskTypeFixedTest, SequentialDifferentTypes) {
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-using ScopedTaskTypeDeathTest = ScopedTaskTypeFixedTest;
+using TaskTypeDeathTest = TaskTypeTest;
 
-DEATH_TEST_F(ScopedTaskTypeDeathTest, CannotNestDifferentTaskTypes, "Invariant failure") {
+DEATH_TEST_F(TaskTypeDeathTest, CannotSetDifferentTypes, "Invariant failure") {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setTaskType(opCtx.get(), TaskType::NonDeprioritizable);
+    getAdmCtx(opCtx.get()).setTaskType(opCtx.get(), TaskType::Background);
+}
+
+DEATH_TEST_F(TaskTypeDeathTest, CannotSetAndScopeDifferentTypes, "Invariant failure") {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setTaskType(opCtx.get(), TaskType::NonDeprioritizable);
+    ScopedTaskTypeBackground bg(opCtx.get());
+}
+
+DEATH_TEST_F(TaskTypeDeathTest, CannotNestDifferentTaskTypes, "Invariant failure") {
     auto opCtx = makeOperationContext();
     ScopedTaskTypeBackground bg(opCtx.get());
     ScopedTaskTypeNonDeprioritizable nd(opCtx.get());
 }
 
-DEATH_TEST_F(ScopedTaskTypeDeathTest, CannotCreateScopeWithLowPriority, "Invariant failure") {
+DEATH_TEST_F(TaskTypeDeathTest, CannotCreateScopeWithLowPriority, "Invariant failure") {
     auto opCtx = makeOperationContext();
     ScopedAdmissionPriority<ExecutionAdmissionContext> lowPriority(
         opCtx.get(), AdmissionContext::Priority::kLow);
     ScopedTaskTypeBackground bg(opCtx.get());
 }
 
-DEATH_TEST_F(ScopedTaskTypeDeathTest, CannotCreateScopeInMultiDocTransaction, "Invariant failure") {
+DEATH_TEST_F(TaskTypeDeathTest, CannotCreateScopeInMultiDocTransaction, "Invariant failure") {
     auto opCtx = makeOperationContext();
     opCtx->setInMultiDocumentTransaction();
     ScopedTaskTypeBackground bg(opCtx.get());

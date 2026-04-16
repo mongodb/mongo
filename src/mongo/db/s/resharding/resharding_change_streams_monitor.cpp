@@ -37,6 +37,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -213,6 +214,11 @@ int64_t ReshardingChangeStreamsMonitor::numBatchesForTest() {
     return _numBatches;
 }
 
+CancelableOperationContext ReshardingChangeStreamsMonitor::_makeOperationContext(
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
+    return resharding::makeReshardingOperationContext(*factory, true /* nonDeprioritizable */);
+}
+
 std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() const {
     DocumentSourceChangeStreamSpec changeStreamSpec;
 
@@ -344,7 +350,7 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
     return AsyncTry([this, factory] {
                EventBatch batch(_role);
 
-               auto opCtx = factory->makeOperationContext(&cc());
+               auto opCtx = _makeOperationContext(factory);
                DBDirectClient client(opCtx.get());
                auto cursor = _makeDBClientCursor(&client);
 

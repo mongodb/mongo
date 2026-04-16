@@ -193,6 +193,12 @@ public:
 
 private:
     /**
+     * Helper to construct an opCtx and set non-deprioritizable state if needed.
+     */
+    CancelableOperationContext _makeOperationContext(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
+
+    /**
      * Runs up until the donor is either in state kBlockingWrites or encountered an error.
      */
     ExecutorFuture<void> _runUntilBlockingWritesOrErrored(
@@ -341,7 +347,7 @@ private:
         _retryingCancelableOpCtxFactory;
 
     // Protects the state below
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Manages abort state and provides cancellation tokens for async operations. Initialized in
     // _initCancelState().

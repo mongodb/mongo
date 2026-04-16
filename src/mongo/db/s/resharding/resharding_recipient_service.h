@@ -292,6 +292,12 @@ private:
      */
     ExecutorFuture<void> _runMandatoryCleanup(Status status);
 
+    /**
+     * Helper to construct an opCtx and set non-deprioritizable state if needed.
+     */
+    CancelableOperationContext _makeOperationContext(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
+
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -474,7 +480,7 @@ private:
     SharedSemiFuture<void> _changeStreamsMonitorQuiesced;
 
     // Protects the state below
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Manages abort state and provides cancellation tokens for async operations. Initialized in
     // _initCancelState().

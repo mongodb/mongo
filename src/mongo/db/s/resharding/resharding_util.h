@@ -598,5 +598,13 @@ boost::optional<int> getIndexCount(OperationContext* opCtx,
  */
 double calculateExponentialMovingAverage(double prevAvg, double currVal, double smoothingFactor);
 
+/**
+ * Constructs a CancelableOperationContext, optionally marking it as non-deprioritizable.
+ * Used by resharding components to ensure operations within (or approaching) the critical
+ * section are not deprioritized by execution admission control.
+ */
+CancelableOperationContext makeReshardingOperationContext(
+    const HierarchicalCancelableOperationContextFactory& factory, bool nonDeprioritizable);
+
 }  // namespace resharding
 }  // namespace mongo

@@ -247,6 +247,11 @@ private:
     };
 
     /**
+     * Helper to construct an opCtx and set non-deprioritizable state if needed.
+     */
+    CancelableOperationContext _makeOperationContext() const;
+
+    /**
      * Construct the initial chunks splits and write down the initial coordinator state to storage.
      */
     ExecutorFuture<void> _initializeCoordinator(
