@@ -622,4 +622,18 @@ void ReshardingCoordinatorExternalStateImpl::verifyFinalCollection(
         "recipientDocumentsFinal"_attr = numDocsTemporary);
 }
 
+void ReshardingCoordinatorExternalStateImpl::stopMigrations(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            const UUID& expectedCollectionUUID,
+                                                            const OperationSessionInfo& osi) {
+    sharding_ddl_util::stopMigrations(opCtx, nss, expectedCollectionUUID, osi);
+}
+
+void ReshardingCoordinatorExternalStateImpl::resumeMigrations(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const UUID& expectedCollectionUUID,
+                                                              const OperationSessionInfo& osi) {
+    sharding_ddl_util::resumeMigrations(opCtx, nss, expectedCollectionUUID, osi);
+}
+
 }  // namespace mongo

@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_command_util.h"
 
+#include "mongo/db/global_catalog/ddl/shardsvr_join_migrations_request_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -49,6 +50,17 @@ std::vector<ShardId> getAllParticipantShardIds(const ReshardingCoordinatorDocume
 }  // namespace
 
 namespace resharding {
+
+void tellAllParticipantsToJoinMigrations(
+    OperationContext* opCtx,
+    const OperationSessionInfo& osi,
+    const ReshardingCoordinatorDocument& doc,
+    CancellationToken stepdownToken,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    ShardsvrJoinMigrations joinMigrationsCmd;
+    sendReshardingCommand(
+        opCtx, osi, joinMigrationsCmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+}
 
 void tellAllParticipantsToCommit(OperationContext* opCtx,
                                  const OperationSessionInfo& osi,

@@ -142,6 +142,24 @@ public:
      */
     virtual void verifyFinalCollection(OperationContext* opCtx,
                                        const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
+
+    /**
+     * To be called during the "initializing" state to set allowMigrations to preventing new chunk
+     * migrations from starting and aborting any in-progress migrations on the source collection.
+     */
+    virtual void stopMigrations(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const UUID& expectedCollectionUUID,
+                                const OperationSessionInfo& osi) = 0;
+
+    /**
+     * To be called on completion (both success and abort) to unset allowMigrations, re-enabling
+     * chunk migrations on the source collection.
+     */
+    virtual void resumeMigrations(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const UUID& expectedCollectionUUID,
+                                  const OperationSessionInfo& osi) = 0;
 };
 
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
@@ -202,6 +220,16 @@ public:
 
     void verifyFinalCollection(OperationContext* opCtx,
                                const ReshardingCoordinatorDocument& coordinatorDoc) override;
+
+    void stopMigrations(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const UUID& expectedCollectionUUID,
+                        const OperationSessionInfo& osi) override;
+
+    void resumeMigrations(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const UUID& expectedCollectionUUID,
+                          const OperationSessionInfo& osi) override;
 
 private:
     /**

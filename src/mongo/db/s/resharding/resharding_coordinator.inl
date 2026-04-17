@@ -30,6 +30,7 @@
 #include "mongo/db/global_catalog/ddl/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_utils.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/balancer/balance_stats.h"
@@ -93,6 +94,7 @@ extern FailPoint reshardingPauseCoordinatorBeforePersistingStateTransition;
 extern FailPoint reshardingPerformValidationAfterApplying;
 extern FailPoint pauseBeforeTellDonorToRefresh;
 extern FailPoint pauseAfterInsertCoordinatorDoc;
+extern FailPoint pauseAfterStoppingActiveMigrations;
 extern FailPoint pauseBeforeCTHolderInitialization;
 extern FailPoint pauseAfterEngagingCriticalSection;
 extern FailPoint reshardingPauseBeforeTellingRecipientsToClone;
@@ -112,6 +114,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
 MONGO_FAIL_POINT_DEFINE(pauseAfterInsertCoordinatorDoc);
+MONGO_FAIL_POINT_DEFINE(pauseAfterStoppingActiveMigrations);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
 MONGO_FAIL_POINT_DEFINE(pauseAfterEngagingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseBeforeTellingRecipientsToClone);
@@ -342,11 +345,55 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
         .runOn(**executor, _ctHolder->getStepdownToken());
 }
 
+void ReshardingCoordinator::_stopMigrations(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
+        return;
+    }
+
+    // moveCollection applies to unsplittable collections that are not subject to migrations.
+    auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
+    if (resharding::isMoveCollection(provenance)) {
+        return;
+    }
+
+    // We must actively stop existing migrations and prevent new from starting to prevent
+    // migrations from racing with resharding to acquire the critical section.
+    auto opCtx = _makeOperationContext();
+    _reshardingCoordinatorExternalState->stopMigrations(opCtx.get(),
+                                                        _coordinatorDoc.getSourceNss(),
+                                                        _coordinatorDoc.getSourceUUID(),
+                                                        _getNewSession(opCtx.get()));
+
+    resharding::tellAllParticipantsToJoinMigrations(opCtx.get(),
+                                                    _getNewSession(opCtx.get()),
+                                                    _coordinatorDoc,
+                                                    _ctHolder->getStepdownToken(),
+                                                    executor);
+
+    pauseAfterStoppingActiveMigrations.pauseWhileSet();
+}
+
+void ReshardingCoordinator::_resumeMigrations(OperationContext* opCtx,
+                                              boost::optional<Status> abortReason) {
+    // moveCollection applies to unsplittable collections that are not subject to migrations.
+    auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
+    if (resharding::isMoveCollection(provenance)) {
+        return;
+    }
+
+    auto collectionUUID =
+        abortReason ? _coordinatorDoc.getSourceUUID() : _coordinatorDoc.getReshardingUUID();
+    _reshardingCoordinatorExternalState->resumeMigrations(
+        opCtx, _coordinatorDoc.getSourceNss(), collectionUUID, _getNewSession(opCtx));
+}
+
 ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return resharding::WithAutomaticRetry([this, executor] {
                return ExecutorFuture<void>(**executor)
                    .then([this] { _insertCoordDocAndChangeOrigCollEntry(); })
+                   .then([this, executor] { _stopMigrations(executor); })
                    .then([this] { _calculateParticipantsAndChunksThenWriteToDisk(); });
            })
         .onTransientError([](const Status& status) {
@@ -1908,6 +1955,7 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
 
 void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx, boost::optional<Status> abortReason) {
+    _resumeMigrations(opCtx, abortReason);
     _releaseSession(opCtx);
 
     auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(

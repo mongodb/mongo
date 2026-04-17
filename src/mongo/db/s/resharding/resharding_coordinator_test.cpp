@@ -230,13 +230,6 @@ protected:
         if (reshardingFields)
             collType.setReshardingFields(std::move(reshardingFields.value()));
 
-        if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone ||
-            coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced ||
-            coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
-            collType.setAllowMigrations(true);
-        } else if (coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate) {
-            collType.setAllowMigrations(false);
-        }
         return collType;
     }
 
@@ -427,7 +420,7 @@ protected:
     }
 
     // Reads the original collection's catalog entry from disk and validates that the
-    // reshardingFields and allowMigration matches the expected.
+    // reshardingFields matches the expected.
     void assertOriginalCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx,
         CollectionType expectedCollType,
@@ -435,8 +428,6 @@ protected:
         DBDirectClient client(opCtx);
         CollectionType onDiskEntry(client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
                                                   BSON("_id" << _originalNss.ns_forTest())));
-
-        ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType.getAllowMigrations());
 
         auto expectedReshardingFields = expectedCollType.getReshardingFields();
         auto expectedCoordinatorState = expectedCoordinatorDoc.getState();
@@ -501,8 +492,6 @@ protected:
         }
 
         CollectionType onDiskEntry(doc);
-
-        ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType->getAllowMigrations());
 
         auto expectedReshardingFields = expectedCollType->getReshardingFields().value();
         ASSERT(onDiskEntry.getReshardingFields());
@@ -824,8 +813,7 @@ protected:
                                   BSON("ns" << updatedCoordinatorDoc.getSourceNss().ns_forTest()));
         ASSERT(doc.isEmpty());
 
-        // Check that the resharding fields are removed from the config.collections entry and
-        // allowMigrations is set back to true.
+        // Check that the resharding fields are removed from the config.collections entry.
         auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
             updatedCoordinatorDoc,
             boost::none,
@@ -849,8 +837,7 @@ protected:
         // Check that the entry is marked as quiesced in config.reshardingOperations
         readReshardingCoordinatorDocAndAssertMatchesExpected(opCtx, updatedCoordinatorDoc);
 
-        // Check that the resharding fields are removed from the config.collections entry and
-        // allowMigrations is set back to true.
+        // Check that the resharding fields are removed from the config.collections entry.
         auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
             updatedCoordinatorDoc,
             boost::none,

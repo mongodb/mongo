@@ -114,6 +114,18 @@ public:
     void verifyFinalCollection(OperationContext*, const ReshardingCoordinatorDocument&) override {
         MONGO_UNREACHABLE;
     }
+    void stopMigrations(OperationContext*,
+                        const NamespaceString&,
+                        const UUID&,
+                        const OperationSessionInfo&) override {
+        MONGO_UNREACHABLE;
+    }
+    void resumeMigrations(OperationContext*,
+                          const NamespaceString&,
+                          const UUID&,
+                          const OperationSessionInfo&) override {
+        MONGO_UNREACHABLE;
+    }
 };
 
 /**

@@ -2351,9 +2351,15 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
 
     const auto cm = uassertStatusOK(
         RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    // Allow clearing allowMigrations on an unsplittable (tracked-unsharded) collection: the field
+    // can be left over from when the collection was sharded (e.g. after unshardCollection), and
+    // resumeMigrations must be able to clear it.
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' is not sharded",
-            cm.isSharded());
+            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' "
+                          << (cm.isUnsplittable()
+                                  ? "is unsplittable; disabling migrations is not supported"
+                                  : "is not sharded"),
+            cm.isSharded() || (cm.isUnsplittable() && allowMigrations));
 
     uassert(ErrorCodes::InvalidUUID,
             str::stream() << "Collection uuid " << collectionUUID

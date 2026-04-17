@@ -65,6 +65,13 @@ void sendReshardingCommand(OperationContext* opCtx,
     resharding::sendCommandToShards(opCtx, opts, shardIds);
 }
 
+void tellAllParticipantsToJoinMigrations(
+    OperationContext* opCtx,
+    const OperationSessionInfo& osi,
+    const ReshardingCoordinatorDocument& doc,
+    CancellationToken stepdownToken,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
 void tellAllParticipantsToCommit(OperationContext* opCtx,
                                  const OperationSessionInfo& osi,
                                  const ReshardingCoordinatorDocument& doc,

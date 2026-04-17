@@ -261,6 +261,16 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
+     * Helper to stop in-progress chunk migrations and prevent new ones from starting.
+     */
+    void _stopMigrations(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Helper to re-enable chunk migrations on abort.
+     */
+    void _resumeMigrations(OperationContext* opCtx, boost::optional<Status> abortReason);
+
+    /**
      * Runs resharding up through preparing to persist the decision.
      */
     ExecutorFuture<ReshardingCoordinatorDocument> _runUntilReadyToCommit(
