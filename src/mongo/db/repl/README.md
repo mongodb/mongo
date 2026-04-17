@@ -2025,7 +2025,7 @@ candidate if `(vc, tc) >= (v, t)`. For a description of the complete voting beha
 ### Formal Specification
 
 For more details on the safe reconfig protocol and its behaviors, refer to the [TLA+
-specification](https://github.com/mongodb/mongo/tree/master/src/mongo/tla_plus/MongoReplReconfig)
+specification](/src/mongo/tla_plus/Replication/MongoReplReconfig)
 or the [paper on MongoDB's reconfig protocol](https://arxiv.org/abs/2102.11960), written in part by replication engineers.
 It defines two main invariants of the protocol, ElectionSafety and NeverRollbackCommitted,
 which assert, respectively, that no two leaders are elected in the same term and that majority

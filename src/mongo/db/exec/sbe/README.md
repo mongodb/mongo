@@ -461,7 +461,7 @@ for more details.
 ## Runtime Planners
 
 See [Classic Runtime Planners for SBE
-README](https://github.com/mongodb/mongo/blob/master/src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/README.md).
+README](/src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/README.md).
 
 ## Incomplete Sections Below (TODO)
 

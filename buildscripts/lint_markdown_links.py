@@ -124,13 +124,30 @@ from typing import Iterable, Optional
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 HTML_ANCHOR_RE = re.compile(r'<a\s+(?:name|id)=["\']([^"\']+)["\']\s*>\s*</a>?', re.IGNORECASE)
-LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+# Matches [text](url) where url is either an angle-bracket form <url> (CommonMark §6.3,
+# allows parentheses inside the URL) or a plain URL (stops at the first unescaped ')').
+LINK_RE = re.compile(r"\[([^\]]+)\]\((<[^>]*>|[^)]+)\)")
 # Inline link references: [text]: url
 REF_DEF_RE = re.compile(r"^\s*\[([^\]]+)\]:\s+(\S+)")
+# Multi-line ref def: label on one line, URL indented on the next (valid CommonMark/Prettier output)
+REF_DEF_LABEL_ONLY_RE = re.compile(r"^\s*\[([^\]]+)\]:\s*$")
 # Reference-style links: [text][label] or [text][] but NOT [[double brackets]]
 # Negative lookbehind (?<!\[) ensures first [ is not preceded by [
 # Negative lookahead (?!\[) ensures first [ is not followed by another [
 REF_USE_RE = re.compile(r"(?<!\[)\[([^\]]+)\](?!\])\[(?:(?:[^\]]+))?\]")
+
+
+def _has_dangling_open_bracket(text: str) -> bool:
+    """Return True when *text* contains a '[' that opens a potential inline link not yet closed.
+
+    Used to decide whether to join the next line when scanning for multi-line inline links.
+    """
+    t = re.sub(r"`[^`]*`", "", text)  # strip inline code spans
+    t = re.sub(r"\[[^\]]*\]\([^)]*\)", "", t)  # strip complete [text](url) links
+    t = re.sub(r"\[[^\]]*\]\[[^\]]*\]", "", t)  # strip complete [text][label] links
+    t = re.sub(r"\[[^\]]*\]", "", t)  # strip any remaining closed [...] (shortcut refs)
+    return "[" in t
+
 
 # Characters removed for anchor IDs (GitHub rules simplified). We strip most punctuation except hyphen and underscore.
 PUNCT_TO_STRIP = "\"'!#$%&()*+,./:;<=>?@[]^`{|}~"  # punctuation characters to remove
@@ -251,18 +268,37 @@ def collect_headings(path: str) -> set[str]:
 
 
 def collect_reference_definitions(path: str) -> dict[str, str]:
-    """Parse all reference-style link definitions [label]: url from a markdown file."""
+    """Parse all reference-style link definitions [label]: url from a markdown file.
+
+    Handles both single-line and Prettier-style multi-line forms:
+      [label]: https://...          (single-line)
+      [label]:                      (multi-line — CommonMark allows URL on next line)
+        https://...
+    """
     if path in REFERENCE_CACHE:
         return REFERENCE_CACHE[path]
     references: dict[str, str] = {}
     try:
         with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                m = REF_DEF_RE.match(line)
-                if m:
-                    label = m.group(1).strip().lower()  # case-insensitive matching
-                    target = m.group(2).strip()
-                    references[label] = target
+            lines = f.readlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            m = REF_DEF_RE.match(line)
+            if m:
+                label = m.group(1).strip().lower()  # case-insensitive matching
+                target = m.group(2).strip()
+                references[label] = target
+            else:
+                m2 = REF_DEF_LABEL_ONLY_RE.match(line)
+                if m2 and i + 1 < len(lines):
+                    next_line = lines[i + 1]
+                    m3 = re.match(r"^\s+(\S+)", next_line)
+                    if m3:
+                        label = m2.group(1).strip().lower()
+                        references[label] = m3.group(1).strip()
+                        i += 1  # consume the URL line
+            i += 1
     except Exception:
         pass
     REFERENCE_CACHE[path] = references
@@ -286,111 +322,133 @@ def parse_links(file_path: str) -> list[tuple[int, str, str]]:
     links: list[tuple[int, str, str]] = []
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            in_fence = False
-            in_blockquote = False
-            fence_delim = None  # track ``` or ~~~
-            for idx, raw_line in enumerate(f, start=1):
-                line = raw_line.rstrip("\n")
-                # Detect start/end of fenced code blocks. Accept ``` or ~~~ with optional language and leading whitespace.
-                fence_match = re.match(r"^\s*(?P<delim>`{3,}|~{3,})(.*)$", line)
-                if fence_match:
-                    full = fence_match.group("delim")
-                    # Toggle if same delimiter starts/ends
-                    if not in_fence:
-                        in_fence = True
-                        fence_delim = full
-                        continue
-                    else:
-                        # Only close if same delimiter length & char
-                        if fence_delim == full:
-                            in_fence = False
-                            fence_delim = None
-                            continue
-                if in_fence:
-                    continue  # skip link detection inside code fences
-                # Blockquote handling: if line starts with '>' treat entire following wrapped paragraph as quoted until blank line
-                if re.match(r"^\s*>", line):
-                    in_blockquote = True
+            raw_lines = f.readlines()
+        in_fence = False
+        in_blockquote = False
+        fence_delim = None  # track ``` or ~~~
+        i = 0
+        while i < len(raw_lines):
+            idx = i + 1  # 1-based line number
+            line = raw_lines[i].rstrip("\n")
+            i += 1
+            # Detect start/end of fenced code blocks. Accept ``` or ~~~ with optional language and leading whitespace.
+            fence_match = re.match(r"^\s*(?P<delim>`{3,}|~{3,})(.*)$", line)
+            if fence_match:
+                full = fence_match.group("delim")
+                # Toggle if same delimiter starts/ends
+                if not in_fence:
+                    in_fence = True
+                    fence_delim = full
                     continue
-                if in_blockquote:
-                    if line.strip() == "":
-                        in_blockquote = False
-                    else:
+                else:
+                    # Only close if same delimiter length & char
+                    if fence_delim == full:
+                        in_fence = False
+                        fence_delim = None
                         continue
-                # Skip lines that are reference definitions themselves
-                if REF_DEF_RE.match(line):
+            if in_fence:
+                continue  # skip link detection inside code fences
+            # Blockquote handling: if line starts with '>' treat entire following wrapped paragraph as quoted until blank line
+            if re.match(r"^\s*>", line):
+                in_blockquote = True
+                continue
+            if in_blockquote:
+                if line.strip() == "":
+                    in_blockquote = False
+                else:
                     continue
+            # Skip lines that are reference definitions themselves (single-line or multi-line forms)
+            if REF_DEF_RE.match(line):
+                continue
+            if REF_DEF_LABEL_ONLY_RE.match(line):
+                # Multi-line ref def: skip this line and the indented URL on the next line
+                if i < len(raw_lines) and re.match(r"^\s+\S", raw_lines[i]):
+                    i += 1
+                continue
 
-                # Find all backtick regions to exclude from link detection
-                # Build a set of character positions that are inside backticks
-                backtick_positions = set()
-                in_code = False
-                for i, char in enumerate(line):
-                    if char == "`":
-                        in_code = not in_code
-                    elif in_code:
-                        backtick_positions.add(i)
+            # Join continuation lines for multi-line inline links.
+            # CommonMark allows link text (and destination) to span lines, e.g.:
+            #   [Sync Source
+            #   Selection](https://...)
+            # Consume following lines until the bracket is closed or a blank line is hit.
+            scan_line = line
+            while _has_dangling_open_bracket(scan_line) and i < len(raw_lines):
+                next_raw = raw_lines[i].rstrip("\n")
+                if not next_raw.strip():
+                    break  # blank line ends a paragraph; inline links can't span it
+                scan_line = scan_line + " " + next_raw
+                i += 1
 
-                # Helper function to check if the opening bracket of a link is inside backticks
-                # We only check the start position because if the [ is in code, the whole link should be skipped
-                def is_in_code_span(match_start):
-                    return match_start in backtick_positions
+            # Find all backtick regions to exclude from link detection
+            # Build a set of character positions that are inside backticks
+            backtick_positions = set()
+            in_code = False
+            for j, char in enumerate(scan_line):
+                if char == "`":
+                    in_code = not in_code
+                elif in_code:
+                    backtick_positions.add(j)
 
-                # Track character ranges of all matched links to avoid double-processing
-                matched_ranges = []
+            # Helper function to check if the opening bracket of a link is inside backticks
+            # We only check the start position because if the [ is in code, the whole link should be skipped
+            def is_in_code_span(match_start):
+                return match_start in backtick_positions
 
-                def overlaps_matched_range(start, end):
-                    """Check if a position range overlaps with any previously matched range."""
-                    for m_start, m_end in matched_ranges:
-                        # Check for any overlap
-                        if start < m_end and end > m_start:
-                            return True
-                    return False
+            # Track character ranges of all matched links to avoid double-processing
+            matched_ranges = []
 
-                # Inline links [text](url)
-                for m in LINK_RE.finditer(line):
-                    if is_in_code_span(m.start()):
-                        continue  # Skip links inside backticks
-                    text, target = m.group(1), m.group(2).strip()
-                    links.append((idx, text, target))
-                    matched_ranges.append((m.start(), m.end()))
+            def overlaps_matched_range(start, end):
+                """Check if a position range overlaps with any previously matched range."""
+                for m_start, m_end in matched_ranges:
+                    # Check for any overlap
+                    if start < m_end and end > m_start:
+                        return True
+                return False
 
-                # Reference-style links [text][label] or [text][]
-                for m in REF_USE_RE.finditer(line):
-                    if is_in_code_span(m.start()):
-                        continue  # Skip links inside backticks
-                    full_match = m.group(0)
-                    text = m.group(1).strip()
-                    # Extract label from [text][label] - if empty brackets [], use text as label
-                    label_part = full_match[len(text) + 2 :]  # skip [text]
-                    if label_part == "[]":
-                        label = text  # implicit reference: [text][] uses "text" as label
-                    else:
-                        # Explicit label: [text][label]
-                        label = label_part.strip("[]").strip()
+            # Inline links [text](url)
+            for m in LINK_RE.finditer(scan_line):
+                if is_in_code_span(m.start()):
+                    continue  # Skip links inside backticks
+                text, target = m.group(1), m.group(2).strip()
+                links.append((idx, text, target))
+                matched_ranges.append((m.start(), m.end()))
+
+            # Reference-style links [text][label] or [text][]
+            for m in REF_USE_RE.finditer(scan_line):
+                if is_in_code_span(m.start()):
+                    continue  # Skip links inside backticks
+                full_match = m.group(0)
+                text = m.group(1).strip()
+                # Extract label from [text][label] - if empty brackets [], use text as label
+                label_part = full_match[len(text) + 2 :]  # skip [text]
+                if label_part == "[]":
+                    label = text  # implicit reference: [text][] uses "text" as label
+                else:
+                    # Explicit label: [text][label]
+                    label = label_part.strip("[]").strip()
+                # Use special marker to indicate this is a reference link
+                links.append((idx, text, f"__REF__{label}"))
+                matched_ranges.append((m.start(), m.end()))
+
+            # Shortcut reference links [text] - single bracket that references a definition
+            # Only match if not already matched by inline or reference-style patterns
+            # Pattern: single bracket pair not preceded by [ and not followed by ( or [
+            for m in re.finditer(r"(?<!\[)\[([^\]]+)\](?![(\[])", scan_line):
+                if is_in_code_span(m.start()):
+                    continue  # Skip links inside backticks
+                # Skip if overlaps with already matched ranges
+                if overlaps_matched_range(m.start(), m.end()):
+                    continue
+                # Skip if this is part of a double bracket pattern [[...]]
+                if m.end() < len(scan_line) and scan_line[m.end()] == "]":
+                    continue
+                text = m.group(1).strip()
+                # Only treat as reference link if it could plausibly be one
+                # (contains text, not just punctuation or numbers)
+                if text and not text.isdigit():
                     # Use special marker to indicate this is a reference link
-                    links.append((idx, text, f"__REF__{label}"))
-                    matched_ranges.append((m.start(), m.end()))
-
-                # Shortcut reference links [text] - single bracket that references a definition
-                # Only match if not already matched by inline or reference-style patterns
-                # Pattern: single bracket pair not preceded by [ and not followed by ( or [
-                for m in re.finditer(r"(?<!\[)\[([^\]]+)\](?![(\[])", line):
-                    if is_in_code_span(m.start()):
-                        continue  # Skip links inside backticks
-                    # Skip if overlaps with already matched ranges
-                    if overlaps_matched_range(m.start(), m.end()):
-                        continue
-                    # Skip if this is part of a double bracket pattern [[...]]
-                    if m.end() < len(line) and line[m.end()] == "]":
-                        continue
-                    text = m.group(1).strip()
-                    # Only treat as reference link if it could plausibly be one
-                    # (contains text, not just punctuation or numbers)
-                    if text and not text.isdigit():
-                        # Use special marker to indicate this is a reference link
-                        # For shortcut references, the label is the text itself
-                        links.append((idx, text, f"__REF__{text}"))
+                    # For shortcut references, the label is the text itself
+                    links.append((idx, text, f"__REF__{text}"))
     except Exception:
         pass
     return links
@@ -466,6 +524,10 @@ def validate_link(current_file: str, line: int, text: str, target: str) -> Optio
                 return None  # Suppress issue since a fuzzy variant matches
             return LinkIssue(current_file, line, text, target, "anchor not found in this file")
         return None
+
+    # Strip CommonMark angle-bracket URL quoting: <https://...> -> https://...
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1]
 
     # Split fragment if present
     file_part, frag_part = target.split("#", 1) if "#" in target else (target, None)

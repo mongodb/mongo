@@ -106,7 +106,7 @@ ResourceType, as locking at this level is done in the storage engine itself for 
 ### Document Level Concurrency Control
 
 Each storage engine is responsible for locking at the document level. The [WiredTiger storage
-engine](../storage/wiredtiger/README.md) uses MVCC [multi-version concurrency control][Multiversion concurrency control] along with optimistic locking in order to provide concurrency guarantees.
+engine](../../storage/wiredtiger/README.md) uses MVCC [multi-version concurrency control][Multiversion concurrency control] along with optimistic locking in order to provide concurrency guarantees.
 
 ## Two-Phase Locking
 

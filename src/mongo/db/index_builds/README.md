@@ -270,7 +270,7 @@ using the startup recovery logic that RTT uses to bring the node back to a writa
 For improved rollback semantics, resumable index builds require a majority read cursor during
 collection scan phase. Index builds wait for the majority commit point to advance before starting
 the collection scan. The majority wait happens after installing the [side table for intercepting new
-writes](#internal-side-table-for-new-writes).
+writes](#internal-table-for-side-writes).
 
 See
 [MultiIndexBlock::\_constructStateObject()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/catalog/multi_index_block.cpp#L900)

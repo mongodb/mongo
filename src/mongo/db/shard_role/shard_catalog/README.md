@@ -758,7 +758,7 @@ increasing cluster key values.
 Because unlike regular capped collections, clustered collections do not need to preserve insertion
 order, they allow non-serialized concurrent writes. In order to avoid missing documents while
 tailing a clustered collection, the user is required to enforce visibility rules similar to the ['no
-holes' point](../storage/README.md#oplog-visibility). Majority read concern is similarly required.
+holes' point](../../storage/README.md#oplog-visibility). Majority read concern is similarly required.
 
 ## Clustered RecordIds
 
