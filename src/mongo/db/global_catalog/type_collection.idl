@@ -49,11 +49,13 @@ enums:
             kFinished: "finished"
 
 structs:
-    CollectionTypeBase:
+    CommonCollectionTypeBase:
         description:
-            "Represents the layout and contents of documents contained in the config
-            server's config.collections collection."
+            "Represents the layout and contents of documents contained in the both config
+            server's config.collections collection as well as the shard's config.shard.catalog.collections
+            collection."
         strict: false
+        generate_comparison_operators: true
         fields:
             _id:
                 cpp_name: nss
@@ -107,6 +109,66 @@ structs:
                 type: bool
                 description: "Uniqueness of the sharding key."
                 default: false
+            unsplittable:
+                type: optionalBool
+                description:
+                    "Flag that identifies whether the collection is splittable in multiple
+                    chunks. If unsplittable, the collection is always equivalent to a 1
+                    chunk collection."
+            allowMigrations:
+                type: bool
+                description:
+                    "Whether this collection allows chunks to move. It is required by
+                    almost all DDL operations in order to guarantee that the set of
+                    shards, which comprise a collection will not change.
+
+                    If the flag is not present it defaults to true."
+                optional: true
+
+    CommonCollectionTypeBaseIncomparable:
+        description:
+            Contains contents of documents contained in the both config server's config.collections
+            collection as well as the shard's config.shard.catalog.collections collection. Stored
+            separately in order to allow automatic comparison operators creation for shard catalog
+            metadata verification.
+        strict: false
+        fields:
+            # TODO SERVER-124325: The resharding fields should ideally be stored exclusively in the global catalog.
+            reshardingFields:
+                type: TypeCollectionReshardingFields
+                description:
+                    "Resharding-related fields. Only set when this collection is either the
+                    original collection undergoing a resharding operation or this
+                    collection is the temporary resharding collection."
+                optional: true
+            # TODO SERVER-124326: The timeseries collection fields should ideally be stored exclusively in the global catalog.
+            timeseriesFields:
+                type: TypeCollectionTimeseriesFields
+                description:
+                    "Time-series collection fields. Only set when this is a time-series
+                    buckets collection."
+                optional: true
+
+    ShardCatalogCollectionTypeBase:
+        description:
+            "Represents the layout and contents of documents contained in the shard's
+            config.shard.catalog.collections collection."
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCollectionTypeBase: commonCollectionBase
+            CommonCollectionTypeBaseIncomparable: commonCollectionBaseIncomparable
+
+    GlobalCatalogCollectionTypeBase:
+        description:
+            "Represents the layout and contents of documents contained in the config
+            server's config.collections collection."
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCollectionTypeBase: commonCollectionBase
+            CommonCollectionTypeBaseIncomparable: commonCollectionBaseIncomparable
+        fields:
             maxChunkSizeBytes:
                 type: safeInt64
                 description: "Max chunk size in bytes."
@@ -131,35 +193,6 @@ structs:
                     "Consulted by the Balancer only and indicates whether this collection
                     should be considered for balancing or not."
                 default: false
-            reshardingFields:
-                type: TypeCollectionReshardingFields
-                description:
-                    "Resharding-related fields. Only set when this collection is either the
-                    original collection undergoing a resharding operation or this
-                    collection is the temporary resharding collection."
-                optional: true
-            allowMigrations:
-                type: bool
-                description:
-                    "Whether this collection allows chunks to move. It is required by
-                    almost all DDL operations in order to guarantee that the set of
-                    shards, which comprise a collection will not change.
-
-                    If the flag is not present it defaults to true."
-                optional: true
-            unsplittable:
-                type: optionalBool
-                description:
-                    "Flag that identifies whether the collection is splittable in multiple
-                    chunks. If unsplittable, the collection is always equivalent to a 1
-                    chunk collection."
-
-            timeseriesFields:
-                type: TypeCollectionTimeseriesFields
-                description:
-                    "Time-series collection fields. Only set when this is a time-series
-                    buckets collection."
-                optional: true
             # TODO SERVER-61033: merge this flag with allowMigrations.
             permitMigrations:
                 type: bool

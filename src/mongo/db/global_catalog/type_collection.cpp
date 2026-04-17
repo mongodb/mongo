@@ -47,25 +47,31 @@ CollectionType::CollectionType(NamespaceString nss,
                                Timestamp creationTime,
                                Date_t updatedAt,
                                UUID uuid,
-                               KeyPattern keyPattern)
-    : CollectionTypeBase(std::move(nss),
-                         std::move(updatedAt),
-                         std::move(creationTime),
-                         std::move(uuid),
-                         std::move(keyPattern)) {
+                               KeyPattern keyPattern) {
+    setNss(std::move(nss));
+    setUpdatedAt(std::move(updatedAt));
+    setTimestamp(std::move(creationTime));
     invariant(getTimestamp() != Timestamp(0, 0));
+    setUuid(std::move(uuid));
+    setKeyPattern(std::move(keyPattern));
     setEpoch(std::move(epoch));
 }
 
 CollectionType::CollectionType(const BSONObj& obj) {
-    CollectionType::parseProtected(obj, IDLParserContext("CollectionType"));
-    invariant(getTimestamp() != Timestamp(0, 0));
+    *this = CollectionType::parse(obj, IDLParserContext("CollectionType"));
+}
+
+CollectionType CollectionType::parse(const BSONObj& obj, const IDLParserContext& ctx) {
+    CollectionType result;
+    result.parseProtected(obj, ctx);
+    invariant(result.getTimestamp() != Timestamp(0, 0));
     uassert(ErrorCodes::BadValue,
-            str::stream() << "Invalid namespace " << getNss().toStringForErrorMsg(),
-            getNss().isValid());
-    if (!getPre22CompatibleEpoch()) {
-        setPre22CompatibleEpoch(OID());
+            str::stream() << "Invalid namespace " << result.getNss().toStringForErrorMsg(),
+            result.getNss().isValid());
+    if (!result.getPre22CompatibleEpoch()) {
+        result.setPre22CompatibleEpoch(OID());
     }
+    return result;
 }
 
 std::string CollectionType::toString() const {
@@ -78,15 +84,22 @@ void CollectionType::setEpoch(OID epoch) {
 
 void CollectionType::setDefaultCollation(const BSONObj& defaultCollation) {
     if (!defaultCollation.isEmpty()) {
-        CollectionTypeBase::setDefaultCollation(defaultCollation);
+        GlobalCatalogCollectionTypeBase::setDefaultCollation(defaultCollation);
     } else {
-        CollectionTypeBase::setDefaultCollation(boost::none);
+        GlobalCatalogCollectionTypeBase::setDefaultCollation(boost::none);
     }
 }
 
 void CollectionType::setMaxChunkSizeBytes(int64_t value) {
     uassert(ErrorCodes::BadValue, "Default chunk size is out of range", value > 0);
-    CollectionTypeBase::setMaxChunkSizeBytes(value);
+    GlobalCatalogCollectionTypeBase::setMaxChunkSizeBytes(value);
+}
+
+BSONObj CollectionType::toShardCatalogBSON() const {
+    BSONObjBuilder builder;
+    getCommonCollectionBase().serialize(&builder);
+    getCommonCollectionBaseIncomparable().serialize(&builder);
+    return builder.obj();
 }
 
 }  // namespace mongo

@@ -717,7 +717,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionName
     const auto db =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
     b.appendRegex(CollectionType::kNssFieldName, fmt::format("^{}\\.", pcre_util::quoteMeta(db)));
-    b.append(CollectionTypeBase::kUnsplittableFieldName, BSON("$ne" << true));
+    b.append(GlobalCatalogCollectionTypeBase::kUnsplittableFieldName, BSON("$ne" << true));
 
     auto collDocs =
         uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
@@ -732,7 +732,8 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionName
     std::vector<NamespaceString> collections;
     collections.reserve(collDocs.size());
     for (const BSONObj& obj : collDocs) {
-        auto coll = CollectionTypeBase::parse(obj, IDLParserContext("getShardedCollectionsForDb"));
+        auto coll = GlobalCatalogCollectionTypeBase::parse(
+            obj, IDLParserContext("getShardedCollectionsForDb"));
         collections.emplace_back(coll.getNss());
     }
 
@@ -764,7 +765,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
     const auto db =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
     b.appendRegex(CollectionType::kNssFieldName, fmt::format("^{}\\.", pcre_util::quoteMeta(db)));
-    b.append(CollectionTypeBase::kUnsplittableFieldName, true);
+    b.append(GlobalCatalogCollectionTypeBase::kUnsplittableFieldName, true);
 
     auto collDocs =
         uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
@@ -779,8 +780,8 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
     std::vector<NamespaceString> collections;
     collections.reserve(collDocs.size());
     for (const BSONObj& obj : collDocs) {
-        auto coll =
-            CollectionTypeBase::parse(obj, IDLParserContext("getAllUnsplittableCollectionsForDb"));
+        auto coll = GlobalCatalogCollectionTypeBase::parse(
+            obj, IDLParserContext("getAllUnsplittableCollectionsForDb"));
         collections.emplace_back(coll.getNss());
     }
 

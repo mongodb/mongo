@@ -120,10 +120,10 @@ void writeCollectionMetadataLocally(OperationContext* opCtx,
     DBDirectClient dbClient(opCtx);
 
     auto serializedNs = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
-    executeLocalUpdates(
-        dbClient,
-        NamespaceString::kConfigShardCatalogCollectionsNamespace,
-        {makeUpsertEntry(BSON(CollectionType::kNssFieldName << serializedNs), coll.toBSON())});
+    executeLocalUpdates(dbClient,
+                        NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                        {makeUpsertEntry(BSON(CollectionType::kNssFieldName << serializedNs),
+                                         coll.toShardCatalogBSON())});
 
     tassert(
         10281500, "Expected to find at least one chunk for a tracked collection", !chunks.empty());

@@ -20,7 +20,7 @@ function getChunksMetadataFromGlobalCatalog(uuid) {
 // Helper: Validate that the collection metadata from the shard catalog matches expected.
 function validateCollectionMetadataFromShardCatalog(ns, shard, expectedCollMetadata) {
     const collMetadataFromShard = shard.getDB("config").getCollection("shard.catalog.collections").findOne({_id: ns});
-    assert.eq(expectedCollMetadata, collMetadataFromShard, "Mismatch in collection metadata for namespace: " + ns);
+    assert.docEq(expectedCollMetadata, collMetadataFromShard, "Mismatch in collection metadata for namespace: " + ns);
 }
 
 // Helper: Validate that the chunks metadata from the shard catalog matches expected.

@@ -51,22 +51,13 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
     // the CSRS to refresh the chunks. Right now it's fully restoring everything from disk. The sort
     // that happens afterwards should also go away as a result.
 
-    // TODO SERVER-119940: Review whether we need to parse only a subset of the information present
-    // on the collection. Right now we're parsing it fully as if we're the CSRS even if never
-    // accessing certain fields.
-    struct CollectionParsed {
-        static CollectionParsed parse(const BSONObj& obj, const IDLParserContext&) {
-            return {CollectionType{obj}};
-        }
-        CollectionType content;
-    };
-    PersistentTaskStore<CollectionParsed> collStore{
+    PersistentTaskStore<CollectionType> collStore{
         NamespaceString::kConfigShardCatalogCollectionsNamespace};
     boost::optional<CollectionType> coll;
     collStore.forEach(opCtx,
                       BSON(CollectionType::kNssFieldName << nss.toStringForResourceId()),
-                      [&](const CollectionParsed& parsedColl) {
-                          coll = parsedColl.content;
+                      [&](const CollectionType& parsedColl) {
+                          coll = parsedColl;
                           return false;
                       });
 
@@ -76,9 +67,6 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
         return CollectionMetadata::UNTRACKED();
     }
 
-    // TODO SERVER-119940: Review whether we need to parse only a subset of the information present
-    // on the chunk. Right now we're parsing it fully as if we're the CSRS even if never accessing
-    // certain fields.
     std::vector<ChunkType> chunks;
     PersistentTaskStore<ChunkType> chunkStore{NamespaceString::kConfigShardCatalogChunksNamespace};
     chunkStore.forEach(

@@ -91,53 +91,54 @@ using ReshardingFields MONGO_MOD_NEEDS_REPLACEMENT = TypeCollectionReshardingFie
  *   }
  *
  */
-class MONGO_MOD_NEEDS_REPLACEMENT CollectionType : private CollectionTypeBase {
+class MONGO_MOD_NEEDS_REPLACEMENT CollectionType : private GlobalCatalogCollectionTypeBase {
 public:
     // Make field names accessible.
     static constexpr auto kEpochFieldName = kPre22CompatibleEpochFieldName;
 
-    using CollectionTypeBase::kAllowMigrationsFieldName;
-    using CollectionTypeBase::kDefaultCollationFieldName;
-    using CollectionTypeBase::kDefragmentationPhaseFieldName;
-    using CollectionTypeBase::kDefragmentCollectionFieldName;
-    using CollectionTypeBase::kEnableAutoMergeFieldName;
-    using CollectionTypeBase::kKeyPatternFieldName;
-    using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
-    using CollectionTypeBase::kNoBalanceFieldName;
-    using CollectionTypeBase::kNssFieldName;
-    using CollectionTypeBase::kPermitMigrationsFieldName;
-    using CollectionTypeBase::kReshardingFieldsFieldName;
-    using CollectionTypeBase::kTimeseriesFieldsFieldName;
-    using CollectionTypeBase::kTimestampFieldName;
-    using CollectionTypeBase::kUniqueFieldName;
-    using CollectionTypeBase::kUnsplittableFieldName;
-    using CollectionTypeBase::kUpdatedAtFieldName;
-    using CollectionTypeBase::kUuidFieldName;
+    using GlobalCatalogCollectionTypeBase::kAllowMigrationsFieldName;
+    using GlobalCatalogCollectionTypeBase::kDefaultCollationFieldName;
+    using GlobalCatalogCollectionTypeBase::kDefragmentationPhaseFieldName;
+    using GlobalCatalogCollectionTypeBase::kDefragmentCollectionFieldName;
+    using GlobalCatalogCollectionTypeBase::kEnableAutoMergeFieldName;
+    using GlobalCatalogCollectionTypeBase::kKeyPatternFieldName;
+    using GlobalCatalogCollectionTypeBase::kMaxChunkSizeBytesFieldName;
+    using GlobalCatalogCollectionTypeBase::kNoBalanceFieldName;
+    using GlobalCatalogCollectionTypeBase::kNssFieldName;
+    using GlobalCatalogCollectionTypeBase::kPermitMigrationsFieldName;
+    using GlobalCatalogCollectionTypeBase::kReshardingFieldsFieldName;
+    using GlobalCatalogCollectionTypeBase::kTimeseriesFieldsFieldName;
+    using GlobalCatalogCollectionTypeBase::kTimestampFieldName;
+    using GlobalCatalogCollectionTypeBase::kUniqueFieldName;
+    using GlobalCatalogCollectionTypeBase::kUnsplittableFieldName;
+    using GlobalCatalogCollectionTypeBase::kUpdatedAtFieldName;
+    using GlobalCatalogCollectionTypeBase::kUuidFieldName;
 
     // Make getters and setters accessible.
-    using CollectionTypeBase::getDefragmentationPhase;
-    using CollectionTypeBase::getKeyPattern;
-    using CollectionTypeBase::getMaxChunkSizeBytes;
-    using CollectionTypeBase::getNss;
-    using CollectionTypeBase::getReshardingFields;
-    using CollectionTypeBase::getTimeseriesFields;
-    using CollectionTypeBase::getTimestamp;
-    using CollectionTypeBase::getUnique;
-    using CollectionTypeBase::getUnsplittable;
-    using CollectionTypeBase::getUpdatedAt;
-    using CollectionTypeBase::getUuid;
-    using CollectionTypeBase::setDefragmentationPhase;
-    using CollectionTypeBase::setDefragmentCollection;
-    using CollectionTypeBase::setKeyPattern;
-    using CollectionTypeBase::setNss;
-    using CollectionTypeBase::setReshardingFields;
-    using CollectionTypeBase::setTimeseriesFields;
-    using CollectionTypeBase::setTimestamp;
-    using CollectionTypeBase::setUnique;
-    using CollectionTypeBase::setUnsplittable;
-    using CollectionTypeBase::setUpdatedAt;
-    using CollectionTypeBase::setUuid;
-    using CollectionTypeBase::toBSON;
+    using GlobalCatalogCollectionTypeBase::getCommonCollectionBase;
+    using GlobalCatalogCollectionTypeBase::getDefragmentationPhase;
+    using GlobalCatalogCollectionTypeBase::getKeyPattern;
+    using GlobalCatalogCollectionTypeBase::getMaxChunkSizeBytes;
+    using GlobalCatalogCollectionTypeBase::getNss;
+    using GlobalCatalogCollectionTypeBase::getReshardingFields;
+    using GlobalCatalogCollectionTypeBase::getTimeseriesFields;
+    using GlobalCatalogCollectionTypeBase::getTimestamp;
+    using GlobalCatalogCollectionTypeBase::getUnique;
+    using GlobalCatalogCollectionTypeBase::getUnsplittable;
+    using GlobalCatalogCollectionTypeBase::getUpdatedAt;
+    using GlobalCatalogCollectionTypeBase::getUuid;
+    using GlobalCatalogCollectionTypeBase::setDefragmentationPhase;
+    using GlobalCatalogCollectionTypeBase::setDefragmentCollection;
+    using GlobalCatalogCollectionTypeBase::setKeyPattern;
+    using GlobalCatalogCollectionTypeBase::setNss;
+    using GlobalCatalogCollectionTypeBase::setReshardingFields;
+    using GlobalCatalogCollectionTypeBase::setTimeseriesFields;
+    using GlobalCatalogCollectionTypeBase::setTimestamp;
+    using GlobalCatalogCollectionTypeBase::setUnique;
+    using GlobalCatalogCollectionTypeBase::setUnsplittable;
+    using GlobalCatalogCollectionTypeBase::setUpdatedAt;
+    using GlobalCatalogCollectionTypeBase::setUuid;
+    using GlobalCatalogCollectionTypeBase::toBSON;
 
     CollectionType(NamespaceString nss,
                    OID epoch,
@@ -150,6 +151,8 @@ public:
 
     CollectionType() = default;
 
+    static CollectionType parse(const BSONObj& obj, const IDLParserContext& ctx);
+
     std::string toString() const;
 
     const OID& getEpoch() const {
@@ -158,7 +161,7 @@ public:
     void setEpoch(OID epoch);
 
     BSONObj getDefaultCollation() const {
-        return CollectionTypeBase::getDefaultCollation().get_value_or(BSONObj());
+        return GlobalCatalogCollectionTypeBase::getDefaultCollation().get_value_or(BSONObj());
     }
 
     void setMaxChunkSizeBytes(int64_t value);
@@ -166,7 +169,7 @@ public:
     void setDefaultCollation(const BSONObj& defaultCollation);
 
     bool getDefragmentCollection() const {
-        return CollectionTypeBase::getDefragmentCollection().get_value_or(false);
+        return GlobalCatalogCollectionTypeBase::getDefragmentCollection().get_value_or(false);
     }
 
     bool getAllowBalance() const {
@@ -174,20 +177,26 @@ public:
     }
 
     bool getAllowMigrations() const {
-        return CollectionTypeBase::getAllowMigrations().get_value_or(true);
+        return GlobalCatalogCollectionTypeBase::getAllowMigrations().get_value_or(true);
     }
 
     void setAllowMigrations(bool allowMigrations) {
         if (allowMigrations)
-            CollectionTypeBase::setAllowMigrations(boost::none);
+            GlobalCatalogCollectionTypeBase::setAllowMigrations(boost::none);
         else
-            CollectionTypeBase::setAllowMigrations(false);
+            GlobalCatalogCollectionTypeBase::setAllowMigrations(false);
     }
 
     // TODO SERVER-61033: remove after permitMigrations have been merge with allowMigrations.
     bool getPermitMigrations() const {
-        return CollectionTypeBase::getPermitMigrations().get_value_or(true);
+        return GlobalCatalogCollectionTypeBase::getPermitMigrations().get_value_or(true);
     }
+
+    /**
+     * Serializes the Collection entry for writes into the config.shard.catalog.collections
+     * collection.
+     */
+    BSONObj toShardCatalogBSON() const;
 };
 
 }  // namespace mongo
