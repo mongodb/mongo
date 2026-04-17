@@ -315,4 +315,7 @@
                                                                                                    \
     /*  Namespace used for container oplog entries. */                                             \
     X(kContainerNamespace, DatabaseName::kAdmin, "$container"_sd)                                  \
-    /**/
+                                                                                                   \
+    /*  Namespace used for the log of all actions taken within a sharded cluster */                \
+    X(kConfigActionlogNamespace, DatabaseName::kConfig, "actionlog"_sd)
+/**/

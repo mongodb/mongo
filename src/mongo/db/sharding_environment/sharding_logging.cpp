@@ -62,7 +62,6 @@ namespace mongo {
 
 namespace {
 
-const std::string kActionLogCollectionName("actionlog");
 const int kActionLogCollectionSizeMB = 20 * 1024 * 1024;
 const int kChangeLogCollectionSizeMB = 200 * 1024 * 1024;
 
@@ -90,11 +89,12 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
     auto catalogClientToUse = catalogClient ? catalogClient : Grid::get(opCtx)->catalogClient();
 
     if (_actionLogCollectionCreated.load() == 0) {
-        Status result = _createCappedConfigCollection(opCtx,
-                                                      kActionLogCollectionName,
-                                                      kActionLogCollectionSizeMB,
-                                                      defaultMajorityWriteConcernDoNotUse(),
-                                                      std::move(configShardToUse));
+        Status result =
+            _createCappedConfigCollection(opCtx,
+                                          NamespaceString::kConfigActionlogNamespace.coll(),
+                                          kActionLogCollectionSizeMB,
+                                          defaultMajorityWriteConcernDoNotUse(),
+                                          std::move(configShardToUse));
         if (result.isOK()) {
             _actionLogCollectionCreated.store(1);
         } else {
@@ -104,7 +104,7 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
     }
 
     return _log(opCtx,
-                kActionLogCollectionName,
+                NamespaceString::kConfigActionlogNamespace.coll(),
                 what,
                 ns,
                 detail,
