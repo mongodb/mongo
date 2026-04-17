@@ -33,10 +33,12 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
@@ -185,6 +187,41 @@ RangeDeletionTask ReadyRangeDeletionsProcessor::_peekFront() const {
     return _queue.front();
 }
 
+// TODO: SERVER-123812 refactor connection between range deleter and resharding
+bool ReadyRangeDeletionsProcessor::_shouldDeferRangeDeletionForResharding(NamespaceString nss,
+                                                                          OperationContext* opCtx) {
+    // the FCV could change after this snapshot is taken, but since deferring range deletions
+    // is a best-effort optimization and not a safety issue, we accept this limitation
+    auto ff = resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto rsOp = LocalReshardingOperationsRegistry::get().getOperation(nss).has_value();
+
+    return ff && rsOp;
+}
+
+void ReadyRangeDeletionsProcessor::_rescheduleRangeDeletion(const RangeDeletionTask& task,
+                                                            Seconds delay,
+                                                            StringData reason) {
+    _completedRangeDeletion();
+
+    sleepFor(_executor, delay).getAsync([this, task, reason](Status status) {
+        if (!status.isOK()) {
+            LOGV2_WARNING(9962300,
+                          "Encountered an error while rescheduling a range deletion task",
+                          "reason"_attr = reason,
+                          "status"_attr = status,
+                          "task"_attr = task.toBSON());
+            // We don't need to re-emplace the range deletion task if the executor shuts down
+            // because the task is still persisted to disk. When the next executor for
+            // RangeDeleterService starts up, it wil reschedule tasks based on the disk
+            return;
+        }
+
+        emplaceRangeDeletion(task);
+    });
+}
+
 void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
     ThreadClient threadClient(kRangeDeletionThreadName, _service->getService());
 
@@ -220,8 +257,6 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
             }
         }
 
-        // Once passing this check, the range deletion will be processed without being halted, even
-        // if the range deleter gets disabled halfway through.
         if (RangeDeleterService::get(opCtx)->isDisabled()) {
             MONGO_IDLE_THREAD_BLOCK;
             sleepFor(kCheckForEnabledServiceInterval);
@@ -234,6 +269,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
         const auto range = task.getRange();
         const auto optKeyPattern = task.getKeyPattern();
 
+
         // A task is considered completed when all the following conditions are met:
         // - All orphans have been deleted
         // - The deletions have been majority committed
@@ -241,23 +277,38 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
         bool taskCompleted = false;
         while (!taskCompleted) {
             try {
-                // Perform the actual range deletion
                 bool orphansRemovalCompleted = false;
+                NamespaceString possiblyStaleNss;
+                try {
+                    // Should only use possiblyStaleNss for logging and the initial resharding check
+                    // collectionUUID is the source of truth for range deletions
+                    possiblyStaleNss =
+                        AutoGetCollection(
+                            opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS)
+                            .getNss();
+                    if (_shouldDeferRangeDeletionForResharding(possiblyStaleNss, opCtx)) {
+                        LOGV2_INFO(11485100,
+                                   "Range deletion task paused for namespace while "
+                                   "resharding takes place",
+                                   "namespace"_attr = possiblyStaleNss,
+                                   "collectionUUID"_attr = collectionUuid.toString(),
+                                   "task"_attr = task.toBSON());
+
+                        _rescheduleRangeDeletion(
+                            task, kCheckForEnabledServiceInterval, "active resharding"_sd);
+                        break;
+                    }
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // no range deletions will occur if the collection doesn't exist,
+                    // but we still need to delete the persistent range deletion task
+                    orphansRemovalCompleted = true;
+                }
+                // Perform the actual range deletion
                 while (!orphansRemovalCompleted) {
                     try {
-                        NamespaceString nss;
-                        {
-                            AutoGetCollection collection(
-                                opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS);
-                            // It's possible for the namespace to become outdated if a concurrent
-                            // rename of collection occurs, because rangeDeletion is not
-                            // synchronized with DDL operations. We are using the nss variable
-                            // solely for logging purposes.
-                            nss = collection.getNss();
-                        }
                         LOGV2_INFO(6872501,
                                    "Beginning deletion of documents in orphan range",
-                                   "namespace"_attr = nss,
+                                   "namespace"_attr = possiblyStaleNss,
                                    "collectionUUID"_attr = collectionUuid.toString(),
                                    "range"_attr = redact(range.toString()));
 
@@ -279,15 +330,12 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                                     batchOpCtx, dbName, collectionUuid, shardKeyPattern, range));
                             LOGV2_INFO(9239400,
                                        "Finished deletion of documents in orphan range",
-                                       "namespace"_attr = nss,
+                                       "namespace"_attr = possiblyStaleNss,
                                        "collectionUUID"_attr = collectionUuid.toString(),
                                        "range"_attr = redact(range.toString()),
                                        "docsDeleted"_attr = numDocsAndBytesDeleted.first,
                                        "bytesDeleted"_attr = numDocsAndBytesDeleted.second);
                         }
-                        orphansRemovalCompleted = true;
-                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                        // No orphaned documents to remove from a dropped collection
                         orphansRemovalCompleted = true;
                     } catch (ExceptionFor<
                              ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist>&) {
@@ -368,22 +416,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                 // built on the shard key. This situation is expected for a hashed shard key and
                 // recoverable for a range shard key. This index may be rebuilt in the future, so
                 // reschedule the task at the end of the queue.
-                _completedRangeDeletion();
-
-                sleepFor(_executor, kMissingIndexRetryInterval)
-                    .getAsync([this, task](Status status) {
-                        if (!status.isOK()) {
-                            LOGV2_WARNING(9962300,
-                                          "Encountered an error while retrying a range deletion "
-                                          "task that previously failed due to missing index",
-                                          "status"_attr = status,
-                                          "task"_attr = task.toBSON());
-                            return;
-                        }
-
-                        emplaceRangeDeletion(task);
-                    });
-
+                _rescheduleRangeDeletion(task, kMissingIndexRetryInterval, "missing index"_sd);
                 break;
             } catch (const DBException&) {
                 // Release the thread only in case the operation context has been interrupted, as

@@ -88,6 +88,16 @@ private:
      */
     RangeDeletionTask _peekFront() const;
 
+
+    bool _shouldDeferRangeDeletionForResharding(NamespaceString nss, OperationContext* opCtx);
+
+    /**
+     * Pops the current task from the queue and re-enqueues it after the given delay. If the
+     * executor is shutting down, the task is not re-enqueued (it will be recovered from disk on
+     * the next step-up).
+     */
+    void _rescheduleRangeDeletion(const RangeDeletionTask& task, Seconds delay, StringData reason);
+
     ServiceContext* const _service;
 
     mutable stdx::mutex _mutex;
