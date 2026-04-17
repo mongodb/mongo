@@ -190,6 +190,7 @@ teams:
   - name: "Server Programmability"
     slack_tags:
       - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+      - "<@U0AMLD1C9J7>" # gabriel.spil@mongodb.com - Lead
     thresholds: # reduced thresholds for C&I teams
       hot: 3
       cold: 5
