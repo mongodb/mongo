@@ -404,12 +404,20 @@ public:
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
 
                 // TODO(SERVER-117546): Use a truncate rather than individual deletes.
-                for (int64_t current = deleteRangeStart; current < deleteRangeEnd; ++current) {
+                for (int64_t batchStart = deleteRangeStart; batchStart < deleteRangeEnd;
+                     batchStart += _batchSize) {
+                    auto batchEnd = std::min(batchStart + _batchSize, deleteRangeEnd);
                     writeConflictRetry(&_opCtx,
                                        _ru,
                                        "ContainerBasedSpiller::mergeSpills_remove",
                                        NamespaceString::kEmpty,
-                                       [&] { _containerBasedStorage().remove(current); });
+                                       [&] {
+                                           WriteUnitOfWork wuow{&_opCtx};
+                                           for (int64_t key = batchStart; key < batchEnd; ++key) {
+                                               _containerBasedStorage().remove(key);
+                                           }
+                                           wuow.commit();
+                                       });
                 }
 
                 iters.push_back(writer->done());
