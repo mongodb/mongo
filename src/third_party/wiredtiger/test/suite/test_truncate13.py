@@ -27,14 +27,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from wiredtiger import stat
+from wiredtiger import disagg_fast_truncate_build, stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_truncate13.py
 # Test reading in the gaps created by a fast-delete.
-# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate13(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     conn_config = 'cache_size=50MB,statistics=(all),log=(enabled=false)'
@@ -66,6 +64,11 @@ class test_truncate13(wttest.WiredTigerTestCase):
         ('noadd', dict(add_data=False)),
     ]
     scenarios = make_scenarios(trunc_values, format_values, range_values, ts_values, add_values)
+
+    def setUp(self):
+        if self.runningHook('disagg') and disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled")
+        super().setUp()
 
     # Make all the values different to avoid having VLCS RLE condense the table.
     def mkdata(self, basevalue, i):

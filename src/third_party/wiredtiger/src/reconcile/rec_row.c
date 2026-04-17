@@ -571,7 +571,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
-        prev_dirty = __wt_atomic_cas_uint8_v(&ref->rec_state, WT_REF_REC_DIRTY, WT_REF_REC_CLEAN);
+        prev_dirty = __wt_atomic_cas_uint8_v(&ref->dirty_state, WT_REF_DIRTY, WT_REF_CLEAN);
 
         /*
          * FIXME-WT-15709: build delta for split pages.
@@ -628,12 +628,12 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
             }
 
             /*
-             * Set the ref_changes state to zero if there were no concurrent changes while
+             * Set the ref dirty state to clean if there were no concurrent changes while
              * reconciling the internal page.
              */
             if (WT_DELTA_INT_ENABLED(btree, S2C(session))) {
                 /* If there are concurrent changes to the first child, abort delta creation. */
-                if (__wt_atomic_load_uint8_v_acquire(&ref->rec_state) == WT_REF_REC_DIRTY &&
+                if (__wt_atomic_load_uint8_v_acquire(&ref->dirty_state) == WT_REF_DIRTY &&
                   build_delta && r->cell_zero)
                     __rec_stop_build_delta_int(r, &build_delta);
             }
@@ -654,12 +654,12 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                 }
 
                 /*
-                 * Set the ref_changes state to zero if there were no concurrent changes while
+                 * Set the ref dirty state to clean if there were no concurrent changes while
                  * reconciling the internal page.
                  */
                 if (WT_DELTA_INT_ENABLED(btree, S2C(session))) {
                     /* If there are concurrent changes to the first child, abort delta creation. */
-                    if (__wt_atomic_load_uint8_v_acquire(&ref->rec_state) == WT_REF_REC_DIRTY &&
+                    if (__wt_atomic_load_uint8_v_acquire(&ref->dirty_state) == WT_REF_DIRTY &&
                       build_delta && r->cell_zero)
                         __rec_stop_build_delta_int(r, &build_delta);
                 }
@@ -672,12 +672,12 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                 WT_ERR(__rec_row_merge(session, r, ref, prev_dirty, &build_delta));
 
                 /*
-                 * Set the ref_changes state to zero if there were no concurrent changes while
+                 * Set the ref dirty state to clean if there were no concurrent changes while
                  * reconciling the internal page.
                  */
                 if (WT_DELTA_INT_ENABLED(btree, S2C(session))) {
                     /* If there are concurrent changes to the first child, abort delta creation. */
-                    if (__wt_atomic_load_uint8_v_acquire(&ref->rec_state) == WT_REF_REC_DIRTY &&
+                    if (__wt_atomic_load_uint8_v_acquire(&ref->dirty_state) == WT_REF_DIRTY &&
                       build_delta && cell_zero_tmp)
                         __rec_stop_build_delta_int(r, &build_delta);
                 }
@@ -805,12 +805,12 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
             WT_ERR(__rec_pack_delta_row_int(session, r, key, val, &ta));
 
         /*
-         * Set the ref_changes state to zero if there were no concurrent changes while reconciling
+         * Set the ref dirty state to clean if there were no concurrent changes while reconciling
          * the internal page.
          */
         if (WT_DELTA_INT_ENABLED(btree, S2C(session))) {
             /* If there are concurrent changes to the first child, abort delta creation. */
-            if (__wt_atomic_load_uint8_v_acquire(&ref->rec_state) == WT_REF_REC_DIRTY &&
+            if (__wt_atomic_load_uint8_v_acquire(&ref->dirty_state) == WT_REF_DIRTY &&
               build_delta && r->cell_zero)
                 __rec_stop_build_delta_int(r, &build_delta);
         }

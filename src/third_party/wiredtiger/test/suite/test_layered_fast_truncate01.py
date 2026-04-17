@@ -48,6 +48,11 @@ class test_layered_fast_truncate01(wttest.WiredTigerTestCase):
 
     nitems = 1000
 
+    def setUp(self):
+        if wiredtiger.disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled.")
+        super().setUp()
+
     def session_create_config(self):
         cfg = 'key_format=S,value_format=S'
         if self.uri.startswith('table'):
@@ -55,8 +60,6 @@ class test_layered_fast_truncate01(wttest.WiredTigerTestCase):
         return cfg
 
     def test_truncate_basic(self):
-        if (wiredtiger.disagg_fast_truncate_build() == 0):
-            self.skipTest("fast truncate support is not enabled.")
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri)
@@ -110,8 +113,6 @@ class test_layered_fast_truncate01(wttest.WiredTigerTestCase):
 
 
     def test_truncate_rollback(self):
-        if (wiredtiger.disagg_fast_truncate_build() == 0):
-            self.skipTest("fast truncate support is not enabled.")
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri)
@@ -152,8 +153,6 @@ class test_layered_fast_truncate01(wttest.WiredTigerTestCase):
         c2.close()
 
     def test_truncate_write_conflict_1(self):
-        if (wiredtiger.disagg_fast_truncate_build() == 0):
-            self.skipTest("fast truncate support is not enabled.")
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri)
@@ -198,8 +197,6 @@ class test_layered_fast_truncate01(wttest.WiredTigerTestCase):
         c2.close()
 
     def test_truncate_write_conflict_2(self):
-        if (wiredtiger.disagg_fast_truncate_build() == 0):
-            self.skipTest("fast truncate support is not enabled.")
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri)

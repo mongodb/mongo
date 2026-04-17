@@ -27,15 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
+from wiredtiger import disagg_fast_truncate_build, stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_truncate10.py
 #
 # Check that nothing comes unstuck if we commit a truncate with durable > commit.
-# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate10(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
     session_config = 'isolation=snapshot'
@@ -67,6 +65,11 @@ class test_truncate10(wttest.WiredTigerTestCase):
     ]
 
     scenarios = make_scenarios(trunc_values, format_values, stable_values, checkpoint_values)
+
+    def setUp(self):
+        if self.runningHook('disagg') and disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled")
+        super().setUp()
 
     def truncate(self, uri, make_key, keynum1, keynum2):
         if self.trunc_with_remove:

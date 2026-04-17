@@ -237,12 +237,7 @@ __wt_schema_close_layered(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered)
     /* Remove the ingest handle from layered table manager list */
     __wt_layered_table_manager_remove_table(session, layered->ingest_btree_id);
 
-    /*
-     * Clear truncate list.
-     *
-     * FIXME-WT-16798: In follower mode, layered dhandles with active truncates should not be
-     * removed.
-     */
+    /* Clear truncate list. */
     __wt_layered_table_truncate_clear(session, layered);
     __wt_rwlock_destroy(session, &layered->truncate_lock);
 

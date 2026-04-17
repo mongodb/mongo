@@ -33,10 +33,9 @@
 import threading, time, wttest
 from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
-from wiredtiger import stat
+from wiredtiger import disagg_fast_truncate_build, stat
 from wtthread import checkpoint_thread
-# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
+
 class test_truncate11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all),statistics_log=(json,on_close,wait=1),timing_stress_for_test=[checkpoint_slow]'
 
@@ -46,6 +45,11 @@ class test_truncate11(wttest.WiredTigerTestCase):
     ]
 
     scenarios = make_scenarios(format_values)
+
+    def setUp(self):
+        if self.runningHook('disagg') and disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled")
+        super().setUp()
 
     @wttest.skip_for_hook("tiered", "test depends on regular checkpoints running")
     def test_truncate11(self):

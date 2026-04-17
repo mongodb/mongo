@@ -29,14 +29,12 @@
 import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from wiredtiger import stat
+from wiredtiger import disagg_fast_truncate_build, stat
 from helper import simulate_crash_restart
 
 # test_checkpoint34.py
 #
 # Test precise checkpoint with fast truncate
-# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "FIXME-WT-15430: fast truncate is not supported for disagg yet")
 @wttest.skip_for_hook("tiered", "fast truncate is not supported for tiered yet")
 class test_checkpoint34(wttest.WiredTigerTestCase):
 
@@ -48,6 +46,11 @@ class test_checkpoint34(wttest.WiredTigerTestCase):
     conn_config = "precise_checkpoint=true"
 
     scenarios = make_scenarios(format_values)
+
+    def setUp(self):
+        if self.runningHook('disagg') and disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled")
+        super().setUp()
 
     def get_fast_truncated_pages(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)

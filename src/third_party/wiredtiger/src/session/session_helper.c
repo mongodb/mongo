@@ -38,6 +38,8 @@ __wt_session_array_walk(WT_SESSION_IMPL *session,
      * array usage pattern in the architecture guide for more details.
      */
     WT_READ_ONCE(session_cnt, conn->session_array.cnt);
+    WT_ASSERT(session, session_cnt <= conn->session_array.size);
+    WT_ASSERT(session, WT_CONN_SESSIONS_GET(conn) != NULL);
 
     for (i = 0, array_session = WT_CONN_SESSIONS_GET(conn); i < session_cnt; i++, array_session++) {
         /*
@@ -56,6 +58,7 @@ __wt_session_array_walk(WT_SESSION_IMPL *session,
         if (skip_internal && F_ISSET(array_session, WT_SESSION_INTERNAL))
             continue;
 
+        WT_ASSERT(session, array_session->hazards.arr != NULL);
         WT_RET(walk_func(session, array_session, &exit_walk, cookiep));
         /* Early exit the walk if possible. */
         if (exit_walk)

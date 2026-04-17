@@ -1090,7 +1090,7 @@ __txn_resolve_prepared_update_chain(
     }
 
     /* Resolve the prepared update to be a committed update. */
-    __txn_apply_prepare_state_update(session, upd, true);
+    __txn_apply_prepare_state_update(session, upd, txn_time_point, true);
 
     /* Sleep for 1 second in the prepared resolution path if configured. */
     if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
@@ -1099,11 +1099,11 @@ __txn_resolve_prepared_update_chain(
 }
 
 /*
- * __txn_resolve_prepared_op --
+ * __wt_txn_resolve_prepared_op --
  *     Resolve a transaction's operations indirect references.
  */
-static int
-__txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
+int
+__wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
   WT_TXN_TIME_POINT *txn_time_point, WT_ITEM *key, uint64_t recno, bool commit, WT_CURSOR **cursorp)
 {
     WT_CURSOR *hs_cursor;
@@ -1210,7 +1210,8 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
      * prepared update on the disk image.
      */
     if (F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS) &&
-      (upd->type != WT_UPDATE_TOMBSTONE || (upd->next != NULL && upd->txnid == upd->next->txnid)))
+      (upd->type != WT_UPDATE_TOMBSTONE ||
+        (upd->next != NULL && F_ISSET(upd->next, WT_UPDATE_PREPARE_RESTORED_FROM_DS))))
         resolve_case = RESOLVE_PREPARE_ON_DISK;
     else if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
         resolve_case = RESOLVE_IN_MEMORY;
@@ -1594,7 +1595,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                         key = &op->u.op_row.key;
                     else
                         recno = op->u.op_col.recno;
-                    WT_ERR(__txn_resolve_prepared_op(
+                    WT_ERR(__wt_txn_resolve_prepared_op(
                       session, op->btree, &txn->time_point, key, recno, true, &cursor));
                 }
 
@@ -1962,7 +1963,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 
             ++prepared_updates;
 
-            __txn_apply_prepare_state_update(session, upd, false);
+            __txn_apply_prepare_state_update(session, upd, &session->txn->time_point, false);
             op->u.op_upd = NULL;
 
             /*
@@ -2112,7 +2113,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[], bool api_call)
                         key = &op->u.op_row.key;
                     else
                         recno = op->u.op_col.recno;
-                    WT_TRET(__txn_resolve_prepared_op(
+                    WT_TRET(__wt_txn_resolve_prepared_op(
                       session, op->btree, &txn->time_point, key, recno, false, &cursor));
                 }
 #ifdef HAVE_DIAGNOSTIC

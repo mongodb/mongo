@@ -1656,24 +1656,28 @@ err:
  *     Reserve a record in the tree.
  */
 int
-__wt_btcur_reserve(WT_CURSOR_BTREE *cbt)
+__wt_btcur_reserve(WT_CURSOR_BTREE *cbt, bool overwrite)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    bool overwrite;
+    bool old_overwrite;
 
     cursor = &cbt->iface;
     session = CUR2S(cbt);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_reserve);
 
-    /* WT_CURSOR.reserve is update-without-overwrite and a special value. */
-    overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
-    F_CLR(cursor, WT_CURSTD_OVERWRITE);
+    /*
+     * WT_CURSOR.reserve uses a special update type. Temporarily configure the overwrite flag (e.g.
+     * followers pass true so that reserve succeeds when the key exists only in the stable table and
+     * we update the ingest one).
+     */
+    old_overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
+    overwrite ? F_SET(cursor, WT_CURSTD_OVERWRITE) : F_CLR(cursor, WT_CURSTD_OVERWRITE);
     ret = __btcur_update(cbt, NULL, WT_UPDATE_RESERVE);
-    if (overwrite)
-        F_SET(cursor, WT_CURSTD_OVERWRITE);
+    old_overwrite ? F_SET(cursor, WT_CURSTD_OVERWRITE) : F_CLR(cursor, WT_CURSTD_OVERWRITE);
+
     return (ret);
 }
 

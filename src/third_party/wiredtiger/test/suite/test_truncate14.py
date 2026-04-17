@@ -28,14 +28,12 @@
 
 import wttest
 from helper import simulate_crash_restart
-from wiredtiger import stat, WT_NOTFOUND
+from wiredtiger import disagg_fast_truncate_build, stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_truncate14.py
 # Generate very large namespace gaps with truncate.
-# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate14(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     conn_config = 'cache_size=50MB,statistics=(all),log=(enabled=false)'
@@ -58,6 +56,11 @@ class test_truncate14(wttest.WiredTigerTestCase):
         ('checkpoint-visible', dict(action='checkpoint-visible')),
     ]
     scenarios = make_scenarios(trunc_values, format_values, action_values)
+
+    def setUp(self):
+        if self.runningHook('disagg') and disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled")
+        super().setUp()
 
     # Make all the values different to avoid having VLCS RLE condense the table.
     def mkdata(self, basevalue, i):

@@ -283,6 +283,8 @@
  */
 #define ATOMIC_CAS(ptr, oldp, newv) \
     __atomic_compare_exchange_n(ptr, oldp, newv, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define ATOMIC_CAS_RELAXED(ptr, oldp, newv) \
+    __atomic_compare_exchange_n(ptr, oldp, newv, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)
 
 #define WT_ATOMIC_FUNC_STORE_LOAD(suffix, _type)                                           \
     static inline _type __wt_atomic_load_##suffix##_relaxed(_type *vp)                     \
@@ -343,9 +345,18 @@
     {                                                                                          \
         return (ATOMIC_CAS(vp, &old, newv));                                                   \
     }                                                                                          \
+    static inline bool __wt_atomic_cas_##suffix##_relaxed(_type *vp, _type old, _type newv)    \
+    {                                                                                          \
+        return (ATOMIC_CAS_RELAXED(vp, &old, newv));                                           \
+    }                                                                                          \
     static inline bool __wt_atomic_cas_##suffix##_v(volatile _type *vp, _type old, _type newv) \
     {                                                                                          \
         return (ATOMIC_CAS(vp, &old, newv));                                                   \
+    }                                                                                          \
+    static inline bool __wt_atomic_cas_##suffix##_v_relaxed(                                   \
+      volatile _type *vp, _type old, _type newv)                                               \
+    {                                                                                          \
+        return (ATOMIC_CAS_RELAXED(vp, &old, newv));                                           \
     }
 
 #define WT_ATOMIC_FUNC(suffix, _type)                                                     \

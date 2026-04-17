@@ -8,6 +8,11 @@
 
 #pragma once
 
+/* Return true if the page modify structure references multiple blocks. */
+#define WT_REC_RESULT_MULTIBLOCK_SPLIT(page)                                         \
+    ((page)->modify != NULL && (page)->modify->rec_result == WT_PM_REC_MULTIBLOCK && \
+      (page)->modify->mod_multi_entries > 1)
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_REC_APP_EVICTION_SNAPSHOT 0x001u
 #define WT_REC_CALL_URGENT 0x002u

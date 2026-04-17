@@ -158,63 +158,83 @@ WT_RELEASE_BARRIER(void)
     {                                                                                          \
         return (__WT_ATOMIC_CAS_INTERNAL(vp, &old, newv));                                     \
     }                                                                                          \
+    static inline bool __wt_atomic_cas_##suffix##_relaxed(_type *vp, _type old, _type newv)    \
+    {                                                                                          \
+        return (__WT_ATOMIC_CAS_INTERNAL(vp, &old, newv));                                     \
+    }                                                                                          \
     static inline bool __wt_atomic_cas_##suffix##_v(volatile _type *vp, _type old, _type newv) \
+    {                                                                                          \
+        return (__WT_ATOMIC_CAS_INTERNAL(vp, &old, newv));                                     \
+    }                                                                                          \
+    static inline bool __wt_atomic_cas_##suffix##_v_relaxed(                                   \
+      volatile _type *vp, _type old, _type newv)                                               \
     {                                                                                          \
         return (__WT_ATOMIC_CAS_INTERNAL(vp, &old, newv));                                     \
     }
 
-#define WT_ATOMIC_FUNC(suffix, _type, s, t)                                                       \
-    static inline _type __wt_atomic_add_##suffix(_type *vp, _type v)                              \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                             \
-    }                                                                                             \
-    static inline _type __wt_atomic_add_##suffix##_relaxed(_type *vp, _type v)                    \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                             \
-    }                                                                                             \
-    static inline _type __wt_atomic_fetch_add_##suffix(_type *vp, _type v)                        \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)));                                   \
-    }                                                                                             \
-    static inline _type __wt_atomic_sub_##suffix(_type *vp, _type v)                              \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                              \
-    }                                                                                             \
-    static inline _type __wt_atomic_sub_##suffix##_relaxed(_type *vp, _type v)                    \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                              \
-    }                                                                                             \
-    static inline _type __wt_atomic_add_##suffix##_v(volatile _type *vp, _type v)                 \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                             \
-    }                                                                                             \
-    static inline _type __wt_atomic_add_##suffix##_v_relaxed(volatile _type *vp, _type v)         \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                             \
-    }                                                                                             \
-    static inline _type __wt_atomic_fetch_add_##suffix##_v(volatile _type *vp, _type v)           \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)));                                   \
-    }                                                                                             \
-    static inline _type __wt_atomic_sub_##suffix##_v(volatile _type *vp, _type v)                 \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                              \
-    }                                                                                             \
-    static inline _type __wt_atomic_sub_##suffix##_v_relaxed(volatile _type *vp, _type v)         \
-    {                                                                                             \
-        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                              \
-    }                                                                                             \
-    static inline bool __wt_atomic_cas_##suffix##_v(                                              \
-      volatile _type *vp, _type old_val, _type new_val)                                           \
-    {                                                                                             \
-        return (                                                                                  \
-          _InterlockedCompareExchange##s((t *)(vp), (t)(new_val), (t)(old_val)) == (t)(old_val)); \
-    }                                                                                             \
-    static inline bool __wt_atomic_cas_##suffix(_type *vp, _type old_val, _type new_val)          \
-    {                                                                                             \
-        return (                                                                                  \
-          _InterlockedCompareExchange##s((t *)(vp), (t)(new_val), (t)(old_val)) == (t)(old_val)); \
-    }                                                                                             \
+#define WT_ATOMIC_FUNC(suffix, _type, s, t)                                                        \
+    static inline _type __wt_atomic_add_##suffix(_type *vp, _type v)                               \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                              \
+    }                                                                                              \
+    static inline _type __wt_atomic_add_##suffix##_relaxed(_type *vp, _type v)                     \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                              \
+    }                                                                                              \
+    static inline _type __wt_atomic_fetch_add_##suffix(_type *vp, _type v)                         \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)));                                    \
+    }                                                                                              \
+    static inline _type __wt_atomic_sub_##suffix(_type *vp, _type v)                               \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                               \
+    }                                                                                              \
+    static inline _type __wt_atomic_sub_##suffix##_relaxed(_type *vp, _type v)                     \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                               \
+    }                                                                                              \
+    static inline _type __wt_atomic_add_##suffix##_v(volatile _type *vp, _type v)                  \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                              \
+    }                                                                                              \
+    static inline _type __wt_atomic_add_##suffix##_v_relaxed(volatile _type *vp, _type v)          \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                              \
+    }                                                                                              \
+    static inline _type __wt_atomic_fetch_add_##suffix##_v(volatile _type *vp, _type v)            \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)));                                    \
+    }                                                                                              \
+    static inline _type __wt_atomic_sub_##suffix##_v(volatile _type *vp, _type v)                  \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                               \
+    }                                                                                              \
+    static inline _type __wt_atomic_sub_##suffix##_v_relaxed(volatile _type *vp, _type v)          \
+    {                                                                                              \
+        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                               \
+    }                                                                                              \
+    static inline bool __wt_atomic_cas_##suffix##_v(                                               \
+      volatile _type *vp, _type old_val, _type new_val)                                            \
+    {                                                                                              \
+        return (                                                                                   \
+          _InterlockedCompareExchange##s((t *)(vp), (t)(new_val), (t)(old_val)) == (t)(old_val));  \
+    }                                                                                              \
+    static inline bool __wt_atomic_cas_##suffix##_v_relaxed(                                       \
+      volatile _type *vp, _type old_val, _type new_val)                                            \
+    {                                                                                              \
+        return (                                                                                   \
+          _InterlockedCompareExchange##s((t *)(vp), (t)(new_val), (t)(old_val)) == (t)(old_val));  \
+    }                                                                                              \
+    static inline bool __wt_atomic_cas_##suffix(_type *vp, _type old_val, _type new_val)           \
+    {                                                                                              \
+        return (                                                                                   \
+          _InterlockedCompareExchange##s((t *)(vp), (t)(new_val), (t)(old_val)) == (t)(old_val));  \
+    }                                                                                              \
+    static inline bool __wt_atomic_cas_##suffix##_relaxed(_type *vp, _type old_val, _type new_val) \
+    {                                                                                              \
+        return (                                                                                   \
+          _InterlockedCompareExchange##s((t *)(vp), (t)(new_val), (t)(old_val)) == (t)(old_val));  \
+    }                                                                                              \
     WT_ATOMIC_FUNC_STORE_LOAD(suffix, _type, s, t)
 
 WT_ATOMIC_FUNC(uint8, uint8_t, 8, char)

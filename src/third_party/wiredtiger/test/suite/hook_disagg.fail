@@ -29,18 +29,15 @@ test_hs_evict_race01.py # FIXME: WT-16872
 test_log03.py
 test_metadata_cursor01.py
 test_metadata_cursor04.py
-test_prepare11.py   # FIXME: WT-16483 cursor.reserve() is not supported for layered tables
 test_prepare28.py   # FIXME: WT-16872
 test_readonly01.py
 test_readonly03.py  # FIXME: WT-14582
-test_reserve.py     # FIXME: WT-16483 cursor.reserve() is not supported for layered tables
 test_shared_cache01.py
 test_stat01.py
 test_stat_log02.py
 test_sweep05
 test_timestamp26.py # FIXME: WT-16182
 test_truncate01.py # FIXME: WT-15474
-test_truncate21.py # FIXME: WT-15472
 test_truncate24.py # FIXME: WT-15473
 test_util01.py
 test_util02.py

@@ -104,5 +104,7 @@ class test_backup17(backup_base):
 
         # Assert that we recorded fewer lengths on the consolidated backup.
         self.assertLess(len(uri2_lens), len(uri1_lens))
-        # Assert that we recorded the same total data length for both.
-        self.assertEqual(sum(uri2_lens), sum(uri1_lens))
+        # Assert that the consolidated backup has roughly the same total data length.
+        # Internal operations (e.g. eviction splitting pages) can cause a small number of
+        # additional dirty blocks between backups, so allow a tolerance of a few granularity units.
+        self.assertAlmostEqual(sum(uri2_lens), sum(uri1_lens), delta=self.granval * 2)

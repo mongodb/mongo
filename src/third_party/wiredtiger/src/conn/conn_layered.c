@@ -1505,6 +1505,14 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
 
     /* FIXME-WT-14965: Exit the function immediately if this check returns false. */
     if (__wt_conn_is_disagg(session)) {
+        /*
+         * FIXME-WT-17177: Read-only connections are currently not supported with disaggregated
+         * storage.
+         */
+        if (F_ISSET(conn, WT_CONN_READONLY))
+            WT_ERR_MSG(session, ENOTSUP,
+              "disaggregated storage is not supported with read-only connections");
+
         WT_ERR(__wti_layered_table_manager_init(session));
 
         /* If we are starting as a primary, abandon a previous incomplete checkpoint. */

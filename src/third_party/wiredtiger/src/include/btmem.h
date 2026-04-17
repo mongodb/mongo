@@ -1161,18 +1161,17 @@ struct __wt_ref {
     wt_shared volatile uint32_t pindex_hint; /* Reference page index hint */
 
 /*
- * A flag used to track a ref has changed during internal page reconciliation. The value is compared
- * and swapped to WT_REF_REC_CLEAN for each internal page reconciliation. If the flag becomes
- * WT_REF_REC_DIRTY, this implies that the ref has been changed concurrently and that the ref
- * remains dirty after internal page reconciliation. It is possible for other operations such as
- * page splits and fast-truncate to concurrently mark WT_REF_REC_DIRTY to the ref, but depending on
- * timing or race conditions, it cannot be guaranteed that the new change is included as part of the
- * reconciliation. The page would need to be reconciled again to ensure that these modifications are
- * included.
+ * A flag used to track whether a ref has been dirtied while reconciling an internal page. The value
+ * is compared and swapped to WT_REF_CLEAN for each internal page reconciliation. If the flag
+ * becomes WT_REF_DIRTY, this implies that the ref has been changed concurrently and remains dirty
+ * after internal page reconciliation. Other operations, such as page splits and fast-truncate, can
+ * also concurrently mark the ref WT_REF_DIRTY, but depending on timing or race conditions, it
+ * cannot be guaranteed that the new change is included as part of the reconciliation. The page
+ * would need to be reconciled again to ensure that these modifications are included.
  */
-#define WT_REF_REC_CLEAN 0
-#define WT_REF_REC_DIRTY 1
-    wt_shared volatile uint8_t rec_state;
+#define WT_REF_CLEAN 0
+#define WT_REF_DIRTY 1
+    wt_shared volatile uint8_t dirty_state;
 
 /*
  * Define both internal- and leaf-page flags for now: we only need one, but it provides an easy way

@@ -15,6 +15,13 @@ static int __clayered_reset_cursors(WT_CURSOR_LAYERED *, bool);
 static int __clayered_search_near(WT_CURSOR *, int *);
 static int __clayered_adjust_state(WT_CURSOR_LAYERED *, bool, bool *);
 
+/* Operations passed to __clayered_put. */
+typedef enum {
+    WT_CLAYERED_PUT_INSERT,
+    WT_CLAYERED_PUT_UPDATE,
+    WT_CLAYERED_PUT_RESERVE,
+} WT_CLAYERED_PUT_OP;
+
 /*
  * __clayered_is_deleted_encoded --
  *     Check if the value starts with the tombstone.
@@ -1843,45 +1850,76 @@ err:
 }
 
 /*
+ * __clayered_reserve_constituent --
+ *     Reserve a key in the constituent cursor.
+ */
+static int
+__clayered_reserve_constituent(WT_SESSION_IMPL *session, WT_CURSOR *constituent)
+{
+    WT_DECL_RET;
+    CURSOR_UPDATE_API_CALL_BTREE(constituent, session, ret, reserve);
+
+    /*
+     * Pass overwrite=true for followers: a follower's ingest table may not contain the key yet (it
+     * lives only in the stable table), so we need overwrite mode to allow the reserve to succeed
+     * without the key being present in the update tree.
+     */
+    WT_ERR(__wt_btcur_reserve(
+      (WT_CURSOR_BTREE *)constituent, !S2C(session)->layered_table_manager.leader));
+
+err:
+    CURSOR_UPDATE_API_END_STAT(session, ret, cursor_reserve);
+
+    return (ret);
+}
+
+/*
  * __clayered_put --
  *     Put an entry into the desired tree.
  */
 static WT_INLINE int
 __clayered_put(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, const WT_ITEM *key,
-  const WT_ITEM *value, bool position, bool reserve)
+  const WT_ITEM *value, WT_CLAYERED_PUT_OP op)
 {
-    WT_CURSOR *c;
-    int (*func)(WT_CURSOR *);
 
-    if (S2C(session)->layered_table_manager.leader)
-        c = clayered->stable_cursor;
-    else {
+    bool leader = S2C(session)->layered_table_manager.leader;
+
+    if (!leader) {
         /*
          * FIXME-WT-16812: Investigate whether this function can be called below the cursor layer.
          * Doing so would remove the cursor write operation dependency on the truncate list.
          */
         WT_RET(__wt_layered_table_truncate_detect_write_conflict(
           session, (WT_LAYERED_TABLE *)clayered->dhandle, key));
-        c = clayered->ingest_cursor;
+
+        /*
+         * Clear the stable cursor position. Don't clear the ingest cursor: we're about to use it
+         * anyway. Keep the cursor position if we are in the middle of a cursor traversal.
+         */
+        if (!F_ISSET(clayered, WT_CLAYERED_ITERATE_NEXT | WT_CLAYERED_ITERATE_PREV))
+            WT_RET(__clayered_reset_cursors(clayered, true));
     }
 
-    /*
-     * Clear the stable cursor position. Don't clear the ingest cursor: we're about to use it
-     * anyway. Keep the cursor position if we are in the middle of a cursor traversal.
-     */
-    if (!F_ISSET(clayered, WT_CLAYERED_ITERATE_NEXT | WT_CLAYERED_ITERATE_PREV))
-        WT_RET(__clayered_reset_cursors(clayered, true));
-
+    WT_CURSOR *c = leader ? clayered->stable_cursor : clayered->ingest_cursor;
     c->set_key(c, key);
-    func = c->insert;
-    if (position)
-        func = reserve ? c->reserve : c->update;
-    if (func != c->reserve)
+    /* Reserve does not require a value. */
+    if (op != WT_CLAYERED_PUT_RESERVE)
         c->set_value(c, value);
-    WT_RET(func(c));
+
+    switch (op) {
+    case WT_CLAYERED_PUT_INSERT:
+        WT_RET(c->insert(c));
+        break;
+    case WT_CLAYERED_PUT_UPDATE:
+        WT_RET(c->update(c));
+        break;
+    case WT_CLAYERED_PUT_RESERVE:
+        WT_RET(__clayered_reserve_constituent(session, c));
+        break;
+    }
 
     /* If necessary, set the position for future scans. */
-    if (position)
+    if (op != WT_CLAYERED_PUT_INSERT)
         clayered->current_cursor = c;
 
     return (0);
@@ -2049,7 +2087,7 @@ __clayered_insert(WT_CURSOR *cursor)
     }
 
     WT_ERR(__clayered_deleted_encode(session, &cursor->value, &value, &buf));
-    WT_ERR(__clayered_put(session, clayered, &cursor->key, &value, false, false));
+    WT_ERR(__clayered_put(session, clayered, &cursor->key, &value, WT_CLAYERED_PUT_INSERT));
 
     /*
      * WT_CURSOR.insert doesn't leave the cursor positioned, and the application may want to free
@@ -2105,7 +2143,7 @@ __clayered_update(WT_CURSOR *cursor)
         WT_ERR(__cursor_needkey(cursor));
     }
     WT_ERR(__clayered_deleted_encode(session, &cursor->value, &value, &buf));
-    WT_ERR(__clayered_put(session, clayered, &cursor->key, &value, true, false));
+    WT_ERR(__clayered_put(session, clayered, &cursor->key, &value, WT_CLAYERED_PUT_UPDATE));
 
     /*
      * Set the cursor to reference the internal key/value of the positioned cursor.
@@ -2192,15 +2230,11 @@ __clayered_reserve(WT_CURSOR *cursor)
     WT_DECL_RET;
     WT_ITEM value;
     WT_SESSION_IMPL *session;
-    bool overwrite;
 
     WT_CLEAR(value);
     clayered = (WT_CURSOR_LAYERED *)cursor;
-    overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve, clayered->dhandle);
-
-    WT_ERR_MSG(session, ENOTSUP, "Reserve is not currently supported for layered cursors");
 
     /*
      * Since a search will be performed afterward that clears the iteration flags, no point to
@@ -2212,20 +2246,14 @@ __clayered_reserve(WT_CURSOR *cursor)
     __cursor_novalue(cursor);
     WT_ERR(__wt_txn_context_check(session, true));
 
-    /* WT_CURSOR.reserve is update-without-overwrite and a special value. */
-    F_CLR(cursor, WT_CURSTD_OVERWRITE);
-    WT_ERR(__clayered_enter(clayered, false, S2C(session)->layered_table_manager.leader, false));
+    WT_ERR(__clayered_enter(clayered, false, true, false));
+
+    /* WT_CURSOR.reserve is update-without-overwrite so we should check whether the key exists. */
     WT_ERR(__clayered_lookup(session, clayered, &value));
-    /*
-     * Copy the key out, since the insert resets non-primary chunk cursors which our lookup may have
-     * landed on.
-     */
-    WT_ERR(__cursor_needkey(cursor));
-    ret = __clayered_put(session, clayered, &cursor->key, NULL, true, true);
+
+    WT_ERR(__clayered_put(session, clayered, &cursor->key, NULL, WT_CLAYERED_PUT_RESERVE));
 
 err:
-    if (overwrite)
-        F_SET(cursor, WT_CURSTD_OVERWRITE);
     __clayered_leave(clayered);
     CURSOR_UPDATE_API_END(session, ret);
 

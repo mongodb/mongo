@@ -666,11 +666,11 @@ snap_repeat_single(TINFO *tinfo)
 }
 
 /*
- * snap_repeat_rollback --
+ * snap_repeat_stable --
  *     Repeat all known operations after a rollback.
  */
 void
-snap_repeat_rollback(WT_SESSION *session, TINFO **tinfo_array, size_t tinfo_count)
+snap_repeat_stable(WT_SESSION *session, TINFO **tinfo_array, size_t tinfo_count)
 {
     SNAP_OPS *snap;
     SNAP_STATE *state;

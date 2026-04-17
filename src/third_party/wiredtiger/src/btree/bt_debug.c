@@ -1219,7 +1219,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
     }
 
     if (mod != NULL) {
-        WT_RET(ds->f(ds, " | rec_state: "));
+        WT_RET(ds->f(ds, " | rec_result: "));
         switch (mod->rec_result) {
         case WT_PM_REC_EMPTY:
             WT_RET(ds->f(ds, "empty"));

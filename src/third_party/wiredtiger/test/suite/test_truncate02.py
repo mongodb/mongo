@@ -31,6 +31,7 @@
 #
 
 from test_truncate01 import test_truncate_base
+from wiredtiger import disagg_fast_truncate_build
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 import wttest
@@ -39,8 +40,6 @@ import wttest
 #       When deleting leaf pages that aren't in memory, we set transactional
 # information in the page's WT_REF structure, which results in interesting
 # issues.
-# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate_fast_delete(test_truncate_base):
     name = 'test_truncate'
     nentries = 10000
@@ -50,11 +49,13 @@ class test_truncate_fast_delete(test_truncate_base):
     types = [
         ('file', dict(type='file:', config=\
             'allocation_size=512,leaf_page_max=512')),
-        # FIXME-WT-15430 Re-enable the layered table scenario once disaggregated storage works with fast truncate tests.
-        # Consider whether we need this scenario here if the scenario is already defined in the test truncate base test.
-        # ('layered', dict(type='layered:', config=\
-        #     'allocation_size=512,leaf_page_max=512'))
     ]
+
+    if 'disagg' in wttest.WiredTigerTestCase.hook_names:
+        types += [
+            ('layered', dict(type='layered:',
+             config='allocation_size=512,leaf_page_max=512')),
+        ]
 
     # This is all about testing the btree layer, not the schema layer, test
     # files and ignore tables.
@@ -94,6 +95,11 @@ class test_truncate_fast_delete(test_truncate_base):
 
     scenarios = make_scenarios(types, keyfmt, overflow, reads, writes, txn,
                                prune=20, prunelong=1000)
+
+    def setUp(self):
+        if self.runningHook('disagg') and disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled")
+        super().setUp()
 
     # Return the number of records visible to the cursor; test both forward
     # and backward iteration, they are different code paths in this case.

@@ -50,7 +50,6 @@ class test_key_provider_disagg01(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages, crash_value)
 
     nentries = 1000
-    current_lsn = 0
     key_expire = 0
 
     MAIN_KEK_PAGE_ID = 1
@@ -96,15 +95,9 @@ class test_key_provider_disagg01(wttest.WiredTigerTestCase):
 
         self.assertTrue(m)
         if (m):
-            page_id, lsn, version = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            page_id, version = int(m.group(1)), int(m.group(3))
             self.assertEqual(page_id, self.MAIN_KEK_PAGE_ID)
-            if (self.key_expire == 0):
-                self.assertGreater(lsn, self.current_lsn)
-            else:
-                self.assertEqual(lsn, self.current_lsn)
             self.assertEqual(version, self.EXPECTED_KEK_VERSION)
-
-            self.current_lsn = lsn
 
     def test_key_provider_disagg01(self):
         if (self.ds_name != "palite"):

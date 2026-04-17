@@ -1219,6 +1219,8 @@ conn_dsrc_stats = [
     CacheStat('cache_eviction_hs_cursor_not_cached', 'history store cursor not cached during eviction'),
     CacheStat('cache_eviction_hs_shared_cursor_not_cached', 'shared history store cursor not cached during eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
+    CacheStat('cache_eviction_multiblock_checkpoint_flagged', 'pages with an unresolved multiblock split flagged by checkpoint to be evicted soon'),
+    CacheStat('cache_eviction_multiblock_split_re_reconciled', 'pages with an unresolved multiblock split re-reconciled by checkpoint'),
     CacheStat('cache_eviction_pages_queued_clean', 'eviction walk pages queued that were clean'),
     CacheStat('cache_eviction_pages_queued_dirty', 'eviction walk pages queued that were dirty'),
     CacheStat('cache_eviction_pages_queued_updates', 'eviction walk pages queued that had updates'),

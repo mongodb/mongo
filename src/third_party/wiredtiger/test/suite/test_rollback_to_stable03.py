@@ -142,9 +142,11 @@ class test_rollback_to_stable03(test_rollback_to_stable_base):
 
         if not self.in_memory:
             # Non-inmemory mode triggers an implicit checkpoint during RTS,
-            # which clears the modified flag, causing the next RTS to be skipped.
-            self.assertEqual(rts_btrees_applied, 1)
-            self.assertEqual(rts_btrees_skipped, 1)
+            # which clears the modified flag, causing the next RTS to be skipped. Unless eviction
+            # modifies the tree prior to the rollback to stable, in which case it may have applied
+            # to both trees.
+            self.assertGreaterEqual(rts_btrees_applied, 1)
+            self.assertEqual(rts_btrees_skipped, 2 - rts_btrees_applied)
         else:
             # In-memory mode skips the checkpoint, so the modified flag remains set
             # and both RTS calls are applied.

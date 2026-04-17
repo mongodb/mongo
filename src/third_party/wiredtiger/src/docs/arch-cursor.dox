@@ -248,8 +248,8 @@ certain options, like bulk loading, random, or readonly, are not cacheable. When
 cursor is checked if it is cacheable.  If so and if cursor caching is enabled in the session, then it will be
 cached. Cached cursors live in a hash table that is owned by the session.  A hash function on the URI is used
 to determine which hash bucket to use.  We compute the hash of the URI once, its value is stored in
-in the cursor for future use.  Thus, caching a cursor (what happens within the type-specific \c cache function
-(e.g. \c __curfile_cache) is relatively quick:
+in the cursor for future use.  Thus, caching a cursor (what happens within the type-specific \c cache function,
+e.g. \c __curfile_cache) is relatively quick:
 
 - Free storage that we don't want held (for example, storage used by the cursor's key and value).
 - Get a *weak* reference to the data handle (increment \c dhandle->references).

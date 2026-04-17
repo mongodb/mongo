@@ -577,7 +577,7 @@ __curfile_reserve(WT_CURSOR *cursor)
 
     WT_ERR(__wt_txn_context_check(session, true));
 
-    WT_ERR(__wt_btcur_reserve(cbt));
+    WT_ERR(__wt_btcur_reserve(cbt, false));
 
     /*
      * Reserve maintains a position and key, which doesn't match the library API, where reserve

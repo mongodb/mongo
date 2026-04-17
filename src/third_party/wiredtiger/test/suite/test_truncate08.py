@@ -31,10 +31,10 @@
 #
 
 import wttest
+from wiredtiger import disagg_fast_truncate_build
 from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
-# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
+
 class test_truncate08(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r')),
@@ -42,6 +42,11 @@ class test_truncate08(wttest.WiredTigerTestCase):
     ]
 
     scenarios = make_scenarios(format_values)
+
+    def setUp(self):
+        if self.runningHook('disagg') and disagg_fast_truncate_build() == 0:
+            self.skipTest("fast truncate support is not enabled")
+        super().setUp()
 
     def test_truncate08(self):
         # Create a large table with lots of pages.

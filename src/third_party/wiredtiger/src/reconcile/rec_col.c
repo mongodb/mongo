@@ -126,7 +126,7 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
-        __wt_atomic_cas_uint8_v(&ref->rec_state, WT_REF_REC_DIRTY, WT_REF_REC_CLEAN);
+        __wt_atomic_cas_uint8_v(&ref->dirty_state, WT_REF_DIRTY, WT_REF_CLEAN);
 
         /* Update the starting record number in case we split. */
         r->recno = ref->ref_recno;

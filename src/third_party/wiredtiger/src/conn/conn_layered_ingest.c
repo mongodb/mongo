@@ -60,7 +60,8 @@ __layered_assert_tombstone_has_value_on_stable_btree(
 
 /*
  * __layered_move_updates --
- *     Move the updates of a key to the stable table
+ *     Move the updates of a key to the stable table. Any unresolved prepared update on the stable
+ *     table should now have been resolved.
  */
 static int
 __layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key,
@@ -176,13 +177,13 @@ __layered_assert_ingest_table_empty(WT_SESSION_IMPL *session, const char *uri)
 static int
 __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_ENTRY *entry)
 {
-    WT_CURSOR *stable_cursor, *version_cursor;
+    WT_CURSOR *ingest_version_cursor, *prepare_cursor, *stable_cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(key);
     WT_DECL_ITEM(tmp_key);
     WT_DECL_ITEM(value);
     WT_DECL_RET;
-    WT_UPDATE *last_upd, *prev_upd, *tombstone, *upd, *upds;
+    WT_UPDATE *last_upd, *prev_upd, *upd, *upds;
     wt_timestamp_t last_checkpoint_timestamp;
     wt_timestamp_t durable_start_ts, durable_stop_ts, start_prepare_ts, start_ts, stop_prepare_ts,
       stop_ts;
@@ -191,10 +192,12 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
     int cmp;
     char buf[256], buf2[64];
     const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL, NULL};
-    bool has_stop, is_prepare_rollback;
+    bool is_prepare_rollback, prepare_resolved, preserve_prepared;
 
-    stable_cursor = version_cursor = NULL;
-    last_upd = prev_upd = tombstone = upd = upds = NULL;
+    ingest_version_cursor = prepare_cursor = stable_cursor = NULL;
+    last_upd = prev_upd = upd = upds = NULL;
+    prepare_resolved = false;
+    preserve_prepared = F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED);
 
     last_checkpoint_timestamp = __wt_atomic_load_uint64_acquire(
       &S2C(session)->disaggregated_storage.last_checkpoint_timestamp);
@@ -205,22 +208,20 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
           buf2, sizeof(buf2), "start_timestamp=%" PRIx64 "", last_checkpoint_timestamp));
     else
         buf2[0] = '\0';
-    /* FIXME-WT-16744 - Enable show_prepared_rollback config to resolve prepared update on the
-     * stable table when draining. */
     WT_ERR(__wt_snprintf(buf, sizeof(buf),
       "debug=(dump_version=(enabled=true,raw_key_value=true,visible_only=true,timestamp_order=true,"
-      "cross_key=true,%s))",
-      buf2));
+      "cross_key=true,show_prepared_rollback=%s,%s))",
+      preserve_prepared ? "true" : "false", buf2));
     cfg[1] = buf;
-    WT_ERR(__wt_open_cursor(session, entry->ingest_uri, NULL, cfg, &version_cursor));
+    WT_ERR(__wt_open_cursor(session, entry->ingest_uri, NULL, cfg, &ingest_version_cursor));
 
     WT_ERR(__wt_scr_alloc(session, 0, &key));
     WT_ERR(__wt_scr_alloc(session, 0, &tmp_key));
     WT_ERR(__wt_scr_alloc(session, 0, &value));
 
     for (;;) {
-        tombstone = upd = NULL;
-        WT_ERR_NOTFOUND_OK(version_cursor->next(version_cursor), true);
+        upd = NULL;
+        WT_ERR_NOTFOUND_OK(ingest_version_cursor->next(ingest_version_cursor), true);
         if (ret == WT_NOTFOUND) {
             if (key->size > 0 && upds != NULL) {
                 WT_WITH_DHANDLE(session, cbt->dhandle,
@@ -232,7 +233,7 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
             break;
         }
 
-        WT_ERR(version_cursor->get_key(version_cursor, tmp_key));
+        WT_ERR(ingest_version_cursor->get_key(ingest_version_cursor, tmp_key));
         WT_ERR(__wt_compare(session, CUR2BT(cbt)->collator, key, tmp_key, &cmp));
         if (cmp != 0) {
             /*
@@ -249,112 +250,117 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
 
             upds = NULL;
             prev_upd = NULL;
+            prepare_resolved = false;
             WT_ERR(__wt_buf_set(session, key, tmp_key->data, tmp_key->size));
         }
 
-        WT_ERR(version_cursor->get_value(version_cursor, &start_txn, &start_ts, &durable_start_ts,
-          &start_prepare_ts, &start_prepared_id, &stop_txn, &stop_ts, &durable_stop_ts,
-          &stop_prepare_ts, &stop_prepared_id, &type, &prepare, &flags, &location, value));
+        WT_ERR(ingest_version_cursor->get_value(ingest_version_cursor, &start_txn, &start_ts,
+          &durable_start_ts, &start_prepare_ts, &start_prepared_id, &stop_txn, &stop_ts,
+          &durable_stop_ts, &stop_prepare_ts, &stop_prepared_id, &type, &prepare, &flags, &location,
+          value));
 
-        has_stop = stop_txn != WT_TXN_MAX;
         is_prepare_rollback = start_txn == WT_TXN_ABORTED;
-        /* FIXME-WT-16744 Remove this assertion when prepared update on the stable table are
-         * resolved during draining. */
-        WT_ASSERT(session, !is_prepare_rollback);
-        /* We assume the updates returned will be in timestamp order. */
-        if (prev_upd != NULL) {
-            WT_ASSERT(session,
-              stop_txn <= prev_upd->txnid && stop_ts <= prev_upd->upd_start_ts &&
-                durable_stop_ts <= prev_upd->upd_durable_ts);
-            WT_ASSERT(session,
-              start_txn <= prev_upd->txnid && start_ts <= prev_upd->upd_start_ts &&
-                durable_start_ts <= prev_upd->upd_durable_ts);
-            if (stop_txn != prev_upd->txnid || stop_ts != prev_upd->upd_start_ts ||
-              durable_stop_ts != prev_upd->upd_durable_ts)
-                WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
-        } else if (has_stop)
-            WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
-
         /*
          * It is possible to see a full value that is smaller than or equal to the last checkpoint
-         * timestamp with a tombstone that is larger than the last checkpoint timestamp. Ignore the
-         * update in this case.
+         * timestamp with a stop timestamp that is larger than the last checkpoint timestamp. Ignore
+         * the update in this case.
          */
         if (durable_start_ts > last_checkpoint_timestamp) {
             /*
-             * FIXME-WT-14732: this is an ugly layering violation. But I can't think of a better way
-             * now.
+             * If the "preserve prepared" option is enabled and the ingest btree contains a resolved
+             * prepared update for this key whose prepared timestamp is less than or equal to the
+             * last checkpoint timestamp, the stable btree must still contain an unresolved prepared
+             * cell from a previous checkpoint. To ensure data consistency, resolve the unresolved
+             * prepared cell before applying the ingest updates.
              */
-            if (__wt_clayered_deleted(value)) {
-                /*
-                 * If we use tombstone value, we should never see a real tombstone on the ingest
-                 * table.
-                 */
-                WT_ASSERT(session, tombstone == NULL);
-                WT_ERR(__wt_upd_alloc_tombstone(session, &upd, NULL));
-            } else
-                WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, NULL));
-            upd->prepare_ts = start_prepare_ts;
-            upd->prepared_id = start_prepared_id;
-            if (is_prepare_rollback) {
-                /*
-                 * WT_UPDATE stores these in a union, so they share the same underlying slots as
-                 * durable/start timestamps. We assign via rollback names here for readability.
-                 */
-                upd->txnid = WT_TXN_ABORTED;
-                upd->upd_rollback_ts = durable_start_ts;
-                upd->upd_saved_txnid = start_ts;
+            if (preserve_prepared && start_prepared_id != WT_PREPARED_ID_NONE &&
+              start_prepare_ts <= last_checkpoint_timestamp) {
+                /* Only resolve the updates from the same prepared transaction once. */
+                if (!prepare_resolved) {
+                    if (is_prepare_rollback) {
+                        /*
+                         * The original transaction id is stored in start timestamp and the rollback
+                         * timestamp is stored in durable timestamp.
+                         */
+                        WT_TXN_TIME_POINT txn_time_point;
+                        txn_time_point.id = start_ts;
+                        txn_time_point.prepared_id = start_prepared_id;
+                        txn_time_point.prepare_timestamp = start_prepare_ts;
+                        txn_time_point.rollback_timestamp = durable_start_ts;
+                        WT_ERR(__wt_txn_resolve_prepared_op(session, CUR2BT(cbt), &txn_time_point,
+                          key, WT_RECNO_OOB, false, &prepare_cursor));
+                    } else {
+                        WT_TXN_TIME_POINT txn_time_point;
+                        txn_time_point.id = start_txn;
+                        txn_time_point.prepared_id = start_prepared_id;
+                        txn_time_point.prepare_timestamp = start_prepare_ts;
+                        txn_time_point.commit_timestamp = start_ts;
+                        txn_time_point.durable_timestamp = durable_start_ts;
+                        WT_ERR(__wt_txn_resolve_prepared_op(session, CUR2BT(cbt), &txn_time_point,
+                          key, WT_RECNO_OOB, true, &prepare_cursor));
+                    }
+                    prepare_resolved = true;
+                }
             } else {
-                upd->txnid = start_txn;
-                upd->upd_start_ts = start_ts;
-                upd->upd_durable_ts = durable_start_ts;
+                /*
+                 * If the update is not a prepared update or a resolved prepared update that has
+                 * never been written to the checkpoint as a prepared update, move it to the stable
+                 * table directly.
+                 */
+                /*
+                 * FIXME-WT-14732: this is an ugly layering violation. But I can't think of a better
+                 * way now.
+                 */
+                if (__wt_clayered_deleted(value))
+                    WT_ERR(__wt_upd_alloc_tombstone(session, &upd, NULL));
+                else
+                    WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, NULL));
+                /*
+                 * If the prepared update is aborted, move the aborted update to the stable table
+                 * because we may write a prepared update to the disk in a future reconciliation.
+                 */
+                if (is_prepare_rollback) {
+                    /* Prepared transactions must have a prepared id in disagg. */
+                    WT_ASSERT(
+                      session, preserve_prepared && start_prepared_id != WT_PREPARED_ID_NONE);
+                    /*
+                     * The original transaction id is stored in start timestamp and the rollback
+                     * timestamp is stored in durable timestamp.
+                     */
+                    upd->txnid = WT_TXN_ABORTED;
+                    upd->prepare_state = WT_PREPARE_INPROGRESS;
+                    upd->prepare_ts = start_prepare_ts;
+                    upd->prepared_id = start_prepared_id;
+                    upd->upd_saved_txnid = start_ts;
+                    upd->upd_rollback_ts = durable_start_ts;
+                } else {
+                    upd->txnid = start_txn;
+                    if (start_prepared_id != WT_PREPARED_ID_NONE)
+                        upd->prepare_state = WT_PREPARE_RESOLVED;
+                    upd->prepare_ts = start_prepare_ts;
+                    upd->prepared_id = start_prepared_id;
+                    upd->upd_start_ts = start_ts;
+                    upd->upd_durable_ts = durable_start_ts;
+                }
+                /* This is for debugging purpose and it is not checked in the code. */
+                F_SET(upd, WT_UPDATE_RESTORED_FROM_INGEST);
+                last_upd = upd;
             }
-            /* This is for debugging purpose and it is not checked in the code. */
-            F_SET(upd, WT_UPDATE_RESTORED_FROM_INGEST);
-            last_upd = upd;
-        } else {
-            WT_ASSERT(session, tombstone != NULL);
-            last_upd = tombstone;
         }
 
-        /*
-         * FIXME-WT-14732: we can simplify the algorithm if we don't use real tombstones on the
-         * ingest table.
-         */
-        if (tombstone != NULL) {
-            tombstone->txnid = stop_txn;
-            tombstone->upd_start_ts = stop_ts;
-            tombstone->upd_durable_ts = durable_stop_ts;
-            tombstone->prepare_ts = stop_prepare_ts;
-            tombstone->prepared_id = stop_prepared_id;
-            tombstone->next = upd;
-            /* This is for debugging purpose and it is not checked in the code. */
-            F_SET(tombstone, WT_UPDATE_RESTORED_FROM_INGEST);
-
-            WT_ASSERT(session, tombstone->upd_durable_ts > last_checkpoint_timestamp);
-
-            if (prev_upd != NULL)
-                prev_upd->next = tombstone;
-            else
-                upds = tombstone;
-
-            prev_upd = upd;
-            tombstone = NULL;
-            upd = NULL;
-        } else {
+        if (upd != NULL) {
+            /* If a prepared update is resolved, it must be the final update to be drained. */
+            WT_ASSERT(session, !prepare_resolved);
             if (prev_upd != NULL)
                 prev_upd->next = upd;
             else
                 upds = upd;
 
             prev_upd = upd;
-            upd = NULL;
         }
     }
 
 err:
-    if (tombstone != NULL)
-        __wt_free(session, tombstone);
     if (upd != NULL)
         __wt_free(session, upd);
     if (upds != NULL)
@@ -362,8 +368,10 @@ err:
     __wt_scr_free(session, &key);
     __wt_scr_free(session, &tmp_key);
     __wt_scr_free(session, &value);
-    if (version_cursor != NULL)
-        WT_TRET(version_cursor->close(version_cursor));
+    if (ingest_version_cursor != NULL)
+        WT_TRET(ingest_version_cursor->close(ingest_version_cursor));
+    if (prepare_cursor != NULL)
+        WT_TRET(prepare_cursor->close(prepare_cursor));
     if (stable_cursor != NULL)
         WT_TRET(stable_cursor->close(stable_cursor));
     return (ret);

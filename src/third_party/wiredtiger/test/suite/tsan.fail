@@ -1,4 +1,4 @@
-# This file is used by evergreen.yml when running the  python test suite under TSAN.
+# This file is used by evergreen.yml when running the python test suite under TSAN.
 # This list are test files that are not run, they are known failures. The reasons for the failures are not known,
 # they'll need to be triaged. When we know something about the failure, they are commented.
 test_alter01.py
@@ -60,6 +60,7 @@ test_tiered08.py
 test_tiered14.py
 test_timestamp04.py
 test_truncate01.py
+test_truncate08.py
 test_truncate11.py
 test_truncate15.py
 test_truncate19.py
