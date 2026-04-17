@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/assert_util.h"
 
@@ -96,7 +97,9 @@ CountScan::CountScan(ExpressionContext* expCtx,
       _startKeyInclusive(params.startKeyInclusive),
       _endKey(std::move(params.endKey)),
       _endKeyInclusive(params.endKeyInclusive),
-      _recordIdDeduplicator(expCtx) {
+      _recordIdDeduplicator(expCtx),
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+          *expCtx, loadMemoryLimit(StageMemoryLimit::CountScanStageMaxMemoryBytes))) {
     _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
@@ -169,9 +172,15 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    if (_shouldDedup && !_recordIdDeduplicator.insert(entry->loc)) {
-        // *loc has been returned already
-        return PlanStage::NEED_TIME;
+    if (_shouldDedup) {
+        if (!_recordIdDeduplicator.insert(entry->loc)) {
+            // *loc has been returned already
+            return PlanStage::NEED_TIME;
+        }
+        _memoryTracker.set(_recordIdDeduplicator.getApproximateSize());
+        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+        uassert(
+            12227901, "CountScan stage exceeded memory limit", _memoryTracker.withinMemoryLimit());
     }
 
     WorkingSetID id = _workingSet->allocate();

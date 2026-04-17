@@ -33,6 +33,7 @@
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/util/modules.h"
 
@@ -81,7 +82,7 @@ namespace mongo {
  * deduplicate. Every document in _resultBuffer is kept track of in _seenDocuments. When a document
  * is returned, it is removed from _seenDocuments.
  *
- * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
+ * Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.
  */
 class NearStage : public RequiresIndexStage {
@@ -246,6 +247,9 @@ private:
     // All children intervals except the last active one are only used by getStats(),
     // because they are all EOF.
     std::vector<std::unique_ptr<CoveredInterval>> _childrenIntervals;
+
+    // Check memory usage of the stage.
+    SimpleMemoryUsageTracker _memoryTracker;
 };
 
 /**

@@ -370,6 +370,10 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
+            if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
+            }
         }
 
         if (auto qsnNode = dynamic_cast<const CountScanNode*>(querySolutionNode); qsnNode) {
@@ -495,6 +499,10 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber(
                 "spilledDataStorageSize",
                 static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
+            if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
+            }
         }
     } else if (STAGE_IDHACK == stats.stageType) {
         IDHackStats* spec = static_cast<IDHackStats*>(stats.specific.get());
@@ -696,6 +704,10 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("nMatched", static_cast<long long>(spec->nMatched));
             bob->appendNumber("nWouldModify", static_cast<long long>(spec->nModified));
             bob->appendNumber("nWouldUpsert", static_cast<long long>(spec->nUpserted));
+            if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+                bob->appendNumber("peakTrackedMemBytes",
+                                  static_cast<long long>(spec->peakTrackedMemBytes));
+            }
         }
     } else if (STAGE_SPOOL == stats.stageType) {
         SpoolStats* spec = static_cast<SpoolStats*>(stats.specific.get());

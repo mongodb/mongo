@@ -47,6 +47,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -622,6 +623,68 @@ public:
     }
 };
 
+/**
+ * Test that CountScan reports a positive peakTrackedMemBytes when deduplication is active
+ * (i.e. on a multikey index).
+ */
+class QueryStageCountScanMemoryTracking : public CountBase {
+public:
+    void run() {
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns_forTest());
+
+        // Array-valued field creates a multikey index, which enables deduplication.
+        insert(BSON("a" << BSON_ARRAY(1 << 2)));
+        insert(BSON("a" << BSON_ARRAY(3 << 4)));
+        addIndex(BSON("a" << 1));
+
+        const auto coll = ctx.getCollection();
+
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
+        params.startKey = BSON("" << 1);
+        params.startKeyInclusive = true;
+        params.endKey = BSON("" << 4);
+        params.endKeyInclusive = true;
+
+        WorkingSet ws;
+        CountScan count(_expCtx.get(), coll, params, &ws);
+
+        runCount(&count);
+
+        const auto* stats = static_cast<const CountScanStats*>(count.getSpecificStats());
+        ASSERT_GT(stats->peakTrackedMemBytes, 0);
+    }
+};
+
+/**
+ * Test that CountScan throws when the memory used by the deduplicator exceeds the configured
+ * limit.
+ */
+class QueryStageCountScanMemoryLimitExceeded : public CountBase {
+public:
+    void run() {
+        // Set an absurdly small limit so the deduplicator overhead alone exceeds it.
+        RAIIServerParameterControllerForTest maxMemoryBytes{"internalCountScanStageMaxMemoryBytes",
+                                                            1};
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns_forTest());
+
+        insert(BSON("a" << BSON_ARRAY(1 << 2)));
+        addIndex(BSON("a" << 1));
+
+        const auto coll = ctx.getCollection();
+
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
+        params.startKey = BSON("" << 1);
+        params.startKeyInclusive = true;
+        params.endKey = BSON("" << 2);
+        params.endKeyInclusive = true;
+
+        WorkingSet ws;
+        CountScan count(_expCtx.get(), coll, params, &ws);
+
+        ASSERT_THROWS_CODE(runCount(&count), DBException, 12227901);
+    }
+};
+
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_count_scan") {}
@@ -637,6 +700,8 @@ public:
         add<QueryStageCountScanDeleteDuringYield>();
         add<QueryStageCountScanInsertNewDocsDuringYield>();
         add<QueryStageCountScanUnusedKeys>();
+        add<QueryStageCountScanMemoryTracking>();
+        add<QueryStageCountScanMemoryLimitExceeded>();
     }
 };
 

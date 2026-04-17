@@ -267,3 +267,29 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+
+    internalUpdateStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the classic UpdateStage stage will cache in-memory
+            before failing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalUpdateStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: std::numeric_limits<long long>::max()
+        validator:
+            gt: 0
+        redact: false
+
+    internalCountScanStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the classic CountScan stage will cache in-memory before
+            failing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalCountScanStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: std::numeric_limits<long long>::max()
+        validator:
+            gt: 0
+        redact: false

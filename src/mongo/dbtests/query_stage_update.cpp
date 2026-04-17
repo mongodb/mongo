@@ -48,6 +48,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -64,6 +65,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -591,6 +593,117 @@ public:
     }
 };
 
+/**
+ * Test that a multi-update reports a positive peakTrackedMemBytes in its stats. The
+ * _updatedRecordIds deduplicator is always allocated for multi-updates, so its overhead is
+ * visible in the peak even when no index is affected.
+ */
+class QueryStageUpdateMemoryTracking : public QueryStageUpdateBase {
+public:
+    void run() {
+        for (int i = 0; i < 10; ++i) {
+            insert(BSON("_id" << i << "x" << i));
+        }
+        ASSERT_EQUALS(10U, count(BSONObj()));
+
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        ASSERT(collection.exists());
+        OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
+        UpdateDriver driver(_expCtx);
+
+        auto request = UpdateRequest();
+        request.setNamespaceString(nss);
+        request.setMulti();
+        request.setQuery(BSONObj());
+        request.setUpdateModification(
+            write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$inc: {x: 1}}")));
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const auto constants = boost::none;
+        ASSERT_DOES_NOT_THROW(driver.parse(
+            request.getUpdateModification(), arrayFilters, constants, request.isMulti()));
+
+        CollectionScanParams collScanParams;
+        collScanParams.direction = CollectionScanParams::FORWARD;
+
+        std::unique_ptr<CanonicalQuery> cq(canonicalize(BSONObj()));
+        UpdateStageParams updateParams(&request, &driver, opDebug);
+        updateParams.canonicalQuery = cq.get();
+
+        auto ws = std::make_unique<WorkingSet>();
+        auto cs = std::make_unique<CollectionScan>(
+            _expCtx.get(), collection, collScanParams, ws.get(), nullptr);
+        auto updateStage = std::make_unique<UpdateStage>(
+            _expCtx.get(), updateParams, ws.get(), collection, cs.release());
+
+        runUpdate(updateStage.get());
+
+        const auto* stats = static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+        ASSERT_GT(stats->peakTrackedMemBytes, 0);
+    }
+};
+
+/**
+ * Test that UpdateStage throws when the memory used by _updatedRecordIds exceeds the configured
+ * limit.
+ */
+class QueryStageUpdateMemoryLimitExceeded : public QueryStageUpdateBase {
+public:
+    void run() {
+        // Set an absurdly small limit so the deduplicator overhead alone exceeds it.
+        RAIIServerParameterControllerForTest maxMemoryBytes{"internalUpdateStageMaxMemoryBytes", 1};
+
+        for (int i = 0; i < 10; ++i) {
+            insert(BSON("_id" << i << "x" << i));
+        }
+        ASSERT_EQUALS(10U, count(BSONObj()));
+
+        // Index on 'x' so that $inc on 'x' sets indexesAffected=true, causing record IDs to be
+        // inserted into _updatedRecordIds before the memory check fires.
+        ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("x" << 1)));
+
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        ASSERT(collection.exists());
+        OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
+        UpdateDriver driver(_expCtx);
+
+        auto request = UpdateRequest();
+        request.setNamespaceString(nss);
+        request.setMulti();
+        request.setQuery(BSONObj());
+        request.setUpdateModification(
+            write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$inc: {x: 1}}")));
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        const auto constants = boost::none;
+        ASSERT_DOES_NOT_THROW(driver.parse(
+            request.getUpdateModification(), arrayFilters, constants, request.isMulti()));
+
+        CollectionScanParams collScanParams;
+        collScanParams.direction = CollectionScanParams::FORWARD;
+
+        std::unique_ptr<CanonicalQuery> cq(canonicalize(BSONObj()));
+        UpdateStageParams updateParams(&request, &driver, opDebug);
+        updateParams.canonicalQuery = cq.get();
+
+        auto ws = std::make_unique<WorkingSet>();
+        auto cs = std::make_unique<CollectionScan>(
+            _expCtx.get(), collection, collScanParams, ws.get(), nullptr);
+        auto updateStage = std::make_unique<UpdateStage>(
+            _expCtx.get(), updateParams, ws.get(), collection, cs.release());
+
+        ASSERT_THROWS_CODE(runUpdate(updateStage.get()), DBException, 12227902);
+    }
+};
+
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_update") {}
@@ -601,6 +714,8 @@ public:
         add<QueryStageUpdateSkipDeletedDoc>();
         add<QueryStageUpdateReturnOldDoc>();
         add<QueryStageUpdateReturnNewDoc>();
+        add<QueryStageUpdateMemoryTracking>();
+        add<QueryStageUpdateMemoryLimitExceeded>();
     }
 };
 

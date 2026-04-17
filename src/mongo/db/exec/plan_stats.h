@@ -414,6 +414,8 @@ struct CountScanStats : public SpecificStats {
     bool isUnique;
 
     size_t keysExamined;
+
+    int64_t peakTrackedMemBytes = 0;
 };
 
 /**
@@ -987,6 +989,8 @@ struct NearStats : public SpecificStats {
     BSONObj keyPattern;
 
     SpillingStats spillingStats;
+
+    int64_t peakTrackedMemBytes = 0;
 };
 
 struct UpdateStats : public SpecificStats {
@@ -1025,6 +1029,8 @@ struct UpdateStats : public SpecificStats {
 
     // The number of documents fetched by write_stage_common::ensureStillMatches.
     size_t docsFetched = 0;
+
+    int64_t peakTrackedMemBytes = 0;
 };
 
 struct TextMatchStats : public SpecificStats {

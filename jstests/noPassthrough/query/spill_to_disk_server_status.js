@@ -42,7 +42,7 @@ assert.commandWorked(setParameter(db, "internalQuerySlotBasedExecutionHashLookup
 // Spilling memory threshold for $graphLookup
 assert.commandWorked(setParameter(db, "internalDocumentSourceGraphLookupMaxMemoryBytes", 1));
 // Spilling memory threshold for geo near
-assert.commandWorked(setParameter(db, "internalNearStageMaxMemoryBytes", 1));
+assert.commandWorked(setParameter(db, "internalNearStageMaxMemoryBytes", 512));
 
 const nDocs = 10;
 for (let i = 0; i < nDocs; i++) {
@@ -271,7 +271,7 @@ testSpillingMetrics({
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ExtendedAutoSpilling")) {
     testSpillingMetrics({
         stageName: "geoNear",
-        expectedSpillingMetrics: {spills: 12, spilledBytes: 810},
+        expectedSpillingMetrics: {spills: 6, spilledBytes: 648},
         expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 1130},
         collName: geoCollName,
     });

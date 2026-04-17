@@ -38,6 +38,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/field_ref_set.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -192,6 +193,9 @@ private:
     // index scan. Unless the index is multikey, the underlying query machinery won't de-dup so we
     // keep track of already updated docs in '_updatedRecordIds'.
     const std::unique_ptr<update::RecordIdSet> _updatedRecordIds;
+
+    // Check memory usage of the stage.
+    SimpleMemoryUsageTracker _memoryTracker;
 
     /**
      * This member is used to check whether the write should be performed, and if so, any other

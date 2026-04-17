@@ -35,6 +35,7 @@
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -151,6 +152,9 @@ private:
     RecordIdDeduplicator _recordIdDeduplicator;
 
     CountScanStats _specificStats;
+
+    // Check memory usage of the stage.
+    SimpleMemoryUsageTracker _memoryTracker;
 };
 
 }  // namespace mongo

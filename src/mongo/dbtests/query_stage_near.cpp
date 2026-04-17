@@ -275,7 +275,8 @@ TEST_F(QueryStageNearTest, EmptyResults) {
 
 TEST_F(QueryStageNearTest, Spilling) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagExtendedAutoSpilling", true};
-    RAIIServerParameterControllerForTest maxMemoryBytes{"internalNearStageMaxMemoryBytes", 128};
+    RAIIServerParameterControllerForTest maxMemoryBytes{"internalNearStageMaxMemoryBytes",
+                                                        200 * 1024};
 
     _expCtx->setTempDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp");
     _expCtx->setAllowDiskUse(true);
@@ -302,6 +303,34 @@ TEST_F(QueryStageNearTest, Spilling) {
 
     const auto* stats = static_cast<const NearStats*>(nearStage.getSpecificStats());
     ASSERT_GT(stats->spillingStats.getSpills(), 0);
+}
+
+TEST_F(QueryStageNearTest, MemoryTracking) {
+    WorkingSet workingSet;
+    MockNearStage nearStage(_expCtx.get(), &workingSet, *_coll, _mockGeoIndex);
+
+    for (int distance = 0; distance < 10; ++distance) {
+        nearStage.addInterval({BSON("distance" << distance)}, distance, distance + 1);
+    }
+
+    advanceStage(&nearStage, &workingSet);
+
+    const auto* stats = static_cast<const NearStats*>(nearStage.getSpecificStats());
+    ASSERT_GT(stats->peakTrackedMemBytes, 0);
+}
+
+TEST_F(QueryStageNearTest, MemoryLimitExceeded) {
+    // Disable auto-spilling so the memory limit triggers the uassert rather than a spill attempt
+    // (which would fail because no temp dir is configured in this test).
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtendedAutoSpilling", false};
+    // Set an absurdly small limit so that buffering even one document exceeds it.
+    RAIIServerParameterControllerForTest maxMemoryBytes{"internalNearStageMaxMemoryBytes", 1};
+
+    WorkingSet workingSet;
+    MockNearStage nearStage(_expCtx.get(), &workingSet, *_coll, _mockGeoIndex);
+    nearStage.addInterval({BSON("distance" << 1.0)}, 0.0, 2.0);
+
+    ASSERT_THROWS_CODE(advanceStage(&nearStage, &workingSet), DBException, 12227900);
 }
 
 }  // namespace

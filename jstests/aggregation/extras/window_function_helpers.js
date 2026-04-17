@@ -237,7 +237,7 @@ export function assertExplainMemoryTracking(stage) {
         assert(
             !queryMemoryTrackingEnabled,
             maxTotalMemoryUsageBytesProp +
-                " should not appear in explain output when query memory tracking is enabled: " +
+                " should not appear in explain output when query memory tracking is not enabled: " +
                 tojson(stage),
         );
     } else {

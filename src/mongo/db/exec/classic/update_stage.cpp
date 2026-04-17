@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
@@ -120,6 +121,8 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
       _idReturning(WorkingSet::INVALID_ID),
       _updatedRecordIds(params.request->isMulti() ? std::make_unique<update::RecordIdSet>(expCtx)
                                                   : nullptr),
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+          *expCtx, loadMemoryLimit(StageMemoryLimit::UpdateStageMaxMemoryBytes))),
       _preWriteFilter(opCtx(), collection.nss()) {
 
     // Should the modifiers validate their embedded docs via storage_validation::scanDocument()?
@@ -329,6 +332,14 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
             if (updateRet != PlanStage::NEED_TIME) {
                 return updateRet;
+            }
+
+            if (_updatedRecordIds) {
+                _memoryTracker.set(_updatedRecordIds->getApproximateSize());
+                _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+                uassert(12227902,
+                        "UpdateStage exceeded memory limit",
+                        _memoryTracker.withinMemoryLimit());
             }
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
             if (ShardVersion::isPlacementVersionIgnored(ex->getVersionReceived()) &&

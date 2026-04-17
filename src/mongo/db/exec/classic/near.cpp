@@ -69,7 +69,9 @@ NearStage::NearStage(ExpressionContext* expCtx,
               : nullptr,
           /*settings=*/{}),
       _stageType(type),
-      _nextInterval(nullptr) {}
+      _nextInterval(nullptr),
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+          *expCtx, loadMemoryLimit(StageMemoryLimit::NearStageMaxMemoryBytes))) {}
 
 NearStage::~NearStage() {}
 
@@ -145,7 +147,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
         }
 
         tassert(10922800,
-                "Intervals must be continious",
+                "Intervals must be continuous",
                 _childrenIntervals.empty() ||
                     interval->minDistance <= _childrenIntervals.back()->maxDistance +
                             std::numeric_limits<double>::epsilon());
@@ -207,9 +209,13 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     nextMember.makeObjOwnedIfNeeded();
     _resultBuffer.add(SorterKey{memberDistance}, std::move(nextMember));
 
-    if (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
+    _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
+    if (!_memoryTracker.withinMemoryLimit() &&
+        feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
         spill(loadMemoryLimit(StageMemoryLimit::NearStageMaxMemoryBytes));
     }
+    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+    uassert(12227900, "Near stage exceeded memory limit", _memoryTracker.withinMemoryLimit());
 
     return PlanStage::NEED_TIME;
 }
@@ -223,6 +229,8 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     WorkingSetID resultID = WorkingSet::INVALID_ID;
     if (_resultBuffer.getState() == ResultBufferSorter::State::kReady) {
         auto [memberDistance, member] = _resultBuffer.next();
+        // _resultBuffer.next() removes an element from the buffer. Update memory tracking.
+        _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
         if (member->hasRecordId()) {
             _seenDocuments.freeMemory(member->recordId);
         }
@@ -279,10 +287,13 @@ void NearStage::updateSpillingStats() {
 }
 
 void NearStage::spill(uint64_t maxMemoryBytes) {
-    if (_resultBuffer.stats().memUsage() <= maxMemoryBytes) {
+    uint64_t totalMemoryUsage =
+        _seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage();
+    if (totalMemoryUsage <= maxMemoryBytes) {
         return;
     }
     _resultBuffer.forceSpill();
+    _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
     updateSpillingStats();
 }
 
@@ -293,7 +304,7 @@ bool NearStage::isEOF() const {
 std::unique_ptr<PlanStageStats> NearStage::getStats() {
     auto ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
     updateSpillingStats();
-    ret->specific = _specificStats.clone();
+    ret->specific = std::make_unique<NearStats>(_specificStats);
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
         ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());
     }
