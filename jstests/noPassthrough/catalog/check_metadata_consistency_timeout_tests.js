@@ -62,6 +62,12 @@ function testCMCCommandWithFailpoint(threadParams, expectedError, failpoint) {
                 asyncCMC.join();
                 blockCMCPoint.off();
             } else {
+                // Sleep long enough to ensure the shortest deadline has expired before turning off the failpoint.
+                const sleepMs =
+                    maxTimeMS > 0
+                        ? Math.min(maxTimeMS, threadParams.dbMetadataLockMaxTimeMS)
+                        : threadParams.dbMetadataLockMaxTimeMS;
+                sleep(sleepMs * 2);
                 blockCMCPoint.off();
                 asyncCMC.join();
             }
