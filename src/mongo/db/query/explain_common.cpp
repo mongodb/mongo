@@ -70,29 +70,30 @@ void appendWarningMessage(StringData fieldName, BSONObjBuilder* out) {
 
 void generateServerInfo(BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverInfo"));
-    out->append("host", getHostNameCached());
-    out->appendNumber("port", serverGlobalParams.port);
+    serverBob.append("host", getHostNameCached());
+    serverBob.appendNumber("port", serverGlobalParams.port);
     auto&& vii = VersionInfoInterface::instance();
-    out->append("version", vii.version());
-    out->append("gitVersion", vii.gitVersion());
+    serverBob.append("version", vii.version());
+    serverBob.append("gitVersion", vii.gitVersion());
     serverBob.doneFast();
 }
 
 void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverParameters"));
-    appendStageMemoryLimitsToExplain(*out);
-    out->appendNumber("internalQueryFacetMaxOutputDocSizeBytes",
-                      internalQueryFacetMaxOutputDocSizeBytes.load());
-    out->appendNumber("internalLookupStageIntermediateDocumentMaxSizeBytes",
-                      internalLookupStageIntermediateDocumentMaxSizeBytes.load());
-    out->appendNumber("internalQueryProhibitBlockingMergeOnMongoS",
-                      internalQueryProhibitBlockingMergeOnMongoS.load());
-    out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
+    appendStageMemoryLimitsToExplain(serverBob);
+    serverBob.appendNumber("internalQueryFacetMaxOutputDocSizeBytes",
+                           internalQueryFacetMaxOutputDocSizeBytes.load());
+    serverBob.appendNumber("internalLookupStageIntermediateDocumentMaxSizeBytes",
+                           internalLookupStageIntermediateDocumentMaxSizeBytes.load());
+    serverBob.appendNumber("internalQueryProhibitBlockingMergeOnMongoS",
+                           internalQueryProhibitBlockingMergeOnMongoS.load());
+    serverBob.appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
     auto queryControl = expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
-    out->append("internalQueryFrameworkControl", idl::serialize(queryControl));
-    out->appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
-                      internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
+    serverBob.append("internalQueryFrameworkControl", idl::serialize(queryControl));
+    serverBob.appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
+                           internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
+    serverBob.doneFast();
 }
 
 void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out) {
