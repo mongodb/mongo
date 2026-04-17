@@ -204,21 +204,35 @@ class DescribeScope extends Scope {
     }
 
     /**
-     * Discover and gather nested content (nested hooks, describe, and it calls)
-     * @param {*} scope Current scope to discover from
-     * @param {string} title Title of this scope
-     * @param {function} fn Function to execute in this scope
+     * Discover and gather nested content (nested hooks, describe, and it calls).
+     *
+     * Two-phase: first run fn() to register all hooks at this level, then
+     * descend into child DescribeScopes so children inherit the complete set
+     * of parent hooks (including any registered after a nested describe call).
+     *
+     * @param {DescribeScope} parent Scope to inherit hooks/context from
      */
-    discover(scope) {
-        this.ctx = scope.ctx;
+    discover(parent) {
+        this.ctx = parent.ctx;
 
-        this.beforeEach = [...scope.beforeEach]; // queue
+        this.beforeEach = [...parent.beforeEach]; // outer-first: parent's hooks before own
 
-        // change shared context and invoke the content
+        // Phase 1: run fn to collect hooks and child scopes at this level.
+        // Child describes are added to this.children but not yet discovered.
+        const savedCurrScope = currScope;
         currScope = this;
-        this.fn.call(scope.ctx);
+        this.fn.call(parent.ctx);
+        currScope = savedCurrScope;
 
-        this.afterEach = [...this.afterEach, ...scope.afterEach]; // stack of queues
+        this.afterEach = [...this.afterEach, ...parent.afterEach]; // inner-first: own hooks before parent's
+
+        // Phase 2: now that all hooks at this level are registered, discover
+        // each child DescribeScope so they inherit the complete beforeEach/afterEach.
+        for (const child of this.children) {
+            if (child instanceof DescribeScope) {
+                child.discover(this);
+            }
+        }
     }
 
     /**
@@ -467,10 +481,10 @@ function addDescribe(
 ) {
     markUsage();
     const scope = new DescribeScope(title, fn, options);
-    const oldScope = currScope;
-    scope.discover(currScope);
-    oldScope.addChild(scope);
-    currScope = oldScope;
+    // Add scope as a child without discovering it yet. Discovery is deferred to
+    // the parent's discover() Phase 2 (or runTests for top-level describes), so
+    // all sibling hooks registered after this call are visible to the child.
+    currScope.addChild(scope);
 }
 
 /**
@@ -549,6 +563,15 @@ function after(fn) {
  */
 async function runTests() {
     const rootScope = currScope;
+
+    // Discover top-level describe scopes now that all root-level hooks are
+    // registered. Their fns have not run yet (addDescribe defers discovery).
+    for (const child of rootScope.children) {
+        if (child instanceof DescribeScope) {
+            child.discover(rootScope);
+        }
+    }
+
     await currScope.run();
     try {
         reporter.report();

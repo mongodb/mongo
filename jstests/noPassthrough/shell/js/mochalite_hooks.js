@@ -131,6 +131,37 @@ describe("describe", function () {
     });
 });
 
+// Grandchild scope: verify afterEach hooks propagate through 3 levels.
+// Standard Mocha behavior: afterEach runs inner-first, then outer (LIFO by scope).
+describe("grandparent", function () {
+    beforeEach(function () {
+        log.push("----grandparent beforeEach");
+    });
+    afterEach(function () {
+        log.push("----grandparent afterEach");
+    });
+    describe("parent", function () {
+        describe("child", function () {
+            beforeEach(function () {
+                log.push("--------child beforeEach");
+            });
+            afterEach(function () {
+                log.push("--------child afterEach");
+            });
+            it("test-grandchild", function () {
+                log.push("----------test-grandchild");
+            });
+        });
+        // intentionally add these after the describe block to ensure they still get registered
+        beforeEach(function () {
+            log.push("------parent beforeEach");
+        });
+        afterEach(function () {
+            log.push("------parent afterEach");
+        });
+    });
+});
+
 // these contain no actual tests, so no hooks should ever be run
 describe("contains no tests", function () {
     const die = () => {
@@ -199,6 +230,17 @@ assert.eq(log, [
     "--afterEach2",
     "----describe after1",
     "----describe after2",
+    "--beforeEach1",
+    "--beforeEach2",
+    "----grandparent beforeEach",
+    "------parent beforeEach",
+    "--------child beforeEach",
+    "----------test-grandchild",
+    "--------child afterEach",
+    "------parent afterEach",
+    "----grandparent afterEach",
+    "--afterEach1",
+    "--afterEach2",
     "--beforeEach1",
     "--beforeEach2",
     "----test5",
