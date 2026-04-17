@@ -48,6 +48,19 @@ using CanPathBeArray = std::function<bool(StringData)>;
 bool defaultCanPathBeArray(StringData path);
 
 /**
+ * Result of looking up which stage last declared or modified a field path.
+ */
+struct DeclaringStageResult {
+    // The sequence of stages that lead to the stage that last declared or modified the field.
+    // nullptr if the field originates from the pipeline input (i.e. the base collection or
+    // sub-pipeline input).
+    std::vector<boost::intrusive_ptr<mongo::DocumentSource>> srcStages;
+
+    // True when the declaring stage was resolved inside a sub-pipeline (e.g. $lookup, $unionWith).
+    bool fromSubpipeline = false;
+};
+
+/**
  * Represents dependencies between fields and stages in a pipeline. Can be partially rebuilt when
  * the pipeline changes.
  */
@@ -84,10 +97,30 @@ public:
                                                                   PathRef path) const;
 
     /**
+     * Return the stage which last modified the path visible from the given DocumentSource along
+     * with all the intermediate stages that contain subpipelines. The stage must have either
+     * declared, modified or removed the path. If the stage is nullptr, the path is originating from
+     * the pipeline input.
+     *
+     * When the path crosses into a sub-pipeline (e.g. "docs.x" through a $lookup), the result
+     * will have 'fromSubpipeline' set to true and 'srcStages' vector populated with pointers to the
+     * sequence of intermediate stages with subpipelines and the final declaring stage or nullptr
+     * (if it comes from the collection).
+     */
+    DeclaringStageResult getDeclaringStageIncludingSubpipelines(DocumentSource* stage,
+                                                                PathRef path) const;
+
+    /**
      * Returns false if the path visible from the given DocumentSource can be assumed to not contain
      * arrays. If nullptr, the path is assumed to originate from the pipeline input.
      */
     bool canPathBeArray(DocumentSource* stage, PathRef path) const;
+
+    /**
+     * Returns the dependency graph for the sub-pipeline of the given stage (e.g. $lookup,
+     * $unionWith), or nullptr if the stage has no sub-pipeline.
+     */
+    const DependencyGraph* getSubpipelineGraph(DocumentSource* stage) const;
 
     /**
      * Invalidate and recompute the subgraph starting from the earliest nodes which correspond to

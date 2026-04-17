@@ -110,12 +110,715 @@ private:
         const StringData kDBName = "test";
         const NamespaceString kTestNss =
             NamespaceString::createNamespaceString_forTest(kDBName, "collection");
+
+        auto additionalNs = std::vector<NamespaceString>(
+            {NamespaceString::createNamespaceString_forTest("test.coll_b"_sd),
+             NamespaceString::createNamespaceString_forTest("test.coll_c"_sd),
+             NamespaceString::createNamespaceString_forTest("test2.coll_d"_sd)});
+
+        ResolvedNamespaceMap resolvedNs;
+        resolvedNs.insert_or_assign(kTestNss, {kTestNss, std::vector<BSONObj>{}});
+        for (auto&& ns : additionalNs) {
+            resolvedNs.insert_or_assign(ns, {ns, std::vector<BSONObj>{}});
+        }
+
         AggregateCommandRequest request(kTestNss, rawPipeline);
-        boost::intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(kTestNss);
+        boost::intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest();
+        ctx->setResolvedNamespaces(resolvedNs);
+
         return pipeline_factory::makePipeline(
             request.getPipeline(), ctx, pipeline_factory::kOptionsMinimal);
     }
 };
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineLookupHasSubGraph) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [
+            {$match: {b_ssn: 1}},
+            {$set: {extra: 1}}
+        ]
+    }}])");
+
+    runTest([&] {
+        // $lookup should have a sub-pipeline graph.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineNullForRegularStage) {
+    setPipeline("[{$set: { a: 'foo' }}, {$match: { a: 'foo' }}]");
+    runTest([&] {
+        // Regular stages should not have sub-pipeline graphs.
+        ASSERT_EQUALS(graph->getSubpipelineGraph(stages[0].get()), nullptr);
+        ASSERT_EQUALS(graph->getSubpipelineGraph(stages[1].get()), nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineGetDeclaringStageDelegatesToSubGraph) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$set: {b_ssn: 2}}]
+    }}])");
+
+    runTest([&] {
+        // 'docs' itself is declared by the $lookup stage.
+        ASSERT_EQUALS(graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs").srcStages,
+                      stages);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "docs"), stages[0]);
+
+        // 'docs.b_ssn' should resolve across the $lookup into the sub-pipeline's $set stage.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        auto result = graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.b_ssn");
+
+        // The declaring stage should come from the sub-pipeline (the $set).
+        auto subDeclaringStage = subGraph->getDeclaringStage(nullptr, "b_ssn");
+        ASSERT_EQUALS(result.srcStages.back(), subDeclaringStage);
+        ASSERT_TRUE(result.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       SubPipelineWithDottedAsPathGetDeclaringStageDelegatesToSubGraph) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs.x",
+        let: {},
+        pipeline: [{$set: {b_ssn: 2}}]
+    }}])");
+
+    runTest([&] {
+        // 'docs.x' itself is declared by the $lookup stage.
+        ASSERT_EQUALS(graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.x").srcStages,
+                      stages);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "docs.x"), stages[0]);
+
+        // 'docs.x.b_ssn' should resolve across the $lookup into the sub-pipeline's $set stage.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        auto result = graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.x.b_ssn");
+
+        // The declaring stage should come from the sub-pipeline (the $set).
+        auto subDeclaringStage = subGraph->getDeclaringStage(nullptr, "b_ssn");
+        ASSERT_EQUALS(result.srcStages.back(), subDeclaringStage);
+        ASSERT_TRUE(result.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineGetDeclaringStageUnknownSubField) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$set: {b_ssn: 2}}]
+    }}])");
+
+    runTest([&] {
+        // 'docs.unknown' - the sub-pipeline's $set does not define 'unknown',
+        // so getDeclaringStage should return nullptr (comes from the sub-pipeline's input).
+        auto result = graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.unknown");
+        ASSERT_EQUALS(result.srcStages.back(), nullptr);
+        ASSERT_TRUE(result.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, NestedSubPipelineGetDeclaringStageSubField) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$lookup: {
+            from: "coll_c",
+            localField: "b_foo",
+            foreignField: "c_foo",
+            as: "rocks",
+            let: {},
+            pipeline: [{$set: {c_ssn: 2}}]
+        }}]
+    }}])");
+
+    runTest([&] {
+        // 'docs.rocks.unknown' - the inner sub-pipeline's $set does not define 'unknown',
+        // so getDeclaringStage should return nullptr (comes from the sub-pipeline's input).
+        auto unknownResult =
+            graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.rocks.unknown");
+        ASSERT_EQUALS(unknownResult.srcStages.back(), nullptr);
+        ASSERT_TRUE(unknownResult.fromSubpipeline);
+
+        // 'docs.rocks.c_ssn' is declared by the innermost $set stage.
+        auto knownResult =
+            graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.rocks.c_ssn");
+        // get the stage generating 'c_ssn' (subpipeline of the subpipeline)
+        auto innerSetStage = stages[0]->getSubPipeline()->front()->getSubPipeline()->front();
+        ASSERT_EQUALS(knownResult.srcStages.back(), innerSetStage);
+        ASSERT_TRUE(knownResult.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineGetDeclaringStageWithInclusionProjection) {
+    setPipeline(R"([{$lookup: {  
+        from: "coll_b",  
+        localField: "foo",  
+        foreignField: "b_foo",  
+        as: "docs",  
+        let: {},  
+        pipeline: [{$project: {b_ssn: 1}}]  
+    }}])");
+
+    runTest([&] {
+        auto resultSubPipelines =
+            graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.b_ssn");
+        ASSERT_EQUALS(resultSubPipelines.srcStages.back(), nullptr);
+        ASSERT_TRUE(resultSubPipelines.fromSubpipeline);
+
+        auto resultMainPipeline = graph->getDeclaringStage(nullptr, "docs.b_ssn");
+        ASSERT_EQUALS(resultMainPipeline, stages[0]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineCanPathBeArrayDelegatesToSubGraph) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$set: {b_ssn: 42}}]
+    }}])");
+
+    runTest([&] {
+        // 'docs.b_ssn' is set to a constant integer, which cannot be an array.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineCanPathBeArrayDelegatesToSubSubGraph) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [
+            {$set: {b_ssn: 1}},
+            {$lookup: {
+                from: "coll_c",
+                localField: "bar",
+                foreignField: "c_bar",
+                as: "inner_docs",
+                let: {},
+                pipeline: [{$set: {c_ssn: 99}}]
+            }}
+        ]
+    }}])");
+
+    runTest([&] {
+        // 'docs.b_ssn' is set to a constant integer, which cannot be an array.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.inner_docs.c_ssn"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineLookupDottedPathDelegation) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [
+            {$set: {a: {b: 42}}}
+        ]
+    }},
+    {$match: {"docs.a": 1}}])");
+
+    runTest([&] {
+        auto* matchStage = stages[1].get();
+        // 'docs.a' should resolve through the $lookup into the subpipeline's $set.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        auto subDeclStage = subGraph->getDeclaringStage(nullptr, "a");
+        auto result = graph->getDeclaringStageIncludingSubpipelines(matchStage, "docs.a");
+        ASSERT_EQUALS(result.srcStages.back(), subDeclStage);
+        ASSERT_TRUE(result.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineLookupInclusionProjection) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$project: {b_ssn: 1}}]
+    }}])");
+
+    runTest([&] {
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+
+        ASSERT_EQUALS(
+            graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs").srcStages.back(),
+            stages[0]);
+
+        // 'docs.b_ssn' crosses into the sub-pipeline. The inclusion projection preserves
+        // b_ssn from the sub-pipeline's input, so it originates from the base collection.
+        auto result = graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.b_ssn");
+        ASSERT_EQUALS(result.srcStages.back(), nullptr);
+        ASSERT_TRUE(result.fromSubpipeline);
+
+        // 'docs.other' is excluded by the inclusion projection, so it's declared by the $project
+        // (deleted).
+        auto otherResult = graph->getDeclaringStageIncludingSubpipelines(nullptr, "docs.other");
+        ASSERT_NOT_EQUALS(otherResult.srcStages.back(), nullptr);
+        ASSERT_TRUE(otherResult.fromSubpipeline);
+
+        // Within the sub-pipeline, b_ssn comes from the base collection (unknown arrayness).
+        ASSERT_TRUE(subGraph->canPathBeArray(nullptr, "b_ssn"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, AddFieldsUnionWithMatchDependencies) {
+    // Pipeline:
+    //   [0] $addFields: { s: "A" }
+    //   [1] $unionWith: { coll: "coll_c", pipeline: [{ $addFields: { s: "B" } }] }
+    //   [2] $match: { s: "A" }
+    setPipeline(R"([
+        {$addFields: {s: "A"}},
+        {$unionWith: {
+            coll: "coll_c",
+            pipeline: [{$addFields: {s: "B"}}]
+        }},
+        {$match: {s: "A"}}
+    ])");
+
+    runTest([&] {
+        // $unionWith should have a sub-pipeline with exactly one stage.
+        auto* subGraph = graph->getSubpipelineGraph(stages[1].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+
+        // $addFields and $match should not have sub-pipelines.
+        ASSERT_EQUALS(graph->getSubpipelineGraph(stages[0].get()), nullptr);
+        ASSERT_EQUALS(graph->getSubpipelineGraph(stages[2].get()), nullptr);
+
+        // From $match (stages[2]), 's' is attributed to $unionWith (stages[1]) since
+        // $unionWith replaces all paths with an exhaustive scope.
+        ASSERT_EQUALS(
+            graph->getDeclaringStageIncludingSubpipelines(stages[2].get(), "s").srcStages.back(),
+            stages[1]);
+
+        // Within the sub-pipeline, 's' is declared by the sub-pipeline's $addFields.
+        auto subDeclStage =
+            subGraph->getDeclaringStageIncludingSubpipelines(nullptr, "s").srcStages.back();
+        ASSERT_NOT_EQUALS(subDeclStage, nullptr);
+
+        // After $unionWith, 's' could come from either branch so canPathBeArray is true.
+        ASSERT_TRUE(graph->canPathBeArray(stages[2].get(), "s"));
+
+        // Within the sub-pipeline, 's' is set to constant string "B", so it cannot be an array.
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "s"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, AddFieldsUnionWithMatchDependenciesWithAddingArrayValue) {
+    // Pipeline:
+    //   [0] $addFields: { s: ["A", "B"] }
+    //   [1] $unionWith: { coll: "coll_c", pipeline: [{ $addFields: { s: "B" } }] }
+    //   [2] $match: { s: "A" }
+    setPipeline(R"([
+        {$addFields: {s: ["A", "B"]}},
+        {$unionWith: {
+            coll: "coll_c",
+            pipeline: [{$addFields: {s: "B"}}]
+        }},
+        {$match: {s: "A"}}
+    ])");
+
+    runTest([&] {
+        // After $unionWith, 's' could come from either branch so canPathBeArray is true.
+        ASSERT_TRUE(graph->canPathBeArray(stages[2].get(), "s"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineCanPathBeArrayUnknownSubField) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$set: {b_ssn: 2}}]
+    }}])");
+
+    runTest([&] {
+        // 'docs.unknown' comes from the sub-pipeline's input collection, arrayness is unknown.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "docs.unknown"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineGetDeclaringStageThenMatch) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$set: {b_ssn: 2}}]
+    }},
+    {$match: {"docs.b_ssn": 1}}])");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // 'docs.b_ssn' visible from the $match stage should still resolve into the sub-pipeline.
+        auto result = graph->getDeclaringStageIncludingSubpipelines(last, "docs.b_ssn");
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        auto subDeclaringStage = subGraph->getDeclaringStage(nullptr, "b_ssn");
+        ASSERT_EQUALS(result.srcStages.back(), subDeclaringStage);
+        ASSERT_TRUE(result.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithHasSubGraph) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}, {$set: {y: 2}}]
+    }}])");
+
+    runTest([&] {
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithNullForRegularStage) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}]
+    }},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        // $unionWith has a sub-pipeline graph.
+        ASSERT_NOT_EQUALS(graph->getSubpipelineGraph(stages[0].get()), nullptr);
+        // $match does not.
+        ASSERT_EQUALS(graph->getSubpipelineGraph(stages[1].get()), nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithDeclaringStage) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}]
+    }},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        auto* matchStage = stages[1].get();
+        // After $unionWith, any field is attributed to the $unionWith stage since it
+        // replaces all paths (kAllPaths).
+        auto declStage =
+            graph->getDeclaringStageIncludingSubpipelines(matchStage, "x").srcStages.back();
+        ASSERT_EQUALS(declStage, stages[0]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithDeclaringStageUnknownField) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}]
+    }},
+    {$match: {y: 1}}])");
+
+    runTest([&] {
+        auto* matchStage = stages[1].get();
+        // Even fields NOT in the sub-pipeline are attributed to $unionWith since
+        // it creates an exhaustive scope.
+        auto declStage =
+            graph->getDeclaringStageIncludingSubpipelines(matchStage, "y").srcStages.back();
+        ASSERT_EQUALS(declStage, stages[0]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineLookupEmptyPipeline) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs"
+    }}])");
+
+    runTest([&] {
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineMultipleStagesWithSubPipelines) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$set: {extra: 1}}]
+    }},
+    {$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}]
+    }},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        // Both $lookup and $unionWith should have subpipeline graphs.
+        auto* lookupSubGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(lookupSubGraph, nullptr);
+
+        auto* unionSubGraph = graph->getSubpipelineGraph(stages[1].get());
+        ASSERT_NOT_EQUALS(unionSubGraph, nullptr);
+
+        // $match should not have a subpipeline graph.
+        ASSERT_EQUALS(graph->getSubpipelineGraph(stages[2].get()), nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineNestedLookup) {
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [
+            {$set: {extra: 1}},
+            {$lookup: {
+                from: "coll_c",
+                localField: "bar",
+                foreignField: "c_bar",
+                as: "inner_docs",
+                let: {},
+                pipeline: [{$set: {deep: 99}}]
+            }}
+        ]
+    }}])");
+
+    runTest([&] {
+        // Outer $lookup has a subpipeline graph.
+        auto* outerSubGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(outerSubGraph, nullptr);
+
+        // The inner $lookup (second stage of outer subpipeline) should also have
+        // its own subpipeline graph via the outer subgraph.
+        auto* outerSubStages = pipeline->getSources().front()->getSubPipeline();
+        auto innerLookupIt = outerSubStages->begin();
+        std::advance(innerLookupIt, 1);  // second stage = inner $lookup
+        auto* innerSubGraph = outerSubGraph->getSubpipelineGraph(innerLookupIt->get());
+        ASSERT_NOT_EQUALS(innerSubGraph, nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithCanPathBeArray) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 42}}]
+    }},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        auto* matchStage = stages[1].get();
+        // After $unionWith (exhaustive scope), canPathBeArray is conservatively true
+        // because documents can come from either stream.
+        ASSERT_TRUE(graph->canPathBeArray(matchStage, "x"));
+        ASSERT_TRUE(graph->canPathBeArray(matchStage, "y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithCanPathBeArrayBothNonArray) {
+    setPipeline(R"([
+        {$set: {x: 42}},
+        {$unionWith: {
+            coll: "coll_c",
+            pipeline: [{$set: {x: 99}}]
+        }},
+        {$match: {x: 1}}
+    ])");
+
+    runTest([&] {
+        auto* matchStage = stages[2].get();
+        // Even though 'x' is a non-array constant in both the main pipeline ($set: {x: 42})
+        // and the sub-pipeline ($set: {x: 99}), after $unionWith the field is conservatively
+        // considered to potentially be an array because $unionWith creates an exhaustive scope.
+        ASSERT_TRUE(graph->canPathBeArray(matchStage, "x"));
+
+        // Within the sub-pipeline, x=99 (constant int), so canPathBeArray is false.
+        auto* subGraph = graph->getSubpipelineGraph(stages[1].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithSubGraphDeclaringStage) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}]
+    }},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        // Although getDeclaringStage for the main pipeline returns $unionWith,
+        // we can independently query the sub-pipeline graph.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+
+        auto subDeclStage =
+            subGraph->getDeclaringStageIncludingSubpipelines(nullptr, "x").srcStages.back();
+        ASSERT_NOT_EQUALS(subDeclStage, nullptr);
+        // The sub-pipeline's $set declares "x".
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithSubGraphCanPathBeArray) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 42}}]
+    }},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+
+        // Within the sub-pipeline, x=42 (constant int), so canPathBeArray is false.
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "x"));
+        // Unknown fields in the sub-pipeline: conservative true.
+        ASSERT_TRUE(subGraph->canPathBeArray(nullptr, "unknown_field"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithThenSet) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}]
+    }},
+    {$set: {x: 99}},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        auto* matchStage = stages[2].get();
+        // $set after $unionWith overrides: field "x" is now declared by the $set.
+        auto declStage =
+            graph->getDeclaringStageIncludingSubpipelines(matchStage, "x").srcStages.back();
+        ASSERT_EQUALS(declStage, stages[1]);
+
+        // "y" not set by the outer $set, still attributed to $unionWith.
+        auto declY =
+            graph->getDeclaringStageIncludingSubpipelines(matchStage, "y").srcStages.back();
+        ASSERT_EQUALS(declY, stages[0]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnionWithThenSetCanPathBeArray) {
+    setPipeline(R"([{$unionWith: {
+        coll: "coll_c",
+        pipeline: [{$set: {x: 1}}]
+    }},
+    {$set: {x: 42}},
+    {$match: {x: 1}}])");
+
+    runTest([&] {
+        auto* matchStage = stages[2].get();
+        // $set {x: 42} after $unionWith: x is a constant int, not an array.
+        ASSERT_FALSE(graph->canPathBeArray(matchStage, "x"));
+        // "y" still comes from the exhaustive scope, so conservatively true.
+        ASSERT_TRUE(graph->canPathBeArray(matchStage, "y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       SubPipelineUnionWithExhaustiveScopesBothBranchesExcludeFieldCanPathBeArray) {
+    // Both branches have inclusion projections that keep only 'x' — 'y' is truly absent
+    // from the outer pipeline and from the $unionWith sub-pipeline.  Despite this, the
+    // graph cannot reason across both branches of a $unionWith, so after the union it
+    // still conservatively reports canPathBeArray(y) = true.
+    setPipeline(R"([
+        {$project: {x: 1, _id: 0}},
+        {$unionWith: {
+            coll: "coll_c",
+            pipeline: [{$project: {x: 1, _id: 0}}]
+        }},
+        {$match: {y: 1}}
+    ])");
+
+    runTest([&] {
+        pathArrayness->addPath("y", {}, true);
+        // Before $unionWith: the outer $project {x: 1} makes 'y' truly absent.
+        auto proj = stages[0].get();
+        ASSERT_FALSE(graph->canPathBeArray(proj, "y"));
+
+        // Inside the sub-pipeline: same $project also makes 'y' truly absent.
+        auto unionWith = stages[1].get();
+        auto* subGraph = graph->getSubpipelineGraph(unionWith);
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "y"));
+
+        ASSERT_TRUE(graph->canPathBeArray(unionWith, "y"));
+
+        // After $unionWith: the graph cannot cross-reference both branches, so 'y'
+        // is conservatively assumed to be potentially present and array-typed.
+        auto match = stages[2].get();
+        ASSERT_TRUE(graph->canPathBeArray(match, "y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineWithEmptyPipeline) {
+    setPipeline(R"([
+        {$match: {my_id: 100}},
+        {$lookup: {
+            from: "coll_b", 
+            localField: "b", 
+            foreignField: "b",
+            as: "B_data"
+        }},
+        {$unwind: "$B_data"},
+        {$match: {"B_data.indicator": "Y"}},
+        {$lookup: {
+            from: "coll_c", 
+            localField: "b", 
+            foreignField: "b", 
+            as: "C_data"
+        }},
+        {$unwind: "$C_data"},
+        {
+            $addFields: {
+                zip: "$C_data.other_id.zip"
+            }
+    }])");
+
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "zip")); });
+}
 
 TEST_F(PipelineDependencyGraphTest, SimpleCase) {
     setPipeline(
@@ -616,7 +1319,7 @@ TEST_F(PipelineDependencyGraphTest, CanMissingBaseFieldBeArray) {
     setPipeline("[{$project: { a: 1 }}, {$set: { 'b.c': 1 }}, {$match: {b: 1}}]");
     runTest([&] {
         auto* ds = stages.back().get();
-        // 'b' is missing after the inclusion projection..
+        // 'b' is missing after the inclusion projection.
         ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
         ASSERT_FALSE(graph->canPathBeArray(ds, "b.c"));
     });
