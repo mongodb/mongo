@@ -276,7 +276,12 @@ boost::optional<BSONObj> generateRandomSplitPoint(OperationContext* opCtx,
     }
 
     // If no document exists, then try to generate a new one in between min and max.
-    return generateRandomDocument(min, max, gen);
+    if (auto randomDoc = generateRandomDocument(min, max, gen)) {
+        if (randomDoc->woCompare(min) > 0 && randomDoc->woCompare(max) < 0) {
+            return *randomDoc;
+        }
+    }
+    return boost::none;
 }
 }  // namespace random_migration_testing_utils
 }  // namespace mongo
