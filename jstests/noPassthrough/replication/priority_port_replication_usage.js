@@ -306,6 +306,8 @@ describe("Tests for priority port usage within replication internals", function 
         assert.doesNotThrow(() => {
             this.rs.start(primaryId, {restart: true, remember: true});
         });
+        this.rs.awaitSecondaryNodes();
+        this.rs.awaitReplication();
 
         jsTest.log.info("Check steady state replication");
         doWritesAndCheckReplication(this.rs.getPrimary(), this.rs.getSecondaries());
