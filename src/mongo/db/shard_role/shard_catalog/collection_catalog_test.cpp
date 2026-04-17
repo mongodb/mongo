@@ -1179,13 +1179,15 @@ public:
         wuow.commit();
     }
 
-    void concurrentCreateCollectionAndEstablishConsistentCollection(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    boost::optional<UUID> uuid,
-                                                                    Timestamp timestamp,
-                                                                    bool openSnapshotBeforeCommit,
-                                                                    bool expectedExistence,
-                                                                    int expectedNumIndexes) {
+    void concurrentCreateCollectionAndEstablishConsistentCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<UUID> uuid,
+        Timestamp timestamp,
+        bool openSnapshotBeforeCommit,
+        bool expectedExistence,
+        int expectedNumIndexes,
+        boost::optional<Timestamp> lookupTimestamp = boost::none) {
         NamespaceStringOrUUID readNssOrUUID = [&]() {
             if (uuid) {
                 return NamespaceStringOrUUID(nss.dbName(), *uuid);
@@ -1199,6 +1201,7 @@ public:
             timestamp,
             [this, &nss, &uuid](OperationContext* opCtx) { _createCollection(opCtx, nss, uuid); },
             openSnapshotBeforeCommit,
+            lookupTimestamp,
             expectedExistence,
             expectedNumIndexes);
     }
@@ -1223,7 +1226,8 @@ public:
         Timestamp timestamp,
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
-        int expectedNumIndexes) {
+        int expectedNumIndexes,
+        boost::optional<Timestamp> lookupTimestamp = boost::none) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
@@ -1232,6 +1236,7 @@ public:
                 _dropCollection(opCtx, nss, timestamp);
             },
             openSnapshotBeforeCommit,
+            lookupTimestamp,
             expectedExistence,
             expectedNumIndexes);
     }
@@ -1259,7 +1264,8 @@ public:
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
         int expectedNumIndexes,
-        std::function<void()> verifyStateCallback = {}) {
+        std::function<void()> verifyStateCallback = {},
+        boost::optional<Timestamp> lookupTimestamp = boost::none) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             lookupNssOrUUID,
@@ -1268,6 +1274,7 @@ public:
                 _renameCollection(opCtx, from, to, timestamp);
             },
             openSnapshotBeforeCommit,
+            lookupTimestamp,
             expectedExistence,
             expectedNumIndexes,
             std::move(verifyStateCallback));
@@ -1297,7 +1304,8 @@ public:
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
         int expectedNumIndexes,
-        std::function<void(OperationContext*)> extraOpHook = {}) {
+        std::function<void(OperationContext*)> extraOpHook = {},
+        boost::optional<Timestamp> lookupTimestamp = boost::none) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
@@ -1309,6 +1317,7 @@ public:
                 }
             },
             openSnapshotBeforeCommit,
+            lookupTimestamp,
             expectedExistence,
             expectedNumIndexes);
     }
@@ -1322,7 +1331,8 @@ public:
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
         int expectedNumIndexes,
-        std::function<void(OperationContext*)> extraOpHook = {}) {
+        std::function<void(OperationContext*)> extraOpHook = {},
+        boost::optional<Timestamp> lookupTimestamp = boost::none) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
@@ -1334,6 +1344,7 @@ public:
                 }
             },
             openSnapshotBeforeCommit,
+            lookupTimestamp,
             expectedExistence,
             expectedNumIndexes);
     }
@@ -1378,10 +1389,11 @@ protected:
                     // The preCommit handler must be registered after the DDL operation so it's
                     // executed after any preCommit hooks set up in the operation.
                     shard_role_details::getRecoveryUnit(opCtx.get())
-                        ->registerPreCommitHook([this](OperationContext*) {
-                            _reachedPreCommit.emplaceValue();
-                            _unhangPreCommit.getFuture().get();
-                        });
+                        ->registerPreCommitHook(
+                            [this](OperationContext*, boost::optional<Timestamp>) {
+                                _reachedPreCommit.emplaceValue();
+                                _unhangPreCommit.getFuture().get();
+                            });
 
                     wuow.commit();
                 });
@@ -1579,6 +1591,7 @@ private:
         Timestamp timestamp,
         Callable&& ddlOperation,
         bool openSnapshotBeforeCommit,
+        boost::optional<Timestamp> lookupTimestamp,
         bool expectedExistence,
         int expectedNumIndexes,
         std::function<void()> verifyStateCallback = {}) {
@@ -1592,13 +1605,13 @@ private:
         }
 
         // Perform the openCollection lookup.
-        OneOffRead oor(opCtx, Timestamp());
+        OneOffRead oor(opCtx, lookupTimestamp ? *lookupTimestamp : Timestamp());
         Lock::GlobalLock globalLock(opCtx, MODE_IS);
         // Stash the catalog so we may perform multiple lookups that will be in sync with our
         // snapshot
         CollectionCatalog::stash(opCtx, CollectionCatalog::get(opCtx));
         auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
-            opCtx, nssOrUUID, boost::none);
+            opCtx, nssOrUUID, lookupTimestamp);
 
         ddl.reset();
 
@@ -3967,6 +3980,493 @@ TEST(GetConfigDebugDumpTest, FeatureFlagDisabled) {
         kNoVersionContext, NamespaceString::createNamespaceString_forTest("config", "databases"));
     ASSERT_FALSE(resultListed);
 };
+
+// Tests for PIT reads racing with pending DDL operations (SERVER-96916).
+// These verify that establishConsistentCollection returns the correct Collection state when a
+// concurrent DDL has committed to the durable catalog but not yet published to the in-memory
+// catalog, and the reader uses a specific readTimestamp.
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateCollectionAndOpenCollectionAfterCommitAtDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    concurrentCreateCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        nss,
+        boost::none,
+        createCollectionTs,
+        false,
+        true,
+        0,
+        boost::make_optional(createCollectionTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateCollectionAndOpenCollectionByUUIDAfterCommitAtDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    UUID uuid = UUID::gen();
+
+    concurrentCreateCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        nss,
+        uuid,
+        createCollectionTs,
+        false,
+        true,
+        0,
+        boost::make_optional(createCollectionTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropCollectionAndOpenCollectionBeforeCommitBeforeDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+    const Timestamp readTs = Timestamp(15, 15);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    concurrentDropCollectionAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, dropCollectionTs, true, true, 0, boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropCollectionAndOpenCollectionAfterCommitAfterDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+    const Timestamp readTs = Timestamp(25, 25);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    concurrentDropCollectionAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, dropCollectionTs, false, false, 0, boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropCollectionAndOpenCollectionByUUIDAfterCommitBeforeDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+    const Timestamp readTs = Timestamp(15, 15);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    concurrentDropCollectionAndEstablishConsistentCollection(opCtx.get(),
+                                                             nss,
+                                                             uuidWithDbName,
+                                                             dropCollectionTs,
+                                                             false,
+                                                             true,
+                                                             0,
+                                                             boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropCollectionAndOpenCollectionByUUIDAfterCommitAfterDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+    const Timestamp readTs = Timestamp(25, 25);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    concurrentDropCollectionAndEstablishConsistentCollection(opCtx.get(),
+                                                             nss,
+                                                             uuidWithDbName,
+                                                             dropCollectionTs,
+                                                             false,
+                                                             false,
+                                                             0,
+                                                             boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithOriginalNameAfterCommitAtDdlTimestamp) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString newNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        newNss,
+        originalNss,
+        renameCollectionTs,
+        false,
+        false,
+        0,
+        {},
+        boost::make_optional(renameCollectionTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithOriginalNameBeforeCommitBeforeDdlTimestamp) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString newNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+    const Timestamp readTs = Timestamp(15, 15);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+
+    concurrentRenameCollectionAndEstablishConsistentCollection(opCtx.get(),
+                                                               originalNss,
+                                                               newNss,
+                                                               originalNss,
+                                                               renameCollectionTs,
+                                                               true,
+                                                               true,
+                                                               0,
+                                                               {},
+                                                               boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithNewNameBeforeCommitBeforeDdlTimestamp) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString newNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+    const Timestamp readTs = Timestamp(15, 15);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+
+    concurrentRenameCollectionAndEstablishConsistentCollection(opCtx.get(),
+                                                               originalNss,
+                                                               newNss,
+                                                               newNss,
+                                                               renameCollectionTs,
+                                                               true,
+                                                               false,
+                                                               0,
+                                                               {},
+                                                               boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithNewNameAfterCommitAtDdlTimestamp) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString newNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        newNss,
+        newNss,
+        renameCollectionTs,
+        false,
+        true,
+        0,
+        {},
+        boost::make_optional(renameCollectionTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithUUIDAfterCommitAtDdlTimestamp) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString newNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), uuid);
+
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        newNss,
+        uuidWithDbName,
+        renameCollectionTs,
+        false,
+        true,
+        0,
+        {},
+        boost::make_optional(renameCollectionTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithUUIDBeforeCommitBeforeDdlTimestamp) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString newNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+    const Timestamp readTs = Timestamp(15, 15);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), uuid);
+
+    concurrentRenameCollectionAndEstablishConsistentCollection(opCtx.get(),
+                                                               originalNss,
+                                                               newNss,
+                                                               uuidWithDbName,
+                                                               renameCollectionTs,
+                                                               true,
+                                                               true,
+                                                               0,
+                                                               {},
+                                                               boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionAfterCommitBeforeDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+    const Timestamp readTs = Timestamp(25, 25);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          nss,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          1,
+                                                          {},
+                                                          boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionByUUIDAfterCommitBeforeDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+    const Timestamp readTs = Timestamp(25, 25);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          uuidWithDbName,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          1,
+                                                          {},
+                                                          boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionBeforeCommitBeforeDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+    const Timestamp readTs = Timestamp(25, 25);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2, {}, boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionAfterCommitBeforeDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+    const Timestamp readTs = Timestamp(25, 25);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    concurrentDropIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                        nss,
+                                                        nss,
+                                                        "y_1",
+                                                        dropIndexTs,
+                                                        false,
+                                                        true,
+                                                        2,
+                                                        {},
+                                                        boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionByUUIDAfterCommitBeforeDdlTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+    const Timestamp readTs = Timestamp(25, 25);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    concurrentDropIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                        nss,
+                                                        uuidWithDbName,
+                                                        "y_1",
+                                                        dropIndexTs,
+                                                        false,
+                                                        true,
+                                                        2,
+                                                        {},
+                                                        boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropAndRecreateCollectionAndOpenCollectionAtOldTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+    const Timestamp recreateTs = Timestamp(30, 30);
+    const Timestamp readTs = Timestamp(15, 15);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    // Concurrently create a new collection with the same namespace (pending, not published) and
+    // read at a timestamp when the OLD collection existed. The old collection's ident is still in
+    // the drop-pending reaper, so _createPITCollectionFromDropPendingIdent succeeds and the
+    // pending collection fallback is not reached. This test verifies the overall flow works.
+    concurrentCreateCollectionAndEstablishConsistentCollection(
+        opCtx.get(), nss, boost::none, recreateTs, false, true, 0, boost::make_optional(readTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest, ConcurrentRecreateWithReapedIdentDoesNotCrash) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+    const Timestamp recreateTs = Timestamp(30, 30);
+    const Timestamp readTs = Timestamp(15, 15);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    // Simulate the ident having been reaped by the checkpoint thread. With this failpoint active,
+    // _createPITCollectionFromDropPendingIdent returns nullptr as if the ident was removed from
+    // the drop-pending reaper.
+    auto fp = globalFailPointRegistry().find("failToCreatePITCollectionFromDropPendingIdent");
+    fp->setMode(FailPoint::alwaysOn);
+
+    // Concurrently create a new collection with the same namespace. The pending collection has
+    // different metadata (different UUID) than the old catalog entry at readTs. With the ident
+    // "reaped", establishConsistentCollection must throw SnapshotUnavailable.
+    {
+        ConcurrentDDL ddl(getServiceContext(), recreateTs, [&nss](OperationContext* opCtx) {
+            AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
+            databaseWriteGuard.ensureDbExists(opCtx);
+            Lock::CollectionLock lk(opCtx, nss, MODE_IX);
+
+            CollectionOptions options;
+            options.uuid.emplace(UUID::gen());
+
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            const auto ident = storageEngine->generateNewCollectionIdent(nss.dbName());
+            auto mdbCatalog = storageEngine->getMDBCatalog();
+            const auto catalogId = mdbCatalog->reserveCatalogId(opCtx);
+            auto rs = unittest::assertGet(durable_catalog::createCollection(
+                opCtx, catalogId, nss, ident, options, mdbCatalog));
+            auto catalogEntry =
+                durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
+            auto metadata = catalogEntry->metadata;
+            std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
+                opCtx, nss, catalogId, metadata, std::move(rs));
+            ownedCollection->init(opCtx);
+            CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
+        });
+
+        ddl.hangAfterCommit();
+
+        {
+            OneOffRead oor(opCtx.get(), readTs);
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+            ASSERT_THROWS_CODE(CollectionCatalog::get(opCtx.get())
+                                   ->establishConsistentCollection(opCtx.get(), nss, readTs),
+                               DBException,
+                               ErrorCodes::SnapshotUnavailable);
+        }
+    }
+
+    fp->setMode(FailPoint::off);
+}
 
 }  // namespace
 }  // namespace mongo

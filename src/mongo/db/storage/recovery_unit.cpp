@@ -64,14 +64,16 @@ void RecoveryUnit::ensureSnapshot() {
     }
 }
 
-void RecoveryUnit::registerPreCommitHook(std::function<void(OperationContext*)> callback) {
+void RecoveryUnit::registerPreCommitHook(
+    std::function<void(OperationContext*, boost::optional<Timestamp>)> callback) {
     _preCommitHooks.push_back(std::move(callback));
 }
 
-void RecoveryUnit::runPreCommitHooks(OperationContext* opCtx) {
+void RecoveryUnit::runPreCommitHooks(OperationContext* opCtx,
+                                     boost::optional<Timestamp> commitTime) {
     ON_BLOCK_EXIT([&] { _preCommitHooks.clear(); });
     for (auto& hook : _preCommitHooks) {
-        hook(opCtx);
+        hook(opCtx, commitTime);
     }
 }
 
@@ -111,9 +113,9 @@ void RecoveryUnit::commitUnitOfWork() {
         return;
     }
 
-    runPreCommitHooks(_opCtx);
-
-    doCommitUnitOfWork();
+    const auto commitTime = _determineCommitTimestamp();
+    runPreCommitHooks(_opCtx, commitTime);
+    doCommitUnitOfWork(commitTime);
     resetSnapshot();
 }
 

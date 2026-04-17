@@ -81,11 +81,6 @@ export const $config = (function () {
                     );
                 }
             } catch (e) {
-                // TODO(SERVER-96916): Remove once this issue is fixed.
-                if (e.code == 10065) {
-                    return;
-                }
-
                 if (e.code == ErrorCodes.SnapshotTooOld) {
                     return;
                 }

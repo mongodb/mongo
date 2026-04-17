@@ -796,6 +796,45 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbor
     ASSERT(!commitTs);
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, PreCommitHookReceivesNoTimestampWhenNoneSet) {
+    boost::optional<Timestamp> preCommitTs = boost::none;
+
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->registerPreCommitHook(
+        [&](OperationContext*, boost::optional<Timestamp> ts) { preCommitTs = ts; });
+    ru1->commitUnitOfWork();
+
+    ASSERT(!preCommitTs);
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, PreCommitHookReceivesLastTimestampSet) {
+    boost::optional<Timestamp> preCommitTs = boost::none;
+    Timestamp ts1(5, 5);
+
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ASSERT_OK(ru1->setTimestamp(ts1));
+    ru1->registerPreCommitHook(
+        [&](OperationContext*, boost::optional<Timestamp> ts) { preCommitTs = ts; });
+    ru1->commitUnitOfWork();
+
+    ASSERT(preCommitTs);
+    ASSERT_EQ(*preCommitTs, ts1);
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, PreCommitHookReceivesCommitTimestamp) {
+    boost::optional<Timestamp> preCommitTs = boost::none;
+    Timestamp ts1(5, 5);
+
+    ru1->setCommitTimestamp(ts1);
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->registerPreCommitHook(
+        [&](OperationContext*, boost::optional<Timestamp> ts) { preCommitTs = ts; });
+    ru1->commitUnitOfWork();
+
+    ASSERT(preCommitTs);
+    ASSERT_EQ(*preCommitTs, ts1);
+}
+
 TEST_F(WiredTigerRecoveryUnitTestFixture, StorageStatsSubsequentTransactions) {
     auto opCtx = clientAndCtx1.second.get();
 

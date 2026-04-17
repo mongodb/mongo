@@ -88,6 +88,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+static constexpr auto kIsSanitizerBuild = __has_feature(thread_sanitizer) ||
+    __has_feature(address_sanitizer) || __has_feature(memory_sanitizer);
 
 // Failpoint which causes catalog updates to hang right before performing a durable commit of them.
 // This causes updates to have been precommitted.
@@ -99,6 +101,8 @@ static constexpr auto kDelayEntireCommitFailpointField = "pauseEntireCommitMilli
 MONGO_FAIL_POINT_DEFINE(hangBeforePublishingCatalogUpdates);
 
 MONGO_FAIL_POINT_DEFINE(setMinVisibleForAllCollectionsToOldestOnStartup);
+
+MONGO_FAIL_POINT_DEFINE(failToCreatePITCollectionFromDropPendingIdent);
 
 /**
  * If a collection is initially created with an untimestamped write, but later DDL operations
@@ -450,13 +454,15 @@ public:
             return;
 
         shard_role_details::getRecoveryUnit(opCtx)->registerPreCommitHook(
-            [](OperationContext* opCtx) { PublishCatalogUpdates::preCommit(opCtx); });
+            [](OperationContext* opCtx, boost::optional<Timestamp> commitTs) {
+                PublishCatalogUpdates::preCommit(opCtx, commitTs);
+            });
         shard_role_details::getRecoveryUnit(opCtx)->registerChangeForCatalogVisibility(
             std::make_unique<PublishCatalogUpdates>(uncommittedCatalogUpdates));
         uncommittedCatalogUpdates.markRegisteredWithRecoveryUnit();
     }
 
-    static void preCommit(OperationContext* opCtx) {
+    static void preCommit(OperationContext* opCtx, boost::optional<Timestamp> commitTs) {
         auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
         const auto& entries = uncommittedCatalogUpdates.entries();
 
@@ -513,19 +519,20 @@ public:
                     continue;
                 }
 
-                // Mark the namespace as pending commit even if we don't have a collection instance.
+                PendingCommitEntry pendingEntry{entry.collection, commitTs};
+
                 catalog._pendingCommitNamespaces =
-                    catalog._pendingCommitNamespaces.set(entry.nss, entry.collection);
+                    catalog._pendingCommitNamespaces.set(entry.nss, pendingEntry);
 
                 if (entry.collection) {
                     // If we have a collection instance for this entry also mark the uuid as pending
                     catalog._pendingCommitUUIDs =
-                        catalog._pendingCommitUUIDs.set(entry.collection->uuid(), entry.collection);
+                        catalog._pendingCommitUUIDs.set(entry.collection->uuid(), pendingEntry);
                 } else if (entry.externalUUID) {
                     // Drops do not have a collection instance but set their UUID in the entry. Mark
                     // it as pending with no collection instance.
                     catalog._pendingCommitUUIDs =
-                        catalog._pendingCommitUUIDs.set(*entry.externalUUID, nullptr);
+                        catalog._pendingCommitUUIDs.set(*entry.externalUUID, pendingEntry);
                 }
             }
 
@@ -1041,15 +1048,10 @@ ExcludeTestOnlyCollectionInstantiation::~ExcludeTestOnlyCollectionInstantiation(
 const Collection* CollectionCatalog::_instantiateCollectionIfTesting(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
+    const RecordId& catalogId,
     boost::optional<Timestamp> readTimestamp) const {
 
-    static constexpr auto kIsSanitizerBuild = __has_feature(thread_sanitizer) ||
-        __has_feature(address_sanitizer) || __has_feature(memory_sanitizer);
-    if (!(kIsSanitizerBuild || kDebugBuild)) {
-        // Not a testing build or using the sanitizer, do an early exit since we don't have to do
-        // anything.
-        return nullptr;
-    }
+    invariant(kIsSanitizerBuild || kDebugBuild);
 
     if (exclusionCounterForDeepCopies(opCtx) > 0) {
         // The branch is running under exclusion rules temporarily while the code is fixed. Nothing
@@ -1106,8 +1108,9 @@ const Collection* CollectionCatalog::_instantiateCollectionIfTesting(
     // the durable state not correspond with what's in memory but expect the in-memory version
     // to be returned. For more details see SERVER-115811.
     bool isPartOfTimeseriesUpgradeDowngrade = [&] {
-        auto pending = _findPendingCommitCollection(nssOrUUID);
-        return pending && _hasPendingTimeseriesUpgradeDowngradeCommit(nssOrUUID, *pending);
+        auto pending = _findPendingCommitEntry(nssOrUUID);
+        return pending &&
+            _hasPendingTimeseriesUpgradeDowngradeCommit(nssOrUUID, pending->collection);
     }();
     shouldInstantiateCollection &= !isPartOfTimeseriesUpgradeDowngrade;
 
@@ -1116,9 +1119,8 @@ const Collection* CollectionCatalog::_instantiateCollectionIfTesting(
     }
 
     auto& openedCollections = OpenedCollections::get(opCtx);
-    static constexpr auto doNotWriteIntoHistoricalCatalogIdTracker = false;
-    auto catalogEntry = _fetchPITCatalogEntry(
-        opCtx, nssOrUUID, readTimestamp, doNotWriteIntoHistoricalCatalogIdTracker);
+    auto catalogEntry =
+        durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
     if (!catalogEntry) {
         // No collection could be found at the given PIT
         return nullptr;
@@ -1154,12 +1156,21 @@ ConsistentCollection CollectionCatalog::establishConsistentCollection(
         return ConsistentCollection{opCtx, coll};
     }
 
-    auto coll = _instantiateCollectionIfTesting(opCtx, nssOrUUID, readTimestamp);
-    if (coll) {
-        return ConsistentCollection{opCtx, coll};
-    }
+    auto coll = _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(nssOrUUID).get();
 
-    coll = _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(nssOrUUID).get();
+    if constexpr (kIsSanitizerBuild || kDebugBuild) {
+        if (coll) {
+            auto clone = _instantiateCollectionIfTesting(
+                opCtx, nssOrUUID, coll->getCatalogId(), readTimestamp);
+            // By definition, if the collection exists, the test helper must return an instance,
+            // unless it has decided not to clone for whatever reason. Hence, if nullptr is returned
+            // it can only be because it was decided not to clone, not because at the PIT the
+            // collection is non-existing. Only return "clone" if not null.
+            if (clone) {
+                return ConsistentCollection{opCtx, clone};
+            }
+        }
+    }
     return ConsistentCollection{opCtx, coll};
 }
 
@@ -1181,7 +1192,7 @@ std::vector<ConsistentCollection> CollectionCatalog::establishConsistentCollecti
         appendIfUnique(std::move(currentCollection));
     }
 
-    for (auto const& [ns, coll] : _pendingCommitNamespaces) {
+    for (auto const& [ns, entry] : _pendingCommitNamespaces) {
         if (ns.dbName() == dbName) {
             auto currentCollection = establishConsistentCollection(opCtx, ns, boost::none);
             appendIfUnique(std::move(currentCollection));
@@ -1191,7 +1202,7 @@ std::vector<ConsistentCollection> CollectionCatalog::establishConsistentCollecti
     return result;
 }
 
-const std::shared_ptr<Collection>* CollectionCatalog::_findPendingCommitCollection(
+const CollectionCatalog::PendingCommitEntry* CollectionCatalog::_findPendingCommitEntry(
     const NamespaceStringOrUUID& nssOrUUID) const {
     if (nssOrUUID.isNamespaceString()) {
         return _pendingCommitNamespaces.find(nssOrUUID.nss());
@@ -1213,7 +1224,7 @@ bool CollectionCatalog::_hasPendingTimeseriesUpgradeDowngradeCommit(
             : nsOrUUID.nss().makeTimeseriesBucketsNamespace();
         auto found = _pendingCommitNamespaces.find(otherNs);
         if (found) {
-            pendingCommitColl = found->get();
+            pendingCommitColl = found->collection.get();
         }
     }
 
@@ -1348,6 +1359,19 @@ bool CollectionCatalog::_hideViewAtPointInTimeIfDowngradedToViewfulTimeseries(
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {
+    // If there are pending commits on a namespace, the in-memory catalog may not reflect the DDL
+    // that has been committed to durable but not yet published. We always need to go through the
+    // open collection path, which will determine if any existing collection instances are
+    // compatible (including the pending commit one) by checking the durable catalog entry, or
+    // instantiate a new one if necessary.
+    auto pending = _findPendingCommitEntry(nsOrUUID);
+
+    // Timeseries upgrade/downgrade is safe to ignore because both viewless and viewful are
+    // supported, and operating on a stale version of Collection is fine.
+    if (pending && !_hasPendingTimeseriesUpgradeDowngradeCommit(nsOrUUID, pending->collection)) {
+        return true;
+    }
+
     if (readTimestamp) {
         auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
 
@@ -1357,10 +1381,8 @@ bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
 
         // Otherwise we only verify that the collection is valid for the given timestamp.
         return *readTimestamp < coll->getMinimumValidSnapshot();
-    } else {
-        auto pending = _findPendingCommitCollection(nsOrUUID);
-        return pending && !_hasPendingTimeseriesUpgradeDowngradeCommit(nsOrUUID, *pending);
     }
+    return false;
 }
 
 const Collection* CollectionCatalog::_openCollection(
@@ -1385,9 +1407,9 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // compare the collection instance in _pendingCommitNamespaces and the collection instance in
     // the in-memory catalog with the durable catalog entry to determine which instance to return.
     const auto& pendingCollection = [&]() -> std::shared_ptr<Collection> {
-        const std::shared_ptr<Collection>* pending = _findPendingCommitCollection(nssOrUUID);
+        const PendingCommitEntry* pending = _findPendingCommitEntry(nssOrUUID);
         invariant(pending);
-        return *pending;
+        return pending->collection;
     }();
 
     auto latestCollection = [&]() -> std::shared_ptr<const Collection> {
@@ -1439,11 +1461,11 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         // under open collection for this namespace. We can detect this case by comparing the
         // catalogId with what is pending for this namespace.
         if (nssOrUUID.isUUID()) {
-            const std::shared_ptr<Collection>* found = _pendingCommitNamespaces.find(nss);
+            const PendingCommitEntry* found = _pendingCommitNamespaces.find(nss);
             // When openCollection is called with no timestamp, the namespace must be pending
             // commit.
             invariant(found);
-            auto& pending = *found;
+            auto& pending = found->collection;
             if (pending && pending->getCatalogId() != catalogId) {
                 openedCollections.store(nullptr, boost::none, uuid);
                 openedCollections.store(pending, nss, pending->uuid());
@@ -1478,9 +1500,9 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         // UUID is supported and will return a Collection with its namespace in sync with the
         // storage snapshot. Like above, the correct instance is either in the catalog or under
         // pending. First lookup in pending by UUID to determine if it contains the right namespace.
-        const std::shared_ptr<Collection>* pending = _pendingCommitUUIDs.find(uuid);
+        const PendingCommitEntry* pending = _pendingCommitUUIDs.find(uuid);
         invariant(pending);
-        const auto& pendingCollectionByUUID = *pending;
+        const auto& pendingCollectionByUUID = pending->collection;
         if (pendingCollectionByUUID->ns() == nsInDurableCatalog) {
             openedCollections.store(pendingCollectionByUUID, pendingCollectionByUUID->ns(), uuid);
         } else {
@@ -1579,9 +1601,13 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
     Timestamp readTimestamp) const {
     auto& openedCollections = OpenedCollections::get(opCtx);
 
-    // Try to find a catalog entry matching 'readTimestamp'.
-    auto catalogEntry = _fetchPITCatalogEntry(opCtx, nssOrUUID, readTimestamp);
-    if (!catalogEntry) {
+    const auto compatibleCollection =
+        _getCollectionAtPointInTimeByNamespaceOrUUID(opCtx, nssOrUUID, readTimestamp);
+    if (compatibleCollection) {
+        openedCollections.store(
+            compatibleCollection, compatibleCollection->ns(), compatibleCollection->uuid());
+        return compatibleCollection.get();
+    } else {
         openedCollections.store(
             nullptr,
             [&]() -> boost::optional<NamespaceString> {
@@ -1598,14 +1624,40 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
             }());
         return nullptr;
     }
+}
+
+std::shared_ptr<Collection> CollectionCatalog::_getCollectionAtPointInTimeByNamespaceOrUUID(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUUID,
+    Timestamp readTimestamp) const {
+
+    const auto [pendingCollectionCompatible, pendingCollection] =
+        _getPendingCommitCollectionAtPointInTimeByNamespaceOrUUIDIfCompatible(
+            opCtx, nssOrUUID, readTimestamp);
+
+    if (pendingCollectionCompatible) {
+        return pendingCollection;
+    }
+
+    // Try to find the catalog entry matching 'readTimestamp'. We reach here when:
+    //  1. Pending commit where:
+    //      a. readTimestamp < ddlTimestamp — the DDL hasn't happened yet.
+    //      b. readTimestamp >= ddlTimestamp but the pending collection instance is incompatible.
+    //  2. No pending commit — normal path.
+    auto catalogEntry = _fetchPITCatalogEntry(opCtx, nssOrUUID, readTimestamp);
+    if (!catalogEntry) {
+        return nullptr;
+    }
 
     auto latestCollection =
         _lookupCollectionByUUIDNoFindInstantiated(*catalogEntry->metadata->options.uuid);
 
-    // Return the in-memory Collection instance if it is compatible with the read timestamp.
-    if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
-        openedCollections.store(latestCollection, latestCollection->ns(), latestCollection->uuid());
-        return latestCollection.get();
+    // Return the in-memory Collection instance if it is compatible with the read timestamp and
+    // its metadata matches the PIT catalog entry. A pending DDL may have changed the metadata
+    // (index create/drop) or namespace (rename) without publishing to the in-memory catalog yet.
+    if (isExistingCollectionCompatible(latestCollection, readTimestamp) &&
+        latestCollection->isMetadataEqual(catalogEntry->metadata->toBSON())) {
+        return latestCollection;
     }
 
     // Use the shared collection state from the latest Collection in the in-memory collection
@@ -1613,48 +1665,115 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
     auto compatibleCollection =
         _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
     if (compatibleCollection) {
-        openedCollections.store(
-            compatibleCollection, compatibleCollection->ns(), compatibleCollection->uuid());
-        return compatibleCollection.get();
+        return compatibleCollection;
     }
 
-    // There is no state in-memory that matches the catalog entry. Try to instantiate a new
-    // Collection instance from scratch.
-    auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
+    // There is no in-memory state that matches the catalog entry. Try to instantiate from the
+    // drop-pending ident (for collections that existed, were published, and then dropped).
+    auto newCollection =
+        _createPITCollectionFromDropPendingIdent(opCtx, readTimestamp, catalogEntry.get());
     if (newCollection) {
-        openedCollections.store(newCollection, newCollection->ns(), newCollection->uuid());
-        return newCollection.get();
+        return newCollection;
     }
 
-    openedCollections.store(
-        nullptr,
-        [nssOrUUID]() -> boost::optional<NamespaceString> {
-            if (nssOrUUID.isNamespaceString()) {
-                return nssOrUUID.nss();
-            }
-            return boost::none;
-        }(),
-        [nssOrUUID]() -> boost::optional<UUID> {
-            if (nssOrUUID.isUUID()) {
-                return nssOrUUID.uuid();
-            }
-            return boost::none;
-        }());
-    return nullptr;
+    // A valid catalog entry was found at readTimestamp but no construction method succeeded. This
+    // happens when the ident has been reaped by the drop-pending reaper (e.g. after a checkpoint)
+    // and cannot be recovered. The data existed at this PIT but is no longer accessible.
+    uasserted(ErrorCodes::SnapshotUnavailable,
+              str::stream() << "Unable to open collection "
+                            << catalogEntry->metadata->nss.toStringForErrorMsg()
+                            << " at the requested timestamp. The catalog entry exists at "
+                            << readTimestamp.toString()
+                            << " but the underlying data is no longer available.");
+}
+
+std::pair<bool, std::shared_ptr<Collection>>
+CollectionCatalog::_getPendingCommitCollectionAtPointInTimeByNamespaceOrUUIDIfCompatible(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUUID,
+    Timestamp readTimestamp) const {
+
+    auto pendingCommit = _findPendingCommitEntry(nssOrUUID);
+    if (!pendingCommit) {
+        // No pending commit.
+        return {false, nullptr};
+    }
+
+    // Fast path for pending commit collection. If the read timestamp >= pending commit timestamp,
+    // we may be able to use the existing pending commit collection instance after an O(1) durable
+    // catalog verification. This avoids going through the HistoricalCatalogIdTracker, which may
+    // require an O(N) durable catalog scan when the tracker has no mapping for a newly introduced
+    // namespace.
+    //
+    // We verify the pending state against the durable catalog entry at readTimestamp before
+    // returning. This is necessary because the DDL's transaction may not have committed yet or it
+    // may have failed to commit. If the durable state doesn't match, we fall through to the normal
+    // PIT reconstruction path.
+
+    // If there is no ddlTimestamp, this is an unreplicated collection. We still want to check if
+    // the pending collection is compatible with a relatively cheap O(1) durable lookup +
+    // comparison.
+    if (pendingCommit->ddlTimestamp && readTimestamp < *pendingCommit->ddlTimestamp) {
+        // The read timestamp is before the DDL's commit time — not compatible.
+        return {false, nullptr};
+    }
+
+    // Get the catalogId from the pending Collection, or from the in-memory catalog for drops or
+    // renames where the pending entry has no Collection pointer. The in-memory catalog still has
+    // the pre-DDL Collection since publish hasn't run.
+    auto catalogId = [&]() -> RecordId {
+        if (pendingCommit->collection) {
+            return pendingCommit->collection->getCatalogId();
+        }
+        auto coll = _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(nssOrUUID);
+        return coll ? coll->getCatalogId() : RecordId();
+    }();
+
+    auto catalogEntry =
+        durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
+
+    // Any DDL besides drop or rename (meaning we are looking up the original nss).
+    if (pendingCommit->collection) {
+        if (catalogEntry &&
+            pendingCommit->collection->isMetadataEqual(catalogEntry->metadata->toBSON())) {
+            return {true, pendingCommit->collection};
+        }
+
+        // If there was a pending collection instance for the nssOrUUID, no catalogEntry or mismatch
+        // means not compatible.
+        return {false, nullptr};
+    }
+
+    // Drop or rename: the catalog row should be deleted (drop) or have a different namespace
+    // (rename). UUID lookups never reach here for renames because the UUID doesn't change — the
+    // UUID pending entry has the actual Collection (kWritableCollection), not the null old-name
+    // entry.
+    bool pendingDropOrRenamedAwayCompatible = !catalogEntry ||
+        (nssOrUUID.isNamespaceString() && catalogEntry->metadata->nss != nssOrUUID.nss());
+
+    // Return compatible but non-existing, or non-compatible.
+    return {pendingDropOrRenamedAwayCompatible, nullptr};
 }
 
 boost::optional<durable_catalog::CatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
-    boost::optional<Timestamp> readTimestamp,
-    bool writeIntoCatalogIdTracker) const {
+    Timestamp readTimestamp) const {
     auto [catalogId, result] = nssOrUUID.isNamespaceString()
         ? _catalogIdTracker.lookup(nssOrUUID.nss(), readTimestamp)
         : _catalogIdTracker.lookup(nssOrUUID.uuid(), readTimestamp);
+
     if (result == HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists) {
         return boost::none;
     }
 
+    // Skip writing to the HistoricalCatalogIdTracker when there are pending commits. The tracker
+    // invariants that insert timestamp is > last entry's timestamp. If a PIT read at a timestamp
+    // greater than the pending commit caches the result, the publish step of the DDL may hit the
+    // invariant. The window the DDL is pending commit is small, and the risk and complexity of
+    // relaxing the invariant outweighs the potential benefits.
+    const auto pendingCommitEntry = _findPendingCommitEntry(nssOrUUID);
+    bool shouldSkipWrite = pendingCommitEntry && readTimestamp >= pendingCommitEntry->ddlTimestamp;
     auto writeCatalogIdAfterScan =
         [&](const boost::optional<durable_catalog::CatalogEntry>& catalogEntry) {
             if (!catalogEntry) {
@@ -1676,13 +1795,13 @@ boost::optional<durable_catalog::CatalogEntry> CollectionCatalog::_fetchPITCatal
                         catalogEntry->metadata->nss,
                         *catalogEntry->metadata->options.uuid,
                         catalogEntry->catalogId,
-                        *readTimestamp);
+                        readTimestamp);
                 } else if (nssOrUUID.isNamespaceString()) {
                     catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.nss(),
-                                                                      *readTimestamp);
+                                                                      readTimestamp);
                 } else {
                     catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.uuid(),
-                                                                      *readTimestamp);
+                                                                      readTimestamp);
                 }
             });
         };
@@ -1694,10 +1813,7 @@ boost::optional<durable_catalog::CatalogEntry> CollectionCatalog::_fetchPITCatal
         auto catalogEntry = nssOrUUID.isNamespaceString()
             ? durable_catalog::scanForCatalogEntryByNss(opCtx, nssOrUUID.nss(), mdbCatalog)
             : durable_catalog::scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid(), mdbCatalog);
-        if (MONGO_likely(writeIntoCatalogIdTracker)) {
-            // We shouldn't receive kUnknown when we don't have a timestamp since no timestamp means
-            // we're operating on the latest.
-            invariant(readTimestamp);
+        if (!shouldSkipWrite) {
             writeCatalogIdAfterScan(catalogEntry);
         }
         return catalogEntry;
@@ -1711,8 +1827,7 @@ boost::optional<durable_catalog::CatalogEntry> CollectionCatalog::_fetchPITCatal
         auto catalogEntry = nssOrUUID.isNamespaceString()
             ? durable_catalog::scanForCatalogEntryByNss(opCtx, nssOrUUID.nss(), mdbCatalog)
             : durable_catalog::scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid(), mdbCatalog);
-        if (MONGO_likely(writeIntoCatalogIdTracker)) {
-            invariant(readTimestamp);
+        if (!shouldSkipWrite) {
             writeCatalogIdAfterScan(catalogEntry);
         }
         return catalogEntry;
@@ -1766,18 +1881,23 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
     return collToReturn;
 }
 
-std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
+std::shared_ptr<Collection> CollectionCatalog::_createPITCollectionFromDropPendingIdent(
     OperationContext* opCtx,
     boost::optional<Timestamp> readTimestamp,
     const durable_catalog::CatalogEntry& catalogEntry) const {
-    // The ident is expired, but it still may not have been dropped by the reaper. Try to mark it as
-    // in use.
+    if (MONGO_unlikely(failToCreatePITCollectionFromDropPendingIdent.shouldFail())) {
+        return nullptr;
+    }
+
+    // The ident must be pending drop but not yet reaped. markIdentInUse returns nullptr if the
+    // ident is unknown to the reaper (e.g. a brand-new collection whose ident was never dropped)
+    // or if the reaper is already in the process of dropping it.
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto newIdent = storageEngine->markIdentInUse(catalogEntry.ident);
     if (!newIdent) {
         LOGV2_DEBUG(6857101,
                     1,
-                    "Collection ident is being dropped or is already dropped",
+                    "Collection ident is not tracked by the drop-pending reaper",
                     "ident"_attr = catalogEntry.ident);
         return nullptr;
     }
@@ -2046,11 +2166,10 @@ boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(OperationCo
     }
 
     if (withCommitPending) {
-        if (const auto collPtr = _pendingCommitUUIDs.find(uuid); collPtr && *collPtr &&
-            !_hasPendingTimeseriesUpgradeDowngradeCommit({(*collPtr)->ns().dbName(), uuid},
-                                                         *collPtr)) {
-            auto coll = *collPtr;
-            return coll->ns();
+        if (const auto entry = _pendingCommitUUIDs.find(uuid); entry && entry->collection &&
+            !_hasPendingTimeseriesUpgradeDowngradeCommit({entry->collection->ns().dbName(), uuid},
+                                                         entry->collection)) {
+            return entry->collection->ns();
         }
     }
 
@@ -2107,10 +2226,11 @@ bool CollectionCatalog::isLatestCollection(OperationContext* opCtx,
     if (!coll) {
         // If there is nothing in the main catalog check for pending commit, we could have just
         // committed a newly created collection which would be considered latest.
-        coll = _pendingCommitUUIDs.find(collection->uuid());
-        if (!coll || !coll->get()) {
+        const PendingCommitEntry* pending = _pendingCommitUUIDs.find(collection->uuid());
+        if (!pending || !pending->collection) {
             return false;
         }
+        return pending->collection.get() == collection;
     }
 
     return coll->get() == collection;
@@ -2440,7 +2560,7 @@ std::vector<DatabaseName> CollectionCatalog::getAllConsistentDbNamesForTenant(
             "point in time catalog lookup for a database list is not supported",
             RecoveryUnit::ReadSource::kNoTimestamp ==
                 shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
-    for (auto const& [ns, coll] : _pendingCommitNamespaces) {
+    for (auto const& [ns, entry] : _pendingCommitNamespaces) {
         if (!visitedDBs.contains(ns.dbName())) {
             if (establishConsistentCollection(opCtx, ns, readTimestamp)) {
                 insertSortedIfUnique(ns.dbName());
@@ -2633,8 +2753,8 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
                                     << "' is already in use.");
     }
 
-    existingCollection = _pendingCommitNamespaces.find(nss);
-    if (existingCollection && existingCollection->get()) {
+    auto pendingEntry = _pendingCommitNamespaces.find(nss);
+    if (pendingEntry && pendingEntry->collection) {
         LOGV2(7683900,
               "Conflicted registering namespace, already have a collection with the same namespace",
               "nss"_attr = nss);

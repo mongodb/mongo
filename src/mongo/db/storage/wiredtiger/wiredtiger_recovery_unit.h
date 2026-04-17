@@ -229,9 +229,12 @@ public:
      */
     void onCreateTable(const char* uri);
 
+protected:
+    boost::optional<Timestamp> _determineCommitTimestamp() const override;
+
 private:
     void doBeginUnitOfWork() override;
-    void doCommitUnitOfWork() override;
+    void doCommitUnitOfWork(boost::optional<Timestamp> commitTime) override;
     void doAbortUnitOfWork() override;
 
     void doAbandonSnapshot() override;
@@ -239,7 +242,7 @@ private:
     void _setIsolation(Isolation) override;
 
     void _abort();
-    void _commit();
+    void _commit(boost::optional<Timestamp> commitTime);
     void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine,
                                  Timestamp commitTime,
                                  bool needsAllDurablePin);

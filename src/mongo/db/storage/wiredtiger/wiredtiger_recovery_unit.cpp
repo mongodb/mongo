@@ -184,12 +184,7 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
     }
 }
 
-void WiredTigerRecoveryUnit::_commit() {
-    // Since we cannot have both a _lastTimestampSet and a _commitTimestamp, we set the
-    // commit time as whichever is non-empty. If both are empty, then _lastTimestampSet will
-    // be boost::none and we'll set the commit time to that.
-    auto commitTime = _commitTimestamp.isNull() ? _lastTimestampSet : _commitTimestamp;
-
+void WiredTigerRecoveryUnit::_commit(boost::optional<Timestamp> commitTime) {
     bool notifyDone = !_prepareTimestamp.isNull();
     if (_session && _isActive()) {
         auto* kvEngine = _connection->getKVEngine();
@@ -278,9 +273,9 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
     setNoEvictionAfterCommitOrRollback();
 }
 
-void WiredTigerRecoveryUnit::doCommitUnitOfWork() {
+void WiredTigerRecoveryUnit::doCommitUnitOfWork(boost::optional<Timestamp> commitTime) {
     invariant(_inUnitOfWork(), toString(_getState()));
-    _commit();
+    _commit(commitTime);
 }
 
 void WiredTigerRecoveryUnit::doAbortUnitOfWork() {
@@ -903,6 +898,13 @@ void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
 
 Timestamp WiredTigerRecoveryUnit::getCommitTimestamp() const {
     return _commitTimestamp;
+}
+
+boost::optional<Timestamp> WiredTigerRecoveryUnit::_determineCommitTimestamp() const {
+    // Since we cannot have both a _lastTimestampSet and a _commitTimestamp, we set the
+    // commit time as whichever is non-empty. If both are empty, then _lastTimestampSet will
+    // be boost::none and we'll set the commit time to that.
+    return _commitTimestamp.isNull() ? _lastTimestampSet : _commitTimestamp;
 }
 
 void WiredTigerRecoveryUnit::setDurableTimestamp(Timestamp timestamp) {

@@ -687,12 +687,16 @@ private:
 
     class PublishCatalogUpdates;
 
+    struct PendingCommitEntry {
+        std::shared_ptr<Collection> collection;   // nullptr for drop and rename (old-name) entries
+        boost::optional<Timestamp> ddlTimestamp;  // boost::none for unreplicated namespaces
+    };
+
     /**
-     * If the NSS or UUID is pending commit, returns the instance of the collection pending commit.
+     * If the NSS or UUID is pending commit, returns the pending commit entry.
      * Otherwise, returns nullptr.
      */
-    const std::shared_ptr<Collection>* _findPendingCommitCollection(
-        const NamespaceStringOrUUID& nssOrUUID) const;
+    const PendingCommitEntry* _findPendingCommitEntry(const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
      * Given a collection that is pending commit, returns whether the pending commit is because
@@ -824,15 +828,13 @@ private:
     const Collection* _lookupSystemViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
-     * Searches for a catalog entry at a point-in-time.
+     * Searches for a catalog entry at a point-in-time using the HistoricalCatalogIdTracker and
+     * the durable catalog.
      */
     boost::optional<durable_catalog::CatalogEntry> _fetchPITCatalogEntry(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nssOrUUID,
-        boost::optional<Timestamp> readTimestamp,
-        // TODO SERVER-121286: This argument shouldn't exist as we only keep this here to avoid
-        // hitting an invariant.
-        bool writeIntoCatalogIdTracker = true) const;
+        Timestamp readTimestamp) const;
 
     /**
      * Tries to create a Collection instance using existing shared collection state. Returns nullptr
@@ -845,9 +847,11 @@ private:
         const durable_catalog::CatalogEntry& catalogEntry) const;
 
     /**
-     * Creates a Collection instance from scratch if the ident has not yet been dropped.
+     * Creates a Collection instance from scratch using an ident that is pending drop. The ident
+     * must be tracked by the drop-pending reaper; returns nullptr if the ident is unknown to the
+     * reaper (e.g. for a brand-new collection) or has already been reaped.
      */
-    std::shared_ptr<Collection> _createNewPITCollection(
+    std::shared_ptr<Collection> _createPITCollectionFromDropPendingIdent(
         OperationContext* opCtx,
         boost::optional<Timestamp> readTimestamp,
         const durable_catalog::CatalogEntry& catalogEntry) const;
@@ -915,6 +919,7 @@ private:
     const Collection* _instantiateCollectionIfTesting(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nssOrUUID,
+        const RecordId& catalogId,
         boost::optional<Timestamp> readTimestamp) const;
 
     /**
@@ -933,6 +938,21 @@ private:
     const Collection* _openCollectionAtLatestByNamespaceOrUUID(
         OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
     const Collection* _openCollectionAtPointInTimeByNamespaceOrUUID(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        Timestamp readTimestamp) const;
+
+    // Helper to determine if a pending commit collection is compatible with the PIT read. Returns
+    // false as the first element of the pair if there is no pending commit, or when it is
+    // incompatible. When returning true, the second element of the pair contains the collection
+    // instance (or nullptr if the collection is dropped or renamed).
+    std::pair<bool, std::shared_ptr<Collection>>
+    _getPendingCommitCollectionAtPointInTimeByNamespaceOrUUIDIfCompatible(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        Timestamp readTimestamp) const;
+
+    std::shared_ptr<Collection> _getCollectionAtPointInTimeByNamespaceOrUUID(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nssOrUUID,
         Timestamp readTimestamp) const;
@@ -959,8 +979,8 @@ private:
     // Namespaces and UUIDs in pending commit. The opened storage snapshot must be consulted to
     // confirm visibility. The instance may be used if the namespace/uuid are otherwise unoccupied
     // in the CollectionCatalog.
-    immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>> _pendingCommitNamespaces;
-    immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash> _pendingCommitUUIDs;
+    immutable::unordered_map<NamespaceString, PendingCommitEntry> _pendingCommitNamespaces;
+    immutable::unordered_map<UUID, PendingCommitEntry, UUID::Hash> _pendingCommitUUIDs;
 
     // Provides functionality to lookup catalogId by namespace/uuid for a given timestamp.
     HistoricalCatalogIdTracker _catalogIdTracker;

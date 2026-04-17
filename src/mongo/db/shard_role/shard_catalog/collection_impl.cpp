@@ -1902,7 +1902,9 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     // Mark this index that there is an ongoing multikey write. This forces readers to read from the
     // durable catalog to determine if the index is multikey or not.
     shard_role_details::getRecoveryUnit(opCtx)->registerPreCommitHook(
-        [concurrentWriteTracker](OperationContext*) { concurrentWriteTracker->preCommit(); });
+        [concurrentWriteTracker](OperationContext*, boost::optional<Timestamp>) {
+            concurrentWriteTracker->preCommit();
+        });
 
     // Capture a reference to 'concurrentWriteTracker' to extend the lifetime of this object until
     // commiting/rolling back the transaction is fully complete.

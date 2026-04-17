@@ -394,7 +394,8 @@ public:
     virtual void clearCommitTimestamp() {}
 
     /**
-     * Returns the commit timestamp. Can be called at any time.
+     * Returns the commit timestamp explicitly set via setCommitTimestamp(). Can be called at
+     * any time.
      */
     virtual Timestamp getCommitTimestamp() const {
         return {};
@@ -629,12 +630,14 @@ public:
 
     /**
      * Registers a callback to be called prior to a WriteUnitOfWork committing the storage
-     * transaction. This callback may throw a WriteConflictException which will abort the
-     * transaction.
+     * transaction. The callback receives the commit timestamp that the storage engine will later
+     * use when committing the transaction. The timestamp is boost::none if no timestamp has been
+     * assigned. This callback may throw a WriteConflictException which will abort the transaction.
      */
-    virtual void registerPreCommitHook(std::function<void(OperationContext*)> callback);
+    virtual void registerPreCommitHook(
+        std::function<void(OperationContext*, boost::optional<Timestamp>)> callback);
 
-    virtual void runPreCommitHooks(OperationContext* opCtx);
+    virtual void runPreCommitHooks(OperationContext* opCtx, boost::optional<Timestamp> commitTime);
 
     /**
      * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
@@ -956,6 +959,18 @@ protected:
     RecoveryUnit() = default;
 
     /**
+     * Returns the commit timestamp for this transaction. The commit timestamp is resolved from
+     * either setCommitTimestamp() for prepared transactions or setTimestamp() for non-prepared
+     * ones. The default returns boost::none; storage engines that support timestamps should
+     * override this.
+     *
+     * This method must only be called when the transaction is about to commit.
+     */
+    virtual boost::optional<Timestamp> _determineCommitTimestamp() const {
+        return boost::none;
+    }
+
+    /**
      * Returns the current state.
      */
     State _getState() const {
@@ -1036,14 +1051,18 @@ protected:
 private:
     virtual void doBeginUnitOfWork() = 0;
     virtual void doAbandonSnapshot() = 0;
-    virtual void doCommitUnitOfWork() = 0;
+    /**
+     * @param commitTime The commit timestamp to be used for this transaction, as resolved by
+     * _determineCommitTimestamp().
+     */
+    virtual void doCommitUnitOfWork(boost::optional<Timestamp> commitTime) = 0;
     virtual void doAbortUnitOfWork() = 0;
 
     virtual void _setIsolation(Isolation) = 0;
 
     virtual void validateInUnitOfWork() const;
 
-    std::vector<std::function<void(OperationContext*)>> _preCommitHooks;
+    std::vector<std::function<void(OperationContext*, boost::optional<Timestamp>)>> _preCommitHooks;
 
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;

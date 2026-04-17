@@ -1369,7 +1369,10 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
         // The preCommit handler must be registered after the DDL operation so it's executed
         // after any preCommit hooks set up in the operation.
         shard_role_details::getRecoveryUnit(newOpCtx.get())
-            ->registerPreCommitHook([&commitHandler](OperationContext* opCtx) { commitHandler(); });
+            ->registerPreCommitHook(
+                [&commitHandler](OperationContext*, boost::optional<Timestamp>) {
+                    commitHandler();
+                });
 
         wuow.commit();
     });

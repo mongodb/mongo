@@ -53,7 +53,7 @@ public:
 
     void doAbandonSnapshot() override {}
 
-    void doCommitUnitOfWork() override {
+    void doCommitUnitOfWork(boost::optional<Timestamp> commitTime) override {
         _executeCommitHandlers(boost::none);
     }
 
