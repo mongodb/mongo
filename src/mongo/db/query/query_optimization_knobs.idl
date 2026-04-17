@@ -97,6 +97,14 @@ enums:
             kINLJ: "INLJ"
             kNLJ: "NLJ"
 
+    TransformHoistPolicy:
+        description: "Controls when the independent prefix of a $project or $addFields is hoisted past the preceding stage."
+        type: string
+        values:
+            kNever: "never"
+            kForMatchPushdown: "forMatchPushdown"
+            kAlways: "always"
+
 structs:
     InternalQueryCutoffForSampleFromRandomCursorStorage:
         description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
@@ -956,14 +964,17 @@ server_parameters:
         default: true
         redact: false
 
-    internalQueryPermitTransformHoist:
+    internalQueryTransformHoistPolicy:
         description: >-
-            When enabled, permits hoisting the independent prefix of a $project or $addFields past
-            the preceding stage.
+            Controls when the independent prefix of a $project or $addFields is hoisted past the
+            preceding stage. "never" disables hoisting entirely; "forMatchPushdown" hoists only
+            when a following $match gains pushdown eligibility; "always" hoists unconditionally.
         set_at: [startup, runtime]
-        cpp_varname: "internalQueryPermitTransformHoist"
-        cpp_vartype: AtomicWord<bool>
-        default: false
+        cpp_class:
+            name: TransformHoistPolicy
+            data: synchronized_value<TransformHoistPolicyEnum>
+        default:
+            expr: TransformHoistPolicyEnum::kNever
         redact: false
 # Note for adding additional query knobs:
 #

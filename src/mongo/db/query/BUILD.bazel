@@ -301,6 +301,7 @@ mongo_cc_library(
         "sampling_ce_method.cpp",
         "sampling_confidence_interval.cpp",
         "sbe_hashAgg_increased_spilling_mode.cpp",
+        "transform_hoist_policy.cpp",
     ],
     deps = [
         ":on_parameter_change_updaters",

@@ -6,9 +6,11 @@
  *   requires_pipeline_optimization,
  *   # Uses runWithParamsAllNonConfigNodes which requires a stable shard list.
  *   assumes_stable_shard_list,
- *   # Uses a knob (internalQueryPermitTransformHoist) that does not exist on older binaries.
+ *   # Uses a knob (internalQueryTransformHoistPolicy) that does not exist on older binaries.
  *   multiversion_incompatible,
  *   assumes_unsharded_collection,
+ *   # $group serialization changes depending on FCV (adds $willBeMerged) which breaks the test.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -49,9 +51,11 @@ function lookupStage(as, references = []) {
  * @param pipeline input pipeline
  * @param optimized the expected optimized pipeline
  * @param expected the expected results
+ * @param policy the required TransformHoistPolicy for the rewrite
  */
-function runTest({name, docs, pipeline, optimized, expected}) {
-    function runTestInner() {
+function runTest({name, docs, pipeline, optimized, expected, policy}) {
+    assert(typeof policy === "string");
+    function runTestInner(expectedOptimized) {
         const coll = db.hoist_computation;
         coll.drop();
         assert.commandWorked(coll.insertMany(docs));
@@ -69,7 +73,7 @@ function runTest({name, docs, pipeline, optimized, expected}) {
 
         // Insert $_internalInhibitOptimization before each stage in the expected optimized
         // pipeline to prevent the optimizer from further modifying it during explain.
-        const inhibitedOptimized = inhibitOptimizationPerStage(optimized);
+        const inhibitedOptimized = inhibitOptimizationPerStage(expectedOptimized);
         const optimizedExplain = coll.explain().aggregate(inhibitedOptimized);
         const expectedStages = extractUserStages(optimizedExplain);
 
@@ -80,9 +84,29 @@ function runTest({name, docs, pipeline, optimized, expected}) {
         assert.docEq(results, expected, "optimized results");
     }
 
-    it(name, function () {
-        runWithParamsAllNonConfigNodes(db, {internalQueryPermitTransformHoist: true}, runTestInner);
-    });
+    function runWithPolicy(p, expectedOptimized) {
+        runWithParamsAllNonConfigNodes(db, {internalQueryTransformHoistPolicy: p}, () =>
+            runTestInner(expectedOptimized),
+        );
+    }
+
+    switch (policy) {
+        case "always":
+            it(name + " (always)", () => {
+                runWithPolicy("always", optimized);
+            });
+            it(name + " (forMatchPushdown)", () => {
+                runWithPolicy("forMatchPushdown", pipeline);
+            });
+            break;
+        case "forMatchPushdown":
+            it(name, () => {
+                runWithPolicy("forMatchPushdown", optimized);
+            });
+            break;
+        default:
+            assert(false);
+    }
 }
 
 runTest({
@@ -97,6 +121,7 @@ runTest({
         {a: [{fromLookup: 1}], b: 1},
         {b: 1, a: [{fromLookup: 1}]},
     ],
+    policy: "always",
 });
 
 runTest({
@@ -108,6 +133,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {b: "$c"}}],
     optimized: [{$set: {b: "$c"}}, lookupStage("a")],
     expected: [{a: [{fromLookup: 1}]}, {a: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -119,6 +145,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {b: "$c.d"}}],
     optimized: [{$set: {b: "$c.d"}}, lookupStage("a")],
     expected: [{a: [{fromLookup: 1}]}, {a: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -130,6 +157,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {b: "$c.d.e"}}],
     optimized: [{$set: {b: "$c.d.e"}}, lookupStage("a")],
     expected: [{a: [{fromLookup: 1}]}, {a: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -144,6 +172,7 @@ runTest({
         {a: [{fromLookup: 1}], b: {}},
         {b: {}, a: [{fromLookup: 1}]},
     ],
+    policy: "always",
 });
 
 runTest({
@@ -158,6 +187,7 @@ runTest({
         {a: [{fromLookup: 1}], b: true},
         {b: true, a: [{fromLookup: 1}]},
     ],
+    policy: "always",
 });
 
 runTest({
@@ -166,6 +196,7 @@ runTest({
     pipeline: [lookupStage("a.b"), {$set: {result: {$gt: ["$a", null]}}}],
     optimized: [lookupStage("a.b"), {$set: {result: {$gt: ["$a", null]}}}],
     expected: [{c: 1, a: {b: [{fromLookup: 1}]}, result: true}],
+    policy: "always",
 });
 
 runTest({
@@ -174,6 +205,7 @@ runTest({
     pipeline: [lookupStage("a.b"), {$set: {result: {$gt: ["$a.c", null]}}}],
     optimized: [{$set: {result: {$gt: ["$a.c", null]}}}, lookupStage("a.b")],
     expected: [{a: {c: 5, b: [{fromLookup: 1}]}, d: 1, result: true}],
+    policy: "always",
 });
 
 runTest({
@@ -182,6 +214,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {result: {$isArray: "$a.fromLookup"}}}],
     optimized: [lookupStage("a"), {$set: {result: {$isArray: "$a.fromLookup"}}}],
     expected: [{c: 1, a: [{fromLookup: 1}], result: true}],
+    policy: "always",
 });
 
 runTest({
@@ -190,6 +223,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {result: {$gt: ["$b.fromLookup", null]}}}],
     optimized: [{$set: {result: {$gt: ["$b.fromLookup", null]}}}, lookupStage("a")],
     expected: [{b: {fromLookup: 5}, d: 1, a: [{fromLookup: 1}], result: true}],
+    policy: "always",
 });
 
 runTest({
@@ -198,6 +232,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {b: {$type: "$$ROOT"}}}],
     optimized: [lookupStage("a"), {$set: {b: {$type: "$$ROOT"}}}],
     expected: [{c: 1, a: [{fromLookup: 1}], b: "object"}],
+    policy: "always",
 });
 
 runTest({
@@ -206,6 +241,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {b: {$type: "$$CURRENT"}}}],
     optimized: [lookupStage("a"), {$set: {b: {$type: "$$CURRENT"}}}],
     expected: [{c: 1, a: [{fromLookup: 1}], b: "object"}],
+    policy: "always",
 });
 
 runTest({
@@ -220,6 +256,7 @@ runTest({
         {a: [{fromLookup: 1}], b: 1},
         {b: 1, a: [{fromLookup: 1}]},
     ],
+    policy: "always",
 });
 
 runTest({
@@ -228,6 +265,7 @@ runTest({
     pipeline: [lookupStage("x", ["$a.b"]), {$set: {a: 99}}],
     optimized: [lookupStage("x", ["$a.b"]), {$set: {a: 99}}],
     expected: [{a: 99, c: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -236,6 +274,7 @@ runTest({
     pipeline: [lookupStage("x", ["$a.b"]), {$set: {"a.c": 99}}],
     optimized: [{$set: {"a.c": 99}}, lookupStage("x", ["$a.b"])],
     expected: [{a: {b: 5, c: 99}, d: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -244,6 +283,7 @@ runTest({
     pipeline: [lookupStage("x", ["$a"]), {$set: {"a.b": 99}}],
     optimized: [lookupStage("x", ["$a"]), {$set: {"a.b": 99}}],
     expected: [{a: {b: 99}, c: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -252,6 +292,7 @@ runTest({
     pipeline: [lookupStage("x", ["$a.c"]), {$set: {"a.b": 99}}],
     optimized: [{$set: {"a.b": 99}}, lookupStage("x", ["$a.c"])],
     expected: [{a: {b: 99, c: 5}, d: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -260,6 +301,7 @@ runTest({
     pipeline: [lookupStage("x", ["$a.b"]), {$set: {"a.b": 99}}],
     optimized: [lookupStage("x", ["$a.b"]), {$set: {"a.b": 99}}],
     expected: [{a: {b: 99}, c: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -274,6 +316,7 @@ runTest({
         {a: 1, b: 0},
         {b: 0, a: 1},
     ],
+    policy: "always",
 });
 
 runTest({
@@ -282,6 +325,7 @@ runTest({
     pipeline: [lookupStage("a.b"), {$set: {a: 99}}],
     optimized: [lookupStage("a.b"), {$set: {a: 99}}],
     expected: [{c: 1, a: 99}],
+    policy: "always",
 });
 
 runTest({
@@ -290,6 +334,7 @@ runTest({
     pipeline: [lookupStage("a.b"), {$set: {"a.c": 99}}],
     optimized: [{$set: {"a.c": 99}}, lookupStage("a.b")],
     expected: [{d: 1, a: {b: [{fromLookup: 1}], c: 99}}],
+    policy: "always",
 });
 
 runTest({
@@ -298,6 +343,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {"a.b": 99}}],
     optimized: [lookupStage("a"), {$set: {"a.b": 99}}],
     expected: [{c: 1, a: [{fromLookup: 1, b: 99}]}],
+    policy: "always",
 });
 
 runTest({
@@ -306,6 +352,7 @@ runTest({
     pipeline: [lookupStage("a.c"), {$set: {"a.b": 99}}],
     optimized: [{$set: {"a.b": 99}}, lookupStage("a.c")],
     expected: [{d: 1, a: {c: [{fromLookup: 1}], b: 99}}],
+    policy: "always",
 });
 
 runTest({
@@ -320,6 +367,7 @@ runTest({
         {a: 0, b: 1},
         {b: 1, a: 0},
     ],
+    policy: "always",
 });
 
 runTest({
@@ -334,6 +382,7 @@ runTest({
         {a: 1, b: 1},
         {b: 1, a: 1},
     ],
+    policy: "always",
 });
 
 runTest({
@@ -342,6 +391,7 @@ runTest({
     pipeline: [lookupStage("a.b"), {$set: {"x.y": 99}}],
     optimized: [{$set: {"x.y": 99}}, lookupStage("a.b")],
     expected: [{x: {y: 99}, c: 1, a: {b: [{fromLookup: 1}]}}],
+    policy: "always",
 });
 
 runTest({
@@ -350,6 +400,7 @@ runTest({
     pipeline: [lookupStage("a"), {$set: {"a.b": 1, "x.y": 1}}],
     optimized: [{$set: {"x.y": 1}}, lookupStage("a"), {$set: {"a.b": 1}}],
     expected: [{x: {y: 1}, c: 1, a: [{fromLookup: 1, b: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -358,6 +409,7 @@ runTest({
     pipeline: [lookupStage("out"), {$set: {out: "$a", a: 42}}],
     optimized: [lookupStage("out"), {$set: {out: "$a", a: 42}}],
     expected: [{a: 42, b: 0, c: 1, out: 5}],
+    policy: "always",
 });
 
 runTest({
@@ -366,6 +418,7 @@ runTest({
     pipeline: [lookupStage("out"), {$set: {out: "$a", a: "$b", b: 42}}],
     optimized: [lookupStage("out"), {$set: {out: "$a", a: "$b", b: 42}}],
     expected: [{a: 3, b: 42, c: 1, out: 5}],
+    policy: "always",
 });
 
 runTest({
@@ -374,6 +427,7 @@ runTest({
     pipeline: [lookupStage("out"), {$set: {out: "$b", "b.c": 42}}],
     optimized: [lookupStage("out"), {$set: {out: "$b", "b.c": 42}}],
     expected: [{b: {c: 42}, d: 1, out: {c: 0}}],
+    policy: "always",
 });
 
 runTest({
@@ -382,6 +436,7 @@ runTest({
     pipeline: [lookupStage("out"), {$set: {out: "$b.c", "b.d": 42}}],
     optimized: [{$set: {"b.d": 42}}, lookupStage("out"), {$set: {out: "$b.c"}}],
     expected: [{b: {c: 5, d: 42}, e: 1, out: 5}],
+    policy: "always",
 });
 
 /// ------------------------------------
@@ -394,6 +449,7 @@ runTest({
     pipeline: [lookupStage("x"), {$unset: "b"}],
     optimized: [lookupStage("x"), {$unset: "b"}],
     expected: [{a: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -402,6 +458,7 @@ runTest({
     pipeline: [lookupStage("x"), {$unset: "x"}],
     optimized: [lookupStage("x"), {$unset: "x"}],
     expected: [{a: 1, b: 1}],
+    policy: "always",
 });
 
 /// ------------------------------------
@@ -414,6 +471,7 @@ runTest({
     pipeline: [lookupStage("x"), {$set: {a: 1}}, {$set: {b: "$a"}}],
     optimized: [{$set: {a: 1}}, {$set: {b: "$a"}}, lookupStage("x")],
     expected: [{a: 1, b: 1, c: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -422,6 +480,7 @@ runTest({
     pipeline: [lookupStage("x"), {$set: {a: 1}}, {$set: {b: "$a"}}, {$set: {c: "$b"}}],
     optimized: [{$set: {a: 1}}, {$set: {b: "$a"}}, {$set: {c: "$b"}}, lookupStage("x")],
     expected: [{a: 1, b: 1, c: 1, d: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -430,6 +489,7 @@ runTest({
     pipeline: [lookupStage("x"), {$set: {a: 42}}, {$set: {b: 7}}, {$set: {c: 3}}],
     optimized: [{$set: {a: 42}}, {$set: {b: 7}}, {$set: {c: 3}}, lookupStage("x")],
     expected: [{a: 42, b: 7, c: 3, e: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -438,6 +498,7 @@ runTest({
     pipeline: [lookupStage("x"), {$set: {a: {$add: ["$a", 1]}}}, {$set: {b: {$add: ["$a", 1]}}}],
     optimized: [{$set: {a: {$add: ["$a", 1]}}}, {$set: {b: {$add: ["$a", 1]}}}, lookupStage("x")],
     expected: [{a: 1, b: 2, c: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -456,6 +517,7 @@ runTest({
         lookupStage("x"),
     ],
     expected: [{a: 1, b: 2, c: 3, d: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 runTest({
@@ -474,6 +536,7 @@ runTest({
         lookupStage("x"),
     ],
     expected: [{a: 1, b: 1, c: 1, e: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 /// ------------------------------------
@@ -486,6 +549,7 @@ runTest({
     pipeline: [lookupStage("x"), {$match: {x: {$exists: true}}}, {$set: {b: 1}}],
     optimized: [lookupStage("x"), {$match: {x: {$exists: true}}}, {$set: {b: 1}}],
     expected: [{a: 1, b: 1, c: 1, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 it("position requirement barrier: $set not hoisted before stage with position requirement", () => {
@@ -493,7 +557,7 @@ it("position requirement barrier: $set not hoisted before stage with position re
     // surprisingly reports empty modified paths, despite being a new source for the pipeline,
     // thereby allowing this rewrite, unless we make sure to check the position requirement.
     // Position requirement is already validated internally, we just need to make sure we don't crash.
-    runWithParamsAllNonConfigNodes(db, {internalQueryPermitTransformHoist: true}, () => {
+    runWithParamsAllNonConfigNodes(db, {internalQueryTransformHoistPolicy: "always"}, () => {
         db.hoist_computation.aggregate([{$indexStats: {}}, {$set: {a: 1}}]).toArray();
     });
 });
@@ -508,11 +572,35 @@ runTest({
     pipeline: [lookupStage("a"), {$group: {_id: "$a"}}, {$set: {a: "$_id", b: 1}}],
     optimized: [lookupStage("a"), {$group: {_id: "$a"}}, {$set: {a: "$_id", b: 1}}],
     expected: [{a: [{fromLookup: 1}], b: 1}],
+    policy: "always",
 });
 
 /// ------------------------------------
 /// $project+$match pushdown cases follow
 /// ------------------------------------
+
+runTest({
+    name: "$project+$match pushdown: independent $set hoisted before $lookup when $match follows",
+    docs: [{a: 5, c: 1}],
+    pipeline: [lookupStage("x"), {$set: {sum: {$add: ["$a", 1]}}}, {$match: {sum: {$gt: 3}}}],
+    optimized: [{$set: {sum: {$add: ["$a", 1]}}}, {$match: {sum: {$gt: 3}}}, lookupStage("x")],
+    expected: [{a: 5, c: 1, sum: 6, x: [{fromLookup: 1}]}],
+    policy: "forMatchPushdown",
+});
+
+runTest({
+    name: "$project+$match pushdown: before $lookup",
+    docs: [{a: 5, c: 1}],
+    pipeline: [lookupStage("x"), {$project: {sum: {$add: ["$a", 1]}, a: 1, c: 1}}, {$match: {sum: {$gt: 3}}}],
+    optimized: [
+        {$addFields: {sum: {$add: ["$a", 1]}}},
+        {$match: {sum: {$gt: 3}}},
+        lookupStage("x"),
+        {$project: {sum: 1, a: 1, c: 1}},
+    ],
+    expected: [{a: 5, c: 1, sum: 6}],
+    policy: "forMatchPushdown",
+});
 
 runTest({
     name: "computed field and match pushed before chained lookup+unwind pairs",
@@ -537,6 +625,7 @@ runTest({
         {a: 0, b: [{fromLookup: 1}], c: [{fromLookup: 1}], sum: 5},
         {b: [{fromLookup: 1}], a: 0, c: [{fromLookup: 1}], sum: 5},
     ],
+    policy: "forMatchPushdown",
 });
 
 runTest({
@@ -545,6 +634,7 @@ runTest({
     pipeline: [lookupStage("x"), {$project: {_id: 0, b: "$a"}}],
     optimized: [{$addFields: {b: "$a"}}, lookupStage("x"), {$project: {_id: 0, b: 1}}],
     expected: [{b: 0}],
+    policy: "always",
 });
 
 runTest({
@@ -553,6 +643,7 @@ runTest({
     pipeline: [lookupStage("x"), {$project: {_id: 0, b: "$a", x: 1}}],
     optimized: [{$addFields: {b: "$a"}}, lookupStage("x"), {$project: {_id: 0, b: 1, x: 1}}],
     expected: [{b: 0, x: [{fromLookup: 1}]}],
+    policy: "always",
 });
 
 // TODO(SERVER-124097): Fix this incorrect rewrite.

@@ -36,12 +36,20 @@
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/stage_dependencies.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::rule_based_rewrites::pipeline {
 namespace {
+
+TransformHoistPolicyEnum getTransformHoistPolicy() {
+    return ServerParameterSet::getNodeParameterSet()
+        ->get<TransformHoistPolicy>("internalQueryTransformHoistPolicy")
+        ->_data.get();
+}
+
 /**
  * Returns true if 'deps' has only path dependencies.
  */
@@ -252,7 +260,8 @@ bool isHoistableTransform(const DocumentSourceSingleDocumentTransformation& tran
  * Checks if the transformation is hoistable and if we should attempt the rewrite.
  */
 bool shouldAttemptToHoistTransform(const PipelineRewriteContext& ctx) {
-    if (!internalQueryPermitTransformHoist.load()) {
+    const auto policy = getTransformHoistPolicy();
+    if (policy == TransformHoistPolicyEnum::kNever) {
         LOGV2_DEBUG(10544911, 4, "shouldAttemptToHoistTransform: blocked - knob disabled");
         return false;
     }
@@ -292,6 +301,31 @@ bool shouldAttemptToHoistTransform(const PipelineRewriteContext& ctx) {
         LOGV2_DEBUG(
             10544913, 4, "shouldAttemptToHoistTransform: blocked - previous stage is $match");
         return false;
+    }
+
+    if (policy == TransformHoistPolicyEnum::kForMatchPushdown) {
+        // If the next stage is not a $match, we should not attempt the rewrite, even through it
+        // might be legal. This is just because when this rewrite was added, it was intended to
+        // specifically enable $match pushdown.
+        if (ctx.atLastStage()) {
+            LOGV2_DEBUG(10544904, 4, "shouldAttemptToHoistTransform: blocked - at last stage");
+            return false;
+        }
+        if (!dynamic_cast<const DocumentSourceMatch*>(ctx.nextStage().get())) {
+            LOGV2_DEBUG(10544905,
+                        4,
+                        "shouldAttemptToHoistTransform: blocked - following stage is not $match",
+                        "nextStageName"_attr = ctx.nextStage()->getSourceName());
+            return false;
+        }
+        if (!ctx.prevStage()->constraints().canSwapWithMatch) {
+            LOGV2_DEBUG(
+                10544915,
+                4,
+                "shouldAttemptToHoistTransform: blocked - previous stage does not swap with $match",
+                "nextStageName"_attr = ctx.nextStage()->getSourceName());
+            return false;
+        }
     }
 
     auto& transform =
@@ -387,6 +421,30 @@ splitTransformation(const DocumentSourceSingleDocumentTransformation& transform,
 }
 
 /**
+ * Returns true if at least one AND-level predicate in 'match' is on a hoisted path and is only
+ * dependent on the hoisted set. Such predicates can be pushed past the residual stage after
+ * hoisting.
+ */
+bool canHoistEnableMatchPushdown(const DocumentSourceMatch& match,
+                                 const OrderedPathSet& hoistedPaths) {
+    auto canPushdownPastResidualPaths = [&](const MatchExpression& pred) -> bool {
+        return expression::isOnlyDependentOnConst(pred, hoistedPaths);
+    };
+
+    const auto& expr = *match.getMatchExpression();
+    if (expr.matchType() == MatchExpression::MatchType::AND) {
+        for (size_t i = 0; i < expr.numChildren(); ++i) {
+            if (canPushdownPastResidualPaths(*expr.getChild(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    return canPushdownPastResidualPaths(expr);
+}
+
+/**
  * Hoist some or all computations of the transformation before the previous stage.
  * Precondition: canHoistSingleDocTransformBeforeStage(ctx) returns true.
  *
@@ -443,6 +501,23 @@ bool hoistSingleDocTransformBeforeStage(PipelineRewriteContext& ctx) {
         LOGV2_DEBUG(
             10544916, 4, "hoistSingleDocTransformBeforeStage: blocked - no valid hoist plan");
         return false;
+    }
+
+    if (getTransformHoistPolicy() == TransformHoistPolicyEnum::kForMatchPushdown) {
+        // At least one predicate in the following $match must be on a hoisted path and the
+        // predicate cannot have a dependency on a residual path. When residualPaths is empty the
+        // whole transform is being moved (swapStageWithPrev below), so the check is moot. The check
+        // also only applies when a $match follows.
+        if (!plan->residualPaths.empty() && !ctx.atLastStage()) {
+            const auto* nextMatch = dynamic_cast<const DocumentSourceMatch*>(ctx.nextStage().get());
+            if (nextMatch && !canHoistEnableMatchPushdown(*nextMatch, plan->hoistablePaths)) {
+                LOGV2_DEBUG(10544912,
+                            4,
+                            "hoistSingleDocTransformBeforeStage: blocked - no $match predicate "
+                            "benefits from hoist");
+                return false;
+            }
+        }
     }
 
     if (!details.isInclusion && plan->residualPaths.empty()) {
