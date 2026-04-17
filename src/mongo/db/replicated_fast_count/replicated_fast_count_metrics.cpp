@@ -84,16 +84,6 @@ auto& flushedDocsTotalCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.flushedDocs.total", .role = ClusterRole::None}});
 
-// The number of times an empty diff is found when writing an update to the replicated fast
-// count collection.
-auto& emptyUpdateCounter = MetricsService::instance().createInt64Counter(
-    MetricNames::kReplicatedFastCountEmptyUpdateCount,
-    "Number of times an empty diff was found when writing an update to the replicated fast "
-    "count collection",
-    MetricUnit::kEvents,
-    {.serverStatusOptions = ServerStatusOptions{
-         .dottedPath = "replicatedFastCount.emptyUpdateCount", .role = ClusterRole::None}});
-
 // The number of inserts/updates to the replicated fast count collection.
 auto& insertCounter = MetricsService::instance().createInt64Counter(
     MetricNames::kReplicatedFastCountInsertCount,
@@ -137,10 +127,6 @@ void ReplicatedFastCountMetrics::recordFlush(Date_t startTime, size_t batchSize)
 
 void ReplicatedFastCountMetrics::incrementFlushFailureCount() {
     flushFailureCounter.add(1);
-}
-
-void ReplicatedFastCountMetrics::incrementEmptyUpdateCount() {
-    emptyUpdateCounter.add(1);
 }
 
 void ReplicatedFastCountMetrics::incrementInsertCount() {

@@ -427,16 +427,12 @@ void ReplicatedFastCountManager::_updateOneMetadata(OperationContext* opCtx,
                     doc.value().toString(),
                     newDoc.toString()));
 
-    if (!diff->isEmpty()) {
-        args.update = update_oplog_entry::makeDeltaOplogEntry(*diff);
-        args.criteria = BSON("_id" << uuid);
-        collection_internal::updateDocument(
-            opCtx, fastCountColl, recordId, doc, newDoc, &args.update, nullptr, nullptr, &args);
-    } else {
-        // TODO(SERVER-122569): Delete this metric and the associated tests.
-        _metrics.incrementEmptyUpdateCount();
-        LOGV2(11648805, "ReplicatedFastCountManager empty update", "uuid"_attr = uuid);
-    }
+    massert(12256900, "Expected non-empty diff for update", !diff->isEmpty());
+
+    args.update = update_oplog_entry::makeDeltaOplogEntry(*diff);
+    args.criteria = BSON("_id" << uuid);
+    collection_internal::updateDocument(
+        opCtx, fastCountColl, recordId, doc, newDoc, &args.update, nullptr, nullptr, &args);
 }
 
 void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,

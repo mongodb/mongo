@@ -52,8 +52,6 @@ public:
 
     void incrementFlushFailureCount();
 
-    void incrementEmptyUpdateCount();
-
     void incrementInsertCount();
 
     void incrementUpdateCount();

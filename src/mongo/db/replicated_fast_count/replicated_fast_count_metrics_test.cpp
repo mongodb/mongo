@@ -63,7 +63,6 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
              MetricNames::kReplicatedFastCountFlushFailureCount,
              MetricNames::kReplicatedFastCountFlushTimeMsTotal,
              MetricNames::kReplicatedFastCountFlushedDocsTotal,
-             MetricNames::kReplicatedFastCountEmptyUpdateCount,
              MetricNames::kReplicatedFastCountInsertCount,
              MetricNames::kReplicatedFastCountUpdateCount,
              MetricNames::kReplicatedFastCountWriteTimeMsTotal,
@@ -141,19 +140,6 @@ TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {
                         /*batchSize=*/1);
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 11);
-}
-
-TEST(ReplicatedFastCountMetricsTest, EmptyUpdateCounterIncrements) {
-    OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
-
-    // Directly call incrementEmptyUpdateCount() to verify the counter and OTel instrument
-    // are correctly connected. Triggering an actual empty diff requires inserting a record and
-    // then committing a zero-net-change, which is complex to arrange in a unit test.
-    metrics.incrementEmptyUpdateCount();
-    metrics.incrementEmptyUpdateCount();
-
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountEmptyUpdateCount), 2);
 }
 
 TEST(ReplicatedFastCountMetricsTest, StaticMetrics) {

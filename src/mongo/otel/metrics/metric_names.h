@@ -138,8 +138,6 @@ public:
         "replicated_fast_count.flushed_docs.max"};
     static constexpr MetricName kReplicatedFastCountFlushedDocsTotal = {
         "replicated_fast_count.flushed_docs.total"};
-    static constexpr MetricName kReplicatedFastCountEmptyUpdateCount = {
-        "replicated_fast_count.empty_update_count"};
     static constexpr MetricName kReplicatedFastCountInsertCount = {
         "replicated_fast_count.insert_count"};
     static constexpr MetricName kReplicatedFastCountUpdateCount = {

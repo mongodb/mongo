@@ -96,11 +96,6 @@ describe("fast count server status metric", function () {
         );
     });
 
-    it("empty update", function () {
-        const metrics = getMetrics(this.db);
-        assert.eq(metrics.emptyUpdateCount, 0, metrics);
-    });
-
     it("collection write and flush size", function () {
         for (let i = 1; i <= 5; i++) {
             assert.commandWorked(this.db.createCollection("coll" + i));
