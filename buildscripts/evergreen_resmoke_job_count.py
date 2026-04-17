@@ -34,6 +34,7 @@ SYS_PLATFORM = sys.platform
 
 # Task factor overrides common to several {A,UB}SAN variants.
 _AUBSAN_TASK_FACTOR_OVERRIDES = [
+    {"task": r"sharding_auth_audit.*", "factor": 0.25},
     {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
     {"task": r".*causally_consistent_jscore_passthrough.*", "factor": 0.25},
     {"task": r"change_streams$", "factor": 0.5},
