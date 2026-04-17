@@ -25,3 +25,24 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard",
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml",
+    data = CORE_DATA,
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

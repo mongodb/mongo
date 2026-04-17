@@ -53,3 +53,18 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "decimal",
+    config = "//buildscripts/resmokeconfig:suites/decimal.yml",
+    tags = [
+        "ci-release-critical",
+        "common",
+        "decimal",
+        "jscore",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)

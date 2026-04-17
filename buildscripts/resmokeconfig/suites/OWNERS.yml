@@ -63,6 +63,12 @@ filters:
   - "core_wildcard_indexes.yml":
     approvers:
       - 10gen/query-execution-write-exec
+  - "decimal.yml":
+    approvers:
+      - 10gen/server-programmability
+  - "disk_wiredtiger.yml":
+    approvers:
+      - 10gen/server-storage-engine-integration
   - "extensions*":
     approvers:
       - 10gen/query-integration-extensions-api

@@ -10,3 +10,8 @@ mongo_js_library(
 )
 
 all_subpackage_javascript_files()
+
+py_binary(
+    name = "reflect",
+    srcs = ["reflect.py"],
+)

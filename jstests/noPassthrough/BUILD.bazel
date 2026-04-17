@@ -1,4 +1,5 @@
 load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,3 +11,62 @@ mongo_js_library(
 )
 
 all_subpackage_javascript_files()
+
+resmoke_suite_test(
+    name = "no_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/no_passthrough.yml",
+    data = [
+        "//jstests/aggregation/extras:merge_helpers.js",
+        "//jstests/auth/lib:all_subpackage_javascript_files",
+        "//jstests/concurrency/fsm_libs:all_subpackage_javascript_files",
+        "//jstests/concurrency/fsm_utils:all_subpackage_javascript_files",
+        "//jstests/core/libs:raw_operation_utils.js",
+        "//jstests/disk/libs:all_subpackage_javascript_files",
+        "//jstests/fle2/libs:all_subpackage_javascript_files",
+        "//jstests/libs:key1",
+        "//jstests/libs:test_crt_files",
+        "//jstests/libs:test_pem_files",
+        "//jstests/libs:testconfig",
+        "//jstests/libs/config_files:set_component_verbosity.json",
+        "//jstests/libs/config_files:set_profiling.json",
+        "//jstests/libs/config_files:set_profiling_filter.json",
+        "//jstests/libs/config_files:set_verbosity.json",
+        "//jstests/multiVersion/libs:all_subpackage_javascript_files",
+        "//jstests/noPassthrough/libs:max_conns_config.yaml",
+        "//jstests/noPassthrough/libs:max_conns_config_no_admin_threads.yaml",
+        "//jstests/noPassthrough/libs:max_conns_override_config.yaml",
+        "//jstests/noPassthrough/libs:max_conns_override_config_no_admin_threads.yaml",
+        "//jstests/noPassthrough/libs:net.bindIpAll.yaml",
+        "//jstests/noPassthrough/libs:net.bindIp_localhost.yaml",
+        "//jstests/noPassthrough/libs:net.max_incoming_connections.yaml",
+        "//jstests/noPassthrough/libs/configExpand:reflect",
+        "//jstests/noPassthrough/network/libs:net.max_incoming_connections_rate_limiter.yaml",
+        "//jstests/query_golden/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:proxy_protocol_server",
+        "//jstests/ssl/libs:all_subpackage_javascript_files",
+        "//jstests/with_mongot/mongotmock/lib",
+        "//x509:generate_main_certificates",
+    ],
+    shard_count = 40,
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122822), TODO(SERVER-122823), Many tests in this suite are currently incompatible with remote execution.
+        "misc_js",
+        "requires-execution-on-windows-patch-build",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/replay:mongor",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+        "//src/third_party/wiredtiger:wt",
+    ],
+)

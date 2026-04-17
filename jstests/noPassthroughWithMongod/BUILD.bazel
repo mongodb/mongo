@@ -1,4 +1,5 @@
 load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,3 +11,23 @@ mongo_js_library(
 )
 
 all_subpackage_javascript_files()
+
+resmoke_suite_test(
+    name = "no_passthrough_with_mongod",
+    srcs = ["//jstests/noPassthroughWithMongod:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/no_passthrough_with_mongod.yml",
+    data = [
+        "//jstests/auth:test_only_commands_list.js",
+    ],
+    shard_count = 10,
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122766) ipv6_connection_string_validation.js: mongod fails to bind to IPv6 port in remote execution
+        "misc_js",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

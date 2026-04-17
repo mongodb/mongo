@@ -1,4 +1,6 @@
 load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,3 +12,27 @@ mongo_js_library(
 )
 
 all_subpackage_javascript_files()
+
+resmoke_suite_test(
+    name = "concurrency_simultaneous",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_simultaneous.yml",
+    data = CONCURRENCY_DATA,
+    shard_count = 15,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "concurrency",
+        "random_name",
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
