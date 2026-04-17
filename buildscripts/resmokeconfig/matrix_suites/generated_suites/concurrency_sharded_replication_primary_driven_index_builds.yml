@@ -30,6 +30,7 @@ executor:
         featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
+        featureFlagResumablePrimaryDrivenIndexBuilds: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
         roleGraphInvalidationIsFatal: 1
@@ -39,6 +40,7 @@ executor:
         featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
+        featureFlagResumablePrimaryDrivenIndexBuilds: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
     num_mongos: 2
     num_rs_nodes_per_shard: 3

@@ -30,6 +30,7 @@ executor:
         featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
+        featureFlagResumablePrimaryDrivenIndexBuilds: 1
     num_nodes: 2
   hooks:
     - class: CheckReplOplogs

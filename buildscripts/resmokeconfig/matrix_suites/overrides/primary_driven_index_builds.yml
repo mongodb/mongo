@@ -6,6 +6,7 @@
           set_parameters:
             featureFlagContainerWrites: 1
             featureFlagPrimaryDrivenIndexBuilds: 1
+            featureFlagResumablePrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
 - name: enable_primary_driven_index_builds_feature_flag_mongos
   value:
@@ -15,6 +16,7 @@
           set_parameters:
             featureFlagContainerWrites: 1
             featureFlagPrimaryDrivenIndexBuilds: 1
+            featureFlagResumablePrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod
   value:
@@ -26,6 +28,7 @@
               setParameters:
                 featureFlagContainerWrites: true
                 featureFlagPrimaryDrivenIndexBuilds: true
+                featureFlagResumablePrimaryDrivenIndexBuilds: true
                 featureFlagRecordIdsReplicated: true
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongos
   value:
@@ -37,6 +40,7 @@
               setParametersMongos:
                 featureFlagContainerWrites: true
                 featureFlagPrimaryDrivenIndexBuilds: true
+                featureFlagResumablePrimaryDrivenIndexBuilds: true
                 featureFlagRecordIdsReplicated: true
 - name: exclude_primary_driven_index_builds_incompatible_tag
   value:

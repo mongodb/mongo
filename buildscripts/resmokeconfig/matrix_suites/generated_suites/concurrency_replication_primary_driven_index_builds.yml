@@ -25,6 +25,7 @@ executor:
         featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
+        featureFlagResumablePrimaryDrivenIndexBuilds: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
         roleGraphInvalidationIsFatal: 1

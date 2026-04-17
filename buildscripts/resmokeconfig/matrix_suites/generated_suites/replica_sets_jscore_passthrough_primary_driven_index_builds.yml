@@ -26,6 +26,7 @@ executor:
         featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
+        featureFlagResumablePrimaryDrivenIndexBuilds: 1
         internalQueryStatsErrorsAreCommandFatal: true
         internalQueryStatsRateLimit: -1
         internalQueryStatsWriteCmdSampleRate: 1.0

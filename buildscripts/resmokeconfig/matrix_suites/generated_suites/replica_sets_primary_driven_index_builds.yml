@@ -15,6 +15,7 @@ executor:
             featureFlagContainerWrites: true
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
+            featureFlagResumablePrimaryDrivenIndexBuilds: true
       nodb: ""
 matrix_suite: true
 selector:
