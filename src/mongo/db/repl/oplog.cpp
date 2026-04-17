@@ -1758,7 +1758,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                     record->data.releaseToBson());
 
     if (recordChangeStreamPreImage && request.shouldReturnNewDocs()) {
-        // Make a copy since obj needs to be used to perform the update.
+        // Capture the pre-image before the update mutates obj in-place. Needed for change-stream
+        // pre-image recording when the caller requested the new doc (RETURN_NEW).
         preImage = obj.value().copy();
     }
 
@@ -1805,7 +1806,45 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
         return doUpdate(opCtx, coll, request);
     }
 
-    return update::parseAndTransformOplogUpdate(opCtx, coll, obj, request, rid, cursor.get());
+    // Save the preImage size for delta size change verification.
+    const int preImageSize = obj.value().objsize();
+
+    auto [result, postDocImageSize] =
+        update::parseAndTransformOplogUpdate(opCtx, coll, obj, request, rid, cursor.get());
+
+    // On secondaries, verify that the size delta recorded in the oplog matches the actual size
+    // change produced by the update. A mismatch indicates data inconsistency.
+    if (mode == OplogApplication::Mode::kSecondary) {
+        if (const auto& sizeMeta = op.getDurableReplOperation().getSizeMetadata()) {
+            if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value())) {
+                const int actualDelta = postDocImageSize - preImageSize;
+                if (actualDelta != singleOpMeta->getSz()) {
+                    logOplogConstraintViolation(
+                        opCtx,
+                        op.getNss(),
+                        OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch,
+                        "update",
+                        redact(op.toBSONForLogging()),
+                        boost::none /* status */);
+                }
+                uassert(
+                    12380201,
+                    fmt::format("Replicated size delta mismatch on update for ns: '{}', "
+                                "uuid: '{}', rid: '{}', oplog sz: '{}', actual size delta: '{}', "
+                                "opTime: '{}', oplog entry: '{}'",
+                                collPtr->ns().toStringForErrorMsg(),
+                                collPtr->uuid().toString(),
+                                rid.toString(),
+                                singleOpMeta->getSz(),
+                                actualDelta,
+                                op.getOpTime().toString(),
+                                redact(op.toBSONForLogging()).toString()),
+                    actualDelta == singleOpMeta->getSz());
+            }
+        }
+    }
+
+    return result;
 }
 
 UpdateResult updateObject(OperationContext* opCtx,
@@ -1954,6 +1993,38 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
             ? collection_internal::RetryableWrite::kYes
             : collection_internal::RetryableWrite::kNo);
     wuow.commit();
+
+    // On secondaries, verify that the size delta recorded in the oplog matches the actual size
+    // of the deleted document. A mismatch indicates data inconsistency.
+    if (mode == OplogApplication::Mode::kSecondary) {
+        if (const auto& sizeMeta = op.getDurableReplOperation().getSizeMetadata()) {
+            if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&sizeMeta.value())) {
+                const int actualDelta = -preImage.value().objsize();
+                if (actualDelta != singleOpMeta->getSz()) {
+                    logOplogConstraintViolation(
+                        opCtx,
+                        op.getNss(),
+                        OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch,
+                        "delete",
+                        redact(op.toBSONForLogging()),
+                        boost::none /* status */);
+                }
+                uassert(
+                    12380200,
+                    fmt::format("Replicated size delta mismatch on delete for ns: '{}', "
+                                "uuid: '{}', rid: '{}', oplog sz: '{}', actual size delta: '{}', "
+                                "opTime: '{}', oplog entry: '{}'",
+                                collPtr->ns().toStringForErrorMsg(),
+                                collPtr->uuid().toString(),
+                                rid.toString(),
+                                singleOpMeta->getSz(),
+                                actualDelta,
+                                op.getOpTime().toString(),
+                                redact(op.toBSONForLogging()).toString()),
+                    actualDelta == singleOpMeta->getSz());
+            }
+        }
+    }
 
     // Update nDeleted and include the preImage if it was requested.
     result.nDeleted = 1;

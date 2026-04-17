@@ -552,6 +552,37 @@ OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
     return {DurableOplogEntry(builder.obj())};
 }
 
+OplogEntry makeUpdateOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
+                                                           const NamespaceString& nss,
+                                                           const BSONObj& documentToUpdate,
+                                                           const BSONObj& updatedDocument,
+                                                           const RecordId& rid,
+                                                           int sizeDelta) {
+    OplogEntry baseEntry =
+        makeUpdateOplogEntryWithRecordId(opTime, nss, documentToUpdate, updatedDocument, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSON("sz" << sizeDelta));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeDeleteOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
+                                                           const NamespaceString& nss,
+                                                           const UUID& uuid,
+                                                           const BSONObj& docToDelete,
+                                                           const RecordId& rid,
+                                                           int sizeDelta) {
+    OplogEntry baseEntry = makeDeleteOplogEntryWithRecordId(opTime, nss, uuid, docToDelete, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSON("sz" << sizeDelta));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
 UUID getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
     const auto optUuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
     ASSERT_TRUE(optUuid);

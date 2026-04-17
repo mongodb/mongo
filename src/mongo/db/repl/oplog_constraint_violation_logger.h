@@ -55,6 +55,8 @@ static constexpr StringData kAcceptableErrorInCommand =
 static constexpr StringData kRecordIdsReplicatedDocIdMismatch =
     "the _id in the oplog entry for a replicated record id collection did not match the _id of the "
     "document found at the rid";
+static constexpr StringData kReplicatedSizeDeltaMismatch =
+    "replicated size delta mismatch between primary and secondary";
 
 enum class OplogConstraintViolationEnum {
     kInsertOnExistingDoc = 0,
@@ -63,6 +65,7 @@ enum class OplogConstraintViolationEnum {
     kDeleteOnMissingNs,
     kAcceptableErrorInCommand,
     kRecordIdsReplicatedDocIdMismatch,
+    kReplicatedSizeDeltaMismatch,
     NUM_VIOLATION_TYPES,
 };
 

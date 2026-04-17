@@ -162,11 +162,15 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
 // TODO SERVER-118695 Support upsert requests
 // Parse an oplog update, perform the transformation, and write the result to storage. This function
 // cannot be used for upserts or requests that have a collation set.
-MONGO_MOD_PUBLIC UpdateResult parseAndTransformOplogUpdate(OperationContext* opCtx,
-                                                           const CollectionAcquisition& coll,
-                                                           const Snapshotted<BSONObj>& oldObj,
-                                                           const UpdateRequest& request,
-                                                           const RecordId& rid,
-                                                           const SeekableRecordCursor* cursor);
+// Returns the UpdateResult paired with the byte size of the post-image document. The size is read
+// directly from the already-live buffer (zero allocation) and is always the size of the document
+// after the update regardless of the ReturnDocOption set on the request.
+MONGO_MOD_PUBLIC std::pair<UpdateResult, int> parseAndTransformOplogUpdate(
+    OperationContext* opCtx,
+    const CollectionAcquisition& coll,
+    const Snapshotted<BSONObj>& oldObj,
+    const UpdateRequest& request,
+    const RecordId& rid,
+    const SeekableRecordCursor* cursor);
 }  // namespace update
 }  // namespace mongo

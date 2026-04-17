@@ -394,6 +394,7 @@ mongo_cc_unit_test(
     name = "replicated_fast_count_oplog_entry_test",
     srcs = [
         "oplog_applier_init_replicated_fast_count_test.cpp",
+        "oplog_applier_size_delta_test.cpp",
         "replicated_fast_count_oplog_entry_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],

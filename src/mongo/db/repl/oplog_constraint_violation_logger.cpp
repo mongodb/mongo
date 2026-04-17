@@ -58,6 +58,8 @@ StringData toString(OplogConstraintViolationEnum type) {
             return kAcceptableErrorInCommand;
         case mongo::repl::OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch:
             return kRecordIdsReplicatedDocIdMismatch;
+        case mongo::repl::OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch:
+            return kReplicatedSizeDeltaMismatch;
         default:
             return "";
     }
