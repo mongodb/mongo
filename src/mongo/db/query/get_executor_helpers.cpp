@@ -215,7 +215,9 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
                         "querySettings"_attr = querySettings,
                         "reason"_attr = exception.reason(),
                         "code"_attr = exception.codeString());
-
+            CurOp::get(canonicalQuery->getExpCtx()->getOperationContext())
+                ->debug()
+                .failedPlanningWithQuerySettings = true;
             plannerOptions |= QueryPlannerParams::IGNORE_QUERY_SETTINGS;
             // Propagate the params to the next iteration.
             plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData);
