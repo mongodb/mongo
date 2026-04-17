@@ -14,6 +14,8 @@
  *  incompatible_tsan,
  *  # TODO(SERVER-119777): Ensure test does not leak cursors.
  *  can_leak_idle_cursors,
+ *  # TODO (SERVER-124153): Re-enable this test.
+ *  featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

@@ -3,7 +3,13 @@
  *
  * Creates multiple unique background indexes in parallel, on capped collections.
  *
- * @tags: [creates_background_indexes, requires_capped, assumes_balancer_off]
+ * @tags: [
+ *  creates_background_indexes,
+ *  requires_capped,
+ *  assumes_balancer_off,
+ *  # TODO (SERVER-124037): Re-enable this test.
+ *  featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

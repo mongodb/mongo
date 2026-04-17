@@ -7,6 +7,8 @@
  * @tags: [
  *  requires_sharding,
  *  assumes_balancer_off,
+ *  # TODO (SERVER-124037): Re-enable this test.
+ *  featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

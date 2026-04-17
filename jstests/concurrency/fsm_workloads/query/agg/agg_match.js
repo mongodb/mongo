@@ -9,6 +9,8 @@
  *   assumes_unsharded_collection,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
+ *  # TODO (SERVER-124153): Re-enable this test.
+ *  featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -4,7 +4,13 @@
  * Exercises concurrent moveChunk and mergeChunk operations, with each thread operating on its own
  * set of chunks.
  *
- * @tags: [requires_sharding, assumes_balancer_off, does_not_support_stepdowns]
+ * @tags: [
+ *  requires_sharding,
+ *  assumes_balancer_off,
+ *  does_not_support_stepdowns,
+ *  # TODO (SERVER-124037): Re-enable this test.
+ *  featureFlagReplicatedFastCount_incompatible,
+ *  ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
