@@ -181,7 +181,7 @@ export const $config = (function () {
         if (res.ok) {
             verifyOutput(db, outName, hasSecondaryIndex, timeseriesOut);
         } else {
-            // TODO(SERVER-119864): Remove the recordIdsReplicated workaround.
+            // TODO(SERVER-123600): Remove the recordIdsReplicated workaround.
             if (
                 (res.code === ErrorCodes.CommandNotSupported || res.code === ErrorCodes.CommandFailed) &&
                 (res.errmsg || "").includes("recordIdsReplicated")
