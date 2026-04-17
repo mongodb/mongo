@@ -44,6 +44,7 @@
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_types.h"
 
@@ -52,6 +53,8 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

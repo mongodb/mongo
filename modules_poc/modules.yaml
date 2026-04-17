@@ -79,6 +79,8 @@ core.idl:
 
 # stuff that is part of a generic mongo service
 core.service:
+  meta:
+    fully_marked: true
   files:
     - src/mongo/db/commands[._]* # not the commands directory
     - src/mongo/db/*operation_context*

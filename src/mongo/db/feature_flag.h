@@ -34,15 +34,18 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional.hpp>
 
+MONGO_MOD_PUBLIC;
+
 namespace mongo {
 class IncrementalFeatureRolloutContext;
 
-class FeatureFlag {
+class MONGO_MOD_OPEN FeatureFlag {
 public:
     virtual ~FeatureFlag() = default;
 
@@ -113,7 +116,7 @@ public:
  * The superclass for any feature flag that can optionally be used as a condition for
  * enabling/disabling a server parameter.
  */
-class ParameterGatingFeatureFlag : public FeatureFlag {
+class MONGO_MOD_OPEN ParameterGatingFeatureFlag : public FeatureFlag {
 public:
     /**
      * Returns true if a server parameter that is conditionalized on this flag should be enabled.
@@ -135,7 +138,7 @@ public:
  * BinaryCompatibleFeatureFlag is a simple boolean feature flag whose value is only set at startup.
  * Its value does not change at runtime, nor during FCV upgrade/downgrade.
  */
-class BinaryCompatibleFeatureFlag : public ParameterGatingFeatureFlag {
+class MONGO_MOD_OPEN BinaryCompatibleFeatureFlag : public ParameterGatingFeatureFlag {
 public:
     explicit BinaryCompatibleFeatureFlag(bool enabled) : _enabled(enabled) {}
 
@@ -189,7 +192,7 @@ private:
  * to Operation FCV (`VersionContext`), this class is abstract, and its derived classes expose
  * different method signatures for feature flag checks.
  */
-class FCVGatedFeatureFlagBase : public ParameterGatingFeatureFlag {
+class MONGO_MOD_OPEN FCVGatedFeatureFlagBase : public ParameterGatingFeatureFlag {
 public:
     FCVGatedFeatureFlagBase(bool enabled,
                             StringData versionString,
@@ -278,7 +281,7 @@ private:
  * A FCV-gated feature flag which can be checked against either an Operation FCV (`VersionContext`)
  * or a server FCV snapshot (`FCVSnapshot`).
  */
-class FCVGatedFeatureFlag : public FCVGatedFeatureFlagBase {
+class MONGO_MOD_OPEN FCVGatedFeatureFlag : public FCVGatedFeatureFlagBase {
 public:
     using FCVGatedFeatureFlagBase::FCVGatedFeatureFlagBase;
 
@@ -297,7 +300,7 @@ public:
 /**
  * A FCV-gated feature flag which can be checked only against an Operation FCV (`VersionContext`).
  */
-class OperationFCVOnlyFCVGatedFeatureFlag : public FCVGatedFeatureFlagBase {
+class MONGO_MOD_OPEN OperationFCVOnlyFCVGatedFeatureFlag : public FCVGatedFeatureFlagBase {
 public:
     using FCVGatedFeatureFlagBase::FCVGatedFeatureFlagBase;
 
@@ -323,7 +326,7 @@ private:
  * This is a transitional solution to allow old FCV-gated feature flag checks to work until they
  * are adapted to the operation FCV aware API.
  */
-class LegacyFCVSnapshotOnlyFCVGatedFeatureFlag : public FCVGatedFeatureFlag {
+class MONGO_MOD_OPEN LegacyFCVSnapshotOnlyFCVGatedFeatureFlag : public FCVGatedFeatureFlag {
 public:
     using FCVGatedFeatureFlag::FCVGatedFeatureFlag;
 
@@ -353,7 +356,7 @@ enum class RolloutPhase {
     released,
 };
 
-class IncrementalRolloutFeatureFlag : public FeatureFlag {
+class MONGO_MOD_OPEN IncrementalRolloutFeatureFlag : public FeatureFlag {
 public:
     static IncrementalRolloutFeatureFlag* findByName(StringData flagName);
 

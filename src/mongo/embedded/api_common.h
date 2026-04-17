@@ -30,9 +30,12 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <string>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -111,39 +114,23 @@ std::nullptr_t handleException(StatusForAPI<ErrorEnum>& status) noexcept {
 }
 
 class ReentrancyGuard {
-private:
-    // This templated "holder" struct stores a thread-local static variable that doesn't need a
-    // corresponding definition in a .cpp file, allowing us to use this same header from multiple
-    // libraries that do not link common objects.
-    // TODO: When we switch to C++17, we can use simply use the "inline" keyword instead of relying
-    // on templates.
-    template <typename T = void>
-    struct GuardHolder {
-        thread_local static bool inLibrary;
-    };
-
-    bool& inLibrary() {
-        return GuardHolder<>::inLibrary;
-    }
-
 public:
     ReentrancyGuard() {
-        uassert(ErrorCodes::ReentrancyNotAllowed,
-                str::stream() << "Reentry into library is not allowed",
-                !inLibrary());
-        inLibrary() = true;
+        uassert(
+            ErrorCodes::ReentrancyNotAllowed, "Reentry into library is not allowed", !_inLibrary);
+        _inLibrary = true;
     }
 
     ~ReentrancyGuard() {
-        inLibrary() = false;
+        _inLibrary = false;
     }
 
-    ReentrancyGuard(ReentrancyGuard const&) = delete;
-    ReentrancyGuard& operator=(ReentrancyGuard const&) = delete;
-};
+    ReentrancyGuard(const ReentrancyGuard&) = delete;
+    ReentrancyGuard& operator=(const ReentrancyGuard&) = delete;
 
-template <typename T>
-thread_local bool ReentrancyGuard::GuardHolder<T>::inLibrary = false;
+private:
+    static thread_local inline bool _inLibrary = false;
+};
 
 template <typename Status,
           typename Function,

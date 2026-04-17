@@ -34,12 +34,15 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <memory>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

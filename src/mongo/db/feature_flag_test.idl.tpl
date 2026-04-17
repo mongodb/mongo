@@ -18,6 +18,7 @@
 #set $last_lts = lts_releases[bisect.bisect_left(lts_releases, latest) - 1]
 ##
 global:
+  mod_visibility: public
   cpp_namespace: "mongo::feature_flags"
   cpp_includes:
   - "mongo/db/change_streams_cluster_parameter.h"

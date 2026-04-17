@@ -57,6 +57,7 @@
 #include "mongo/util/inline_memory.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/lockable_adapter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
@@ -70,6 +71,8 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

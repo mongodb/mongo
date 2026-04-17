@@ -36,10 +36,13 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 static constexpr StringData kErrorLabelsFieldName = "errorLabels"_sd;

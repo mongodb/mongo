@@ -38,6 +38,10 @@
 #include <stddef.h>  // NOLINT
 #include <stdint.h>  // NOLINT
 
+#ifdef __cplusplus
+#include "mongo/util/modules.h"
+#endif
+
 #pragma push_macro("MONGO_API_CALL")
 #undef MONGO_API_CALL
 

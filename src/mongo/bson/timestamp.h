@@ -118,20 +118,8 @@ public:
     bool operator==(const Timestamp& r) const {
         return tie() == r.tie();
     }
-    bool operator!=(const Timestamp& r) const {
-        return tie() != r.tie();
-    }
-    bool operator<(const Timestamp& r) const {
-        return tie() < r.tie();
-    }
-    bool operator<=(const Timestamp& r) const {
-        return tie() <= r.tie();
-    }
-    bool operator>(const Timestamp& r) const {
-        return tie() > r.tie();
-    }
-    bool operator>=(const Timestamp& r) const {
-        return tie() >= r.tie();
+    auto operator<=>(const Timestamp& r) const {
+        return tie() <=> r.tie();
     }
 
     Timestamp operator+(unsigned long long inc) const {
@@ -140,6 +128,14 @@ public:
 
     Timestamp operator-(unsigned long long inc) const {
         return Timestamp(asULL() - inc);
+    }
+
+    friend std::ostream& operator<<(std::ostream& s, const Timestamp& t) {
+        return s << t.toString();
+    }
+
+    friend StringBuilder& operator<<(StringBuilder& s, const Timestamp& t) {
+        return s << t.toString();
     }
 
     // Append the BSON representation of this Timestamp to the given BufBuilder with the given
@@ -173,14 +169,6 @@ private:
     unsigned i = 0;
     unsigned secs = 0;
 };
-
-inline std::ostream& operator<<(std::ostream& s, const Timestamp& t) {
-    return (s << t.toString());
-}
-
-inline StringBuilder& operator<<(StringBuilder& s, const Timestamp& t) {
-    return (s << t.toString());
-}
 
 }  // namespace mongo
 

@@ -29,6 +29,7 @@ global:
     cpp_namespace: mongo::initialize_server_global_state
     cpp_includes:
         - mongo/logv2/constants.h
+    mod_visibility: public
 
 server_parameters:
     maxLogSizeKB:

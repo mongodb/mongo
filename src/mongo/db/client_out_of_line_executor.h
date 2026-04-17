@@ -32,11 +32,14 @@
 #include "mongo/db/client.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 #include <functional>
 #include <memory>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

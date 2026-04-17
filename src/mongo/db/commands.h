@@ -71,7 +71,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
@@ -88,6 +88,8 @@
 
 #include <boost/optional.hpp>
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -124,7 +126,7 @@ bool prepareForFLERewrite(OperationContext* opCtx,
  * These hooks will only run on external requests that form CommandInvocations (a.k.a. OP_MSG
  * requests). They are not applied for runCommandDirectly() or raw CommandInvocation::run() calls.
  */
-class CommandInvocationHooks {
+class MONGO_MOD_OPEN CommandInvocationHooks {
 public:
     /**
      * Set `hooks` as the `CommandInvocationHooks` decoration of `serviceContext`
@@ -1358,7 +1360,7 @@ private:
 };
 
 template <typename Derived>
-class TypedCommand<Derived>::InvocationBaseInternal : public CommandInvocation {
+class MONGO_MOD_OPEN TypedCommand<Derived>::InvocationBaseInternal : public CommandInvocation {
 public:
     using RequestType = typename Derived::Request;
 
@@ -1429,7 +1431,7 @@ class MONGO_MOD_OPEN TypedCommand<Derived>::MinimalInvocationBase : public Invoc
  * Mix-in base for requests containing a `GenericArguments`.
  * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
  */
-class GenericArgumentsTypedRequest {
+class MONGO_MOD_OPEN GenericArgumentsTypedRequest {
 public:
     explicit GenericArgumentsTypedRequest(const OpMsgRequest& req) : _args{_parseArgs(req)} {}
 
@@ -1459,7 +1461,7 @@ private:
  * Mix-in base for Requests containing a DatabaseName.
  * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
  */
-class DbNameTypedRequest {
+class MONGO_MOD_OPEN DbNameTypedRequest {
 public:
     explicit DbNameTypedRequest(const OpMsgRequest& req) : _dbName{req.parseDbName()} {}
 
@@ -1475,7 +1477,8 @@ private:
  * Base for Requests having a `GenericArguments` and a `DatabaseName`.
  * Fills the `TypedCommand` `Request` requirements.
  */
-class BasicTypedRequest : public GenericArgumentsTypedRequest, public DbNameTypedRequest {
+class MONGO_MOD_OPEN BasicTypedRequest : public GenericArgumentsTypedRequest,
+                                         public DbNameTypedRequest {
 public:
     explicit BasicTypedRequest(const OpMsgRequest& req)
         : GenericArgumentsTypedRequest{req}, DbNameTypedRequest{req} {}

@@ -36,6 +36,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <memory>
@@ -46,6 +47,8 @@
 
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

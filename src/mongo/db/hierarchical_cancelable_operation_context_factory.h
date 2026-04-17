@@ -30,6 +30,9 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

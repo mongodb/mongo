@@ -45,7 +45,7 @@
 #include "mongo/util/concurrency/lock_free_read_list.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/synchronized_value.h"
@@ -65,6 +65,8 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -151,7 +153,7 @@ auto makeLockHandleForObjectLock(T* object) {
  * destroyed.
  */
 template <typename T, typename MutexType = T>
-class ObjectLock {
+class MONGO_MOD_PUBLIC ObjectLock {
 public:
     ObjectLock() = default;
     explicit ObjectLock(T* obj) : _lk(makeLockHandleForObjectLock(obj)), _object(obj) {}
@@ -374,7 +376,7 @@ public:
      * Observer interface implemented to hook client and operation context creation and
      * destruction.
      */
-    class ClientObserver {
+    class MONGO_MOD_OPEN ClientObserver {
     public:
         virtual ~ClientObserver() = default;
 

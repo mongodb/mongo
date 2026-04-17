@@ -36,10 +36,13 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <variant>
 
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

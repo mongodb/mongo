@@ -35,8 +35,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

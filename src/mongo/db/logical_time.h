@@ -32,11 +32,15 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/util/modules.h"
 
 #include <array>
+#include <compare>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -51,7 +55,11 @@ class LogicalTime {
 public:
     static constexpr StringData kOperationTimeFieldName = "operationTime"_sd;
 
-    LogicalTime() = default;
+
+    /** An uninitialized value of LogicalTime. Default constructed. */
+    static const LogicalTime kUninitialized;
+
+    constexpr LogicalTime() = default;
     explicit LogicalTime(Timestamp ts);
 
     /**
@@ -98,41 +106,22 @@ public:
     static LogicalTime parseFromBSON(const BSONElement& elem);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
 
-    /**
-     * An uninitialized value of LogicalTime. Default constructed.
-     */
-    static const LogicalTime kUninitialized;
+    bool operator==(const LogicalTime& o) const {
+        return asTimestamp() == o.asTimestamp();
+    }
+
+    auto operator<=>(const LogicalTime& o) const {
+        return asTimestamp() <=> o.asTimestamp();
+    }
+
+    friend std::ostream& operator<<(std::ostream& s, const LogicalTime& v) {
+        return s << v.toString();
+    }
 
 private:
     uint64_t _time{0};
 };
 
-inline bool operator==(const LogicalTime& l, const LogicalTime& r) {
-    return l.asTimestamp() == r.asTimestamp();
-}
-
-inline bool operator!=(const LogicalTime& l, const LogicalTime& r) {
-    return !(l == r);
-}
-
-inline bool operator<(const LogicalTime& l, const LogicalTime& r) {
-    return l.asTimestamp() < r.asTimestamp();
-}
-
-inline bool operator<=(const LogicalTime& l, const LogicalTime& r) {
-    return (l < r || l == r);
-}
-
-inline bool operator>(const LogicalTime& l, const LogicalTime& r) {
-    return (r < l);
-}
-
-inline bool operator>=(const LogicalTime& l, const LogicalTime& r) {
-    return (l > r || l == r);
-}
-
-inline std::ostream& operator<<(std::ostream& s, const LogicalTime& v) {
-    return (s << v.toString());
-}
+inline const LogicalTime LogicalTime::kUninitialized{};
 
 }  // namespace mongo

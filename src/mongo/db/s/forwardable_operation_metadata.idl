@@ -41,6 +41,7 @@ imports:
 structs:
     ForwardableOperationMetadataBase:
         description: "Used to store metadata of an operation context that can be safely passed among different threads."
+        mod_visibility: public
         strict: false
         fields:
             comment:
