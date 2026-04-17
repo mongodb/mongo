@@ -106,6 +106,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/intrusive_counter.h"
@@ -118,6 +119,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(findAndModifyChangeOwningShardThrowsInterruptedAtShutdown);
 
 constexpr size_t kMaxDatabaseCreationAttempts = 3u;
 
@@ -1131,6 +1134,11 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
     BSONObjBuilder* result) {
     RouterOperationContextSession routerSession(opCtx);
     try {
+        if (MONGO_unlikely(
+                findAndModifyChangeOwningShardThrowsInterruptedAtShutdown.shouldFail())) {
+            uasserted(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
+        }
+
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
@@ -1186,8 +1194,9 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         }
 
         auto txnRouterForAbort = TransactionRouter::get(opCtx);
-        if (txnRouterForAbort)
+        if (txnRouterForAbort && txnRouterForAbort.isInitialized()) {
             txnRouterForAbort.implicitlyAbortTransaction(opCtx, e.toStatus());
+        }
 
         throw;
     }
