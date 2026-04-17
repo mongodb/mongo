@@ -13,6 +13,8 @@
  * not work for ephemeral storage engines, as they do not store any data in the dbpath.
  * @tags: [
  *   requires_persistence,
+ *   # TODO(SERVER-124037): Remove. This internally runs capped collection tests.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

@@ -32,8 +32,10 @@ rst.initiate();
 const primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
 
-function getStats(coll) {
-    return assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
+function getSizeAndCount(coll) {
+    const size = testDB.runCommand({dataSize: coll.getFullName()}).size;
+    const count = coll.count();
+    return {size, count};
 }
 
 /**
@@ -139,8 +141,8 @@ function runTest(testName, {commit, chainedApplyOps, opType}) {
     const coll2 = testDB["txn_count_size_2"];
     const baseCount = setupCollections(coll1, coll2);
 
-    const base1 = getStats(coll1);
-    const base2 = getStats(coll2);
+    const base1 = getSizeAndCount(coll1);
+    const base2 = getSizeAndCount(coll2);
     assert.eq(baseCount, base1.count);
     assert.eq(baseCount, base2.count);
 
@@ -164,8 +166,8 @@ function runTest(testName, {commit, chainedApplyOps, opType}) {
             : doTxnOps(sessionColl1, sessionColl2, opType, opCount);
 
     // External observers must see only the committed state.
-    const mid1 = getStats(coll1);
-    const mid2 = getStats(coll2);
+    const mid1 = getSizeAndCount(coll1);
+    const mid2 = getSizeAndCount(coll2);
     assert.eq(base1.count, mid1.count, "external coll1 count must be unchanged mid-transaction");
     assert.eq(base2.count, mid2.count, "external coll2 count must be unchanged mid-transaction");
     assert.eq(base1.size, mid1.size, "external coll1 size must be unchanged mid-transaction");
@@ -174,8 +176,8 @@ function runTest(testName, {commit, chainedApplyOps, opType}) {
     if (commit) {
         assert.commandWorked(session.commitTransaction_forTesting());
 
-        const post1 = getStats(coll1);
-        const post2 = getStats(coll2);
+        const post1 = getSizeAndCount(coll1);
+        const post2 = getSizeAndCount(coll2);
 
         const expectedCount = baseCount + countDelta;
         assert.eq(
@@ -211,8 +213,8 @@ function runTest(testName, {commit, chainedApplyOps, opType}) {
     } else {
         assert.commandWorked(session.abortTransaction_forTesting());
 
-        const post1 = getStats(coll1);
-        const post2 = getStats(coll2);
+        const post1 = getSizeAndCount(coll1);
+        const post2 = getSizeAndCount(coll2);
         assert.eq(base1.count, post1.count, "coll1 count must be unchanged after abort");
         assert.eq(base2.count, post2.count, "coll2 count must be unchanged after abort");
         assert.eq(base1.size, post1.size, "coll1 size must be unchanged after abort");

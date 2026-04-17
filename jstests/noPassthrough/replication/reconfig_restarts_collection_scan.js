@@ -8,6 +8,8 @@
  *     # The inMemory storage engine does not throw ReadConcernMajorityNotAvailableYet on a
  *     # re-config.
  *     requires_persistence,
+ *    # TODO SERVER-124180: Revisit this tag.
+ *    featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -4,6 +4,8 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
+ *   # TODO SERVER-124178: Revisit this tag.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

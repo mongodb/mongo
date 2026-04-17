@@ -1,6 +1,10 @@
 /**
  * Insert 20MB of docs in EU zone (shard 0) and 10MB in US zone (shards 1 and 2), then make sure US zone gets properly balanced (configured "balancing unit" 1MB).
  * This is a regression test for SERVER-115962.
+ *  @tags: [
+ *  # TODO SERVER-124153: Revisit this tag.
+ *  featureFlagReplicatedFastCount_incompatible,
+ *  ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

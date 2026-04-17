@@ -1,5 +1,9 @@
 /**
  * Tests that a collection with migrations not allowed is disregarded by the balancer,
+ * @tags: [
+ *   # TODO SERVER-124153: Revisit this tag.
+ *   featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";

@@ -1,6 +1,10 @@
 /*
  * Test checking that the $shardedDataDistribution aggregation stage only returns info about shards
  * owning chunks or orphan ranges.
+ * @tags: [
+ * # TODO SERVER-124153: Revisit this tag.
+ *  featureFlagReplicatedFastCount_incompatible,
+ *  ]
  */
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
