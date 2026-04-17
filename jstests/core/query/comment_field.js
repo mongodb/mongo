@@ -15,6 +15,8 @@
  *   no_selinux,
  *   # Parallel shell not running through the override.
  *   exclude_from_timeseries_crud_passthrough,
+ *   # Background FCV changes can cause profiler writes to silently fail due to lock conflicts.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 
