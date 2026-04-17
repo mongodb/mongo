@@ -543,5 +543,97 @@ TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionUnordered) {
     scopedDss->clearExpectedFailureDbVersionCheck();
 }
 
+TEST_F(BulkWriteShardTest, ShardedSucceedsUnshardedFailsSameDbStaleDbVersionUnordered) {
+    {
+        auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersionTestDb1,
+                                                                     incorrectDatabaseVersion);
+    }
+
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << -1))},
+        {nsInfoWithShardDatabaseVersions(
+             nssShardedCollection1, boost::none, shardVersionShardedCollection1),
+         nsInfoWithShardDatabaseVersions(
+             nssUnshardedCollection1, incorrectDatabaseVersion, ShardVersion::UNTRACKED())});
+
+    request.setOrdered(false);
+
+    const auto& [replyItems, retriedStmtIds, summaryFields] =
+        bulk_write::performWrites(opCtx(), request);
+
+    ASSERT_EQ(2, replyItems.size());
+    ASSERT_OK(replyItems.front().getStatus());
+    ASSERT_EQ(ErrorCodes::StaleDbVersion, replyItems.back().getStatus().code());
+    ASSERT_EQ(1, summaryFields.nErrors);
+
+    OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+    scopedDss->clearExpectedFailureDbVersionCheck();
+}
+
+TEST_F(BulkWriteShardTest, ShardedUpdateSucceedsUnshardedUpdateFailsSameDbStaleDbVersionUnordered) {
+    {
+        auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersionTestDb1,
+                                                                     incorrectDatabaseVersion);
+    }
+
+    BulkWriteCommandRequest request(
+        {BulkWriteUpdateOp(0, BSON("x" << BSON("$gt" << 0)), BSON("x" << 9)),
+         BulkWriteUpdateOp(1, BSON("x" << BSON("$gt" << 0)), BSON("x" << -9))},
+        {nsInfoWithShardDatabaseVersions(
+             nssShardedCollection2, boost::none, shardVersionShardedCollection2),
+         nsInfoWithShardDatabaseVersions(
+             nssUnshardedCollection1, incorrectDatabaseVersion, ShardVersion::UNTRACKED())});
+
+    request.setOrdered(false);
+
+    const auto& [replyItems, retriedStmtIds, summaryFields] =
+        bulk_write::performWrites(opCtx(), request);
+
+    ASSERT_EQ(2, replyItems.size());
+    ASSERT_OK(replyItems.front().getStatus());
+    ASSERT_EQ(ErrorCodes::StaleDbVersion, replyItems.back().getStatus().code());
+    ASSERT_EQ(1, summaryFields.nErrors);
+
+    OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+    scopedDss->clearExpectedFailureDbVersionCheck();
+}
+
+TEST_F(BulkWriteShardTest, ShardedDeleteSucceedsUnshardedDeleteFailsSameDbStaleDbVersionUnordered) {
+    {
+        auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersionTestDb1,
+                                                                     incorrectDatabaseVersion);
+    }
+
+    BulkWriteCommandRequest request(
+        {BulkWriteDeleteOp(0, BSON("x" << BSON("$gt" << 0))),
+         BulkWriteDeleteOp(1, BSON("x" << BSON("$gt" << 0)))},
+        {nsInfoWithShardDatabaseVersions(
+             nssShardedCollection1, boost::none, shardVersionShardedCollection1),
+         nsInfoWithShardDatabaseVersions(
+             nssUnshardedCollection1, incorrectDatabaseVersion, ShardVersion::UNTRACKED())});
+
+    request.setOrdered(false);
+
+    const auto& [replyItems, retriedStmtIds, summaryFields] =
+        bulk_write::performWrites(opCtx(), request);
+
+    ASSERT_EQ(2, replyItems.size());
+    ASSERT_OK(replyItems.front().getStatus());
+    ASSERT_EQ(ErrorCodes::StaleDbVersion, replyItems.back().getStatus().code());
+    ASSERT_EQ(1, summaryFields.nErrors);
+
+    OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+    scopedDss->clearExpectedFailureDbVersionCheck();
+}
+
 }  // namespace
 }  // namespace mongo

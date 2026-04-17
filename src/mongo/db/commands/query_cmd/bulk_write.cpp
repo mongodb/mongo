@@ -667,6 +667,48 @@ void handleGroupedTimeseriesInserts(OperationContext* opCtx,
     populateWriteResultWithInsertReply(numOps, req.getOrdered(), insertReply, out);
 }
 
+/**
+ * Helper function that sets shard role for the collection, involved in the current operation.
+ * Returns a vector of RAII objects to reset shard role, after the operation is complete.
+ * TODO SERVER-117124 return a single ScopedSetShardRole object once 9.0 becomes last LTS and all
+ * timeseries are viewless
+ */
+std::vector<ScopedSetShardRole> setShardRoleForScope(OperationContext* opCtx,
+                                                     const NamespaceInfoEntry& nsInfo) {
+    auto& invocationNss = nsInfo.getNs();
+    auto& shardVersion = nsInfo.getShardVersion();
+    auto& databaseVersion = nsInfo.getDatabaseVersion();
+
+    std::vector<ScopedSetShardRole> roles;
+
+    if (shardVersion || databaseVersion) {
+        roles.emplace_back(opCtx, invocationNss, shardVersion, databaseVersion);
+
+        // For legacy viewful timeseries, a router may target the main namespace but the shard
+        // will translate the namespace and execute on the underlying timeseries system buckets.
+        //
+        // This NSS translation is only safe if both router and shard agree the collection is
+        // 'untracked'.
+        //
+        // We enforce this by initializing the 'OperationShardingState' with the timeseries
+        // system buckets namespace, but intentionally passing it the router's version for the
+        // main nss.
+        //
+        // This forces a check of the router's main namespace version vs. the shard's timeseries
+        // system buckets version. This check will only pass if both are 'untracked'. All other
+        // combinations (e.g., 'tracked' vs 'untracked', or 'tracked' vs 'tracked') will cause
+        // the shard to throw a StaleConfigInfo.
+        //
+        // TODO SERVER-117124 remove this workaround once 9.0 becomes last LTS and all
+        // timeseries are viewless
+        if (!invocationNss.isTimeseriesBucketsCollection()) {
+            auto timeseriesBucketsNss = invocationNss.makeTimeseriesBucketsNamespace();
+            roles.emplace_back(opCtx, timeseriesBucketsNss, shardVersion, databaseVersion);
+        }
+    }
+    return roles;
+}
+
 /*
  * Helper function to flush insert ops grouped by the insertGrouper.
  * Return true if we can continue with the rest of operations in the bulkWrite request.
@@ -690,6 +732,8 @@ bool handleGroupedInserts(OperationContext* opCtx,
     const auto nsIdx = firstInsert->getNsInfoIdx();
     const auto& nsEntry = nsInfo[nsIdx];
     const auto& nsString = nsEntry.getNs();
+
+    auto shardRole = setShardRoleForScope(opCtx, nsEntry);
 
     auto [preConditions, isTimeseriesLogicalRequest] =
         timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
@@ -1025,6 +1069,8 @@ bool handleDeleteOp(OperationContext* opCtx,
     const auto& nsInfo = req.getNsInfo();
     auto idx = op->getNsInfoIdx();
     auto& nsEntry = nsInfo.at(idx);
+    auto shardRole = setShardRoleForScope(opCtx, nsEntry);
+
     try {
         auto stmtId = opCtx->isRetryableWrite()
             ? bulk_write_common::getStatementId(req, currentOpIdx)
@@ -1603,6 +1649,7 @@ bool handleUpdateOp(OperationContext* opCtx,
     const auto& nsInfo = req.getNsInfo();
     const auto idx = op->getNsInfoIdx();
     const auto& nsEntry = nsInfo[idx];
+    auto shardRole = setShardRoleForScope(opCtx, nsEntry);
 
     try {
         auto stmtId = opCtx->isRetryableWrite()
@@ -1824,48 +1871,10 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         write_ops_exec::updateRetryStats(opCtx, !responses.getRetriedStmtIds().empty());
     });
 
-    bool hasEncryptionInformation = false;
-
-    // Tell mongod what the shard and database versions are. This will cause writes to fail in
-    // case there is a mismatch in the mongos request provided versions and the local (shard's)
-    // understanding of the version.
-    for (const auto& nsInfo : req.getNsInfo()) {
-        auto& invocationNss = nsInfo.getNs();
-        auto& shardVersion = nsInfo.getShardVersion();
-        auto& databaseVersion = nsInfo.getDatabaseVersion();
-
-        if (shardVersion || databaseVersion) {
-            OperationShardingState::setShardRole(
-                opCtx, invocationNss, shardVersion, databaseVersion);
-
-            // For legacy viewful timeseries, a router may target the main namespace but the shard
-            // will translate the namespace and execute on the underlying timeseries system buckets.
-            //
-            // This NSS translation is only safe if both router and shard agree the collection is
-            // 'untracked'.
-            //
-            // We enforce this by initializing the 'OperationShardingState' with the timeseries
-            // system buckets namespace, but intentionally passing it the router's version for the
-            // main nss.
-            //
-            // This forces a check of the router's main namespace version vs. the shard's timeseries
-            // system buckets version. This check will only pass if both are 'untracked'. All other
-            // combinations (e.g., 'tracked' vs 'untracked', or 'tracked' vs 'tracked') will cause
-            // the shard to throw a StaleConfigInfo.
-            //
-            // TODO SERVER-117124 remove this workaround once 9.0 becomes last LTS and all
-            // timeseries are viewless
-            if (!invocationNss.isTimeseriesBucketsCollection()) {
-                auto timeseriesBucketsNss = invocationNss.makeTimeseriesBucketsNamespace();
-                OperationShardingState::setShardRole(
-                    opCtx, timeseriesBucketsNss, shardVersion, databaseVersion);
-            }
-        }
-
-        if (nsInfo.getEncryptionInformation().has_value()) {
-            hasEncryptionInformation = true;
-        }
-    }
+    const bool hasEncryptionInformation =
+        std::any_of(req.getNsInfo().begin(), req.getNsInfo().end(), [](const auto& nsInfo) {
+            return nsInfo.getEncryptionInformation().has_value();
+        });
 
     if (hasEncryptionInformation) {
         uassert(ErrorCodes::BadValue,
