@@ -54,6 +54,8 @@
 namespace mongo::sorter {
 namespace {
 
+using Storage = ContainerBasedStorage<IntWrapper, IntWrapper>;
+
 TEST(ContainerIteratorTest, Iterate) {
     RecoveryUnitNoop ru;
     ViewableIntegerKeyedContainer container;
@@ -466,6 +468,93 @@ TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries)
     ASSERT_EQ(container.entries()[1].second, std::string(expected.buf(), expected.len()));
 
     exhaustIterators<IntWrapper, IntWrapper>(writer);
+}
+
+TEST_F(SortedContainerWriterTest, GetBufferSizeReflectsAverageEntrySize) {
+    auto opCtx = makeOperationContext();
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(std::make_shared<Ident>("buffer_size_test"));
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
+
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(*opCtx,
+                                                          ru,
+                                                          container,
+                                                          stats,
+                                                          /*currKey=*/1,
+                                                          /*dbName=*/boost::none,
+                                                          sorter::kLatestChecksumVersion);
+
+    // Before any spills, buffer size is 0. In production getBufferSize() is only consulted after
+    // the first spill.
+    ASSERT_EQ(storage.getBufferSize(), 0);
+
+    // Write two IntWrapper+IntWrapper entries (4 + 4 = 8 bytes each serialized).
+    SortOptions opts;
+    auto writer =
+        storage.makeWriter(opts, ContainerBasedStorage<IntWrapper, IntWrapper>::Settings{});
+    writer->addAlreadySorted(IntWrapper{1}, IntWrapper{2});
+    writer->addAlreadySorted(IntWrapper{3}, IntWrapper{4});
+
+    // Average entry size = 16 / 2 = 8, plus per-cursor overhead.
+    ASSERT_EQ(storage.getBufferSize(), 8 + Storage::kPerCursorOverheadBytes);
+
+    // Spilled bytes should have propagated to the tracker.
+    ASSERT_EQ(stats.bytesSpilledUncompressed(), 16);
+    ASSERT_EQ(stats.numSpilledEntries(), 2);
+    ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.load(), 16);
+}
+
+TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {
+    auto opCtx = makeOperationContext();
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(std::make_shared<Ident>("buffer_size_edge_test"));
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    // Zero-byte entries (e.g. NullValue + NullValue): overhead only.
+    {
+        SorterContainerStats stats(nullptr);
+        Storage storage(*opCtx,
+                        ru,
+                        container,
+                        stats,
+                        /*currKey=*/1,
+                        /*dbName=*/boost::none,
+                        sorter::kLatestChecksumVersion);
+        stats.addSpilledDataSizeUncompressed(0);
+        stats.incrementNumSpilledEntries();
+        ASSERT_EQ(storage.getBufferSize(), Storage::kPerCursorOverheadBytes);
+    }
+
+    // Non-divisible total: 10 bytes across 3 entries truncates to 3 (not 4), plus overhead. The
+    // fixed per-cursor overhead provides the conservative bias, so truncation is safe.
+    {
+        SorterContainerStats stats(nullptr);
+        Storage storage(*opCtx,
+                        ru,
+                        container,
+                        stats,
+                        /*currKey=*/1,
+                        /*dbName=*/boost::none,
+                        sorter::kLatestChecksumVersion);
+        stats.addSpilledDataSizeUncompressed(4);
+        stats.incrementNumSpilledEntries();
+        stats.addSpilledDataSizeUncompressed(3);
+        stats.incrementNumSpilledEntries();
+        stats.addSpilledDataSizeUncompressed(3);
+        stats.incrementNumSpilledEntries();
+        ASSERT_EQ(storage.getBufferSize(), 3 + Storage::kPerCursorOverheadBytes);
+    }
 }
 
 TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSerialization) {

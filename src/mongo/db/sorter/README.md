@@ -60,7 +60,7 @@ In the implementation, the adjusted `maxMemoryUsageBytes` on the sorter correspo
 
 Iterator count is bounded by the reserved iterator budget and the size of a single iterator object:
 
-Both the file-based and container-based iterator buffer are configured to `64 KB` per active iterator buffer (TODO SERVER-119549: we currently allocate more buffer size to the container implementation than necessary).
+The file-based iterator buffer is configured to `64 KB` per active iterator. The container-based iterator buffer size is computed dynamically as the average serialized entry size across all spilled data, since container iterators read one entry at a time from a cursor rather than loading a fixed-size block.
 
 The per‑iterator memory footprint is obtained from the underlying spiller implementation. ([container-based spiller](https://github.com/mongodb/mongo/blob/65e3cec07260d56eea6f96c9edf6ab780b11b751/src/mongo/db/sorter/container_based_spiller.h#L300), [file-based spiller](https://github.com/mongodb/mongo/blob/65e3cec07260d56eea6f96c9edf6ab780b11b751/src/mongo/db/sorter/file_based_spiller.h#L454))
 
@@ -74,14 +74,14 @@ When merging many spilled runs, the sorter limits the number of iterators it dri
 
 - `fanInLimit = max(dataMaxMemoryUsageBytes/ bufferSize, 2)`
 
-As mentioned above, the container-based and file-based spiller's `bufferSize` are both `64 KB` (TODO SERVER-119549), so the numerical fan-in bounds are the same for file- and container-based spillers; only the concrete iterator type differs.
+For file-based spillers, `bufferSize` is a fixed `64 KB`. For container-based spillers, `bufferSize` is the average serialized entry size (recomputed after each spill), so the fan-in limit adapts to the actual data being sorted.
 
 `fanInLimit` is used as:
 
 - The maximum number of child iterators a merge can drive at once, and
 - The target spill count for the final merge when the caller indicates we are finished sorting.
 
-The fan-in limit bounds how many `64 KB` buffers can be live at once during merges for both file- and container-based sorters.
+The fan-in limit bounds how many iterator buffers can be live at once during merges (`64 KB` each for file-based, average entry size for container-based).
 
 #### Rough upper-bound data volumes
 
@@ -115,11 +115,11 @@ The sorter’s basic workflow is:
 
      - **Container-based**:
        - Uses container-specific classes for spilling and writing to containers.
-       - Data is written in [`64 KB` chunks](https://github.com/mongodb/mongo/blob/65e3cec07260d56eea6f96c9edf6ab780b11b751/src/mongo/db/sorter/container_based_spiller.h#L57) into an internal container (for example, a temporary `RecordStore` keyed by `KeyFormat::Long`).
+       - Data is written entry-by-entry into an internal container (for example, a temporary `RecordStore` keyed by `KeyFormat::Long`).
 
    - Creates a new iterator for the spilled range and pushes it into a vector of iterators:
-     - Each iterator represents one logical sorted range, even though the data may occupy multiple `64 KB` blocks on disk or in the container.
-     - Idle iterators hold mostly metadata; the `64 KB` buffers are only allocated while an iterator is actively being driven.
+     - Each iterator represents one logical sorted range, even though the data may occupy multiple blocks on disk or entries in the container.
+     - Idle iterators hold mostly metadata; file-based `64 KB` buffers are only allocated while an iterator is actively being driven, and container-based iterators read one entry at a time from a cursor.
 
    After adding the new iterator:
 
@@ -157,7 +157,7 @@ The caller [signals](https://github.com/mongodb/mongo/blob/65e3cec07260d56eea6f9
     - If the size of the vector of iterators is greater than the fan-in limit, it [merges spills](https://github.com/mongodb/mongo/blob/65e3cec07260d56eea6f96c9edf6ab780b11b751/src/mongo/db/sorter/sorter_template_defs.h#L663) down toward the fan-in limit, using the same k-way merge logic when we perform spilling.
     - The result is one or more merged ranges, each represented by an iterator.
 
-  - Finally, the sorter [returns a merge iterator](https://github.com/mongodb/mongo/blob/65e3cec07260d56eea6f96c9edf6ab780b11b751/src/mongo/db/sorter/sorter_template_defs.h#L665) that yields all remaining ranges in sorted order. The merge fan-in is again capped by the fan-in limit, so the number of active `64 KB` buffers remains bounded for both file- and container-based sorters.
+  - Finally, the sorter [returns a merge iterator](https://github.com/mongodb/mongo/blob/65e3cec07260d56eea6f96c9edf6ab780b11b751/src/mongo/db/sorter/sorter_template_defs.h#L665) that yields all remaining ranges in sorted order. The merge fan-in is again capped by the fan-in limit, so the number of active iterator buffers remains bounded for both file- and container-based sorters.
 
 ### Sorter variants and limits
 

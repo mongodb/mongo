@@ -56,9 +56,6 @@
 MONGO_MOD_PUB;
 namespace mongo::sorter {
 
-// TODO SERVER-119549 Make container buffer size more accurate
-constexpr inline std::size_t kContainerBufferSize = size_t{64} << 10;
-
 template <typename Key, typename Value>
 class ContainerIterator : public Iterator<Key, Value> {
 public:
@@ -236,6 +233,7 @@ public:
             this->_checksumCalculator.addData(buffer.buf(), size);
         }
         _containerStats.addSpilledDataSizeUncompressed(size);
+        _containerStats.incrementNumSpilledEntries();
         _lastAddedSize = size;
     }
 
@@ -277,6 +275,10 @@ class ContainerBasedStorage : public StorageBase<Key, Value> {
 public:
     using Settings = StorageBase<Key, Value>::Settings;
 
+    // Fixed per-cursor overhead not captured by the serialized entry size.
+    // TODO(SERVER-124382): Re-evaluate the 2 KB estimate with profiling.
+    static constexpr std::size_t kPerCursorOverheadBytes = 2 * 1024;
+
     ContainerBasedStorage(OperationContext& opCtx,
                           RecoveryUnit& ru,
                           IntegerKeyedContainer& container,
@@ -301,9 +303,17 @@ public:
         return sizeof(sorter::ContainerIterator<Key, Value>);
     };
 
-    // TODO SERVER-119549 Make container buffer size more accurate
+    /**
+     * Returns the estimated per-iterator memory cost during merge: the average serialized entry
+     * size plus a fixed per-cursor overhead.
+     */
     size_t getBufferSize() override {
-        return kContainerBufferSize;
+        auto count = _stats.numSpilledEntries();
+        if (count == 0) {
+            return 0;
+        }
+        return static_cast<std::size_t>(_stats.bytesSpilledUncompressed() / count) +
+            kPerCursorOverheadBytes;
     }
 
     std::shared_ptr<sorter::Iterator<Key, Value>> getSortedIterator(

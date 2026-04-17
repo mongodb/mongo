@@ -60,14 +60,21 @@ public:
 
     void addSpilledDataSizeUncompressed(long long size);
 
+    void incrementNumSpilledEntries();
+
     long long bytesSpilledUncompressed() const {
         return _bytesSpilledUncompressed.load();
+    }
+
+    long long numSpilledEntries() const {
+        return _numSpilledEntries.load();
     }
 
 private:
     SorterTracker* _sorterTracker;
 
     AtomicWord<long long> _bytesSpilledUncompressed;
+    AtomicWord<long long> _numSpilledEntries;
 };
 
 

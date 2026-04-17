@@ -498,9 +498,10 @@ protected:
         }
     }
 
-    void _mergeSpills(std::size_t numTargetedSpills) {
+    void _mergeSpills() {
         // The number of target spills and the number of parallel spills are equal.
-        _mergeSpills(numTargetedSpills, numTargetedSpills);
+        updateSpillsNumToRespectMemoryLimits();
+        _mergeSpills(_spillsNumToRespectMemoryLimits, _spillsNumToRespectMemoryLimits);
     }
 
     const Comparator _comp;
@@ -515,20 +516,39 @@ protected:
 
     /**
      * The size of the buffer for the underlying storage used by the spiller.
+     * _bufferSize is populated by updateSpillsNumToRespectMemoryLimits() before a merge, which is
+     * the only point at which it is consumed.
      */
     size_t _bufferSize = 0;
 
     /**
      * The maximum number of spills that can be merged simultaneously in order to respect memory
-     * limits. While merging, a chunk of 64KB from each spill is loaded to memory. The total size of
-     * chunks loaded to memory should not exceed the available memory.
+     * limits. While merging, each active iterator consumes memory proportional to its buffer size.
+     * The total memory consumed by iterator buffers should not exceed the available memory.
      * Only set if spiller != nullptr.
+     * _spillsNumToRespectMemoryLimits is populated by updateSpillsNumToRespectMemoryLimits()
+     * immediately before a merge, which is the only point at which it is consumed.
      */
     size_t _spillsNumToRespectMemoryLimits = 0;
 
     size_t iteratorsMaxBytesSize =
         1 * 1024 * 1024;  // Memory Iterators for spilled data area allowed to use.
     size_t iteratorsMaxNum = 0;
+
+    /**
+     * Re-queries getBufferSize() from the storage and recomputes _spillsNumToRespectMemoryLimits.
+     * Called before a merge so the fan-in limit reflects the actual data that has been
+     * spilled.
+     */
+    void updateSpillsNumToRespectMemoryLimits() {
+        if (this->_spiller == nullptr) {
+            return;
+        }
+        _bufferSize = this->_spiller->getStorage().getBufferSize();
+        invariant(_bufferSize > 0);
+        _spillsNumToRespectMemoryLimits =
+            std::max(this->_opts.maxMemoryUsageBytes / _bufferSize, static_cast<std::size_t>(2));
+    }
 
 private:
     // Update the maxMemoryUsageBytes subtracting the memory reserved for iterators. Iterators can
@@ -540,7 +560,6 @@ private:
             return;
         }
         _iteratorSize = this->_spiller->getStorage().getIteratorSize();
-        _bufferSize = this->_spiller->getStorage().getBufferSize();
         double percRequested = maxIteratorsMemoryUsagePercentage.load();
         auto iteratorMemBytesRequested =
             static_cast<size_t>(this->_opts.maxMemoryUsageBytes * percRequested);
@@ -556,8 +575,6 @@ private:
             this->_opts.MaxMemoryUsageBytes(this->_opts.maxMemoryUsageBytes -
                                             this->iteratorsMaxBytesSize);
         }
-        _spillsNumToRespectMemoryLimits =
-            std::max(this->_opts.maxMemoryUsageBytes / _bufferSize, static_cast<std::size_t>(2));
     }
 };
 
@@ -650,7 +667,7 @@ public:
         }
 
         spill();
-        this->_mergeSpills(this->_spillsNumToRespectMemoryLimits);
+        this->_mergeSpills();
 
         return sorter::merge<Key, Value>(this->_iters, this->_opts, this->_comp);
     }
@@ -755,6 +772,7 @@ private:
 
         // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
         if (this->_iters.size() >= this->iteratorsMaxNum) {
+            this->updateSpillsNumToRespectMemoryLimits();
             this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
         }
     }
@@ -945,7 +963,7 @@ public:
         }
 
         spill();
-        this->_mergeSpills(this->_spillsNumToRespectMemoryLimits);
+        this->_mergeSpills();
 
         _done = true;
         return sorter::merge<Key, Value>(this->_iters, this->_opts, this->_comp);
@@ -1103,6 +1121,7 @@ private:
 
         // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
         if (this->_iters.size() >= this->iteratorsMaxNum) {
+            this->updateSpillsNumToRespectMemoryLimits();
             this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
         }
     }
