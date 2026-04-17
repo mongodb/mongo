@@ -20,6 +20,8 @@
  *   # moveCollection (used by random_migrations suites) recreates the collection on the destination
  *   # shard with an empty plan cache, which would cause plan cache assertions to fail mid-test.
  *   assumes_stable_collection_uuid,
+ *   # TODO(SERVER-124265): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

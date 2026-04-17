@@ -11,6 +11,8 @@
 //   requires_collstats,
 //   requires_fastcount,
 //   no_selinux,
+//   # TODO(SERVER-124153): Remove this tag.
+//   featureFlagReplicatedFastCount_incompatible,
 // ]
 
 // -------------------------

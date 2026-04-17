@@ -7,6 +7,8 @@
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
  *   uses_api_parameters,
+ *   # TODO(SERVER-124193): Remove this tag.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

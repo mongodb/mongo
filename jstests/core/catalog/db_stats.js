@@ -9,6 +9,7 @@
 //   does_not_support_causal_consistency,
 // ]
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function serverIsMongos() {
     const res = db.runCommand("hello");
@@ -55,9 +56,12 @@ if (isMongoS) {
     assert.commandWorked(dbStats);
 }
 
-assert.eq(1, dbStats.objects, tojson(dbStats));
-assert.eq(dataSize, dbStats.avgObjSize, tojson(dbStats));
-assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
+// TODO(SERVER-124148): Remove feature flag check.
+if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "featureFlagReplicatedFastCount")) {
+    assert.eq(1, dbStats.objects, tojson(dbStats));
+    assert.eq(dataSize, dbStats.avgObjSize, tojson(dbStats));
+    assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
+}
 
 // Index count will vary on mongoS if an additional index is needed to support sharding.
 if (isMongoS) {
