@@ -1316,7 +1316,16 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
     }
 
     if (fn->filter) {
-        auto filterExpr = generateFilter(_state, fn->filter.get(), resultSlot, outputs);
+        SbExpr filterExpr;
+        if (_state.expCtx->hasMainCollPathArrayness()) {
+            filterExpr = generateFilter(_state,
+                                        fn->filter.get(),
+                                        resultSlot,
+                                        outputs,
+                                        _state.expCtx->getMainCollPathArrayness());
+        } else {
+            filterExpr = generateFilter(_state, fn->filter.get(), resultSlot, outputs);
+        }
         if (!filterExpr.isNull()) {
             stage = b.makeFilter(std::move(stage), std::move(filterExpr));
         }

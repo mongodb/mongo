@@ -1,0 +1,6 @@
+# Golden test output of GoldenSbeFilterBuilderArraynessTestFixture/TestPathArraynessTraverseFElision
+TraverseFElided_KnownNonArrayPath
+((getField(getField(s1, "a"), "b") == 1) ?: false) 
+# Golden test output of GoldenSbeFilterBuilderArraynessTestFixture/TestPathArraynessTraverseFElision
+TraverseFRetained_UnknownPath
+traverseF(getField(s1, "c"), lambda(l3.0) { traverseF(getField(move(l3.0), "d"), lambda(l4.0) { ((move(l4.0) == 1) ?: false) }, false) }, false) 

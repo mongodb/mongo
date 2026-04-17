@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/util/modules.h"
 
@@ -59,6 +60,13 @@ SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
                       boost::optional<SbSlot> inputSlot,
                       const PlanStageSlots& slots,
+                      bool isFilterOverIxscan = false);
+
+SbExpr generateFilter(StageBuilderState& state,
+                      const MatchExpression* root,
+                      boost::optional<SbSlot> inputSlot,
+                      const PlanStageSlots& slots,
+                      const PathArrayness& pathArrayness,
                       bool isFilterOverIxscan = false);
 
 /**

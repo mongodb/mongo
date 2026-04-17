@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -40,7 +41,10 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -49,7 +53,7 @@
 
 namespace mongo::stage_builder {
 
-class GoldenGenFilternTest : public GoldenSbeExprBuilderTestFixture {
+class GoldenSbeFilterBuilderTestFixture : public GoldenSbeExprBuilderTestFixture {
 public:
     void setUp() override {
         GoldenSbeExprBuilderTestFixture::setUp();
@@ -74,7 +78,7 @@ public:
     }
 };
 
-TEST_F(GoldenGenFilternTest, TestSimpleExpr) {
+TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
     auto root =
         BSON("_id" << 0 << "field1" << 5 << "arr" << BSON_ARRAY(4 << BSON("a" << 5)) << "str"
                    << "abc");
@@ -205,7 +209,7 @@ TEST_F(GoldenGenFilternTest, TestSimpleExpr) {
     }
 }
 
-TEST_F(GoldenGenFilternTest, TestBitsExpr) {
+TEST_F(GoldenSbeFilterBuilderTestFixture, TestBitsExpr) {
     auto root = BSON("_id" << 0 << "field1" << 5);
     auto rootSlotId = _env->registerSlot("root"_sd,
                                          sbe::value::TypeTags::bsonObject,
@@ -249,7 +253,7 @@ TEST_F(GoldenGenFilternTest, TestBitsExpr) {
     }
 }
 
-TEST_F(GoldenGenFilternTest, TestCompExpr) {
+TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
     auto root = BSON("_id" << 0 << "field1" << 5);
     auto rootSlotId = _env->registerSlot("root"_sd,
                                          sbe::value::TypeTags::bsonObject,
@@ -378,6 +382,153 @@ TEST_F(GoldenGenFilternTest, TestCompExpr) {
                 false /* isFilterOverIxscan */,
                 false /* expected */,
                 "LTMatchExpression_MinKey"_sd);
+    }
+}
+
+class GoldenSbeFilterBuilderArraynessTestFixture : public GoldenSbeFilterBuilderTestFixture {
+public:
+    void setUp() override {
+        GoldenSbeExprBuilderTestFixture::setUp();
+        _gctx->validateOnClose(true);
+    }
+
+    void runTestWithPathArrayness(const MatchExpression* expr,
+                                  boost::optional<SbSlot> rootSlot,
+                                  const PathArrayness& pathArrayness,
+                                  bool expected,
+                                  StringData test,
+                                  PlanStageSlots slots = {}) {
+        auto sbExpr = generateFilter(*_state, expr, rootSlot, slots, pathArrayness);
+
+        auto [expectedTag, expectedVal] = sbe::value::makeValue(Value(expected));
+        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        GoldenSbeExprBuilderTestFixture::runTest(std::move(sbExpr), expectedTag, expectedVal, test);
+    }
+};
+
+TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFElision) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+
+    auto root = BSON("a" << BSON("b" << 1) << "c" << BSON("d" << 1));
+    auto rootSlotId = _env->registerSlot("root"_sd,
+                                         sbe::value::TypeTags::bsonObject,
+                                         sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                         false,
+                                         &_slotIdGenerator);
+    auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+    PathArrayness pathArrayness;
+    pathArrayness.addPath(FieldPath("a.b"), MultikeyComponents{}, true /* isFullRebuild */);
+
+    {
+        EqualityMatchExpression eqExpr("a.b"_sd, Value(1));
+        runTestWithPathArrayness(&eqExpr,
+                                 rootSlot,
+                                 pathArrayness,
+                                 true /* expected */,
+                                 "TraverseFElided_KnownNonArrayPath"_sd);
+    }
+    {
+        EqualityMatchExpression eqExpr("c.d"_sd, Value(1));
+        runTestWithPathArrayness(&eqExpr,
+                                 rootSlot,
+                                 pathArrayness,
+                                 true /* expected */,
+                                 "TraverseFRetained_UnknownPath"_sd);
+    }
+}
+
+TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArrayness) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+
+    PathArrayness pathArrayness;
+    pathArrayness.addPath(FieldPath("a.b"), MultikeyComponents{}, true /* isFullRebuild */);
+
+    // Document with scalar intermediate: "a" is 42, so getField(42, "b") returns Nothing.
+    // All null-matching predicates should return true (field path doesn't exist).
+    {
+        auto root = BSON("a" << 42);
+        auto rootSlotId = _env->registerSlot("scalarRoot"_sd,
+                                             sbe::value::TypeTags::bsonObject,
+                                             sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                             false,
+                                             &_slotIdGenerator);
+        auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+        {
+            EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+            runTestWithPathArrayness(&eqExpr,
+                                     rootSlot,
+                                     pathArrayness,
+                                     true /* expected */,
+                                     "NothingCheck_EqNull_ScalarIntermediate"_sd);
+        }
+        {
+            LTEMatchExpression lteExpr("a.b"_sd, Value(BSONNULL));
+            runTestWithPathArrayness(&lteExpr,
+                                     rootSlot,
+                                     pathArrayness,
+                                     true /* expected */,
+                                     "NothingCheck_LteNull_ScalarIntermediate"_sd);
+        }
+        {
+            GTEMatchExpression gteExpr("a.b"_sd, Value(BSONNULL));
+            runTestWithPathArrayness(&gteExpr,
+                                     rootSlot,
+                                     pathArrayness,
+                                     true /* expected */,
+                                     "NothingCheck_GteNull_ScalarIntermediate"_sd);
+        }
+        {
+            InMatchExpression inExpr("a.b"_sd);
+            BSONArray arr = BSON_ARRAY(BSONNULL);
+            ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
+            runTestWithPathArrayness(&inExpr,
+                                     rootSlot,
+                                     pathArrayness,
+                                     true /* expected */,
+                                     "NothingCheck_InNull_ScalarIntermediate"_sd);
+        }
+    }
+
+    // Document with object intermediate: "a.b" is 1, not null.
+    {
+        auto root = BSON("a" << BSON("b" << 1));
+        auto rootSlotId = _env->registerSlot("objectRoot"_sd,
+                                             sbe::value::TypeTags::bsonObject,
+                                             sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                             false,
+                                             &_slotIdGenerator);
+        auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+        {
+            EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+            runTestWithPathArrayness(&eqExpr,
+                                     rootSlot,
+                                     pathArrayness,
+                                     false /* expected */,
+                                     "NothingCheck_EqNull_ObjectIntermediate"_sd);
+        }
+    }
+
+    // Document with missing field: "a" doesn't exist, so path is entirely absent.
+    {
+        auto root = BSONObj();
+        auto rootSlotId = _env->registerSlot("emptyRoot"_sd,
+                                             sbe::value::TypeTags::bsonObject,
+                                             sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                             false,
+                                             &_slotIdGenerator);
+        auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+        {
+            EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+            runTestWithPathArrayness(&eqExpr,
+                                     rootSlot,
+                                     pathArrayness,
+                                     true /* expected */,
+                                     "NothingCheck_EqNull_MissingField"_sd);
+        }
     }
 }
 

@@ -70,11 +70,15 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/bson_typemask.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -88,6 +92,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::stage_builder {
 namespace {
@@ -147,8 +153,13 @@ struct MatchExpressionVisitorContext {
                                   boost::optional<SbSlot> rootSlot,
                                   const MatchExpression* root,
                                   const PlanStageSlots* slots,
+                                  const PathArrayness& pathArrayness,
                                   bool isFilterOverIxscan)
-        : state{state}, rootSlot{rootSlot}, slots{slots}, isFilterOverIxscan{isFilterOverIxscan} {
+        : state{state},
+          rootSlot{rootSlot},
+          slots{slots},
+          pathArrayness{pathArrayness},
+          isFilterOverIxscan{isFilterOverIxscan} {
         tassert(
             7097201, "Expected 'rootSlot' or 'slots' to be defined", rootSlot || slots != nullptr);
 
@@ -199,6 +210,7 @@ struct MatchExpressionVisitorContext {
     // document ('rootSlot') or with the set of kField slots ('slots').
     boost::optional<SbSlot> rootSlot;
     const PlanStageSlots* slots = nullptr;
+    const PathArrayness& pathArrayness;
     bool isFilterOverIxscan = false;
 };
 
@@ -221,7 +233,8 @@ SbExpr generateTraverseF(SbExpr inputExpr,
                          StageBuilderState& state,
                          const MakePredicateFn& makePredicate,
                          bool matchesNothing,
-                         LeafTraversalMode mode) {
+                         LeafTraversalMode mode,
+                         bool canPathBeArray = true) {
     tassert(7097202,
             "Expected an input expression or top level field",
             !inputExpr.isNull() || topLevelFieldSlot.has_value());
@@ -233,26 +246,25 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     // will be false.
     const bool childIsLeafWithEmptyName =
         (level == fp.numParts() - 2u) && fp.isPathComponentEmpty(level + 1);
-    int arrayIndex = 0;
-    const bool isNumericField = (level < fp.FieldRef::numParts()) &&
-        fp.isNumericPathComponentStrict(level) &&
-        NumberParser{}(fp.getPart(level), &arrayIndex).isOK();
-    int arrayIndexNext = 0;
-    const bool isNumericFieldNext = (level + 1 < fp.FieldRef::numParts()) &&
-        fp.isNumericPathComponentStrict(level + 1) &&
-        NumberParser{}(fp.getPart(level + 1), &arrayIndexNext).isOK();
     const bool isLeafField = (level == fp.numParts() - 1u) || childIsLeafWithEmptyName;
     const bool needsArrayCheck = (isLeafField && mode == LeafTraversalMode::kArrayAndItsElements);
     const bool needsNothingCheck = !isLeafField && matchesNothing;
-    const bool isLeafNumeric =
-        (isNumericField && (!isNumericFieldNext || mode == LeafTraversalMode::kDoNotTraverseLeaf));
+    const bool omitTraverseF = !canPathBeArray && !needsNothingCheck;
 
-    auto lambdaFrameId = frameIdGenerator->generate();
-    auto lambdaParam = SbExpr{SbVar{lambdaFrameId, 0}};
-    auto getFieldName = isNumericField ? "getFieldOrElement"_sd : "getField"_sd;
+    LOGV2_DEBUG(12166710,
+                3,
+                "generateTraverseF decision",
+                "path"_attr = fp.dottedField(),
+                "level"_attr = level,
+                "isLeafField"_attr = isLeafField,
+                "canPathBeArray"_attr = canPathBeArray,
+                "matchesNothing"_attr = matchesNothing,
+                "needsNothingCheck"_attr = needsNothingCheck,
+                "omitTraverseF"_attr = omitTraverseF);
+
     SbExpr fieldExpr = topLevelFieldSlot
         ? SbExpr{*topLevelFieldSlot}
-        : b.makeFunction(getFieldName, inputExpr.clone(), b.makeStrConstant(fp.getPart(level)));
+        : b.makeFunction("getField"_sd, inputExpr.clone(), b.makeStrConstant(fp.getPart(level)));
 
     if (childIsLeafWithEmptyName) {
         auto frameId = frameIdGenerator->generate();
@@ -264,19 +276,30 @@ SbExpr generateTraverseF(SbExpr inputExpr,
         fieldExpr = b.makeLet(frameId, SbExpr::makeSeq(std::move(fieldExpr)), std::move(expr));
     }
 
-    auto resultExpr = isLeafField ? makePredicate(lambdaParam.clone())
-                                  : generateTraverseF(lambdaParam.clone(),
-                                                      boost::none /* topLevelFieldSlot */,
-                                                      fp,
-                                                      level + 1,
-                                                      frameIdGenerator,
-                                                      state,
-                                                      makePredicate,
-                                                      matchesNothing,
-                                                      mode);
+    auto makeResultExpr = [&](const SbExpr& inputExpr, bool innerCanPathBeArray) -> SbExpr {
+        return isLeafField ? makePredicate(inputExpr.clone())
+                           : generateTraverseF(inputExpr.clone(),
+                                               boost::none /* topLevelFieldSlot */,
+                                               fp,
+                                               level + 1,
+                                               frameIdGenerator,
+                                               state,
+                                               makePredicate,
+                                               matchesNothing,
+                                               mode,
+                                               innerCanPathBeArray);
+    };
 
-    if ((isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) ||
-        (!isNumericField && isNumericFieldNext)) {
+    if (omitTraverseF) {
+        return makeResultExpr(fieldExpr, false /* canPathBeArray */);
+    }
+
+    auto lambdaFrameId = frameIdGenerator->generate();
+    auto lambdaParam = SbExpr{SbVar{lambdaFrameId, 0}};
+
+    auto resultExpr = makeResultExpr(lambdaParam, true /* canPathBeArray */);
+
+    if (isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) {
         return b.makeLet(
             lambdaFrameId, SbExpr::makeSeq(std::move(fieldExpr)), std::move(resultExpr));
     }
@@ -305,20 +328,8 @@ SbExpr generateTraverseF(SbExpr inputExpr,
 
     // traverseF() can return Nothing only when the lambda returns Nothing. All expressions that we
     // generate return Boolean, so there is no need for explicit fillEmpty here.
-    auto traverseFExpr = isNumericField
-        ? b.makeFunction(
-              "magicTraverseF",
-              inputExpr.clone(),
-              b.makeStrConstant(fp.getPart(level)),
-              b.makeInt32Constant(arrayIndex),
-              std::move(lambdaExpr),
-              b.makeInt32Constant(
-                  (isLeafNumeric ? sbe::vm::MagicTraverse::kPreTraverse : 0) +
-                  (isNumericFieldNext || isLeafField ? 0 : sbe::vm::MagicTraverse::kPostTraverse)))
-        : b.makeFunction("traverseF",
-                         fieldExpr.clone(),
-                         std::move(lambdaExpr),
-                         b.makeBoolConstant(needsArrayCheck));
+    auto traverseFExpr = b.makeFunction(
+        "traverseF", fieldExpr.clone(), std::move(lambdaExpr), b.makeBoolConstant(needsArrayCheck));
 
     // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
     if (needsNothingCheck) {
@@ -412,6 +423,10 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             "Expected either input expr or top-level field slot to be defined",
             !frame.inputExpr.isNull() || topLevelFieldSlot.has_value());
 
+    const bool canPathBeArray = feature_flags::gFeatureFlagPathArrayness.isEnabled()
+        ? context->pathArrayness.canPathBeArray(path, context->state.expCtx.get())
+        : true;
+
     frame.pushExpr(generateTraverseF(frame.inputExpr.clone(),
                                      topLevelFieldSlot,
                                      path,
@@ -420,7 +435,8 @@ void generatePredicate(MatchExpressionVisitorContext* context,
                                      context->state,
                                      makePredicate,
                                      matchesNothing,
-                                     mode));
+                                     mode,
+                                     canPathBeArray));
 }
 
 /**
@@ -1268,13 +1284,24 @@ SbExpr generateFilter(StageBuilderState& state,
                       boost::optional<SbSlot> rootSlot,
                       const PlanStageSlots& slots,
                       bool isFilterOverIxscan) {
+    PathArrayness pathArrayness{};
+    return generateFilter(state, root, rootSlot, slots, pathArrayness, isFilterOverIxscan);
+}
+
+SbExpr generateFilter(StageBuilderState& state,
+                      const MatchExpression* root,
+                      boost::optional<SbSlot> rootSlot,
+                      const PlanStageSlots& slots,
+                      const PathArrayness& pathArrayness,
+                      bool isFilterOverIxscan) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
     if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
         return SbExpr{};
     }
 
-    MatchExpressionVisitorContext context{state, rootSlot, root, &slots, isFilterOverIxscan};
+    MatchExpressionVisitorContext context{
+        state, rootSlot, root, &slots, pathArrayness, isFilterOverIxscan};
 
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};

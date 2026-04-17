@@ -1014,6 +1014,10 @@ public:
         return (this->_params.mainCollPathArrayness != nullptr);
     }
 
+    const PathArrayness& getMainCollPathArrayness() const {
+        return *_params.mainCollPathArrayness;
+    }
+
     const PathArrayness* getMainCollPathArrayness_forTest() const {
         return _params.mainCollPathArrayness.get();
     }
