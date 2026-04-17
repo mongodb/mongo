@@ -973,6 +973,14 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+
+    internalChangeStreamRespectsReadPreference:
+        description: "Enables change stream cursors to respect readPreference after replica set elections."
+        set_at: [startup, runtime]
+        cpp_varname: internalChangeStreamRespectsReadPreference
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

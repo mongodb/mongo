@@ -128,6 +128,52 @@ static const ReadConcernSupportResult kSupportsReadConcernResult{
       "default read concern not permitted (getMore uses the cursor's read concern)"}}};
 
 /**
+ * For change stream cursors, validates that the current node's replica set role still matches the
+ * cursor's original readPreference. Throws InterruptedDueToReplStateChange error if the
+ * readPreference can no longer be satisfied, causing the driver or mongos to reopen the cursor on
+ * an appropriate node.
+ *
+ * This check is a no-op for non-change-stream cursors.
+ */
+void ensureChangeStreamReadPreferenceCanBeSatisfied(OperationContext* opCtx,
+                                                    ClientCursorPin& cursorPin) {
+    if (!cursorPin->isChangeStreamQuery()) {
+        return;
+    }
+
+    if (!internalChangeStreamRespectsReadPreference.loadRelaxed()) {
+        return;
+    }
+
+    const auto readPref = cursorPin->getReadPreferenceSetting().pref;
+
+    // Flexible preferences are always satisfiable regardless of node role.
+    if (readPref == ReadPreference::PrimaryPreferred ||
+        readPref == ReadPreference::SecondaryPreferred || readPref == ReadPreference::Nearest) {
+        return;
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const auto memberState = replCoord->getMemberState();
+
+    const bool didTargetPrimaryButIsNoLongerPrimary =
+        readPref == ReadPreference::PrimaryOnly && !memberState.primary();
+    const bool didTargetSecondaryButBecamePrimary =
+        readPref == ReadPreference::SecondaryOnly && memberState.primary();
+    if (didTargetSecondaryButBecamePrimary || didTargetPrimaryButIsNoLongerPrimary) {
+        // Kill the cursor before throwing. Without this, the ClientCursorPin destructor would just
+        // unpin it back to idle in the CursorManager, leaking the cursor until timeout-based
+        // garbage collection. Inside acquireLocksAndIterateCursor, a ScopeGuard handles this, but
+        // we're before that point.
+        cursorPin.deleteUnderlying();
+        uasserted(ErrorCodes::InterruptedDueToReplStateChange,
+                  str::stream() << "Change stream readPreference '"
+                                << ReadPreferenceSetting(readPref).toString()
+                                << "' can no longer be satisfied after a replica set election");
+    }
+}
+
+/**
  * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after
  * authenticating, so that it is safe to report the lsid of 'cursor'.
  */
@@ -808,6 +854,9 @@ public:
             }
 
             ClientCursorPin cursorPin = pinCursorWithRetry(opCtx, cursorId, nss);
+
+            // Check that readPreference can still be satisfied after possible elections.
+            ensureChangeStreamReadPreferenceCanBeSatisfied(opCtx, cursorPin);
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==

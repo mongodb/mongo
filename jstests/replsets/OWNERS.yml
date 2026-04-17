@@ -39,3 +39,6 @@ filters:
   - "all_commands_downgrading_to_upgraded.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "*change_stream*":
+    approvers:
+      - 10gen/query-execution-change-streams
