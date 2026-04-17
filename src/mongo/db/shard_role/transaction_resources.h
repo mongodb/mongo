@@ -36,6 +36,7 @@
 #include "mongo/db/shard_role/post_resharding_placement.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/snapshot_helper.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -477,6 +478,24 @@ struct MONGO_MOD_NEEDS_REPLACEMENT TransactionResources {
         Locker::LockSnapshot yieldedLocker;
     };
     boost::optional<YieldedStateHolder> yielded;
+
+    // Snapshot information for the transaction, used to validate nested acquisition (i.e 2
+    // separated acquisitions for the same operation which are not separated by a yield or a stash).
+    // Nested acquisition suffer the problem that the second acquisition will just re-use the
+    // snapshot open by the first. The Snapshot policy is used to validate the hyphotetical snapshot
+    // the second acquisition would take against the current one. The replication state is stored so
+    // that we can validate whether the second acquisition happened on a different state than the
+    // first one. This is currently used only to check the validity of the read source.
+    // A snapshot opened on a secondary with no timestamp might read in the middle of a oplog batch
+    // application. A second acquisition on a replicated collection is therefore not safe.
+    // A snapshot opened on a primary with no timestamp will read always consistent information, so
+    // a second acquisition on a replicated collection is safe (even if the replication state is now
+    // secondary)
+    struct SnapshotPolicy {
+        RecoveryUnit::ReadSource readSource;
+        SnapshotHelper::NodeRole nodeRole;
+    };
+    boost::optional<SnapshotPolicy> snapshotPolicy = boost::none;
 
     // The number of times we have called acquireCollection* on these TransactionResources. The
     // number is used to identify acquisitions that share the same global/db locks.

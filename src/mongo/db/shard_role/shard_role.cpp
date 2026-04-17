@@ -505,10 +505,63 @@ const Lock::GlobalLockOptions kLockFreeReadsGlobalLockOptions{[] {
     return options;
 }()};
 
+void validateAgainstSnapshotPolicy(
+    OperationContext* opCtx,
+    const ResolvedNamespaceOrViewAcquisitionRequests& newAcquisitionRequests,
+    RecoveryUnit::ReadSource newReadSource,
+    SnapshotHelper::NodeRole newNodeRole) {
+    auto& txnResources = TransactionResources::get(opCtx);
+    auto currentSnapshotPolicy = txnResources.snapshotPolicy;
+    auto& acquisitions = txnResources.acquiredCollections;
+    tassert(10141602,
+            "Invalid nested acquisition. Detected a outer transaction resource without snapshot "
+            "policy. This is unsafe given it will skip the nested acquisition validation.",
+            currentSnapshotPolicy || acquisitions.empty());
+
+    if (!currentSnapshotPolicy) {
+        // Return early given this is not a nested acquisition
+        return;
+    }
+
+
+    // On a secondary a dangerous transition is kNoTimestamp (unreplicated) followed by
+    // kLastApplied (replicated). In that case the replicated collection would be forced to read
+    // without a timestamp because the snapshot is already open at kNoTimestamp, which can return
+    // inconsistent data since we might read in the middle of a secondary batch application.
+    // When both acquisitions are on a secondary, this is an implementation bug, so we tassert.
+    // When one acquisition is on a primary and the other is on a secondary, this is safe because
+    // the open snapshot can't have inconsistent batch application.
+    bool isPrimaryToSecondaryRoleChange =
+        currentSnapshotPolicy->nodeRole == SnapshotHelper::NodeRole::kPrimary &&
+        newNodeRole == SnapshotHelper::NodeRole::kSecondary;
+    bool fromNoTimestampToLastApplied =
+        currentSnapshotPolicy->readSource == RecoveryUnit::ReadSource::kNoTimestamp &&
+        newReadSource == RecoveryUnit::ReadSource::kLastApplied;
+    tassert(10141601,
+            "Invalid nested acquisition. The first acquisition opened a snapshot at lastest but "
+            "the second requires to read at the last applied timestamp on secondaries. This is "
+            "unsafe because the replicated collection would read without a timestamp and might "
+            "return inconsistent data.",
+            isPrimaryToSecondaryRoleChange || !fromNoTimestampToLastApplied);
+}
+
+void updateSnapshotPolicy(TransactionResources& txnResources,
+                          RecoveryUnit::ReadSource readSource,
+                          SnapshotHelper::NodeRole nodeRole) {
+    if (!txnResources.snapshotPolicy) {
+        txnResources.snapshotPolicy = TransactionResources::SnapshotPolicy{readSource, nodeRole};
+    } else {
+        txnResources.snapshotPolicy->readSource = readSource;
+        txnResources.snapshotPolicy->nodeRole = nodeRole;
+    }
+}
+
 CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
-    ResolvedNamespaceOrViewAcquisitionRequests& sortedAcquisitionRequests) {
+    ResolvedNamespaceOrViewAcquisitionRequests& sortedAcquisitionRequests,
+    RecoveryUnit::ReadSource readSource,
+    SnapshotHelper::NodeRole nodeRole) {
     CollectionOrViewAcquisitions acquisitions;
 
     auto& txnResources = TransactionResources::get(opCtx);
@@ -620,6 +673,8 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
     const auto& nss = sortedAcquisitionRequests.begin()->prerequisites.nss;
     direct_connection_util::checkDirectShardOperationAllowed(opCtx, nss);
 
+    updateSnapshotPolicy(txnResources, readSource, nodeRole);
+
     return acquisitions;
 }
 
@@ -630,6 +685,12 @@ bool haveAcquiredConsistentCatalogAndSnapshot(const CollectionCatalog* catalogBe
     return catalogBeforeSnapshot == catalogAfterSnapshot &&
         replTermBeforeSnapshot == replTermAfterSnapshot;
 }
+
+struct CatalogAtReadSource {
+    std::shared_ptr<const CollectionCatalog> catalog;
+    RecoveryUnit::ReadSource readSource;
+    SnapshotHelper::NodeRole nodeRole;
+};
 
 /**
  * This function is responsible for acquiring an in-memory version of the CollectionCatalog and
@@ -667,20 +728,32 @@ bool haveAcquiredConsistentCatalogAndSnapshot(const CollectionCatalog* catalogBe
  * engine without a timestamp or whether they should read at the last applied timestamp. If the
  * replication state changes, the opened snapshot is abandoned and the process is retried.
  */
-std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(
+CatalogAtReadSource getConsistentCatalogAndSnapshot(
     OperationContext* opCtx,
     const NamespaceStringOrUUIDRequests& acquisitionRequests,
     bool isWriteAcquisition) {
     while (true) {
+        SnapshotHelper::ReadSourceInfo readSourceInfo;
         shard_role_details::SnapshotAttempt snapshotAttempt(opCtx, acquisitionRequests);
         snapshotAttempt.snapshotInitialState();
         // Writes always need to see the latest data. Secondary reads need to read at lastApplied.
         if (!isWriteAcquisition) {
-            snapshotAttempt.changeReadSourceForSecondaryReads();
+            bool isSnapshotOpen = shard_role_details::getRecoveryUnit(opCtx)->isActive();
+            if (isSnapshotOpen) {
+                readSourceInfo = snapshotAttempt.getRequiredReadSourceForSecondaryReads();
+            } else {
+                readSourceInfo = snapshotAttempt.changeReadSourceForSecondaryReads();
+            }
+        } else {
+            // Write acquisitions maintain whatever read source was already set.
+            readSourceInfo.readSource =
+                shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
+            readSourceInfo.nodeRole = SnapshotHelper::getNodeRole(opCtx);
         }
         snapshotAttempt.openStorageSnapshot();
+
         if (auto catalog = snapshotAttempt.getConsistentCatalog()) {
-            return catalog;
+            return {catalog, readSourceInfo.readSource, readSourceInfo.nodeRole};
         }
     }
 }
@@ -806,15 +879,16 @@ ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock
     return {lockFreeReadsBlock, globalLock};
 }
 
-std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
+
+CatalogAtReadSource getConsistentCatalog(
     OperationContext* opCtx,
     const CollectionOrViewAcquisitionRequests& acquisitionRequests,
     bool isWriteAcquisition) {
     auto requests = toNamespaceStringOrUUIDs(acquisitionRequests);
-    auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests, isWriteAcquisition);
+    auto catalogAtReadSource = getConsistentCatalogAndSnapshot(opCtx, requests, isWriteAcquisition);
     // Stash the catalog, it will be automatically unstashed when the snapshot is released.
-    CollectionCatalog::stash(opCtx, catalog);
-    return catalog;
+    CollectionCatalog::stash(opCtx, catalogAtReadSource.catalog);
+    return catalogAtReadSource;
 }
 
 // TODO SERVER-77067 simplify conditions
@@ -1265,10 +1339,13 @@ void SnapshotAttempt::snapshotInitialState() {
     _catalogBeforeSnapshot = CollectionCatalog::get(_opCtx);
 }
 
-void SnapshotAttempt::changeReadSourceForSecondaryReads() {
+SnapshotHelper::ReadSourceInfo SnapshotAttempt::getRequiredReadSourceForSecondaryReads() {
     dassert(_replTermBeforeSnapshot && _catalogBeforeSnapshot);
     auto catalog = *_catalogBeforeSnapshot;
-
+    SnapshotHelper::ReadSourceInfo selectedReadSourceInfo{
+        shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource(),
+        SnapshotHelper::getNodeRole(_opCtx),
+        StringData{}};
     for (auto& nsOrUUID : _acquisitionRequests) {
         NamespaceString nss;
         try {
@@ -1290,10 +1367,71 @@ void SnapshotAttempt::changeReadSourceForSecondaryReads() {
                 throw;
             }
         }
-        _shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(_opCtx, nss);
-        if (_shouldReadAtLastApplied)
-            return;
+        auto desiredReadSourceInfo =
+            SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(_opCtx, nss);
+        // kLastApplied is the strictest read source possible. We can early exit given no other read
+        // sources would be applied beyond this point.
+        if (desiredReadSourceInfo &&
+            desiredReadSourceInfo->readSource == RecoveryUnit::ReadSource::kLastApplied) {
+            return {RecoveryUnit::ReadSource::kLastApplied,
+                    desiredReadSourceInfo->nodeRole,
+                    desiredReadSourceInfo->reason};
+        } else if (desiredReadSourceInfo) {
+            selectedReadSourceInfo = *desiredReadSourceInfo;
+        }
     }
+
+    return selectedReadSourceInfo;
+}
+
+SnapshotHelper::ReadSourceInfo SnapshotAttempt::changeReadSourceForSecondaryReads() {
+    dassert(_replTermBeforeSnapshot && _catalogBeforeSnapshot);
+    auto catalog = *_catalogBeforeSnapshot;
+    // An open snapshot can't change it's read-source
+    bool isSnapshotOpen = shard_role_details::getRecoveryUnit(_opCtx)->isActive();
+    invariant(!isSnapshotOpen);
+    for (auto& nsOrUUID : _acquisitionRequests) {
+        NamespaceString nss;
+        try {
+            // This can lookup into the commit pending entries without establishing a consistent
+            // collection. This is safe because we only use this resolved namespace to check if the
+            // collection is replicated or not. As we do not allow changing this setting by the user
+            // this is independent of the consistent collection namespace. Note that a later check
+            // in the Acquisition API will verify that it is not uncommitted in the WT snapshot. We
+            // do not allow lookups on uncommitted collections since they still do not exist.
+            nss = catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(_opCtx,
+                                                                                       nsOrUUID);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            invariant(nsOrUUID.isUUID());
+
+            const auto readSource =
+                shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource();
+            if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
+                readSource == RecoveryUnit::ReadSource::kLastApplied) {
+                throw;
+            }
+        }
+        auto desiredReadSourceInfo =
+            SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(_opCtx, nss);
+        // Given no snapshot is already open and we have got a non-empty desired read source, try to
+        // set it.
+        if (desiredReadSourceInfo) {
+            SnapshotHelper::updateReadSourceTimestampForSecondaryReadsIfPossible(
+                _opCtx, nss, desiredReadSourceInfo->readSource, desiredReadSourceInfo->reason);
+        }
+        // If we tried to apply kLastApplied we can early exit.
+        // The function aims at applying kLastApplied or set a kNoTimestamp if not possible.
+        // In any case, we can return given no other read sources will be set.
+        if (desiredReadSourceInfo &&
+            desiredReadSourceInfo->readSource == RecoveryUnit::ReadSource::kLastApplied) {
+            return {getRecoveryUnit(_opCtx)->getTimestampReadSource(),
+                    desiredReadSourceInfo->nodeRole,
+                    desiredReadSourceInfo->reason};
+        }
+    }
+    return {getRecoveryUnit(_opCtx)->getTimestampReadSource(),
+            SnapshotHelper::getNodeRole(_opCtx),
+            StringData{}};
 }
 
 void SnapshotAttempt::openStorageSnapshot() {
@@ -1413,21 +1551,27 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
     checkShardingPlacement(opCtx, acquisitionRequests);
 
     // Open a consistent catalog snapshot if needed.
-    bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
-    auto catalog = openSnapshot
-        ? stashConsistentCatalog(opCtx, acquisitionRequests, false /* isWriteAcquisition */)
-        : CollectionCatalog::get(opCtx);
-
+    bool isSnapshotOpen = shard_role_details::getRecoveryUnit(opCtx)->isActive();
+    auto catalogAtReadSource =
+        getConsistentCatalog(opCtx, acquisitionRequests, false /* isWriteAcquisition */);
     try {
         // Second sharding placement check.
         checkShardingPlacement(opCtx, acquisitionRequests);
 
         auto sortedAcquisitionRequests = shard_role_details::generateSortedAcquisitionRequests(
-            opCtx, *catalog, acquisitionRequests, lockFreeReadsResources);
-        return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
-            opCtx, *catalog, sortedAcquisitionRequests);
+            opCtx, *catalogAtReadSource.catalog, acquisitionRequests, lockFreeReadsResources);
+        validateAgainstSnapshotPolicy(opCtx,
+                                      sortedAcquisitionRequests,
+                                      catalogAtReadSource.readSource,
+                                      catalogAtReadSource.nodeRole);
+
+        return acquireResolvedCollectionsOrViewsWithoutTakingLocks(opCtx,
+                                                                   *catalogAtReadSource.catalog,
+                                                                   sortedAcquisitionRequests,
+                                                                   catalogAtReadSource.readSource,
+                                                                   catalogAtReadSource.nodeRole);
     } catch (...) {
-        if (openSnapshot && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
+        if (!isSnapshotOpen && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
         throw;
     }
@@ -1547,13 +1691,21 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
 
         // Open a consistent catalog snapshot if needed.
         bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
-        auto catalog = openSnapshot
-            ? stashConsistentCatalog(opCtx, acquisitionRequests, isWriteAcquisition)
-            : CollectionCatalog::get(opCtx);
+        auto catalogAtReadSource =
+            getConsistentCatalog(opCtx, acquisitionRequests, isWriteAcquisition);
+        validateAgainstSnapshotPolicy(opCtx,
+                                      sortedAcquisitionRequests,
+                                      catalogAtReadSource.readSource,
+                                      catalogAtReadSource.nodeRole);
+        auto catalog = catalogAtReadSource.catalog;
 
         try {
             return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
-                opCtx, *catalog, sortedAcquisitionRequests);
+                opCtx,
+                *catalog,
+                sortedAcquisitionRequests,
+                catalogAtReadSource.readSource,
+                catalogAtReadSource.nodeRole);
         } catch (const DBException& ex) {
             if (openSnapshot && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
                 shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
@@ -1647,6 +1799,10 @@ CollectionAcquisition shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWi
                                             std::move(lockRequirements),
                                             std::move(coll)});
 
+    updateSnapshotPolicy(txnResources,
+                         shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource(),
+                         SnapshotHelper::getNodeRole(opCtx));
+
     return CollectionAcquisition(txnResources, acquiredCollection);
 }
 
@@ -1730,6 +1886,10 @@ CollectionAcquisition shard_role_nocheck::acquireLocalCollectionNoConsistentCata
     if (!txnResources.catalogEpoch) {
         txnResources.catalogEpoch = catalog->getEpoch();
     }
+
+    updateSnapshotPolicy(txnResources,
+                         shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource(),
+                         SnapshotHelper::getNodeRole(opCtx));
 
     return CollectionAcquisition(txnResources, acquiredCollection);
 }
@@ -1901,11 +2061,10 @@ void restoreTransactionResourcesToOperationContext(
         auto [requests, isWriteAcquisition] = toNamespaceStringOrUUIDs(
             transactionResources.acquiredCollections, transactionResources.acquiredViews);
 
-        bool isSnapshotOpen = shard_role_details::getRecoveryUnit(opCtx)->isActive();
-        auto catalog = isSnapshotOpen
-            ? CollectionCatalog::get(opCtx)
-            : getConsistentCatalogAndSnapshot(opCtx, requests, isWriteAcquisition);
+        auto catalogAndReadSource =
+            getConsistentCatalogAndSnapshot(opCtx, requests, isWriteAcquisition);
 
+        auto catalog = catalogAndReadSource.catalog;
         // The catalog epoch changes every time a replication rollback is performed. If a rollback
         // occurs while the query is yielded, the query might be resumed on a earlier point in
         // time which can lead to anomalies. To avoid potential issues, the query must be
@@ -2033,6 +2192,10 @@ void restoreTransactionResourcesToOperationContext(
                 acquiredCollection.collectionPtr.setShardKeyPattern(
                     acquiredCollection.collectionDescription->getKeyPattern());
             }
+
+            updateSnapshotPolicy(transactionResources,
+                                 catalogAndReadSource.readSource,
+                                 catalogAndReadSource.nodeRole);
         }
 
         for (auto& acquiredView : transactionResources.acquiredViews) {

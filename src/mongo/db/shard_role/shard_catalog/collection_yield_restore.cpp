@@ -103,7 +103,11 @@ ConsistentCollection LockedCollectionYieldRestore::operator()(OperationContext* 
     // state. After a query yields its locks, the replication state may have changed, invalidating
     // our current choice of ReadSource. Using the same preconditions, change our ReadSource if
     // necessary.
-    SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
+    auto readSourceInfo = SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(opCtx, _nss);
+    if (readSourceInfo) {
+        SnapshotHelper::updateReadSourceTimestampForSecondaryReadsIfPossible(
+            opCtx, _nss, readSourceInfo->readSource, readSourceInfo->reason);
+    }
 
     return ConsistentCollection{opCtx, collection};
 }

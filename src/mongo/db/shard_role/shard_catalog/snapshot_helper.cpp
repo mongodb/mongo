@@ -116,18 +116,44 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
 
 namespace SnapshotHelper {
 
-bool changeReadSourceIfNeeded(OperationContext* opCtx,
-                              boost::optional<const NamespaceString&> nss) {
+NodeRole getNodeRole(OperationContext* opCtx) {
+    return repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary()
+        ? NodeRole::kPrimary
+        : NodeRole::kSecondary;
+}
 
-    StringData reason;
-    bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, &reason);
+boost::optional<ReadSourceInfo> getReadSourceForSecondaryReadsIfNeeded(
+    OperationContext* opCtx, boost::optional<const NamespaceString&> nss) {
 
     if (!canReadAtLastApplied(opCtx)) {
-        return readAtLastApplied;
+        return boost::none;
     }
 
+    // We may only change to kLastApplied if we were reading without a timestamp (or if kLastApplied
+    // is already set)
+    auto originalReadSource = shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
+    if (originalReadSource != RecoveryUnit::ReadSource::kNoTimestamp &&
+        originalReadSource != RecoveryUnit::ReadSource::kLastApplied) {
+        return boost::none;
+    }
+
+    StringData reason;
+    if (shouldReadAtLastApplied(opCtx, nss, &reason)) {
+        return ReadSourceInfo{RecoveryUnit::ReadSource::kLastApplied, NodeRole::kSecondary, reason};
+    }
+    return ReadSourceInfo{RecoveryUnit::ReadSource::kNoTimestamp, getNodeRole(opCtx), reason};
+}
+
+void updateReadSourceTimestampForSecondaryReadsIfPossible(
+    OperationContext* opCtx,
+    boost::optional<const NamespaceString&> nss,
+    RecoveryUnit::ReadSource desired,
+    StringData reason) {
     auto ru = shard_role_details::getRecoveryUnit(opCtx);
     const auto originalReadSource = ru->getTimestampReadSource();
+
+    bool readAtLastApplied = (desired == RecoveryUnit::ReadSource::kLastApplied);
+
     if (ru->isReadSourcePinned()) {
         LOGV2_DEBUG(5863601,
                     2,
@@ -136,15 +162,9 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
                     "rejected"_attr = readAtLastApplied
                         ? RecoveryUnit::toString(RecoveryUnit::ReadSource::kLastApplied)
                         : RecoveryUnit::toString(RecoveryUnit::ReadSource::kNoTimestamp));
-        return false;
+        return;
     }
 
-    // We may only change to kLastApplied if we were reading without a timestamp (or if kLastApplied
-    // is already set)
-    if (originalReadSource != RecoveryUnit::ReadSource::kNoTimestamp &&
-        originalReadSource != RecoveryUnit::ReadSource::kLastApplied) {
-        return readAtLastApplied;
-    }
 
     // Helper to set read source to the recovery unit and remember our current setting
     auto currentReadSource = originalReadSource;
@@ -218,10 +238,6 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
                     "namespace"_attr = nss,
                     "reason"_attr = reason);
     }
-
-    // Return if we need to read at last applied to the caller in case further checks need to be
-    // performed.
-    return readAtLastApplied;
 }
 }  // namespace SnapshotHelper
 }  // namespace mongo

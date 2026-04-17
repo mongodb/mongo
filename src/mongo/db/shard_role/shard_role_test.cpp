@@ -632,6 +632,197 @@ DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
 }
 
 // ---------------------------------------------------------------------------
+// Tests for validateSnapshotPolicy - nested acquisition validation
+// ---------------------------------------------------------------------------
+
+// On a primary, a replicated acquisition will be kNoTimestamp.
+// On a primary, an unreplicated acquisition will also be kNoTimestamp, which is compatible.
+TEST_F(ShardRoleTest, NestedAcquisitionsOnPrimaryReplicatedThenUnreplicated) {
+    createTestCollection(operationContext(), NamespaceString::kSystemReplSetNamespace);
+
+    const auto replicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                     PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    ASSERT_TRUE(replicatedAcquisition.exists());
+
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    const auto unreplicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    // On a primary, both replicated and unreplicated collections read at kNoTimestamp.
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+// On a primary, an unreplicated acquisition will be kNoTimestamp.
+// On a primary, a replicated acquisition will also be kNoTimestamp, which is compatible.
+TEST_F(ShardRoleTest, NestedAcquisitionsUnreplicatedThenReplicated) {
+    createTestCollection(operationContext(), NamespaceString::kSystemReplSetNamespace);
+
+    const auto unreplicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    ASSERT_TRUE(unreplicatedAcquisition.exists());
+
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    const auto replicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                     PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+
+// on a primary 2 replicated acquisition will be kNoTimestamp
+TEST_F(ShardRoleTest, NestedAcquisitionsOnPrimaryUnreplicatedThenReplicated) {
+    PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
+
+    const auto replicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                     PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    ASSERT_TRUE(replicatedAcquisition.exists());
+
+
+    const auto replicatedAcquisition2 = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                     PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+// On a secondary a replicated acquisition will be kLastApplied.
+// On a secondary a unreplicated acquisition will be kNoTimestamp.
+// A nested unreplicated acquisition with unreplicated collection will run on kLastApplied due to
+// the snapshot taken by the outer acquisition. This is safe, given unreplicated collection are
+// untimestamped and they ignore kLastApplied.
+TEST_F(ShardRoleTest, NestedAcquisitionsOnSecondaryReplicatedThenUnreplicated) {
+    createTestCollection(operationContext(), NamespaceString::kSystemReplSetNamespace);
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    const auto replicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                     PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    ASSERT_TRUE(replicatedAcquisition.exists());
+
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kLastApplied,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    const auto unreplicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kLastApplied,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+// On a secondary, an unreplicated acquisition will be kNoTimestamp.
+// On a secondary, a replicated acquisition will be kLastApplied.
+// A nested replicated acquisition with replicated collection will run on kNoTimestamp due to the
+// snapshot taken by the outer acquisition. This is unsafe, since the replicated collection would be
+// forced to read without a timestamp, potentially returning inconsistent data.
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
+                   NestedAcquisitionsOnSecondaryUnreplicatedThenReplicated,
+                   "Tripwire assertion.*10141601") {
+    createTestCollection(operationContext(), NamespaceString::kSystemReplSetNamespace);
+    ASSERT_FALSE(NamespaceString::kSystemReplSetNamespace.isReplicated());
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    const auto unreplicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    ASSERT_TRUE(unreplicatedAcquisition.exists());
+
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                     PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+}
+
+// If a previous acquisition exists but the snapshot policy was cleared, the validation catches it
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
+                   MissingSnapshotPolicyWithExistingAcquisitions,
+                   "Tripwire assertion.*10141602") {
+    const NamespaceString nssUnshardedCollection2 =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "unsharded2");
+    createTestCollection(operationContext(), nssUnshardedCollection2);
+    installUntrackedCollectionMetadata(operationContext(), nssUnshardedCollection2);
+
+    auto acquisition1 =
+        acquireCollection(operationContext(),
+                          {nssUnshardedCollection1,
+                           PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                           repl::ReadConcernArgs(),
+                           AcquisitionPrerequisites::kRead},
+                          MODE_IS);
+
+    // Clear the snapshot policy while keeping the acquired collection.
+    auto& txnResources = shard_role_details::TransactionResources::get(operationContext());
+    txnResources.snapshotPolicy = boost::none;
+
+    // Second acquisition should detect missing snapshot policy and fire tassert 10141602.
+    auto acquisition2 =
+        acquireCollection(operationContext(),
+                          {nssUnshardedCollection2,
+                           PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                           repl::ReadConcernArgs(),
+                           AcquisitionPrerequisites::kRead},
+                          MODE_IS);
+}
+
+// ---------------------------------------------------------------------------
 // Placement checks when acquiring sharded collections
 
 TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {

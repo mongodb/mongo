@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/snapshot_helper.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/assert_util.h"
@@ -672,7 +673,13 @@ public:
 
     void snapshotInitialState();
 
-    void changeReadSourceForSecondaryReads();
+    // Returns the read source and node role after potentially changing the read source.
+    // Must only be called when no snapshot is open yet.
+    SnapshotHelper::ReadSourceInfo changeReadSourceForSecondaryReads();
+
+    // Computes what read source and node role should be used for secondary reads without
+    // modifying the recovery unit. Must only be called when a snapshot is already open.
+    SnapshotHelper::ReadSourceInfo getRequiredReadSourceForSecondaryReads();
 
     void openStorageSnapshot();
 
@@ -685,7 +692,6 @@ private:
     bool _successful = false;
     boost::optional<long long> _replTermBeforeSnapshot;
     boost::optional<std::shared_ptr<const CollectionCatalog>> _catalogBeforeSnapshot;
-    bool _shouldReadAtLastApplied = false;
 };
 
 /*

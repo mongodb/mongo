@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
@@ -40,12 +42,44 @@ namespace mongo {
 namespace SnapshotHelper {
 
 /**
- * Changes the read source in the recovery unit if needed depending on server state. If reading at
- * last applied is needed and we already have that read source set, refresh the lastApplied
- * timestamp.
- *
- * Returns true if the state is such that we should read at last applied, false otherwise.
+ * The role of the node when the read source was determined (primary or secondary).
  */
-bool changeReadSourceIfNeeded(OperationContext* opCtx, boost::optional<const NamespaceString&> nss);
+enum class NodeRole { kPrimary, kSecondary };
+
+/**
+ * The result of determining the appropriate read source for secondary reads.
+ */
+struct ReadSourceInfo {
+    RecoveryUnit::ReadSource readSource;
+    NodeRole nodeRole;
+    StringData reason;
+};
+
+/**
+ * Returns the node's current role as kPrimary or kSecondary based on replication state.
+ */
+NodeRole getNodeRole(OperationContext* opCtx);
+
+/**
+ * Determines the read source that should be active for this operation based on replication
+ * state and namespace. Pure query — does not modify the recovery unit.
+ *
+ * Returns kLastApplied if on a secondary, kNoTimestamp if on a primary / unreplicated,
+ * or boost::none if the override doesn't apply (read concern is not local/available).
+ */
+boost::optional<ReadSourceInfo> getReadSourceForSecondaryReadsIfNeeded(
+    OperationContext* opCtx, boost::optional<const NamespaceString&> nss);
+
+/**
+ * Applies the desired read source to the recovery unit. If a snapshot is already open,
+ * validates that the desired read source is compatible with the current one and throws
+ * if they conflict.
+ */
+void updateReadSourceTimestampForSecondaryReadsIfPossible(
+    OperationContext* opCtx,
+    boost::optional<const NamespaceString&> nss,
+    RecoveryUnit::ReadSource desired,
+    StringData reason);
+
 }  // namespace SnapshotHelper
 }  // namespace mongo

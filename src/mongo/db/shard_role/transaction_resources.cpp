@@ -195,6 +195,7 @@ void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
     locker.reset();
     yielded.reset();
     catalogEpoch.reset();
+    snapshotPolicy.reset();
 }
 
 void TransactionResources::assertNoAcquiredCollections() const {
