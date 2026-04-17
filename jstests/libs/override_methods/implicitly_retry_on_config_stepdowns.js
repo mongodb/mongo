@@ -1,10 +1,10 @@
 /**
- * Overrides runCommand to retry operations that encounter FailedToSatisfyReadPreference errors,
+ * Overrides runCommand to retry operations that encounter FailedToSatisfyReadPreference or PrimarySteppedDown errors,
  * which can occur when the config server primary is stepped down.
  *
  * This override is intended to be used with the sharding_csrs_continuous_config_stepdown suite.
  *
- * NOTE: Tests that deliberately stop shards and expect FailedToSatisfyReadPreference errors from
+ * NOTE: Tests that deliberately stop shards and expect FailedToSatisfyReadPreference or PrimarySteppedDown errors from
  * them should be excluded from the suite in the yml file, not handled here. See the exclusion
  * list in sharding_csrs_continuous_config_stepdown.yml for examples.
  */
@@ -30,8 +30,8 @@ const kNonRetryableCommands = new Set([
 ]);
 
 function isRetryableException(e) {
-    // Check if exception or error object has FailedToSatisfyReadPreference error code
-    return e.code === ErrorCodes.FailedToSatisfyReadPreference;
+    // Check if exception or error object has FailedToSatisfyReadPreference or PrimarySteppedDown error.
+    return e.code === ErrorCodes.FailedToSatisfyReadPreference || e.code === ErrorCodes.PrimarySteppedDown;
 }
 
 function isRetryableError(res) {
@@ -82,7 +82,9 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
             } catch (e) {
                 if (isRetryableException(e)) {
                     jsTest.log.info(
-                        "Retrying on FailedToSatisfyReadPreference exception from " +
+                        "Retrying on retryable exception (code " +
+                            e.code +
+                            ") from " +
                             cmdName +
                             " during config server stepdown. Attempt: " +
                             attempt,
@@ -95,13 +97,9 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
             }
 
             if (shouldRetry(cmdObj, res)) {
-                jsTest.log.info(
-                    "Retrying on FailedToSatisfyReadPreference from " +
-                        cmdName +
-                        " during config server stepdown. Attempt: " +
-                        attempt,
-                    {res},
-                );
+                jsTest.log.info("Retrying on config server stepdown error from " + cmdName + ". Attempt: " + attempt, {
+                    res,
+                });
                 return kRetry;
             }
 
@@ -110,7 +108,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
         () =>
             "Timed out while retrying command '" +
             tojson(cmdObj) +
-            "' on FailedToSatisfyReadPreference, response: " +
+            "' on config server stepdown error, response: " +
             tojson(res) +
             ", last exception: " +
             (caughtException ? caughtException.toString() : "none"),
