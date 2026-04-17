@@ -169,6 +169,7 @@ private:
      * Returns the minimum last ping time for a sampler to be considered as active.
      */
     Date_t _getMinLastPingTime();
+    Date_t _getMinLastPingTime(Date_t now);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisCoordinator::_mutex");
 
