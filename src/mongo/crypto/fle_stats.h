@@ -57,6 +57,8 @@ static void accumulateStats(ECOCStats& left, const ECOCStats& right) {
 static void accumulateStats(FLEIndexTypeStats& left, const FLEIndexTypeStats& right) {
     left.setEquality(left.getEquality() + right.getEquality());
     left.setRange(left.getRange() + right.getRange());
+    left.setSuffix(left.getSuffix() + right.getSuffix());
+    left.setPrefix(left.getPrefix() + right.getPrefix());
     left.setRangePreview(left.getRangePreview() + right.getRangePreview());
     left.setSubstringPreview(left.getSubstringPreview() + right.getSubstringPreview());
     left.setSuffixPreview(left.getSuffixPreview() + right.getSuffixPreview());
