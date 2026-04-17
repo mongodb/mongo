@@ -439,6 +439,49 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "applyOps_container_update",
+            skipSharded: true,
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagContainerWrites") || !storageEngineIsWiredTiger(),
+            setup: function (db) {
+                const coll = "containerOpsColl";
+                db[coll].drop();
+                assert.commandWorked(db.createCollection(coll));
+                const uri = getUriForColl(db[coll]);
+                return {nss: db.getName() + "." + coll, coll, uri};
+            },
+
+            command: function (state) {
+                return {
+                    applyOps: [
+                        {
+                            op: "cu",
+                            ns: state.nss,
+                            container: state.uri,
+                            o: {k: BinData(0, "QQ=="), v: BinData(0, "Qg==")},
+                        },
+                    ],
+                };
+            },
+
+            teardown: function (db, state) {
+                if (state && state.coll) db[state.coll].drop();
+            },
+
+            testcases: [
+                // Attempting to update a nonexistent key in a container fails.
+                {runOnDb: firstDbName, roles: {__system: 1, root: 1, restore: 1}, expectFail: true},
+                {runOnDb: "local", roles: {__system: 1, root: 1, restore: 1}, expectFail: true},
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {resource: {db: firstDbName, collection: ""}, actions: ["containerUpdate"]},
+                        {resource: {cluster: true}, actions: ["applyOps"]},
+                    ],
+                    expectFail: true,
+                },
+            ],
+        },
+        {
             testname: "abortMoveCollection",
             command: {abortMoveCollection: "test.x"},
             skipUnlessSharded: true,
