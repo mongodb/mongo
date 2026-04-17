@@ -6,6 +6,7 @@ import * as LongPipelineWorkloads from "jstests/product_limits/libs/long_pipelin
 import * as MatchWorkloads from "jstests/product_limits/libs/match.js";
 import * as NonLeadingMatchWorkloads from "jstests/product_limits/libs/non_leading_match.js";
 import * as OperatorWorkloads from "jstests/product_limits/libs/operators.js";
+import * as ProjectionWorkloads from "jstests/product_limits/libs/projection.js";
 import * as StageWorkloads from "jstests/product_limits/libs/stages.js";
 import * as TextSearchWorkloads from "jstests/product_limits/libs/text_search.js";
 import {DEFAULT_SCALE, range} from "jstests/product_limits/libs/util.js";
@@ -81,9 +82,9 @@ export class DatasetOneField extends Dataset {
             NonLeadingMatchWorkloads.WorkloadOrPlusAndOverSingleField,
             NonLeadingMatchWorkloads.WorkloadBucketAutoManyBuckets,
             NonLeadingMatchWorkloads.WorkloadTopK,
+            ProjectionWorkloads.WorkloadReplaceRootManyFields,
             StageWorkloads.WorkloadLongFieldName,
             StageWorkloads.WorkloadManyDocuments,
-            StageWorkloads.WorkloadReplaceRoot,
         ];
     }
 
@@ -123,7 +124,13 @@ export class DatasetOneStringField extends Dataset {
 }
 export class DatasetOneDocumentOneField extends Dataset {
     workloads() {
-        return [OperatorWorkloads.WorkloadRange, StageWorkloads.WorkloadNestedProject];
+        return [
+            OperatorWorkloads.WorkloadRange,
+            ProjectionWorkloads.WorkloadAddFieldsManyStages,
+            ProjectionWorkloads.WorkloadProjectManyStages,
+            ProjectionWorkloads.WorkloadProjectNestedFields,
+            ProjectionWorkloads.WorkloadReplaceRootNestedFields,
+        ];
     }
 
     populate(db) {
@@ -243,14 +250,16 @@ export class DatasetManyFields extends Dataset {
             OperatorWorkloads.WorkloadConcat,
             OperatorWorkloads.WorkloadCond,
             OperatorWorkloads.WorkloadSwitch,
+            ProjectionWorkloads.WorkloadAddFieldsManyFields,
+            ProjectionWorkloads.WorkloadExclusionProjectManyFields,
+            ProjectionWorkloads.WorkloadExpressionProjectManyFields,
+            ProjectionWorkloads.WorkloadInclusionProjectManyFields,
             StageWorkloads.WorkloadFacetManyFields,
             StageWorkloads.WorkloadFillManyOutputs,
             StageWorkloads.WorkloadFillManySortFields,
             StageWorkloads.WorkloadGetField,
             StageWorkloads.WorkloadLetManyVars,
             StageWorkloads.WorkloadMergeManyLet,
-            StageWorkloads.WorkloadProjectManyExpressions,
-            StageWorkloads.WorkloadProjectManyFields,
             StageWorkloads.WorkloadSort,
             StageWorkloads.WorkloadSortByCount,
             StageWorkloads.WorkloadUnset,
