@@ -16,6 +16,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/mongo/db/query/compiler/stats:stats_gen",
         "//src/mongo/db/query/compiler/stats:stats_test_utils",
     ],

@@ -308,13 +308,20 @@ public:
 
     /**
      * Relative position of a key to an interval.
-     * Exposed for testing only.
      */
     enum Location {
         BEHIND = -1,
         WITHIN = 0,
         AHEAD = 1,
     };
+
+    /**
+     * Returns BEHIND/WITHIN/AHEAD for a single interval. 'direction' must be derived from
+     * OrderedIntervalList::computeDirection()
+     */
+    static Location intervalCmp(const Interval& interval,
+                                const BSONElement& key,
+                                Interval::Direction direction);
 
     /**
      * If 'elt' is in any interval, return WITHIN and set 'newIntervalIndex' to the index of the

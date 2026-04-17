@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -586,4 +587,140 @@ TEST(CountUniqueDocuments, EmptyList) {
     ASSERT_EQ(0, countUniqueDocuments({}));
 }
 
+// Helper to build a BSONElement from an int stored in a persistent BSONObj.
+// The returned element points into 'storage', which must outlive the element.
+static BSONElement intElt(int v, BSONObj& storage) {
+    storage = BSON("" << v);
+    return storage.firstElement();
+}
+
+TEST(MatchesIntervalOIL, EmptyOILReturnsFalse) {
+    OrderedIntervalList oil;
+    BSONObj storage;
+    ASSERT_FALSE(matchesInterval(oil, intElt(5, storage)));
+}
+
+TEST(MatchesIntervalOIL, SingleInclusiveInterval) {
+    // OIL: [3, 7]
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 3 << "" << 7), true, true));
+
+    BSONObj s;
+    ASSERT_FALSE(matchesInterval(oil, intElt(2, s)));  // before start
+    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));   // == start, inclusive
+    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));   // strictly inside
+    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));   // == end, inclusive
+    ASSERT_FALSE(matchesInterval(oil, intElt(8, s)));  // after end
+}
+
+TEST(MatchesIntervalOIL, SingleExclusiveBounds) {
+    // OIL: (3, 7)
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 3 << "" << 7), false, false));
+
+    BSONObj s;
+    ASSERT_FALSE(matchesInterval(oil, intElt(3, s)));  // == start, exclusive
+    ASSERT_TRUE(matchesInterval(oil, intElt(4, s)));   // inside
+    ASSERT_FALSE(matchesInterval(oil, intElt(7, s)));  // == end, exclusive
+}
+
+TEST(MatchesIntervalOIL, MultipleAscendingIntervals) {
+    // OIL: [1,3], [5,7], [9,11]
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, true));
+    oil.intervals.push_back(Interval(BSON("" << 5 << "" << 7), true, true));
+    oil.intervals.push_back(Interval(BSON("" << 9 << "" << 11), true, true));
+
+    BSONObj s;
+    ASSERT_FALSE(matchesInterval(oil, intElt(0, s)));   // before all
+    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));    // start of first
+    ASSERT_TRUE(matchesInterval(oil, intElt(2, s)));    // inside first
+    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));    // end of first
+    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));   // gap [3,5)
+    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));    // start of second
+    ASSERT_TRUE(matchesInterval(oil, intElt(6, s)));    // inside second
+    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));    // end of second
+    ASSERT_FALSE(matchesInterval(oil, intElt(8, s)));   // gap [7,9)
+    ASSERT_TRUE(matchesInterval(oil, intElt(9, s)));    // start of third
+    ASSERT_TRUE(matchesInterval(oil, intElt(10, s)));   // inside third
+    ASSERT_TRUE(matchesInterval(oil, intElt(11, s)));   // end of third
+    ASSERT_FALSE(matchesInterval(oil, intElt(12, s)));  // after all
+}
+
+TEST(MatchesIntervalOIL, MultipleIntervalsWithExclusiveBounds) {
+    // OIL: [1,3), (5,7]
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil.intervals.push_back(Interval(BSON("" << 5 << "" << 7), false, true));
+
+    BSONObj s;
+    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));   // inclusive start
+    ASSERT_FALSE(matchesInterval(oil, intElt(3, s)));  // exclusive end of first
+    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));  // gap
+    ASSERT_FALSE(matchesInterval(oil, intElt(5, s)));  // exclusive start of second
+    ASSERT_TRUE(matchesInterval(oil, intElt(6, s)));   // inside second
+    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));   // inclusive end
+}
+
+TEST(MatchesIntervalOIL, MixedRangesAndPointIntervals) {
+    // OIL: [1,3], [5,5], [7,9]
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, true));
+    oil.intervals.push_back(Interval(BSON("" << 5 << "" << 5), true, true));
+    oil.intervals.push_back(Interval(BSON("" << 7 << "" << 9), true, true));
+
+    BSONObj s;
+    ASSERT_FALSE(matchesInterval(oil, intElt(0, s)));   // before all
+    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));    // start of range [1,3]
+    ASSERT_TRUE(matchesInterval(oil, intElt(2, s)));    // inside [1,3]
+    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));    // end of range [1,3]
+    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));   // gap between [1,3] and [5,5]
+    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));    // point interval [5,5]
+    ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));   // gap between [5,5] and [7,9]
+    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));    // start of range [7,9]
+    ASSERT_TRUE(matchesInterval(oil, intElt(8, s)));    // inside [7,9]
+    ASSERT_TRUE(matchesInterval(oil, intElt(9, s)));    // end of range [7,9]
+    ASSERT_FALSE(matchesInterval(oil, intElt(10, s)));  // after all
+}
+
+TEST(MatchesIntervalOIL, DescendingIntervals) {
+    // OIL descending: [7,3] then [1,-1]
+    // In a descending OIL, start >= end and intervals are ordered from high to low.
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 7 << "" << 3), true, true));
+    oil.intervals.push_back(Interval(BSON("" << 1 << "" << -1), true, true));
+
+    BSONObj s;
+    ASSERT_FALSE(matchesInterval(oil, intElt(8, s)));   // above first interval's start
+    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));    // == start of first
+    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));    // inside first
+    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));    // == end of first
+    ASSERT_FALSE(matchesInterval(oil, intElt(2, s)));   // gap [1,3)
+    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));    // start of second
+    ASSERT_TRUE(matchesInterval(oil, intElt(0, s)));    // inside second
+    ASSERT_TRUE(matchesInterval(oil, intElt(-1, s)));   // end of second
+    ASSERT_FALSE(matchesInterval(oil, intElt(-2, s)));  // below last interval's end
+}
+TEST(MatchesIntervalOIL, PointIntervalInclusive) {
+    // OIL: [5, 5] — computeDirection() returns kDirectionNone; direction defaults to ascending.
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 5 << "" << 5), true, true));
+
+    BSONObj s;
+    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));  // before the point
+    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));   // exactly the point
+    ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));  // after the point
+}
+
+TEST(MatchesIntervalOIL, PointIntervalExclusive) {
+    // OIL: (5, 5) — degenerate empty interval; computeDirection() returns kDirectionNone.
+    // Nothing can fall inside an exclusive point, so all values should return false.
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 5 << "" << 5), false, false));
+
+    BSONObj s;
+    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));
+    ASSERT_FALSE(matchesInterval(oil, intElt(5, s)));
+    ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));
+}
 }  // namespace mongo::ce

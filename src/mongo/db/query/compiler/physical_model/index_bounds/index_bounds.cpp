@@ -55,31 +55,6 @@ int sgn(int i) {
     return i > 0 ? 1 : -1;
 }
 
-/**
- * Returns BEHIND if the key is behind the interval.
- * Returns WITHIN if the key is within the interval.
- * Returns AHEAD if the key is ahead the interval.
- *
- * All directions are oriented along 'direction'.
- */
-IndexBoundsChecker::Location intervalCmp(const Interval& interval,
-                                         const BSONElement& key,
-                                         const int expectedDirection) {
-    int cmp = sgn(key.woCompare(interval.start, false));
-    bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
-    if (!startOK) {
-        return IndexBoundsChecker::BEHIND;
-    }
-
-    cmp = sgn(key.woCompare(interval.end, false));
-    bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
-    if (!endOK) {
-        return IndexBoundsChecker::AHEAD;
-    }
-
-    return IndexBoundsChecker::WITHIN;
-}
-
 }  // namespace
 
 // For debugging.
@@ -634,6 +609,26 @@ bool IndexBoundsChecker::getStartSeekPoint(IndexSeekPoint* out) {
     return true;
 }
 
+namespace {
+
+IndexBoundsChecker::Location intervalCmpImpl(const Interval& interval,
+                                             const BSONElement& key,
+                                             int expectedDirection) {
+    int cmp = sgn(key.woCompare(interval.start, false));
+    bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
+    if (!startOK) {
+        return IndexBoundsChecker::BEHIND;
+    }
+    cmp = sgn(key.woCompare(interval.end, false));
+    bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
+    if (!endOK) {
+        return IndexBoundsChecker::AHEAD;
+    }
+    return IndexBoundsChecker::WITHIN;
+}
+
+}  // namespace
+
 bool IndexBoundsChecker::findLeftmostProblem(const vector<BSONElement>& keyValues,
                                              size_t* where,
                                              Location* what) {
@@ -641,7 +636,7 @@ bool IndexBoundsChecker::findLeftmostProblem(const vector<BSONElement>& keyValue
     for (size_t i = 0; i < _curInterval.size(); ++i) {
         const OrderedIntervalList& field = _bounds->fields[i];
         const Interval& currentInterval = field.intervals[_curInterval[i]];
-        Location cmp = intervalCmp(currentInterval, keyValues[i], _expectedDirection[i]);
+        Location cmp = intervalCmpImpl(currentInterval, keyValues[i], _expectedDirection[i]);
 
         // If it's not in the interval we think it is...
         if (0 != cmp) {
@@ -869,13 +864,21 @@ namespace {
  */
 bool isKeyAheadOfInterval(const Interval& interval,
                           const std::pair<BSONElement, int>& keyAndDirection) {
-    const BSONElement& elt = keyAndDirection.first;
-    int expectedDirection = keyAndDirection.second;
-    IndexBoundsChecker::Location where = intervalCmp(interval, elt, expectedDirection);
-    return IndexBoundsChecker::AHEAD == where;
+    return intervalCmpImpl(interval, keyAndDirection.first, keyAndDirection.second) ==
+        IndexBoundsChecker::AHEAD;
 }
 
 }  // namespace
+
+// static
+IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& interval,
+                                                             const BSONElement& key,
+                                                             Interval::Direction direction) {
+    // Point intervals (eg. [x,x]) have Direction kDirectionNone. We default to the ascending
+    // operator in this case.
+    const int intDir = (direction == Interval::Direction::kDirectionDescending) ? -1 : 1;
+    return intervalCmpImpl(interval, key, intDir);
+}
 
 // static
 IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
@@ -905,7 +908,7 @@ IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
     *newIntervalIndex = std::distance(oil.intervals.begin(), i);
 
     // Additional check to determine if interval contains key.
-    Location where = intervalCmp(*i, elt, expectedDirection);
+    Location where = intervalCmpImpl(*i, elt, expectedDirection);
     tassert(11051913,
             "Expect the element to be either behind, or within the interval",
             BEHIND == where || WITHIN == where);

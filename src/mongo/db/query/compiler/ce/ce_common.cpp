@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/path.h"
 
+#include <algorithm>
 #include <concepts>
 
 #include <boost/optional/optional.hpp>
@@ -356,12 +357,28 @@ bool matchesInterval(const Interval& interval, BSONElement val) {
 }
 
 bool matchesInterval(const OrderedIntervalList& oil, BSONElement val) {
-    for (auto&& interval : oil.intervals) {
-        if (matchesInterval(interval, val)) {
-            return true;
-        }
+    if (oil.intervals.empty()) {
+        return false;
     }
-    return false;
+
+    const Interval::Direction direction = oil.computeDirection();
+
+    // Binary search for the first interval val is not strictly AHEAD of.
+    auto it =
+        std::lower_bound(oil.intervals.begin(),
+                         oil.intervals.end(),
+                         std::make_pair(val, direction),
+                         [](const Interval& interval,
+                            const std::pair<BSONElement, Interval::Direction>& valAndDirection) {
+                             return IndexBoundsChecker::intervalCmp(
+                                        interval, valAndDirection.first, valAndDirection.second) ==
+                                 IndexBoundsChecker::AHEAD;
+                         });
+
+    if (it == oil.intervals.end()) {
+        return false;
+    }
+    return IndexBoundsChecker::intervalCmp(*it, val, direction) == IndexBoundsChecker::WITHIN;
 }
 
 }  // namespace mongo::ce
