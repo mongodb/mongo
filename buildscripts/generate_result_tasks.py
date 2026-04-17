@@ -79,7 +79,7 @@ def make_task_group(
             BuiltInCommand(
                 "s3.get",
                 {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_file": "build_events.json",
                     "remote_file": "${project}/${version_id}/${build_variant}/"
@@ -90,7 +90,7 @@ def make_task_group(
             BuiltInCommand(
                 "s3.get",
                 {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_file": "resmoke-tests-bazel-invocation.txt",
                     "remote_file": "${project}/${build_variant}/${revision}/"
@@ -107,7 +107,7 @@ def make_task_group(
             BuiltInCommand(
                 "s3.put",
                 {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_file": "bazel-invocation.txt",
                     "remote_file": "${project}/${build_variant}/${revision}/bazel-invocation-${task_id}.txt",
@@ -120,7 +120,7 @@ def make_task_group(
             BuiltInCommand(
                 "s3.put",
                 {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_files_include_filter_prefix": "results",
                     "local_files_include_filter": "**/*outputs.zip",
@@ -135,7 +135,7 @@ def make_task_group(
             BuiltInCommand(
                 "s3.put",
                 {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_files_include_filter_prefix": "results",
                     "local_files_include_filter": "**/*_MANIFEST",
@@ -150,7 +150,7 @@ def make_task_group(
             BuiltInCommand(
                 "s3.put",
                 {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_files_include_filter_prefix": "results",
                     "local_files_include_filter": "**/*test.log",
@@ -399,7 +399,7 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
             {
                 "command": "s3.get",
                 "params": {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_file": "build_events.json",
                     "remote_file": f"${{project}}/${{version_id}}/${{build_variant}}/{task_name}/build_events.json",
@@ -409,7 +409,7 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
             {
                 "command": "s3.get",
                 "params": {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_file": "resmoke-tests-bazel-invocation.txt",
                     "remote_file": f"${{project}}/${{build_variant}}/${{revision}}/bazel-invocation-{task_name}-0.txt",
@@ -425,7 +425,7 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
             {
                 "command": "s3.put",
                 "params": {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_file": "bazel-invocation.txt",
                     "remote_file": "${project}/${build_variant}/${revision}/bazel-invocation-${task_id}.txt",
@@ -438,7 +438,7 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
             {
                 "command": "s3.put",
                 "params": {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_files_include_filter_prefix": "results",
                     "local_files_include_filter": "**/*outputs.zip",
@@ -453,7 +453,7 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
             {
                 "command": "s3.put",
                 "params": {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_files_include_filter_prefix": "results",
                     "local_files_include_filter": "**/*_MANIFEST",
@@ -468,7 +468,7 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
             {
                 "command": "s3.put",
                 "params": {
-                    "aws_key": "${aws_key}",
+                    "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
                     "local_files_include_filter_prefix": "results",
                     "local_files_include_filter": "**/*test.log",
