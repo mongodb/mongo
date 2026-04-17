@@ -1119,6 +1119,10 @@ void makeEOFExplainResult(OperationContext* opCtx,
                           BSONObjBuilder* result,
                           std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     BSONObjBuilder queryPlannerBob(result->subobjStart("queryPlanner"));
+    queryPlannerBob.append("namespace",
+                           NamespaceStringUtil::serialize(namespaces.requestedNss,
+                                                          SerializationContext::stateDefault()));
+
     BSONObjBuilder winningPlanBob(queryPlannerBob.subobjStart("winningPlan"));
     winningPlanBob.append("stage", "EOF");
     winningPlanBob.appendNumber("planNodeId", 1);

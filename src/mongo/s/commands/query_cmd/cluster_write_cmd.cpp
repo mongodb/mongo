@@ -44,6 +44,7 @@
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
@@ -350,6 +351,28 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     return UpdateShardKeyResult{sharedBlock->updatedShardKey, std::move(upsertedId)};
 }
 
+void makeEOFWriteExplainResult(OperationContext* opCtx,
+                               const BatchedCommandRequest& req,
+                               BSONObjBuilder* result) {
+    BSONObjBuilder queryPlannerBob(result->subobjStart("queryPlanner"));
+    queryPlannerBob.append(
+        "namespace",
+        NamespaceStringUtil::serialize(req.getNS(), SerializationContext::stateDefault()));
+
+    BSONObjBuilder winningPlanBob(queryPlannerBob.subobjStart("winningPlan"));
+    winningPlanBob.append("stage", "EOF");
+    winningPlanBob.appendNumber("planNodeId", 1);
+    winningPlanBob.append("type", eof_node::typeStr(eof_node::EOFType::NonExistentNamespace));
+    winningPlanBob.doneFast();
+    queryPlannerBob.doneFast();
+
+    auto expCtx = makeBlankExpressionContext(opCtx, req.getNS());
+
+    explain_common::generateQueryShapeHash(opCtx, result);
+    explain_common::generateServerInfo(result);
+    explain_common::generateServerParameters(expCtx, result);
+    explain_common::appendIfRoom(req.toBSON(), "command", result);
+}
 }  // namespace
 
 bool cluster_write_cmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
@@ -552,75 +575,77 @@ bool cluster_write_cmd::runExplainWithoutShardKey(OperationContext* opCtx,
     }
 
     sharding::router::CollectionRouter router(opCtx, originalNss);
+    try {
+        return router.routeWithRoutingContext(
+            "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+                // If supported, compute QueryShapeHash and record it in CurOp
+                query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
+                    opCtx, WriteCommandRef{req}, true /* skipRegistration */);
 
-    // Implicitly create the db if it doesn't exist. There is no way right now to return an
-    // explain on a sharded cluster if the database doesn't exist.
-    // TODO (SERVER-120673) Stop creating the db once explain can be executed when th db
-    // doesn't exist.
-    router.createDbImplicitlyOnRoute();
-    return router.routeWithRoutingContext(
-        "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
-            // If supported, compute QueryShapeHash and record it in CurOp
-            query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
-                opCtx, WriteCommandRef{req}, true /* skipRegistration */);
+                const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
+                auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
+                    opCtx, originalRoutingCtx, originalNss, req, targeter);
+                if (!write_without_shard_key::useTwoPhaseProtocol(
+                        opCtx,
+                        translatedNss,
+                        true /* isUpdateOrDelete */,
+                        isUpsert,
+                        query,
+                        collation,
+                        req.getLet(),
+                        req.getLegacyRuntimeConstants(),
+                        false /* isTimeseriesViewRequest */)) {
+                    return false;
+                }
 
-            const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-            auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
-                opCtx, originalRoutingCtx, originalNss, req, targeter);
-            if (!write_without_shard_key::useTwoPhaseProtocol(
-                    opCtx,
-                    translatedNss,
-                    true /* isUpdateOrDelete */,
-                    isUpsert,
-                    query,
-                    collation,
-                    req.getLet(),
-                    req.getLegacyRuntimeConstants(),
-                    false /* isTimeseriesViewRequest */)) {
-                return false;
-            }
+                // Explain currently cannot be run within a transaction, so each command is instead
+                // run separately outside of a transaction, and we compose the results at the end.
+                auto vts = auth::ValidatedTenancyScope::get(opCtx);
+                auto clusterQueryWithoutShardKeyExplainRes = [&] {
+                    ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(
+                        ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity));
+                    const auto explainClusterQueryWithoutShardKeyCmd =
+                        ClusterExplain::wrapAsExplain(clusterQueryWithoutShardKeyCommand.toBSON(),
+                                                      verbosity);
+                    auto opMsg = OpMsgRequestBuilder::create(
+                        vts, translatedNss.dbName(), explainClusterQueryWithoutShardKeyCmd);
+                    auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
+                    uassertStatusOK(getStatusFromCommandResult(res));
+                    return res.getOwned();
+                }();
 
-            // Explain currently cannot be run within a transaction, so each command is instead run
-            // separately outside of a transaction, and we compose the results at the end.
-            auto vts = auth::ValidatedTenancyScope::get(opCtx);
-            auto clusterQueryWithoutShardKeyExplainRes = [&] {
-                ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(
-                    ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity));
-                const auto explainClusterQueryWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
-                    clusterQueryWithoutShardKeyCommand.toBSON(), verbosity);
-                auto opMsg = OpMsgRequestBuilder::create(
-                    vts, translatedNss.dbName(), explainClusterQueryWithoutShardKeyCmd);
-                auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
-                uassertStatusOK(getStatusFromCommandResult(res));
-                return res.getOwned();
-            }();
+                // Since 'explain' does not return the results of the query, we do not have an _id
+                // document to target by from the 'Read Phase'. We instead will use a dummy _id
+                // target document 'Write Phase'.
+                auto clusterWriteWithoutShardKeyExplainRes = [&] {
+                    ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
+                        ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity),
+                        std::string{
+                            clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId")},
+                        write_without_shard_key::targetDocForExplain);
+                    const auto explainClusterWriteWithoutShardKeyCmd =
+                        ClusterExplain::wrapAsExplain(clusterWriteWithoutShardKeyCommand.toBSON(),
+                                                      verbosity);
 
-            // Since 'explain' does not return the results of the query, we do not have an _id
-            // document to target by from the 'Read Phase'. We instead will use a dummy _id target
-            // document 'Write Phase'.
-            auto clusterWriteWithoutShardKeyExplainRes = [&] {
-                ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
-                    ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity),
-                    std::string{
-                        clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId")},
-                    write_without_shard_key::targetDocForExplain);
-                const auto explainClusterWriteWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
-                    clusterWriteWithoutShardKeyCommand.toBSON(), verbosity);
+                    auto opMsg = OpMsgRequestBuilder::create(
+                        vts, translatedNss.dbName(), explainClusterWriteWithoutShardKeyCmd);
+                    auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
+                    uassertStatusOK(getStatusFromCommandResult(res));
+                    return res.getOwned();
+                }();
 
-                auto opMsg = OpMsgRequestBuilder::create(
-                    vts, translatedNss.dbName(), explainClusterWriteWithoutShardKeyCmd);
-                auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
-                uassertStatusOK(getStatusFromCommandResult(res));
-                return res.getOwned();
-            }();
-
-            result->append("command", req.toBSON());
-            write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
-                *result,
-                clusterQueryWithoutShardKeyExplainRes,
-                clusterWriteWithoutShardKeyExplainRes);
-            return true;
-        });
+                result->append("command", req.toBSON());
+                write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
+                    *result,
+                    clusterQueryWithoutShardKeyExplainRes,
+                    clusterWriteWithoutShardKeyExplainRes);
+                return true;
+            });
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // Build an EOF explain result for explained writes targeting non-existent databases.
+        makeEOFWriteExplainResult(opCtx, req, result);
+        return true;
+    }
 }
 
 void cluster_write_cmd::executeWriteOpExplain(OperationContext* opCtx,
@@ -646,43 +671,42 @@ void cluster_write_cmd::executeWriteOpExplain(OperationContext* opCtx,
     }
 
     sharding::router::CollectionRouter router(opCtx, originalNss);
+    try {
+        router.routeWithRoutingContext(
+            "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+                // If supported, compute QueryShapeHash and record it in CurOp
+                query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
+                    opCtx, WriteCommandRef{*requestPtr}, true /* skipRegistration */);
 
-    // Implicitly create the db if it doesn't exist. There is no way right now to return an
-    // explain on a sharded cluster if the database doesn't exist.
-    // TODO (SERVER-120673) Stop creating the db once explain can be executed when th db
-    // doesn't exist.
-    router.createDbImplicitlyOnRoute();
-    router.routeWithRoutingContext(
-        "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
-            // If supported, compute QueryShapeHash and record it in CurOp
-            query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
-                opCtx, WriteCommandRef{*requestPtr}, true /* skipRegistration */);
+                const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
+                auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
+                    opCtx, originalRoutingCtx, originalNss, *requestPtr, targeter);
+                const auto explainCmd = ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity);
 
-            const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-            auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
-                opCtx, originalRoutingCtx, originalNss, *requestPtr, targeter);
-            const auto explainCmd = ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity);
+                // We will time how long it takes to run the commands on the shards.
+                Timer timer;
 
-            // We will time how long it takes to run the commands on the shards.
-            Timer timer;
-
-            // Target the command to the shards based on the singleton batch item.
-            BatchItemRef targetingBatchItem(requestPtr, 0);
-            std::vector<AsyncRequestsSender::Response> shardResponses;
-            commandOpWrite(opCtx,
-                           translatedNss,
-                           explainCmd,
-                           std::move(targetingBatchItem),
-                           targeter,
-                           &shardResponses);
-            uassertStatusOK(
-                ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, translatedNss),
-                                                   shardResponses,
-                                                   ClusterExplain::kWriteOnShards,
-                                                   timer.millis(),
-                                                   requestObj,
-                                                   &bodyBuilder));
-        });
+                // Target the command to the shards based on the singleton batch item.
+                BatchItemRef targetingBatchItem(requestPtr, 0);
+                std::vector<AsyncRequestsSender::Response> shardResponses;
+                commandOpWrite(opCtx,
+                               translatedNss,
+                               explainCmd,
+                               std::move(targetingBatchItem),
+                               targeter,
+                               &shardResponses);
+                uassertStatusOK(ClusterExplain::buildExplainResult(
+                    makeBlankExpressionContext(opCtx, translatedNss),
+                    shardResponses,
+                    ClusterExplain::kWriteOnShards,
+                    timer.millis(),
+                    requestObj,
+                    &bodyBuilder));
+            });
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // Build an EOF explain result for explained writes targeting non-existent databases.
+        makeEOFWriteExplainResult(opCtx, batchedRequest, &bodyBuilder);
+    }
 }
 
 bool cluster_write_cmd::runImpl(OperationContext* opCtx,

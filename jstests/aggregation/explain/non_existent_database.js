@@ -2,7 +2,8 @@
  * Tests the behavior of explain() when used on a database that does not exist.
  * We should get back an EOF plan
  * @tags: [
- *   # Implicit sharding creates the collection, directly contradicting this test
+ *   # Implicit sharding or timeseries passthroughs, for example, create the collection, directly
+ *   # contradicting this test.
  *   assumes_no_implicit_collection_creation_on_get_collection,
  *   # Wrapping in $facet changes the explain output
  *   do_not_wrap_aggregations_in_facets,
@@ -10,22 +11,117 @@
  *   requires_fcv_83,
  * ]
  */
+import {before, describe, it} from "jstests/libs/mochalite.js";
+import {isEofPlan} from "jstests/libs/query/analyze_plan.js";
 
-import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-
-const testDB = db.getSiblingDB(jsTestName());
+const dbName = jsTestName();
+const testDB = db.getSiblingDB(dbName);
 assert.commandWorked(testDB.dropDatabase({}));
 
-// Do it twice to make sure the DB does not get created as a side-effect.
-for (let i = 0; i < 2; i++) {
-    const result = testDB.test.explain().aggregate([]);
+function assertPlanIsEOF(result) {
+    assert.commandWorked(result);
+    assert(isEofPlan(db, result), "Expected an EOF plan, got: " + tojson(result));
+    assert(!db.getMongo().getDBNames().includes(testDB.getName()), "Database should not have been created");
 
-    if (isMongos(testDB) || result.explainVersion === "1") {
-        assert.eq(result.queryPlanner.winningPlan.stage, "EOF", result);
-        assert.eq(result.queryPlanner.winningPlan.type, "nonExistentNamespace", result);
-    } else {
-        // SBE has a different explain format
-        assert.eq(result.queryPlanner.winningPlan.queryPlan.stage, "EOF", result);
-        assert.eq(result.queryPlanner.winningPlan.queryPlan.type, "nonExistentNamespace", result);
-    }
+    // listDatabases filters out empty DBs, so we also directly check the config.databases
+    // collection to ensure that the database metadata entry was not created.
+    const configDB = db.getSiblingDB("config");
+    assert.eq(
+        null,
+        configDB.databases.findOne({_id: testDB.getName()}),
+        "Database metadata entry should have been created in config.databases",
+    );
 }
+
+describe("explain on non-existent database should return an EOF plan", function () {
+    before(function () {
+        // Every test case starts with dropped DB.
+        assert.commandWorked(testDB.dropDatabase({}));
+    });
+
+    it("for aggregate", function () {
+        assertPlanIsEOF(testDB.test.explain().aggregate([]));
+    });
+
+    it("for aggregate specified with explain command", function () {
+        assertPlanIsEOF(testDB.test.runCommand({explain: {aggregate: "test", pipeline: [], cursor: {}}}));
+    });
+
+    it("for find", function () {
+        assertPlanIsEOF(testDB.test.find({}).explain());
+    });
+
+    // TODO SERVER-123329: Re-enable these tests once we consistent return EOF for both of these
+    // commands, in all configurations.
+    // it("for count", function () {
+    //     assertPlanIsEOF(testDB.test.explain().count());
+    // });
+
+    // it("for distinct", function () {
+    //     assertPlanIsEOF(testDB.test.explain().distinct("a"));
+    // });
+
+    it("for delete", function () {
+        assertPlanIsEOF(testDB.runCommand({explain: {delete: "test", deletes: [{q: {a: 1}, limit: 0}]}}));
+    });
+
+    it("for update with upsert:false", function () {
+        assertPlanIsEOF(
+            testDB.runCommand({explain: {update: "test", updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: false}]}}),
+        );
+    });
+
+    it("for update with upsert:true", function () {
+        assertPlanIsEOF(
+            testDB.runCommand({explain: {update: "test", updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: true}]}}),
+        );
+    });
+
+    it("for bulkWrite", function () {
+        const res = testDB.runCommand({
+            explain: {
+                bulkWrite: 1,
+                ops: [{update: 0, filter: {a: 1}, updateMods: {$set: {b: 1}}}],
+                nsInfo: [{ns: `${dbName}.test`}],
+            },
+        });
+        // If auth is enabled, the bulkWrite command will fail with an authorization error before
+        // it can return an EOF plan.
+        if (TestData.auth) {
+            assert.commandFailed(res);
+        } else {
+            assertPlanIsEOF(res);
+        }
+    });
+
+    it("for rawData aggregate", function () {
+        assertPlanIsEOF(testDB.test.explain("executionStats").aggregate([], {rawData: true}));
+    });
+
+    it("for rawData delete", function () {
+        assertPlanIsEOF(
+            testDB.runCommand({explain: {delete: "test", deletes: [{q: {a: 1}, limit: 0}], rawData: true}}),
+        );
+    });
+
+    // Find And Modify is unique. Unlike other commands, it will throw an error if the database
+    // does not exist, instead of returning an EOF plan. TODO SERVER-123329: Update these assertions
+    // once we always return EOF rather than erroring here.
+    it("for findAndModify with upsert:false", function () {
+        assert.commandFailedWithCode(
+            testDB.runCommand({
+                explain: {findAndModify: "test", query: {a: 1}, update: {$set: {b: 1}}, upsert: false},
+            }),
+            ErrorCodes.NamespaceNotFound,
+        );
+    });
+
+    it("for findAndModify with upsert:true", function () {
+        assert.commandFailedWithCode(
+            testDB.runCommand({
+                explain: {findAndModify: "test", query: {a: 1}, update: {$set: {b: 1}}, upsert: true},
+            }),
+            ErrorCodes.NamespaceNotFound,
+        );
+    });
+});
