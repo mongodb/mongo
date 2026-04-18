@@ -1233,6 +1233,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_crud",
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/query:throughput_gauge",
         "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/util/concurrency:spin_lock",
     ],

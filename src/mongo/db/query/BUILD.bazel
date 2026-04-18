@@ -120,6 +120,20 @@ mongo_cc_library(
     ],
 )
 
+# TMP-MERGE the src/mongo/db/query/util/BUILD.bazel doesn't do much on v8.0. Many utils are in this
+# src/mongo/db/query/BUILD.bazel instead.
+mongo_cc_library(
+    name = "throughput_gauge",
+    srcs = [
+    ],
+    hdrs = [
+        "//src/mongo/db/query/util:throughput_gauge.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 mongo_cc_library(
     name = "query_plan_cache",
     srcs = [
@@ -520,6 +534,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/util:hash_roaring_set_test.cpp",
         "//src/mongo/db/query/util:memory_util_test.cpp",
         "//src/mongo/db/query/util:string_util_test.cpp",
+        "//src/mongo/db/query/util:throughput_gauge_test.cpp",
     ],
     data = [
         "//src/mongo/db/query/test_output/query_planner_i_x_select_test:test_data",
