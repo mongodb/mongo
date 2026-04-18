@@ -1,12 +1,10 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 class TextFieldBase {
-    constructor(lb, ub, caseSensitive, diacriticSensitive, maxContention, forcePreview = false) {
+    constructor(lb, ub, caseSensitive, diacriticSensitive, maxContention) {
         this._lb = NumberInt(lb);
         this._ub = NumberInt(ub);
         this._caseSensitive = caseSensitive;
         this._diacriticSensitive = diacriticSensitive;
         this._cm = NumberLong(maxContention);
-        this._forcePreview = forcePreview;
     }
     createQueryTypeDescriptor() {
         return {
@@ -20,12 +18,10 @@ class TextFieldBase {
 }
 
 export class SuffixField extends TextFieldBase {
-    createQueryTypeDescriptor(db) {
-        let queryType = "suffix";
-        if (this._forcePreview || (db && FeatureFlagUtil.isPresentAndDisabled(db.getMongo(), "QEPrefixSuffixSearch"))) {
-            queryType = "suffixPreview";
-        }
-        return Object.assign({"queryType": queryType}, super.createQueryTypeDescriptor());
+    createQueryTypeDescriptor() {
+        // Use the deprecated "suffixPreview" name for mongocrypt compatibility.
+        // TODO SERVER-123416 Change to "suffix" once libmongocrypt supports the new name.
+        return Object.assign({"queryType": "suffixPreview"}, super.createQueryTypeDescriptor());
     }
 
     calculateExpectedTagCount(byte_len) {
@@ -65,12 +61,11 @@ export class SuffixField extends TextFieldBase {
 }
 
 export class PrefixField extends SuffixField {
-    createQueryTypeDescriptor(db) {
-        let spec = super.createQueryTypeDescriptor(db);
-        spec.queryType = "prefix";
-        if (this._forcePreview || (db && FeatureFlagUtil.isPresentAndDisabled(db.getMongo(), "QEPrefixSuffixSearch"))) {
-            spec.queryType = "prefixPreview";
-        }
+    createQueryTypeDescriptor() {
+        let spec = super.createQueryTypeDescriptor();
+        // Use the deprecated "prefixPreview" name for mongocrypt compatibility.
+        // TODO SERVER-123416 Change to "prefix" once libmongocrypt supports the new name.
+        spec.queryType = "prefixPreview";
         return spec;
     }
 
@@ -96,12 +91,12 @@ export class PrefixField extends SuffixField {
 }
 
 export class SubstringField extends TextFieldBase {
-    constructor(mlen, lb, ub, caseSensitive, diacriticSensitive, maxContention, forcePreview = false) {
-        super(lb, ub, caseSensitive, diacriticSensitive, maxContention, forcePreview);
+    constructor(mlen, lb, ub, caseSensitive, diacriticSensitive, maxContention) {
+        super(lb, ub, caseSensitive, diacriticSensitive, maxContention);
         this._mlen = NumberInt(mlen);
     }
 
-    createQueryTypeDescriptor(db) {
+    createQueryTypeDescriptor() {
         return Object.assign(
             {"queryType": "substringPreview", "strMaxLength": this._mlen},
             super.createQueryTypeDescriptor(),
@@ -159,26 +154,12 @@ export class SubstringField extends TextFieldBase {
 }
 
 export class SuffixAndPrefixField {
-    constructor(sfxLb, sfxUb, pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention, forcePreview = false) {
-        this._suffixField = new SuffixField(
-            sfxLb,
-            sfxUb,
-            caseSensitive,
-            diacriticSensitive,
-            maxContention,
-            forcePreview,
-        );
-        this._prefixField = new PrefixField(
-            pfxLb,
-            pfxUb,
-            caseSensitive,
-            diacriticSensitive,
-            maxContention,
-            forcePreview,
-        );
+    constructor(sfxLb, sfxUb, pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention) {
+        this._suffixField = new SuffixField(sfxLb, sfxUb, caseSensitive, diacriticSensitive, maxContention);
+        this._prefixField = new PrefixField(pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention);
     }
-    createQueryTypeDescriptor(db) {
-        return [this._suffixField.createQueryTypeDescriptor(db), this._prefixField.createQueryTypeDescriptor(db)];
+    createQueryTypeDescriptor() {
+        return [this._suffixField.createQueryTypeDescriptor(), this._prefixField.createQueryTypeDescriptor()];
     }
     calculateExpectedTagCount(byte_len) {
         // subtract 1 since the exact match string is doubly counted in the other call
