@@ -982,6 +982,7 @@ mongo_cc_library(
         "vote_index_build_gen",
         "//src/mongo/db/commands/query_cmd:map_reduce_command.cpp",
         "//src/mongo/db/commands/server_status:read_write_concern_defaults_server_status.cpp",
+        "//src/mongo/db/commands/set_feature_compatibility_version_steps:index_builds_fcv_step.cpp",
         "//src/mongo/db/commands/set_feature_compatibility_version_steps:legacy_fcv_step.cpp",
         "//src/mongo/db/shard_role/ddl:internal_rename_if_options_and_indexes_match_cmd.cpp",
         "//src/mongo/db/shard_role/ddl:internal_rename_if_options_and_indexes_match_gen",
