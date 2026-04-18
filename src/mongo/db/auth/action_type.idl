@@ -221,7 +221,6 @@ enums:
             applyOps: "applyOps"
             containerInsert: "containerInsert" # run "ci" ops in the applyOps command
             containerDelete: "containerDelete" # run "cd" ops in the applyOps command
-            containerUpdate: "containerUpdate" # run "cu" ops in the applyOps command
 
     # In 'MatchType' the extra_data field "serverlessActionTypes" is used
     # by the AuthorizationSession while in multitenancy mode to determine
@@ -288,7 +287,6 @@ enums:
                         - listSearchIndexes
                         - containerInsert
                         - containerDelete
-                        - containerUpdate
                         - updateSearchIndex
                         - performRawDataOperations
                         - planCacheIndexFilter
@@ -342,7 +340,6 @@ enums:
                         - updateSearchIndex
                         - containerInsert
                         - containerDelete
-                        - containerUpdate
                         - performRawDataOperations
                         - planCacheIndexFilter
                         - planCacheRead
@@ -431,7 +428,6 @@ enums:
                         - validate
                         - containerInsert
                         - containerDelete
-                        - containerUpdate
 
             # resource: { db: '', system_buckets: 'exact' }
             kMatchSystemBucketInAnyDBResource:
