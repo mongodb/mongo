@@ -656,6 +656,7 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats stats{nullptr};
+    int64_t spilled = 0;
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
@@ -664,6 +665,7 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
         stats,
         boost::none,
         sorter::kLatestChecksumVersion,
+        [&spilled] { ++spilled; },
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -677,6 +679,8 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     auto it2 = spiller.spill(SortOptions{},
                              Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
                              span.subspan(2, 2));
+
+    EXPECT_EQ(spilled, 2);
 
     ASSERT_TRUE(it1->more());
     EXPECT_EQ(it1->next().first, 50);
@@ -700,6 +704,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
+    int64_t spilled = 0;
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
@@ -708,6 +713,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
+        [&spilled] { ++spilled; },
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -738,6 +744,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
 
     EXPECT_EQ(iterators.size(), 2);
     EXPECT_EQ(container.entries().size(), data.size());
+    EXPECT_EQ(spilled, 3 + 2);  // 3 spills and 2 merge passes
 
     ASSERT_TRUE(iterators[0]->more());
     EXPECT_EQ(iterators[0]->next().first, 50);
@@ -765,6 +772,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
+    int64_t spilled = 0;
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
@@ -773,6 +781,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
+        [&spilled] { ++spilled; },
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -807,6 +816,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
 
     EXPECT_EQ(iterators.size(), 3);
     EXPECT_EQ(container.entries().size(), data.size());
+    EXPECT_EQ(spilled, data.size() + 8);  // data.size() spills and 8 merge passes
 
     ASSERT_TRUE(iterators[0]->more());
     EXPECT_EQ(iterators[0]->next().first, 50);
@@ -870,6 +880,7 @@ TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
             stats,
             ns.dbName(),
             sorter::kLatestChecksumVersion,
+            [] {},
             batchSize(),
             batchBytes(),
             testSpillingMinAvailableDiskSpaceBytes};

@@ -221,15 +221,17 @@ struct ContainerTraits {
         auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
         auto owner = std::make_shared<SpillerOwner>(SpillerOwner{
             .table = std::move(table),
-            .spiller = ContainerSpiller(*_opCtx,
-                                        ru,
-                                        container,
-                                        _containerStats,
-                                        boost::none,
-                                        checksumVersion,
-                                        insertionBatchSize,
-                                        std::numeric_limits<int64_t>::max(),
-                                        testSpillingMinAvailableDiskSpaceBytes),
+            .spiller = ContainerSpiller(
+                *_opCtx,
+                ru,
+                container,
+                _containerStats,
+                boost::none,
+                checksumVersion,
+                [] {},
+                insertionBatchSize,
+                std::numeric_limits<int64_t>::max(),
+                testSpillingMinAvailableDiskSpaceBytes),
         });
         return std::shared_ptr<Spiller<IntWrapper, IntWrapper, IWComparator>>(owner,
                                                                               &owner->spiller);

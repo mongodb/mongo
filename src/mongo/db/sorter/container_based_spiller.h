@@ -353,12 +353,17 @@ private:
 template <typename Key, typename Value, typename Comparator>
 class ContainerBasedSpiller : public SpillerBase<Key, Value, Comparator> {
 public:
+    // Callback to be run upon spilling, including merging spills (after writing the merged ranges
+    // but before deleting the old ranges).
+    using OnSpillFn = std::function<void()>;
+
     ContainerBasedSpiller(OperationContext& opCtx,
                           RecoveryUnit& ru,
                           IntegerKeyedContainer& container,
                           SorterContainerStats& stats,
                           boost::optional<DatabaseName> dbName,
                           SorterChecksumVersion checksumVersion,
+                          OnSpillFn onSpill,
                           int64_t batchSize,
                           int64_t batchBytes,
                           int64_t minAvailableDiskBytesToSpill)
@@ -368,6 +373,7 @@ public:
               minAvailableDiskBytesToSpill),
           _opCtx(opCtx),
           _ru(ru),
+          _onSpill(std::move(onSpill)),
           _batchSize(batchSize),
           _batchBytes(batchBytes) {}
 
@@ -412,6 +418,8 @@ public:
                     ++numSpilled;
                 }
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
+
+                _onSpill();
 
                 // TODO(SERVER-117546): Use a truncate rather than individual deletes.
                 for (int64_t batchStart = deleteRangeStart; batchStart < deleteRangeEnd;
@@ -491,12 +499,14 @@ private:
 
         _current += data.size();
         _containerBasedStorage().updateCurrKey(_current);
+        _onSpill();
 
         return std::move(writer);
     }
 
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
+    OnSpillFn _onSpill;
     int64_t _batchSize;
     int64_t _batchBytes;
     int64_t _current = 1;
