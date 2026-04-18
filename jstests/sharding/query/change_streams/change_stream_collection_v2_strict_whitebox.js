@@ -19,6 +19,7 @@ import {
     assertOpenCursors,
     cursorCommentFilter,
     awaitLogMessageCodes,
+    V2TargeterLogCodes,
 } from "jstests/libs/query/change_stream_util.js";
 import {
     CreateDatabaseCommand,
@@ -29,11 +30,12 @@ import {
     MovePrimaryCommand,
 } from "jstests/libs/util/change_stream/change_stream_commands.js";
 
-// LOGV2 IDs used in assertions.
-const kInitStrictMode = 11600500; // Strict mode initialization
-const kPlacementRefresh = 10922912; // handlePlacementRefresh (MovePrimary, NamespacePlacementChanged)
-const kDbAbsentEvent = 12013809; // DbAbsent event handling (DatabaseCreated)
-const kHandleMoveChunk = 10917004; // Collection-level handleMoveChunk
+const {
+    kCollOrDbShardTargeterInitStrictMode: kInitStrictMode,
+    kCollOrDbPlacementRefresh: kPlacementRefresh,
+    kCollOrDbDbAbsentEventHandling: kDbAbsentEvent,
+    kCollectionHandleMoveChunk: kHandleMoveChunk,
+} = V2TargeterLogCodes;
 
 describe("collection v2 strict whitebox", function () {
     let st;

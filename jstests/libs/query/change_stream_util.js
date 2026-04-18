@@ -255,6 +255,11 @@ export function ChangeStreamTest(_db, options) {
 
     function addResumeToken(pipeline, resumeToken) {
         let csStage = pipeline[0]["$changeStream"];
+        // Only one resume option is allowed. Clear any previously set resume
+        // options before setting resumeAfter (mirrors the server-side logic in
+        // change_stream_topology_helpers.cpp::replaceResumeTokenAndVersionInCommand).
+        delete csStage["startAtOperationTime"];
+        delete csStage["startAfter"];
         csStage["resumeAfter"] = resumeToken;
         pipeline[0] = {$changeStream: csStage};
         return pipeline;
@@ -308,6 +313,7 @@ export function ChangeStreamTest(_db, options) {
                 pipeline: pipeline,
                 collName: collName,
                 doNotModifyInPassthroughs: doNotModifyInPassthroughs,
+                aggregateOptions: aggregateOptions,
             });
             updateResumeToken(res.cursor, res.cursor.firstBatch);
             _allCursors.push(new DBCommandCursor(_db, res));
@@ -344,7 +350,7 @@ export function ChangeStreamTest(_db, options) {
         const newCursor = self.startWatchingChanges({
             pipeline: pipeline,
             collection: cursorInfo.collName,
-            aggregateOptions: {cursor: {batchSize: 0}},
+            aggregateOptions: Object.merge(cursorInfo.aggregateOptions || {}, {cursor: {batchSize: 0}}),
             doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs,
         });
         Object.assign(cursor, newCursor);
@@ -375,7 +381,11 @@ export function ChangeStreamTest(_db, options) {
                 const res = assert.commandWorked(
                     _db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
                 );
-                cursor = res.cursor;
+                // Update in-place to preserve the reference chain so that
+                // the caller's cursor object always holds the latest cursor ID.
+                delete cursor.firstBatch;
+                delete cursor.nextBatch;
+                Object.assign(cursor, res.cursor);
                 updateResumeToken(cursor, getBatchFromCursorDocument(cursor));
                 return cursor;
             } catch (e) {
@@ -1017,7 +1027,9 @@ export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, 
     assert.soonNoExcept(
         () => {
             // Query all open cursors matching the filter via mongos.
-            const shardsWithOpenCursors = listIdleCursors(adminDB, filter).map((cursor) => cursor.shard);
+            const dataShardCursors = listIdleCursors(adminDB, filter);
+            jsTest.log.debug("Open shard cursors", {dataShardCursors});
+            const shardsWithOpenCursors = dataShardCursors.map((cursor) => cursor.shard);
 
             // In config shard mode, the config server is also a data shard (named "config").
             // Cursors on it are reported as regular data shard cursors via mongos, so we
@@ -1036,6 +1048,7 @@ export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, 
             // localOps since they don't appear in the mongos $currentOp results.
             if (!jsTestOptions().configShard) {
                 const configCursors = listIdleCursors(configAdminDB, filter, {localOps: true});
+                jsTest.log.debug("Open config cursors", {configCursors});
                 const configMatch = expectedConfigCursor ? configCursors.length > 0 : configCursors.length == 0;
                 return configMatch;
             }
@@ -1053,6 +1066,23 @@ export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, 
         },
     );
 }
+
+// LOGV2 IDs for v2 shard targeter whitebox assertions.
+export const V2TargeterLogCodes = Object.freeze({
+    kTopologyHandlerStageStateTransition: 10657506,
+    kShardTargeterDbPresentPlacementNotAvailableSwitchToV1: 12321700,
+    kShardTargeterDbAbsentPlacementNotAvailableSwitchToV1: 12321703,
+    kClusterShardTargeterPlacementNotAvailableSwitchToV1: 12321704,
+    kCollOrDbPlacementRefresh: 10922912,
+    kCollOrDbShardTargeterInitStrictMode: 11600500,
+    kCollOrDbShardTargeterStartChangeStreamSegment: 10922905,
+    kCollOrDbDbAbsentEventHandling: 12013809,
+    kCollectionHandleMoveChunk: 10917004,
+    kClusterShardTargeterInitStrictMode: 11138104,
+    kClusterShardTargeterStartChangeStreamSegment: 11138108,
+    kClusterSetEventHandler: 11138113,
+    kClusterPlacementRefresh: 11138117,
+});
 
 /**
  * Capture logs from `conn` while repeatedly calling `fn`, polling until all `expectedCodes`

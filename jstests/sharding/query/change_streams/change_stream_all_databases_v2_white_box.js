@@ -18,11 +18,14 @@ import {
     ensureShardDistribution,
     awaitLogMessageCodes,
     assertOpenCursors,
+    V2TargeterLogCodes,
 } from "jstests/libs/query/change_stream_util.js";
 
-const kInitStrictMode = 11138104; // Strict mode initialization
-const kSetEventHandler = 11138113; // Set event handler
-const kPlacementRefresh = 11138117; // handlePlacementRefresh (MovePrimary, NamespacePlacementChanged)
+const {
+    kClusterShardTargeterInitStrictMode: kInitStrictMode,
+    kClusterSetEventHandler: kSetEventHandler,
+    kClusterPlacementRefresh: kPlacementRefresh,
+} = V2TargeterLogCodes;
 
 describe("$changeStream v2", function () {
     let st;
