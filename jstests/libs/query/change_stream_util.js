@@ -15,6 +15,17 @@ export const ChangeStreamWatchMode = Object.freeze({
     kCluster: 3,
 });
 
+export function watchModeToString(watchMode) {
+    switch (watchMode) {
+        case ChangeStreamWatchMode.kCollection:
+            return "collection";
+        case ChangeStreamWatchMode.kDb:
+            return "db";
+        case ChangeStreamWatchMode.kCluster:
+            return "cluster";
+    }
+}
+
 /**
  * Returns a truncated json object if the size of 'jsonObj' is greater than 'maxErrorSizeBytes'.
  */

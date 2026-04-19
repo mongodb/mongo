@@ -86,6 +86,12 @@ ShardTargeterDecision ChangeStreamShardTargeterBase::initialize(
                                      false /* checkIfPointInTimeIsInFuture */,
                                      false /* ignoreRemovedShardsMode */);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
+        LOGV2_DEBUG(12321701,
+                    3,
+                    STAGE_LOG_PREFIX
+                    "Placement history not available during initialization, switching to v1",
+                    "atClusterTime"_attr = atClusterTime,
+                    "namespace"_attr = readerContext.getChangeStream().getNamespace());
         return ShardTargeterDecision::kSwitchToV1;
     }
     tassert(10720100,

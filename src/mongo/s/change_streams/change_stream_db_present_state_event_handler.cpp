@@ -121,6 +121,11 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
                                                   false /* checkIfPointInTimeIsInFuture */,
                                                   false /* ignoreRemovedShards */);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
+        LOGV2_DEBUG(12321700,
+                    3,
+                    STAGE_LOG_PREFIX "Placement history not available, switching to v1",
+                    "atClusterTime"_attr = clusterTime,
+                    "namespace"_attr = readerCtx.getChangeStream().getNamespace());
         return ShardTargeterDecision::kSwitchToV1;
     }
 

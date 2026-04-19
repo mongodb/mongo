@@ -79,6 +79,10 @@ ShardTargeterDecision AllDatabasesShardTargeterStateEventHandler::handlePlacemen
                                                   false /* checkIfPointInTimeIsInFuture */,
                                                   false /* ignoreRemovedShards */);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
+        LOGV2_DEBUG(12321704,
+                    3,
+                    "Placement history not available, switching to v1",
+                    "atClusterTime"_attr = clusterTime);
         return ShardTargeterDecision::kSwitchToV1;
     }
 

@@ -1259,6 +1259,40 @@ class MoveChunkCommand extends MoveCommandBase {
     }
 }
 
+/**
+ * Command that downgrades FCV to lastLTSFCV. Produces no user-visible change stream events.
+ */
+class FCVDowngradeCommand extends Command {
+    execute(conn) {
+        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    }
+
+    toString() {
+        return "FCVDowngradeCommand";
+    }
+
+    getChangeEvents() {
+        return [];
+    }
+}
+
+/**
+ * Command that upgrades FCV to latestFCV. Produces no user-visible change stream events.
+ */
+class FCVUpgradeCommand extends Command {
+    execute(conn) {
+        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    }
+
+    toString() {
+        return "FCVUpgradeCommand";
+    }
+
+    getChangeEvents() {
+        return [];
+    }
+}
+
 function _registerAll(...classes) {
     for (const cls of classes) {
         Command._registry[cls.name] = cls;
@@ -1284,6 +1318,8 @@ _registerAll(
     MovePrimaryCommand,
     MoveCollectionCommand,
     MoveChunkCommand,
+    FCVDowngradeCommand,
+    FCVUpgradeCommand,
 );
 
 export {
@@ -1306,6 +1342,8 @@ export {
     MovePrimaryCommand,
     MoveCollectionCommand,
     MoveChunkCommand,
+    FCVDowngradeCommand,
+    FCVUpgradeCommand,
     ShardingType,
     getShardKeySpec,
 };
