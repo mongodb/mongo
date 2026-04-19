@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/change_streams/shard_targeter_helper.h"
 #include "mongo/stdx/unordered_set.h"
@@ -50,8 +51,31 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
     const ControlEvent& event,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
+    // For NamespacePlacementChanged events with empty namespace (FCV downgrade),
+    // check if placement history is still available. If not, switch to v1.
+    if (std::holds_alternative<NamespacePlacementChangedControlEvent>(event)) {
+        const auto& placementChangedEvent = std::get<NamespacePlacementChangedControlEvent>(event);
+        tassert(12321702,
+                "Only cluster-level (empty namespace) NamespacePlacementChanged events are "
+                "expected in DbAbsent state",
+                placementChangedEvent.nss.isEmpty());
+        auto allocationToShardsStatus =
+            change_streams::getDataToShardsAllocationQueryService(opCtx)
+                ->getAllocationToShardsStatus(opCtx, placementChangedEvent.clusterTime);
+        if (allocationToShardsStatus == AllocationToShardsStatus::kNotAvailable) {
+            LOGV2_DEBUG(12321703,
+                        3,
+                        STAGE_LOG_PREFIX "Placement history not available, switching to v1",
+                        "atClusterTime"_attr = placementChangedEvent.clusterTime,
+                        "namespace"_attr = readerCtx.getChangeStream().getNamespace());
+            return ShardTargeterDecision::kSwitchToV1;
+        }
+        return ShardTargeterDecision::kContinue;
+    }
+
     tassert(11600502,
-            "Only DatabaseCreatedControlEvent can be processed in DbAbsent state.",
+            "Only DatabaseCreatedControlEvent or NamespacePlacementChangedControlEvent can be "
+            "processed in DbAbsent state.",
             std::holds_alternative<DatabaseCreatedControlEvent>(event));
     Timestamp clusterTime = std::get<DatabaseCreatedControlEvent>(event).clusterTime;
 

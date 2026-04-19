@@ -172,10 +172,10 @@ TEST_F(
 
 TEST_F(
     ChangeStreamReaderBuilderImplTest,
-    Given_ConfigServer_When_CallingGetControlEventTypesOnConfigServer_Then_ReturnsInsertEventType) {
+    Given_ConfigServer_When_CallingGetControlEventTypesOnConfigServer_Then_ReturnsInsertAndNamespacePlacementChangedEventTypes) {
     auto nss = NamespaceString::createNamespaceString_forTest("testDB.testCollection");
     auto dbNss = NamespaceString::createNamespaceString_forTest("testDB.");
-    std::set<std::string> expectedControlTypes{"insert"};
+    std::set<std::string> expectedControlTypes{"insert", "namespacePlacementChanged"};
     ASSERT_EQ(expectedControlTypes,
               readerBuilder().getControlEventTypesOnConfigServer(opCtx(), collChangeStream(nss)));
     ASSERT_EQ(expectedControlTypes,
@@ -468,6 +468,25 @@ TEST_F(
             .toBSON();
     BSONMatchableDocument nonMatchingDoc2(insertIntoDifferentNssOplogEntryBSON);
     ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc2));
+
+    // Ensure that namespacePlacementChanged events with empty namespace (FCV upgrade/downgrade)
+    // match the filter.
+    {
+        NamespacePlacementChanged eventWithEmptyNss(NamespaceString::kEmpty, Timestamp(100));
+        auto oplogEntryBSON =
+            buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithEmptyNss).toBSON();
+        BSONMatchableDocument matchingDoc3(oplogEntryBSON);
+        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc3));
+    }
+
+    // Ensure that namespacePlacementChanged events with non-empty namespace do not match.
+    {
+        NamespacePlacementChanged eventWithNonEmptyNss(matchingNss, Timestamp(100));
+        auto oplogEntryBSON =
+            buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithNonEmptyNss).toBSON();
+        BSONMatchableDocument nonMatchingDoc3(oplogEntryBSON);
+        ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc3));
+    }
 }
 
 TEST_F(
@@ -510,6 +529,25 @@ TEST_F(
             .toBSON();
     BSONMatchableDocument nonMatchingDoc2(insertIntoDifferentNssOplogEntryBSON);
     ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc2));
+
+    // Ensure that namespacePlacementChanged events with empty namespace (FCV upgrade/downgrade)
+    // match the filter.
+    {
+        NamespacePlacementChanged eventWithEmptyNss(NamespaceString::kEmpty, Timestamp(100));
+        auto oplogEntryBSON =
+            buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithEmptyNss).toBSON();
+        BSONMatchableDocument matchingDoc3(oplogEntryBSON);
+        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc3));
+    }
+
+    // Ensure that namespacePlacementChanged events with non-empty namespace do not match.
+    {
+        NamespacePlacementChanged eventWithNonEmptyNss(matchingNss, Timestamp(100));
+        auto oplogEntryBSON =
+            buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithNonEmptyNss).toBSON();
+        BSONMatchableDocument nonMatchingDoc3(oplogEntryBSON);
+        ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc3));
+    }
 }
 
 TEST_F(
@@ -552,6 +590,25 @@ TEST_F(
             .toBSON();
     BSONMatchableDocument nonMatchingDoc(insertIntoDifferentNssOplogEntryBSON);
     ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc));
+
+    // Ensure that namespacePlacementChanged events with empty namespace (FCV upgrade/downgrade)
+    // match the filter.
+    {
+        NamespacePlacementChanged eventWithEmptyNss(NamespaceString::kEmpty, Timestamp(100));
+        auto oplogEntryBSON =
+            buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithEmptyNss).toBSON();
+        BSONMatchableDocument matchingDoc3(oplogEntryBSON);
+        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc3));
+    }
+
+    // Ensure that namespacePlacementChanged events with non-empty namespace do not match.
+    {
+        NamespacePlacementChanged eventWithNonEmptyNss(matchingNss1, Timestamp(100));
+        auto oplogEntryBSON =
+            buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithNonEmptyNss).toBSON();
+        BSONMatchableDocument nonMatchingDoc2(oplogEntryBSON);
+        ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc2));
+    }
 }
 
 }  // namespace

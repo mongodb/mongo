@@ -30,6 +30,7 @@
 #include "mongo/s/change_streams/database_change_stream_db_absent_state_event_handler.h"
 
 #include "mongo/db/pipeline/change_stream_reader_context_mock.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
@@ -120,10 +121,47 @@ DEATH_TEST_REGEX_F(DatabaseDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
     handler().handleEvent(opCtx(), MoveChunkControlEvent{}, ctx(), readerCtx());
 }
 
-DEATH_TEST_REGEX_F(DatabaseDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
-                   Given_NamespacePlacementChangedControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*11600502") {
-    handler().handleEvent(opCtx(), NamespacePlacementChangedControlEvent{}, ctx(), readerCtx());
+DEATH_TEST_REGEX_F(
+    DatabaseDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
+    Given_NamespacePlacementChangedWithNonEmptyNamespace_When_HandleEventIsCalled_Then_Throws,
+    "Tripwire assertion.*12321702") {
+    NamespacePlacementChangedControlEvent event{
+        Timestamp(10, 0), NamespaceString::createNamespaceString_forTest("testDb.testColl")};
+    handler().handleEvent(opCtx(), event, ctx(), readerCtx());
+}
+
+TEST_F(
+    DatabaseDbAbsentStateEventHandlerStrictModeFixture,
+    Given_NamespacePlacementChangedWithEmptyNamespaceAndNotAvailable_When_HandleEventIsCalled_Then_ReturnsSwitchToV1) {
+    Timestamp clusterTime(10, 0);
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(
+        clusterTime, AllocationToShardsStatus::kNotAvailable);
+
+    NamespacePlacementChangedControlEvent event{clusterTime,
+                                                NamespaceString::createNamespaceString_forTest("")};
+
+    auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
+    ASSERT_EQ(result, ShardTargeterDecision::kSwitchToV1);
+    ASSERT_EQ(readerCtx().closeCursorOnConfigServerCount, 0);
+    ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
+    ASSERT_TRUE(ctx().setHandlerCalls.empty());
+}
+
+TEST_F(
+    DatabaseDbAbsentStateEventHandlerStrictModeFixture,
+    Given_NamespacePlacementChangedWithEmptyNamespaceAndAvailable_When_HandleEventIsCalled_Then_ReturnsContinue) {
+    Timestamp clusterTime(10, 0);
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(clusterTime,
+                                                                  AllocationToShardsStatus::kOk);
+
+    NamespacePlacementChangedControlEvent event{clusterTime,
+                                                NamespaceString::createNamespaceString_forTest("")};
+
+    auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
+    ASSERT_EQ(result, ShardTargeterDecision::kContinue);
+    ASSERT_EQ(readerCtx().closeCursorOnConfigServerCount, 0);
+    ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
+    ASSERT_TRUE(ctx().setHandlerCalls.empty());
 }
 
 TEST_F(
@@ -222,10 +260,13 @@ DEATH_TEST_REGEX_F(DatabaseDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtu
     handler().handleEvent(opCtx(), MoveChunkControlEvent{}, ctx(), readerCtx());
 }
 
-DEATH_TEST_REGEX_F(DatabaseDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
-                   Given_NamespacePlacementChangedControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*11600502") {
-    handler().handleEvent(opCtx(), NamespacePlacementChangedControlEvent{}, ctx(), readerCtx());
+DEATH_TEST_REGEX_F(
+    DatabaseDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
+    Given_NamespacePlacementChangedWithNonEmptyNamespace_When_HandleEventIsCalled_Then_Throws,
+    "Tripwire assertion.*12321702") {
+    NamespacePlacementChangedControlEvent event{
+        Timestamp(10, 0), NamespaceString::createNamespaceString_forTest("testDb.testColl")};
+    handler().handleEvent(opCtx(), event, ctx(), readerCtx());
 }
 
 DEATH_TEST_REGEX_F(DatabaseDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,

@@ -136,27 +136,42 @@ BSONObj ChangeStreamReaderBuilderImpl::buildControlEventFilterForConfigServer(
     OperationContext* opCtx, const ChangeStream& changeStream) {
     const auto& configDbNssString = NamespaceStringUtil::serialize(
         NamespaceString::kConfigDatabasesNamespace, SerializationContext::stateCommandRequest());
+
+    // Match NamespacePlacementChanged events with empty namespace (FCV upgrade/downgrade).
+    BSONObj doesNotExist = BSON("$exists" << false);
+    auto placementChangedPredicate =
+        BSON("o2.namespacePlacementChanged" << 1 << "o2.ns.db" << doesNotExist << "o2.ns.coll"
+                                            << doesNotExist);
+
+    BSONObj databaseCreatedPredicate;
     switch (changeStream.getChangeStreamType()) {
         case ChangeStreamType::kCollection:
             [[fallthrough]];
         case ChangeStreamType::kDatabase: {
             auto dbName = DatabaseNameUtil::serialize(changeStream.getNamespace()->dbName(),
                                                       SerializationContext::stateCommandRequest());
-            return BSON(repl::OplogEntry::kNssFieldName
-                        << configDbNssString << repl::OplogEntry::kOpTypeFieldName << "i" << "o._id"
-                        << dbName);
+            databaseCreatedPredicate =
+                BSON(repl::OplogEntry::kNssFieldName << configDbNssString
+                                                     << repl::OplogEntry::kOpTypeFieldName << "i"
+                                                     << "o._id" << dbName);
+            break;
         }
         case ChangeStreamType::kAllDatabases:
-            return BSON(repl::OplogEntry::kNssFieldName
-                        << configDbNssString << repl::OplogEntry::kOpTypeFieldName << "i");
+            databaseCreatedPredicate =
+                BSON(repl::OplogEntry::kNssFieldName << configDbNssString
+                                                     << repl::OplogEntry::kOpTypeFieldName << "i");
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(10719002);
     }
 
-    MONGO_UNREACHABLE_TASSERT(10719002);
+    return BSON("$or" << BSON_ARRAY(databaseCreatedPredicate << placementChangedPredicate));
 }
 
 std::set<std::string> ChangeStreamReaderBuilderImpl::getControlEventTypesOnConfigServer(
     OperationContext* opCtx, const ChangeStream& changeStream) {
-    return {std::string(DatabaseCreatedControlEvent::opType)};
+    return {std::string(DatabaseCreatedControlEvent::opType),
+            std::string(NamespacePlacementChangedControlEvent::opType)};
 }
 
 namespace {
