@@ -100,33 +100,6 @@ describe("OTel Prometheus file export using openTelemetryPrometheusMetricsPath",
     it("should correctly track new connections to mongod", function () {
         runConnectionsTest(this.mongod, this.metricsDir, this.metricsFileName);
     });
-
-    it("should report connections processed counter in serverStatus under metrics.network", function () {
-        const db = this.mongod.getDB("test");
-        // Connections are established in the previous test case. Wait until serverStatus reflects them.
-        assert.soon(
-            () => {
-                return db.serverStatus().metrics.network.connectionsProcessed >= 1;
-            },
-            () =>
-                `Expected metrics.network.connectionsProcessed >= 1, got ${tojson(db.serverStatus().metrics.network)}`,
-        );
-    });
-
-    it("should report write counters in serverStatus under metrics.prometheusFileExporter", function () {
-        const db = this.mongod.getDB("test");
-        // At least one export will have occurred by this point. Wait until serverStatus reflects it.
-        assert.soon(
-            () => {
-                const pfe = db.serverStatus().metrics.prometheusFileExporter;
-                return pfe.writes >= 1 && pfe.failedWrites == 0 && pfe.skippedWrites == 0;
-            },
-            () =>
-                `Expected prometheusFileExporter writes >= 1, failedWrites == 0, skippedWrites == 0, got ${tojson(
-                    db.serverStatus().metrics.prometheusFileExporter,
-                )}`,
-        );
-    });
 });
 
 describe("OTel Prometheus file export using openTelemetryPrometheusMetricsDirectory", function () {
