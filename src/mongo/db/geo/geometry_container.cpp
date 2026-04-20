@@ -346,9 +346,10 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
     }
 
     if (nullptr != otherContainer._polygon) {
-        tassert(7323500,
-                "Checking if geometry contains big polygon is not supported",
-                nullptr != otherContainer._polygon->s2Polygon);
+        if (nullptr == otherContainer._polygon->s2Polygon) {
+            // Cannot check containment of big polygons — conservatively return false.
+            return false;
+        }
         return contains(*otherContainer._polygon->s2Polygon);
     }
 
@@ -396,6 +397,10 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
         }
 
         for (const auto& polygon : c.polygons) {
+            if (nullptr == polygon->s2Polygon) {
+                // Big polygon in geometry collection — cannot check containment.
+                return false;
+            }
             if (!contains(*polygon->s2Polygon)) {
                 return false;
             }
