@@ -11,6 +11,8 @@
 load("jstests/aggregation/extras/utils.js");  // for documentEq
 load("jstests/libs/fixture_helpers.js");      // for getPrimaryForNodeHostingDatabase
 
+const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
+
 function assertFailsValidation(res) {
     assert.writeError(res);
     assert.eq(res.getWriteError().code, ErrorCodes.DocumentValidationFailure);
@@ -57,6 +59,35 @@ checkLog.containsJson(conn, logId, {
 // make sure persisted
 const info = db.getCollectionInfos({name: t.getName()})[0];
 assert.eq("warn", info.options.validationAction, tojson(info));
+
+// check warn mode log with redaction enabled
+if (hasEnterpriseModule) {
+    assert.commandWorked(t.insert({_id: 2, a: 1}));
+    const adminDb = db.getSiblingDB("admin");
+    FixtureHelpers.runCommandOnEachPrimary(
+        {db: adminDb, cmdObj: {setParameter: 1, redactClientLogData: true}});
+    try {
+        t.update({_id: 2}, {$set: {a: 99}});
+    } finally {
+        FixtureHelpers.runCommandOnEachPrimary(
+            {db: adminDb, cmdObj: {setParameter: 1, redactClientLogData: false}});
+    }
+    assert.commandWorked(t.remove({_id: 2}));
+    const redactedErrInfo = {
+        failingDocumentId: 2,
+        details: {
+            operatorName: "$eq",
+            specifiedAs: {a: 1},
+            reason: "comparison failed",
+            consideredValue: "###"
+        }
+    };
+    checkLog.checkContainsOnceJson(conn, logId, {
+        "errInfo": function(obj) {
+            return documentEq(obj, redactedErrInfo);
+        }
+    });
+}
 
 // Verify that validator expressions which throw accept writes when in 'warn' mode.
 assert.commandWorked(t.runCommand("collMod", {validator: {$expr: {$divide: [10, 0]}}}));
