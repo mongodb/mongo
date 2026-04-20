@@ -63,6 +63,13 @@ export const fieldArb = fc.constantFrom("a", "b", "t", "m", "_id", "m.m1", "m.m2
 export const dollarFieldArb = fieldArb.map((f) => "$" + f);
 export const assignableFieldArb = fc.constantFrom("a", "b", "t", "m");
 
+// Dotted field paths up to depth 2 built from assignable base fields.
+export const dottedFieldArb = fc.oneof(
+    fieldArb,
+    fc.tuple(assignableFieldArb, assignableFieldArb).map(([a, b]) => `${a}.${b}`),
+);
+export const dottedDollarFieldArb = dottedFieldArb.map((f) => "$" + f);
+
 export const leafParametersPerFamily = 10;
 export class LeafParameter {
     constructor(concreteValues) {

@@ -29,10 +29,14 @@ import {
 export const addFieldsConstArb = fc.tuple(fieldArb, leafParameterArb).map(function ([destField, leafParams]) {
     return {$addFields: {[destField]: leafParams}};
 });
-// Add field from source field. {$addFields: {a: '$b'}}
-export const addFieldsVarArb = fc.tuple(fieldArb, dollarFieldArb).map(function ([destField, sourceField]) {
-    return {$addFields: {[destField]: sourceField}};
-});
+// Add field from source field, parameterized on the dest and src field arbs.
+// {$addFields: {[dest]: '$src'}}.
+export function getAddFieldsVarArb(destFieldArb, srcFieldArb) {
+    return fc.tuple(destFieldArb, srcFieldArb).map(function ([destField, sourceField]) {
+        return {$addFields: {[destField]: sourceField}};
+    });
+}
+export const addFieldsVarArb = getAddFieldsVarArb(fieldArb, dollarFieldArb);
 // $replaceRoot projection
 export const replaceRootArb = fc.tuple(assignableFieldArb, dollarFieldArb).map(function ([destField, sourceField]) {
     // We use $$ROOT to keep the overall schema in order to better cooperate with other stages.

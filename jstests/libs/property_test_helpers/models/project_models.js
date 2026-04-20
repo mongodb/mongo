@@ -44,7 +44,11 @@ export const multipleFieldProjectArb = oneof(
     getMultipleFieldProjectArb(false /*isInclusion*/),
 );
 
-// Project from one field to another. {$project {a: '$b'}}
-export const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function ([destField, srcField]) {
-    return {$project: {[destField]: srcField}};
-});
+// Project from one field to another, parameterized on the dest and src field arbs.
+// {$project: {[dest]: '$src'}}.
+export function getComputedProjectArb(destFieldArb, srcFieldArb) {
+    return fc.tuple(destFieldArb, srcFieldArb).map(function ([destField, srcField]) {
+        return {$project: {[destField]: srcField}};
+    });
+}
+export const computedProjectArb = getComputedProjectArb(fieldArb, dollarFieldArb);
