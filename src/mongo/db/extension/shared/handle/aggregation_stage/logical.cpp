@@ -153,4 +153,11 @@ BSONObj LogicalAggStageAPI::getFilter() const {
     ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
+
+void LogicalAggStageAPI::applyPipelineSuffixDependencies(
+    const ::MongoExtensionPipelineDependencies* deps) {
+    invokeCAndConvertStatusToException(
+        [&]() { return _vtable().apply_pipeline_suffix_dependencies(get(), deps); });
+}
+
 }  // namespace mongo::extension

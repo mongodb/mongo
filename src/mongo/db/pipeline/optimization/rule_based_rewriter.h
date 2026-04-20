@@ -216,8 +216,18 @@ public:
         return std::next(_itr) == _container.end();
     }
 
-    const mongo::pipeline::dependency_graph::DependencyGraph& getDependencyGraph() const;
+    /**
+     * Returns a DepsTracker representing the dependency set of all stages after the current one.
+     * This is distinct from the DependencyGraph on PipelineRewriteContext, which tracks inter-stage
+     * ordering dependencies. This DepsTracker reflects what data (fields, metadata) the suffix
+     * pipeline actually needs to consume.
+     *
+     * Currently only called for extension source stages, so it is invoked at most once per
+     * pipeline.
+     */
+    DepsTracker getPipelineSuffixDependencies() const;
 
+    const mongo::pipeline::dependency_graph::DependencyGraph& getDependencyGraph() const;
 
     ExpressionContext& getExpCtx() {
         return _expCtx;

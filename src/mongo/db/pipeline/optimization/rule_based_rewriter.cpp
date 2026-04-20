@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -245,6 +246,16 @@ bool Transforms::partialPushdown(PipelineRewriteContext& ctx,
     // May be able to optimize stage before the pushed down $match further.
     ctx._itr = prevOrFirstItr(ctx._container, std::prev(ctx._itr));
     return true;
+}
+
+DepsTracker PipelineRewriteContext::getPipelineSuffixDependencies() const {
+    if (atLastStage()) {
+        return DepsTracker{};
+    }
+    DocumentSourceContainer suffix(std::next(_itr), _container.end());
+    return Pipeline::getDependenciesForContainer(boost::intrusive_ptr<ExpressionContext>(&_expCtx),
+                                                 suffix,
+                                                 DepsTracker::NoMetadataValidation{});
 }
 
 }  // namespace mongo::rule_based_rewrites::pipeline

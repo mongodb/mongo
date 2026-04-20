@@ -113,6 +113,11 @@ public:
      */
     BSONObj getFilter() const;
 
+    /**
+     * Pushes the pipeline dependencies to the extension stage.
+     */
+    void applyPipelineSuffixDependencies(const ::MongoExtensionPipelineDependencies* deps);
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11420603, "LogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(11173703, "LogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
@@ -135,6 +140,9 @@ public:
                 "LogicalAggStage 'evaluate_rule_transform' is null",
                 vtable.evaluate_rule_transform != nullptr);
         tassert(12200400, "LogicalAggStage 'get_filter' is null", vtable.get_filter != nullptr);
+        tassert(12200100,
+                "LogicalAggStage 'apply_pipeline_suffix_dependencies' is null",
+                vtable.apply_pipeline_suffix_dependencies != nullptr);
     }
 };
 

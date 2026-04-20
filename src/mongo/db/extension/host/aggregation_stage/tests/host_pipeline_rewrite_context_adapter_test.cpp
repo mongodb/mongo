@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/extension/host/pipeline_rewrite_context.h"
+#include "mongo/db/extension/host_connector/adapter/pipeline_dependencies_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/shared/handle/pipeline_dependencies_handle.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_mock_stages.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
@@ -168,6 +172,64 @@ TEST(PipelineRewriteContextAdapterTest, HasAtLeastNNextStagesFalseAtLastStage) {
 
     PipelineRewriteContextAPI api(&adapter);
     ASSERT_FALSE(api.hasAtLeastNNextStages(1));
+}
+
+TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixDependenciesEmptyAtLastStage) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    ASSERT_TRUE(rbrCtx.atLastStage());
+
+    DepsTracker deps = rbrCtx.getPipelineSuffixDependencies();
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+}
+
+TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixDependenciesWithMetadataRequest) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+    container.push_back(
+        DocumentSourceGeneratesMetaField::create(expCtx, DocumentMetadataFields::kTextScore));
+    container.push_back(
+        DocumentSourceNeedsMetaField::create(expCtx, DocumentMetadataFields::kTextScore));
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    ASSERT_FALSE(rbrCtx.atLastStage());
+
+    DepsTracker deps = rbrCtx.getPipelineSuffixDependencies();
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kSearchScore));
+}
+
+TEST(PipelineDependenciesAdapterTest, NeedsWholeDocumentReturnsTrue) {
+    DepsTracker deps;
+    deps.needWholeDocument = true;
+    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    ASSERT_TRUE(PipelineDependenciesHandle(&adapter)->needsWholeDocument());
+}
+
+TEST(PipelineDependenciesAdapterTest, NeedsWholeDocumentReturnsFalse) {
+    DepsTracker deps;
+    deps.needWholeDocument = false;
+    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsWholeDocument());
+}
+
+TEST(PipelineDependenciesAdapterTest, NeedsMetadataReturnsTrueForSetMetadataType) {
+    DepsTracker deps;
+    deps.setNeedsMetadata(DocumentMetadataFields::kSearchScore);
+    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    ASSERT_TRUE(PipelineDependenciesHandle(&adapter)->needsMetadata("searchScore"));
+}
+
+TEST(PipelineDependenciesAdapterTest, NeedsMetadataReturnsFalseForUnsetMetadataType) {
+    DepsTracker deps;
+    // Do not set kSearchScore.
+    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsMetadata("searchScore"));
 }
 
 }  // namespace

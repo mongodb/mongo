@@ -59,6 +59,7 @@ extensions_with_config(
         ":add_fields_match_mongo_extension_signed_lib",
         ":modify_for_log_mongo_extension_signed_lib",
         ":shard_id_mongo_extension_signed_lib",
+        ":track_deps_mongo_extension_signed_lib",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -132,6 +133,7 @@ pkg_name = "//" + package_name() + "/"
         "desugar_add_view_name",
         "view_pipeline_validator",
         "shard_id",
+        "track_deps",
     ]
 ]
 

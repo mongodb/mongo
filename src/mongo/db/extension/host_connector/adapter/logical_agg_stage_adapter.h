@@ -188,6 +188,16 @@ private:
         const ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteBuf** output) noexcept;
 
+    static ::MongoExtensionStatus* _hostApplyPipelineSuffixDependencies(
+        ::MongoExtensionLogicalAggStage* logicalStage,
+        const ::MongoExtensionPipelineDependencies* deps) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(12200104,
+                      "_hostApplyPipelineSuffixDependencies should not be called on a "
+                      "host-allocated logical stage.");
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
@@ -202,6 +212,7 @@ private:
         .evaluate_rule_precondition = &_hostEvaluateRulePrecondition,
         .evaluate_rule_transform = &_hostEvaluateRuleTransform,
         .get_filter = &_hostGetFilter,
+        .apply_pipeline_suffix_dependencies = &_hostApplyPipelineSuffixDependencies,
     };
 
     std::unique_ptr<host::LogicalAggStage> _logicalAggStage;

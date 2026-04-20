@@ -842,6 +842,17 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*get_filter)(const MongoExtensionLogicalAggStage* logicalStage,
                                         MongoExtensionByteBuf** output);
 
+    /**
+     * Receives the field and metadata dependencies of all pipeline stages that follow this stage.
+     * Called by the host as an in-place optimization for source stages when the full pipeline is
+     * available. The extension should inspect `deps` and update its internal state accordingly.
+     *
+     * `deps` is owned by the caller and is only valid for the duration of this call.
+     */
+    MongoExtensionStatus* (*apply_pipeline_suffix_dependencies)(
+        MongoExtensionLogicalAggStage* logicalStage,
+        const struct MongoExtensionPipelineDependencies* deps);
+
 } MongoExtensionLogicalAggStageVTable;
 
 /**
@@ -1093,6 +1104,31 @@ typedef struct MongoExtensionPipelineRewriteContextVTable {
     MongoExtensionStatus* (*has_at_least_n_next_stages)(
         const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* out);
 } MongoExtensionPipelineRewriteContextVTable;
+
+/**
+ * Represents the dependencies of the pipeline, excluding the current source stage. Passed to
+ * extension logical stages via apply_pipeline_suffix_dependencies so they can observe downstream
+ * field and metadata usage and update their internal state.
+ */
+typedef struct MongoExtensionPipelineDependencies {
+    const struct MongoExtensionPipelineDependenciesVTable* const vtable;
+} MongoExtensionPipelineDependencies;
+
+typedef struct MongoExtensionPipelineDependenciesVTable {
+    /**
+     * Populates 'out' with true if the pipeline depends on the metadata field identified by
+     * 'name' (e.g. "searchSequenceToken").
+     */
+    MongoExtensionStatus* (*needs_metadata)(const MongoExtensionPipelineDependencies* deps,
+                                            MongoExtensionByteView name,
+                                            bool* out);
+
+    /**
+     * Populates 'out' with true if the pipeline requires the full document.
+     */
+    MongoExtensionStatus* (*needs_whole_document)(const MongoExtensionPipelineDependencies* deps,
+                                                  bool* out);
+} MongoExtensionPipelineDependenciesVTable;
 
 ////////////////////////////////////////////////////////////////
 //

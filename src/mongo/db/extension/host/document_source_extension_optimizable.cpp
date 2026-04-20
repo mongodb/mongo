@@ -34,6 +34,7 @@
 #include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/extension/host/query_execution_context.h"
+#include "mongo/db/extension/host_connector/adapter/pipeline_dependencies_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
@@ -616,7 +617,8 @@ DocumentSourceExtensionOptimizable::_buildOwnedRewriteRules(
 }
 
 bool DocumentSourceExtensionOptimizable::dispatchExtensionRules(
-    rule_based_rewrites::pipeline::PipelineRewriteContext& ctx, PipelineRewriteRuleTags tagFilter) {
+    rule_based_rewrites::pipeline::PipelineRewriteContext& ctx,
+    PipelineRewriteRuleTags tagFilter) const {
     for (const auto& rule : _ownedRewriteRules) {
         if (rule.tags & tagFilter) {
             ctx.addRule(rule);
@@ -625,17 +627,40 @@ bool DocumentSourceExtensionOptimizable::dispatchExtensionRules(
     return false;
 }
 
+void DocumentSourceExtensionOptimizable::applyPipelineSuffixDependencies(
+    const host_connector::PipelineDependenciesAdapter& deps) {
+    _logicalStage->applyPipelineSuffixDependencies(&deps);
+}
+
 bool extensionDispatcherReorderingPrecondition(
     rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
-    auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
+    const auto* stage = dynamic_cast<const DocumentSourceExtensionOptimizable*>(&ctx.current());
     return stage && stage->dispatchExtensionRules(ctx, kReordering);
 }
 
 bool extensionDispatcherInPlacePrecondition(
     rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
-    auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
+    const auto* stage = dynamic_cast<const DocumentSourceExtensionOptimizable*>(&ctx.current());
     return stage && stage->dispatchExtensionRules(ctx, kInPlace);
 }
+
+bool extensionApplyDependenciesPrecondition(
+    rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
+    const auto* stage = dynamic_cast<const DocumentSourceExtensionOptimizable*>(&ctx.current());
+    // Only source stages produce documents that benefit from dependency analysis. Note that this is
+    // only run when the full pipeline is visible (i.e. not on a shard after pipeline split).
+    return stage && !stage->getStaticProperties().getRequiresInputDocSource() &&
+        !ctx.getExpCtx().getNeedsMerge();
+}
+
+bool extensionApplyDependenciesTransform(
+    rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
+    auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
+    const host_connector::PipelineDependenciesAdapter adapter(ctx.getPipelineSuffixDependencies());
+    stage->applyPipelineSuffixDependencies(adapter);
+    return false;
+}
+
 }  // namespace mongo::extension::host
 
 namespace mongo::rule_based_rewrites::pipeline {
@@ -655,6 +680,13 @@ REGISTER_RULES_WITH_FEATURE_FLAG(
         .name = "EXTENSION_DISPATCHER_IN_PLACE",
         .precondition = mongo::extension::host::extensionDispatcherInPlacePrecondition,
         .transform = Transforms::noop,
+        .priority = kDefaultOptimizeInPlacePriority,
+        .tags = PipelineRewriteContext::Tags::InPlace,
+    },
+    {
+        .name = "EXTENSION_APPLY_PIPELINE_SUFFIX_DEPENDENCIES",
+        .precondition = mongo::extension::host::extensionApplyDependenciesPrecondition,
+        .transform = mongo::extension::host::extensionApplyDependenciesTransform,
         .priority = kDefaultOptimizeInPlacePriority,
         .tags = PipelineRewriteContext::Tags::InPlace,
     });

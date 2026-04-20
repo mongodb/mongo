@@ -48,6 +48,10 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
+namespace mongo::extension::host_connector {
+class PipelineDependenciesAdapter;
+}  // namespace mongo::extension::host_connector
+
 namespace mongo::extension::host {
 
 class DocumentSourceExtensionOptimizableTest;
@@ -478,7 +482,7 @@ public:
      * DocumentSourceExtensionOptimizable.
      */
     bool dispatchExtensionRules(rule_based_rewrites::pipeline::PipelineRewriteContext& ctx,
-                                PipelineRewriteRuleTags tagFilter);
+                                PipelineRewriteRuleTags tagFilter) const;
 
     /**
      * Static function that registers each given vector of extension pipeline rewrite rules with the
@@ -490,6 +494,11 @@ public:
 
     static void unregisterStageRules_forTest(StringData stageName);
     static const std::vector<PipelineRewriteRule>* getStageRules_forTest(StringData stageName);
+
+    /**
+     * Pushes the pipeline dependencies to the underlying extension logical stage.
+     */
+    void applyPipelineSuffixDependencies(const host_connector::PipelineDependenciesAdapter& deps);
 
 protected:
     /**
