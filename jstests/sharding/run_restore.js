@@ -139,6 +139,9 @@ MongoRunner.stopMongod(conn);
 conn = MongoRunner.runMongod({noCleanData: true, dbpath: configDbPath, restore: ""});
 assert(conn);
 
+// Disables production of minidump on Windows, as this could hang during shutdown.
+conn.getDB("admin").runCommand({setParameter: 1, win32MinidumpEnabled: false});
+
 // '_configsvrRunRestore' command ignores cache collections.
 assert.commandWorked(conn.getDB("config").createCollection("cache.test"));
 assert.commandWorked(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}));

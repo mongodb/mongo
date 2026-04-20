@@ -38,6 +38,9 @@ const configDbPath = s.c0.dbpath;
 let conn = MongoRunner.runMongod({noCleanData: true, dbpath: configDbPath, restore: "", maintenanceMode: "standalone"});
 assert(conn);
 
+// Disables production of minidump on Windows, as this could hang during shutdown.
+conn.getDB("admin").runCommand({setParameter: 1, win32MinidumpEnabled: false});
+
 assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, logLevel: 1}));
 
 // Create the "local.system.collections_to_restore" collection and insert "test.a".
