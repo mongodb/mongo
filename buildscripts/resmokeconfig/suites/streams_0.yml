@@ -4,6 +4,7 @@ selector:
   roots:
     - src/mongo/db/modules/*/jstests/streams/merge_dynamic_2.js
     - src/mongo/db/modules/*/jstests/streams/merge_2_dynamic.js
+    - src/mongo/db/modules/*/jstests/streams/lookup_latency.js
 
 executor:
   fixture:
