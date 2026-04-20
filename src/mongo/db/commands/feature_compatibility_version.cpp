@@ -360,7 +360,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 }  // namespace
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
-    OperationContext* opCtx) {
+    OperationContext* opCtx) try {
     auto options = auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
         .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection autoColl(
@@ -371,6 +371,8 @@ StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersion
     const auto query = BSON("_id" << multiversion::kParameterName);
     return repl::StorageInterface::get(opCtx)->findById(
         opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
@@ -382,12 +384,12 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
     auto fcvObj = findFeatureCompatibilityVersionDocument(opCtx);
     if (!fcvObj.isOK()) {
         Status status = fcvObj.getStatus();
-        invariant(ErrorCodes::isRetriableError(status));
-        uasserted(
-            8531600,
-            str::stream() << "failed to validate setFCV request because the existing FCV document "
-                             "could not be found due to error: "
-                          << status.toString() << ". Retry the setFCV request.");
+        tassert(12446900,
+                str::stream() << "unexpected error while finding FCV document: " << status,
+                ErrorCodes::isRetriableError(status) || ErrorCodes::isInterruption(status));
+        uassertStatusOK(status.withContext(
+            "failed to validate setFCV request because the existing FCV document "
+            "could not be retrieved. Retry the setFCV request."));
     }
 
     auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
@@ -529,12 +531,12 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         auto currentFCVObj = findFeatureCompatibilityVersionDocument(opCtx);
         if (!currentFCVObj.isOK()) {
             Status status = currentFCVObj.getStatus();
-            invariant(ErrorCodes::isRetriableError(status));
-            uasserted(8531601,
-                      str::stream()
-                          << "failed to update FCV document because the existing FCV document "
-                             "could not be found due to error: "
-                          << status.toString() << ". Retry the setFCV request.");
+            tassert(12446901,
+                    str::stream() << "unexpected error while finding FCV document: " << status,
+                    ErrorCodes::isRetriableError(status) || ErrorCodes::isInterruption(status));
+            uassertStatusOK(status.withContext(
+                "failed to update FCV document because the existing FCV document "
+                "could not be retrieved. Retry the setFCV request."));
         }
 
         auto currentFCVDoc = FeatureCompatibilityVersionDocument::parse(
