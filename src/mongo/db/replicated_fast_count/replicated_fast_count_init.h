@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/storage/key_format.h"
 
 namespace mongo {
 /**
@@ -39,6 +40,21 @@ namespace mongo {
  * collections cannot be created.
  */
 MONGO_MOD_PUBLIC void setUpReplicatedFastCount(OperationContext* opCtx);
+
+MONGO_MOD_PUBLIC Status createInternalFastCountContainers(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          StringData metadataIdent,
+                                                          KeyFormat metadataKeyFormat,
+                                                          StringData timestampsIdent,
+                                                          KeyFormat timestampsKeyFormat,
+                                                          bool writeToOplog);
+
+MONGO_MOD_PUBLIC std::pair<Status, std::string> handleExistingFastCountIdent(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    StringData existingIdent,
+    KeyFormat existingIdentFormat,
+    StringData nonExistentIdent);
 
 namespace replicated_fast_count {
 /**

@@ -29,13 +29,17 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
@@ -187,5 +191,70 @@ TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
         _fastCountManager->shutdown(_opCtx);
     }
 }
+
+// TODO SERVER-122317 Add a similar test case where metadata is non-empty. Creation should then
+// fail.
+TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyMetadataExists) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicatedFastCountDurability", true);
+
+    auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto* engine = storageEngine->getEngine();
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
+    auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
+
+    // Pre-create only the metadata ident to simulate partial state from a previous failure.
+    {
+        WriteUnitOfWork wuow(_opCtx);
+        ASSERT_OK(engine->createRecordStore(provider,
+                                            *ru,
+                                            NamespaceString::kAdminCommandNamespace,
+                                            ident::kFastCountMetadataStore,
+                                            RecordStore::Options{.keyFormat = KeyFormat::String}));
+        wuow.commit();
+    }
+
+    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    ASSERT_FALSE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+
+    setUpReplicatedFastCount(_opCtx);
+
+    // Both idents should exist after setup creates the timestamps ident.
+    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+}
+
+// TODO SERVER-122317 Add a similar test case where timestamps is non-empty. Creation should then
+// fail.
+TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyTimestampsExists) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicatedFastCountDurability", true);
+
+    auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto* engine = storageEngine->getEngine();
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
+    auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
+
+    // Pre-create only the timestamps ident to simulate partial state from a previous failure.
+    {
+        WriteUnitOfWork wuow(_opCtx);
+        ASSERT_OK(engine->createRecordStore(provider,
+                                            *ru,
+                                            NamespaceString::kAdminCommandNamespace,
+                                            ident::kFastCountMetadataStoreTimestamps,
+                                            RecordStore::Options{.keyFormat = KeyFormat::Long}));
+        wuow.commit();
+    }
+
+    ASSERT_FALSE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+
+    setUpReplicatedFastCount(_opCtx);
+
+    // Both idents should exist after setup creates the metadata ident.
+    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+}
+
 }  // namespace
 }  // namespace mongo
