@@ -88,6 +88,7 @@
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
@@ -109,6 +110,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(findAndModifyChangeOwningShardThrowsInterruptedAtShutdown);
 
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
@@ -1245,6 +1248,11 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
     BSONObjBuilder* result) {
     RouterOperationContextSession routerSession(opCtx);
     try {
+        if (MONGO_unlikely(
+                findAndModifyChangeOwningShardThrowsInterruptedAtShutdown.shouldFail())) {
+            uasserted(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
+        }
+
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
