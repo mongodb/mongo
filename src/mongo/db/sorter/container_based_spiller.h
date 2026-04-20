@@ -408,14 +408,41 @@ public:
 
                 int64_t numSpilled = 0;
 
+                std::vector<std::pair<Key, Value>> batch;
+                auto& containerWriter =
+                    *static_cast<SortedContainerWriter<Key, Value>*>(writer.get());
                 while (mergeIterator->more()) {
-                    auto next = mergeIterator->next();
+                    batch.clear();
                     writeConflictRetry(&_opCtx,
                                        _ru,
                                        "ContainerBasedSpiller::mergeSpills_insert",
                                        NamespaceString::kEmpty,
-                                       [&] { writer->addAlreadySorted(next.first, next.second); });
-                    ++numSpilled;
+                                       [&] {
+                                           int64_t bytesInBatch = 0;
+
+                                           WriteUnitOfWork wuow{&_opCtx};
+
+                                           // In the case of a write conflict, re-add any buffered
+                                           // items from the batch before getting more from the
+                                           // merge iterator.
+                                           for (size_t i = 0; i < batch.size(); ++i) {
+                                               containerWriter.addAlreadySorted(batch[i].first,
+                                                                                batch[i].second);
+                                               bytesInBatch += containerWriter.lastAddedSize();
+                                           }
+
+                                           while (mergeIterator->more() &&
+                                                  static_cast<int64_t>(batch.size()) < _batchSize &&
+                                                  bytesInBatch < _batchBytes) {
+                                               batch.push_back(mergeIterator->next());
+                                               containerWriter.addAlreadySorted(
+                                                   batch.back().first, batch.back().second);
+                                               bytesInBatch += containerWriter.lastAddedSize();
+                                           }
+
+                                           wuow.commit();
+                                       });
+                    numSpilled += batch.size();
                 }
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
 
