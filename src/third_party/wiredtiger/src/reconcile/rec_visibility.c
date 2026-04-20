@@ -1304,7 +1304,7 @@ __rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_U
                 if (!F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED))
                     continue;
 
-                if (upd->prepared_id == WT_PREPARED_ID_NONE) {
+                if (upd->next->prepared_id == WT_PREPARED_ID_NONE) {
                     write_start_prepare = false;
                     continue;
                 }

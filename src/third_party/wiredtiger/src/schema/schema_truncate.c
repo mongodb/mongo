@@ -68,7 +68,6 @@ __truncate_layered(WT_SESSION_IMPL *session, const char *uri)
     WT_DECL_RET;
 
     start = NULL;
-    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 
     WT_STAT_DSRC_INCR(session, cursor_truncate);
 
@@ -79,14 +78,12 @@ __truncate_layered(WT_SESSION_IMPL *session, const char *uri)
         ret = 0;
         goto done;
     }
-    WT_WITHOUT_DHANDLE(session, ret = __wt_session_range_truncate(session, NULL, start, NULL));
-    WT_ERR(ret);
+    WT_ERR(__wt_session_range_truncate(session, NULL, start, NULL));
 
 done:
 err:
     if (start != NULL)
         WT_TRET(start->close(start));
-    WT_TRET(__wt_session_release_dhandle(session));
     return (ret);
 }
 

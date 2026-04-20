@@ -38,7 +38,7 @@ test_stat_log02.py
 test_sweep05
 test_timestamp26.py # FIXME: WT-16182
 test_truncate01.py # FIXME: WT-15474
-test_truncate24.py # FIXME: WT-15473
+
 test_util01.py
 test_util02.py
 test_util04.py

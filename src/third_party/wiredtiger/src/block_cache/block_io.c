@@ -137,7 +137,11 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *b
     ip = buf;
     expect_conversion = compressor != NULL || encryptor != NULL;
     if (expect_conversion) {
-        WT_RET(__wt_scr_alloc(session, 4 * 1024, &tmp));
+        /*
+         * Pre-size the scratch buffer to the leaf page max to avoid realloc when reading typical
+         * pages.
+         */
+        WT_RET(__wt_scr_alloc(session, btree->maxleafpage, &tmp));
         ip = tmp;
     }
 

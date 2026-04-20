@@ -120,20 +120,41 @@ __rts_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
 {
     WT_DECL_RET;
     WT_REF *ref;
-    WT_TIMER timer;
-    uint64_t msg_count;
+    double max_npos, npos;
+    uint64_t btree_pages, btree_start_clock, clock_now, elapsed_ns, last_report_clock;
     uint32_t flags;
 
-    __wt_timer_start(session, &timer);
+    btree_start_clock = __wt_clock(session);
+    last_report_clock = btree_start_clock;
     flags = WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED | WT_READ_SEE_DELETED;
-    msg_count = 0;
+    btree_pages = 0;
+    max_npos = 0.0;
 
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
     while ((ret = __wt_tree_walk_custom_skip(
               session, &ref, __rts_btree_walk_page_skip, &rollback_timestamp, flags)) == 0 &&
       ref != NULL) {
-        __wti_rts_progress_msg(session, &timer, 0, 0, &msg_count, true);
+        ++btree_pages;
+        (void)__wt_atomic_add_uint64_relaxed(&S2C(session)->rts->progress.pages_walked, 1);
+
+        /*
+         * Use the cheap rdtsc-based clock to check if a progress message is due. Only compute npos
+         * (which walks parent indexes) and emit the message when the period has elapsed.
+         */
+        clock_now = __wt_clock(session);
+        elapsed_ns = __wt_clock_to_nsec(clock_now, last_report_clock);
+        if (elapsed_ns >= (uint64_t)WT_BILLION * WT_PROGRESS_MSG_PERIOD) {
+            npos = __wt_page_npos(session, ref, 0.5, NULL, NULL, 0);
+            /*
+             * npos can fluctuate due to unbalanced trees, so track the maximum seen so far to get a
+             * monotonically increasing progress indicator.
+             */
+            if (npos > max_npos)
+                max_npos = npos;
+            __wti_rts_progress_msg_walk(
+              session, btree_start_clock, &last_report_clock, max_npos, btree_pages);
+        }
 
         if (F_ISSET(ref, WT_REF_FLAG_LEAF))
             WT_ERR(__wti_rts_btree_abort_updates(session, ref, rollback_timestamp));
@@ -256,8 +277,11 @@ __rts_btree(WT_SESSION_IMPL *session, const char *uri, wt_timestamp_t rollback_t
           WT_RTS_VERB_TAG_SKIP_DAMAGE
           "%s: skipped performing rollback to stable because the file %s",
           uri, ret == ENOENT ? "does not exist" : "is corrupted.");
+        WT_STAT_CONN_INCR(session, txn_rts_btrees_skipped);
+        (void)__wt_atomic_add_uint64_relaxed(&S2C(session)->rts->progress.btrees_skipped, 1);
         ret = 0;
-    }
+    } else if (ret == 0)
+        (void)__wt_atomic_add_uint64_relaxed(&S2C(session)->rts->progress.btrees_processed, 1);
     return (ret);
 }
 
@@ -365,6 +389,8 @@ __wti_rts_btree_walk_btree_apply(
           WT_RTS_VERB_TAG_FILE_SKIP
           "skipping rollback to stable on file=%s because has never been checkpointed",
           uri);
+        WT_STAT_CONN_INCR(session, txn_rts_btrees_skipped);
+        (void)__wt_atomic_add_uint64_relaxed(&S2C(session)->rts->progress.btrees_skipped, 1);
         return (0);
     }
 
@@ -411,8 +437,10 @@ __wti_rts_btree_walk_btree_apply(
           prepared_updates ? "true" : "false", rollback_txnid, S2C(session)->recovery_ckpt_snap_min,
           has_txn_updates_gt_than_ckpt_snap ? "true" : "false");
 
-    if (file_skipped)
-        WT_STAT_CONN_DSRC_INCR(session, txn_rts_btrees_skipped);
+    if (file_skipped) {
+        WT_STAT_CONN_INCR(session, txn_rts_btrees_skipped);
+        (void)__wt_atomic_add_uint64_relaxed(&S2C(session)->rts->progress.btrees_skipped, 1);
+    }
 
     /*
      * Truncate history store entries for the non-timestamped table.

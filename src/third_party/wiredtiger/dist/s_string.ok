@@ -57,6 +57,7 @@ BqRv
 Brueckner
 Bsearch
 Btree
+Btrees
 Buf
 Buildvariants
 Bxxx
@@ -1316,6 +1317,7 @@ munmap
 mutex
 mutexes
 mux
+mvcc
 myconn
 mytable
 nTemp

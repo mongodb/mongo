@@ -174,16 +174,23 @@ __wti_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
      */
     if ((S2BT(session)->modified || max_durable_ts > rollback_timestamp) &&
       rollback_timestamp != WT_TS_NONE) {
+        __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+          "Rollback to stable history store final pass: rolling back with durable_timestamp=%s",
+          __wt_timestamp_to_string(max_durable_ts, ts_string[0]));
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_HS_TREE_ROLLBACK "tree rolled back with durable_timestamp=%s",
           __wt_timestamp_to_string(max_durable_ts, ts_string[0]));
         WT_TRET(__wti_rts_btree_walk_btree(session, rollback_timestamp));
-    } else
+    } else {
+        __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+          "Rollback to stable history store final pass: skipped with durable_timestamp=%s",
+          __wt_timestamp_to_string(max_durable_ts, ts_string[0]));
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_HS_TREE_SKIP
           "tree skipped with durable_timestamp=%s and stable_timestamp=%s",
           __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
           __wt_timestamp_to_string(rollback_timestamp, ts_string[1]));
+    }
 
     /*
      * Truncate history store entries from the partial backup remove list. The list holds all of the

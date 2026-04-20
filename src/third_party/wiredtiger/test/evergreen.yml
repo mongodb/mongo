@@ -330,7 +330,8 @@ functions:
           ${IMPORT_S3_SDK|} \
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
-          ${CC_OPTIMIZE_LEVEL|}"
+          ${CC_OPTIMIZE_LEVEL|} \
+          ${WT_DISAGG_FAST_TRUNCATE_BUILD|}"
 
         # The RHEL PPC platform does not have ZSTD. Strip it out.
         if [ "${build_variant|}" = "rhel8-ppc" ] && [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_ZSTD=1) ]]; then

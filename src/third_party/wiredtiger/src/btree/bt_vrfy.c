@@ -56,6 +56,7 @@ static int __verify_row_int_key_order(
   WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int __verify_row_leaf_key_order(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
 static int __verify_tree(WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
+static int __verify_unique_btree_ids(WT_SESSION_IMPL *);
 
 /*
  * __verify_config --
@@ -214,6 +215,81 @@ __verify_disagg_accumulate_size(
     return (0);
 }
 
+typedef struct {
+    uint32_t id;
+    char *uri;
+} WT_ID_URI_PAIR;
+
+/*
+ * __id_uri_pair_cmp --
+ *     Comparator for sorting btree ID entries by ID.
+ */
+static int WT_CDECL
+__id_uri_pair_cmp(const void *a, const void *b)
+{
+    uint32_t ia, ib;
+
+    ia = ((const WT_ID_URI_PAIR *)a)->id;
+    ib = ((const WT_ID_URI_PAIR *)b)->id;
+    return (ia < ib ? -1 : (ia == ib ? 0 : 1));
+}
+
+/*
+ * __verify_unique_btree_ids --
+ *     Verify that no two stable constituent files in the local metadata share the same btree ID.
+ *     Only called for .wt_stable files, where the verify session's exclusive lock is on the stable
+ *     file not the metadata file so a shared metadata cursor can be opened directly.
+ */
+static int
+__verify_unique_btree_ids(WT_SESSION_IMPL *session)
+{
+    WT_CONFIG_ITEM id_val;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_ID_URI_PAIR *pairs;
+    size_t allocated, count, i;
+    const char *key, *value;
+
+    cursor = NULL;
+    pairs = NULL;
+    allocated = count = 0;
+
+    WT_ERR(__wt_metadata_cursor(session, &cursor));
+
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_key(cursor, &key));
+        if (!WT_PREFIX_MATCH(key, "file:") || !WT_SUFFIX_MATCH(key, ".wt_stable"))
+            continue;
+        WT_ERR(cursor->get_value(cursor, &value));
+        WT_ERR(__wt_config_getones(session, value, "id", &id_val));
+        WT_ERR(__wt_realloc_def(session, &allocated, count + 1, &pairs));
+        pairs[count].id = (uint32_t)id_val.val;
+        WT_ERR(__wt_strdup(session, key, &pairs[count].uri));
+        ++count;
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    if (count > 1) {
+        __wt_qsort(pairs, count, sizeof(WT_ID_URI_PAIR), __id_uri_pair_cmp);
+        for (i = 0; i < count - 1; ++i) {
+            if (pairs[i].id != pairs[i + 1].id)
+                continue;
+            __wt_verbose_error(session, WT_VERB_VERIFY,
+              "metadata corruption: btree ID %" PRIu32 " is shared by %s and %s", pairs[i].id,
+              pairs[i].uri, pairs[i + 1].uri);
+            ret = WT_ERROR;
+        }
+    }
+
+err:
+    for (i = 0; i < count; ++i)
+        __wt_free(session, pairs[i].uri);
+    __wt_free(session, pairs);
+    if (cursor != NULL)
+        WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    return (ret);
+}
+
 /*
  * __wt_verify --
  *     Verify a file.
@@ -262,6 +338,14 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 #endif
     if (quit)
         goto done;
+
+    /*
+     * Check that no two stable constituent files share the same btree ID. Only run for stable files
+     * the verify session's exclusive lock is on the stable file, not the metadata file, so a shared
+     * metadata cursor can be opened directly on the verify session.
+     */
+    if (WT_SUFFIX_MATCH(name, ".wt_stable"))
+        WT_ERR(__verify_unique_btree_ids(session));
 
     /*
      * Get a list of the checkpoints for this file. Empty objects and ingest tables have no
@@ -370,16 +454,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
                 if (!skip_hs) {
                     __wt_verbose(session, WT_VERB_VERIFY, "%s: verify against history store", name);
-#ifndef WT_STANDALONE_BUILD
-                    /* FIXME-WT-16557: Re-enable HS validation at all times. */
-                    if (__wt_conn_is_disagg(session))
-                        __wt_verbose(session, WT_VERB_VERIFY,
-                          "%s: skipping verify against history store in disagg", name);
-                    else
-                        WT_TRET(__wt_hs_verify_one(session, btree->id));
-#else
-                    WT_TRET(__wt_hs_verify_one(session, btree->id));
-#endif
+                    WT_TRET_MSG(session, __wt_hs_verify_one(session, btree->id),
+                      "history store verification failed");
                 }
                 /*
                  * We cannot error out here. If we got an error verifying the history store, we need

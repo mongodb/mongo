@@ -262,6 +262,7 @@ __rollback_to_stable_finalize(WT_ROLLBACK_TO_STABLE *rts)
 {
     rts->dryrun = false;
     rts->threads_num = 0;
+    WT_CLEAR(rts->progress);
 }
 
 /*
@@ -315,9 +316,20 @@ __rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckpt)
 
     /* Time since the RTS started. */
     __wt_timer_evaluate_ms(session, &timer, &time_diff_ms);
+
+    /* Log a summary of RTS work before the final end message. */
+    __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+      "Rollback to stable summary: total_btrees=%" PRIu64 ", processed=%" PRIu64
+      ", skipped=%" PRIu64 ", pages_walked=%" PRIu64 ", elapsed_ms=%" PRIu64,
+      S2C(session)->rts->progress.total_btrees,
+      __wt_atomic_load_uint64_relaxed(&S2C(session)->rts->progress.btrees_processed),
+      __wt_atomic_load_uint64_relaxed(&S2C(session)->rts->progress.btrees_skipped),
+      __wt_atomic_load_uint64_relaxed(&S2C(session)->rts->progress.pages_walked), time_diff_ms);
+
     __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-      WT_RTS_VERB_TAG_END "finished rollback to stable%s and has ran for %" PRIu64 " milliseconds",
-      dryrun ? " dryrun" : "", time_diff_ms);
+      WT_RTS_VERB_TAG_END "finished rollback to stable%s with %" PRIu32
+                          " worker threads, ran for %" PRIu64 " milliseconds",
+      dryrun ? " dryrun" : "", threads, time_diff_ms);
     WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 0);
 
     /* Reset the RTS configuration to default. */

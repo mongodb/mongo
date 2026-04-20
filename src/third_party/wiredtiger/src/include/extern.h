@@ -1926,8 +1926,8 @@ extern void __wti_read_row_time_window(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw);
 extern void __wti_ref_addr_safe_free(WT_SESSION_IMPL *session, void *p, size_t len);
 extern void __wti_rts_pop_work(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT **entryp);
-extern void __wti_rts_progress_msg(WT_SESSION_IMPL *session, WT_TIMER *rollback_start,
-  uint64_t rollback_count, uint64_t max_count, uint64_t *rollback_msg_count, bool walk);
+extern void __wti_rts_progress_msg_walk(WT_SESSION_IMPL *session, uint64_t btree_start_clock,
+  uint64_t *last_report_clock, double npos, uint64_t btree_pages);
 extern void __wti_rts_work_free(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT *entry);
 extern void __wti_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp);
 extern void __wti_tiered_get_remove_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp);
