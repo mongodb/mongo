@@ -4,13 +4,24 @@ import sys
 import unittest
 
 
+def _extract_extra_bazel_args(argv):
+    if "--" not in argv:
+        return [], argv
+
+    separator_index = argv.index("--")
+    return argv[:separator_index], argv[separator_index + 1 :]
+
+
 class MongoTidyTests(unittest.TestCase):
+    extra_bazel_args = []
+
     def run_clang_tidy(self):
         cmd = [
             "bazel",
             "build",
             "--config=clang-tidy",
             "--skip_archive=False",
+            *self.extra_bazel_args,
             "--build_tag_filters=mongo-tidy-tests",
             "--@bazel_clang_tidy//:clang_tidy_config=//src/mongo/tools/mongo_tidy_checks/tests:"
             + self._testMethodName
@@ -333,5 +344,32 @@ class MongoTidyTests(unittest.TestCase):
         self.run_clang_tidy()
 
 
+class MongoTidyArgParsingTests(unittest.TestCase):
+    def test_extract_extra_bazel_args_without_separator(self):
+        self.assertEqual(
+            _extract_extra_bazel_args(["MongoTidyTests.test_MongoHeaderBracketCheck"]),
+            ([], ["MongoTidyTests.test_MongoHeaderBracketCheck"]),
+        )
+
+    def test_extract_extra_bazel_args_with_separator(self):
+        self.assertEqual(
+            _extract_extra_bazel_args(
+                [
+                    "--remote_execution_priority=2",
+                    "--",
+                    "MongoTidyTests.test_MongoHeaderBracketCheck",
+                ]
+            ),
+            (
+                ["--remote_execution_priority=2"],
+                ["MongoTidyTests.test_MongoHeaderBracketCheck"],
+            ),
+        )
+
+    def test_extract_extra_bazel_args_with_only_separator(self):
+        self.assertEqual(_extract_extra_bazel_args(["--"]), ([], []))
+
+
 if __name__ == "__main__":
-    unittest.main()
+    MongoTidyTests.extra_bazel_args, unittest_args = _extract_extra_bazel_args(sys.argv[1:])
+    unittest.main(argv=[sys.argv[0], *unittest_args])

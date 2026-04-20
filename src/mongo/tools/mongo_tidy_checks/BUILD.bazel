@@ -92,6 +92,11 @@ cc_library(
         "-Wsuggest-override",
         "-Iexternal/mongo_toolchain_v5/stow/llvm-v5/include",
     ],
+    features = [
+        "-dwarf64",
+        "-pie",
+        "pic",
+    ],
     local_defines = [
         "GTEST_HAS_RTTI=0",
         "_GNU_SOURCE",
@@ -119,8 +124,12 @@ cc_shared_library(
     additional_linker_inputs = [],
     dynamic_deps = [],
     features = [
+        "-build_id",
+        "-dwarf64",
+        "linker_lld",
         "-pie",
         "pic",
+        "-rdynamic",
     ],
     tags = [
         "mongo-tidy-checks",

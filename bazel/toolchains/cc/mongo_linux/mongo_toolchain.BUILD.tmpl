@@ -1,6 +1,7 @@
 # This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
 
 load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
+load("@//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
 load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
     "CLANG_INCLUDE_DIRS",
     "COMMON_BINDIRS",
@@ -57,21 +58,13 @@ Error:
   --//bazel/config:linker=lld is not supported on s390x
 """
 
-LINKER_LINKFLAGS = select(
-    {
-        "@//bazel/config:linker_default": [],
-        "@//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
-        "@//bazel/config:linker_mold_valid_settings": ["-fuse-ld=mold", "-B./external/mongo_toolchain_{version}/mold-2.41.0-{arch}-linux/bin/"],
-    },
-    no_match_error = LINKER_ERROR_MESSAGE,
-)
-
 CHOSEN_LINKER = select(
     {
         "@//bazel/config:linker_default": "",
         "@//bazel/config:linker_lld_valid_settings": "lld",
         "@//bazel/config:linker_mold_valid_settings": "mold",
-    }
+    },
+    no_match_error = LINKER_ERROR_MESSAGE,
 )
 
 SHARED_ARCHIVE_ENABLED = select({
@@ -192,7 +185,9 @@ IS_DEBUG_BUILD = select({
     "@//conditions:default": False,
 })
 
-LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
+MOLD_BIN_DIR = "./external/mongo_toolchain_{version}/" + MOLD_MAP["{arch}"]["bin_dir"]
+
+LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS]
 
 # Helper target for the toolchain (see below):
 filegroup(
@@ -224,6 +219,7 @@ mongo_linux_cc_toolchain_config(
     compiler = "gcc",
     dbg = IS_DEBUG_BUILD,
     linker = CHOSEN_LINKER,
+    mold_bin_dir = MOLD_BIN_DIR,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
@@ -286,6 +282,7 @@ mongo_linux_cc_toolchain_config(
     compiler = "clang",
     dbg = IS_DEBUG_BUILD,
     linker = CHOSEN_LINKER,
+    mold_bin_dir = MOLD_BIN_DIR,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
