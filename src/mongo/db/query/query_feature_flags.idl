@@ -323,6 +323,12 @@ feature_flags:
         default: false
         fcv_gated: true
 
+    featureFlagQueryStatsDelete:
+        description: "Feature flag to enable query stats for the delete command."
+        cpp_varname: gFeatureFlagQueryStatsDelete
+        default: false
+        fcv_gated: true
+
     featureFlagQueryStatsCBRMetrics:
         description: "Feature flag to enable cost-based ranker metrics in query stats."
         cpp_varname: gFeatureFlagQueryStatsCBRMetrics
