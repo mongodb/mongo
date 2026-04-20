@@ -551,8 +551,6 @@ roles:
           - insert
           - performRawDataOperations
           - updateSearchIndex
-          - containerInsert
-          - containerDelete
       - matchType: database
         db: "config"
         actions: *restoreRoleWriteActions
