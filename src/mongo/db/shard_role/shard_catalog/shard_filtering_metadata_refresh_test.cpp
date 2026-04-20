@@ -667,6 +667,54 @@ TEST_F(AuthoritativeRefreshFixture,
     ASSERT_FALSE(metadataOpt->getShardPlacementVersion().isSet());
 }
 
+TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkMetadata) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    const UUID uuid = UUID::gen();
+    const OID epoch = OID::gen();
+    const Timestamp timestamp(Date_t::now());
+
+    CollectionType collType{kTestNss, epoch, timestamp, Date_t::now(), uuid, kShardKeyPattern};
+
+    // Build two contiguous chunks owned by this shard whose extremes are neither MinKey nor
+    // MaxKey. The "missing" chunks [MinKey, 100) and [300, MaxKey] logically exist on
+    // "otherShard" but are not persisted on this node, exactly as `fetchOwnedChunks` would
+    // produce at runtime.
+    auto makeChunk = [&](BSONObj min, BSONObj max, ChunkVersion v) {
+        ChunkType c{uuid, ChunkRange(std::move(min), std::move(max)), v, kMyShardName};
+        c.setName(OID::gen());
+        return c;
+    };
+
+    ChunkVersion v({epoch, timestamp}, {1, 0});
+    std::vector<ChunkType> myOwnedChunks;
+    myOwnedChunks.push_back(makeChunk(BSON(kShardKey << 100), BSON(kShardKey << 200), v));
+    v.incMajor();
+    myOwnedChunks.push_back(makeChunk(BSON(kShardKey << 200), BSON(kShardKey << 300), v));
+
+    populateDiskCatalog(opCtx, collType, myOwnedChunks);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
+    ASSERT_OK(status);
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    auto metadataOpt = csr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadataOpt.has_value());
+    ASSERT_TRUE(metadataOpt->isSharded());
+    ASSERT_TRUE(metadataOpt->getShardPlacementVersion().isSet());
+    ASSERT_EQ(metadataOpt->getShardPlacementVersion(), myOwnedChunks.back().getVersion());
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
+}
+
 TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
                                                      true);

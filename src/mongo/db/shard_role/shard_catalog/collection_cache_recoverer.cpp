@@ -101,18 +101,18 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
         return nullptr;
     }();
     auto rt = OptionalRoutingTableHistory{std::make_shared<RoutingTableHistory>(
-        RoutingTableHistory::makeNew(coll->getNss(),
-                                     coll->getUuid(),
-                                     coll->getKeyPattern(),
-                                     coll->getUnsplittable(),
-                                     std::move(defaultCollator),
-                                     coll->getUnique(),
-                                     coll->getEpoch(),
-                                     coll->getTimestamp(),
-                                     coll->getTimeseriesFields(),
-                                     coll->getReshardingFields(),
-                                     coll->getAllowMigrations(),
-                                     chunks))};
+        RoutingTableHistory::makeNewAllowingGaps(coll->getNss(),
+                                                 coll->getUuid(),
+                                                 coll->getKeyPattern(),
+                                                 coll->getUnsplittable(),
+                                                 std::move(defaultCollator),
+                                                 coll->getUnique(),
+                                                 coll->getEpoch(),
+                                                 coll->getTimestamp(),
+                                                 coll->getTimeseriesFields(),
+                                                 coll->getReshardingFields(),
+                                                 coll->getAllowMigrations(),
+                                                 chunks))};
     auto cm = CurrentChunkManager{std::move(rt)};
     return CollectionMetadata{std::move(cm), ShardingState::get(opCtx)->shardId()};
 }
