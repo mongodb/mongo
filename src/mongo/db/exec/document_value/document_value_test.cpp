@@ -49,10 +49,14 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <cmath>
@@ -1409,6 +1413,61 @@ TEST(DocumentTest, ToBsonWithMetaDataStripsAllMetadataNamedUserFields) {
     // Only _id should remain; all metadata-named user fields should be stripped.
     ASSERT_EQ(bsonWithMeta.nFields(), 1);
     ASSERT_EQ(bsonWithMeta["_id"].Int(), 1);
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataLogsWarningWhenStrippingUserField) {
+    // Bump kQuery severity so log lines still reach the sink when the rate-limiter
+    // in toBsonStrippingMetadata() downgrades the emission to Debug(2).
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kQuery,
+                                                       logv2::LogSeverity::Debug(2)};
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("$sortKey", Value("user_value"_sd));
+
+    Document doc = md.freeze();
+
+    unittest::LogCaptureGuard logs;
+    doc.toBsonWithMetaData();
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12363300)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSON("fieldName" << "$sortKey"))), 1);
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataRedactsFieldNameWhenRedactionEnabled) {
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kQuery,
+                                                       logv2::LogSeverity::Debug(2)};
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("$sortKey", Value("user_value"_sd));
+
+    Document doc = md.freeze();
+
+    logv2::setShouldRedactLogs(true);
+    ON_BLOCK_EXIT([] { logv2::setShouldRedactLogs(false); });
+
+    unittest::LogCaptureGuard logs;
+    doc.toBsonWithMetaData();
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12363300)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSON("fieldName" << "###"))), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSON("fieldName" << "$sortKey"))), 0);
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataDoesNotLogWhenNothingStripped) {
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("regular", Value("kept"_sd));
+    md.metadata().setTextScore(42.0);
+
+    Document doc = md.freeze();
+
+    unittest::LogCaptureGuard logs;
+    doc.toBsonWithMetaData();
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12363300)), 0);
 }
 
 TEST(DocumentTest, CreateDocumentWithMetadata) {

@@ -35,11 +35,16 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/util/validate_id.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
 #include <boost/functional/hash.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 using boost::intrusive_ptr;
@@ -610,14 +615,28 @@ constexpr StringData Document::metaFieldChangeStreamControlEvent;
 void Document::toBsonStrippingMetadata(BSONObjBuilder* builder) const {
     // Only strips metadata-named fields at the top level, not in nested sub-objects.
     constexpr size_t recursionLevel = 1;
+    auto warnStripped = [](StringData fieldName) {
+        static StaticImmortal<logv2::SeveritySuppressor> logSeverity{
+            Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+        LOGV2_DEBUG(12363300,
+                    (*logSeverity)().toInt(),
+                    "Stripping user-defined field that collides with a reserved metadata "
+                    "name during cross-shard merge serialization; see "
+                    "https://www.mongodb.com/docs/manual/core/dot-dollar-considerations/ "
+                    "for restricted top-level field names",
+                    "fieldName"_attr = redact(fieldName));
+    };
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
         if (auto cached = it.cachedValue()) {
             if (isMetadataFieldName(cached->nameSD())) {
+                warnStripped(cached->nameSD());
                 continue;
             }
             cached->val.addToBsonObj(builder, cached->nameSD(), recursionLevel);
         } else {
-            if (isMetadataFieldName((*it.bsonIter()).fieldNameStringData())) {
+            auto fieldName = (*it.bsonIter()).fieldNameStringData();
+            if (isMetadataFieldName(fieldName)) {
+                warnStripped(fieldName);
                 continue;
             }
             builder->append(*it.bsonIter());
