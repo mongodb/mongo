@@ -298,12 +298,13 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
 
 boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
     OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition = acquireCollectionOrViewMaybeLockFree(
+    CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
         opCtx,
         CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx,
             NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-            AcquisitionPrerequisites::OperationType::kRead));
+            AcquisitionPrerequisites::OperationType::kRead),
+        LockMode::MODE_IS);
 
     if (acquisition.getCollectionPtr()) {
         return acquisition;
