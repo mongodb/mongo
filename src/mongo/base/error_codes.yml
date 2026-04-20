@@ -212,7 +212,11 @@ error_codes:
   - {code: 19, name: CannotReuseObject}
   - {code: 20, name: IllegalOperation}
   - {code: 21, name: EmptyArrayOperation}
-  - {code: 22, name: InvalidBSON, categories: [ValidationError]}
+  - {
+      code: 22,
+      name: InvalidBSON,
+      categories: [ValidationError, ConnectionFatalMessageParseError],
+    }
   - {code: 23, name: AlreadyInitialized}
   - {code: 24, name: LockTimeout, categories: [Interruption]}
   - {code: 25, name: RemoteValidationError}
@@ -1211,6 +1215,42 @@ error_codes:
       code: 497,
       name: StreamProcessorMergeExpressionError,
       categories: [StreamProcessorUserError],
+    }
+
+  - {
+      code: 498,
+      name: InvalidOpMsgSize,
+      categories: [ConnectionFatalMessageParseError],
+    }
+
+  - {
+      code: 499,
+      name: MultipleOpMsgBodySections,
+      categories: [ConnectionFatalMessageParseError],
+    }
+
+  - {
+      code: 500,
+      name: DuplicateOpMsgDocumentSequence,
+      categories: [ConnectionFatalMessageParseError],
+    }
+
+  - {
+      code: 501,
+      name: UnknownOpMsgSectionKind,
+      categories: [ConnectionFatalMessageParseError],
+    }
+
+  - {
+      code: 502,
+      name: MissingOpMsgBodySection,
+      categories: [ConnectionFatalMessageParseError],
+    }
+
+  - {
+      code: 503,
+      name: DuplicateOpMsgField,
+      categories: [ConnectionFatalMessageParseError],
     }
 
   # ^^^^

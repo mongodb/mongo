@@ -117,7 +117,7 @@ void OpMsg::replaceFlags(Message* message, uint32_t flags) {
 uint32_t OpMsg::getChecksum(const Message& message) {
     invariant(message.operation() == dbMsg);
     invariant(isFlagSet(message, kChecksumPresent));
-    uassert(51252,
+    uassert(ErrorCodes::InvalidOpMsgSize,
             "Invalid message size for an OpMsg containing a checksum",
             // Check that the message size is at least the size of a crc-32 checksum and
             // the 32-bit flags section.
@@ -161,7 +161,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     boost::optional<uint32_t> checksum;
     if (flags & kChecksumPresent) {
         checksum = getChecksum(message);
-        uassert(51251,
+        uassert(ErrorCodes::InvalidOpMsgSize,
                 "Invalid message size for an OpMsg containing a checksum",
                 dataSize > kCrc32Size);
         dataSize -= kCrc32Size;
@@ -170,8 +170,8 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // The sections begin after the flags and before the checksum (if present).
     BufReader sectionsBuf(message.singleData().data() + sizeof(flags), dataSize);
 
-    // TODO some validation may make more sense in the IDL parser. I've tagged them with
-    // comments.
+    // TODO(SERVER-124113) some validation may make more sense in the IDL parser. I've tagged them
+    // with comments.
     bool haveBody = false;
     OpMsg msg;
     StringData securityToken;
@@ -179,11 +179,12 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
         const auto sectionKind = sectionsBuf.read<Section>();
         switch (sectionKind) {
             case Section::kBody: {
-                uassert(40430, "Multiple body sections in message", !haveBody);
+                uassert(ErrorCodes::MultipleOpMsgBodySections,
+                        "Multiple body sections in message",
+                        !haveBody);
                 haveBody = true;
                 msg.body = sectionsBuf.read<Validated<BSONObj>>();
-                uassertStatusOK(msg.body.validateBSONObjSize(kOpMsgReplyBSONBufferMaxSize)
-                                    .addContext("Parsing opMsg body failed"));
+                uassertStatusOK(msg.body.validateBSONObjSize(kOpMsgReplyBSONBufferMaxSize));
                 break;
             }
 
@@ -201,17 +202,18 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                     sectionsBuf.read<LittleEndian<int32_t>>() - sizeof(int32_t);
                 BufReader seqBuf(sectionsBuf.skip(remainingSize), remainingSize);
                 const auto name = seqBuf.readCStr();
-                uassert(40431,
+                uassert(ErrorCodes::DuplicateOpMsgDocumentSequence,
                         str::stream() << "Duplicate document sequence: " << name,
-                        !msg.getSequence(name));  // TODO IDL
+                        !msg.getSequence(name));  // TODO(SERVER-124114) IDL
 
                 msg.sequences.push_back({std::string{name}});
                 while (!seqBuf.atEof()) {
                     auto obj = seqBuf.read<Validated<BSONObj>>();
-                    // For document sequences, each document must be within the 16MB document limit.
-                    // See the OP_MSG documentation for further details on the size limits:
+                    // For document sequences, each document must be within the 16MB document
+                    // limit. See the OP_MSG documentation for further details on the size
+                    // limits:
                     // https://github.com/mongodb/specifications/blob/master/source/message/OP_MSG.md#sections.
-                    uassertStatusOK(msg.body.validateBSONObjSize().addContext(
+                    uassertStatusOK(obj.val.validateBSONObjSize().addContext(
                         "Parsing opMsg DocSequence failed"));
                     msg.sequences.back().objs.push_back(obj);
                 }
@@ -230,18 +232,19 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 
             default:
                 // Using uint32_t so we append as a decimal number rather than as a char.
-                uasserted(40432, str::stream() << "Unknown section kind " << uint32_t(sectionKind));
+                uasserted(ErrorCodes::UnknownOpMsgSectionKind,
+                          str::stream() << "Unknown section kind " << uint32_t(sectionKind));
         }
     }
 
-    uassert(40587, "OP_MSG messages must have a body", haveBody);
+    uassert(ErrorCodes::MissingOpMsgBodySection, "OP_MSG messages must have a body", haveBody);
 
-    // Detect duplicates between doc sequences and body. TODO IDL
+    // Detect duplicates between doc sequences and body. TODO(SERVER-124115) IDL
     // Technically this is O(N*M) but N is at most 2.
     for (const auto& docSeq : msg.sequences) {
         const char* name = docSeq.name.c_str();  // Pointer is redirected by next call.
         auto inBody = !bson::extractElementAtOrArrayAlongDottedPath(msg.body, name).eoo();
-        uassert(40433,
+        uassert(ErrorCodes::DuplicateOpMsgField,
                 str::stream() << "Duplicate field between body and document sequence "
                               << docSeq.name,
                 !inBody);

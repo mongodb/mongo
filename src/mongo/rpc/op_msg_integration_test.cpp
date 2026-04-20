@@ -1330,10 +1330,237 @@ TEST(OpMsg, ServerHandlesReallyLargeMessagesGracefully) {
     auto requestMsg = request.serializeWithoutSizeChecking();
 
     Message replyMsg = conn->call(requestMsg);
-
     auto reply = OpMsg::parse(replyMsg);
     auto replyStatus = getStatusFromCommandResult(reply.body);
     ASSERT_NOT_OK(replyStatus);
+    ASSERT_EQ(replyStatus, ErrorCodes::BSONObjectTooLarge);
+}
+
+class OpMsgIllFormedTest : public unittest::Test {
+public:
+    void setUp() override {
+        disableClientChecksum();
+        conn = getIntegrationTestConnection();
+    }
+
+    void tearDown() override {
+        enableClientChecksum();
+    }
+
+protected:
+    /**
+     * Builds a raw OP_MSG Message from a byte buffer containing [flags + sections].
+     * This lets us craft arbitrarily malformed messages for testing connection-fatal parse errors.
+     */
+    Message buildRawOpMsg(BufBuilder messageBuffer) {
+        constexpr size_t kHeaderSize = sizeof(MSGHEADER::Layout);
+
+        const size_t totalSize = kHeaderSize + messageBuffer.len();
+        auto buf = SharedBuffer::allocate(totalSize);
+
+        auto header = MsgData::View(buf.get());
+        header.setLen(totalSize);
+        header.setId(1);
+        header.setResponseToMsgId(0);
+        header.setOperation(dbMsg);
+        std::copy_n(messageBuffer.buf(), messageBuffer.len(), buf.get() + kHeaderSize);
+
+        return Message{std::move(buf)};
+    }
+
+    /**
+     * Helper to serialize a valid ping request and return the raw Message for further manipulation.
+     */
+    Message buildValidPingMessage() {
+        return OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                           DatabaseName::kAdmin,
+                                           BSON("ping" << 1))
+            .serialize();
+    }
+
+    static constexpr uint32_t kNoFlags = 0;
+
+    void appendBody(BufBuilder& buf, BSONObj body) {
+        static constexpr uint8_t kBody = 0;
+        buf.appendChar(kBody);
+        body.appendSelfToBufBuilder(buf);
+    }
+
+    void appendDocSequence(BufBuilder& buf,
+                           StringData name,
+                           boost::optional<BSONObj> doc = boost::none) {
+        static constexpr uint8_t kDocSequence = 1;
+        buf.appendChar(kDocSequence);
+        BufBuilder seqBuf;
+        seqBuf.appendCStr(name);
+        if (doc) {
+            doc->appendSelfToBufBuilder(seqBuf);
+        }
+        buf.appendNum(static_cast<int32_t>(sizeof(int32_t) + seqBuf.len()));
+        buf.appendBuf(seqBuf.buf(), seqBuf.len());
+    }
+
+    std::unique_ptr<DBClientBase> conn;
+};
+
+TEST_F(OpMsgIllFormedTest, MissingBodySectionClosesConnection) {
+    BufBuilder buf;
+    buf.appendNum(kNoFlags);
+
+    // Build a valid OP_MSG with only an empty doc sequence section and no body section.
+    appendDocSequence(buf, "docs");
+
+    auto request = buildRawOpMsg(std::move(buf));
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, UnknownSectionKindClosesConnection) {
+    auto request = buildValidPingMessage();
+    auto rawData = request.sharedBuffer().get();
+    // rawData[0..3] = flags (4 bytes), rawData[4] = first section kind byte.
+    // Replace the section kind with an invalid value.
+    rawData[sizeof(MSGHEADER::Layout) + sizeof(uint32_t)] = static_cast<char>(0xff);
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, BSONParseErrorClosesConnection) {
+    auto request = buildValidPingMessage();
+    // Truncate the message so the BSON body is incomplete. The header size field must match.
+    const int truncatedSize = request.size() - 5;
+    auto truncated = SharedBuffer::allocate(truncatedSize);
+    memcpy(truncated.get(), request.singleData().view2ptr(), truncatedSize);
+    MsgData::View(truncated.get()).setLen(truncatedSize);
+    Message truncatedMsg(std::move(truncated));
+
+    ASSERT_THROWS(conn->call(truncatedMsg), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, MultipleMsgBodySectionsClosesConnection) {
+    BufBuilder buf;
+    buf.appendNum(kNoFlags);
+
+    // Multiple bodies
+    appendBody(buf, BSON("ping" << 1 << "$db" << "admin"));
+    appendBody(buf, BSON("pong" << 1 << "$db" << "admin"));
+
+    auto request = buildRawOpMsg(std::move(buf));
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, DuplicateDocumentSequenceClosesConnection) {
+    BufBuilder buf;
+    buf.appendNum(kNoFlags);
+
+    appendBody(buf, BSON("insert" << "collection" << "$db" << "test"));
+
+    // Duplicate doc name
+    appendDocSequence(buf, "documents", BSON("a" << 1));
+    appendDocSequence(buf, "documents", BSON("a" << 1));
+
+    auto request = buildRawOpMsg(std::move(buf));
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, DuplicateMsgFieldClosesConnection) {
+    BufBuilder buf;
+    buf.appendNum(kNoFlags);
+    appendBody(buf,
+               BSON("insert" << "collection" << "documents" << BSON_ARRAY(BSON("a" << 1)) << "$db"
+                             << "test"));
+
+    // Doc sequence also named "documents", collides with body field
+    appendDocSequence(buf, "documents", BSON("b" << 2));
+
+    auto request = buildRawOpMsg(std::move(buf));
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, ChecksumMismatchClosesConnection) {
+    auto request = buildValidPingMessage();
+    OpMsg::appendChecksum(&request);
+    // Corrupt the checksum by flipping bits in the last byte.
+    auto rawData = request.sharedBuffer().get();
+    rawData[request.size() - 1] ^= static_cast<char>(0xff);
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, InvalidMessageSizeWithChecksumClosesConnection) {
+    // Build a message that has the checksum flag set but is too small to contain
+    // both flags and a checksum (needs >8 bytes of data, we provide exactly 8).
+    BufBuilder buf;
+    buf.appendNum(OpMsg::kChecksumPresent);
+    buf.appendNum(0u);  // fake checksum
+
+    auto request = buildRawOpMsg(std::move(buf));
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, TooManyDocumentSequencesClosesConnection) {
+    // The parser allows at most 2 document sequences. A third triggers TooManyDocumentSequences.
+    BufBuilder buf;
+    buf.appendNum(kNoFlags);
+    appendBody(buf, BSON("insert" << "collection" << "$db" << "test"));
+    appendDocSequence(buf, "a", BSON("x" << 1));
+    appendDocSequence(buf, "b", BSON("x" << 1));
+    appendDocSequence(buf, "c", BSON("x" << 1));
+
+    auto request = buildRawOpMsg(std::move(buf));
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, BSONParseErrorInDocSequenceClosesConnection) {
+    // Invalid BSON inside a doc sequence.
+    BufBuilder buf;
+    buf.appendNum(kNoFlags);
+    appendBody(buf, BSON("insert" << "collection" << "$db" << "test"));
+
+    // Manually build a doc sequence with a BSON document whose size header is bogus.
+    buf.appendChar(1);  // section kind = doc sequence
+    BufBuilder seqBuf;
+    seqBuf.appendCStr("documents");
+    // A BSON size field claiming 100 bytes, but no actual data follows — triggers parse failure.
+    seqBuf.appendNum(100);
+    buf.appendNum(static_cast<int32_t>(sizeof(int32_t) + seqBuf.len()));
+    buf.appendBuf(seqBuf.buf(), seqBuf.len());
+
+    auto request = buildRawOpMsg(std::move(buf));
+
+    ASSERT_THROWS(conn->call(request), ExceptionFor<ErrorCategory::NetworkError>);
+}
+
+TEST_F(OpMsgIllFormedTest, OversizedDocumentInDocSequenceIsRejected) {
+    // Craft a valid OP_MSG with a small body and a doc sequence containing a single document
+    // that exceeds BSONObjMaxInternalSize (16MB + 16KB). The server must reject the oversized
+    // document during OpMsg::parse() and return BSONObjectTooLarge.
+    // This guards against a previous bug where the body size was validated instead of the
+    // doc sequence element size, allowing arbitrarily large documents to slip through.
+    // We use a non-existent command name so that if the parse-level check is bypassed (the bug),
+    // the server returns CommandNotFound instead of BSONObjectTooLarge, making the test fail.
+    BufBuilder buf;
+    buf.appendNum(kNoFlags);
+    appendBody(buf, BSON("nonExistentCommand" << 1 << "$db" << "test"));
+
+    // Build a BSON object larger than BSONObjMaxInternalSize using LargeSizeTrait.
+    const std::string oversizedPayload(BSONObjMaxInternalSize, 'x');
+    BSONObjBuilder docBuilder;
+    docBuilder.append("data", oversizedPayload);
+    auto oversizedDoc = docBuilder.obj<BSONObj::LargeSizeTrait>();
+    ASSERT_GT(oversizedDoc.objsize(), BSONObjMaxInternalSize);
+
+    appendDocSequence(buf, "documents", oversizedDoc);
+
+    auto request = buildRawOpMsg(std::move(buf));
+
+    Message replyMsg = conn->call(request);
+    auto reply = OpMsg::parse(replyMsg);
+    auto replyStatus = getStatusFromCommandResult(reply.body);
     ASSERT_EQ(replyStatus, ErrorCodes::BSONObjectTooLarge);
 }
 

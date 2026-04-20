@@ -280,7 +280,7 @@ TEST_F(OpMsgParser, FailsIfNoBody) {
         kNoFlags,  //
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40587);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::MissingOpMsgBodySection);
 }
 
 TEST_F(OpMsgParser, FailsIfNoBodyEvenWithSequence) {
@@ -291,7 +291,7 @@ TEST_F(OpMsgParser, FailsIfNoBodyEvenWithSequence) {
         Sized{"docs"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40587);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::MissingOpMsgBodySection);
 }
 
 TEST_F(OpMsgParser, FailsIfTwoBodies) {
@@ -304,7 +304,7 @@ TEST_F(OpMsgParser, FailsIfTwoBodies) {
         fromjson("{pong: 1}"),
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40430);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::MultipleOpMsgBodySections);
 }
 
 TEST_F(OpMsgParser, FailsIfDuplicateSequences) {
@@ -320,7 +320,7 @@ TEST_F(OpMsgParser, FailsIfDuplicateSequences) {
         Sized{"docs"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40431);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::DuplicateOpMsgDocumentSequence);
 }
 
 TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBody) {
@@ -333,7 +333,7 @@ TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBody) {
         Sized{"docs"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40433);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::DuplicateOpMsgField);
 }
 
 TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBodyNested) {
@@ -346,7 +346,7 @@ TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBodyNested) {
         Sized{"a.b"},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40433);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::DuplicateOpMsgField);
 }
 
 TEST_F(OpMsgParser, SucceedsIfSequenceAndBodyHaveCommonPrefix) {
@@ -378,7 +378,7 @@ TEST_F(OpMsgParser, FailsIfUnknownSectionKind) {
         Sized{},
     };
 
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 40432);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::UnknownOpMsgSectionKind);
 }
 
 TEST_F(OpMsgParser, FailsIfBodyTooBig) {
@@ -1199,7 +1199,7 @@ TEST(OpMsgTest, EmptyMessageWithChecksumFlag) {
     // missing a body, is invalid because a checksum was specified in the flag
     // but no checksum was included.
     auto msg = OpMsgBytes{OpMsg::kChecksumPresent};
-    ASSERT_THROWS_CODE(msg.parse(), AssertionException, 51252);
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidOpMsgSize);
 }
 
 TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {

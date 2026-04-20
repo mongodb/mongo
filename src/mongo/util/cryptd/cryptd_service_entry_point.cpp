@@ -94,7 +94,10 @@ Future<DbResponse> ServiceEntryPointCryptD::handleRequest(OperationContext* opCt
     auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
 
     OpMsgRequest request;
-    try {  // Parse.
+    try {
+        // Parse. Most exception thrown by this function will close the connection.
+        // Only error codes without the ConnectionFatalMessageParseError category
+        // (such as NonConformantBSON, InvalidBSONColumn or Unauthorized) will be reported.
         request = rpc::opMsgRequestFromAnyProtocol(message, opCtx->getClient());
     } catch (const DBException& ex) {
         // If this error needs to fail the connection, propagate it out.
