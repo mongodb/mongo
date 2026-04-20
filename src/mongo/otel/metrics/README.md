@@ -286,6 +286,63 @@ mongo_cc_unit_test(
 )
 ```
 
+## serverStatus Integration
+
+Metrics can optionally be exposed in the `serverStatus` command response under the `metrics`
+section by specifying `serverStatusOptions` when creating a metric:
+
+```cpp
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/metrics/metrics_service.h"
+
+namespace {
+auto& myCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kMyFeatureEvents,
+    "Number of events processed",
+    otel::metrics::MetricUnit::kEvents,
+    {.serverStatusOptions = otel::metrics::ServerStatusOptions{.dottedPath = "myFeature.eventCount",
+                                                               .role = ClusterRole::None}});
+}  // namespace
+```
+
+This metric appears in the `serverStatus` response under the `metrics` section:
+
+```json
+{
+  "metrics": {
+    "myFeature": {
+      "eventCount": NumberLong(42)
+    }
+  }
+}
+```
+
+### Dotted Path
+
+The `dottedPath` field specifies the path under `metrics`. Do **not** include a `metrics.`
+prefix. It is added automatically.
+
+### Role
+
+The `role` field controls which node types expose the metric:
+
+| Value                       | Exposed on          |
+| --------------------------- | ------------------- |
+| `ClusterRole::None`         | All node types      |
+| `ClusterRole::ShardServer`  | Shard servers only  |
+| `ClusterRole::RouterServer` | Router servers only |
+
+### Serialization Format
+
+Each metric type serializes differently in the serverStatus response:
+
+| Metric Type   | serverStatus format                                        |
+| ------------- | ---------------------------------------------------------- |
+| Counter       | Scalar (`NumberLong` for `int64_t`, `double` for `double`) |
+| UpDownCounter | Scalar (`NumberLong` for `int64_t`, `double` for `double`) |
+| Gauge         | Scalar (`NumberLong` for `int64_t`, `double` for `double`) |
+| Histogram     | `{ "average": <double>, "count": <NumberLong> }`           |
+
 ## Exporting Metrics
 
 Metrics can be exported in [OTLP format](https://opentelemetry.io/docs/specs/otlp/) using either
