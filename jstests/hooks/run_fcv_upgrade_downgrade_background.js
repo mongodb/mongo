@@ -6,6 +6,7 @@
  */
 
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
+import {assertTimeseriesConsistentWithViewlessFlag} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 if (typeof db === "undefined") {
     throw new Error("Expected mongo shell to be connected a server, but global 'db' object isn't defined");
@@ -63,6 +64,7 @@ const sendFCVUpDown = function (ver) {
         }
         throw e;
     }
+    assertTimeseriesConsistentWithViewlessFlag(db);
 };
 
 Random.setRandomSeed();

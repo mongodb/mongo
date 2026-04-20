@@ -74,6 +74,37 @@ export function isViewfulTimeseriesOnlySuite(db) {
 }
 
 /**
+ * Asserts the format of all timeseries collections matches the current value of the viewless timeseries feature flag.
+ * TODO SERVER-101609 remove this function once 9.0 becomes lastLTS.
+ */
+export function assertTimeseriesConsistentWithViewlessFlag(db) {
+    const viewlessEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+    const dbNames = assert
+        .commandWorked(db.adminCommand({listDatabases: 1, nameOnly: true}))
+        .databases.map((d) => d.name);
+    for (const dbName of dbNames) {
+        // Use {type: {$ne: "view"}} to skip loading the view catalog (so we don't fail if there are invalid views).
+        const listCollections = db.getSiblingDB(dbName).getCollectionInfos({type: {$ne: "view"}});
+        for (const coll of listCollections) {
+            if (coll.type !== "timeseries") continue;
+            const isViewlessTimeseries = coll.info.uuid !== undefined;
+            assert.eq(
+                isViewlessTimeseries,
+                viewlessEnabled,
+                `Expected timeseries '${coll.name}' to be ${viewlessEnabled ? "viewless" : "viewful"}: ${tojson(listCollections)}`,
+            );
+        }
+
+        if (viewlessEnabled) {
+            assert(
+                !listCollections.some((coll) => coll.name.startsWith("system.buckets.")),
+                `Unexpected system.buckets.* collection with viewless timeseries enabled: ${tojson(listCollections)}`,
+            );
+        }
+    }
+}
+
+/**
  * Asserts that `value` is truthy for viewless timeseries and falsy for viewful timeseries.
  * In suites with mixed viewless/viewful timeseries, no assertion is made.
  */
