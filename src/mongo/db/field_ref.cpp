@@ -452,35 +452,11 @@ bool FieldRef::equalsDottedField(StringData other) const {
     return false;
 }
 
-int FieldRef::compare(const FieldRef& other) const {
-    const FieldIndex toCompare = std::min(_parts.size(), other._parts.size());
-    for (FieldIndex i = 0; i < toCompare; i++) {
-        if (getPart(i) == other.getPart(i)) {
-            continue;
-        }
-        return getPart(i) < other.getPart(i) ? -1 : 1;
-    }
-
-    const FieldIndex rest = _parts.size() - toCompare;
-    const FieldIndex otherRest = other._parts.size() - toCompare;
-    if ((rest == 0) && (otherRest == 0)) {
-        return 0;
-    } else if (rest < otherRest) {
-        return -1;
-    } else {
-        return 1;
-    }
-}
-
 void FieldRef::clear() {
     _cachedSize = 0;
     _parts.clear();
     _dotted.clear();
     _replacements.clear();
-}
-
-std::ostream& operator<<(std::ostream& stream, const FieldRef& field) {
-    return stream << field.dottedField();
 }
 
 }  // namespace mongo

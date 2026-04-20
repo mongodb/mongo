@@ -40,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
@@ -223,12 +224,6 @@ public:
     bool equalsDottedField(StringData other) const;
 
     /**
-     * Return 0 if 'this' is equal to 'other' lexicographically, -1 if is it less than or +1 if it
-     * is greater than.
-     */
-    int compare(const FieldRef& other) const;
-
-    /**
      * Resets the internal state. See note in parse() call.
      */
     void clear();
@@ -264,6 +259,34 @@ public:
             _dotted.get().capacity() +
             // Add size of the object.
             sizeof(*this);
+    }
+
+    bool operator==(const FieldRef& o) const {
+        if (_parts.size() != o._parts.size())
+            return false;
+        for (size_t i = 0; i < _parts.size(); ++i)
+            if (getPart(i) != o.getPart(i))
+                return false;
+        return true;
+    }
+
+    std::strong_ordering operator<=>(const FieldRef& o) const {
+        const size_t common = std::min(_parts.size(), o._parts.size());
+        for (size_t i = 0; i < common; ++i)
+            if (auto c = getPart(i) <=> o.getPart(i); c != 0)
+                return c;
+        return _parts.size() <=> o._parts.size();
+    }
+
+    FieldRef operator+(const FieldRef& rhs) const {
+        FieldRef result{*this};
+        for (size_t i = 0; i < rhs.numParts(); ++i)
+            result.appendPart(rhs.getPart(i));
+        return result;
+    }
+
+    friend std::ostream& operator<<(std::ostream& stream, const FieldRef& field) {
+        return stream << field.dottedField();
     }
 
 private:
@@ -357,39 +380,5 @@ private:
      */
     mutable std::vector<ValidatedPathString> _replacements;
 };
-
-inline bool operator==(const FieldRef& lhs, const FieldRef& rhs) {
-    return lhs.compare(rhs) == 0;
-}
-
-inline bool operator!=(const FieldRef& lhs, const FieldRef& rhs) {
-    return lhs.compare(rhs) != 0;
-}
-
-inline bool operator<(const FieldRef& lhs, const FieldRef& rhs) {
-    return lhs.compare(rhs) < 0;
-}
-
-inline bool operator<=(const FieldRef& lhs, const FieldRef& rhs) {
-    return lhs.compare(rhs) <= 0;
-}
-
-inline bool operator>(const FieldRef& lhs, const FieldRef& rhs) {
-    return lhs.compare(rhs) > 0;
-}
-
-inline bool operator>=(const FieldRef& lhs, const FieldRef& rhs) {
-    return lhs.compare(rhs) >= 0;
-}
-
-inline FieldRef operator+(const FieldRef& lhs, const FieldRef& rhs) {
-    FieldRef result = lhs;
-    for (size_t i = 0; i < rhs.numParts(); ++i) {
-        result.appendPart(rhs.getPart(i));
-    }
-    return result;
-}
-
-std::ostream& operator<<(std::ostream& stream, const FieldRef& value);
 
 }  // namespace MONGO_MOD_PUBLIC mongo

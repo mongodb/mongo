@@ -211,8 +211,7 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
                             << projectionPos->dottedField() << "' wildcardProjection path"};
             }
 
-            int cmp = projectionPos->compare(*indexPos);
-            if (cmp < 0) {
+            if (*projectionPos < *indexPos) {
                 ++projectionPos;
             } else {
                 ++indexPos;
@@ -231,8 +230,7 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
                 // fine we can move indexPos to test next index field
                 ++indexPos;
             } else {
-                int cmp = projectionPos->compare(*indexPos);
-                if (cmp < 0) {
+                if (*projectionPos < *indexPos) {
                     ++projectionPos;
                 } else {
                     return {ErrorCodes::Error{7246209},
