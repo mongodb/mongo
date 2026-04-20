@@ -3,6 +3,10 @@
 set -o errexit
 set -o pipefail
 
+# Cache the current workspace's output_base in-process so retry and timeout handlers
+# can inspect Bazel state without re-entering the server.
+BAZEL_EVERGREEN_OUTPUT_BASE="${BAZEL_EVERGREEN_OUTPUT_BASE:-}"
+
 # --- Pre-flight (assumes prelude.sh already sourced by caller) -------------
 
 bazel_evergreen_shutils::activate_and_cd_src() {
@@ -214,9 +218,25 @@ bazel_evergreen_shutils::is_timeout_exit_code() {
 
 # --- Bazel server lifecycle & OOM-detect retry -----------------------------
 
+bazel_evergreen_shutils::cache_bazel_output_base() {
+    local BAZEL_BINARY="$1"
+    local output_base=""
+
+    if [[ -n "${BAZEL_EVERGREEN_OUTPUT_BASE:-}" ]]; then
+        return 0
+    fi
+
+    # `bazel --batch info output_base` kills a live server because the startup
+    # options differ. Cache the normal output_base once while the server is healthy.
+    output_base="$("$BAZEL_BINARY" info output_base 2>/dev/null)" || return 1
+    [[ -n "$output_base" ]] || return 1
+    BAZEL_EVERGREEN_OUTPUT_BASE="$output_base"
+}
+
 bazel_evergreen_shutils::bazel_output_base() {
     local BAZEL_BINARY="$1"
-    "$BAZEL_BINARY" --batch info output_base 2>/dev/null || "$BAZEL_BINARY" info output_base 2>/dev/null
+    bazel_evergreen_shutils::cache_bazel_output_base "$BAZEL_BINARY" || return 1
+    echo "$BAZEL_EVERGREEN_OUTPUT_BASE"
 }
 
 bazel_evergreen_shutils::bazel_pidfile_path() {
@@ -572,6 +592,7 @@ bazel_evergreen_shutils::jstack_bazel() {
 bazel_evergreen_shutils::ensure_server_and_print_pid() {
     local BAZEL_BINARY="$1"
     _IGN=$("$BAZEL_BINARY" info >/dev/null 2>&1 || true)
+    bazel_evergreen_shutils::cache_bazel_output_base "$BAZEL_BINARY" || true
     bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY"
 }
 
@@ -599,6 +620,10 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
     if [[ -n "$timeout_str" ]]; then
         timeout_duration=$(echo "$timeout_str" | awk '{print $NF}')
     fi
+
+    # Cache output_base before the main Bazel command runs so later retry and
+    # timeout handling can read pidfiles and JVM logs without invoking Bazel again.
+    bazel_evergreen_shutils::cache_bazel_output_base "$BAZEL_BINARY" || true
 
     # Get command log path for usage afterwards
     # Use the selected Bazel binary so PPC/s390x don't fall back to a different

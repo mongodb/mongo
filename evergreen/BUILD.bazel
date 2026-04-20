@@ -52,6 +52,12 @@ sh_binary(
     srcs = ["bazel_evergreen_shutils.sh"],
 )
 
+sh_test(
+    name = "bazel_evergreen_shutils_test",
+    srcs = ["bazel_evergreen_shutils_test.sh"],
+    data = ["bazel_evergreen_shutils.sh"],
+)
+
 sh_binary(
     name = "check_idl_compat",
     srcs = ["check_idl_compat.sh"],
