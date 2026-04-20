@@ -1,5 +1,5 @@
 # Mold linker
-MOLD_VERSION = "2.41.0"
+MOLD_VERSION = "2.40.4"
 
 def _mold_entry(arch, sha):
     return {
@@ -9,8 +9,8 @@ def _mold_entry(arch, sha):
     }
 
 MOLD_MAP = {
-    "aarch64": _mold_entry("aarch64", "946de2774b06a71346bd59b55fddba610b65b8d93c3a4a1559cc84e103472710"),
-    "x86_64": _mold_entry("x86_64", "a3696680d99e692970590a178bc3a33d78d60d1c6dc9db7a11b557b02b751f5d"),
-    "s390x": _mold_entry("s390x", "e5e42a2685967ad209d7568e29a0b2ea86ec9d462cbf5d4aa7398a8087ee1a9d"),
-    "ppc64le": _mold_entry("ppc64le", "b1a045d9dcbdb1af523518beca9da38f3ee0f208964851831a0664cafaf9bc70"),
+    "aarch64": _mold_entry("aarch64", "c799b9ccae8728793da2186718fbe53b76400a9da396184fac0c64aa3298ec37"),
+    "x86_64": _mold_entry("x86_64", "4c999e19ffa31afa5aa429c679b665d5e2ca5a6b6832ad4b79668e8dcf3d8ec1"),
+    "s390x": _mold_entry("s390x", "79cc0a7e596dfbb8b05835f91222c24468278438369ec4a7afa70abb4a84158b"),
+    "ppc64le": _mold_entry("ppc64le", "81e6a2531d4e6b3a62163de04d63fc5f845a5f00ad13fde8b89856206c93a9f9"),
 }
