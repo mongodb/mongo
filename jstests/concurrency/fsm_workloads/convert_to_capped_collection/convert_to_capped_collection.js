@@ -22,7 +22,6 @@
  * ]
  */
 export const $config = (function () {
-    // TODO(SERVER-124041): This workload may fail if an iteration multiplier is specified.
     let data = {prefix: "convert_to_capped_collection"};
 
     let states = (function () {

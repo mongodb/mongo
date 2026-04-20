@@ -34,14 +34,7 @@ export const runner = (function () {
     }
 
     function validateExecutionOptions(mode, options) {
-        let allowedKeys = [
-            "dbNamePrefix",
-            "iterationMultiplier",
-            "sessionOptions",
-            "actionFiles",
-            "threadMultiplier",
-            "tenantId",
-        ];
+        let allowedKeys = ["dbNamePrefix", "sessionOptions", "actionFiles", "threadMultiplier", "tenantId"];
 
         if (mode.parallel) {
             allowedKeys.push("numSubsets");
@@ -74,10 +67,6 @@ export const runner = (function () {
         if (typeof options.dbNamePrefix !== "undefined") {
             assert.eq("string", typeof options.dbNamePrefix, "expected dbNamePrefix to be a string");
         }
-
-        options.iterationMultiplier = options.iterationMultiplier || 1;
-        assert(Number.isInteger(options.iterationMultiplier), "expected iterationMultiplier to be an integer");
-        assert.gte(options.iterationMultiplier, 1, "expected iterationMultiplier to be greater than or equal to 1");
 
         if (typeof options.actionFiles !== "undefined") {
             assert.eq("string", typeof options.actionFiles.permitted, "expected actionFiles.permitted to be a string");
@@ -418,7 +407,6 @@ export const runner = (function () {
             assert.neq("undefined", typeof $config, "$config was not defined by " + workload);
             context[workload] = {config: parseConfig($config)};
             if (applyMultipliers) {
-                context[workload].config.iterations *= executionOptions.iterationMultiplier;
                 context[workload].config.threadCount *= executionOptions.threadMultiplier;
             }
         }
