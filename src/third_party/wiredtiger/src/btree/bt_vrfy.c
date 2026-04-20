@@ -701,7 +701,8 @@ __verify_tree(
      *
      * Report progress occasionally.
      */
-    WT_RET(__wt_progress_backoff(session, NULL, ++vs->fcnt));
+    if (__wt_counter_backoff(++vs->fcnt, 100))
+        WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
     /* Optionally dump the blocks or page in debugging mode. */
