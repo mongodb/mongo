@@ -59,7 +59,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/embedded_builder.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -87,6 +86,79 @@ namespace dps = ::mongo::bson;
 
 namespace {
 
+/** Assembles hierarchical objects. */
+class EmbeddedBuilder {
+public:
+    explicit EmbeddedBuilder(BSONObjBuilder* root) {
+        // Root isn't owned, so give it a nop deleter.
+        _builders.push_back({{}, {root, [](auto) {
+                                  }}});
+    }
+
+    void appendAs(const BSONElement& e, StringData name) {
+        if (e.type() == BSONType::object &&
+            e.valuesize() == 5) {  // empty object -- this way we can add to it later
+            _prepareContext(std::string{name} + ".foo");
+            return;
+        }
+        StringData leafName = _prepareContext(name);
+        _builders.back().second->appendAs(e, leafName);
+    }
+
+    void done() {
+        while (!_builders.empty())
+            _builders.pop_back();
+    }
+
+private:
+    std::vector<StringData> _splitByDots(StringData name) {
+        std::vector<StringData> parts;
+        while (!name.empty()) {
+            StringData part;
+            auto sep = name.find('.');
+            if (sep == name.npos) {
+                part = name;
+                sep = name.size();
+            } else {
+                part = name.substr(0, sep);
+                ++sep;
+            }
+            name.remove_prefix(sep);
+            parts.push_back(part);
+        }
+        return parts;
+    }
+
+    /**
+     * Pops and pushes the subobj builder stack such that the top builder is
+     * ready to receive the leaf element.
+     * Returns the name of that leaf, the substring of `name` to the right
+     * of the last dot.
+     * `name` is a dot-delimited hierarchical node path.
+     * Calls must be made with the `name` parameter in ascending order.
+     */
+    StringData _prepareContext(StringData name) {
+        std::vector<StringData> parts = _splitByDots(name);
+        auto lastPart = parts.back();
+        parts.pop_back();
+        size_t i = 0;
+        for (; i < parts.size() &&        //
+             i + 1 < _builders.size() &&  //
+             parts[i] == _builders[i + 1].first;
+             ++i)
+            ;
+        while (i + 1 < _builders.size())
+            _builders.pop_back();
+        for (; i < parts.size(); ++i)
+            _builders.push_back(
+                {std::string{parts[i]},
+                 std::make_shared<BSONObjBuilder>(_builders.back().second->subobjStart(parts[i]))});
+        return lastPart;
+    }
+
+    std::vector<std::pair<std::string, std::shared_ptr<BSONObjBuilder>>> _builders;
+};
+
 enum FieldCompareResult {
     LEFT_SUBFIELD = -2,
     LEFT_BEFORE = -1,
@@ -94,8 +166,6 @@ enum FieldCompareResult {
     RIGHT_BEFORE = 1,
     RIGHT_SUBFIELD = 2
 };
-
-}  // namespace
 
 typedef std::map<std::string, BSONElement> BSONMap;
 BSONMap bson2map(const BSONObj& obj) {
@@ -190,6 +260,8 @@ FieldCompareResult compareDottedFieldNames(const std::string& l,
     MONGO_verify(0);
     return SAME;  // will never get here
 }
+
+}  // namespace
 
 namespace JsobjTests {
 
