@@ -718,6 +718,17 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "query_knob_configuration_bm",
+    srcs = ["query_knob_configuration_bm.cpp"],
+    tags = ["query_bm"],
+    deps = [
+        "query_knob_configuration",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "query_planner_bm",
     srcs = [
         "query_planner_bm.cpp",
