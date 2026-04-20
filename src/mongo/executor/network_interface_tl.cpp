@@ -859,7 +859,7 @@ NetworkInterfaceTL::CommandStateBase::getClient(AsyncClientFactory& factory) {
         return failPointStatus;
     }
 
-    if (deadline != RemoteCommandRequest::kNoDeadline) {
+    if (deadline != RemoteCommandRequest::kNoDeadline && request.enforceLocalTimeout) {
         auto now = interface->now();
         poolTimeout = deadline - now;
 
@@ -896,7 +896,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
         WireSpec::getWireSpec(interface->_svcCtx).isInternalClient()) {
         auto now = interface->now();
         auto remainingTimeout = Milliseconds(request.deadline - now).count();
-        if (remainingTimeout <= 0) {
+        if (remainingTimeout <= 0 && requestToSend.enforceLocalTimeout) {
             // If we haven't sent the request yet, then return the connection handle with an OK
             // status as it hasn't been used to send anything.
             releaseClientHandle(Status::OK());
@@ -911,17 +911,19 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
                 .thenRunOn(makeGuaranteedExecutor());
         }
 
-        BSONObjBuilder updatedCmdBuilder;
-        updatedCmdBuilder.appendElements(request.cmdObj);
-        updatedCmdBuilder.append("maxTimeMSOpOnly", remainingTimeout);
-        requestToSend.cmdObj = updatedCmdBuilder.obj();
+        if (remainingTimeout > 0) {
+            BSONObjBuilder updatedCmdBuilder;
+            updatedCmdBuilder.appendElements(request.cmdObj);
+            updatedCmdBuilder.append("maxTimeMSOpOnly", remainingTimeout);
+            requestToSend.cmdObj = updatedCmdBuilder.obj();
 
-        LOGV2_DEBUG(4924402,
-                    2,
-                    "Set maxTimeMSOpOnly for request",
-                    "maxTimeMSOpOnly"_attr = remainingTimeout,
-                    "requestId"_attr = request.id,
-                    "target"_attr = request.target);
+            LOGV2_DEBUG(4924402,
+                        2,
+                        "Set maxTimeMSOpOnly for request",
+                        "maxTimeMSOpOnly"_attr = remainingTimeout,
+                        "requestId"_attr = request.id,
+                        "target"_attr = request.target);
+        }
     }
 
     networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
