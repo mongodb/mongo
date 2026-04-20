@@ -308,19 +308,6 @@ TYPED_TEST(MetricCreationTest, SameMetricReturnedWhenCreateWithIdenticalServerSt
     EXPECT_EQ(&m2, &m3);
 }
 
-TYPED_TEST(MetricCreationTest, ExceptionWhenInServerStatusAndServerStatusOptionsBothSet) {
-    MetricOptions<TypeParam> options{
-        .serverStatusOptions = ServerStatusOptions{.dottedPath = "network.openConnections"},
-        .inServerStatus = true,
-    };
-    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
-                                                        MetricNames::kTest1,
-                                                        "description",
-                                                        MetricUnit::kSeconds,
-                                                        options),
-                       DBException,
-                       12323501);
-}
 
 TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentParameters) {
     MetricCreator<TypeParam>::create(
@@ -352,11 +339,16 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentParameters) {
         DBException,
         ErrorCodes::ObjectAlreadyExists);
 
-    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
-                                                        MetricNames::kTest1,
-                                                        "description",
-                                                        MetricUnit::kSeconds,
-                                                        {.inServerStatus = true}),
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(
+                           this->metricsService.get(),
+                           MetricNames::kTest1,
+                           "description",
+                           MetricUnit::kSeconds,
+                           MetricOptions<TypeParam>{.serverStatusOptions =
+                                                        ServerStatusOptions{
+                                                            .dottedPath = "network.openConnections",
+                                                            .role = ClusterRole{},
+                                                        }}),
                        DBException,
                        ErrorCodes::ObjectAlreadyExists);
 }
@@ -586,68 +578,6 @@ TEST_F(MetricsServiceTest, NoOpMeterProviderBeforeInit) {
         meterProvider->GetMeter(toStdStringViewForInterop(MetricsService::kMeterName)).get()));
 }
 #endif  // MONGO_CONFIG_OTEL
-
-using SerializeMetricsFlatTest = MetricsServiceTest;
-
-TEST_F(SerializeMetricsFlatTest, IncludeMetricsInServerStatus) {
-    auto& int64Histogram = metricsService->createInt64Histogram(
-        MetricNames::kTest1, "description", MetricUnit::kSeconds, {.inServerStatus = true});
-    auto& doubleHistogram = metricsService->createDoubleHistogram(
-        MetricNames::kTest2, "description", MetricUnit::kSeconds, {.inServerStatus = true});
-    auto& counter = metricsService->createInt64Counter(
-        MetricNames::kTest3, "description", MetricUnit::kSeconds, {.inServerStatus = true});
-    auto& gauge = metricsService->createDoubleGauge(
-        MetricNames::kTest4, "description", MetricUnit::kQueries, {.inServerStatus = true});
-    auto& int64UpDown = metricsService->createInt64UpDownCounter(
-        MetricNames::kTest5, "description", MetricUnit::kSeconds, {.inServerStatus = true});
-    auto& doubleUpDown = metricsService->createDoubleUpDownCounter(
-        MetricNames::kTest6, "description", MetricUnit::kSeconds, {.inServerStatus = true});
-    int64Histogram.record(10);
-    doubleHistogram.record(20);
-    counter.add(1);
-    gauge.set(0.33);
-    int64UpDown.add(4);
-    int64UpDown.add(-1);
-    doubleUpDown.add(2.0);
-    doubleUpDown.add(-0.5);
-
-    BSONObjBuilder expectedBson;
-    expectedBson.append("test_only.metric1_seconds", BSON("average" << 10.0 << "count" << 1));
-    expectedBson.append("test_only.metric2_seconds", BSON("average" << 20.0 << "count" << 1));
-    expectedBson.append("test_only.metric3_seconds", 1);
-    expectedBson.append("test_only.metric4_queries", 0.33);
-    expectedBson.append("test_only.metric5_seconds", 3);
-    expectedBson.append("test_only.metric6_seconds", 1.5);
-    expectedBson.doneFast();
-
-    BSONObjBuilder builder;
-    metricsService->appendMetricsForServerStatus(builder);
-    ASSERT_BSONOBJ_EQ(builder.obj(), expectedBson.obj());
-}
-
-TEST_F(SerializeMetricsFlatTest, ExcludesMetricsNotInServerStatus) {
-    auto& int64Histogram = metricsService->createInt64Histogram(
-        MetricNames::kTest1, "description", MetricUnit::kSeconds, {.inServerStatus = false});
-    // Only doubleHistogram is in the constructed object.
-    auto& doubleHistogram = metricsService->createDoubleHistogram(
-        MetricNames::kTest2, "description", MetricUnit::kSeconds, {.inServerStatus = true});
-    auto& counter = metricsService->createInt64Counter(
-        MetricNames::kTest3, "description", MetricUnit::kSeconds, {.inServerStatus = false});
-    auto& gauge = metricsService->createDoubleGauge(
-        MetricNames::kTest4, "description", MetricUnit::kQueries, {.inServerStatus = false});
-    int64Histogram.record(10);
-    doubleHistogram.record(20);
-    counter.add(1);
-    gauge.set(0.33);
-
-    BSONObjBuilder expectedBson;
-    expectedBson.append("test_only.metric2_seconds", BSON("average" << 20.0 << "count" << 1));
-    expectedBson.doneFast();
-
-    BSONObjBuilder builder;
-    metricsService->appendMetricsForServerStatus(builder);
-    ASSERT_BSONOBJ_EQ(builder.obj(), expectedBson.obj());
-}
 
 using SerializeMetricsTreeTest = MetricsServiceTest;
 

@@ -83,62 +83,10 @@ TEST_F(ServerStatusServersTest, IncludeUnderMetricsSection) {
     ASSERT_EQ(metricsObj["test"]["metric1"].Long(), 11);
 }
 
-TEST_F(ServerStatusServersTest, IncludeUnderOtelMetricsSection) {
-    auto& metricsService = otel::metrics::MetricsService::instance();
-    otel::metrics::CounterOptions options{
-        .inServerStatus = true,
-    };
-    auto& counter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest1,
-                                                      "description",
-                                                      otel::metrics::MetricUnit::kSeconds,
-                                                      options);
-    counter.add(11);
-
-    BSONObj resultObj = runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1));
-    ASSERT_TRUE(resultObj.hasField("otelMetrics"));
-    BSONObj otelMetricsObj = resultObj.getObjectField("otelMetrics");
-    ASSERT_EQ(otelMetricsObj["test_only.metric1_seconds"].Long(), 11);
-}
-
-TEST_F(ServerStatusServersTest, IncludeUnderOtelMetricsSectionAndMetricsSection) {
-    auto& metricsService = otel::metrics::MetricsService::instance();
-
-    otel::metrics::CounterOptions flatOptions{
-        .inServerStatus = true,
-    };
-    auto& flatCounter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest1,
-                                                          "description",
-                                                          otel::metrics::MetricUnit::kSeconds,
-                                                          flatOptions);
-    flatCounter.add(11);
-
-    otel::metrics::CounterOptions nestedOptions{
-        .serverStatusOptions = otel::metrics::ServerStatusOptions{.dottedPath = "test.metric2",
-                                                                  .role = ClusterRole::None},
-    };
-    auto& nestedCounter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest2,
-                                                            "description",
-                                                            otel::metrics::MetricUnit::kSeconds,
-                                                            nestedOptions);
-    nestedCounter.add(22);
-
-    BSONObj resultObj =
-        runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1 << "metrics" << 1));
-    ASSERT_TRUE(resultObj.hasField("otelMetrics"));
-    ASSERT_TRUE(resultObj.hasField("metrics"));
-
-    BSONObj otelMetricsObj = resultObj.getObjectField("otelMetrics");
-    ASSERT_EQ(otelMetricsObj["test_only.metric1_seconds"].Long(), 11);
-
-    BSONObj metricsObj = resultObj.getObjectField("metrics");
-    ASSERT_EQ(metricsObj["test"]["metric2"].Long(), 22);
-}
-
-TEST_F(ServerStatusServersTest, ExcludeWhenServerStatusOptionsAndInServerStatusNotset) {
+TEST_F(ServerStatusServersTest, ExcludeWhenServerStatusOptionsNotSet) {
     auto& metricsService = otel::metrics::MetricsService::instance();
     otel::metrics::CounterOptions options{};
     ASSERT_FALSE(options.serverStatusOptions.has_value());
-    ASSERT_FALSE(options.inServerStatus);
 
     auto& counter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest1,
                                                       "description",
@@ -146,9 +94,7 @@ TEST_F(ServerStatusServersTest, ExcludeWhenServerStatusOptionsAndInServerStatusN
                                                       options);
     counter.add(11);
 
-    BSONObj resultObj =
-        runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1 << "metrics" << 1));
-    ASSERT_FALSE(resultObj.hasField("otelMetrics"));
+    BSONObj resultObj = runCommand(BSON("serverStatus" << 1 << "metrics" << 1));
     // The "metrics" section may still exist because of non-otel serverStatus metrics.
     if (resultObj.hasField("metrics")) {
         BSONObj metricsObj = resultObj.getObjectField("metrics");

@@ -60,8 +60,6 @@ namespace mongo::otel::metrics {
 
 struct ScalarMetricOptions {
     boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
-    // If true, this metric will also be added to server status in the "otelMetrics" section.
-    bool inServerStatus = false;
 };
 using CounterOptions = ScalarMetricOptions;
 using UpDownCounterOptions = ScalarMetricOptions;
@@ -69,8 +67,6 @@ using GaugeOptions = ScalarMetricOptions;
 
 struct HistogramOptions {
     boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
-    // If true, this metric will also be added to server status in the "otelMetrics" section.
-    bool inServerStatus = false;
     /**
      * explicitBucketBoundaries allows users to specify custom buckets. The vector elements
      * denote the upper and lower bounds for the histogram buckets.
@@ -210,11 +206,6 @@ public:
                                              const HistogramOptions& options = {});
 
     /**
-     * Appends all the created metrics for server status reporting.
-     */
-    void appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const;
-
-    /**
      * Used in unit tests only. Removes all metrics registered by this MetricsService from the
      * internal map and from the serverStatus metric trees.
      */
@@ -237,8 +228,7 @@ private:
     struct MetricIdentifier {
         std::string description;
         MetricUnit unit;
-        // If false, this metric will be skipped when exporting to server status.
-        bool inServerStatus;  // TODO (SERVER-123617): Remove.
+        // If this is none, the metric will not be exported to serverStatus.
         boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
         boost::optional<std::vector<double>> histogramBucketBoundaries = boost::none;
 

@@ -342,9 +342,6 @@ InstrumentT& MetricsService::_createMetric(MetricName name,
                                            AddObservableRef<InstrumentT> addObservable) {
     // Validate otel and serverStatus metric names.
     uassertStatusOK(validateOtelMetricName(name.getName()));
-    massert(12323501,
-            "inServerStatus and serverStatusOptions cannot both be set",
-            !(options.inServerStatus && options.serverStatusOptions.has_value()));
     if (options.serverStatusOptions) {
         uassertStatusOK(validateServerStatusMetricPath(options.serverStatusOptions->dottedPath));
     }
@@ -378,7 +375,6 @@ Counter<T>& MetricsService::createCounter(MetricName name,
                                           const CounterOptions& options) {
     MetricIdentifier identifier{.description = description,
                                 .unit = unit,
-                                .inServerStatus = options.inServerStatus,
                                 .serverStatusOptions = options.serverStatusOptions,
                                 .histogramBucketBoundaries = boost::none};
     return _createMetric<Counter<T>, CounterOptions>(
@@ -428,7 +424,6 @@ UpDownCounter<T>& MetricsService::createUpDownCounter(MetricName name,
                                                       const UpDownCounterOptions& options) {
     MetricIdentifier identifier{.description = description,
                                 .unit = unit,
-                                .inServerStatus = options.inServerStatus,
                                 .serverStatusOptions = options.serverStatusOptions,
                                 .histogramBucketBoundaries = boost::none};
     return _createMetric<UpDownCounter<T>, UpDownCounterOptions>(
@@ -482,7 +477,6 @@ Gauge<T>& MetricsService::createGauge(MetricName name,
                                       const GaugeOptions& options) {
     MetricIdentifier identifier{.description = description,
                                 .unit = unit,
-                                .inServerStatus = options.inServerStatus,
                                 .serverStatusOptions = options.serverStatusOptions,
                                 .histogramBucketBoundaries = boost::none};
     return _createMetric<Gauge<T>, GaugeOptions>(
@@ -532,7 +526,6 @@ Histogram<T>& MetricsService::createHistogram(MetricName name,
     const std::string unitStr = static_cast<std::string>(toString(unit));
     MetricIdentifier identifier{.description = description,
                                 .unit = unit,
-                                .inServerStatus = options.inServerStatus,
                                 .serverStatusOptions = options.serverStatusOptions,
                                 .histogramBucketBoundaries = options.explicitBucketBoundaries};
     return _createMetric<Histogram<T>, HistogramOptions>(
@@ -570,25 +563,6 @@ Histogram<int64_t>& MetricsService::createInt64Histogram(MetricName name,
     return createHistogram<int64_t>(name, description, unit, options);
 }
 
-void MetricsService::appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const {
-    stdx::lock_guard lock(_mutex);
-    for (const auto& [name, identifierAndMetric] : _metrics) {
-        if (!identifierAndMetric.identifier.inServerStatus) {
-            continue;
-        }
-        std::visit(
-            [&](const auto& metric) {
-                const auto key =
-                    fmt::format("{}_{}", name, toString(identifierAndMetric.identifier.unit));
-                const auto obj = metric->serializeToBson(key);
-                massert(ErrorCodes::KeyNotFound,
-                        fmt::format("Provided key {} not found in serialized BSONObj", key),
-                        !obj.getField(key).eoo());
-                bsonBuilder.append(obj.getField(key));
-            },
-            identifierAndMetric.metric);
-    }
-}
 void MetricsService::clearForTests() {
     stdx::lock_guard lock(_mutex);
 #ifdef MONGO_CONFIG_OTEL
