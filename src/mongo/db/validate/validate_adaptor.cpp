@@ -111,9 +111,6 @@ const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 static constexpr const char* kSchemaValidationFailedReason =
     "Detected one or more documents not compliant with the collection's schema. Check logs for log "
     "id 5363500.";
-static constexpr const char* kTimeseriesSchemaValidationFailedReason =
-    "Detected one or more time-series bucket documents not compliant with time-series "
-    "specifications. Check logs for log id 11634800.";
 static constexpr const char* kBSONValidationNonConformantReason =
     "Detected one or more documents in this collection not conformant to BSON specifications. For "
     "more info, see logs with log id 6825900";
@@ -1252,13 +1249,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                         LOGV2_WARNING_OPTIONS(11634800,
                                               {logv2::LogTruncation::Disabled},
                                               "Time-series bucket document is not compliant with "
-                                              "time-series specifications",
+                                              "the collection's schema",
                                               logAttrs(coll->ns()),
                                               "recordId"_attr = record->id,
                                               "collectionUuid"_attr = coll->uuid(),
                                               "record"_attr = record->data.toBson(),
                                               "reason"_attr = schemaValidationResult);
-                        results->addError(kTimeseriesSchemaValidationFailedReason);
+                        results->addError(kSchemaValidationFailedReason);
                     } else {
                         LOGV2_WARNING_OPTIONS(
                             5363500,
