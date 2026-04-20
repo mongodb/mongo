@@ -44,14 +44,13 @@ constexpr int32_t kTimestampDocId = 0;
 
 boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForRead(
     OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition =
-        acquireCollectionOrView(opCtx,
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    opCtx,
-                                    NamespaceString::makeGlobalConfigCollection(
-                                        NamespaceString::kReplicatedFastCountStoreTimestamps),
-                                    AcquisitionPrerequisites::OperationType::kRead),
-                                LockMode::MODE_IS);
+    CollectionOrViewAcquisition acquisition = acquireCollectionOrViewMaybeLockFree(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx,
+            NamespaceString::makeGlobalConfigCollection(
+                NamespaceString::kReplicatedFastCountStoreTimestamps),
+            AcquisitionPrerequisites::OperationType::kRead));
 
     if (acquisition.getCollectionPtr()) {
         return acquisition;

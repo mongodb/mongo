@@ -217,7 +217,8 @@ CollectionSizeCount ReplicatedFastCountManager::findLatest(OperationContext* opC
     ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
         shard_role_details::getRecoveryUnit(opCtx), boost::none);
 
-    const AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+    const AutoGetOplogFastPath oplogRead(
+        opCtx, OplogAccessMode::kRead, Date_t::max(), {.skipRSTLLock = true});
     const auto& oplogColl = oplogRead.getCollection();
     massert(123334, "oplog collection not found", oplogColl);
 
