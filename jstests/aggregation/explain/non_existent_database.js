@@ -8,7 +8,7 @@
  *   # Wrapping in $facet changes the explain output
  *   do_not_wrap_aggregations_in_facets,
  *   # Older versions have different explain behaviour around non-existent DBs
- *   requires_fcv_83,
+ *   requires_fcv_90,
  * ]
  */
 import {before, describe, it} from "jstests/libs/mochalite.js";
