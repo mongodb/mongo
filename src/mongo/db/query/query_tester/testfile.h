@@ -144,7 +144,7 @@ public:
     /**
      * If 'compare' is set, tests must have results to compare to.
      */
-    bool writeAndValidate(ModeOption, WriteOutOptions, ErrorLogLevel, DiffStyle);
+    bool writeAndValidate(ModeOption, WriteOutOptions, ErrorLogLevel, DiffStyle, bool isPartialRun);
 
     bool writeOutAndNumber(std::fstream&, WriteOutOptions);
 

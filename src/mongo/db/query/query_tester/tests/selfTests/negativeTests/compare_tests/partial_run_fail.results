@@ -1,0 +1,16 @@
+partial_run_fail
+test
+test.coll as fuzzer_coll
+
+0
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"_id":999}
+]
+
+1
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}
+[
+{"_id":0,"value":"a"},
+{"_id":1,"value":"b"}
+]

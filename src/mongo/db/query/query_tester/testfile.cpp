@@ -42,6 +42,38 @@
 namespace mongo::query_tester {
 namespace {
 
+static constexpr auto kPartialRunSentinel = "// PARTIAL_RUN";
+
+void prependPartialRunSentinel(const std::filesystem::path& filePath) {
+    auto ifs = std::ifstream{filePath};
+    auto content = std::string{std::istreambuf_iterator<char>(ifs), {}};
+    ifs.close();
+    auto ofs = std::ofstream{filePath, std::ios::out | std::ios::trunc};
+    ofs << kPartialRunSentinel
+        << ": Generated with -n or -r. "
+           "Do not rename this file to .results."
+        << std::endl
+        << content;
+    ofs.close();
+}
+
+void checkForPartialRunSentinel(const std::filesystem::path& filePath) {
+    auto ifs = std::ifstream{filePath};
+    if (!ifs.is_open()) {
+        return;
+    }
+    auto firstLine = std::string{};
+    if (!std::getline(ifs, firstLine)) {
+        return;
+    }
+    uassert(10387200,
+            str::stream{} << filePath.string()
+                          << " was generated from a partial run (-n/-r) and must not be used as a "
+                             "complete .results file. Re-run without -n/-r and use --out to "
+                             "generate a full .results file.",
+            !firstLine.starts_with(kPartialRunSentinel));
+}
+
 // This regex matches geospatial and text indices.
 static const auto kAlwaysIncludedIndex =
     pcre::Regex{R"-([{,]\s*("?)[^":,]+\1\s*:\s*"(2d|2dsphere|text)"\s*[},])-"};
@@ -509,6 +541,8 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
     // If we're not running all tests, print the expected results of the narrowed set of tests to a
     // temporary results file.
     if (mode == ModeOption::Compare && partialTestRun) {
+        // Guard against .results files that were produced from a partial run.
+        checkForPartialRunSentinel(_expectedPath);
         const auto narrowedPath = std::filesystem::path{_expectedPath}.concat(".narrowed");
         auto narrowedStream = std::fstream{narrowedPath, std::ios::out | std::ios::trunc};
 
@@ -583,7 +617,8 @@ bool QueryFile::textBasedCompare(const std::filesystem::path& expectedPath,
 bool QueryFile::writeAndValidate(const ModeOption mode,
                                  const WriteOutOptions writeOutOpts,
                                  const ErrorLogLevel errorLogLevel,
-                                 const DiffStyle diffStyle) {
+                                 const DiffStyle diffStyle,
+                                 const bool isPartialRun) {
     // Set up the text-based diff environment.
     std::filesystem::create_directories(std::filesystem::absolute(_actualPath).parent_path());
     auto actualStream = std::fstream{_actualPath, std::ios::out | std::ios::trunc};
@@ -596,7 +631,16 @@ bool QueryFile::writeAndValidate(const ModeOption mode,
     // One big comparison, all at once.
     if (mode == ModeOption::Compare ||
         (mode == ModeOption::Normalize && writeOutOpts == WriteOutOptions::kNone)) {
-        return textBasedCompare(_expectedPath, _actualPath, errorLogLevel, diffStyle);
+        // Guard against .results files that were produced from a partial run.
+        checkForPartialRunSentinel(_expectedPath);
+        const auto result = textBasedCompare(_expectedPath, _actualPath, errorLogLevel, diffStyle);
+        if (!result && isPartialRun) {
+            // The comparison failed and the .actual file will be left on disk. Prepend a sentinel
+            // so that the file cannot be silently renamed to .results (which would lose results
+            // for tests not in the partial range).
+            prependPartialRunSentinel(_actualPath);
+        }
+        return result;
     } else {
         const bool includeResults = writeOutOpts == WriteOutOptions::kResult ||
             writeOutOpts == WriteOutOptions::kOnelineResult;

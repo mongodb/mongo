@@ -1,0 +1,7 @@
+partial_run_fail
+test
+test.coll as fuzzer_coll
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}

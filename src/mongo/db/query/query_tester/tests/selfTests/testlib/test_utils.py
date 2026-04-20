@@ -76,6 +76,8 @@ def run_mongotest(
     out_result: bool = False,
     extract_features: bool = False,
     override_type: str = None,
+    partial_n: int | None = None,
+    partial_r: tuple[int, int] | None = None,
 ) -> tuple[ExitCode, bytes]:
     """
     Execute mongotest binary with specified test files and options. It constructs the command-line invocation of mongotest based on the input parameters and executes the command. It returns the output of the mongotest process to the calling function.
@@ -90,19 +92,30 @@ def run_mongotest(
         load: If True, mongotest will load data into test collection. Defaults to True.
         minimal_index: If True, mongotest will only load a minimal set of indices. Defaults to False.
         out_result: If True, mongotest will produce an output .result file. It can only be true if mode is RUN or NORMALIZE. Defaults to False.
+        partial_n: If set, pass '-n <partial_n>' immediately after each '-t' argument to run only
+            that single test number (0-indexed). Incompatible with partial_r and --out.
+        partial_r: If set, pass '-r <start> <end>' immediately after each '-t' argument to run
+            only tests in that inclusive range. Incompatible with partial_n and --out.
     Returns:
         Tuple containing the exit code and output (as bytes) from the mongotest execution.
     """
     if out_result and mode == Mode.COMPARE:
         sys.exit("Mode must be set to RUN or NORMALIZE if we want to produce output .result files.")
+    if partial_n is not None and partial_r is not None:
+        sys.exit("partial_n and partial_r are mutually exclusive.")
 
     # Retrieve mongotest binary path and mongod uri from command line arguments
     mongotest, uri = _get_mongotest_args()
     test_file_names = tuple(f"{test_file_name}.test" for test_file_name in test_file_names)
-    test_files = map(_discover_test_file, test_file_names)
+    test_files = list(map(_discover_test_file, test_file_names))
 
     cmd = [mongotest, "--uri", uri]
-    cmd.extend((test_arg for test_file in test_files for test_arg in ("-t", test_file)))
+    for test_file in test_files:
+        cmd.extend(["-t", test_file])
+        if partial_n is not None:
+            cmd.extend(["-n", str(partial_n)])
+        elif partial_r is not None:
+            cmd.extend(["-r", str(partial_r[0]), str(partial_r[1])])
 
     if drop:
         cmd.append("--drop")

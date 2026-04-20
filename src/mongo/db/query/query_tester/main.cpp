@@ -177,7 +177,9 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         const bool hasFailures = [&](const auto& testPath) {
             try {
                 currFile.runTestFile(conn.get(), mode);
-                return !currFile.writeAndValidate(mode, outOpt, errorLogLevel, diffStyle);
+                const bool isPartialRun = (startRange != kMinTestNum || endRange != kMaxTestNum);
+                return !currFile.writeAndValidate(
+                    mode, outOpt, errorLogLevel, diffStyle, isPartialRun);
             } catch (const std::exception& exception) {
                 std::cerr << std::endl
                           << testPath.string() << std::endl
