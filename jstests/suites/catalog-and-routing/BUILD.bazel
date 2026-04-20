@@ -1,3 +1,17 @@
+## Need to update a resmoke_suite_test?
+# Explanations of fields of the resmoke_suite_test rule are in bazel/resmoke/README.md.
+# In addition, certain `tags` and `target_compatible_with` are used to control which
+# tests are run in which CI tasks. Common cases are enumerated in jstests/suites/README.md.
+#
+# To run a suite:
+# bazel test //jstests/suites/query-execution:core
+#
+# To run a single test in a suite:
+# bazel test //jstests/suites/query-execution:core --test_sharding_strategy=disabled --test_arg=jstests/some_test.js
+#
+# To run outside the bazel sandbox, you may still use:
+# python buildscripts/resmoke.py run --suites=core
+
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
 
