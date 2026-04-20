@@ -50,6 +50,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
 MONGO_FAIL_POINT_DEFINE(failDuringFlush);
 MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
+MONGO_FAIL_POINT_DEFINE(useInMemoryReplicatedSizeCount);
 
 }  // namespace
 
@@ -231,6 +232,10 @@ CollectionSizeCount ReplicatedFastCountManager::findLatest(OperationContext* opC
 
 CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* opCtx,
                                                               UUID uuid) const {
+    if (MONGO_unlikely(useInMemoryReplicatedSizeCount.shouldFail())) {
+        return find(uuid);
+    }
+
     return replicated_fast_count::readPersisted(opCtx, _sizeCountStore, uuid);
 }
 
