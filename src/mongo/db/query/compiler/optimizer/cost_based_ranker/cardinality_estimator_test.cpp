@@ -993,6 +993,118 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
     }
 }
 
+// Mock sampling estimator that counts calls to estimateRIDs.
+class CountingEstimator : public ce::SamplingEstimator {
+public:
+    mutable size_t estimateRIDsCallCount = 0;
+
+    CardinalityEstimate estimateCardinality(const MatchExpression*) const override {
+        return makeCard(10.0);
+    }
+    std::vector<CardinalityEstimate> estimateCardinality(
+        const std::vector<const MatchExpression*>&) const override {
+        return {};
+    }
+    CardinalityEstimate estimateKeysScanned(const IndexBounds&) const override {
+        return makeCard(10.0);
+    }
+    std::vector<CardinalityEstimate> estimateKeysScanned(
+        const std::vector<const IndexBounds*>&) const override {
+        return {};
+    }
+    CardinalityEstimate estimateRIDs(const IndexBounds&, const MatchExpression*) const override {
+        ++estimateRIDsCallCount;
+        return makeCard(10.0);
+    }
+    std::vector<CardinalityEstimate> estimateRIDs(
+        const std::vector<const IndexBounds*>&,
+        const std::vector<const MatchExpression*>&) const override {
+        return {};
+    }
+    void generateSample(ce::ProjectionParams) override {}
+    CardinalityEstimate estimateNDV(
+        const std::vector<ce::FieldPathAndEqSemantics>&,
+        boost::optional<std::span<const OrderedIntervalList>>) const override {
+        return makeCard(10.0);
+    }
+    CardinalityEstimate estimateNDVMultiKey(
+        const std::vector<ce::FieldPathAndEqSemantics>&,
+        boost::optional<std::span<const OrderedIntervalList>>) const override {
+        return makeCard(10.0);
+    }
+    double getCollCard() const override {
+        return 100.0;
+    }
+    size_t getSampleSize() const override {
+        return 100;
+    }
+};
+
+// Build IndexBounds with a single-point OIL on "a" and 'bIntervalCount' point intervals on "b".
+// Having a single-point OIL first avoids triggering the index skip-scan detection inside
+// equalityPrefix(), which requires that all OILs after the equality prefix are fully open.
+IndexBounds makeTwoFieldBounds(size_t bIntervalCount) {
+    IndexBounds bounds;
+    OrderedIntervalList oilA("a");
+    oilA.intervals.push_back(IndexBoundsBuilder::makePointInterval(0.0));
+    bounds.fields.push_back(oilA);
+
+    OrderedIntervalList oilB("b");
+    for (size_t i = 0; i < bIntervalCount; ++i) {
+        oilB.intervals.push_back(IndexBoundsBuilder::makePointInterval(static_cast<double>(i)));
+    }
+    bounds.fields.push_back(oilB);
+    return bounds;
+}
+
+TEST(CardinalityEstimator, CachesEstimateWhenTotalIntervalsAtOrBelowLimit) {
+    // OIL "a": 1 interval, OIL "b": 999 intervals → total = 1000 == kMaxNumIntervalsCached.
+    // Estimating the same bounds twice should hit the cache on the second evaluation,
+    // so estimateRIDs is called only once across both plan estimations.
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    std::vector<std::string> indexFields = {"a", "b"};
+    IndexBounds bounds = makeTwoFieldBounds(kMaxNumIntervalsCached - 1);
+
+    auto plan1 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto plan2 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+
+    CountingEstimator mockEstimator;
+    const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
+    EstimateMap qsnEstimates;
+    CardinalityEstimator estimator{
+        collInfo, &mockEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+
+    ASSERT(estimator.estimatePlan(*plan1).isOK());
+    ASSERT(estimator.estimatePlan(*plan2).isOK());
+
+    // All evaluations after the first cache miss should hit the cache.
+    ASSERT_EQ(mockEstimator.estimateRIDsCallCount, 1u);
+}
+
+TEST(CardinalityEstimator, DoesNotCacheEstimateWhenTotalIntervalsAboveLimit) {
+    // OIL "a": 1 interval, OIL "b": 1000 intervals → total = 1001 > kMaxNumIntervalsCached.
+    // The cache is bypassed every time, so estimateRIDs is called on every ridsEstFunct
+    // invocation: 2 per plan estimation (main + equality-prefix inCE) × 2 plans = 4.
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    std::vector<std::string> indexFields = {"a", "b"};
+    IndexBounds bounds = makeTwoFieldBounds(kMaxNumIntervalsCached);
+
+    auto plan1 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto plan2 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+
+    CountingEstimator mockEstimator;
+    const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
+    EstimateMap qsnEstimates;
+    CardinalityEstimator estimator{
+        collInfo, &mockEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+
+    ASSERT(estimator.estimatePlan(*plan1).isOK());
+    ASSERT(estimator.estimatePlan(*plan2).isOK());
+
+    // Cache is never used: estimateRIDs called on every invocation.
+    ASSERT_EQ(mockEstimator.estimateRIDsCallCount, 4u);
+}
+
 // Helpers shared by EqualityPrefixHeuristicCETest and EqualityPrefixSamplingCETest.
 namespace {
 OrderedIntervalList makeFullyOpenOil(const std::string& fieldName) {

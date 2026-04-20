@@ -56,6 +56,11 @@ concept IntersectionType = std::same_as<T, AndHashNode> || std::same_as<T, AndSo
 template <typename T>
 concept UnionType = std::same_as<T, OrNode> || std::same_as<T, MergeSortNode>;
 
+// Above this interval count building and hashing a MatchExpression cache key from the bounds costs
+// more than the CE computation itself, in which case we skip caching and call estimateRIDs
+// directly.
+constexpr size_t kMaxNumIntervalsCached = 1000;
+
 /**
  * This class implements bottom-up cardinality estimation of QuerySolutionNode plans that consist of
  * QSN nodes, MatchExpression filter nodes, and Intervals. This estimator may use different CE
