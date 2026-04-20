@@ -178,9 +178,7 @@ bool canSwapWithSubsequentMatch(PipelineRewriteContext& ctx) {
         ctx, &ctx.current(), dynamic_cast<DocumentSourceMatch*>(ctx.nextStage().get()));
 }
 
-DocumentSource::GetModPathsReturn buildModPaths(PipelineRewriteContext& ctx,
-                                                DocumentSource& prev,
-                                                DocumentSource* stageBeforePrev) {
+DocumentSource::GetModPathsReturn buildModPaths(PipelineRewriteContext& ctx, DocumentSource& prev) {
     using namespace document_transformation;
 
     if (!feature_flags::gFeatureFlagImprovedDepsAnalysis.checkEnabled()) {
@@ -188,10 +186,7 @@ DocumentSource::GetModPathsReturn buildModPaths(PipelineRewriteContext& ctx,
     }
 
     auto canPathBeArray = [&](StringData path) {
-        return stageBeforePrev
-            ? ctx.getDependencyGraph().canPathBeArray(stageBeforePrev, path)
-            // If 'prev' is the first stage, look up from the Path Arrayness API directly.
-            : ctx.getExpCtx().canMainCollPathBeArray(FieldRef(path));
+        return ctx.getDependencyGraph().canPathBeArray(&prev, path);
     };
 
     return toGetModPathsReturn(withArraynessInfo(prev, canPathBeArray));
@@ -199,19 +194,8 @@ DocumentSource::GetModPathsReturn buildModPaths(PipelineRewriteContext& ctx,
 
 template <bool shouldAdvance>
 bool pushdownMatch(PipelineRewriteContext& ctx, DocumentSource& prev, DocumentSourceMatch& match) {
-    auto* stageBeforePrev = [&]() -> DocumentSource* {
-        if (shouldAdvance && !ctx.atFirstStage()) {
-            return ctx.prevStage().get();
-        }
-        if (!shouldAdvance && ctx.hasAtLeastNPrevStages<2>()) {
-            return ctx.nthPrevStage<2>().get();
-        }
-        return nullptr;
-    }();
-
     auto [renameableMatchPart, nonRenameableMatchPart] =
-        DocumentSourceMatch::splitMatchByModifiedFields(&match,
-                                                        buildModPaths(ctx, prev, stageBeforePrev));
+        DocumentSourceMatch::splitMatchByModifiedFields(&match, buildModPaths(ctx, prev));
     tassert(11010400,
             "Both sides can't be null after splitting a $match",
             renameableMatchPart || nonRenameableMatchPart);

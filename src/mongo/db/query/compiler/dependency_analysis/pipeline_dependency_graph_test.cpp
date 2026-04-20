@@ -775,16 +775,13 @@ TEST_F(PipelineDependencyGraphTest,
     runTest([&] {
         pathArrayness->addPath("y", {}, true);
         // Before $unionWith: the outer $project {x: 1} makes 'y' truly absent.
-        auto proj = stages[0].get();
-        ASSERT_FALSE(graph->canPathBeArray(proj, "y"));
+        auto unionWith = stages[1].get();
+        ASSERT_FALSE(graph->canPathBeArray(unionWith, "y"));
 
         // Inside the sub-pipeline: same $project also makes 'y' truly absent.
-        auto unionWith = stages[1].get();
         auto* subGraph = graph->getSubpipelineGraph(unionWith);
         ASSERT_NOT_EQUALS(subGraph, nullptr);
         ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "y"));
-
-        ASSERT_TRUE(graph->canPathBeArray(unionWith, "y"));
 
         // After $unionWith: the graph cannot cross-reference both branches, so 'y'
         // is conservatively assumed to be potentially present and array-typed.
@@ -1259,12 +1256,11 @@ TEST_F(PipelineDependencyGraphTest, CanRenamedPathBeArray) {
     setPipeline("[{$set: { a: '$b' }}]");
     runTest([&] {
         // Lookup from the end of the pipeline.
-        auto* ds = stages.back().get();
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "a.a"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "a.unknown"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "unknown"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.unknown"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "unknown"));
     });
 }
 
@@ -1276,12 +1272,11 @@ TEST_F(PipelineDependencyGraphTest, CanRenamedChainBeArray) {
         " {$set: { d: '$c' }}]");
     runTest([&] {
         // Lookup from the end of the pipeline.
-        auto* ds = stages.back().get();
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "c"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "d"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "d.x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "d"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "d.x"));
     });
 }
 
@@ -1290,11 +1285,10 @@ TEST_F(PipelineDependencyGraphTest, CanRenamedWithProjectBeArray) {
     setPipeline("[{$set: {}}, {$group: { _id: '$a' }}]");
     runTest([&] {
         // Lookup from the end of the pipeline.
-        auto* ds = stages.back().get();
-        ASSERT_FALSE(graph->canPathBeArray(ds, "_id"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "_id"));
         // 'a' is not defined after the $group but may exist as an implicitly created field (e.g.
         // accumulator), so we conservatively assume it can be an array.
-        ASSERT_TRUE(graph->canPathBeArray(ds, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
         ASSERT_FALSE(graph->canPathBeArray(stages.front().get(), "a"));
     });
 }
@@ -1330,19 +1324,18 @@ TEST_F(PipelineDependencyGraphTest, CanDottedRenamedPathsBeArray) {
     setPipeline("[{$set: { a: '$x', b: '$x.y', 'c.d': '$x', 'e.f': '$x.y.z', 'g': '$x.y.z' }}]");
     runTest([&] {
         // Lookup from the end of the pipeline.
-        auto* ds = stages.back().get();
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "a.unknown"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "b.unknown"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b.z"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "g"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "c"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "c.d"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "c.unknown"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "e"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "e.f"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "e.unknown"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.unknown"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "b.unknown"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.z"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "g"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "c"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "c.d"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "c.unknown"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "e"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "e.f"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "e.unknown"));
     });
 }
 
@@ -1353,16 +1346,15 @@ TEST_F(PipelineDependencyGraphTest, CanRedefinedBaseFieldBeArray) {
         "{$set: { 'a.b.a': 1, 'b.b': 1, 'b.a': 1 }}]");
     runTest([&] {
         // Lookup from the end of the pipeline.
-        auto* ds = stages.back().get();
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a.a"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a.b"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a.b.a"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b.b"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b.a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.a"));
         // TODO(SERVER-119392): This should pass.
-        // ASSERT_FALSE(graph->canPathBeArray(ds, "b.b.b"));
+        // ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.b.b"));
     });
 }
 
@@ -1371,11 +1363,10 @@ TEST_F(PipelineDependencyGraphTest, CanBeArraysLooksThroughDottedRenamedPaths) {
     setPipeline("[{$set: { a: '$x', b: '$x.y', 'c.d': '$x', 'e.f': '$x.y.z' }}]");
     runTest([&] {
         // Lookup from the end of the pipeline.
-        auto* ds = stages.back().get();
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a.y.z"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a.y"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "b.z"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "a.unknown"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.y.z"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.z"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.unknown"));
     });
 }
 
@@ -1385,9 +1376,8 @@ TEST_F(PipelineDependencyGraphTest, CanAliasChainWithDottedRenameBeArray) {
         "[{$set: { b: '$a' }}, "
         " {$set: { c: '$b.x' }}]");
     runTest([&] {
-        auto* ds = stages.back().get();
-        ASSERT_FALSE(graph->canPathBeArray(ds, "c"));
-        ASSERT_FALSE(graph->canPathBeArray(ds, "c.y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "c.y"));
     });
 }
 
@@ -1409,11 +1399,10 @@ TEST_F(PipelineDependencyGraphTest, CanBaseCollectionFieldInPrefixBeArray) {
     pathArrayness->addPath("a.b", {}, true);
     setPipeline("[{$set: { 'a.c': '$a.b' }}]");
     runTest([&] {
-        auto* ds = stages.back().get();
         // "a" is a collection field known to be non-array from path arrayness.
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
         // "a.c" is renamed from "a.b" which is non-array, and prefix "a" is also non-array.
-        ASSERT_FALSE(graph->canPathBeArray(ds, "a.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.c"));
     });
 }
 

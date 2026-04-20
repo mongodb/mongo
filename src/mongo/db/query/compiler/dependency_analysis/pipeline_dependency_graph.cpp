@@ -529,12 +529,7 @@ public:
 
     boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage(DocumentSource* ds,
                                                                   PathRef path) const {
-        auto stageId = getStageId(ds);
-        if (ds) {
-            // We want the stage that last defined the path (before 'ds'). A null document source
-            // denotes one past the end, so we don't shift back in that case.
-            stageId.value--;
-        }
+        auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.
             return nullptr;
@@ -553,12 +548,7 @@ public:
 
     DeclaringStageResult getDeclaringStageIncludingSubpipelines(DocumentSource* ds,
                                                                 PathRef path) const {
-        auto stageId = getStageId(ds);
-        if (ds) {
-            // We want the stage that last defined the path (before 'ds'). A null document source
-            // denotes one past the end, so we don't shift back in that case.
-            stageId.value--;
-        }
+        auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.
             return {{nullptr}};
@@ -591,11 +581,12 @@ public:
     }
 
     bool canPathBeArray(DocumentSource* ds, PathRef path) const {
-        auto stageId = getStageId(ds);
+        auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.
             return _canMainCollPathBeArray(path);
         }
+
         auto scopeId = _stages[stageId].scope;
         auto parsedPath = parsePath(path);
 
@@ -992,6 +983,22 @@ private:
         }
         tasserted(11937307,
                   fmt::format("Unknown DocumentSource {}", getUnknownDocumentSourceString(ds)));
+    }
+
+    /**
+     * Gets the stage node that represents the stage before the given DocumentSource in the graph. A
+     * nullptr denotes the position after last stage.
+     */
+    StageId getPreviousStageId(DocumentSource* ds) const {
+        auto stageId = getStageId(ds);
+        if (ds) {
+            if (stageId == StageId{0}) {
+                // If this is the first stage, no previous stage exists.
+                return StageId::none();
+            }
+            stageId.value--;
+        }
+        return stageId;
     }
 
     /**
