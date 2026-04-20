@@ -218,3 +218,7 @@ gpg()
 load("//bazel/mongot_extension_signing_key:mongot_extension_signing_key.bzl", "mongot_extension_signing_key")
 
 mongot_extension_signing_key()
+
+load("//bazel/db_contrib_tool:db_contrib_tool.bzl", "db_contrib_tool")
+
+db_contrib_tool()

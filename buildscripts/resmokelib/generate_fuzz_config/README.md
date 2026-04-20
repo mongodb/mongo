@@ -116,7 +116,7 @@ The log line starting with "resmoke.py invocation for local usage" and the one w
 
 ## Running the config fuzzer locally
 
-Before running the Resmoke config fuzzer command, you need to obtain the necessary binaries. You can download them from the "Files" section of the `archive_dist_test` task in Evergreen (e.g., binaries from the `amazon2-arm64-compile` variant). Alternatively, if you don't require those specific binaries, you can use `db-contrib-tool` to download the binaries (e.g., by running `db-contrib-tool setup-repro-env master`).
+Before running the Resmoke config fuzzer command, you need to obtain the necessary binaries. You can download them from the "Files" section of the `archive_dist_test` task in Evergreen (e.g., binaries from the `amazon2-arm64-compile` variant). Alternatively, if you don't require those specific binaries, you can use `db-contrib-tool` to download the binaries (e.g., by running `bazel run db-contrib-tool -- setup-repro-env master`).
 
 To re-run a command locally that failed through the config fuzzer, you can navigate to the specific test that failed, and under files you can find a name titled "Resmoke.py Invocation for Local Usage". If you are replicating an older config fuzzer invocation, remove the command line argument "`--installDir=dist-test/bin`". A simple example command is shown below:
 

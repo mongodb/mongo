@@ -4,63 +4,55 @@ To run aggregation pipelines containing $search or $vectorSearch stages, you wil
 
 ## Using release or latest mongot
 
-In order to acquire a release or latest mongot binary, from your ~/mongo directory you will need to:
-
-1. Make sure your [db-contrib-tool](https://github.com/10gen/db-contrib-tool/tree/main) is up-to-date. In order to do this, you will need to run:
-
-######
-
-    python3 -m pipx upgrade db-contrib-tool
-
-2. Know your virtual workstations OS and architecture. Assuming your VM is on ubuntu (the default), run `lscpu` in your terminal and inspect the first line of the response to confirm your VM's architecture.
+In order to acquire a release or latest mongot binary, from your ~/mongo directory you will need to know your virtual workstations OS and architecture. Assuming your VM is on ubuntu (the default), run `lscpu` in your terminal and inspect the first line of the response to confirm your VM's architecture.
 
 The default behavior of setup-mongot-repro assume you want to download the latest version of mongot binary compatible with linux x86_64. In which case, if this works for your VM/testing needs, you can run:
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env --installDir build/install/bin
+    bazel run db-contrib-tool -- setup-mongot-repro-env --installDir build/install/bin
 
 However, you can be more verbose and get the same result via:
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env --architecture x86_64  --installDir build/install/bin
+    bazel run db-contrib-tool -- setup-mongot-repro-env --architecture x86_64  --installDir build/install/bin
 
 and
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env --architecture x86_64 --platform linux --installDir build/install/bin
+    bazel run db-contrib-tool -- setup-mongot-repro-env --architecture x86_64 --platform linux --installDir build/install/bin
 
 and even
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env latest --architecture x86_64 --platform linux --installDir build/install/bin
+    bazel run db-contrib-tool -- setup-mongot-repro-env latest --architecture x86_64 --platform linux --installDir build/install/bin
 
 To install the production mongot linux x86_64 binary, you should run:
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env release  --architecture x86_64 --installDir build/install/bin
+    bazel run db-contrib-tool -- setup-mongot-repro-env release  --architecture x86_64 --installDir build/install/bin
 
 If your architecture is of type aarch64, to install the latest mongot binary, you should run:
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env --architecture aarch64 --installDir build/install/bin
+    bazel run db-contrib-tool -- setup-mongot-repro-env --architecture aarch64 --installDir build/install/bin
 
 If your VM is running macos, you can install the latest macos compatible mongot binary via:
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env --platform macos --installDir build/install/bin
+    bazel run db-contrib-tool -- setup-mongot-repro-env --platform macos --installDir build/install/bin
 
 Clearly, many options to play around with! To learn more about setup-mongot-repro-env command line options, use
 
 ######
 
-    db-contrib-tool setup-mongot-repro-env --help
+    bazel run db-contrib-tool -- setup-mongot-repro-env --help
 
 ## Compiling mongot from source
 
@@ -138,19 +130,19 @@ The general format of the command is:
 
 ######
 
-    db-contrib-tool setup-repro-env --variant <evergreen variant name> <evergreen patch id OR associated git commit hash>
+    bazel run db-contrib-tool -- setup-repro-env --variant <evergreen variant name> <evergreen patch id OR associated git commit hash>
 
 Specifically, to download from the `AL2023 x86 mongot integration tasks cron only` build variant, you could run:
 
 ######
 
-    db-contrib-tool setup-repro-env --variant amazon-linux-2023-x86-mongot-integration-cron-only 23b790a2a81767b8edbbc266043a205029867b74
+    bazel run db-contrib-tool -- setup-repro-env --variant amazon-linux-2023-x86-mongot-integration-cron-only 23b790a2a81767b8edbbc266043a205029867b74
 
 By default, the download will be placed in `build/multiversion_bin/<githash_patchid OR githash>/dist_test/`, but you can also specify a location via the `--installDir` option. For example:
 
 ######
 
-    db-contrib-tool setup-repro-env --variant amazon-linux2023-arm64-static-compile 23b790a2a81767b8edbbc266043a205029867b74 --installDir=build/multiversion_bin/my_variant
+    bazel run db-contrib-tool -- setup-repro-env --variant amazon-linux2023-arm64-static-compile 23b790a2a81767b8edbbc266043a205029867b74 --installDir=build/multiversion_bin/my_variant
 
 Will place the mongot binary in `build/multiversion_bin/my_variant/23b790a2a81767b8edbbc266043a205029867b74/dist_test/bin/mongot-localdev`
 
