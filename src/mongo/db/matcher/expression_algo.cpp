@@ -917,27 +917,6 @@ bool hasPredicateOnPaths(const MatchExpression& expr,
     return hasPredicateOnPathsHelper(expr, searchType, paths, boost::none /* parentPath */);
 }
 
-bool containsLargeInList(const MatchExpression& expr, size_t maxInListSize) {
-    struct Visitor : public SelectiveMatchExpressionVisitorBase<true> {
-        using SelectiveMatchExpressionVisitorBase<true>::visit;
-        size_t maxSize;
-        bool found = false;
-
-        explicit Visitor(size_t maxSize) : maxSize(maxSize) {}
-
-        void visit(const InMatchExpression* expr) final {
-            if (expr->getEqualities().size() > maxSize) {
-                found = true;
-            }
-        }
-    };
-
-    Visitor visitor(maxInListSize);
-    MatchExpressionWalker walker(&visitor, nullptr, nullptr);
-    tree_walker::walk<true, MatchExpression>(&expr, &walker);
-    return visitor.found;
-}
-
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
     // lhs is the query and rhs is the index.
     tassert(11052402, "lhs must not be null", lhs);
@@ -1254,7 +1233,6 @@ bool containsEmptyPaths(const OrderedPathSet& testSet) {
         return false;
     });
 }
-
 
 bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSet2) {
     return !containsDependency(pathSet1, pathSet2) && !containsDependency(pathSet2, pathSet1);
