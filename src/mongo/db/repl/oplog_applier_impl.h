@@ -153,8 +153,8 @@ protected:
      */
     MONGO_MOD_FILE_PRIVATE virtual Status applyOplogBatchPerWorker(
         OperationContext* opCtx,
-        std::vector<ApplierOperation>* ops,
-        WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+        std::vector<ApplierOperation>& ops,
+        WorkerMultikeyPathInfo& workerMultikeyPathInfo,
         bool isDataConsistent);
 };
 

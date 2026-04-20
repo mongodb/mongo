@@ -60,7 +60,7 @@ public:
         OperationContext*, const OplogEntryOrGroupedInserts&, OplogApplication::Mode, bool)>
         ApplyFunc;
 
-    InsertGroup(std::vector<ApplierOperation>* ops,
+    InsertGroup(std::vector<ApplierOperation>& ops,
                 OperationContext* opCtx,
                 Mode mode,
                 bool isDataConsistent,

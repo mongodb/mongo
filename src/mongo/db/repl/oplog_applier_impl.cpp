@@ -735,17 +735,19 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             std::vector<Status> statusVector(nWorkers, Status::OK());
             // Doles out all the work to the writer pool threads. writerVectors is not modified,
             // but applyOplogBatchPerWorker will modify the vectors that it contains.
-            invariant(writerVectors.size() == statusVector.size());
             for (size_t i = 0; i < writerVectors.size(); i++) {
                 if (writerVectors[i].empty()) {
                     continue;
                 }
 
+                invariant(writerVectors.size() == statusVector.size() &&
+                          statusVector.size() == multikeyVector.size());
+
                 _workerPool->schedule([this,
                                        scheduled = Date_t::now(),
-                                       &writer = writerVectors.at(i),
-                                       &status = statusVector.at(i),
-                                       &multikeyVector = multikeyVector.at(i),
+                                       &writer = writerVectors[i],
+                                       &status = statusVector[i],
+                                       &multikeyVector = multikeyVector[i],
                                        isDataConsistent = isDataConsistent](Status scheduleStatus) {
                     const auto dispatched = Date_t::now();
                     const auto dispatchLatency = dispatched - scheduled;
@@ -765,7 +767,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
                     status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
                         return applyOplogBatchPerWorker(
-                            opCtx.get(), &writer, &multikeyVector, isDataConsistent);
+                            opCtx.get(), writer, multikeyVector, isDataConsistent);
                     });
 
                     const auto completed = Date_t::now();
@@ -1149,8 +1151,8 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
 }
 
 Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
-                                                  std::vector<ApplierOperation>* ops,
-                                                  WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                                                  std::vector<ApplierOperation>& ops,
+                                                  WorkerMultikeyPathInfo& workerMultikeyPathInfo,
                                                   const bool isDataConsistent) {
     // Applying an Oplog batch is crucial to the stability of the Replica Set. We
     // mark it as having Immediate priority so that it skips waiting for ticket
@@ -1177,10 +1179,10 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
     }
 
     invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
-    invariant(workerMultikeyPathInfo->empty());
+    invariant(workerMultikeyPathInfo.empty());
     auto newPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo();
     if (!newPaths.empty()) {
-        workerMultikeyPathInfo->swap(newPaths);
+        std::swap(workerMultikeyPathInfo, newPaths);
     }
 
     return Status::OK();

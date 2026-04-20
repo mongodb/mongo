@@ -257,7 +257,7 @@ uint32_t OplogApplierUtils::addToWriterVector(
     return addToWriterVectorImpl(writerId, writerVectors, op);
 }
 
-void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* ops) {
+void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>& ops) {
     auto nssComparator = [](const ApplierOperation& l, const ApplierOperation& r) {
         if (l->getNss().isCommand()) {
             if (r->getNss().isCommand())
@@ -274,11 +274,11 @@ void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* ops
 
     // Walk through the vector, if a prepared transaction command is encountered, sort
     // the ops between the previous prepared transaction command and the current one.
-    for (size_t start = 0, end = 0; end <= ops->size(); ++end) {
+    for (size_t start = 0, end = 0; end <= ops.size(); ++end) {
         // The end iterator acts as a dummy prepared transaction command, so we would
         // also sort the ops after the last real one encountered.
-        if (end == ops->size() || ops->at(end)->isPreparedTransactionCommand()) {
-            std::stable_sort(ops->begin() + start, ops->begin() + end, nssComparator);
+        if (end == ops.size() || ops.at(end)->isPreparedTransactionCommand()) {
+            std::stable_sort(ops.begin() + start, ops.begin() + end, nssComparator);
             start = end + 1;
         }
     }
@@ -683,7 +683,7 @@ StatusWith<std::vector<ApplierOperation>::const_iterator> groupAndApplyContainer
 
 Status OplogApplierUtils::applyOplogBatchCommon(
     OperationContext* opCtx,
-    std::vector<ApplierOperation>* ops,
+    std::vector<ApplierOperation>& ops,
     OplogApplication::Mode oplogApplicationMode,
     bool allowNamespaceNotFoundErrorsOnCrudOps,
     const bool isDataConsistent,
@@ -700,7 +700,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
         ops, opCtx, oplogApplicationMode, isDataConsistent, applyOplogEntryOrGroupedInserts);
 
     const bool inStableRecovery = oplogApplicationMode == OplogApplication::Mode::kStableRecovering;
-    for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
+    for (auto it = ops.cbegin(); it != ops.cend(); ++it) {
         const auto& op = *it;
 
         // If we are successful in grouping and applying inserts, advance the current iterator
@@ -713,7 +713,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
 
         if (op->isContainerOpType()) {
             auto result = groupAndApplyContainerOps(
-                opCtx, it, ops->cend(), oplogApplicationMode, incrementOpsAppliedStats);
+                opCtx, it, ops.cend(), oplogApplicationMode, incrementOpsAppliedStats);
             if (!result.isOK()) {
                 LOGV2_FATAL_CONTINUE(12337303,
                                      "Error applying grouped container operations",

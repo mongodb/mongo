@@ -107,7 +107,7 @@ public:
      *     update(ns1, docB),                        delete(ns2, docA),    -
      * ]                                         ]
      */
-    static void stableSortByNamespace(std::vector<ApplierOperation>* ops);
+    static void stableSortByNamespace(std::vector<ApplierOperation>& ops);
 
     /**
      * Adds a single oplog entry to the appropriate writer vector. Returns the index of the
@@ -248,7 +248,7 @@ public:
      */
     static Status applyOplogBatchCommon(
         OperationContext* opCtx,
-        std::vector<ApplierOperation>* ops,
+        std::vector<ApplierOperation>& ops,
         OplogApplication::Mode oplogApplicationMode,
         bool allowNamespaceNotFoundErrorsOnCrudOps,
         bool isDataConsistent,

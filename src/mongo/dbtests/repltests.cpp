@@ -312,7 +312,7 @@ protected:
                 }
                 uassertStatusOK(
                     OplogApplierUtils::applyOplogBatchCommon(&_opCtx,
-                                                             &ops,
+                                                             ops,
                                                              getOplogApplicationMode(),
                                                              true,
                                                              true,

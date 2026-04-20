@@ -60,13 +60,13 @@ constexpr auto kInsertGroupMaxOpCount = 64;
 
 }  // namespace
 
-InsertGroup::InsertGroup(std::vector<ApplierOperation>* ops,
+InsertGroup::InsertGroup(std::vector<ApplierOperation>& ops,
                          OperationContext* opCtx,
                          InsertGroup::Mode mode,
                          const bool isDataConsistent,
                          ApplyFunc applyOplogEntryOrGroupedInserts)
-    : _nextOpToGroup(ops->cbegin()),
-      _end(ops->cend()),
+    : _nextOpToGroup(ops.cbegin()),
+      _end(ops.cend()),
       _opCtx(opCtx),
       _mode(mode),
       _isDataConsistent(isDataConsistent),

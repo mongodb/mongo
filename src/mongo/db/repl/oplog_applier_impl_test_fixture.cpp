@@ -367,8 +367,7 @@ Status OplogApplierImplTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
     }
     WorkerMultikeyPathInfo pathInfo;
     const bool dataIsConsistent = true;
-    return oplogApplier.applyOplogBatchPerWorker(
-        _opCtx.get(), &opsPtrs, &pathInfo, dataIsConsistent);
+    return oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), opsPtrs, pathInfo, dataIsConsistent);
 }
 
 Status OplogApplierImplTest::runOpInitialSync(const OplogEntry& op) {

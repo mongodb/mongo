@@ -89,7 +89,7 @@ TEST(InsertGroupTest, SingleGroupedInserts) {
     buildOps(numOps, docId, nssV[0], ops);
     buildApplierOperationsFromOps(applyOps, ops);
     InsertGroup insertGroup(
-        &applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionOK);
+        applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionOK);
     int numGroups = 0;
 
     for (auto it = applyOps.cbegin(); it != applyOps.cend(); ++it, ++numGroups) {
@@ -117,7 +117,7 @@ TEST(InsertGroupTest, MultipleGroupedInserts) {
     buildApplierOperationsFromOps(applyOps, ops);
 
     InsertGroup insertGroup(
-        &applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionOK);
+        applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionOK);
     unsigned long numGroups = 0;
 
     for (auto it = applyOps.cbegin(); it != applyOps.cend(); ++it, ++numGroups) {
@@ -142,7 +142,7 @@ TEST(InsertGroupTest, NoGroupingApplyError) {
     buildApplierOperationsFromOps(applyOps, ops);
 
     InsertGroup insertGroup(
-        &applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionError);
+        applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionError);
     int numGroups = 0;
 
     for (auto it = applyOps.cbegin(); it != applyOps.cend(); ++it, ++numGroups) {
@@ -167,7 +167,7 @@ TEST(InsertGroupTest, NoGroupingCount) {
     buildApplierOperationsFromOps(applyOps, ops);
 
     InsertGroup insertGroup(
-        &applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionOK);
+        applyOps, nullptr, OplogApplication::Mode::kSecondary, true, testApplierFunctionOK);
     int numGroups = 0;
 
     for (auto it = applyOps.cbegin(); it != applyOps.cend(); ++it, ++numGroups) {
