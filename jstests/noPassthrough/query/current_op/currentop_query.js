@@ -331,17 +331,21 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
 
         confirmCurrentOpContents({
             test: function (db) {
-                assert.eq(
-                    db.currentop_query.findAndModify({
+                // Use runCommand instead of the shell helper to send "findAndModify"
+                // (camelCase) on the wire. The shell helper sends "findandmodify"
+                // (lowercase), but all drivers and mongosh use the camelCase form.
+                let result = assert.commandWorked(
+                    db.runCommand({
+                        findAndModify: "currentop_query",
                         query: {_id: 1, a: 1},
                         update: {$inc: {b: 1}},
                         collation: {locale: "fr"},
                         comment: "currentop_query",
                     }),
-                    {"_id": 1, "a": 1},
                 );
+                assert.eq(result.value, {"_id": 1, "a": 1});
             },
-            command: "findandmodify",
+            command: "findAndModify",
             planSummary: "IXSCAN { _id: 1 }",
             currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
         });
