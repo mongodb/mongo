@@ -134,6 +134,14 @@ public:
 
     static const StringDataSet allMetadataFieldNames;
 
+    static bool isMetadataFieldName(StringData fieldName) {
+        return fieldName.starts_with('$') && allMetadataFieldNames.contains(fieldName);
+    }
+
+    static bool isMetadataFieldName(HashedFieldName fieldName) {
+        return isMetadataFieldName(fieldName.key());
+    }
+
     /// Empty Document (does no allocation)
     Document() {}
 
@@ -329,6 +337,13 @@ public:
      * depth.
      */
     void toBson(BSONObjBuilder* builder, size_t recursionLevel = 1) const;
+
+    /**
+     * Like 'toBson()', but unconditionally strips fields whose names match internal metadata
+     * field names (e.g. $textScore, $sortKey). Used by toBsonWithMetaData() so that user fields
+     * don't collide with real metadata appended afterward.
+     */
+    void toBsonStrippingMetadata(BSONObjBuilder* builder) const;
 
     template <typename BSONTraits = BSONObj::DefaultSizeTrait>
     BSONObj toBson() const {
@@ -609,7 +624,7 @@ public:
      *         this can be used to increase memory allocation efficiency. There is
      *         no impact on correctness if this field over or under estimates.
      *
-     *  TODO: find some way to convey field-name sizes to make even more efficient
+     *  TODO SERVER-124117: find some way to convey field-name sizes to make even more efficient
      */
     MutableDocument() : _storageHolder(nullptr), _storage(_storageHolder) {}
     explicit MutableDocument(size_t expectedFields);
@@ -651,7 +666,7 @@ public:
      *
      *  It is an error to add a field that has the same name as another field.
      *
-     *  TODO: This is currently allowed but getField only gets first field.
+     *  TODO SERVER-124118: This is currently allowed but getField only gets first field.
      *        Decide what level of support is needed for duplicate fields.
      *        If duplicates are not allowed, consider removing this method.
      */
@@ -772,7 +787,7 @@ public:
      *  Call this to indicate that you are done with this Document and will
      *  not be making further changes from this MutableDocument.
      *
-     *  TODO: there are some optimizations that may make sense at freeze time.
+     *  TODO SERVER-124119: there are some optimizations that may make sense at freeze time.
      */
     Document freeze() {
         resetSnapshottedApproximateSize();

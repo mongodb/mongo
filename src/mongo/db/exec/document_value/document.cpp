@@ -145,8 +145,7 @@ bool DocumentStorageIterator::shouldSkipDeleted() {
 
         // If we strip the metadata see if a field name matches the known list. All metadata fields
         // start with '$' so optimize for a quick bailout.
-        if (_storage->bsonHasMetadata() && fieldName.starts_with('$') &&
-            Document::allMetadataFieldNames.contains(fieldName)) {
+        if (_storage->bsonHasMetadata() && Document::isMetadataFieldName(fieldName)) {
             return true;
         }
         // Check if the field is in the cache and if so then check if it has been deleted (i.e. the
@@ -211,6 +210,11 @@ template Position DocumentStorage::findFieldInCache<HashedFieldName>(HashedField
 
 template <typename T>
 Position DocumentStorage::findField(T field) const {
+    // Hide metadata-named fields so they are only accessible through the metadata API.
+    if (_bsonHasMetadata && Document::isMetadataFieldName(field)) {
+        return Position();
+    }
+
     if (auto pos = findFieldInCache(field); pos.found()) {
         return pos;
     }
@@ -603,8 +607,26 @@ constexpr StringData Document::metaFieldScore;
 constexpr StringData Document::metaFieldStream;
 constexpr StringData Document::metaFieldChangeStreamControlEvent;
 
+void Document::toBsonStrippingMetadata(BSONObjBuilder* builder) const {
+    // Only strips metadata-named fields at the top level, not in nested sub-objects.
+    constexpr size_t recursionLevel = 1;
+    for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+        if (auto cached = it.cachedValue()) {
+            if (isMetadataFieldName(cached->nameSD())) {
+                continue;
+            }
+            cached->val.addToBsonObj(builder, cached->nameSD(), recursionLevel);
+        } else {
+            if (isMetadataFieldName((*it.bsonIter()).fieldNameStringData())) {
+                continue;
+            }
+            builder->append(*it.bsonIter());
+        }
+    }
+}
+
 void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
-    toBson(builder);
+    toBsonStrippingMetadata(builder);
     toBsonWithMetaDataOnly(builder);
 }
 
