@@ -86,7 +86,7 @@ filters:
       - 10gen/query-execution
   - "query_tester_self_test.yml":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-correctness
   - "search*":
     approvers:
       - 10gen/query-integration-search
