@@ -53,6 +53,7 @@ mongo_cc_unit_test(
     srcs = [
         "//src/mongo/db/matcher:debug_string_test.cpp",
         "//src/mongo/db/matcher:doc_validation_error_json_schema_test.cpp",
+        "//src/mongo/db/matcher:doc_validation_error_redaction_test.cpp",
         "//src/mongo/db/matcher:doc_validation_error_test.cpp",
         "//src/mongo/db/matcher:expression_algo_test.cpp",
         "//src/mongo/db/matcher:expression_always_boolean_test.cpp",
