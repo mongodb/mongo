@@ -45,7 +45,6 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
@@ -1899,9 +1898,7 @@ TEST_F(BinaryJoinStageBuilderTest, IndexJoinWithCompoundPredicate) {
 
         auto rightScanNode = std::make_unique<FetchNode>(
             std::make_unique<IndexProbeNode>(
-                foreignCollectionName,
-                buildSimpleIndexEntry(indexKeyPattern,
-                                      DBClientBase::genIndexName(indexKeyPattern))),
+                foreignCollectionName, makeIndexEntry(foreignCollectionName, indexKeyPattern)),
             foreignCollectionName);
         auto solution = makeQuerySolution(
             std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(leftScanNode),

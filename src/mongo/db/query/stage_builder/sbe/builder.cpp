@@ -370,10 +370,12 @@ std::vector<const QuerySolutionNode*> getAllNodesByType(const QuerySolutionNode*
 
 std::unique_ptr<fts::FTSMatcher> makeFtsMatcher(OperationContext* opCtx,
                                                 const CollectionPtr& collection,
-                                                const std::string& indexName,
+                                                const IndexEntry& textIndex,
                                                 const fts::FTSQuery* ftsQuery) {
-    auto entry = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    tassert(5432210,
+    const auto& indexName = textIndex.identifier.catalogName;
+    auto entry = collection->getIndexCatalog()->findIndexByIdent(
+        opCtx, textIndex.indexCatalogEntryStorage->getIdent());
+    uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "index entry not found for index named '" << indexName
                           << "' in collection '" << collection->ns().toStringForErrorMsg() << "'",
             entry);
@@ -1129,7 +1131,11 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
 
     const auto& collection = getCollection(csn->nss);
     auto indexName = csn->index.identifier.catalogName;
-    const auto indexEntry = collection->getIndexCatalog()->findIndexByName(_state.opCtx, indexName);
+    const auto indexEntry = collection->getIndexCatalog()->findIndexByIdent(
+        _state.opCtx, csn->index.indexCatalogEntryStorage->getIdent());
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "failed to find index in catalog named: " << indexName,
+            indexEntry);
     const auto indexDescriptor = indexEntry->descriptor();
     auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
@@ -3130,8 +3136,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     tassert(5432217, "result slot is not produced by text match sub-plan", outputs.hasResultObj());
 
     // Create an FTS 'matcher' to apply 'ftsQuery' to matching documents.
-    auto matcher = makeFtsMatcher(
-        _opCtx, coll, textNode->index.identifier.catalogName, textNode->ftsQuery.get());
+    auto matcher = makeFtsMatcher(_opCtx, coll, textNode->index, textNode->ftsQuery.get());
 
     // Build an 'ftsMatch' expression to match against the result object using the 'matcher'
     // instance.

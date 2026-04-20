@@ -131,6 +131,12 @@ public:
 protected:
     void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj>& docs);
 
+    /**
+     * Returns an IndexEntry populated with the real IndexCatalogEntry shared_ptr so ident-based
+     * catalog lookups work in the stage builder.
+     */
+    IndexEntry makeIndexEntry(const NamespaceString& nss, BSONObj keyPattern);
+
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder");
 };
@@ -153,6 +159,11 @@ protected:
     void runTest(std::unique_ptr<QuerySolutionNode> root,
                  const mongo::BSONArray& expectedValue,
                  BuildPlanStageParam param = {});
+
+    IndexEntry makeIndexEntry(BSONObj keyPattern) {
+        ASSERT_TRUE(_collInitialized) << "collection must be initialized before looking up index";
+        return SbeStageBuilderTestFixture::makeIndexEntry(_nss, keyPattern);
+    }
 
     std::unique_ptr<unittest::GoldenTestContext> _gctx;
     bool _collInitialized = false;

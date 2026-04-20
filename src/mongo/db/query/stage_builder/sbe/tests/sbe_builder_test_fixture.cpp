@@ -151,6 +151,36 @@ void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONOb
     insertDocuments(_nss, docs);
 }
 
+IndexEntry SbeStageBuilderTestFixture::makeIndexEntry(const NamespaceString& nss,
+                                                      BSONObj keyPattern) {
+    auto acquisition =
+        acquireCollectionOrView(operationContext(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    operationContext(), nss, AcquisitionPrerequisites::kRead),
+                                MODE_IS);
+    const auto& collPtr = acquisition.getCollection().getCollectionPtr();
+    const auto indexName = DBClientBase::genIndexName(keyPattern);
+    for (auto&& ice :
+         collPtr->getIndexCatalog()->getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
+        if (ice->descriptor()->indexName() == indexName) {
+            return {keyPattern,
+                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                    IndexConfig::kLatestIndexVersion,
+                    false /* multiKey */,
+                    {{}, {}} /* multiKeyPaths */,
+                    {} /* multikeyPathSet */,
+                    false /* sp */,
+                    false /* unq */,
+                    CoreIndexInfo::Identifier(indexName),
+                    {} /* io */,
+                    nullptr /* wildcardProjection */,
+                    ice};
+        }
+    }
+    FAIL("Could not find index with keyPattern " + keyPattern.toString() + " in collection");
+    MONGO_UNREACHABLE;
+}
+
 void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode> root,
                                                const mongo::BSONArray& expectedValue,
                                                BuildPlanStageParam param) {

@@ -808,8 +808,9 @@ buildIndexSeekStage(StageBuilderState& state,
     const auto foreignCollUUID = foreignColl->uuid();
     const auto& foreignCollDbName = foreignColl->ns().dbName();
     const auto& indexName = index.identifier.catalogName;
-    const auto indexEntry = foreignColl->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
-    tassert(6447401,
+    const auto indexEntry = foreignColl->getIndexCatalog()->findIndexByIdent(
+        state.opCtx, index.indexCatalogEntryStorage->getIdent());
+    uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "Index " << indexName
                           << " is unexpectedly missing for $lookup index join",
             indexEntry);

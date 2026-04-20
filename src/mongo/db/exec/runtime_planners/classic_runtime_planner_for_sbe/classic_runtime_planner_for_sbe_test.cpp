@@ -175,6 +175,15 @@ protected:
         wunit.commit();
         ASSERT_EQ(indexesBefore + 1, indexCatalog->numIndexesReady());
 
+        std::shared_ptr<const IndexCatalogEntry> iceStorage;
+        for (auto&& ice : indexCatalog->getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
+            if (ice->descriptor()->indexName() == indexName) {
+                iceStorage = ice;
+                break;
+            }
+        }
+        ASSERT(iceStorage) << "Could not find index '" << indexName << "' in catalog";
+
         // The QueryPlannerParams should also have information about the index to consider it when
         // actually doing the planning.
         _indices.push_back(IndexEntry(index,
@@ -187,7 +196,8 @@ protected:
                                       false,
                                       IndexEntry::Identifier{indexName},
                                       BSONObj(),
-                                      nullptr));
+                                      nullptr /* wildcardProjection */,
+                                      std::move(iceStorage)));
     }
 
     BSONObj makeIndexSpec(BSONObj index, StringData indexName) {

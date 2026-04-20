@@ -124,9 +124,14 @@ public:
     }
 
     const IndexCatalogEntry* findIndexByIdent(OperationContext*,
-                                              StringData,
+                                              StringData ident,
                                               InclusionPolicy) const override {
-        MONGO_UNREACHABLE;
+        for (const auto& entry : _indexEntries) {
+            if (entry->getIdent() == ident) {
+                return entry.get();
+            }
+        }
+        return nullptr;
     }
 
     const IndexCatalogEntry* refreshEntry(OperationContext*,

@@ -864,8 +864,9 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& stat
 
     const auto& keyPattern = ixn->index.keyPattern;
     auto indexName = ixn->index.identifier.catalogName;
-    auto entry = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
-    tassert(5483200,
+    auto entry = collection->getIndexCatalog()->findIndexByIdent(
+        state.opCtx, ixn->index.indexCatalogEntryStorage->getIdent());
+    uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "failed to find index in catalog named: "
                           << ixn->index.identifier.catalogName,
             entry);
@@ -1028,8 +1029,9 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
     const auto& keyPattern = ixn->index.keyPattern;
     const bool forward = ixn->direction == 1;
     auto indexName = ixn->index.identifier.catalogName;
-    auto entry = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
-    tassert(6335101,
+    auto entry = collection->getIndexCatalog()->findIndexByIdent(
+        state.opCtx, ixn->index.indexCatalogEntryStorage->getIdent());
+    uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "failed to find index in catalog named: "
                           << ixn->index.identifier.catalogName,
             entry);

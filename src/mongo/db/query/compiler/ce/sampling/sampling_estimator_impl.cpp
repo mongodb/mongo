@@ -57,6 +57,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #include <cmath>
 
@@ -68,6 +69,8 @@ namespace mongo::ce {
 
 using CardinalityType = mongo::cost_based_ranker::CardinalityType;
 using EstimationSource = mongo::cost_based_ranker::EstimationSource;
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeCBRSamplingGenerateSample);
 
 namespace {
 
@@ -525,13 +528,15 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
         validateTopLevelSampleFieldNames(*topLevelSampleFieldNames);
         _topLevelSampleFieldNames = *topLevelSampleFieldNames;
     }
+
+    // Test hook: pause here so tests can arm setYieldAllLocksHang after any multiplanning
+    // trial phase is done, ensuring the yield fires inside the sampling executor.
+    hangBeforeCBRSamplingGenerateSample.pauseWhileSet(_opCtx);
+
     if (internalQuerySamplingBySequentialScan.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
         generateSampleBySeqScanningForTesting();
-        return;
-    }
-
-    if (_sampleSize >= _collectionCard.cardinality().v()) {
+    } else if (_sampleSize >= _collectionCard.cardinality().v()) {
         // If the required sample is larger than the collection, the sample is generated from all
         // the documents on the collection.
         generateFullCollScanSample();
