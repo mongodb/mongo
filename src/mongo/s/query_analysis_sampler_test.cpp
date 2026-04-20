@@ -438,8 +438,9 @@ public:
         auto runner = makePeriodicRunner(getServiceContext());
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
-        // Reset the counters since each test assumes that the count starts at 0.
-        globalOpCounters().resetForTest();
+        // Inject _localOpCounters so each test reads from a counter that starts at zero,
+        // independent of any global counter activity elsewhere in the process.
+        QueryAnalysisSampler::get(operationContext()).setOpCountersForTest(_localOpCounters);
     }
 
     void tearDown() override {
@@ -500,7 +501,7 @@ protected:
     void setUpConfigurations(
         QueryAnalysisSampler* sampler,
         const std::vector<CollectionQueryAnalyzerConfiguration>& configurations) {
-        globalOpCounters().gotQuery();
+        _localOpCounters.gotQuery();
         sampler->refreshQueryStatsForTest();
 
         auto queryStats = sampler->getQueryStatsForTest();
@@ -517,6 +518,11 @@ protected:
         auto rateLimiters = sampler->getRateLimitersForTest();
         ASSERT_EQ(rateLimiters.size(), configurations.size());
     }
+
+    // An isolated OpCounters instance injected into the QueryAnalysisSampler for each test.
+    // Starting from zero and unaffected by global process activity, it lets tests assert on
+    // exact counter deltas without resetting or adjusting the process-wide globalOpCounters().
+    OpCounters _localOpCounters;
 
     const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 
@@ -569,7 +575,7 @@ protected:
     void testInsertsTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
         auto numInserts = 3;
-        globalOpCounters().gotInserts(numInserts);
+        _localOpCounters.gotInserts(numInserts);
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -581,7 +587,7 @@ protected:
 
     void testUpdatesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters().gotUpdate();
+        _localOpCounters.gotUpdate();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -593,7 +599,7 @@ protected:
 
     void testDeletesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters().gotDelete();
+        _localOpCounters.gotDelete();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -617,7 +623,7 @@ protected:
 
     void testQueriesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters().gotQuery();
+        _localOpCounters.gotQuery();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -629,7 +635,7 @@ protected:
 
     void testCommandsTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters().gotCommand();
+        _localOpCounters.gotCommand();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -677,7 +683,7 @@ protected:
 
     void testNestedAggregates(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        globalOpCounters().gotNestedAggregate();
+        _localOpCounters.gotNestedAggregate();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -903,9 +909,8 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     ASSERT_EQ(it1->second.getSamplesPerSecond(), refreshedConfigurations1[1].getSamplesPerSecond());
 
     // The per-second counts after: [0, 2].
-    std::cout << "XXX role " << toString(operationContext()->getService()->role()) << std::endl;
-    globalOpCounters().gotUpdate();
-    globalOpCounters().gotDelete();
+    _localOpCounters.gotUpdate();
+    _localOpCounters.gotDelete();
     sampler.refreshQueryStatsForTest();
 
     auto queryStats2 = sampler.getQueryStatsForTest();
@@ -937,7 +942,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     ASSERT_EQ(it->second.getSamplesPerSecond(), refreshedConfigurations2[0].getSamplesPerSecond());
 
     // The per-second counts after: [0, 2, 5].
-    globalOpCounters().gotQuery();
+    _localOpCounters.gotQuery();
     sampler.gotCommand("findandmodify");
     sampler.gotCommand("aggregate");
     sampler.gotCommand("count");

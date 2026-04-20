@@ -408,10 +408,18 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
     }
 }
 
-void ClusterCommandTestFixture::testOpcountersAreCorrect(BSONObj cmd, BSONObj expectedMetrics) {
-    globalOpCounters().resetForTest();
+void ClusterCommandTestFixture::testOpcountersAreCorrect(BSONObj cmd,
+                                                         BSONObj expectedMetricDeltas) {
+    auto opsBefore = globalOpCounters().getObj();
     testNoErrors(cmd);
-    ASSERT_BSONOBJ_EQ(globalOpCounters().getObj(), expectedMetrics);
+    auto opsAfter = globalOpCounters().getObj();
+
+    BSONObjBuilder delta;
+    for (auto&& elem : expectedMetricDeltas) {
+        auto key = elem.fieldNameStringData();
+        delta.append(key, opsAfter[key].numberLong() - opsBefore[key].numberLong());
+    }
+    ASSERT_BSONOBJ_EQ(delta.obj(), expectedMetricDeltas);
 }
 
 void ClusterCommandTestFixture::appendTxnResponseMetadata(BSONObjBuilder& bob) {

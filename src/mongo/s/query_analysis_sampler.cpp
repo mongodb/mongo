@@ -224,25 +224,28 @@ double QueryAnalysisSampler::QueryStats::_calculateExponentialMovingAverage(
     return (1 - smoothingFactor) * prevAvg + smoothingFactor * newVal;
 }
 
+QueryAnalysisSampler::QueryStats::QueryStats() : _opCounters(&globalOpCounters()) {}
+
+
 void QueryAnalysisSampler::QueryStats::refreshTotalCount() {
     const auto& thisNodesClusterRole = serverGlobalParams.clusterRole;
     long long newTotalCount = [&] {
         if (thisNodesClusterRole.hasExclusively(ClusterRole::RouterServer) ||
             thisNodesClusterRole.has(ClusterRole::None)) {
             // This node represents the 'front door' for queries entering the cluster.
-            return globalOpCounters().getUpdate()->load() +  //
-                globalOpCounters().getDelete()->load() +     //
-                globalOpCounters().getQuery()->load() +      //
-                _lastFindAndModifyQueriesCount +             //
-                _lastAggregateQueriesCount +                 //
-                _lastCountQueriesCount +                     //
+            return _opCounters->getUpdate()->load() +  //
+                _opCounters->getDelete()->load() +     //
+                _opCounters->getQuery()->load() +      //
+                _lastFindAndModifyQueriesCount +       //
+                _lastAggregateQueriesCount +           //
+                _lastCountQueriesCount +               //
                 _lastDistinctQueriesCount;
         } else if (thisNodesClusterRole.has(ClusterRole::ShardServer)) {
             // This node captures mostly internal traffic, which has already been routed and
             // performed shard targeting and the like. However, for queries in sub-pipelines, this
             // shard may still act as a router and need to perform nested shard targeting. So we
             // count these operations.
-            return globalOpCounters().getNestedAggregate()->load();
+            return _opCounters->getNestedAggregate()->load();
         }
         MONGO_UNREACHABLE;
     }();

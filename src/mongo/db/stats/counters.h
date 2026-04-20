@@ -167,15 +167,7 @@ public:
         return &*_recordIdsReplicatedDocIdMismatch;
     }
 
-    // Reset all counters. To used for testing purposes only.
-    void resetForTest() {
-        _reset();
-    }
-
 private:
-    // Reset all counters.
-    void _reset();
-
     CacheExclusive<AtomicWord<long long>> _insert;
     CacheExclusive<AtomicWord<long long>> _query;
     CacheExclusive<AtomicWord<long long>> _update;

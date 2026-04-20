@@ -128,9 +128,9 @@ protected:
     void testIncludeQueryStatsMetrics(BSONObj cmd, bool isTargeted);
 
     /**
-     * Verifies that the opcounters match the expected values after a command is run.
+     * Verifies that the opcounters change by the given delta values after a command is run.
      */
-    void testOpcountersAreCorrect(BSONObj cmd, BSONObj expectedMetrics);
+    void testOpcountersAreCorrect(BSONObj cmd, BSONObj expectedMetricDeltas);
 
     /**
      * Appends the metadata shards return on responses to transaction statements, such as the

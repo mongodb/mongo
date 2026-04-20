@@ -49,6 +49,11 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+// Forward declaration: QueryStats reads operation counts from an OpCounters instance rather than
+// calling globalOpCounters() directly, so that tests can inject a private OpCounters instance.
+class OpCounters;
+
 namespace analyze_shard_key {
 
 /**
@@ -77,12 +82,24 @@ public:
      * average is recalculated every second when the total number of queries is refreshed.
      */
     struct QueryStats {
-        QueryStats() = default;
+        /**
+         * Constructs a QueryStats that reads operation counts from the process-wide
+         * globalOpCounters(). This is the production constructor.
+         */
+        QueryStats();
 
         /**
          * If the command is an aggregate, count or distinct command, increment its count.
          */
         void gotCommand(StringData cmdName);
+
+        /**
+         * Replaces the OpCounters source. Intended for tests that need an isolated counter source
+         * that is unaffected by other activity in the process.
+         */
+        void setOpCountersForTest(OpCounters& opCounters) {
+            _opCounters = &opCounters;
+        }
 
         long long getLastTotalCount() const {
             return _lastTotalCount;
@@ -109,6 +126,12 @@ public:
 
         long long _lastTotalCount = 0;
         boost::optional<double> _lastAvgCount;
+
+        // Non-owning pointer to the source of operation counts. In production this always points
+        // to globalOpCounters(). Tests may supply their own OpCounters instance via
+        // setOpCountersForTest() so that each test starts with a clean counter state without
+        // touching the process-wide global.
+        OpCounters* _opCounters;
     };
 
     /**
@@ -225,6 +248,20 @@ public:
 
     void refreshQueryStatsForTest() {
         _refreshQueryStats();
+    }
+
+    /**
+     * Replaces the OpCounters source used by QueryStats with the given instance. Intended for
+     * tests that need an isolated counter source that is unaffected by other activity in the
+     * process.
+     *
+     * Note: ideally this would be supplied at construction time, but QueryAnalysisSampler is a
+     * ServiceContext decoration and is therefore default-constructed by the framework with no
+     * opportunity to pass arguments. A post-construction setter is the least-bad alternative.
+     */
+    void setOpCountersForTest(OpCounters& opCounters) {
+        stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
+        _queryStats.setOpCountersForTest(opCounters);
     }
 
     QueryStats getQueryStatsForTest() const {
