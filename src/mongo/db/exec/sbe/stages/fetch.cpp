@@ -207,6 +207,7 @@ void FetchStage::open(bool reOpen) {
         _cursor = _coll.getPtr()->getCursor(_opCtx, true /* forward */);
     }
     _children[0]->open(reOpen);
+    _childOpened = true;
     _recordIdAccessor.reset(
         false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_seekRid));
 
@@ -290,7 +291,10 @@ PlanState FetchStage::getNext() {
 void FetchStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
-    _children[0]->close();
+    if (_childOpened) {
+        _children[0]->close();
+        _childOpened = false;
+    }
     _cursor.reset();
     _coll.reset();
 }

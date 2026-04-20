@@ -104,5 +104,6 @@ private:
 
     int64_t _index{0};
     bool _inArray{false};
+    bool _childOpened{false};
 };
 }  // namespace mongo::sbe

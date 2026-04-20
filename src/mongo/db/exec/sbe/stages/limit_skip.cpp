@@ -85,6 +85,7 @@ void LimitSkipStage::open(bool reOpen) {
     _commonStats.opens++;
     _commonStats.isEOF = false;
     _children[0]->open(reOpen);
+    _childOpened = true;
 
     _limit = _runLimitOrSkipCode(_limitCode.get());
     _skip = _runLimitOrSkipCode(_skipCode.get());
@@ -113,7 +114,10 @@ void LimitSkipStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _children[0]->close();
+    if (_childOpened) {
+        _children[0]->close();
+        _childOpened = false;
+    }
 }
 
 std::unique_ptr<PlanStageStats> LimitSkipStage::getStats(bool includeDebugInfo) const {

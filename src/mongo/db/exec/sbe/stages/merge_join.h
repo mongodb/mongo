@@ -143,6 +143,8 @@ private:
     const value::MaterializedRowEq _rowEq;
     const value::MaterializedRowLess _rowLt;
 
+    bool _childrenOpened{false};
+
     // For when need to EOF earlier after exhausting all of the rows from the outer side.
     bool _isOuterDone{false};
 };

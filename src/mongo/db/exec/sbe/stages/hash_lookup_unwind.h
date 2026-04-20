@@ -175,6 +175,7 @@ private:
 
     // LookupHashTable instance holding the inner collection.
     LookupHashTable _hashTable;
+    bool _outerOpened{false};
     // Tracks whether we are already processing an outer key.
     bool _outerKeyOpen{false};
 

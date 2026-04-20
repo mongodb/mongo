@@ -202,6 +202,7 @@ void HashLookupStage::open(bool reOpen) {
 
     innerChild()->close();
     outerChild()->open(reOpen);
+    _outerOpened = true;
 }  // HashLookupStage::open
 
 template <typename Container>
@@ -235,7 +236,10 @@ PlanState HashLookupStage::getNext() {
 void HashLookupStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
-    outerChild()->close();
+    if (_outerOpened) {
+        outerChild()->close();
+        _outerOpened = false;
+    }
     reset(true /* fromClose */);
 }
 

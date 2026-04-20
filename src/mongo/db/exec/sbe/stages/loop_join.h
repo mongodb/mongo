@@ -153,6 +153,7 @@ private:
 
     const JoinType _joinType;
 
+    bool _outerOpened{false};
     bool _reOpenInner{false};
     bool _outerGetNext{false};
 

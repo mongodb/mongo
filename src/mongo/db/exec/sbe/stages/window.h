@@ -400,6 +400,7 @@ private:
     // every document.
     long long _failPointSpillCounter{0};
 
+    bool _childOpened{false};
     WindowStats _specificStats;
 };
 

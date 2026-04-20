@@ -106,6 +106,7 @@ void BlockToRowStage::open(bool reOpen) {
 
     _commonStats.opens++;
     _children[0]->open(reOpen);
+    _childOpened = true;
 }
 
 PlanState BlockToRowStage::getNextFromDeblockedValues() {
@@ -227,7 +228,10 @@ void BlockToRowStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _children[0]->close();
+    if (_childOpened) {
+        _children[0]->close();
+        _childOpened = false;
+    }
 }
 
 void BlockToRowStage::doSaveState() {

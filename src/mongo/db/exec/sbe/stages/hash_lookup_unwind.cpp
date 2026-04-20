@@ -192,6 +192,7 @@ void HashLookupUnwindStage::open(bool reOpen) {
 
     innerChild()->close();
     outerChild()->open(reOpen);
+    _outerOpened = true;
 }  // HashLookupUnwindStage::open
 
 PlanState HashLookupUnwindStage::getNext() {
@@ -238,7 +239,10 @@ PlanState HashLookupUnwindStage::getNext() {
 void HashLookupUnwindStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
-    outerChild()->close();
+    if (_outerOpened) {
+        outerChild()->close();
+        _outerOpened = false;
+    }
     reset(true /* fromClose */);
 }
 

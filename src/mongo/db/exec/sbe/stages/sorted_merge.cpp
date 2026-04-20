@@ -144,6 +144,7 @@ void SortedMergeStage::open(bool reOpen) {
         auto& child = _children[i];
         child->open(reOpen);
     }
+    _childrenOpened = true;
     _merger->init();
 }
 
@@ -153,8 +154,11 @@ PlanState SortedMergeStage::getNext() {
 
 void SortedMergeStage::close() {
     trackClose();
-    for (auto& child : _children) {
-        child->close();
+    if (_childrenOpened) {
+        for (auto& child : _children) {
+            child->close();
+        }
+        _childrenOpened = false;
     }
 
     _merger->clear();

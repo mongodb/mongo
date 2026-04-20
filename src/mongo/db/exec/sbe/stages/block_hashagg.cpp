@@ -650,6 +650,7 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenize
 void BlockHashAggStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
     _children[0]->open(reOpen);
+    _childOpened = true;
     _commonStats.opens++;
 
     _ht.emplace();
@@ -1002,7 +1003,10 @@ void BlockHashAggStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _children[0]->close();
+    if (_childOpened) {
+        _children[0]->close();
+        _childOpened = false;
+    }
 
     _ht = boost::none;
     if (_recordStore && _opCtx) {
@@ -1019,8 +1023,6 @@ void BlockHashAggStage::close() {
     _bitmapBlock = nullptr;
     _tokenInfos.clear();
     _monoBlocks.clear();
-
-    _children[0]->close();
 
     _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
     _memoryTracker.value().set(0);

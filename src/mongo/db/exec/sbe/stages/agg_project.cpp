@@ -98,6 +98,7 @@ void AggProjectStage::open(bool reOpen) {
 
     _commonStats.opens++;
     _children[0]->open(reOpen);
+    _childOpened = true;
 }
 
 PlanState AggProjectStage::getNext() {
@@ -119,7 +120,10 @@ void AggProjectStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _children[0]->close();
+    if (_childOpened) {
+        _children[0]->close();
+        _childOpened = false;
+    }
 }
 
 std::unique_ptr<PlanStageStats> AggProjectStage::getStats(bool includeDebugInfo) const {

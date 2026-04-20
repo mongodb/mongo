@@ -142,6 +142,7 @@ void LoopJoinStage::open(bool reOpen) {
 
     _commonStats.opens++;
     _children[0]->open(reOpen);
+    _outerOpened = true;
     _outerGetNext = true;
     // Do not open the inner child as we do not have values of correlated parameters yet.
     // The values are available only after we call getNext on the outer side.
@@ -211,7 +212,10 @@ void LoopJoinStage::close() {
         ++_specificStats.innerCloses;
     }
 
-    _children[0]->close();
+    if (_outerOpened) {
+        _children[0]->close();
+        _outerOpened = false;
+    }
 }
 
 void LoopJoinStage::doSaveState() {

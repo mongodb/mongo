@@ -105,6 +105,8 @@ private:
     value::SlotAccessor* _bitmapAccessor = nullptr;
     std::vector<value::ViewOfValueAccessor> _valsOutAccessors;
 
+    bool _childOpened{false};
+
     // Keeps track of the current reading index of the blocks.
     size_t _curIdx = 0;
 };

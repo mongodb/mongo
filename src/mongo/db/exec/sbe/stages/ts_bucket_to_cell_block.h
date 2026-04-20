@@ -101,6 +101,8 @@ private:
 
     std::vector<std::unique_ptr<value::TsBlock>> _tsBlockStorage;
 
+    bool _childOpened{false};
+
     TsBucketToBlockStats _specificStats;
 };
 }  // namespace mongo::sbe

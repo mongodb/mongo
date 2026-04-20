@@ -186,6 +186,7 @@ void MergeJoinStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
     _children[1]->open(reOpen);
+    _childrenOpened = true;
 
     // Start with an initially empty buffer.
     _outerProjectsBuffer.clear();
@@ -324,8 +325,11 @@ void MergeJoinStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _children[0]->close();
-    _children[1]->close();
+    if (_childrenOpened) {
+        _children[0]->close();
+        _children[1]->close();
+        _childrenOpened = false;
+    }
     _outerProjectsBuffer.clear();
 }
 

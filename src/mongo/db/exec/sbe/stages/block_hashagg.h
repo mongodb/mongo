@@ -267,6 +267,7 @@ private:
     vm::ByteCode _bytecode;
     bool _compiled = false;
 
+    bool _childOpened{false};
     bool _done = false;
 
     // Partial aggregates that have been spilled and restored are passed into the bytecode in

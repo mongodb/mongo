@@ -102,6 +102,7 @@ private:
                         value::MaterializedRowEq>
         _seen;
     size_t _prevSeenSizeBytes = 0;
+    bool _childOpened{false};
     UniqueStats _specificStats;
 
     DeduplicatorReporter _dedupReporter;
@@ -151,6 +152,7 @@ private:
     HashRoaringSet _seen;
     size_t _prevSeenSizeBytes = 0;
 
+    bool _childOpened{false};
     UniqueStats _specificStats;
 
     DeduplicatorReporter _dedupReporter;

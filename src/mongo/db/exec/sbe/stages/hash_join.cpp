@@ -174,6 +174,7 @@ void HashJoinStage::open(bool reOpen) {
 
     innerChild()->close();
     outerChild()->open(reOpen);
+    _outerOpened = true;
 
     _joinPhase = JoinPhase::kProbing;  // Set initial phase
     _cursor.reset();
@@ -245,7 +246,10 @@ void HashJoinStage::close() {
     }
 
     trackClose();
-    outerChild()->close();
+    if (_outerOpened) {
+        outerChild()->close();
+        _outerOpened = false;
+    }
 }
 
 std::unique_ptr<PlanStageStats> HashJoinStage::getStats(bool includeDebugInfo) const {

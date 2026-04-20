@@ -169,6 +169,7 @@ void AndHashStage::open(bool reOpen) {
     _children[0]->close();
 
     _children[1]->open(reOpen);
+    _innerOpened = true;
 
     _htIt = _ht->end();
     _htItEnd = _ht->end();
@@ -212,7 +213,10 @@ void AndHashStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _children[1]->close();
+    if (_innerOpened) {
+        _children[1]->close();
+        _innerOpened = false;
+    }
     _ht = boost::none;
 }
 

@@ -201,6 +201,7 @@ private:
     value::SlotAccessor* _root{nullptr};
 
     bool _compiled{false};
+    bool _childOpened{false};
 };
 
 using MakeObjStage = MakeObjStageBase<MakeObjOutputType::Object>;

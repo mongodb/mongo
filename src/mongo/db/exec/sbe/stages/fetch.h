@@ -166,6 +166,7 @@ private:
     // Used for index key corruption checks.
     StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
 
+    bool _childOpened{false};
     FetchStats _specificStats;
 };
 }  // namespace sbe

@@ -191,6 +191,7 @@ private:
 
     // LookupHashTable instance holding the inner collection.
     LookupHashTable _hashTable;
+    bool _outerOpened{false};
 
     void doForceSpill() final {
         _hashTable.forceSpill();

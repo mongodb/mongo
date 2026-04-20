@@ -104,6 +104,7 @@ private:
     boost::optional<int64_t> _limit;
     boost::optional<int64_t> _skip;
     int64_t _current;
+    bool _childOpened{false};
     LimitSkipStats _specificStats;
 };
 }  // namespace mongo::sbe
