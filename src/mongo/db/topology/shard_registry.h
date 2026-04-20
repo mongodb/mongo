@@ -76,19 +76,22 @@ MONGO_MOD_PRIVATE extern Counter64& blockedOpsGauge;
 class MONGO_MOD_PRIVATE ShardRegistryData {
 public:
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
+    using ShardIdToConnectionStringMap =
+        stdx::unordered_map<ShardId, ConnectionString, ShardId::Hasher>;
 
     /**
      * Creates a basic ShardRegistryData, that only contains the config shard.  Needed during
      * initialization, when the config servers are contacted for the first time (ie. the first time
-     * createFromCatalogClient() is called).
+     * the catalog client is queried for shards).
      */
     static ShardRegistryData createWithConfigShardOnly(std::shared_ptr<Shard> configShard);
 
     /**
-     * Reads shards docs from the catalog client and fills in maps.
+     * Builds a ShardRegistryData from a map of shardId -> connectionString.
+     * Creates Shard instances (and their RSMs) for each entry.
      */
-    static std::pair<ShardRegistryData, Timestamp> createFromCatalogClient(
-        OperationContext* opCtx, ShardFactory* shardFactory);
+    static ShardRegistryData buildFromShardDocs(const ShardIdToConnectionStringMap& shardDocs,
+                                                ShardFactory* shardFactory);
 
     /**
      * Merges alreadyCachedData and configServerData into a new ShardRegistryData.
@@ -97,16 +100,12 @@ public:
      * string based lookups, any values from alreadyCachedData will take precedence over those from
      * configServerData.
      *
-     * Returns the merged data, as well as the shards that have been removed (ie. that are present
-     * in alreadyCachedData but not configServerData) as a mapping from ShardId to
-     * std::shared_ptr<Shard>.
-     *
      * Called when reloading the shard registry. It is important to merge _hostLookup because
      * reloading the shard registry can interleave with updates to the shard registry passed by the
      * RSM.
      */
-    static std::pair<ShardRegistryData, ShardMap> mergeExisting(
-        const ShardRegistryData& alreadyCachedData, const ShardRegistryData& configServerData);
+    static ShardRegistryData mergeExisting(const ShardRegistryData& alreadyCachedData,
+                                           const ShardRegistryData& configServerData);
 
     /**
      * Create a duplicate of existingData, but additionally updates the shard for newConnString.
@@ -153,6 +152,8 @@ public:
     BSONObj toBSON() const;
 
 private:
+    friend class ShardRegistryTest;
+
     /**
      * Returns the shard with the given shard id, or nullptr if no such shard.
      */
@@ -452,7 +453,10 @@ private:
          * Create a Time which will cause merging of force reload requests that have been made
          * before 'lookupFn' is evaluated, and contain the topologyTime returned by 'lookupFn'.
          */
-        static Time makeWithLookup(std::function<Timestamp(void)>&& lookupFn);
+        using LookupFn =
+            std::function<std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Timestamp>()>;
+        static std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Time> makeWithLookup(
+            LookupFn&& lookupFn);
 
         /**
          * Get the topologyTime component.
@@ -554,6 +558,14 @@ private:
     std::vector<LatestConnStrings::value_type> _getLatestConnStrings() const;
 
     void _removeReplicaSet(const std::string& setName);
+
+    /**
+     * Tears down RSMs and fires removal hooks for shards that are present in cachedData
+     * but absent from the fetched shardDocs.
+     */
+    void _tearDownRemovedShards(OperationContext* opCtx,
+                                const Cache::ValueHandle& cachedData,
+                                const ShardRegistryData::ShardIdToConnectionStringMap& shardDocs);
 
     void _initializeCacheIfNecessary() const;
 

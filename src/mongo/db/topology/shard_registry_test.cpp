@@ -182,7 +182,10 @@ protected:
     }
 
     auto makeTimeWithLookup(std::function<Timestamp(void)>&& lookupFn) {
-        return ShardRegistry::Time::makeWithLookup(std::move(lookupFn));
+        auto [_, time] = ShardRegistry::Time::makeWithLookup([fn = std::move(lookupFn)]() {
+            return std::pair{ShardRegistryData::ShardIdToConnectionStringMap{}, fn()};
+        });
+        return time;
     }
 
     const int kDummyPort{12345};
@@ -200,6 +203,16 @@ protected:
 
     size_t getLatestConnStringsSize() {
         return shardRegistry()->_latestConnStrings.size();
+    }
+
+    void setLatestConnString(const ConnectionString& cs) {
+        stdx::lock_guard lk(shardRegistry()->_mutex);
+        shardRegistry()->_latestConnStrings[cs.getSetName()] = cs;
+    }
+
+    bool hasLatestConnString(const std::string& rsName) {
+        stdx::lock_guard lk(shardRegistry()->_mutex);
+        return shardRegistry()->_latestConnStrings.count(rsName) > 0;
     }
 
     void clearForRecovery() {
@@ -549,6 +562,183 @@ TEST_F(ShardRegistryTest, toBSONWithShards) {
     ASSERT_TRUE(result.hasField("timeInStore"));
     std::string timeInStoreStr = result["timeInStore"].String();
     ASSERT_TRUE(timeInStoreStr.find("topologyTime") != std::string::npos);
+}
+
+// When a shard is removed from config.shards, the registry should drop the shard's
+// ID-based entry after a refresh.
+TEST_F(ShardRegistryTest, RemovedShardIsDroppedFromRegistry) {
+    addShard({"shard0"}, kAdvanceTopologyTime);
+    addShard({"extraShard"}, kAdvanceTopologyTime);
+
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    removeShard({"extraShard"}, kAdvanceTopologyTime);
+
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    auto data = getData();
+    ASSERT(data->findShard(ShardId("shard0")));
+    ASSERT(!data->findShard(ShardId("extraShard"))) << "Removed shard should not be in ID lookup";
+}
+
+// When a shard is removed from config.shards, _tearDownRemovedShards should erase its RS from
+// _latestConnStrings. This applies to both regular shards and the config shard (kConfigServerId).
+TEST_F(ShardRegistryTest, RemovedShardErasesLatestConnString) {
+    const auto extraConnString =
+        ConnectionString::forReplicaSet("extraShardRS", {HostAndPort("host1", kDummyPort)});
+    const auto configConnString =
+        ConnectionString::forReplicaSet("configRS", {HostAndPort("configHost", kDummyPort)});
+
+    addShard({"shard0"}, kAdvanceTopologyTime);
+    addShard(ShardType("extraShard_0", extraConnString.toString()), kAdvanceTopologyTime);
+    addShard(ShardType("config", configConnString.toString()), kAdvanceTopologyTime);
+
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    setLatestConnString(extraConnString);
+    setLatestConnString(configConnString);
+    ASSERT(hasLatestConnString("extraShardRS"));
+    ASSERT(hasLatestConnString("configRS"));
+
+    // Remove both extraShard_0 and config, keeping only shard0.
+    clearShards();
+    addShard({"shard0"}, kAdvanceTopologyTime);
+
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    auto data = getData();
+    ASSERT(data->findShard(ShardId("shard0")));
+    ASSERT(!data->findShard(ShardId("extraShard_0")));
+    ASSERT(!data->findByRSName("extraShardRS"));
+    ASSERT(!data->findShard(ShardId("config")));
+
+    ASSERT(!hasLatestConnString("extraShardRS"))
+        << "_latestConnStrings for regular shard RS should be erased";
+    ASSERT(!hasLatestConnString("configRS"))
+        << "_latestConnStrings for config shard RS should be erased";
+}
+
+// When a shard is removed and re-added with a different ID but the same RS name, the
+// remove-first-then-create pattern tears down the old RSM, then builds a fresh one for
+// the new shard. The registry should resolve the RS name to the new shard ID, and
+// operations through the registry should succeed (no HostUnreachable).
+TEST_F(ShardRegistryTest, ShardIdChangeWithSameRSNameRecreatesRSM) {
+    const auto sharedConnString =
+        ConnectionString::forReplicaSet("extraShardRS", {HostAndPort("host1", kDummyPort)});
+
+    // Load registry with shard0 + extraShard_0.
+    addShard({"shard0"}, kAdvanceTopologyTime);
+    addShard(ShardType("extraShard_0", sharedConnString.toString()), kAdvanceTopologyTime);
+
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    // Simulate that the RSM has reported a connection string for "extraShardRS".
+    setLatestConnString(sharedConnString);
+    ASSERT(hasLatestConnString("extraShardRS"));
+
+    // Config change: extraShard_0 removed, extraShard_1 added with the same RS name.
+    clearShards();
+    addShard({"shard0"}, kAdvanceTopologyTime);
+    addShard(ShardType("extraShard_1", sharedConnString.toString()), kAdvanceTopologyTime);
+
+    // Refresh the registry — stale RSM is removed first, then a fresh one is created.
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    auto data = getData();
+    ASSERT(!data->findShard(ShardId("extraShard_0")));
+
+    auto shard = data->findShard(ShardId("extraShard_1"));
+    ASSERT(shard) << "extraShard_1 should be in the registry";
+    ASSERT_EQ(shard->getConnString().getSetName(), "extraShardRS");
+
+    auto shardByRS = data->findByRSName("extraShardRS");
+    ASSERT(shardByRS) << "RS name 'extraShardRS' should still resolve to a live shard";
+    ASSERT_EQ(shardByRS->getId(), ShardId("extraShard_1"));
+
+    // The old _latestConnStrings entry was erased when the stale RSM was removed, which is
+    // correct — the fresh RSM will repopulate it when it reports back.
+    ASSERT(!hasLatestConnString("extraShardRS"))
+        << "_latestConnStrings should be cleared after RSM removal and recreation";
+}
+
+// Verifies that when a shard is removed and re-added with the same RS name but DIFFERENT hosts,
+// the registry picks up the new hosts — not the stale ones from _latestConnStrings.
+TEST_F(ShardRegistryTest, ShardIdChangeWithSameRSNameButDifferentHostsPicksUpNewHosts) {
+    const auto oldConnString =
+        ConnectionString::forReplicaSet("extraShardRS", {HostAndPort("oldHost", kDummyPort)});
+    const auto newConnString =
+        ConnectionString::forReplicaSet("extraShardRS", {HostAndPort("newHost", kDummyPort)});
+
+    addShard({"shard0"}, kAdvanceTopologyTime);
+    addShard(ShardType("extraShard_0", oldConnString.toString()), kAdvanceTopologyTime);
+
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    // Simulate that the RSM has reported the old connection string for "extraShardRS".
+    // This populates _latestConnStrings with the stale host set.
+    setLatestConnString(oldConnString);
+    ASSERT(hasLatestConnString("extraShardRS"));
+
+    // extraShard_0 removed, extraShard_1 added with same RS name but NEW hosts.
+    clearShards();
+    addShard({"shard0"}, kAdvanceTopologyTime);
+    addShard(ShardType("extraShard_1", newConnString.toString()), kAdvanceTopologyTime);
+
+    {
+        auto future =
+            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    auto data = getData();
+    ASSERT(!data->findShard(ShardId("extraShard_0")));
+
+    auto shard = data->findShard(ShardId("extraShard_1"));
+    ASSERT(shard) << "extraShard_1 should be in the registry";
+    ASSERT_EQ(shard->getConnString().getSetName(), "extraShardRS");
+
+    auto servers = shard->getConnString().getServers();
+    ASSERT_EQ(servers.size(), 1u);
+    ASSERT_EQ(servers[0].host(), "newHost")
+        << "Shard should have new hosts from config.shards, not stale hosts from "
+           "_latestConnStrings. Actual conn string: "
+        << shard->getConnString().toString();
 }
 
 }  // namespace
