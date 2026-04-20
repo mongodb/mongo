@@ -321,55 +321,21 @@ export var ClusteredCappedUtils = class {
         TTLUtil.waitForPass(db, /*waitForMajorityCommit=*/ false);
         assert.eq(0, db.getCollection(collName).find().itcount());
 
-        // The TTL deletion has been replicated to the oplog.
-        const isBatched = assert.commandWorked(db.adminCommand({getParameter: 1, "ttlMonitorBatchDeletes": 1}))[
-            "ttlMonitorBatchDeletes"
-        ];
+        // Batched operations can be grouped into the oplog in various distributions depending
+        // on timing, so check only that every expected delete is visible somewhere in the oplog.
         const ns = db.getName() + "." + collName;
-
-        if (isBatched) {
-            const ops = db
-                .getSiblingDB("local")
-                .oplog.rs.find({
+        const oplog = db.getSiblingDB("local").oplog.rs;
+        for (const id of [tenDaysAgo, earlierTenDaysAgo]) {
+            const standalone = oplog.find({op: "d", ns: ns, "o._id": id}).sort({$natural: -1}).itcount();
+            const insideApplyOps = oplog
+                .find({
                     op: "c",
                     ns: "admin.$cmd",
-                    "o.applyOps": {
-                        $elemMatch: {op: "d", ns: ns, "o._id": {$in: [tenDaysAgo, earlierTenDaysAgo]}},
-                    },
+                    "o.applyOps": {$elemMatch: {op: "d", ns: ns, "o._id": id}},
                 })
                 .sort({$natural: -1})
-                .limit(1)
-                .toArray();
-            assert.lte(ops[0].o.applyOps.length, 2);
-            if (ops[0].o.applyOps.length === 1) {
-                // The batch got split in two separate executions.
-                const pendingId =
-                    ops[0].o.applyOps[0].o._id.getTime() === tenDaysAgo.getTime() ? earlierTenDaysAgo : tenDaysAgo;
-                assert.eq(
-                    1,
-                    db
-                        .getSiblingDB("local")
-                        .oplog.rs.find({op: "d", ns: ns, "o._id": pendingId})
-                        .sort({$natural: -1})
-                        .itcount(),
-                );
-            }
-        } else {
-            assert.eq(
-                1,
-                db
-                    .getSiblingDB("local")
-                    .oplog.rs.find({op: "d", ns: ns, "o._id": tenDaysAgo})
-                    .sort({$natural: -1})
-                    .itcount(),
-            );
-            assert.eq(
-                1,
-                db
-                    .getSiblingDB("local")
-                    .oplog.rs.find({op: "d", ns: ns, "o._id": earlierTenDaysAgo}.sort({$natural: -1}))
-                    .itcount(),
-            );
+                .itcount();
+            assert.eq(1, standalone + insideApplyOps, `expected exactly one oplog delete for ${tojson(id)}`);
         }
 
         db.getCollection(collName).drop();
