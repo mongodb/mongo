@@ -56,6 +56,21 @@
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
+namespace {
+
+// Return a `$in` list containing all oplog entry types that represent CRUD ops.
+BSONObj getCRUDOplogEntryTypesFilter() {
+    // Matches the following oplog entry types:
+    // - "d": delete
+    // - "i": insert
+    // - "u": update
+    return BSON("$in" << BSON_ARRAY("d"
+                                    << "i"
+                                    << "u"));
+}
+
+}  // namespace
+
 namespace change_stream_filter {
 
 std::unique_ptr<MatchExpression> buildTsFilter(
@@ -130,7 +145,7 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     // The standard event filter, before it is combined with the user filter, is as follows:
     //    {
     //      $or: [
-    //        {ns: nsRegex, $nor: [{op: "n"}, {op: "c"}]},    // CRUD events
+    //        {ns: nsRegex, op: {$in: ["d", "i", "u"]}},      // CRUD events
     //        {ns: cmdNsRegex, op: "c", $or: [                // Commands on relevant DB(s)
     //          {"o.drop": collRegex},                        // Drops of relevant collection(s)
     //          {"o.renameCollection": nsRegex},              // Renames of relevant collection(s)
@@ -145,11 +160,8 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     std::unique_ptr<ListOfMatchExpression> operationFilter = std::make_unique<OrMatchExpression>();
 
     // (1) CRUD events on a monitored namespace.
-    auto crudEvents = backingBsonObjs.emplace_back(BSON("ns" << BSONRegEx(nsRegex) << "$nor"
-                                                             << BSON_ARRAY(BSON("op"
-                                                                                << "n")
-                                                                           << BSON("op"
-                                                                                   << "c"))));
+    auto crudEvents = backingBsonObjs.emplace_back(
+        BSON("ns" << BSONRegEx(nsRegex) << "op" << getCRUDOplogEntryTypesFilter()));
 
     // (2.1) The namespace for matching relevant commands.
     auto cmdNsMatch = backingBsonObjs.emplace_back(BSON("op"
@@ -224,19 +236,12 @@ std::unique_ptr<MatchExpression> buildViewDefinitionEventFilter(
     std::vector<BSONObj>& backingBsonObjs) {
     // The view op filter is as follows:
     // {
-    //   ns: nsSystemViewsRegex, // match system.views for relevant DBs
-    //   $nor: [                 // match only CRUD events
-    //     {op: "n"},
-    //     {op: "c"}
-    //   ]
+    //   ns: nsSystemViewsRegex,     // match system.views for relevant DBs
+    //   op: {$in: ["d", "i", "u"]}  // match only CRUD events
     // }
     auto nsSystemViewsRegex = DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx);
-    auto viewEventsFilter =
-        backingBsonObjs.emplace_back(BSON("ns" << BSONRegEx(nsSystemViewsRegex) << "$nor"
-                                               << BSON_ARRAY(BSON("op"
-                                                                  << "n")
-                                                             << BSON("op"
-                                                                     << "c"))));
+    auto viewEventsFilter = backingBsonObjs.emplace_back(
+        BSON("ns" << BSONRegEx(nsSystemViewsRegex) << "op" << getCRUDOplogEntryTypesFilter()));
 
     return MatchExpressionParser::parseAndNormalize(viewEventsFilter, expCtx);
 }

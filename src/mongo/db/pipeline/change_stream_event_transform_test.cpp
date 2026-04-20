@@ -54,6 +54,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
@@ -487,6 +488,89 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransformWithTenantId) {
     outputNs = changeStreamDoc[DocumentSourceChangeStream::kNamespaceField].getDocument();
 
     ASSERT_DOCUMENT_EQ(outputNs, expectedNamespace);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformTest,
+                 TestInvalidCommand,
+                 "Tripwire assertion.*6654400.*Unsupported command type") {
+
+    // "applyOps" command type not supported by the event transformer
+    Document unsupportedCommandType{
+        {"applyOps", Value{std::vector<Document>{}}},
+        {"prepare", true},
+    };
+
+    auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kCommand,
+                                     nss.getCommandNS(),
+                                     unsupportedCommandType.toBson(),
+                                     testUuid(),
+                                     boost::none,  // fromMigrate
+                                     boost::none   // o2 field
+    );
+
+    applyTransformation(oplogEntry);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformTest, TestInvalidNoop, "Tripwire assertion.*5052201") {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+
+    auto o2Field = Document{{"unsupported_event", nss.toString_forTest()}};
+    auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kNoop,
+                                     nss,
+                                     BSONObj(),
+                                     testUuid(),
+                                     boost::none,  // fromMigrate
+                                     o2Field.toBson());
+
+    // Applying the transform on invalid Noop should throw a TAssert.
+    applyTransformation(oplogEntry);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformTest,
+                 TestUnsupportedOplogEntryType,
+                 "Tripwire assertion.*6330501.*Unsupported oplog entry type") {
+    // Need to create an invalid oplog 'document' here, as 'repl::OplogEntry' validates its invalid
+    // and cannot be created with an invalid "op" type.
+    auto oplogDoc = Document{{"op", "unexpected"_sd}, {"ns", nss.toString_forTest()}};
+
+    // Cannot simply call 'applyTransformation()' here, because it expects a 'repl::OplogEntry'
+    // parameter. Thus create the transformer manually here in order to execute it with an invalid
+    // input 'Document'.
+    DocumentSourceChangeStreamSpec spec;
+    spec.setStartAtOperationTime(kDefaultTs);
+
+    // Applying the transform on unsupported container insert should throw a TAssert.
+    ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(nss), spec);
+
+    // Applying the transform on unsupported "applyOps" oplog entry should throw a TAssert.
+    ASSERT_THROWS_CODE(transformer.applyTransformation(oplogDoc), AssertionException, 6330501);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformTest,
+                 TestUnsupportedOplogEntryTypeForViewTransformer,
+                 "Tripwire assertion.*6330501.*Unsupported oplog entry type") {
+    // Need to create an invalid oplog 'document' here, as 'repl::OplogEntry' validates its invalid
+    // and cannot be created with an invalid "op" type.
+    const NamespaceString viewNss = NamespaceString::makeSystemDotViewsNamespace(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    auto oplogDoc = Document{{"op", "unexpected"_sd}, {"ns", viewNss.toString_forTest()}};
+
+    // Cannot simply call 'applyTransformation()' here, because it expects a 'repl::OplogEntry'
+    // parameter. Thus create the transformer manually here in order to execute it with an invalid
+    // input 'Document'.
+    DocumentSourceChangeStreamSpec spec;
+    spec.setStartAtOperationTime(kDefaultTs);
+
+    // It is required that we have a non-collection change stream for the view event transformer to
+    // get involved.
+    const NamespaceString streamNss = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "testDB"));
+    ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(streamNss),
+                                             spec);
+
+    // Applying the transform on unsupported "applyOps" oplog entry should throw a TAssert.
+    ASSERT_THROWS_CODE(transformer.applyTransformation(oplogDoc), AssertionException, 6330501);
 }
 
 }  // namespace

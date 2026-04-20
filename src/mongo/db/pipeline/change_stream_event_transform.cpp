@@ -55,9 +55,12 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -113,6 +116,15 @@ CollectionType determineCollectionType(const Document& data, const DatabaseName&
         return CollectionType::kTimeseries;
     }
     return CollectionType::kView;
+}
+
+// Warns about the usage of an unsupported oplog entry type by logging an error and tasserting.
+[[noreturn]] void throwUnsupportedOplogEntryType(const Document& input, std::string error) {
+    LOGV2_WARNING(
+        11992902, "Unsupported oplog entry type", "error"_attr = error, "input"_attr = input);
+    tasserted(6330501,
+              str::stream() << "Unsupported oplog entry type, error " << error << ": "
+                            << input.toString());
 }
 
 Document copyDocExceptFields(const Document& source, std::initializer_list<StringData> fieldNames) {
@@ -241,7 +253,14 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     Value tenantId = input[repl::OplogEntry::kTidFieldName];
     checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    auto opType = getOplogOpType(input);
+    const auto opType = [&]() -> repl::OpTypeEnum {
+        try {
+            return getOplogOpType(input);
+        } catch (const DBException& ex) {
+            // If parsing the oplog entry type failed, bail out.
+            throwUnsupportedOplogEntryType(input, ex.toString());
+        }
+    }();
 
     NamespaceString nss = createNamespaceStringFromOplogEntry(tenantId, ns.getStringData());
     Value id = input.getNestedField("o._id");
@@ -427,7 +446,12 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                                    {"indexOptions", o2Field.getField("indexOptions_old")}});
             } else {
                 // We should never see an unknown command.
-                MONGO_UNREACHABLE_TASSERT(6654400);
+                LOGV2_WARNING(11992901,
+                              "Unsupported command type found in command oplog entry",
+                              "oField"_attr = oField);
+                tasserted(6654400,
+                          str::stream() << "Unsupported command type found in command oplog entry "
+                                        << oField.toString());
             }
 
             // Make sure the result doesn't have a document key.
@@ -500,10 +524,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             }
 
             // We should never see an unknown noop entry.
-            MONGO_UNREACHABLE_TASSERT(5052201);
+            LOGV2_WARNING(11992900, "Invalid noop entry", "o2Field"_attr = o2Field);
+            tasserted(5052201, str::stream() << "Invalid noop entry " << o2Field.toString());
         }
         default: {
-            MONGO_UNREACHABLE_TASSERT(6330501);
+            throwUnsupportedOplogEntryType(input, "unhandled case" /* error */);
         }
     }
 
@@ -610,7 +635,16 @@ std::set<std::string> ChangeStreamViewDefinitionEventTransformation::getFieldNam
 Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     const Document& input) const {
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
-    auto opType = getOplogOpType(input);
+
+    const auto opType = [&]() -> repl::OpTypeEnum {
+        try {
+            return getOplogOpType(input);
+        } catch (const DBException& ex) {
+            // If parsing the oplog entry type failed, bail out.
+            throwUnsupportedOplogEntryType(input, ex.toString());
+        }
+    }();
+
     Value tenantId = input[repl::OplogEntry::kTidFieldName];
 
     StringData operationType;
