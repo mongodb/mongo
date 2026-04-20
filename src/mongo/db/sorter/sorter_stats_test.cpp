@@ -306,5 +306,24 @@ TYPED_TEST(SorterStorageStatsTest, MultipleInstancesShareTracker) {
     ASSERT_EQ(stats2.bytesSpilledUncompressed(), 30);
     ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 80);
 }
+
+TEST(SorterContainerStatsTest, AddSpilledDataSize) {
+    SorterTracker sorterTracker;
+    SorterContainerStats stats(&sorterTracker);
+
+    stats.addSpilledDataSize(100);
+    ASSERT_EQ(stats.bytesSpilled(), 100);
+    ASSERT_EQ(sorterTracker.bytesSpilled.loadRelaxed(), 100);
+
+    stats.addSpilledDataSize(50);
+    ASSERT_EQ(stats.bytesSpilled(), 150);
+    ASSERT_EQ(sorterTracker.bytesSpilled.loadRelaxed(), 150);
+}
+
+TEST(SorterContainerStatsTest, AddSpilledDataSizeWithoutTracker) {
+    SorterContainerStats stats(nullptr);
+    stats.addSpilledDataSize(100);
+    ASSERT_EQ(stats.bytesSpilled(), 100);
+}
 }  // namespace
 }  // namespace mongo

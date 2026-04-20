@@ -58,9 +58,14 @@ class SorterContainerStats {
 public:
     explicit SorterContainerStats(SorterTracker* sorterTracker);
 
+    void addSpilledDataSize(long long size);
     void addSpilledDataSizeUncompressed(long long size);
 
     void incrementNumSpilledEntries();
+
+    long long bytesSpilled() const {
+        return _bytesSpilled.load();
+    }
 
     long long bytesSpilledUncompressed() const {
         return _bytesSpilledUncompressed.load();
@@ -73,6 +78,7 @@ public:
 private:
     SorterTracker* _sorterTracker;
 
+    AtomicWord<long long> _bytesSpilled;
     AtomicWord<long long> _bytesSpilledUncompressed;
     AtomicWord<long long> _numSpilledEntries;
 };

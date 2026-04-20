@@ -504,10 +504,13 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeReflectsAverageEntrySize) {
     // Average entry size = 16 / 2 = 8, plus per-cursor overhead.
     ASSERT_EQ(storage.getBufferSize(), 8 + Storage::kPerCursorOverheadBytes);
 
-    // Spilled bytes should have propagated to the tracker.
+    // Spilled bytes should have propagated to the tracker. The container-based sorter does not
+    // compress in the sorter layer, so `bytesSpilled` and `bytesSpilledUncompressed` match.
     ASSERT_EQ(stats.bytesSpilledUncompressed(), 16);
+    ASSERT_EQ(stats.bytesSpilled(), 16);
     ASSERT_EQ(stats.numSpilledEntries(), 2);
     ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.load(), 16);
+    ASSERT_EQ(this->sorterTracker.bytesSpilled.load(), 16);
 }
 
 TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {

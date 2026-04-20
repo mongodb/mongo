@@ -232,6 +232,9 @@ public:
         if (size > 0) {
             this->_checksumCalculator.addData(buffer.buf(), size);
         }
+        // The container-based sorter does not compress in the sorter layer, so report the
+        // same value for compressed and uncompressed bytes.
+        _containerStats.addSpilledDataSize(size);
         _containerStats.addSpilledDataSizeUncompressed(size);
         _containerStats.incrementNumSpilledEntries();
         _lastAddedSize = size;

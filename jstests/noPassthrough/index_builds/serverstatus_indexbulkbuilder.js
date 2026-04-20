@@ -80,10 +80,12 @@ assert.between(
     tojson(indexBulkBuilderSection),
     /*inclusive=*/ true,
 );
+// Primary-driven index builds use a container-based spiller that does not compress in the sorter
+// layer, so `bytesSpilled` equals `bytesSpilledUncompressed` and shares the uncompressed bound.
 assert.between(
     0,
     indexBulkBuilderSection.bytesSpilled,
-    approxMemoryUsage,
+    approxMemoryUsage + spillOverhead,
     tojson(indexBulkBuilderSection),
     /*inclusive=*/ true,
 );
