@@ -100,9 +100,9 @@ public:
     /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
      *
-     * Returns nullptr if the ident is not found, or if the ident state is `kBeingDropped`. Returns
-     * a shared_ptr to the `dropToken` if it isn't expired, otherwise a new shared_ptr is generated,
-     * stored in `dropToken`, and returned.
+     * Returns nullptr if the ident is not found, or if the ident is currently in the process of
+     * being dropped. Returns a shared_ptr to the `dropToken` if it isn't expired, otherwise a new
+     * shared_ptr is generated, stored in `dropToken`, and returned.
      */
     std::shared_ptr<Ident> markIdentInUse(StringData ident);
 
@@ -115,7 +115,7 @@ public:
     /**
      * Returns a list of ident names currently tracked by the reaper.
      */
-    std::vector<std::string> getAllIdentNames() const;
+    std::set<std::string> getAllIdentNames() const;
 
     /**
      * Returns the number of drop-pending idents.
@@ -123,10 +123,10 @@ public:
     size_t getNumIdents() const;
 
     /**
-     * Notifies this class that the storage engine has advanced its oldest timestamp.
-     * Drops all unreferenced drop-pending idents with drop timestamps before 'ts', as well as all
-     * unreferenced idents with Timestamp::min() drop timestamps (untimestamped on standalones) as
-     * long as the changes have been checkpointed.
+     * Notifies this class that the storage engine has advanced its timestamps.Drops all
+     * unreferenced drop-pending idents with drop timestamps before the corresponding timestamp in
+     * `timestamps`, as well as all unreferenced idents with Immediate drop timestamps or
+     * checkpoint-based drops which have been checkpointed.
      */
     void dropIdentsOlderThan(OperationContext* opCtx,
                              const StorageEngine::TimestampMonitor::Timestamps& timestamps);
@@ -149,15 +149,20 @@ public:
      * ident could not be dropped due to being in use. Returns Status::OK() if the ident was not
      * tracked as the reaper cannot distinguish "ident has already been dropped" from "ident was
      * never drop pending".
+     *
+     * Only untimestamped drops or drops added with dropUnknownIdent() can be immediately completed.
      */
     Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident);
 
     /**
      * If the given ident has been registered with the reaper, attempts to immediately drop it
      * using the provided replicated drop timestamp. Returns ObjectIsBusy if 'timestamp' is earlier
-     * than the pending drop timestamp or if the ident is still in use. Returns BadValue for
-     * checkpoint-iteration drops. Returns Status::OK() if the ident was not tracked, as the reaper
-     * cannot distinguish "ident has already been dropped" from "ident was never drop pending".
+     * than the pending drop timestamp or if the ident is still in use. Returns Status::OK() if the
+     * ident was not tracked, as the reaper cannot distinguish "ident has already been dropped" from
+     * "ident was never drop pending".
+     *
+     * Only timestamped drops can be immediately completed with a timestamp, as checkpoint and
+     * immediate drops are not replicated. Attempting to complete one of them will return BadValue.
      */
     Status immediatelyCompletePendingDropAtTimestamp(OperationContext* opCtx,
                                                      StringData ident,
@@ -186,7 +191,7 @@ private:
         // keep the ident alive.
         bool dropInProgress = false;
 
-        bool isExpired(const KVEngine* engine, const Timestamp& ts) const;
+        bool isExpired(const KVEngine* engine, Timestamp ts) const;
     };
 
     struct DropUnreplicated {};
@@ -206,21 +211,20 @@ private:
         StringData ident,
         boost::optional<Timestamp> replicatedIdentDropTimestamp);
 
+    template <typename Field>
     struct CompareByDropTime {
         using is_transparent = bool;
-        bool operator()(const std::shared_ptr<IdentInfo>& a,
-                        const std::shared_ptr<IdentInfo>& b) const;
-        bool operator()(const StorageEngine::DropTime& a,
-                        const std::shared_ptr<IdentInfo>& b) const;
-        bool operator()(const std::shared_ptr<IdentInfo>& a,
-                        const StorageEngine::DropTime& b) const;
+        bool operator()(const IdentInfo* a, const IdentInfo* b) const;
+        bool operator()(const StorageEngine::DropTime& a, const IdentInfo* b) const;
+        bool operator()(const IdentInfo* a, const StorageEngine::DropTime& b) const;
     };
 
     // Container type for drop-pending namespaces. We use a multiset so that we can order the
     // namespaces by drop optime. Additionally, it is possible for certain user operations (such
     // as renameCollection across databases) to generate more than one drop-pending namespace for
     // the same drop optime.
-    using DropPendingIdents = std::multiset<std::shared_ptr<IdentInfo>, CompareByDropTime>;
+    template <typename Field>
+    using DropPendingIdents = std::multiset<IdentInfo*, CompareByDropTime<Field>>;
 
     // Used to access the KV engine for the purposes of dropping the ident.
     KVEngine* const _engine;
@@ -250,11 +254,17 @@ private:
     // Guards access to member variables below.
     mutable stdx::mutex _mutex;
 
-    // Drop-pending idents. Ordered by drop timestamp.
-    DropPendingIdents _timestampOrderedIdents;
+    // Untimestamped drop-pending idents. Ordered by drop order.
+    std::vector<IdentInfo*> _untimestampedDrops;
+    // Timestamped drop-pending idents. Ordered by drop timestamp.
+    DropPendingIdents<StorageEngine::OldestTimestamp> _oldestTimestampDrops;
+    DropPendingIdents<StorageEngine::StableTimestamp> _stableTimestampDrops;
 
-    // Ident to drop timestamp map. Used for efficient lookups into _timestampOrderedIdents.
-    StringMap<std::shared_ptr<IdentInfo>> _dropPendingIdents;
+    // Ident name to drop information map for all drop pending idents. node_hash_map is used for
+    // pointer stability, allowing the timestamp-keyed maps to index into this map. All drop pending
+    // idents are tracked here plus exactly one of `_untimestampedDrops`, `_oldestTimestampDrops`,
+    // or `_stableTimestampDrops`.
+    absl::node_hash_map<std::string, IdentInfo, StringMapHasher, StringMapEq> _dropPendingIdents;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

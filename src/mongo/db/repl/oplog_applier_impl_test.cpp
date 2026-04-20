@@ -4945,7 +4945,7 @@ TEST_F(OplogApplierImplTest, DropIdentCommandDropsPendingIdentAtOpTimestamp) {
     const Timestamp pendingDropTs(20, 0);
     {
         auto identRef = std::make_shared<Ident>(ident);
-        storageEngine->addDropPendingIdent(pendingDropTs, identRef);
+        storageEngine->addDropPendingIdent(StorageEngine::OldestTimestamp{pendingDropTs}, identRef);
     }
 
     auto op = makeCommandOplogEntry(OpTime(Timestamp(21, 0), 1),

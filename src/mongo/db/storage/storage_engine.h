@@ -39,6 +39,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_tier_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
@@ -552,6 +553,8 @@ public:
                                       Timestamp timestamp) = 0;
 
     BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
+    BOOST_STRONG_TYPEDEF(Timestamp, OldestTimestamp);
+    BOOST_STRONG_TYPEDEF(Timestamp, StableTimestamp);
     struct Immediate {
         bool operator==(const Immediate&) const = default;
     };
@@ -563,13 +566,15 @@ public:
      * CheckpointIteration obtained from getCheckPointIteration()), or as soon as possible. Note
      * that Immediate still drops the ident asynchronously.
      */
-    struct DropTime : public std::variant<Timestamp, CheckpointIteration, Immediate> {
-        using Base = std::variant<Timestamp, CheckpointIteration, Immediate>;
+    struct DropTime
+        : public std::variant<OldestTimestamp, StableTimestamp, CheckpointIteration, Immediate> {
+        using Base = std::variant<OldestTimestamp, StableTimestamp, CheckpointIteration, Immediate>;
         using Base::Base;
 
         BSONObj toBSON() const {
             return std::visit(OverloadedVisitor{
-                                  [](Timestamp ts) { return ts.toBSON(); },
+                                  [](OldestTimestamp ts) { return ts.t.toBSON(); },
+                                  [](StableTimestamp ts) { return ts.t.toBSON(); },
                                   [](CheckpointIteration iter) {
                                       return BSON("checkpointIteration"
                                                   << std::to_string(uint64_t{iter}));
@@ -578,26 +583,6 @@ public:
                               },
                               *this);
         }
-
-        // Drop times are ordered as Immediate -> CheckpointIteration -> Timestamp
-        auto operator<=>(const DropTime& other) const {
-            return std::visit(
-                OverloadedVisitor{
-                    [](Immediate, Immediate) { return std::strong_ordering::equal; },
-                    [](Immediate, auto) { return std::strong_ordering::less; },
-                    [](auto, Immediate) { return std::strong_ordering::greater; },
-
-                    [](CheckpointIteration a, CheckpointIteration b) { return a <=> b; },
-                    [](CheckpointIteration, Timestamp) { return std::strong_ordering::less; },
-                    [](Timestamp, CheckpointIteration) { return std::strong_ordering::greater; },
-
-                    [](Timestamp a, Timestamp b) { return a.asULL() <=> b.asULL(); },
-                },
-                *this,
-                other);
-        }
-
-        bool operator==(const DropTime&) const = default;
     };
 
     /**

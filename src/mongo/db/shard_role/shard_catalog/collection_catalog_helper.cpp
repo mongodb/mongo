@@ -348,7 +348,7 @@ void removeIndex(OperationContext* opCtx,
                     // checkpoint iteration instead.
                     dropTime = storageEngine->getEngine()->getCheckpointIteration();
                 } else {
-                    dropTime = *commitTimestamp;
+                    dropTime = StorageEngine::OldestTimestamp{*commitTimestamp};
                 }
                 LOGV2_PROD_ONLY(22206,
                                 "Deferring table drop for index",
@@ -409,7 +409,7 @@ Status dropCollection(OperationContext* opCtx,
                 // checkpoint iteration instead.
                 dropTime = storageEngine->getEngine()->getCheckpointIteration();
             } else {
-                dropTime = *commitTimestamp;
+                dropTime = StorageEngine::OldestTimestamp{*commitTimestamp};
             }
             LOGV2_PROD_ONLY(22214,
                             "Deferring table drop for collection",

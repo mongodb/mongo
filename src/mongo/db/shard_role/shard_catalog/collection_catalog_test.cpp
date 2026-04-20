@@ -1499,7 +1499,8 @@ private:
 
         // Add the collection ident to the drop-pending reaper.
         opCtx->getServiceContext()->getStorageEngine()->addDropPendingIdent(
-            timestamp, collection->getRecordStore()->getSharedIdent());
+            StorageEngine::OldestTimestamp{timestamp},
+            collection->getRecordStore()->getSharedIdent());
 
         // Drops the collection from the durable catalog.
         auto storageEngine = getServiceContext()->getStorageEngine();

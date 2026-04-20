@@ -282,7 +282,8 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
     ON_CALL(*_mockProvider, getSchemaEpochForTimestamp(dropIdentTs))
         .WillByDefault(testing::Return(expectedSchemaEpoch));
 
-    _storageEngine->addDropPendingIdent(dropCollectionTs, std::make_shared<Ident>(ident));
+    _storageEngine->addDropPendingIdent(StorageEngine::OldestTimestamp{dropCollectionTs},
+                                        std::make_shared<Ident>(ident));
 
     EXPECT_CALL(*_mockKVEngine, dropIdent)
         .WillOnce([&](RecoveryUnit& calledRu,
@@ -300,7 +301,8 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
     ASSERT_DOES_NOT_THROW(_storageEngine->dropIdentTimestamped(opCtx, ident, dropIdentTs));
 
     // Assert that if dropIdentTimestamped returns a failure, it is propagated.
-    _storageEngine->addDropPendingIdent(dropCollectionTs, std::make_shared<Ident>(ident));
+    _storageEngine->addDropPendingIdent(StorageEngine::OldestTimestamp{dropCollectionTs},
+                                        std::make_shared<Ident>(ident));
     EXPECT_CALL(*_mockKVEngine, dropIdent)
         .WillOnce([&](RecoveryUnit& calledRu,
                       StringData calledIdent,
