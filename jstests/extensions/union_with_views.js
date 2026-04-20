@@ -10,6 +10,7 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
+ *   featureFlagExtensionsInsideHybridSearch,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
