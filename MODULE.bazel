@@ -326,6 +326,11 @@ use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")
 register_toolchains("@mongo_windows_toolchain//...")
 
 ###################### RUST DEPS ######################
+# Rules rust uses a custom cargo-bazel binary that doesnt exist for ppc so
+# we have to build it ourselves. It needs to be in sync with the rules_rust
+# version. Use the script buildscripts/build_cargo_bazel_ppc64le.sh on a ppc
+# machine to regenerate the file, upload it to the public build s3 bucket
+# and then fix the url in ppc64le_cargo_bazel_url.patch
 bazel_dep(name = "rules_rust", version = "0.69.0")
 
 # Right now we dont build rust on ppc, when we do unsupported_host_skip_crates.patch
