@@ -33,6 +33,12 @@ const nearPredicate = {
 
 function assertSpillingAndAllDocumentsReturned(coll) {
     jsTest.log.info("Running query", nearPredicate);
+
+    assert.throwsWithCode(
+        () => coll.find(nearPredicate).allowDiskUse(false).itcount(),
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+    );
+
     const explain = coll.find(nearPredicate).explain("executionStats");
     let assertedSpilling = false;
     for (let stages of getExecutionStages(explain)) {

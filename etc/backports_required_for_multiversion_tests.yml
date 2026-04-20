@@ -33,6 +33,8 @@ last-continuous:
       ticket: SERVER-121533
     - test_file: jstests/core/timeseries/query/timeseries_lookup_index_use.js
       ticket: SERVER-95352
+    - test_file: jstests/core/index/geo/geo_circle_spilling.js
+      ticket: SERVER-124376
   suites: null
 last-lts:
   all:
@@ -706,4 +708,6 @@ last-lts:
       ticket: SERVER-95352
     - test_file: jstests/sharding/resharding_change_stream_internal_ops.js
       ticket: SERVER-120962
+    - test_file: jstests/core/index/geo/geo_circle_spilling.js
+      ticket: SERVER-124376
   suites: null

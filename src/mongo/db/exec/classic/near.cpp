@@ -58,7 +58,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
           makeSortOptions(),
           SorterKeyComparator{},
           NoOpBound{},
-          (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled())
+          (expCtx->getAllowDiskUse() && feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled())
               ? std::make_shared<
                     sorter::FileBasedSpiller<SorterKey, SorterValue, SorterKeyComparator>>(
                     expCtx->getTempDir(),
@@ -212,7 +212,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
     if (!_memoryTracker.withinMemoryLimit() &&
         feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
-        spill(loadMemoryLimit(StageMemoryLimit::NearStageMaxMemoryBytes));
+        spill(_memoryTracker.maxAllowedMemoryUsageBytes());
     }
     _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
     uassert(12227900, "Near stage exceeded memory limit", _memoryTracker.withinMemoryLimit());
@@ -261,29 +261,24 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 }
 
 SortOptions NearStage::makeSortOptions() {
-    if (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
-        return SortOptions{}  // Spilling will handled externally by NearStage::spill method
-            .MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
-    } else {
-        return SortOptions{}.MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
-    }
+    return SortOptions{}  // Spilling will handled externally by NearStage::spill method
+        .MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
 }
 
 void NearStage::updateSpillingStats() {
-
     auto additionalSpilledBytes = _sorterFileStats.bytesSpilledUncompressed() -
         _specificStats.spillingStats.getSpilledBytes();
+    auto additionalSpilledRecords = _resultBuffer.stats().spilledKeyValuePairs() -
+        _specificStats.spillingStats.getSpilledRecords();
 
-    auto spilledDataStorageIncrease = _specificStats.spillingStats.updateSpillingStats(
-        1 /*spills*/,
-        additionalSpilledBytes,
-        _resultBuffer.stats().spilledKeyValuePairs(),
-        _sorterFileStats.bytesSpilled());
+    auto spilledDataStorageIncrease =
+        _specificStats.spillingStats.updateSpillingStats(1 /*spills*/,
+                                                         additionalSpilledBytes,
+                                                         additionalSpilledRecords,
+                                                         _sorterFileStats.bytesSpilled());
 
-    geoNearCounters.incrementPerSpilling(1,
-                                         additionalSpilledBytes,
-                                         _resultBuffer.stats().spilledKeyValuePairs(),
-                                         spilledDataStorageIncrease);
+    geoNearCounters.incrementPerSpilling(
+        1, additionalSpilledBytes, additionalSpilledRecords, spilledDataStorageIncrease);
 }
 
 void NearStage::spill(uint64_t maxMemoryBytes) {
@@ -292,6 +287,11 @@ void NearStage::spill(uint64_t maxMemoryBytes) {
     if (totalMemoryUsage <= maxMemoryBytes) {
         return;
     }
+    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+            str::stream() << _commonStats.stageTypeStr
+                          << " stage exceeded memory limit and can't spill to disk. Set "
+                             "allowDiskUse: true to allow spilling",
+            expCtx()->getAllowDiskUse());
     _resultBuffer.forceSpill();
     _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
     updateSpillingStats();

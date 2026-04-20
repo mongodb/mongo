@@ -303,6 +303,12 @@ TEST_F(QueryStageNearTest, Spilling) {
 
     const auto* stats = static_cast<const NearStats*>(nearStage.getSpecificStats());
     ASSERT_GT(stats->spillingStats.getSpills(), 0);
+    ASSERT_GT(stats->spillingStats.getSpilledRecords(), results.size() / 2);
+
+    size_t approximateBytesPerSpilledRecord =
+        stats->spillingStats.getSpilledBytes() / stats->spillingStats.getSpilledRecords();
+    ASSERT_LTE(16, approximateBytesPerSpilledRecord);
+    ASSERT_GTE(64, approximateBytesPerSpilledRecord);
 }
 
 TEST_F(QueryStageNearTest, MemoryTracking) {
