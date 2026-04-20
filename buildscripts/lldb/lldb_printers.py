@@ -20,7 +20,6 @@ import lldb
 try:
     import bson
     from bson import Decimal128, json_util
-    from bson.codec_options import DEFAULT_CODEC_OPTIONS
 except ImportError:
     print("Warning: Could not load bson library for Python {}.".format(sys.version))
     print("Check with the pip command if pymongo 3.x is installed.")
@@ -177,19 +176,12 @@ def BSONObjPrinter(valobj, *_args):
 
 
 def BSONElementPrinter(valobj, *_args):
-    """Print a BSONElement in a JSON format."""
-    ptr = valobj.GetChildMemberWithName("data").GetValueAsUnsigned()
-    size = valobj.GetChildMemberWithName("totalSize").GetValueAsUnsigned()
-
-    if size <= 1:
-        return "<empty>"
-
-    mem = bytes(memoryview(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
-
-    # Call an internal bson method to directly convert an BSON element to a string
-    el_tuple = bson._element_to_dict(mem, memoryview(mem), 0, len(mem), DEFAULT_CODEC_OPTIONS)
-
-    return '"%s": %s' % (el_tuple[0], el_tuple[1])
+    return (
+        valobj.EvaluateExpression("toString(true, true)")
+        .GetSummary()
+        .encode()
+        .decode("unicode_escape")[1:-1]
+    )
 
 
 def Date_tPrinter(valobj, *_args):
