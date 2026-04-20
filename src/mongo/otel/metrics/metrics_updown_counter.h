@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/otel/metrics/metrics_attributes.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
@@ -57,7 +58,13 @@ public:
      */
     virtual void add(T value) = 0;
 
-    virtual T value() const = 0;
+    /**
+     * For each combination of attributes for which the counter has been incremented, returns the
+     * set of attributes and the counter value associated with this. Note that the result is valid
+     * only while this counter is valid.
+     * TODO SERVER-124075: Add attribute support.
+     */
+    virtual AttributesAndValues<T> values() const = 0;
 };
 
 template <typename T>
@@ -65,9 +72,7 @@ class UpDownCounterImpl : public UpDownCounter<T> {
 public:
     void add(T value) override;
 
-    T value() const override {
-        return _value.load();
-    }
+    AttributesAndValues<T> values() const override;
 
     BSONObj serializeToBson(const std::string& key) const override;
 
@@ -86,6 +91,13 @@ private:
 template <typename T>
 void UpDownCounterImpl<T>::add(T value) {
     _value.fetchAndAddRelaxed(value);
+}
+
+template <typename T>
+AttributesAndValues<T> UpDownCounterImpl<T>::values() const {
+    // TODO SERVER-121408: Return per-attribute values once attribute support is added.
+    return {{.attributes = AttributesKeyValueIterable(std::vector<AttributeNameAndValue>{}),
+             .value = _value.loadRelaxed()}};
 }
 
 template <typename T>

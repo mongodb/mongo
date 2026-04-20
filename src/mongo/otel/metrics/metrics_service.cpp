@@ -56,12 +56,12 @@ template <template <typename> class MetricT, typename ValueT>
 void observableCallback(opentelemetry::metrics::ObserverResult observer_result, void* state) {
     invariant(state != nullptr);
     auto* const metric = static_cast<MetricT<ValueT>*>(state);
-    ValueT value = metric->value();
-
     auto observer = std::get_if<std::shared_ptr<opentelemetry::metrics::ObserverResultT<ValueT>>>(
         &observer_result);
     invariant(observer != nullptr && *observer != nullptr);
-    (*observer)->Observe(value);
+    for (const auto& entry : metric->values()) {
+        (*observer)->Observe(entry.value, entry.attributes);
+    }
 }
 
 // Creates a view with the provided aggregation type and aggregation configuration.

@@ -56,9 +56,6 @@ public:
     /** T must be nonnegative. */
     virtual void add(T value, const Attributes& attributes) = 0;
 
-    // TODO SERVER-121408: Use values() and remove this.
-    virtual T value() const = 0;
-
     /**
      * For each combination of attributes for which the counter has been incremented, returns the
      * set of attributes and the counter value associated with this. Note that the result is valid
@@ -80,7 +77,6 @@ public:
     void add(T value) {
         add(value, {});
     }
-    virtual T value() const = 0;
     virtual AttributesAndValues<T> values() const = 0;
 };
 
@@ -101,7 +97,6 @@ public:
 #ifdef MONGO_CONFIG_OTEL
     void reset(opentelemetry::metrics::Meter* meter) override;
 #endif  // MONGO_CONFIG_OTEL
-    T value() const override;
     AttributesAndValues<T> values() const override;
 
     BSONObj serializeToBson(const std::string& key) const override;
@@ -140,17 +135,12 @@ void CounterImpl<T, AttributeTs...>::add(T value, const Attributes& attributes) 
 }
 
 template <typename T, typename... AttributeTs>
-T CounterImpl<T, AttributeTs...>::value() const {
+BSONObj CounterImpl<T, AttributeTs...>::serializeToBson(const std::string& key) const {
     T total = 0;
     for (const auto& [attributes, counter] : _counters) {
         total += counter->loadRelaxed();
     }
-    return total;
-}
-
-template <typename T, typename... AttributeTs>
-BSONObj CounterImpl<T, AttributeTs...>::serializeToBson(const std::string& key) const {
-    return BSON(key << value());
+    return BSON(key << total);
 }
 
 #ifdef MONGO_CONFIG_OTEL
@@ -170,18 +160,20 @@ AttributesAndValues<T> CounterImpl<T, AttributeTs...>::values() const {
         T value = counter->loadRelaxed();
         // If there is a large number of possible attribute combinations but most aren't typically
         // incremented, including them would massively increase the size of the metrics output
-        // without adding any significant value.
-        if (value == 0) {
+        // without adding any significant value. Always include if there's no attributes.
+        // TODO SERVER-124243: Add a way to include zero-valued metrics with attributes.
+        if (value == 0 && sizeof...(AttributeTs) > 0) {
             continue;
         }
-        attributesAndValues.push_back({.value = value});
+        std::vector<AttributeNameAndValue> attrList;
         std::apply(
-            [this, &attributesList = attributesAndValues.back().attributes](auto&&... attribute) {
+            [this, &attrList](auto&&... attribute) {
                 size_t i = 0;
-                ((attributesList.push_back({.name = _attributeNames[i++], .value = attribute})),
-                 ...);
+                (attrList.push_back({.name = _attributeNames[i++], .value = attribute}), ...);
             },
             attributes);
+        attributesAndValues.push_back(
+            {.attributes = AttributesKeyValueIterable(std::move(attrList)), .value = value});
     }
     return attributesAndValues;
 }

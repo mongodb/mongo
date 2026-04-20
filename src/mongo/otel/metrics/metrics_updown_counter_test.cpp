@@ -29,6 +29,7 @@
 
 #include "mongo/otel/metrics/metrics_updown_counter.h"
 
+#include "mongo/otel/metrics/metrics_attributes_test_utils.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -37,6 +38,8 @@
 namespace mongo::otel::metrics {
 
 using testing::DoubleEq;
+using testing::ElementsAre;
+using testing::IsEmpty;
 
 template <typename T>
 class UpDownCounterImplTest : public testing::Test {};
@@ -46,30 +49,30 @@ TYPED_TEST_SUITE(UpDownCounterImplTest, UpDownCounterTypes);
 
 TYPED_TEST(UpDownCounterImplTest, Adds) {
     UpDownCounterImpl<TypeParam> counter;
-    EXPECT_EQ(counter.value(), 0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{0})));
     counter.add(1);
-    EXPECT_EQ(counter.value(), 1);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{1})));
     counter.add(10);
-    EXPECT_EQ(counter.value(), 11);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{11})));
 }
 
 TYPED_TEST(UpDownCounterImplTest, AddsZero) {
     UpDownCounterImpl<TypeParam> counter;
-    EXPECT_EQ(counter.value(), 0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{0})));
     counter.add(0);
-    EXPECT_EQ(counter.value(), 0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{0})));
     counter.add(10);
     counter.add(0);
-    EXPECT_EQ(counter.value(), 10);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{10})));
 }
 
 TYPED_TEST(UpDownCounterImplTest, Subtracts) {
     UpDownCounterImpl<TypeParam> counter;
     counter.add(5);
     counter.add(-2);
-    EXPECT_EQ(counter.value(), 3);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{3})));
     counter.add(-3);
-    EXPECT_EQ(counter.value(), 0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{0})));
 }
 
 // Any issues with thread safety should be caught by tsan on this test.
@@ -91,7 +94,9 @@ TYPED_TEST(UpDownCounterImplTest, ConcurrentAdds) {
         thread.join();
     }
 
-    EXPECT_EQ(counter.value(), kNumThreads * kIncrementsPerThread);
+    EXPECT_THAT(counter.values(),
+                ElementsAre(IsAttributesAndValue(IsEmpty(),
+                                                 TypeParam{kNumThreads * kIncrementsPerThread})));
 }
 
 TYPED_TEST(UpDownCounterImplTest, Serialization) {
@@ -108,12 +113,12 @@ TYPED_TEST(UpDownCounterImplTest, Serialization) {
 
 TEST(DoubleUpDownCounterImplTest, AddsFractionalValues) {
     UpDownCounterImpl<double> counter;
-    EXPECT_EQ(counter.value(), 0.0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(0.0))));
     counter.add(1.1);
-    EXPECT_THAT(counter.value(), DoubleEq(1.1));
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(1.1))));
     counter.add(10.5);
-    EXPECT_THAT(counter.value(), DoubleEq(11.6));
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(11.6))));
     counter.add(-0.6);
-    EXPECT_THAT(counter.value(), DoubleEq(11.0));
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(11.0))));
 }
 }  // namespace mongo::otel::metrics

@@ -33,6 +33,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -47,6 +48,13 @@
 #include <absl/types/span.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/common/attribute_value.h>
+#include <opentelemetry/common/key_value_iterable.h>
+#include <opentelemetry/nostd/function_ref.h>
+#include <opentelemetry/nostd/string_view.h>
+#endif
 
 
 namespace mongo::otel::metrics {
@@ -120,9 +128,57 @@ struct AttributeNameAndValue {
     StringData name;
     AnyAttributeType value;
 };
+
+/**
+ * Holds a collection of attribute name/value pairs and implements the opentelemetry
+ * KeyValueIterable interface (when OTel is enabled) so it can be passed directly to OTel
+ * observer callbacks.
+ */
+class AttributesKeyValueIterable
+#ifdef MONGO_CONFIG_OTEL
+    : public opentelemetry::common::KeyValueIterable
+#endif
+{
+public:
+    using value_type = AttributeNameAndValue;
+
+    AttributesKeyValueIterable() = default;
+    explicit AttributesKeyValueIterable(std::vector<AttributeNameAndValue> attributes)
+        : _attributes(std::move(attributes)) {}
+
+    /** Container interface, which allows it to be looped over and enables GoogleTest matchers. */
+    auto begin() const noexcept {
+        return _attributes.begin();
+    }
+    auto end() const noexcept {
+        return _attributes.end();
+    }
+    bool empty() const noexcept {
+        return _attributes.empty();
+    }
+
+#ifdef MONGO_CONFIG_OTEL
+    bool ForEachKeyValue(
+        opentelemetry::nostd::function_ref<bool(opentelemetry::nostd::string_view,
+                                                opentelemetry::common::AttributeValue)> callback)
+        const noexcept override;
+
+    size_t size() const noexcept override {
+        return _attributes.size();
+    }
+#else
+    size_t size() const noexcept {
+        return _attributes.size();
+    }
+#endif
+
+private:
+    std::vector<AttributeNameAndValue> _attributes;
+};
+
 template <typename T>
 struct AttributesAndValue {
-    std::vector<AttributeNameAndValue> attributes;
+    AttributesKeyValueIterable attributes;
     T value;
 };
 /**

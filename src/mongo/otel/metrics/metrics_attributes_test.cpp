@@ -36,14 +36,23 @@
 #include <tuple>
 #include <vector>
 
-namespace mongo::otel::metrics {
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/common/attribute_value.h>
+#include <opentelemetry/nostd/string_view.h>
+#include <opentelemetry/nostd/variant.h>
+#endif
 
+namespace mongo::otel::metrics {
+namespace {
+
+using testing::_;
 using testing::ElementsAre;
 using testing::FieldsAre;
 using testing::IsEmpty;
 using testing::Pair;
 using testing::Pointee;
 using testing::UnorderedElementsAre;
+using testing::VariantWith;
 
 TEST(SafeMakeAttributeTuplesTest, NoArgs) {
     std::vector<std::tuple<>> result = safeMakeAttributeTuples();
@@ -375,4 +384,153 @@ TEST(AttributesMapTest, ScalarAndSpanKeys) {
             Pair(IsAttributesTuple(std::make_tuple(false, std::span<int32_t>(data1))), 100)));
 }
 
+
+TEST(AttributesKeyValueIterableTest, EmptyAttributes) {
+    AttributesKeyValueIterable empty(std::vector<AttributeNameAndValue>{});
+    EXPECT_EQ(empty.size(), 0u);
+    EXPECT_THAT(empty, IsEmpty());
+}
+
+TEST(AttributesKeyValueIterableTest, SingleAttribute) {
+    AttributesKeyValueIterable attrs(
+        std::vector<AttributeNameAndValue>{{.name = "count", .value = int64_t{42}}});
+    EXPECT_EQ(attrs.size(), 1u);
+    EXPECT_THAT(attrs, ElementsAre(AttributeNameAndValue{.name = "count", .value = int64_t{42}}));
+}
+
+TEST(AttributesKeyValueIterableTest, MultipleAttributes) {
+    AttributesKeyValueIterable attrs(std::vector<AttributeNameAndValue>{
+        {.name = "count", .value = int64_t{42}},
+        {.name = "flag", .value = true},
+    });
+    EXPECT_EQ(attrs.size(), 2u);
+    EXPECT_THAT(attrs,
+                ElementsAre(AttributeNameAndValue{.name = "count", .value = int64_t{42}},
+                            AttributeNameAndValue{.name = "flag", .value = true}));
+}
+
+#ifdef MONGO_CONFIG_OTEL
+using OtelAttributeValue = opentelemetry::common::AttributeValue;
+
+struct KeyAndOtelValue {
+    std::string key;
+    OtelAttributeValue value;
+};
+
+// Matches against a KeyAndOtelValue struct with the given key and value matchers.
+MATCHER_P2(KeyAndOtelValueIs, keyMatcher, valueMatcher, "") {
+    return testing::ExplainMatchResult(keyMatcher, arg.key, result_listener) &&
+        testing::ExplainMatchResult(valueMatcher, arg.value, result_listener);
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueEmpty) {
+    AttributesKeyValueIterable empty(std::vector<AttributeNameAndValue>{});
+    bool completed =
+        empty.ForEachKeyValue([](std::string_view, OtelAttributeValue) noexcept { return true; });
+    EXPECT_TRUE(completed);
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueBool) {
+    AttributesKeyValueIterable attrs(
+        std::vector<AttributeNameAndValue>{{.name = "flag", .value = true}});
+    std::vector<KeyAndOtelValue> result;
+    attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
+        result.push_back({std::string(key), value});
+        return true;
+    });
+    EXPECT_THAT(result, ElementsAre(KeyAndOtelValueIs("flag", VariantWith<bool>(true))));
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueInt32) {
+    AttributesKeyValueIterable attrs(
+        std::vector<AttributeNameAndValue>{{.name = "x", .value = int32_t{7}}});
+    std::vector<KeyAndOtelValue> result;
+    attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
+        result.push_back({std::string(key), value});
+        return true;
+    });
+    EXPECT_THAT(result, ElementsAre(KeyAndOtelValueIs("x", VariantWith<int32_t>(7))));
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueInt64) {
+    AttributesKeyValueIterable attrs(
+        std::vector<AttributeNameAndValue>{{.name = "count", .value = int64_t{999}}});
+    std::vector<KeyAndOtelValue> result;
+    attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
+        result.push_back({std::string(key), value});
+        return true;
+    });
+    EXPECT_THAT(result, ElementsAre(KeyAndOtelValueIs("count", VariantWith<int64_t>(999))));
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueDouble) {
+    AttributesKeyValueIterable attrs(
+        std::vector<AttributeNameAndValue>{{.name = "ratio", .value = 3.14}});
+    std::vector<KeyAndOtelValue> result;
+    attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
+        result.push_back({std::string(key), value});
+        return true;
+    });
+    EXPECT_THAT(result, ElementsAre(KeyAndOtelValueIs("ratio", VariantWith<double>(3.14))));
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueStringData) {
+    std::string str = "hello";
+    AttributesKeyValueIterable attrs(
+        std::vector<AttributeNameAndValue>{{.name = "greeting", .value = StringData(str)}});
+    std::vector<KeyAndOtelValue> result;
+    attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
+        result.push_back({std::string(key), value});
+        return true;
+    });
+    EXPECT_THAT(result,
+                ElementsAre(KeyAndOtelValueIs("greeting", VariantWith<std::string_view>("hello"))));
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueStringDataSpan) {
+    std::vector<StringData> strings = {"hello", "world"};
+    AttributesKeyValueIterable attrs(
+        std::vector<AttributeNameAndValue>{{.name = "greeting", .value = strings}});
+    std::vector<std::string> result;
+    attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
+        ASSERT_THAT(value, VariantWith<std::span<const std::string_view>>(_));
+        for (const std::string_view s : std::get<std::span<const std::string_view>>(value)) {
+            result.push_back(std::string(s));
+        }
+        return true;
+    });
+    EXPECT_THAT(result, ElementsAre("hello", "world"));
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueMultipleAttributes) {
+    AttributesKeyValueIterable attrs(std::vector<AttributeNameAndValue>{
+        {.name = "count", .value = int64_t{1}},
+        {.name = "flag", .value = true},
+    });
+    std::vector<KeyAndOtelValue> result;
+    attrs.ForEachKeyValue([&](std::string_view key, OtelAttributeValue value) noexcept {
+        result.push_back({std::string(key), value});
+        return true;
+    });
+    EXPECT_THAT(result,
+                UnorderedElementsAre(KeyAndOtelValueIs("count", VariantWith<int64_t>(1)),
+                                     KeyAndOtelValueIs("flag", VariantWith<bool>(true))));
+}
+
+TEST(AttributesKeyValueIterableTest, ForEachKeyValueCallbackAbort) {
+    AttributesKeyValueIterable attrs(std::vector<AttributeNameAndValue>{
+        {.name = "a", .value = int64_t{1}},
+        {.name = "b", .value = int64_t{2}},
+    });
+    int callCount = 0;
+    bool completed = attrs.ForEachKeyValue([&](std::string_view, OtelAttributeValue) noexcept {
+        ++callCount;
+        return false;
+    });
+    EXPECT_FALSE(completed);
+    EXPECT_EQ(callCount, 1);
+}
+#endif  // MONGO_CONFIG_OTEL
+
+}  // namespace
 }  // namespace mongo::otel::metrics

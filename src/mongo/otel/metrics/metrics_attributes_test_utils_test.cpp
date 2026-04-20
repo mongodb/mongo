@@ -92,20 +92,23 @@ TEST(AttributeNameAndValueEqualsTest, NotEquals) {
 }
 
 TEST(IsAttributesAndValueTest, MatchesAttributes) {
-    EXPECT_THAT(
-        (AttributesAndValue{.attributes = {AttributeNameAndValue{.name = "foo", .value = 1}},
-                            .value = 5}),
-        AllOf(
-            IsAttributesAndValue(ElementsAre(AttributeNameAndValue{.name = "foo", .value = 1}), _),
-            Not(IsAttributesAndValue(ElementsAre(AttributeNameAndValue{.name = "bar", .value = 1}),
-                                     _)),
-            Not(IsAttributesAndValue(ElementsAre(AttributeNameAndValue{.name = "foo", .value = 2}),
-                                     _))));
+    EXPECT_THAT((AttributesAndValue<int32_t>{
+                    .attributes = AttributesKeyValueIterable(std::vector<AttributeNameAndValue>{
+                        AttributeNameAndValue{.name = "foo", .value = 1}}),
+                    .value = 5}),
+                AllOf(IsAttributesAndValue(
+                          ElementsAre(AttributeNameAndValue{.name = "foo", .value = 1}), _),
+                      Not(IsAttributesAndValue(
+                          ElementsAre(AttributeNameAndValue{.name = "bar", .value = 1}), _)),
+                      Not(IsAttributesAndValue(
+                          ElementsAre(AttributeNameAndValue{.name = "foo", .value = 2}), _))));
 }
 
 TEST(IsAttributesAndValueTest, MatchesValue) {
-    EXPECT_THAT((AttributesAndValue{
-                    .attributes = {AttributeNameAndValue{.name = "foo", .value = 1}}, .value = 5}),
+    EXPECT_THAT((AttributesAndValue<int32_t>{
+                    .attributes = AttributesKeyValueIterable(std::vector<AttributeNameAndValue>{
+                        AttributeNameAndValue{.name = "foo", .value = 1}}),
+                    .value = 5}),
                 AllOf(IsAttributesAndValue(_, 5),
                       IsAttributesAndValue(_, Gt(4)),
                       Not(IsAttributesAndValue(_, 4))));

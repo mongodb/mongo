@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/otel/metrics/metrics_attributes.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
@@ -44,9 +45,17 @@ namespace mongo::otel::metrics {
 template <typename T>
 class MONGO_MOD_PUBLIC Gauge : public Metric {
 public:
-    // T must be nonnegative.
     virtual void set(T value) = 0;
 
+    /**
+     * For each combination of attributes for which the gauge has been set, returns the set of
+     * attributes and the gauge value associated with this. Note that the result is valid only while
+     * this gauge is valid.
+     * TODO SERVER-124075: Add attribute support.
+     */
+    virtual AttributesAndValues<T> values() const = 0;
+
+    // TODO SERVER-124167 Remove this.
     virtual T value() const = 0;
 };
 
@@ -55,6 +64,8 @@ template <typename T>
 class GaugeImpl : public Gauge<T> {
 public:
     void set(T value) override;
+
+    AttributesAndValues<T> values() const override;
 
     T value() const override {
         return _value.load();
@@ -80,8 +91,15 @@ void GaugeImpl<T>::set(T value) {
 }
 
 template <typename T>
+AttributesAndValues<T> GaugeImpl<T>::values() const {
+    // TODO SERVER-121408: Return per-attribute values once attribute support is added.
+    return {{.attributes = AttributesKeyValueIterable(std::vector<AttributeNameAndValue>{}),
+             .value = _value.loadRelaxed()}};
+}
+
+template <typename T>
 BSONObj GaugeImpl<T>::serializeToBson(const std::string& key) const {
-    return BSON(key << value());
+    return BSON(key << _value.loadRelaxed());
 }
 
 #ifdef MONGO_CONFIG_OTEL

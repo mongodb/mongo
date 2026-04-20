@@ -29,6 +29,7 @@
 
 #include "mongo/otel/metrics/metrics_gauge.h"
 
+#include "mongo/otel/metrics/metrics_attributes_test_utils.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -37,6 +38,8 @@
 namespace mongo::otel::metrics {
 
 using testing::DoubleEq;
+using testing::ElementsAre;
+using testing::IsEmpty;
 
 template <typename T>
 class GaugeImplTest : public testing::Test {};
@@ -46,13 +49,13 @@ TYPED_TEST_SUITE(GaugeImplTest, GaugeTypes);
 
 TYPED_TEST(GaugeImplTest, Sets) {
     GaugeImpl<TypeParam> gauge;
-    EXPECT_EQ(gauge.value(), 0);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{0})));
     gauge.set(1);
-    EXPECT_EQ(gauge.value(), 1);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{1})));
     gauge.set(10);
-    EXPECT_EQ(gauge.value(), 10);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{10})));
     gauge.set(-1);
-    EXPECT_EQ(gauge.value(), -1);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{-1})));
 }
 
 // Any issues with thread safety should be caught by tsan on this test.
@@ -74,15 +77,16 @@ TYPED_TEST(GaugeImplTest, ConcurrentSets) {
         thread.join();
     }
 
-    EXPECT_EQ(gauge.value(), kIterationsPerThread - 1);
+    EXPECT_THAT(gauge.values(),
+                ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{kIterationsPerThread - 1})));
 }
 
 TEST(DoubleGaugeImplTest, SetsFractionalValues) {
     GaugeImpl<double> gauge;
     gauge.set(1.1);
-    EXPECT_THAT(gauge.value(), DoubleEq(1.1));
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(1.1))));
     gauge.set(-3.14);
-    EXPECT_THAT(gauge.value(), DoubleEq(-3.14));
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(-3.14))));
 }
 
 }  // namespace mongo::otel::metrics

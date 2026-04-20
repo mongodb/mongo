@@ -39,6 +39,7 @@
 
 namespace mongo::otel::metrics {
 namespace {
+using testing::_;
 using testing::DoubleEq;
 using testing::ElementsAre;
 using testing::IsEmpty;
@@ -52,21 +53,21 @@ TYPED_TEST_SUITE(CounterImplTest, CounterTypes);
 
 TYPED_TEST(CounterImplTest, Adds) {
     CounterImpl<TypeParam> counter;
-    EXPECT_EQ(counter.value(), 0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
     counter.add(1);
-    EXPECT_EQ(counter.value(), 1);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 1)));
     counter.add(10);
-    EXPECT_EQ(counter.value(), 11);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 11)));
 }
 
 TYPED_TEST(CounterImplTest, AddsZero) {
     CounterImpl<TypeParam> counter;
-    EXPECT_EQ(counter.value(), 0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
     counter.add(0);
-    EXPECT_EQ(counter.value(), 0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
     counter.add(10);
     counter.add(0);
-    EXPECT_EQ(counter.value(), 10);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
 }
 
 TYPED_TEST(CounterImplTest, ExceptionOnNegativeAdd) {
@@ -94,7 +95,8 @@ TYPED_TEST(CounterImplTest, ConcurrentAdds) {
         thread.join();
     }
 
-    EXPECT_EQ(counter.value(), kNumThreads * kIncrementsPerThread);
+    EXPECT_THAT(counter.values(),
+                ElementsAre(IsAttributesAndValue(IsEmpty(), kNumThreads * kIncrementsPerThread)));
 }
 
 TYPED_TEST(CounterImplTest, Serialization) {
@@ -107,10 +109,29 @@ TYPED_TEST(CounterImplTest, Serialization) {
     ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 10));
 }
 
-TYPED_TEST(CounterImplTest, ValuesSkipsZero) {
+TYPED_TEST(CounterImplTest, SerializationWithAttributesAggregates) {
+    CounterImpl<TypeParam, int32_t> counter({.name = "is_cool", .values = {1, 2, 3}});
+    const std::string key = "a";
+    ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 0));
+    counter.add(0, {1});
+    ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 0));
+    counter.add(1, {2});
+    ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 1));
+    counter.add(10, {3});
+    ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 11));
+}
+
+TYPED_TEST(CounterImplTest, ValuesContainsZeroNoAttributes) {
     CounterImpl<TypeParam> counter;
-    EXPECT_THAT(counter.values(), IsEmpty());
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
     counter.add(0);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
+}
+
+TYPED_TEST(CounterImplTest, ValuesSkipsZeroForAttributedCounter) {
+    CounterImpl<TypeParam, bool> counter({.name = "is_cool", .values = {true, false}});
+    EXPECT_THAT(counter.values(), IsEmpty());
+    counter.add(0, {true});
     EXPECT_THAT(counter.values(), IsEmpty());
 }
 
@@ -143,7 +164,6 @@ TYPED_TEST(CounterImplTest, AddWithSingleAttribute) {
     counter.add(3, {false});
     counter.add(2, {true});
 
-    EXPECT_EQ(counter.value(), 10);
     EXPECT_THAT(counter.values(),
                 UnorderedElementsAre(
                     IsAttributesAndValue(
@@ -159,7 +179,6 @@ TYPED_TEST(CounterImplTest, AddWithMultipleAttributes) {
     counter.add(5, {true, 1});
     counter.add(3, {false, 2});
 
-    EXPECT_EQ(counter.value(), 8);
     EXPECT_THAT(
         counter.values(),
         UnorderedElementsAre(
@@ -199,7 +218,7 @@ TYPED_TEST(CounterImplTest, StringDataAttributeValueIsCopied) {
     sourceValues = nullptr;
 
     counter.add(5, {"foo"_sd});
-    EXPECT_EQ(counter.value(), 5);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(_, 5)));
 }
 
 TYPED_TEST(CounterImplTest, SpanAttributeValueIsCopied) {
@@ -226,7 +245,7 @@ TYPED_TEST(CounterImplTest, SpanAttributeValueIsCopied) {
     std::vector<int32_t> intInput{1, 2};
     std::vector<StringData> stringInput{"a"_sd, "b"_sd};
     counter.add(5, {std::span<int32_t>(intInput), std::span<StringData>(stringInput)});
-    EXPECT_EQ(counter.value(), 5);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(_, 5)));
 }
 
 TEST(DoubleCounterImplTest, AddsFractionalValues) {
@@ -236,7 +255,6 @@ TEST(DoubleCounterImplTest, AddsFractionalValues) {
     counter.add(10.5, {false});
     counter.add(2.2, {true});
 
-    EXPECT_THAT(counter.value(), DoubleEq(13.8));
     EXPECT_THAT(counter.values(),
                 UnorderedElementsAre(IsAttributesAndValue(ElementsAre(AttributeNameAndValue{
                                                               .name = "is_cool", .value = true}),

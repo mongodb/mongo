@@ -181,7 +181,14 @@ mongo_cc_unit_test(
 mongo_cc_library(
     name = "metrics_attributes",
     srcs = ["metrics_attributes.cpp"],
-    deps = ["//src/mongo:base"],
+    deps = ["//src/mongo:base"] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/third_party/opentelemetry-cpp/api",
+            ],
+            "//conditions:default": [],
+        },
+    ),
 )
 
 mongo_cc_unit_test(
@@ -193,14 +200,21 @@ mongo_cc_unit_test(
     deps = [
         ":metrics_attributes",
         ":metrics_attributes_test_utils",
-    ],
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/third_party/opentelemetry-cpp/api",
+            ],
+            "//conditions:default": [],
+        },
+    ),
 )
 
 mongo_cc_library(
     name = "metrics_attributes_test_utils",
     srcs = ["metrics_attributes_test_utils.cpp"],
     deps = [
-        "//src/mongo:base",
+        ":metrics_attributes",
         "//src/mongo/unittest",
     ],
 )
@@ -245,6 +259,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
+        ":metrics_attributes_test_utils",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
@@ -262,6 +277,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
+        ":metrics_attributes_test_utils",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
