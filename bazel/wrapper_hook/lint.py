@@ -3,6 +3,8 @@ import difflib
 import os
 import pathlib
 import platform
+import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -13,6 +15,7 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MiB
+LINT_FAILURE_DETAIL_ENV_VAR = "MONGO_BAZEL_LINT_FAILURE_FILE"
 
 
 def _read_optional_bytes(path: pathlib.Path) -> bytes | None:
@@ -37,7 +40,7 @@ def _display_path(path: pathlib.Path) -> str:
         return str(path)
 
 
-def _print_unified_diff(path: pathlib.Path, before: bytes | None, after: bytes | None) -> None:
+def _get_unified_diff(path: pathlib.Path, before: bytes | None, after: bytes | None) -> str:
     display_path = _display_path(path).lstrip("/\\")
     before_lines = (before or b"").decode("utf-8", errors="replace").splitlines(keepends=True)
     after_lines = (after or b"").decode("utf-8", errors="replace").splitlines(keepends=True)
@@ -47,32 +50,109 @@ def _print_unified_diff(path: pathlib.Path, before: bytes | None, after: bytes |
         fromfile=f"a/{display_path}",
         tofile=f"b/{display_path}",
     )
-    print("".join(diff), end="")
+    return "".join(diff)
 
 
-def _lockfile_has_git_diff(path: pathlib.Path) -> bool:
-    display_path = _display_path(path)
-    result = subprocess.run(
-        ["git", "status", "--porcelain", "--", display_path],
-        capture_output=True,
-        text=True,
-        check=True,
-        cwd=REPO_ROOT,
+def _print_unified_diff(path: pathlib.Path, before: bytes | None, after: bytes | None) -> None:
+    print(_get_unified_diff(path, before, after), end="")
+
+
+def _format_lint_failure_detail(summary: str, detail: str | None = None) -> str:
+    detail_body = (detail or "").rstrip()
+    if not detail_body:
+        return summary
+    return f"{summary}\n\n{detail_body}"
+
+
+def _format_bazel_run_command(target: str, args: list[str]) -> str:
+    command = ["bazel", "run", target]
+    if args:
+        command.extend(["--", *args])
+    return shlex.join(command)
+
+
+def _parse_rules_lint_report(report: str) -> tuple[str, str] | None:
+    normalized_report = report.replace("\\", "/")
+    report_relative_path = normalized_report.split("/bin/", 1)[-1]
+    match = re.fullmatch(
+        r"(?:(?P<package>.+)/)?(?P<target>[^/]+)\.AspectRulesLint(?P<linter>[^/.]+)\.out",
+        report_relative_path,
     )
-    return bool(result.stdout.strip())
+    if match is None:
+        return None
+
+    package = match.group("package")
+    target = match.group("target")
+    linter = match.group("linter")
+    label = f"//{package}:{target}" if package else f"//:{target}"
+    return linter, label
 
 
-def _print_git_diff_against_head(path: pathlib.Path) -> None:
-    display_path = _display_path(path)
-    result = subprocess.run(
-        ["git", "diff", "--no-ext-diff", "HEAD", "--", display_path],
-        capture_output=True,
-        text=True,
-        check=True,
-        cwd=REPO_ROOT,
+def _extract_actionable_report_line(file_contents: str) -> str | None:
+    lines = [line.strip() for line in file_contents.splitlines() if line.strip()]
+    if not lines:
+        return None
+
+    actionable_patterns = (
+        re.compile(r"\.[A-Za-z0-9]+:\d"),
+        re.compile(r"[/\\][^:\s]+\.[A-Za-z0-9_]+"),
     )
-    if result.stdout:
-        print(result.stdout, end="")
+    for line in lines:
+        if any(pattern.search(line) for pattern in actionable_patterns):
+            return line
+
+    return lines[0]
+
+
+def _summarize_rules_lint_failure(report: str, file_contents: str) -> str:
+    parsed_report = _parse_rules_lint_report(report)
+    actionable_line = _extract_actionable_report_line(file_contents)
+
+    if parsed_report is None:
+        return actionable_line or f"rules_lint report: {report}"
+
+    linter, label = parsed_report
+    if actionable_line:
+        return f"{linter} failed for {label}: {actionable_line}"
+    return f"{linter} failed for {label}"
+
+
+def _summarize_failing_rules_lint_reports(failing_reports: list[str]) -> str:
+    if not failing_reports:
+        return "Failing reports"
+    if len(failing_reports) == 1:
+        return failing_reports[0]
+    return f"{failing_reports[0]} (+{len(failing_reports) - 1} more failing reports)"
+
+
+def _get_lint_failure_detail_path() -> pathlib.Path | None:
+    lint_failure_detail_path = os.environ.get(LINT_FAILURE_DETAIL_ENV_VAR)
+    if not lint_failure_detail_path:
+        return None
+    return pathlib.Path(lint_failure_detail_path)
+
+
+def _record_lint_failure_detail(detail: str) -> None:
+    lint_failure_detail_path = _get_lint_failure_detail_path()
+    if lint_failure_detail_path is None:
+        return
+    lint_failure_detail_path.write_text(detail, encoding="utf-8")
+
+
+def _record_lint_failure_detail_if_unset(detail: str) -> None:
+    lint_failure_detail_path = _get_lint_failure_detail_path()
+    if lint_failure_detail_path is None:
+        return
+
+    existing_detail = lint_failure_detail_path.read_text(encoding="utf-8").strip()
+    if existing_detail:
+        return
+
+    lint_failure_detail_path.write_text(detail, encoding="utf-8")
+
+
+def _clear_lint_failure_detail() -> None:
+    _record_lint_failure_detail("")
 
 
 def _get_buildozer() -> Optional[str]:
@@ -289,17 +369,22 @@ class LintRunner:
                 print(f"{lockfile_display} is up to date.")
             return
 
-        if not _lockfile_has_git_diff(lockfile_path):
+        if not changed:
             print(f"{lockfile_display} is up to date.")
             return
 
+        summary = f"{lockfile_display} has diffs after refresh"
+        diff = _get_unified_diff(lockfile_path, original_contents, refreshed_contents)
         print(f"{lockfile_display} has diffs after `bazel mod deps --lockfile_mode=refresh`.")
-        _print_git_diff_against_head(lockfile_path)
+        if _get_lint_failure_detail_path() is not None:
+            _record_lint_failure_detail(_format_lint_failure_detail(summary, diff))
+        elif diff:
+            print(diff, end="")
         print("Run the following to attempt to fix the issue automatically:")
         print("\tbazel run lint --fix")
         self.fail = True
         if not self.keep_going:
-            raise LinterFail(f"{lockfile_display} has diffs after refresh")
+            raise LinterFail(summary)
 
     def simple_file_size_check(self, files_to_lint: list[str]):
         for file in files_to_lint:
