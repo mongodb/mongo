@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/primary_only_service_helpers/cancel_state.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
@@ -337,6 +338,9 @@ private:
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.donor.
     const CommonReshardingMetadata _metadata;
+
+    // Cached copy of _metadata's ForwardableOperationMetadata with cross-shard propagation enabled.
+    const boost::optional<ForwardableOperationMetadata> _forwardableOpMetadata;
     const std::vector<ShardId> _recipientShardIds;
 
     // The in-memory representation of the mutable portion of the document in

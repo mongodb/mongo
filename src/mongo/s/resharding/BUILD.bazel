@@ -15,6 +15,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:keypattern_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
 )

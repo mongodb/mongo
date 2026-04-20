@@ -288,6 +288,10 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       _serviceContext(serviceContext),
       _metrics{ReshardingMetrics::initializeFrom(donorDoc, _serviceContext)},
       _metadata{donorDoc.getCommonReshardingMetadata()},
+      _forwardableOpMetadata{
+          _metadata.getForwardableOpMetadata().map([](const ForwardableOperationMetadata& f) {
+              return f.withVersionContextPropagation_UNSAFE();
+          })},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
       _changeStreamsMonitorCtx{donorDoc.getChangeStreamsMonitor()},
@@ -338,8 +342,8 @@ CancelableOperationContext ReshardingDonorService::DonorStateMachine::_makeOpera
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _donorCtx.getState();
     }();
-    return resharding::makeReshardingOperationContext(*factory,
-                                                      state >= DonorStateEnum::kBlockingWrites);
+    return resharding::makeReshardingOperationContext(
+        *factory, state >= DonorStateEnum::kBlockingWrites, _forwardableOpMetadata);
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(

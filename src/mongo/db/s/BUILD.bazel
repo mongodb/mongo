@@ -119,7 +119,6 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:raw_data_operation",
         "//src/mongo/db/stats:direct_system_buckets_access",
         "//src/mongo/db/topology/user_write_block:write_block_bypass",
-        "//src/mongo/otel",
         "//src/mongo/otel/traces:telemetry_context_serialization",
         "//src/mongo/rpc:metadata_impersonated_user",
         "//src/mongo/util/concurrency:spin_lock",

@@ -55,6 +55,24 @@ public:
     explicit ForwardableOperationMetadata(OperationContext* opCtx);
 
     void setOn(OperationContext* opCtx) const;
+
+    /**
+     * Enables propagation of the VersionContext (OFCV) to sub-operations for network calls.
+     * This may only be called from durable operations (e.g. ShardingCoordinator, resharding state
+     * machines), which setFCV can reliably track and drain.
+     *
+     * Misusing this API can lead to issues with inconsistent data persistence. Please include a
+     * Catalog and Routing member on the code review before enabling this flag.
+     */
+    [[nodiscard]] ForwardableOperationMetadata withVersionContextPropagation_UNSAFE() const {
+        auto copy = *this;
+
+        // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled on lastLTS
+        if (const auto& vCtx = copy.getVersionContext()) {
+            copy.setVersionContext(vCtx->withPropagationAcrossShards_UNSAFE());
+        }
+        return copy;
+    }
 };
 
 }  // namespace mongo

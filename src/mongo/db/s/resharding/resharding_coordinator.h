@@ -33,6 +33,7 @@
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
@@ -622,6 +623,9 @@ private:
     // The in-memory representation of the immutable portion of the document in
     // config.reshardingOperations.
     const CommonReshardingMetadata _metadata;
+
+    // Cached copy of _metadata's ForwardableOperationMetadata with cross-shard propagation enabled.
+    const boost::optional<ForwardableOperationMetadata> _forwardableOpMetadata;
 
     // Observes writes that indicate state changes for this resharding operation and notifies
     // 'this' when all donors/recipients have entered some state so that 'this' can transition

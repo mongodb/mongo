@@ -429,6 +429,29 @@ TEST_F(ReshardingUtilTest, CreateCoordinatorDocPerformVerification) {
     }
 }
 
+TEST_F(ReshardingUtilTest, CreateCoordinatorDocStoresForwardableOpMetadata) {
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+
+    ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+    configsvrReshardCollection.setDbName(nss().dbName());
+
+    // The test opCtx has no inherited OFCV, so createReshardingCoordinatorDoc falls back to
+    // snapshotting the global FCV.
+    ASSERT_FALSE(VersionContext::getDecoration(operationContext()).hasOperationFCV());
+
+    ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
+        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+
+    ASSERT_TRUE(coordinatorDoc.getForwardableOpMetadata().has_value());
+    ASSERT_TRUE(coordinatorDoc.getForwardableOpMetadata()->getVersionContext().has_value());
+    ASSERT_TRUE(coordinatorDoc.getForwardableOpMetadata()->getVersionContext()->hasOperationFCV());
+}
+
 TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_Basic) {
     auto replCoord = repl::ReplicationCoordinator::get(operationContext());
 
@@ -863,6 +886,41 @@ TEST_F(MakeReshardingOperationContextTest, NonDeprioritizableFalse) {
     auto cancelableOpCtx = makeReshardingOperationContext(factory(), false);
     auto& admCtx = ExecutionAdmissionContext::get(cancelableOpCtx.get());
     ASSERT_EQ(admCtx.getTaskType(), ExecutionAdmissionContext::TaskType::Default);
+}
+
+TEST_F(MakeReshardingOperationContextTest, NoMetadataLeavesDecorationUnset) {
+    auto cancelableOpCtx = makeReshardingOperationContext(factory(), false, boost::none);
+    ASSERT_FALSE(VersionContext::getDecoration(cancelableOpCtx.get()).hasOperationFCV());
+    ASSERT_FALSE(VersionContext::getDecoration(cancelableOpCtx.get()).canPropagateAcrossShards());
+}
+
+TEST_F(MakeReshardingOperationContextTest, ForwardableOpMetadataSetsVersionContext) {
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ForwardableOperationMetadata fom;
+    fom.setVersionContext(VersionContext{fcv});
+
+    auto cancelableOpCtx = makeReshardingOperationContext(factory(), false, fom);
+    ASSERT_TRUE(VersionContext::getDecoration(cancelableOpCtx.get()).hasOperationFCV());
+}
+
+TEST_F(MakeReshardingOperationContextTest, PropagationIsPreservedByFactory) {
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ForwardableOperationMetadata fom;
+    fom.setVersionContext(VersionContext{fcv});
+
+    auto cancelableOpCtx = makeReshardingOperationContext(
+        factory(), false, fom.withVersionContextPropagation_UNSAFE());
+    ASSERT_TRUE(VersionContext::getDecoration(cancelableOpCtx.get()).canPropagateAcrossShards());
+}
+
+TEST_F(MakeReshardingOperationContextTest,
+       GetVersionContextFallsBackToDefaultWhenNoVersionContext) {
+    // A ForwardableOperationMetadata with no VersionContext set should fall back to default.
+    ForwardableOperationMetadata fom;
+    ASSERT_FALSE(fom.getVersionContext().has_value());
+
+    auto vCtx = getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(fom));
+    ASSERT_FALSE(vCtx.hasOperationFCV());
 }
 
 }  // namespace
