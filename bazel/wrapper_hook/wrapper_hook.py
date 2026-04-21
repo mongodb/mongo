@@ -43,39 +43,21 @@ def _fmt_duration(seconds: float) -> str:
 
 
 def _info(msg: str, printer=print, stream=None):
-    term_err = get_terminal_stream("MONGO_WRAPPER_STDERR_FD")
-    # Save current stdout/stderr
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-
-    try:
-        sys.stdout = term_err
-        sys.stderr = term_err
-
-        stream = stream or sys.stdout
-        prefix = _info_prefix(stream)
-        printer(f"{prefix} {msg}")
-
-    finally:
-        # Restore original stdout/stderr to whatever wrapper has
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
+    run_with_terminal_output(lambda: printer(f"{_info_prefix(stream or sys.stdout)} {msg}"))
 
 
 def run_with_terminal_output(func, *args, **kwargs):
     term_err = get_terminal_stream("MONGO_WRAPPER_STDERR_FD")
-    sys.stdout = None
-    # Save current stdout/stderr
     old_stdout = sys.stdout
     old_stderr = sys.stderr
 
     try:
-        sys.stdout = term_err
-        sys.stderr = term_err
+        if term_err is not None:
+            sys.stdout = term_err
+            sys.stderr = term_err
         return func(*args, **kwargs)
 
     finally:
-        # Restore original stdout/stderr to whatever wrapper has
         sys.stdout = old_stdout
         sys.stderr = old_stderr
 

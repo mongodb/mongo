@@ -719,8 +719,8 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         args = ["//..."] + args
 
     fix = ""
-    with tempfile.NamedTemporaryFile(delete=False) as buildevents:
-        buildevents_path = buildevents.name
+    buildevents_fd, buildevents_path = tempfile.mkstemp()
+    os.close(buildevents_fd)
 
     for linter in ["eslint", "ruff"]:
         args.append(f"--aspects=//tools/lint:linters.bzl%{linter}")
@@ -746,7 +746,6 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     # so that the naive thing of pasting that flag to lint.sh will do what the user expects.
     if parsed_args.fix:
         fix = "patch"
-        args.extend(["--@aspect_rules_lint//lint:fix", "--output_groups=rules_lint_patch"])
 
     # the --dry-run flag must immediately follow the --fix flag
     if parsed_args.dry_run:
@@ -758,47 +757,15 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         + [arg for arg in args if not arg.startswith("--")]
     )
 
-    # Actually run the lint itself
-    subprocess.run([bazel_bin, "build"] + args, check=True, stdout=sys.stdout, stderr=sys.stderr)
-
     # Parse out the reports from the build events
     filter_expr = '.namedSetOfFiles | values | .files[] | select(.name | endswith($ext)) | ((.pathPrefix | join("/")) + "/" + .name)'
 
-    # Maybe this could be hermetic with bazel run @aspect_bazel_lib//tools:jq or sth
-    # jq on windows outputs CRLF which breaks this script. https://github.com/jqlang/jq/issues/92
-    valid_reports = (
-        subprocess.run(
-            ["jq", "--arg", "ext", ".out", "--raw-output", filter_expr, buildevents_path],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        .stdout.strip()
-        .split("\n")
-    )
-
-    failing_reports = 0
-    for report in valid_reports:
-        # Exclude coverage reports, and check if the output is empty.
-        if "coverage.dat" in report or not os.path.exists(report) or not os.path.getsize(report):
-            # Report is empty. No linting errors.
-            continue
-        with open(report, "r", encoding="utf-8") as f:
-            file_contents = f.read().strip()
-            if file_contents == "All checks passed!":
-                # Report is successful. No linting errors.
-                continue
-
-            print(f"From {report}:")
-            print(file_contents)
-            print()
-            failing_reports += 1
-
-    # Apply fixes if requested
-    if fix:
-        valid_patches = (
+    def _jq_files(ext: str, events_path: str) -> list[str]:
+        # jq on windows outputs CRLF which breaks this script. https://github.com/jqlang/jq/issues/92
+        # Maybe this could be hermetic with bazel run @aspect_bazel_lib//tools:jq or sth
+        return (
             subprocess.run(
-                ["jq", "--arg", "ext", ".patch", "--raw-output", filter_expr, buildevents_path],
+                ["jq", "--arg", "ext", ext, "--raw-output", filter_expr, events_path],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -807,12 +774,39 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
             .split("\n")
         )
 
-        for patch in valid_patches:
-            # Exclude coverage, and check if the patch is empty.
-            if "coverage.dat" in patch or not os.path.exists(patch) or not os.path.getsize(patch):
-                # Patch is empty. No linting errors.
-                continue
+    # Fix pass: run with fix mode enabled to generate and apply/print patches.
+    # This is a separate build from the check pass below because rules_lint's human
+    # output in fix mode reports the violations that *were* fixed (pre-fix state), not
+    # the violations that *remain* (post-fix state). The check pass re-lints the patched
+    # files to produce an accurate report of unfixable violations.
+    # See unresolved decision upstream: https://github.com/aspect-build/rules_lint/blob/v2.5.0/lint/ruff.bzl
+    # (same TODO exists in eslint.bzl): "if we run with --fix, this will report the
+    # issues that were fixed. Does a machine reader want to know about them?"
+    if fix:
+        fix_buildevents_fd, fix_buildevents_path = tempfile.mkstemp()
+        os.close(fix_buildevents_fd)
 
+        fix_args = [
+            arg.replace(
+                f"--build_event_json_file={buildevents_path}",
+                f"--build_event_json_file={fix_buildevents_path}",
+            )
+            for arg in args
+        ]
+        sep = fix_args.index("--")
+        fix_args = (
+            fix_args[:sep]
+            + ["--@aspect_rules_lint//lint:fix", "--output_groups=rules_lint_patch"]
+            + fix_args[sep:]
+        )
+
+        subprocess.run(
+            [bazel_bin, "build"] + fix_args, check=True, stdout=sys.stdout, stderr=sys.stderr
+        )
+
+        for patch in _jq_files(".patch", fix_buildevents_path):
+            if "coverage.dat" in patch or not os.path.exists(patch) or not os.path.getsize(patch):
+                continue
             if fix == "print":
                 print(f"From {patch}:")
                 with open(patch, "r", encoding="utf-8") as f:
@@ -825,5 +819,24 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
             else:
                 print(f"ERROR: unknown fix type {fix}", file=sys.stderr)
                 raise LinterFail("Unknown fix type")
-    elif failing_reports != 0:
+
+    # Check pass: always run without fix mode to find remaining violations.
+    # Runs after the fix pass (if any) so that auto-fixed violations are no longer
+    # reported, but unfixable violations still cause a non-zero exit.
+    subprocess.run([bazel_bin, "build"] + args, check=True, stdout=sys.stdout, stderr=sys.stderr)
+
+    failing_reports = 0
+    for report in _jq_files(".out", buildevents_path):
+        if "coverage.dat" in report or not os.path.exists(report) or not os.path.getsize(report):
+            continue
+        with open(report, "r", encoding="utf-8") as f:
+            file_contents = f.read().strip()
+            if file_contents == "All checks passed!":
+                continue
+            print(f"From {report}:")
+            print(file_contents)
+            print()
+            failing_reports += 1
+
+    if failing_reports != 0:
         raise LinterFail("Failing reports")
