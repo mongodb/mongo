@@ -268,14 +268,18 @@ void openCatalog(OperationContext* opCtx,
                                                           StorageEngine::LastShutdownState::kClean,
                                                           false /* forRepair */));
 
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            vCtx, fcvSnapshot)) {
+        const bool generateIndexBuildIdent =
+            feature_flags::gResumablePrimaryDrivenIndexBuilds
+                .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
         for (auto&& [buildUUID, entry] : reconcileResult.indexBuildsToRestart) {
             std::vector<IndexBuildInfo> builds;
             builds.reserve(entry.indexSpecsAndIdents.size());
             for (auto&& [spec, ident] : entry.indexSpecsAndIdents) {
-                builds.emplace_back(spec, ident, *storageEngine);
+                builds.emplace_back(spec, ident, *storageEngine, generateIndexBuildIdent);
             }
             index_builds::primary_driven::registry(opCtx->getServiceContext())
                 .add(buildUUID, entry.dbName, entry.collUUID, std::move(builds));

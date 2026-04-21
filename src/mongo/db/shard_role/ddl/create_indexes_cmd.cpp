@@ -570,8 +570,18 @@ ResolvedIndexBuildRequest resolveIndexBuild(OperationContext* opCtx,
                 isCreatingInternalConfigTxnsPartialIndex(cmd));
 
     auto specs = parseAndValidateIndexSpecs(opCtx, cmd, ns);
-    auto indexes = toIndexBuildInfoVec(
-        specs, *opCtx->getServiceContext()->getStorageEngine(), cmd.getDbName());
+    // Acquire one FCV snapshot so the two feature-flag checks see the same FCV value.
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool generateIndexBuildIdent =
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot) &&
+        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot);
+    auto indexes = toIndexBuildInfoVec(specs,
+                                       *opCtx->getServiceContext()->getStorageEngine(),
+                                       cmd.getDbName(),
+                                       generateIndexBuildIdent);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto protocol = determineProtocol(opCtx, ns);
     auto commitQuorum = parseAndGetCommitQuorum(opCtx, protocol, cmd);

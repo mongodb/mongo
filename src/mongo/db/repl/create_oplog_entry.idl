@@ -72,6 +72,10 @@ structs:
                 description: "The ident used for the duplicate key tracker temp table, when one is created."
                 type: string
                 optional: true
+            indexBuildIdent:
+                description: "The ident used to track the state of an index build."
+                type: string
+                optional: true
     IndexIdents:
         description: "The idents used for an index build."
         strict: false

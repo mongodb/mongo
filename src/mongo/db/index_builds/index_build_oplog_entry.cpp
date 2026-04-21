@@ -34,13 +34,17 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -218,8 +222,17 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
             }
         }
 
-        if (o2HasInternalIdents &&
-            !isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+        // Acquire one FCV snapshot so the two feature-flag checks below see the same FCV value,
+        // even if a downgrade lands mid-call.
+        const auto vCtx = VersionContext::getDecoration(opCtx);
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        const bool pdibEnabled = feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                                     .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
+        const bool resumablePdibEnabled =
+            feature_flags::gResumablePrimaryDrivenIndexBuilds
+                .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
+
+        if (o2HasInternalIdents && !pdibEnabled) {
             return {ErrorCodes::BadValue,
                     "'internalIdents' may only appear when primary-driven index builds are "
                     "enabled"};
@@ -253,6 +266,16 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                             "constraintViolationsIdent is required for unique and _id "
                             "indexes"};
                 }
+                if (const auto& indexBuildIdent = internalIdents.getIndexBuildIdent()) {
+                    if (!resumablePdibEnabled) {
+                        return {ErrorCodes::BadValue,
+                                "'indexBuildIdent' may only appear when resumable "
+                                "primary-driven index builds are enabled"};
+                    }
+                    if (auto status = validateInternalIdent(*indexBuildIdent); !status.isOK()) {
+                        return status;
+                    }
+                }
                 indexesVec[i].setInternalIdents(
                     std::string{internalIdents.getSorterIdent()},
                     std::string{internalIdents.getSideWritesIdent()},
@@ -260,6 +283,9 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                     internalIdents.getConstraintViolationsIdent()
                         ? boost::make_optional(
                               std::string{*internalIdents.getConstraintViolationsIdent()})
+                        : boost::none,
+                    internalIdents.getIndexBuildIdent()
+                        ? boost::make_optional(std::string{*internalIdents.getIndexBuildIdent()})
                         : boost::none);
             }
 

@@ -382,6 +382,33 @@ TEST_F(OplogEntryTest, IndexBuildO2RoundTrip) {
     const auto serializedO2WithoutConstraintViolations =
         parsedO2WithoutConstraintViolations.toBSON();
     ASSERT_BSONOBJ_EQ(rawO2WithoutConstraintViolations, serializedO2WithoutConstraintViolations);
+
+    // indexBuildIdent is an optional field on InternalIdents; round-trip when set.
+    const auto rawO2WithResumeInfo = BSON(
+        "indexes" << BSON_ARRAY(BSON(
+            "indexIdent" << indexIdentUniqueTag << "internalIdents"
+                         << BSON("sorterIdent" << "internal-sorter-c" << "sideWritesIdent"
+                                               << "internal-sideWrites-c"
+                                               << "skippedRecordsIdent"
+                                               << "internal-skippedRecords-c" << "indexBuildIdent"
+                                               << "internal-indexBuild-c"))));
+    const auto parsedO2WithResumeInfo = IndexBuildOplogEntryO2::parse(
+        rawO2WithResumeInfo, IDLParserContext("indexBuildOplogEntryO2"));
+    const auto& parsedIndexesWithResumeInfo = parsedO2WithResumeInfo.getIndexes();
+
+    ASSERT_EQ(parsedIndexesWithResumeInfo.size(), 1);
+    ASSERT(parsedIndexesWithResumeInfo[0].getInternalIdents());
+    ASSERT(parsedIndexesWithResumeInfo[0].getInternalIdents()->getIndexBuildIdent());
+    EXPECT_EQ(*parsedIndexesWithResumeInfo[0].getInternalIdents()->getIndexBuildIdent(),
+              "internal-indexBuild-c");
+    EXPECT_FALSE(
+        parsedIndexesWithResumeInfo[0].getInternalIdents()->getConstraintViolationsIdent());
+    ASSERT_BSONOBJ_EQ(rawO2WithResumeInfo, parsedO2WithResumeInfo.toBSON());
+
+    // Without indexBuildIdent, the parsed InternalIdents leaves that optional field unset.
+    EXPECT_FALSE(parsedIndexesWithInternalIdents[0].getInternalIdents()->getIndexBuildIdent());
+    EXPECT_FALSE(
+        parsedIndexesWithoutConstraintViolations[0].getInternalIdents()->getIndexBuildIdent());
 }
 
 TEST_F(OplogEntryTest, ContainerInsert) {
@@ -1198,6 +1225,85 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         EXPECT_EQ(*parsed.indexes[0].sideWritesIdent, "internal-sideWrites-0");
         EXPECT_EQ(*parsed.indexes[0].skippedRecordsIdent, "internal-skippedRecords-0");
         EXPECT_FALSE(parsed.indexes[0].constraintViolationsIdent);
+        EXPECT_FALSE(parsed.indexes[0].indexBuildIdent);
+    }
+
+    // startIndexBuild o2 with internalIdents.indexBuildIdent is parsed through to
+    // IndexBuildInfo::indexBuildIdent.
+    {
+        const auto singleIndexSpecs =
+            BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name" << "x_1"));
+        const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
+                                              << "indexes" << singleIndexSpecs);
+        const auto o2 =
+            BSON("indexes" << BSON_ARRAY(BSON(
+                     "indexIdent" << "index-0" << "internalIdents"
+                                  << BSON("sorterIdent" << "internal-sorter-0" << "sideWritesIdent"
+                                                        << "internal-sideWrites-0"
+                                                        << "skippedRecordsIdent"
+                                                        << "internal-skippedRecords-0"
+                                                        << "indexBuildIdent"
+                                                        << "internal-indexBuild-0"))));
+
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
+        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+            "featureFlagPrimaryDrivenIndexBuilds", true);
+        RAIIServerParameterControllerForTest resumablePrimaryDrivenIndexBuildsEnabled(
+            "featureFlagResumablePrimaryDrivenIndexBuilds", true);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
+        ASSERT_EQ(parsed.indexes.size(), 1);
+        ASSERT_TRUE(parsed.indexes[0].indexBuildIdent);
+        EXPECT_EQ(*parsed.indexes[0].indexBuildIdent, "internal-indexBuild-0");
+    }
+
+    // Parsing fails when 'indexBuildIdent' is present but
+    // featureFlagResumablePrimaryDrivenIndexBuilds is disabled on the parsing node, even if
+    // featureFlagPrimaryDrivenIndexBuilds is enabled.
+    {
+        const auto singleIndexSpecs =
+            BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name" << "x_1"));
+        const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
+                                              << "indexes" << singleIndexSpecs);
+        const auto o2 =
+            BSON("indexes" << BSON_ARRAY(BSON(
+                     "indexIdent" << "index-0" << "internalIdents"
+                                  << BSON("sorterIdent" << "internal-sorter-0" << "sideWritesIdent"
+                                                        << "internal-sideWrites-0"
+                                                        << "skippedRecordsIdent"
+                                                        << "internal-skippedRecords-0"
+                                                        << "indexBuildIdent"
+                                                        << "internal-indexBuild-0"))));
+
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
+        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+            "featureFlagPrimaryDrivenIndexBuilds", true);
+        // featureFlagResumablePrimaryDrivenIndexBuilds intentionally NOT enabled.
+        auto result = IndexBuildOplogEntry::parse(_opCtx.get(), entry);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    }
+
+    // Parsing also fails when 'indexBuildIdent' is present and both
+    // featureFlagPrimaryDrivenIndexBuilds and featureFlagResumablePrimaryDrivenIndexBuilds are
+    // disabled.
+    {
+        const auto singleIndexSpecs =
+            BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name" << "x_1"));
+        const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
+                                              << "indexes" << singleIndexSpecs);
+        const auto o2 =
+            BSON("indexes" << BSON_ARRAY(BSON(
+                     "indexIdent" << "index-0" << "internalIdents"
+                                  << BSON("sorterIdent" << "internal-sorter-0" << "sideWritesIdent"
+                                                        << "internal-sideWrites-0"
+                                                        << "skippedRecordsIdent"
+                                                        << "internal-skippedRecords-0"
+                                                        << "indexBuildIdent"
+                                                        << "internal-indexBuild-0"))));
+
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
+        // Both feature flags intentionally NOT enabled.
+        auto result = IndexBuildOplogEntry::parse(_opCtx.get(), entry);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
     }
 
     {

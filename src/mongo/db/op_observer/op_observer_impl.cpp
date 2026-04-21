@@ -323,13 +323,22 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     std::vector<repl::IndexIdents> o2Indexes;
     o2Indexes.reserve(indexes.size());
+    // Acquire one FCV snapshot so the two feature-flag checks below see the same FCV value.
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool pdibEnabled =
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot);
+    const bool resumablePdibEnabled =
+        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot);
     for (const auto& indexBuildInfo : indexes) {
         auto indexIdentUniqueTag =
             storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
         repl::IndexIdents indexIdents;
         indexIdents.setIndexIdent(std::string{indexIdentUniqueTag});
 
-        if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+        if (pdibEnabled) {
             invariant(indexBuildInfo.sorterIdent);
             invariant(indexBuildInfo.sideWritesIdent);
             invariant(indexBuildInfo.skippedRecordsIdent);
@@ -337,6 +346,7 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
                 !(indexBuildInfo.spec["unique"].trueValue() ||
                   IndexDescriptor::isIdIndexPattern(indexBuildInfo.spec.getObjectField("key"))) ||
                 indexBuildInfo.constraintViolationsIdent);
+            invariant(indexBuildInfo.indexBuildIdent.has_value() == resumablePdibEnabled);
 
             repl::InternalIdents internalIdents;
             internalIdents.setSorterIdent(*indexBuildInfo.sorterIdent);
@@ -345,6 +355,9 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
             if (indexBuildInfo.constraintViolationsIdent) {
                 internalIdents.setConstraintViolationsIdent(
                     *indexBuildInfo.constraintViolationsIdent);
+            }
+            if (indexBuildInfo.indexBuildIdent) {
+                internalIdents.setIndexBuildIdent(*indexBuildInfo.indexBuildIdent);
             }
             indexIdents.setInternalIdents(std::move(internalIdents));
         }
