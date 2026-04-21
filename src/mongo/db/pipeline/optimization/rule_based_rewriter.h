@@ -43,6 +43,8 @@
 #include <concepts>
 #include <cstddef>
 #include <iterator>
+#include <set>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -226,6 +228,11 @@ public:
      * pipeline.
      */
     DepsTracker getPipelineSuffixDependencies() const;
+
+    /**
+     * Returns the set of built-in variable names referenced by any stage after the current one.
+     */
+    std::set<std::string> getBuiltInVariableRefsInPipelineSuffix() const;
 
     const mongo::pipeline::dependency_graph::DependencyGraph& getDependencyGraph() const;
 

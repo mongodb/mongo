@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -256,6 +257,28 @@ DepsTracker PipelineRewriteContext::getPipelineSuffixDependencies() const {
     return Pipeline::getDependenciesForContainer(boost::intrusive_ptr<ExpressionContext>(&_expCtx),
                                                  suffix,
                                                  DepsTracker::NoMetadataValidation{});
+}
+
+std::set<std::string> PipelineRewriteContext::getBuiltInVariableRefsInPipelineSuffix() const {
+    // Collect all variable IDs referenced in the suffix.
+    std::set<Variables::Id> allRefs;
+    for (auto it = std::next(_itr); it != _container.end(); ++it) {
+        (*it)->addVariableRefs(&allRefs);
+    }
+
+    // Collect names of all referenced variables. A variable is included if it was found by
+    // addVariableRefs() above or if this pipeline was forwarded from a router and the variable has
+    // a value in the ExpressionContext. The second condition handles query-constant variables (e.g.
+    // $$NOW) that the router resolved to literal constants before forwarding.
+    const bool fromRouter = _expCtx.getFromRouter();
+    std::set<std::string> varNames;
+    for (const auto& [id, name] : Variables::kIdToBuiltinVarName) {
+        if (allRefs.contains(id) || (fromRouter && _expCtx.variables.hasValue(id))) {
+            varNames.insert(name);
+        }
+    }
+
+    return varNames;
 }
 
 }  // namespace mongo::rule_based_rewrites::pipeline

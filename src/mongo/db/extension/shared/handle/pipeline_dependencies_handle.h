@@ -64,6 +64,17 @@ public:
     }
 
     /**
+     * Returns true if the pipeline references the builtin variable identified by 'name'
+     * (e.g. "SEARCH_META").
+     */
+    bool needsVariable(std::string_view name) const {
+        bool result = false;
+        invokeCAndConvertStatusToException(
+            [&]() { return _vtable().needs_variable(get(), stringViewAsByteView(name), &result); });
+        return result;
+    }
+
+    /**
      * Returns true if the pipeline requires the full document.
      */
     bool needsWholeDocument() const {
@@ -77,6 +88,9 @@ public:
         tassert(12200101,
                 "PipelineDependencies 'needs_metadata' is null",
                 vtable.needs_metadata != nullptr);
+        tassert(12200102,
+                "PipelineDependencies 'needs_variable' is null",
+                vtable.needs_variable != nullptr);
         tassert(12200103,
                 "PipelineDependencies 'needs_whole_document' is null",
                 vtable.needs_whole_document != nullptr);

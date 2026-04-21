@@ -41,16 +41,23 @@ using namespace mongo;
  *
  * Arguments (all optional):
  *   meta: <string>  — a metadata field name to track via needsMetadata()
+ *   var:  <string>  — a builtin variable name to track via needsVariable()
  *
- * Emits one document: {_id: 0, neededMeta: <bool>}, reflecting whether the downstream pipeline
- * referenced the specified metadata field.
+ * Emits one document:
+ *   {_id: 0, neededMeta: <bool>, neededVar: <bool>, neededWholeDoc: <bool>}
+ * reflecting whether the downstream pipeline referenced the specified metadata field, variable,
+ * or the full document.
  */
 
 class TrackDepsExecStage : public sdk::ExecAggStageSource {
 public:
-    TrackDepsExecStage(std::string_view stageName, bool neededMeta, bool neededWholeDoc)
+    TrackDepsExecStage(std::string_view stageName,
+                       bool neededMeta,
+                       bool neededVar,
+                       bool neededWholeDoc)
         : sdk::ExecAggStageSource(stageName),
           _neededMeta(neededMeta),
+          _neededVar(neededVar),
           _neededWholeDoc(neededWholeDoc) {}
 
     extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle&,
@@ -60,8 +67,9 @@ public:
         }
         _emitted = true;
         return extension::ExtensionGetNextResult::advanced(
-            extension::ExtensionBSONObj::makeAsByteBuf(BSON(
-                "_id" << 0 << "neededMeta" << _neededMeta << "neededWholeDoc" << _neededWholeDoc)));
+            extension::ExtensionBSONObj::makeAsByteBuf(
+                BSON("_id" << 0 << "neededMeta" << _neededMeta << "neededVar" << _neededVar
+                           << "neededWholeDoc" << _neededWholeDoc)));
     }
 
     void open() override {}
@@ -75,6 +83,7 @@ public:
 
 private:
     const bool _neededMeta;
+    const bool _neededVar;
     const bool _neededWholeDoc;
     bool _emitted = false;
 };
@@ -84,14 +93,19 @@ public:
     TrackDepsLogicalStage(std::string_view stageName, const BSONObj& args)
         : sdk::LogicalAggStage(stageName),
           _meta(args["meta"].str()),
+          _var(args["var"].str()),
           _neededMeta(args["neededMeta"].booleanSafe()),
+          _neededVar(args["neededVar"].booleanSafe()),
           _neededWholeDoc(args["neededWholeDoc"].booleanSafe()) {}
 
     BSONObj serialize() const override {
         BSONObjBuilder spec;
         if (!_meta.empty())
             spec.append("meta", _meta);
+        if (!_var.empty())
+            spec.append("var", _var);
         spec.appendBool("neededMeta", _neededMeta);
+        spec.appendBool("neededVar", _neededVar);
         spec.appendBool("neededWholeDoc", _neededWholeDoc);
         return BSON(_name << spec.obj());
     }
@@ -102,7 +116,8 @@ public:
     }
 
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<TrackDepsExecStage>(_name, _neededMeta, _neededWholeDoc);
+        return std::make_unique<TrackDepsExecStage>(
+            _name, _neededMeta, _neededVar, _neededWholeDoc);
     }
 
     std::unique_ptr<sdk::LogicalAggStage> clone() const override {
@@ -124,12 +139,16 @@ public:
         const extension::PipelineDependenciesHandle& deps) override {
         if (!_meta.empty())
             _neededMeta = deps->needsMetadata(_meta);
+        if (!_var.empty())
+            _neededVar = deps->needsVariable(_var);
         _neededWholeDoc = deps->needsWholeDocument();
     }
 
 private:
     const std::string _meta;
+    const std::string _var;
     bool _neededMeta;
+    bool _neededVar;
     bool _neededWholeDoc;
 };
 

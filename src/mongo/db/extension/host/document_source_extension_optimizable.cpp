@@ -656,7 +656,8 @@ bool extensionApplyDependenciesPrecondition(
 bool extensionApplyDependenciesTransform(
     rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
     auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
-    const host_connector::PipelineDependenciesAdapter adapter(ctx.getPipelineSuffixDependencies());
+    const host_connector::PipelineDependenciesAdapter adapter(
+        ctx.getPipelineSuffixDependencies(), ctx.getBuiltInVariableRefsInPipelineSuffix());
     stage->applyPipelineSuffixDependencies(adapter);
     return false;
 }

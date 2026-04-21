@@ -88,7 +88,8 @@ void assertSearchMetaAccessValidHelper(
                 DocumentSourceSetVariableFromSubPipeline::kStageName;
             auto stageName = StringData(source->getSourceName());
             if (stageName == DocumentSourceInternalSearchMongotRemote::kStageName ||
-                stageName == DocumentSourceSearch::kStageName || stageName == kSetVarName) {
+                stageName == DocumentSourceSearch::kStageName || stageName == kSetVarName ||
+                stageName == kExtensionSearchStageName) {
                 searchMetaSet = true;
                 if (stageName == kSetVarName) {
                     tassert(6448003,

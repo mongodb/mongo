@@ -1124,6 +1124,14 @@ typedef struct MongoExtensionPipelineDependenciesVTable {
                                             bool* out);
 
     /**
+     * Populates 'out' with true if the pipeline references the builtin variable identified
+     * by 'name' (e.g. "SEARCH_META").
+     */
+    MongoExtensionStatus* (*needs_variable)(const MongoExtensionPipelineDependencies* deps,
+                                            MongoExtensionByteView name,
+                                            bool* out);
+
+    /**
      * Populates 'out' with true if the pipeline requires the full document.
      */
     MongoExtensionStatus* (*needs_whole_document)(const MongoExtensionPipelineDependencies* deps,

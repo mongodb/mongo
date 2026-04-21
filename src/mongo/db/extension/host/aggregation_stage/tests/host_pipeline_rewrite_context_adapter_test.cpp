@@ -34,6 +34,7 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/shared/handle/pipeline_dependencies_handle.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock_stages.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -202,6 +203,57 @@ TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixDependenciesWithMetadat
     ASSERT_TRUE(deps.getNeedsAnyMetadata());
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
     ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kSearchScore));
+}
+
+TEST(PipelineRewriteContextAdapterTest, VariableRefsEmptyForUnknownVariable) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+    container.push_back(DocumentSourceSkip::create(expCtx, 5));
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    auto variableRefs = rbrCtx.getBuiltInVariableRefsInPipelineSuffix();
+    ASSERT_FALSE(variableRefs.contains("SOME_UNKNOWN_VARIABLE"));
+
+    // Verify the adapter agrees.
+    DepsTracker deps;
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), std::move(variableRefs));
+    ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsVariable("SOME_UNKNOWN_VARIABLE"));
+}
+
+TEST(PipelineRewriteContextAdapterTest, VariableRefsDoNotContainUnreferencedVariable) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+    container.push_back(DocumentSourceSkip::create(expCtx, 5));
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    // $limit and $skip don't reference $$SEARCH_META.
+    auto variableRefs = rbrCtx.getBuiltInVariableRefsInPipelineSuffix();
+    ASSERT_FALSE(variableRefs.contains("SEARCH_META"));
+
+    DepsTracker deps;
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), std::move(variableRefs));
+    ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsVariable("SEARCH_META"));
+}
+
+TEST(PipelineRewriteContextAdapterTest, VariableRefsContainSearchMetaWhenReferenced) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+    // $addFields references $$SEARCH_META, so it appears in the suffix variable refs.
+    container.push_back(DocumentSourceAddFields::create(BSON("x" << "$$SEARCH_META"), expCtx));
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    auto variableRefs = rbrCtx.getBuiltInVariableRefsInPipelineSuffix();
+    ASSERT_TRUE(variableRefs.contains("SEARCH_META"));
+
+    DepsTracker deps;
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), std::move(variableRefs));
+    ASSERT_TRUE(PipelineDependenciesHandle(&adapter)->needsVariable("SEARCH_META"));
 }
 
 TEST(PipelineDependenciesAdapterTest, NeedsWholeDocumentReturnsTrue) {

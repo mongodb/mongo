@@ -32,6 +32,9 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/util/modules.h"
 
+#include <set>
+#include <string>
+
 namespace mongo::extension::host_connector {
 
 /**
@@ -47,8 +50,10 @@ namespace mongo::extension::host_connector {
  */
 class PipelineDependenciesAdapter final : public ::MongoExtensionPipelineDependencies {
 public:
-    PipelineDependenciesAdapter(DepsTracker deps)
-        : ::MongoExtensionPipelineDependencies{&VTABLE}, _deps(std::move(deps)) {}
+    PipelineDependenciesAdapter(DepsTracker deps, std::set<std::string> variableRefs = {})
+        : ::MongoExtensionPipelineDependencies{&VTABLE},
+          _deps(std::move(deps)),
+          _variableRefs(std::move(variableRefs)) {}
 
     ~PipelineDependenciesAdapter() = default;
 
@@ -61,8 +66,16 @@ public:
         return _deps;
     }
 
+    const std::set<std::string>& getVariableRefs() const {
+        return _variableRefs;
+    }
+
 private:
     static ::MongoExtensionStatus* _hostNeedsMetadata(
+        const ::MongoExtensionPipelineDependencies* deps,
+        ::MongoExtensionByteView name,
+        bool* out) noexcept;
+    static ::MongoExtensionStatus* _hostNeedsVariable(
         const ::MongoExtensionPipelineDependencies* deps,
         ::MongoExtensionByteView name,
         bool* out) noexcept;
@@ -71,10 +84,12 @@ private:
 
     static constexpr ::MongoExtensionPipelineDependenciesVTable VTABLE = {
         .needs_metadata = &_hostNeedsMetadata,
+        .needs_variable = &_hostNeedsVariable,
         .needs_whole_document = &_hostNeedsWholeDocument,
     };
 
-    DepsTracker _deps;
+    const DepsTracker _deps;
+    const std::set<std::string> _variableRefs;
 };
 
 }  // namespace mongo::extension::host_connector

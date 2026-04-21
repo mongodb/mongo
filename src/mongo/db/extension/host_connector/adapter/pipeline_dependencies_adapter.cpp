@@ -46,6 +46,18 @@ namespace mongo::extension::host_connector {
     });
 }
 
+::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsVariable(
+    const ::MongoExtensionPipelineDependencies* deps,
+    ::MongoExtensionByteView name,
+    bool* out) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto sv = byteViewAsStringView(name);
+        const auto& variableRefs =
+            static_cast<const PipelineDependenciesAdapter*>(deps)->getVariableRefs();
+        *out = variableRefs.contains(std::string(sv));
+    });
+}
+
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsWholeDocument(
     const ::MongoExtensionPipelineDependencies* deps, bool* out) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
