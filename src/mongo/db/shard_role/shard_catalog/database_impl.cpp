@@ -132,6 +132,12 @@ MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedFalse);
 // for example due to SERVER-87678, or due to a drop concurrent to direct inserts on the buckets NS.
 MONGO_FAIL_POINT_DEFINE(skipCreateTimeseriesBucketsWithoutOptionsCheck);
 
+// Allows creating a timeseries collection that doesn't match the current viewless timeseries
+// feature flag state, e.g. a legacy system.buckets collection when the flag is enabled or a
+// viewless collection when the flag is disabled. Used by tests that need to simulate
+// upgrade/downgrade or metadata-inconsistency scenarios via applyOps.
+MONGO_FAIL_POINT_DEFINE(skipCreateTimeseriesVersionMismatchCheck);
+
 
 Status validateDBNameForWindows(StringData dbname) {
     const std::vector<std::string> windowsReservedNames = {
@@ -978,6 +984,43 @@ Status DatabaseImpl::userCreateNS(
     auto swCollator = validateCollator(opCtx, collectionOptions);
     if (!swCollator.isOK()) {
         return swCollator.getStatus();
+    }
+
+    if (!MONGO_unlikely(skipCreateTimeseriesVersionMismatchCheck.shouldFail()) &&
+        opCtx->isEnforcingConstraints()) {
+        const auto viewlessTimeseriesEnabled =
+            gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx));
+        if (viewlessTimeseriesEnabled && nss.isTimeseriesBucketsCollection()) {
+            // Attempt to create legacy timeseries collection in FCV => 9.0
+            //
+            // TODO SERVER-124386 prevent creation of legacy timeseries collection in FCV => 9.0
+            // when we are in fully upgraded state.
+            if (!fromMigrate) {
+                tasserted(
+                    12392800,
+                    fmt::format("Creation of a legacy system.buckets timeseries collection '{}' "
+                                "is not allowed when viewless timeseries feature flag is enabled",
+                                nss.toStringForErrorMsg()));
+            }
+        }
+
+        if (!viewlessTimeseriesEnabled && collectionOptions.timeseries &&
+            !nss.isTimeseriesBucketsCollection()) {
+            // (Generic FCV reference): Attempt to create viewless timeseries collection in FCV
+            // < 9.0. fromMigrate is only tolerated while the FCV is still transitioning, so
+            // pre-existing viewless collections can finish being migrated; once the FCV is fully
+            // downgraded no such collection should exist anywhere in the cluster.
+            const bool fcvTransitioning =
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                    .isUpgradingOrDowngrading();
+            if (!fromMigrate || !fcvTransitioning) {
+                tasserted(12392801,
+                          fmt::format("Creation of a viewless timeseries collection '{}' is not "
+                                      "allowed when viewless timeseries feature flag is disabled",
+                                      nss.toStringForErrorMsg()));
+            }
+        }
     }
 
     if (nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries &&

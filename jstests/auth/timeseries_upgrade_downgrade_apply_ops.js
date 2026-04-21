@@ -9,6 +9,7 @@
  *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 if (lastLTSFCV != "8.0") {
@@ -68,7 +69,9 @@ function makeUpgradeDowngradeCmd(isUpgrade, uuid) {
 }
 
 // Create a legacy (viewful) timeseries collection via applyOps at FCV 9.0.
+const fp = configureFailPoint(primary, "skipCreateTimeseriesVersionMismatchCheck");
 assert.commandWorked(testDB.adminCommand(makeCreateCmd("system.buckets." + collName)));
+fp.off();
 const collUUID = bucketsColl.getUUID();
 
 // A root user should not be able to applyOps an internal-only oplog entry.

@@ -928,7 +928,8 @@ TEST_F(CreateCollectionTest, TestCollectionCreationChecks) {
 }
 
 TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseries) {
-    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
+    NamespaceString newNss = timeseries::test_util::resolveTimeseriesNss(
+        NamespaceString::createNamespaceString_forTest("test.newColl"));
 
     auto opCtx = makeOpCtx();
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
@@ -951,7 +952,8 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseries) {
 
 // In the ApplyOps path, $-prefixed timeField or metaField should be allowed
 TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseriesDollarPrefix) {
-    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
+    NamespaceString newNss = timeseries::test_util::resolveTimeseriesNss(
+        NamespaceString::createNamespaceString_forTest("test.newColl"));
 
     auto opCtx = makeOpCtx();
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));

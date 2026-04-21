@@ -867,12 +867,6 @@ void _createTimeseriesCollection(
         !viewlessTimeseriesEnabled || !ns.isTimeseriesBucketsCollection() ||
             !ns.isOutStageTmpCollection());
 
-    tassert(12128910,
-            fmt::format("Received illegal create timeseries collection request on legacy system "
-                        "buckets namespace '{}' when viewless timeseries feature flag is enabled",
-                        ns.toStringForErrorMsg()),
-            !viewlessTimeseriesEnabled || !ns.isTimeseriesBucketsCollection());
-
     const auto& [mainNs, bucketsNs] = [&]() -> std::tuple<NamespaceString, NamespaceString> {
         if (ns.isTimeseriesBucketsCollection()) {
             return {ns.getTimeseriesViewNamespace(), ns};

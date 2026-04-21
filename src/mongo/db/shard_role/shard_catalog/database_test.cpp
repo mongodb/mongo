@@ -58,6 +58,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
@@ -86,6 +87,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -882,6 +884,155 @@ TEST_F(RecordIdsReplicatedDatabaseTest, NeitherProviderNorFlag_False) {
     auto opCtx = _opCtx.get();
     createTestCollection(opCtx, _testNss);
     ASSERT_FALSE(areRecordIdsReplicated(opCtx, _testNss));
+}
+
+// --- Tests for the timeseries/viewless-timeseries mismatch guard in userCreateNS ---
+
+// Attempts to create a timeseries collection via Database::userCreateNS. Returns the Status;
+// tripwire assertions are allowed to propagate so callers can assert on them.
+Status attemptUserCreateTimeseriesNS(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     bool fromMigrate = false) {
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
+    auto* db = autoDb.ensureDbExists(opCtx);
+    invariant(db);
+    CollectionOptions options{.clusteredIndex =
+                                  clustered_util::makeCanonicalClusteredInfoForLegacyFormat(),
+                              .timeseries = TimeseriesOptions{"t"}};
+    WriteUnitOfWork wuow(opCtx);
+    auto status = db->userCreateNS(opCtx,
+                                   nss,
+                                   options,
+                                   /*createDefaultIndexes=*/false,
+                                   /*idIndex=*/BSONObj(),
+                                   fromMigrate);
+    if (status.isOK()) {
+        wuow.commit();
+    }
+    return status;
+}
+
+TEST_F(DatabaseTest, UserCreateNSRejectsLegacyBucketsWhenViewlessTimeseriesEnabled) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              true);
+    const auto bucketsNss =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+    ASSERT_THROWS_WITH_CHECK(
+        attemptUserCreateTimeseriesNS(_opCtx.get(), bucketsNss, /*fromMigrate=*/false),
+        DBException,
+        [](const DBException& ex) {
+            ASSERT_EQ(ex.code(), 12392800);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+}
+
+TEST_F(DatabaseTest, UserCreateNSAllowsLegacyBucketsFromMigrateWhenViewlessTimeseriesEnabled) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              true);
+    const auto bucketsNss =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+    ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), bucketsNss, /*fromMigrate=*/true));
+}
+
+TEST_F(DatabaseTest, UserCreateNSRejectsViewlessTimeseriesWhenFlagDisabled) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              false);
+    ASSERT_THROWS_WITH_CHECK(
+        attemptUserCreateTimeseriesNS(_opCtx.get(), _nss, /*fromMigrate=*/false),
+        DBException,
+        [](const DBException& ex) {
+            ASSERT_EQ(ex.code(), 12392801);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+}
+
+// fromMigrate is not enough to bypass the guard once the FCV is fully downgraded.
+TEST_F(DatabaseTest,
+       UserCreateNSRejectsViewlessTimeseriesFromMigrateWhenFlagDisabledAndFullyDowngraded) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              false);
+    ASSERT_THROWS_WITH_CHECK(
+        attemptUserCreateTimeseriesNS(_opCtx.get(), _nss, /*fromMigrate=*/true),
+        DBException,
+        [](const DBException& ex) {
+            ASSERT_EQ(ex.code(), 12392801);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+}
+
+// Scoped override of the in-memory FCV; restores the prior value on destruction.
+class ScopedFCV {
+public:
+    explicit ScopedFCV(multiversion::FeatureCompatibilityVersion version)
+        : _prev(serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()) {
+        serverGlobalParams.mutableFCV.setVersion(version);
+    }
+    ~ScopedFCV() {
+        serverGlobalParams.mutableFCV.setVersion(_prev);
+    }
+
+private:
+    multiversion::FeatureCompatibilityVersion _prev;
+};
+
+// While the FCV is still transitioning, pre-existing viewless collections are tolerated so that
+// migrations and other operations that perform collection cloning can be executed.
+TEST_F(DatabaseTest,
+       UserCreateNSAllowsViewlessTimeseriesFromMigrateWhenFlagDisabledAndFCVTransitioning) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              false);
+    // (Generic FCV reference): test usage
+    ScopedFCV fcv(multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
+
+    ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), _nss, /*fromMigrate=*/true));
+}
+
+TEST_F(DatabaseTest, UserCreateNSTimeseriesMismatchCheckSkippedByFailPoint) {
+    FailPointEnableBlock fp("skipCreateTimeseriesVersionMismatchCheck");
+
+    // Flag ON + legacy buckets would normally tassert 12392800.
+    {
+        RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                                  true);
+        const auto bucketsNss =
+            NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+        ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), bucketsNss, /*fromMigrate=*/false));
+    }
+    // Flag OFF + viewless TS would normally tassert 12392801.
+    {
+        RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                                  false);
+        const auto viewlessNss = NamespaceString::createNamespaceString_forTest("test.vl");
+        ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), viewlessNss, /*fromMigrate=*/false));
+    }
+}
+
+TEST_F(DatabaseTest, UserCreateNSTimeseriesMismatchCheckSkippedWhenNotEnforcingConstraints) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              true);
+
+    auto opCtx = _opCtx.get();
+    opCtx->setEnforceConstraints(false);
+    ON_BLOCK_EXIT([&] { opCtx->setEnforceConstraints(true); });
+
+    const auto bucketsNss =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+    ASSERT_OK(attemptUserCreateTimeseriesNS(opCtx, bucketsNss, /*fromMigrate=*/false));
+}
+
+// Regression: matching flag/NS combinations must keep succeeding.
+TEST_F(DatabaseTest, UserCreateNSAllowsViewlessTimeseriesWhenFlagEnabled) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              true);
+    ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), _nss, /*fromMigrate=*/false));
+}
+
+TEST_F(DatabaseTest, UserCreateNSAllowsLegacyBucketsWhenFlagDisabled) {
+    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
+                                              false);
+    const auto bucketsNss =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+    ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), bucketsNss, /*fromMigrate=*/false));
 }
 
 }  // namespace

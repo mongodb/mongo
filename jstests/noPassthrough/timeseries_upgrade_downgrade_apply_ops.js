@@ -8,6 +8,7 @@
  *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 if (lastLTSFCV != "8.0") {
@@ -68,7 +69,9 @@ function makeUpgradeDowngradeCmd(isUpgrade, uuid) {
     jsTest.log("Phase 1: Testing timeseries upgrade via applyOps at latest FCV");
 
     // Create a legacy system.buckets collection via applyOps.
+    const fp1 = configureFailPoint(primary, "skipCreateTimeseriesVersionMismatchCheck");
     assert.commandWorked(testDB.adminCommand(makeCreateCmd("system.buckets." + collName)));
+    fp1.off();
     const collUUID = bucketsColl.getUUID();
     assert.neq(null, bucketsColl.exists(), "system.buckets collection should exist after create");
 
@@ -89,7 +92,9 @@ function makeUpgradeDowngradeCmd(isUpgrade, uuid) {
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     // Create a viewless timeseries collection via applyOps.
+    const fp2 = configureFailPoint(primary, "skipCreateTimeseriesVersionMismatchCheck");
     assert.commandWorked(testDB.adminCommand(makeCreateCmd(collName)));
+    fp2.off();
     const collUUID = mainColl.getUUID();
     assert.neq(null, mainColl.exists(), "Main collection should exist after create");
     assert.eq(null, bucketsColl.exists(), "system.buckets should not exist for viewless collection");
