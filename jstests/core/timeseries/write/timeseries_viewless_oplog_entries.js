@@ -3,13 +3,12 @@
  * isTimeseries set to true.
  * 
  * @tags: [
- *  requires_fcv_83,
+ *  requires_fcv_90,
  *  assumes_against_mongod_not_mongos,
  *  requires_capped,
  *  requires_getmore,
  *  requires_replication,
  *  requires_timeseries,
- *  featureFlagMarkTimeseriesEventsInOplog,
  *  incompatible_with_snapshot_reads,
  *  no_selinux,
  * ]

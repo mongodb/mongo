@@ -100,8 +100,6 @@ selector:
     - featureFlagRankFusionBasic
     - featureFlagRankFusionFull
     - featureFlagSearchHybridScoringFull
-    # TODO: SERVER-101595 remove feature flag
-    - featureFlagCreateViewlessTimeseriesCollections
     # Transactions are aborted upon fcv upgrade or downgrade.
     - uses_transactions
     # Exclude tests that require a specific fcv.
