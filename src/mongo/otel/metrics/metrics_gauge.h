@@ -54,9 +54,6 @@ public:
      * TODO SERVER-124075: Add attribute support.
      */
     virtual AttributesAndValues<T> values() const = 0;
-
-    // TODO SERVER-124167 Remove this.
-    virtual T value() const = 0;
 };
 
 // A lock free Gauge and metadata about it.
@@ -66,10 +63,6 @@ public:
     void set(T value) override;
 
     AttributesAndValues<T> values() const override;
-
-    T value() const override {
-        return _value.load();
-    }
 
     BSONObj serializeToBson(const std::string& key) const override;
 
