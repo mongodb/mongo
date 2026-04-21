@@ -1412,7 +1412,7 @@ TEST(BSONValidateColumn, BSONColumnBadExtendedSelector) {
     block = (14 << 4)          /* 14 extended selector */
         + 7                    /* original selector */
         + ((block >> 8) << 8); /* original blocks */
-    memcpy((char*)columnData.data + 31, &block, sizeof(block));
+    DataView((char*)columnData.data + 31).write<LittleEndian<uint64_t>>(block);
     ASSERT_EQ(validateBSONColumn((char*)columnData.data, columnData.length).code(),
               ErrorCodes::InvalidBSONColumn);
 }
