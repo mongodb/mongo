@@ -974,7 +974,7 @@ server_parameters:
             name: TransformHoistPolicy
             data: synchronized_value<TransformHoistPolicyEnum>
         default:
-            expr: TransformHoistPolicyEnum::kNever
+            expr: TransformHoistPolicyEnum::kForMatchPushdown
         redact: false
 
     internalQueryTransformHoistMaximumPaths:

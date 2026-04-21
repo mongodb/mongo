@@ -7,7 +7,15 @@ import {normalizeArray} from "jstests/libs/golden_test.js";
 import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPermitMatchSwappingForComplexRenames: true}));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPermitMatchSwappingForComplexRenames: true,
+            // Disable transform hoisting so the golden output is stable regardless of whether
+            // featureFlagImprovedDepsAnalysis is enabled. This test is about match pushdown, not hoist.
+            internalQueryTransformHoistPolicy: "never",
+        }),
+    );
     const coll = db.complex_match_swap;
     coll.drop();
 
@@ -219,6 +227,12 @@ try {
     pipeline = [{$addFields: {"a.d": "$c"}}, {$match: {"a.e": null}}];
     runPipeline(testCaseName, pipeline);
 } finally {
-    // Reset the parameter to its default value.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPermitMatchSwappingForComplexRenames: false}));
+    // Reset the parameters to their default values.
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPermitMatchSwappingForComplexRenames: false,
+            internalQueryTransformHoistPolicy: "forMatchPushdown",
+        }),
+    );
 }
