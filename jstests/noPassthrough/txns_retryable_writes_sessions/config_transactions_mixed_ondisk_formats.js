@@ -83,9 +83,7 @@ function testSecondaryReplicationOfConfigTxnsFormat() {
     const primaryConfig = primary.getDB("config");
     assert.commandWorked(primaryConfig.runCommand({drop: "transactions"}));
     replSet.awaitReplication();
-    assert.commandWorked(secondary.adminCommand({replSetStepUp: 1}));
-    replSet.awaitNodesAgreeOnPrimary();
-    assert.eq(secondary, replSet.getPrimary());
+    replSet.stepUp(secondary);
     replSet.awaitReplication();
     verifyConfigTxnsFormat(replSet, {clustered: false});
     openAndCloseTransactions(replSet.getPrimary(), nextTxnNum);
@@ -174,7 +172,7 @@ function testShardsWithDifferentConfigTxnsFormats() {
         shardedCluster.rs0.awaitReplication();
         assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
         shardedCluster.rs0.awaitReplication();
-        assert.commandWorked(primary.adminCommand({replSetStepUp: 1}));
+        shardedCluster.rs0.stepUp(primary);
         shardedCluster.rs0.awaitReplication();
     })(shardedCluster);
 
