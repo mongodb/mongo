@@ -80,10 +80,33 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockCollectionCacheLookup);
 MONGO_FAIL_POINT_DEFINE(blockDatabaseCacheLookup);
+MONGO_FAIL_POINT_DEFINE(waitForDBVersionCacheInvalidation);
 
 // How many times to try refreshing the routing info of a collection if the
 // information loaded from the config server is found to be inconsistent.
 const int kMaxInconsistentCollectionRefreshAttempts = 3;
+
+void waitForDBCacheInvalidationFailpoint() {
+    // Failpoints do not have a way to pause until a given predicate fails so we implement it here
+    // manually.
+    while (MONGO_unlikely(waitForDBVersionCacheInvalidation.shouldFail())) {
+        bool shouldContinue = false;
+        waitForDBVersionCacheInvalidation.execute([&](const BSONObj& data) {
+            auto thisId = Client::getCurrent()->getConnectionId();
+            const auto conns = data.getField("conns").Array();
+            shouldContinue = std::any_of(conns.begin(), conns.end(), [&](const auto& a) {
+                return a.safeNumberLong() == thisId;
+            });
+        });
+        if (shouldContinue) {
+            LOGV2_INFO(12242701, "Continuing since our cache invalidation got unblocked");
+            break;
+        }
+        LOGV2_INFO(12242700, "Waiting since our cache invalidation got blocked");
+        // Sleep for a bit before checking if the failpoint still fulfills the criteria.
+        stdx::this_thread::sleep_for(Milliseconds{50}.toSystemDuration());
+    }
+}
 
 std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
     OperationContext* opCtx,
@@ -562,6 +585,8 @@ StatusWith<CurrentChunkManager> CatalogCache::getCollectionPlacementInfoWithRefr
 
 void CatalogCache::onStaleDatabaseVersion(const DatabaseName& dbName,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
+    waitForDBCacheInvalidationFailpoint();
+
     if (databaseVersion) {
         const auto version =
             ComparableDatabaseVersion::makeComparableDatabaseVersion(databaseVersion.value());
