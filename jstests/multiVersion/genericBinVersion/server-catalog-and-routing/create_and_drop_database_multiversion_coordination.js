@@ -17,7 +17,7 @@ const configDB = st.configRS.getPrimary().getDB("config");
 assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
 
 const fpDrop = configureFailPoint(st.rs0.getPrimary(), "dropDatabaseCoordinatorPauseAfterConfigCommit");
-const fpSetFCV = configureFailPoint(st.configRS.getPrimary(), "setFCVPauseAfterReadingConfigDropPedingDBs");
+const fpSetFCV = configureFailPoint(st.configRS.getPrimary(), "setFCVPauseAfterReadingConfigDropPendingDBs");
 
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 

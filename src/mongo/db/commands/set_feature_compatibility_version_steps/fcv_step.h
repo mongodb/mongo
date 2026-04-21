@@ -71,7 +71,6 @@ namespace mongo {
  *
  * private:
  *
- *     // Mandatory:
  *     void userCollectionsUassertsForUpgrade(OperationContext* opCtx,
  *                                            FCV originalVersion,
  *                                            FCV requestedVersion) {
@@ -84,6 +83,7 @@ namespace mongo {
  *     ...
  *     }
  *
+ * };
  *
  * namespace {
  *
@@ -104,6 +104,27 @@ namespace mongo {
 class MONGO_MOD_PRIVATE FCVStep {
 public:
     using FCV = multiversion::FeatureCompatibilityVersion;
+
+    // An FCV step can override any of the following methods to add the corresponding
+    // logic to the FCV upgrade/downgrade process. The default implementation of
+    // each method is a no-op, so FCV steps only need to override the methods corresponding
+    // to the hooks they are interested in.
+
+    // The following two hooks can be overriden by an FCV Step to perform actions before the FCV
+    // transition starts. The distinction between the two is that the first hook is called outside
+    // the FixedFCVRegion, and the second one is called inside the FixedFCVRegion.
+    // Operations which could result in long work, like network calls, or waiting for replication,
+    // should not be performed in the beforeStartWithFCVLock hook, as they will block other code
+    // that is trying to acquire the same lock, and thus lead to potential availability problems
+
+    virtual void beforeStartWithoutFCVLock(OperationContext* opCtx,
+                                           FCV originalVersion,
+                                           FCV requestedVersion) {}
+
+    virtual void beforeStartWithFCVLock(OperationContext* opCtx,
+                                        FCV originalVersion,
+                                        FCV requestedVersion) {}
+
     virtual void prepareToUpgradeActionsBeforeGlobalLock(OperationContext* opCtx,
                                                          FCV originalVersion,
                                                          FCV requestedVersion) {}
@@ -122,9 +143,17 @@ public:
 
     virtual void finalizeUpgrade(OperationContext* opCtx, FCV requestedVersion) {}
 
+
     virtual void prepareToDowngradeActions(OperationContext* opCtx,
                                            FCV originalVersion,
                                            FCV requestedVersion) {}
+
+    // An FCV Step can override this hook to perform draining operations during the first phase of
+    // the shard protocol. No assumptions should be made regarding the ordering of these operations
+    // with respect to the generic drainings (DDL coordinators, OFCV, global lock).
+    virtual void drainingOnDowngrade(OperationContext* opCtx,
+                                     FCV originalVersion,
+                                     FCV requestedVersion) {}
 
     virtual void userCollectionsUassertsForDowngrade(OperationContext* opCtx,
                                                      FCV originalVersion,
@@ -211,9 +240,21 @@ public:
 
     void finalizeUpgrade(OperationContext* opCtx, FCV requestedVersion) final;
 
+    void beforeStartWithoutFCVLock(OperationContext* opCtx,
+                                   FCV originalVersion,
+                                   FCV requestedVersion) final;
+
+    void beforeStartWithFCVLock(OperationContext* opCtx,
+                                FCV originalVersion,
+                                FCV requestedVersion) final;
+
     void prepareToDowngradeActions(OperationContext* opCtx,
                                    FCV originalVersion,
                                    FCV requestedVersion) final;
+
+    void drainingOnDowngrade(OperationContext* opCtx,
+                             FCV originalVersion,
+                             FCV requestedVersion) final;
 
     void userCollectionsUassertsForDowngrade(OperationContext* opCtx,
                                              FCV originalVersion,

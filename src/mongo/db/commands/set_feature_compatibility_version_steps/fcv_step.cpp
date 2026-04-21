@@ -94,11 +94,35 @@ void FCVStepRegistry::finalizeUpgrade(OperationContext* opCtx, const FCV request
     });
 }
 
+void FCVStepRegistry::beforeStartWithoutFCVLock(OperationContext* opCtx,
+                                                FCV originalVersion,
+                                                FCV requestedVersion) {
+    std::for_each(_steps.begin(), _steps.end(), [&](FCVStep* step) {
+        step->beforeStartWithoutFCVLock(opCtx, originalVersion, requestedVersion);
+    });
+}
+
+void FCVStepRegistry::beforeStartWithFCVLock(OperationContext* opCtx,
+                                             FCV originalVersion,
+                                             FCV requestedVersion) {
+    std::for_each(_steps.begin(), _steps.end(), [&](FCVStep* step) {
+        step->beforeStartWithFCVLock(opCtx, originalVersion, requestedVersion);
+    });
+}
+
 void FCVStepRegistry::prepareToDowngradeActions(OperationContext* opCtx,
                                                 FCV originalVersion,
                                                 FCV requestedVersion) {
     std::for_each(_steps.begin(), _steps.end(), [&](FCVStep* step) {
         step->prepareToDowngradeActions(opCtx, originalVersion, requestedVersion);
+    });
+}
+
+void FCVStepRegistry::drainingOnDowngrade(OperationContext* opCtx,
+                                          FCV originalVersion,
+                                          FCV requestedVersion) {
+    std::for_each(_steps.begin(), _steps.end(), [&](FCVStep* step) {
+        step->drainingOnDowngrade(opCtx, originalVersion, requestedVersion);
     });
 }
 
