@@ -647,6 +647,26 @@ public:
     }
 
     void resize(DocumentSourceContainer::const_iterator newEndIt) {
+        ScopeGuard g([previousSize = _stages.size(), newEndIt, this] {
+            auto newSize = _stages.size();
+            LOGV2_DEBUG(12432301,
+                        5,
+                        "DependencyGraph::resize",
+                        "previousSize"_attr = previousSize,
+                        "newSize"_attr = newSize,
+                        "pipelineSize"_attr = _container.size());
+            if constexpr (kDebugBuild) {
+                auto expectedSize =
+                    static_cast<size_t>(std::distance(_container.begin(), newEndIt));
+                tassert(
+                    12432302,
+                    fmt::format("DependencyGraph::resize produced wrong size: expected {}, got {}",
+                                expectedSize,
+                                newSize),
+                    newSize == expectedSize);
+            }
+        });
+
         if (newEndIt == _container.begin()) {
             invalidate(StageId{0});
             return;
@@ -977,8 +997,7 @@ private:
         if (!ds) {
             return _stages.getLastId();
         }
-        if (auto it = _dsToStageId.find(ds);
-            it != _dsToStageId.end() && it->second < _stages.getNextId()) {
+        if (auto it = _dsToStageId.find(ds); it != _dsToStageId.end()) {
             return it->second;
         }
         tasserted(11937307,
@@ -1271,9 +1290,8 @@ private:
                 // No-op if already the last stage.
                 return true;
             }
-            // Check if this is a truncation operation (if the stage is within the graph).
-            if (auto it = _dsToStageId.find(lastStageIt->get());
-                it != _dsToStageId.end() && it->second < _stages.getLastId()) {
+            // Truncate if the stage is within the graph.
+            if (auto it = _dsToStageId.find(lastStageIt->get()); it != _dsToStageId.end()) {
                 truncate(it->second);
                 if constexpr (kDebugBuild) {
                     verifyExactRange(_container.begin(), newEndIt);
@@ -1394,12 +1412,16 @@ private:
         absl::erase_if(_aliases,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
 
-        // Remove subpipeline graphs for invalidated stages (always at the tail of the vector).
+
+        // Clean up for invalidated stages.
         size_t subpipelinesToRemove = 0;
         for (auto sid = invalidStage; sid < _stages.getNextId(); sid.value++) {
+            // Remove subpipeline graphs for invalidated stages (always at the tail of the vector).
             if (_stages[sid].subpipelineGraph) {
                 ++subpipelinesToRemove;
             }
+            // Clean up DocumentSource to StageId mapping for affected stages.
+            _dsToStageId.erase(_stages[sid].documentSource.get());
         }
         _subpipelineGraphs.resize(_subpipelineGraphs.size() - subpipelinesToRemove);
 
@@ -1457,9 +1479,7 @@ private:
     // String interning pool. Each entry is a path component.
     StringPool _strings;
 
-    // Mapping between DocumentSource and StageId. May contain dangling entries for DocumentSources
-    // that have been removed from the pipeline. This is safe because this map is never iterated and
-    // is only ever queried with valid DocumentSource pointers.
+    // Mapping between DocumentSource and StageId in the graph.
     absl::flat_hash_map<const DocumentSource*, StageId> _dsToStageId;
 
     // Maps a FieldId to the collection path it aliases (as interned StringPool IDs).

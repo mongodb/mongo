@@ -1623,5 +1623,27 @@ TEST_F(PipelineDependencyGraphTest, SetThenGroupThenSetThenMatch) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, TruncateWithSwappedStages) {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        "{$set: {b: 1}},"
+        "{$set: {c: 1}},"
+        "{$set: {d: 1}},"
+        "{$set: {e: 1}}]");
+    auto& container = pipeline->getSources();
+
+    // We used to leave stale entries in _dsToStageId which would cause a crash in the sequence
+    // below, thinking incorrectly that B is still a position 2.
+    graph->resize(std::next(container.begin(), 3));
+    // Move B to the end: [A, C, D, E, B].
+    container.splice(container.end(), container, std::next(container.begin()));
+    // Rebuild graph over [A, C, D].
+    graph->resize(container.begin());
+    graph->resize(std::next(container.begin(), 3));
+
+    // Must grow to size 5, not truncate because of stale B.
+    ASSERT_DOES_NOT_THROW(graph->resize(container.end()));
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
