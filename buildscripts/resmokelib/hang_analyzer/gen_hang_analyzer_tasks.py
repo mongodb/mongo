@@ -381,7 +381,7 @@ def _get_core_analyzer_commands(
         BuiltInCommand(
             "s3.put",
             {
-                "aws_key": "${aws_key}",
+                "aws_key": "${aws_key_new}",
                 "aws_secret": "${aws_secret}",
                 "local_file": "src/mongo-coreanalysis.tgz",
                 "remote_file": core_analyzer_results_url,
