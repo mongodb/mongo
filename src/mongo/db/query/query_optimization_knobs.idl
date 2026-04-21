@@ -976,6 +976,19 @@ server_parameters:
         default:
             expr: TransformHoistPolicyEnum::kNever
         redact: false
+
+    internalQueryTransformHoistMaximumPaths:
+        description: >-
+            Maximum number of modified paths (computed fields and renames) in a $project or
+            $addFields for which the hoist transformation will be attempted. Projections with more
+            modified paths than this threshold are not hoisted, even when
+            internalQueryTransformHoistPolicy is always.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryTransformHoistMaximumPaths"
+        cpp_vartype: AtomicWord<int>
+        default: 1024
+        validator: {gte: 0}
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

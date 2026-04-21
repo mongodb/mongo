@@ -39,6 +39,8 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/logv2/log.h"
 
+#include <queue>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::rule_based_rewrites::pipeline {
@@ -78,7 +80,7 @@ OrderedPathSet extractStrictPathDependencies(const Expression& expr) {
 struct PathTransformationDetails {
     // All new paths introduced by the transformation, with their dependencies.
     // {modifiedPath -> dependencies of modifiedPath}
-    stdx::unordered_map<std::string, OrderedPathSet> modifiedPathOperands;
+    StringMap<OrderedPathSet> modifiedPathOperands;
     // True if inclusion projection.
     bool isInclusion{true};
     // All paths preserved by inclusion projection.
@@ -149,23 +151,40 @@ struct HoistPlan {
 /**
  * Removes from 'hoistablePaths' any path that is depended on by a path in the remainder
  * (i.e. a path in modifiedPathOperands that is NOT in hoistablePaths).
+ *
+ * Uses BFS (queue): each residual path is processed once, and any hoistable path it reads is also
+ * moved to the remainder. Linear when cross-dependencies are few, quadratic in the worst case where
+ * a long dependency chain causes one path to be removed per step.
  */
-void pruneHoistableByPinnedDependences(
-    OrderedPathSet& hoistablePaths,
-    const stdx::unordered_map<std::string, OrderedPathSet>& modifiedPathOperands) {
-    // Repeats until stable, since each removal may expose new violations.
-    bool changed = true;
-    while (changed) {
-        changed = false;
+void pruneHoistableByPinnedDependences(OrderedPathSet& hoistablePaths,
+                                       const StringMap<OrderedPathSet>& modifiedPathOperands) {
+    // BFS queue, starts with the initial remainder and extended as paths are pruned.
+    std::queue<std::string> queue;
+    // Used to ensure each path is processed at most once.
+    StringSet visited;
+
+    for (auto& [path, deps] : modifiedPathOperands) {
+        if (!hoistablePaths.contains(path)) {
+            queue.push(path);
+        }
+    }
+
+    while (!queue.empty()) {
+        std::string path = std::move(queue.front());
+        queue.pop();
+
+        if (!visited.insert(std::string(path)).second) {
+            continue;
+        }
+
+        auto pathIt = modifiedPathOperands.find(path);
+        dassert(pathIt != modifiedPathOperands.end());
+        const OrderedPathSet& pathOperands = pathIt->second;
+
         for (auto it = hoistablePaths.begin(); it != hoistablePaths.end();) {
-            bool dependedOnByRemainder = std::any_of(
-                modifiedPathOperands.begin(), modifiedPathOperands.end(), [&](const auto& entry) {
-                    return !hoistablePaths.contains(entry.first) &&
-                        !expression::areIndependent(entry.second, {*it});
-                });
-            if (dependedOnByRemainder) {
+            if (!expression::areIndependent(pathOperands, {*it})) {
+                queue.push(*it);
                 it = hoistablePaths.erase(it);
-                changed = true;
             } else {
                 ++it;
             }
@@ -496,6 +515,17 @@ bool hoistSingleDocTransformBeforeStage(PipelineRewriteContext& ctx) {
     }
 
     auto details = getPathTransformationDetails(transform);
+    const size_t numPaths = details.modifiedPathOperands.size();
+    const size_t maxPaths = static_cast<size_t>(internalQueryTransformHoistMaximumPaths.load());
+    if (numPaths > maxPaths) {
+        LOGV2_DEBUG(10622200,
+                    4,
+                    "hoistSingleDocTransformBeforeStage: blocked - too many projection paths",
+                    "numPaths"_attr = numPaths,
+                    "maxPaths"_attr = maxPaths);
+        return false;
+    }
+
     auto plan = computeHoistPlan(details, *prevOutputPaths, prevDeps.fields);
     if (!plan) {
         LOGV2_DEBUG(

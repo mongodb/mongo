@@ -562,6 +562,31 @@ it("position requirement barrier: $set not hoisted before stage with position re
     });
 });
 
+it("maximum paths knob: blocks hoisting above the limit", () => {
+    runWithParamsAllNonConfigNodes(
+        db,
+        {
+            internalQueryTransformHoistPolicy: "always",
+            internalQueryTransformHoistMaximumPaths: 2,
+        },
+        () => {
+            const coll = db.hoist_computation;
+            coll.drop();
+            assert.commandWorked(coll.insertMany([{a: 0, b: 0, c: 0}]));
+
+            const assertPlan = (input, expected) => {
+                assert.eq(
+                    extractUserStages(coll.explain().aggregate(input)),
+                    extractUserStages(coll.explain().aggregate(inhibitOptimizationPerStage(expected))),
+                );
+            };
+
+            assertPlan([lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}], [lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}]);
+            assertPlan([lookupStage("x"), {$set: {a: 1, b: 2}}], [{$set: {a: 1, b: 2}}, lookupStage("x")]);
+        },
+    );
+});
+
 /// ------------------------------------
 /// sanity check cases
 /// ------------------------------------

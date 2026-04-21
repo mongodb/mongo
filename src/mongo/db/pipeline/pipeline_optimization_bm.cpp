@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
@@ -36,7 +37,9 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -116,18 +119,23 @@ public:
     boost::intrusive_ptr<ExpressionContextForTest> expCtx;
 };
 
-// Report optimization time.
-BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
-(benchmark::State& state) {
-    auto rawPipeline = generateRawPipeline(state.range(0));
+static void benchmarkOptimizePipeline(
+    benchmark::State& state,
+    const std::vector<BSONObj>& rawPipeline,
+    const boost::intrusive_ptr<ExpressionContextForTest>& expCtx) {
     for (auto keepRunning : state) {
         state.PauseTiming();
         auto pipeline =
             pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
         state.ResumeTiming();
-
         pipeline_optimization::optimizePipeline(*pipeline);
     }
+}
+
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
+(benchmark::State& state) {
+    auto rawPipeline = generateRawPipeline(state.range(0));
+    benchmarkOptimizePipeline(state, rawPipeline, expCtx);
 }
 BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
     ->Arg(10)
@@ -235,6 +243,99 @@ BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_RebuildDependencyGraphFro
     ->Arg(100)
     ->Arg(1000)
     ->Unit(benchmark::kMicrosecond);
+
+/// Generates field names a, b, ... aa, ab and so on.
+static std::string generateFieldName(size_t index) {
+    constexpr std::string_view kAlphabet = "abcdefghijklmnopqrstuvwxyz";
+    std::string name;
+    for (size_t n = index + 1; n > 0; n = (n - 1) / 26) {
+        name += kAlphabet[(n - 1) % 26];
+    }
+    return {name.rbegin(), name.rend()};
+}
+
+template <typename MakeField>
+static BSONObj makeAddFields(size_t numFields, MakeField makeField) {
+    BSONObjBuilder bob;
+    BSONObjBuilder spec(bob.subobjStart("$addFields"));
+    for (size_t i = 0; i < numFields; ++i) {
+        makeField(spec, i);
+    }
+    spec.done();
+    return bob.obj();
+}
+
+/// All fields are independent constants: {$addFields: {a: 1, b: 1, ...}}.
+static BSONObj makeConstantsAddFields(size_t numFields) {
+    return makeAddFields(
+        numFields, [](BSONObjBuilder& spec, size_t i) { spec.append(generateFieldName(i), 1); });
+}
+
+/// Each field reads the next, forming a dependency chain: {$addFields: {a: "$b", b: "$c", ...}}.
+static BSONObj makeChainAddFields(size_t numFields) {
+    return makeAddFields(numFields, [](BSONObjBuilder& spec, size_t i) {
+        spec.append(generateFieldName(i), "$" + generateFieldName(i + 1));
+    });
+}
+
+static std::vector<BSONObj> makeHoistBenchmarkPipeline(const BSONObj& projection) {
+    // The $sort creates a dependency, so that we cannot hoist {$set: {a: ...}}.
+    return {fromjson("{$sort: {a: 1}}"), projection};
+}
+
+/// Returns stage names of the optimized pipeline.
+static std::vector<StringData> stageNamesAfterOptimization(
+    const std::vector<BSONObj>& rawPipeline,
+    const boost::intrusive_ptr<ExpressionContextForTest>& expCtx) {
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    pipeline_optimization::optimizePipeline(*pipeline);
+
+    std::vector<StringData> names;
+    for (auto& source : pipeline->getSources()) {
+        names.push_back(source->getSourceName());
+    }
+    return names;
+}
+
+template <typename MakeProjection>
+static void runHoistBenchmark(benchmark::State& state,
+                              boost::intrusive_ptr<ExpressionContextForTest>& expCtx,
+                              std::vector<StringData> expectedStageNames,
+                              MakeProjection makeProjection) {
+    // Always perform the rewrite for any number of paths.
+    feature_flags::gFeatureFlagImprovedDepsAnalysis.setForServerParameter(true);
+    auto& param = *ServerParameterSet::getNodeParameterSet()->get<TransformHoistPolicy>(
+        "internalQueryTransformHoistPolicy");
+    param._data = TransformHoistPolicyEnum::kAlways;
+    internalQueryTransformHoistMaximumPaths.store(std::numeric_limits<int>::max());
+
+    auto rawPipeline = makeHoistBenchmarkPipeline(makeProjection(state.range(0)));
+    auto actualStageNames = stageNamesAfterOptimization(rawPipeline, expCtx);
+    invariant(actualStageNames == expectedStageNames);
+    benchmarkOptimizePipeline(state, rawPipeline, expCtx);
+}
+
+static void hoistBenchmarkArgs(benchmark::internal::Benchmark* b) {
+    b->RangeMultiplier(4)->Range(4, 16384)->Unit(benchmark::kMicrosecond);
+}
+
+// All fields are constants, therefore we can hoist them all except the sort key.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_HoistComputationConstants)
+(benchmark::State& state) {
+    runHoistBenchmark(state, expCtx, {"$addFields", "$sort", "$addFields"}, makeConstantsAddFields);
+}
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_HoistComputationConstants)
+    ->Apply(hoistBenchmarkArgs);
+
+
+// Fields depend on each other, which creates a chain preventing any rewrite.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_HoistComputationChain)
+(benchmark::State& state) {
+    runHoistBenchmark(state, expCtx, {"$sort", "$addFields"}, makeChainAddFields);
+}
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_HoistComputationChain)
+    ->Apply(hoistBenchmarkArgs);
 
 }  // namespace
 }  // namespace mongo
