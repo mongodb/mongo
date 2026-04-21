@@ -7,6 +7,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
@@ -84,5 +85,11 @@ assert.gte(shard1Metrics.currentOpen, originalShard1Metrics.currentOpen + 1);
 assert.eq(shard1Metrics.totalAborted, 0);
 
 session.abortTransaction();
+
+// TODO(SLS-1414): Remove once DSC supports graceful stepdown.
+if (PersistenceProviderUtil.allNodesHavePropertyWithValue(st.shard1, "supportsLocalCollections", false)) {
+    jsTest.log.info("Manually killing the session as graceful stepdown is not supported in DSC");
+    assert.commandWorked(st.shard1.adminCommand({killSessions: [{id: session.getSessionId().id}]}));
+}
 
 st.stop();
