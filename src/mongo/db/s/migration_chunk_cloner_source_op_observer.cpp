@@ -346,8 +346,9 @@ void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
         return;
     }
 
-    // Return early if this isn't a retryable batched write.
-    if (!opAccumulator || opAccumulator->batchOpTimes.empty() ||
+    // Return early if this isn't a retryable batched write, or if no oplog entries were written.
+    if (!opAccumulator ||
+        (opAccumulator->batchOpTimes.empty() && opAccumulator->opTime.writeOpTime.isNull()) ||
         oplogGroupingFormat != WriteUnitOfWork::kGroupForPossiblyRetryableOperations ||
         !opCtx->getTxnNumber() || !opCtx->getLogicalSessionId()) {
         return;
@@ -358,9 +359,15 @@ void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
     const auto affectedNamespaces = txnParticipant.affectedNamespaces();
     std::vector<NamespaceString> namespaces(affectedNamespaces.begin(), affectedNamespaces.end());
 
+    // Single-op batched writes produce a regular CRUD oplog entry and leave batchOpTimes empty;
+    // multi-op batched writes produce an applyOps entry and populate batchOpTimes per inner op.
+    std::vector<repl::OpTime> opTimes = opAccumulator->batchOpTimes.empty()
+        ? std::vector<repl::OpTime>{opAccumulator->opTime.writeOpTime}
+        : opAccumulator->batchOpTimes;
+
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<LogRetryableApplyOpsForShardingHandler>(std::move(namespaces),
-                                                                 opAccumulator->batchOpTimes));
+        std::make_unique<LogBatchedWriteForSessionMigrationHandler>(std::move(namespaces),
+                                                                    std::move(opTimes)));
 }
 
 }  // namespace mongo

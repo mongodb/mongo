@@ -1628,18 +1628,18 @@ void LogDeleteForShardingHandler::commit(OperationContext* opCtx,
     }
 }
 
-LogRetryableApplyOpsForShardingHandler::LogRetryableApplyOpsForShardingHandler(
+LogBatchedWriteForSessionMigrationHandler::LogBatchedWriteForSessionMigrationHandler(
     std::vector<NamespaceString> namespaces, std::vector<repl::OpTime> opTimes)
     : _namespaces(std::move(namespaces)), _opTimes(std::move(opTimes)) {}
 
-void LogRetryableApplyOpsForShardingHandler::commit(OperationContext* opCtx,
-                                                    boost::optional<Timestamp>) noexcept {
+void LogBatchedWriteForSessionMigrationHandler::commit(OperationContext* opCtx,
+                                                       boost::optional<Timestamp>) noexcept {
     for (const auto& nss : _namespaces) {
         // For vectored inserts an applyOps entry will only affect a single namespace that is still
         // under a WUOW, so we should be holding an IX lock on it. Other affected namespaces should
         // be skipped since they were handled already in one of LogInsertForShardingHandler,
         // LogUpdateForShardingHandler, LogDeleteForShardingHandler, or a previous invocation of
-        // LogRetryableApplyOpsForShardingHandler.
+        // LogBatchedWriteForSessionMigrationHandler.
         if (!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX)) {
             continue;
         }

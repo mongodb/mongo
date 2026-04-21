@@ -171,14 +171,14 @@ private:
 };
 
 /**
- * Used to keep track of retryable applyOps that may include changes in documents that are
- * part of a chunk being migrated.  Only takes care of retryability; the actual operations
- * are broken out and added to the transfer mods  by the other handlers.
+ * Used to keep track of retryable batched writes that may include changes in documents that are
+ * part of a chunk being migrated. Only takes care of retryability via session migration; the
+ * actual operations are broken out and added to the transfer mods by the other handlers.
  */
-class LogRetryableApplyOpsForShardingHandler final : public RecoveryUnit::Change {
+class LogBatchedWriteForSessionMigrationHandler final : public RecoveryUnit::Change {
 public:
-    LogRetryableApplyOpsForShardingHandler(std::vector<NamespaceString> namespaces,
-                                           std::vector<repl::OpTime> opTimes);
+    LogBatchedWriteForSessionMigrationHandler(std::vector<NamespaceString> namespaces,
+                                              std::vector<repl::OpTime> opTimes);
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override;
 
@@ -418,7 +418,7 @@ public:
 private:
     friend class LogOpForShardingHandler;
     friend class LogTransactionOperationsForShardingHandler;
-    friend class LogRetryableApplyOpsForShardingHandler;
+    friend class LogBatchedWriteForSessionMigrationHandler;
 
     using RecordIdSet = std::set<RecordId>;
 
