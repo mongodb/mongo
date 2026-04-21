@@ -404,6 +404,11 @@ void InitialSyncer::setAllowedOutageDuration_forTest(Milliseconds allowedOutageD
     }
 }
 
+Milliseconds InitialSyncer::getAllowedOutageDuration_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _allowedOutageDuration;
+}
+
 bool InitialSyncer::_isShuttingDown() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _isShuttingDown(lock);
@@ -664,6 +669,10 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     _phaseTransitions.clear();
     _setPhase(lock, Phase::kInitializing);
     _oplogApplier = {};
+
+    // Reload the transient error retry period from the server parameter so that runtime changes
+    // are picked up on each new initial sync attempt.
+    _allowedOutageDuration = Seconds(initialSyncTransientErrorRetryPeriodSeconds.load());
 
     LOGV2_DEBUG(
         21165, 2, "Resetting sync source so a new one can be chosen for this initial sync attempt");

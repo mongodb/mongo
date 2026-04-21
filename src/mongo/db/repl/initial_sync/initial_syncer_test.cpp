@@ -53,6 +53,7 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/oplog_fetcher_mock.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
@@ -5202,6 +5203,45 @@ TEST_F(InitialSyncerTest, InitialSyncAttemptInfoRecordsPhaseAtFailure) {
     ASSERT_EQUALS(attempt0.getStringField("phase"),
                   InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
         << attempt0;
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerReloadsTransientErrorRetryPeriodOnEachAttempt) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    // Override chooseNewSyncSource() to always return an empty host, so every attempt fails
+    // quickly during sync source selection.
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
+
+    const std::uint32_t initialSyncMaxAttempts = 2U;
+
+    // Set the server parameter to an initial value before starting initial sync.
+    const int initialRetryPeriod = 100;
+    initialSyncTransientErrorRetryPeriodSeconds.store(initialRetryPeriod);
+
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), initialSyncMaxAttempts));
+
+    auto net = getNet();
+
+    // First attempt: fails because no sync source is available.
+    _simulateChooseSyncSourceFailure(net, _options.syncSourceRetryWait);
+
+    // Before the second attempt starts, change the server parameter to a new value.
+    const int updatedRetryPeriod = 500;
+    initialSyncTransientErrorRetryPeriodSeconds.store(updatedRetryPeriod);
+
+    // Advance clock to trigger the second attempt.
+    advanceClock(net, _options.initialSyncRetryWait);
+
+    // Second attempt also fails (no sync source).
+    _simulateChooseSyncSourceFailure(net, _options.syncSourceRetryWait);
+
+    advanceClock(net, _options.initialSyncRetryWait);
+
+    initialSyncer->join();
+
+    // Verify that the updated server parameter value was picked up for the second attempt.
+    ASSERT_EQUALS(initialSyncer->getAllowedOutageDuration_forTest(), Seconds(updatedRetryPeriod));
 }
 
 }  // namespace

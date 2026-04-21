@@ -290,6 +290,12 @@ public:
      */
     void setAllowedOutageDuration_forTest(Milliseconds allowedOutageDuration);
 
+    /**
+     * Gets the allowed outage duration.
+     * For testing only.
+     */
+    Milliseconds getAllowedOutageDuration_forTest() const;
+
 private:
     enum LastOplogEntryFetcherRetryStrategy {
         kFetcherHandlesRetries,
