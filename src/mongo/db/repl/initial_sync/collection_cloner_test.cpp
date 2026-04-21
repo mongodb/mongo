@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/repl/initial_sync/collection_cloner.h"
 #include "mongo/db/repl/initial_sync/initial_sync_cloner_test_fixture.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/tenant_id.h"
@@ -115,7 +116,8 @@ protected:
                                                   _mockClient.get(),
                                                   &_storageInterface,
                                                   _dbWorkThreadPool.get(),
-                                                  recordIdsReplicated);
+                                                  recordIdsReplicated,
+                                                  _summaryStats);
     }
 
     ProgressMeter& getProgressMeter(CollectionCloner* cloner) {
@@ -146,6 +148,9 @@ protected:
     StorageInterfaceMock::CreateCollectionForBulkFn _standardCreateCollectionFn;
     CollectionBulkLoaderMock* _loader = nullptr;  // Owned by CollectionCloner.
     CollectionOptions _options;
+
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats =
+        std::make_shared<InitialSyncSummaryStats>();
 
     NamespaceString _nss;
     UUID _collUuid = UUID::gen();
@@ -1166,7 +1171,8 @@ protected:
                                                   _mockClient.get(),
                                                   &_storageInterface,
                                                   _dbWorkThreadPool.get(),
-                                                  recordIdsReplicated);
+                                                  recordIdsReplicated,
+                                                  _summaryStats);
     }
 
     NamespaceString _nss;

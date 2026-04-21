@@ -3142,7 +3142,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
     ReplSetGetStatusResponseStyle responseStyle) {
 
     BSONObj initialSyncProgress;
-    if (responseStyle == ReplSetGetStatusResponseStyle::kInitialSync) {
+    if (responseStyle == ReplSetGetStatusResponseStyle::kInitialSync ||
+        responseStyle == ReplSetGetStatusResponseStyle::kInitialSyncSummary) {
         std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
         {
             std::lock_guard lk(_mutex);
@@ -3153,7 +3154,11 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         // lock. Else it might deadlock with InitialSyncer::_multiApplierCallback where it first
         // acquires InitialSyncer::_mutex and then ReplicationCoordinatorImpl::_mutex.
         if (initialSyncerCopy) {
-            initialSyncProgress = initialSyncerCopy->getInitialSyncProgress();
+            if (responseStyle == ReplSetGetStatusResponseStyle::kInitialSyncSummary) {
+                initialSyncProgress = initialSyncerCopy->getInitialSyncProgressSummary();
+            } else {
+                initialSyncProgress = initialSyncerCopy->getInitialSyncProgress();
+            }
         }
     }
 

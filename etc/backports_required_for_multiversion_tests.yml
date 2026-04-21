@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
+      ticket: SERVER-121218
     - test_file: jstests/core/administrative/filemd5.js
       ticket: SERVER-119317
     - test_file: jstests/core/timeseries/write/timeseries_bypass_document_validation_raw_buckets.js
@@ -40,6 +42,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
+      ticket: SERVER-121218
     - test_file: jstests/core/administrative/filemd5.js
       ticket: SERVER-119317
     - test_file: jstests/core/index/elemmatch_index.js

@@ -113,6 +113,16 @@ public:
     virtual BSONObj getInitialSyncProgress() const = 0;
 
     /**
+     * Returns summary stats about the progress of initial sync without per-collection detail.
+     * Useful for FTDC to avoid unbounded data growth. Includes top-level progress stats,
+     * attempt history, and aggregate database counts but omits individual collection statistics.
+     * Default implementation returns full progress for backward compatibility.
+     */
+    virtual BSONObj getInitialSyncProgressSummary() const {
+        return getInitialSyncProgress();
+    }
+
+    /**
      * Cancels the current initial sync attempt if the initial syncer is active.
      */
     virtual void cancelCurrentAttempt() = 0;

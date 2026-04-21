@@ -52,6 +52,7 @@
 namespace mongo {
 namespace repl {
 
+struct InitialSyncSummaryStats;
 class AllDatabaseClonerTest;
 
 class AllDatabaseCloner final : public InitialSyncBaseCloner {
@@ -63,13 +64,15 @@ public:
         std::vector<DatabaseCloner::Stats> databaseStats;
 
         void append(BSONObjBuilder* builder) const;
+        void appendSummary(BSONObjBuilder* builder) const;
     };
 
     AllDatabaseCloner(InitialSyncSharedData* sharedData,
                       const HostAndPort& source,
                       DBClientConnection* client,
                       StorageInterface* storageInterface,
-                      ThreadPool* dbPool);
+                      ThreadPool* dbPool,
+                      std::shared_ptr<InitialSyncSummaryStats> summaryStats);
 
     ~AllDatabaseCloner() override = default;
 
@@ -155,6 +158,7 @@ private:
     std::vector<DatabaseName> _databases;                    // (X)
     std::unique_ptr<DatabaseCloner> _currentDatabaseCloner;  // (MX)
     Stats _stats;                                            // (MX)
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats;  // (R)
 };
 
 }  // namespace repl

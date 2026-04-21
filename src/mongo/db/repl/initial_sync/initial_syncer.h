@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -94,6 +95,36 @@ struct InitialSyncState;
 struct MemberState;
 class ReplicationProcess;
 class StorageInterface;
+
+/**
+ * Lock-free summary stats for initial sync progress reporting.
+ * All fields are atomic. Written by InitialSyncer and the cloner hierarchy under their
+ * respective mutexes; read without any lock by getInitialSyncProgressSummary().
+ */
+struct InitialSyncSummaryStats {
+    // InitialSyncer-owned fields:
+    Atomic64Metric failedInitialSyncAttempts;
+    Atomic64Metric maxFailedInitialSyncAttempts;
+    Counter64 totalAttempts;
+    AtomicWord<Date_t> initialSyncStart;
+    AtomicWord<Date_t> initialSyncEnd;
+    AtomicWord<int> phase{
+        0};  // Phase enum stored as int; cast to int only at write, to Phase at read.
+    Atomic64Metric appliedOps;
+    AtomicWord<unsigned long long> beginApplyingTimestamp{0};
+    AtomicWord<unsigned long long> beginFetchingTimestamp{0};
+    AtomicWord<unsigned long long> stopTimestamp{0};
+
+    // AllDatabaseCloner-owned fields:
+    Atomic64Metric approxTotalDataSize;
+    Counter64 approxTotalBytesCopied;  // Rolling counter from collection cloners.
+    Atomic64Metric databasesToClone;
+    Atomic64Metric databasesCloned;
+    Counter64 collectionsToClone;
+    Counter64 collectionsCloned;
+
+    BSONObj getReport() const;
+};
 
 /**
  * The initial syncer provides services to keep collection in sync by replicating
@@ -218,6 +249,8 @@ public:
     void join() final;
 
     BSONObj getInitialSyncProgress() const final;
+
+    BSONObj getInitialSyncProgressSummary() const final;
 
     void cancelCurrentAttempt() final;
 
@@ -773,6 +806,10 @@ private:
 
     // Sets _currentPhase and records the transition timestamp. Caller must hold _mutex.
     void _setPhase(WithLock, Phase phase);
+
+    // Lock-free summary stats. Written under _mutex, read without any lock. (S)
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats{
+        std::make_shared<InitialSyncSummaryStats>()};
 };
 
 }  // namespace repl

@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/initial_sync/initial_sync_cloner_test_fixture.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
@@ -75,8 +76,12 @@ protected:
                                                    _source,
                                                    _mockClient.get(),
                                                    &_storageInterface,
-                                                   _dbWorkThreadPool.get());
+                                                   _dbWorkThreadPool.get(),
+                                                   _summaryStats);
     }
+
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats =
+        std::make_shared<InitialSyncSummaryStats>();
 
     std::vector<DatabaseName> getDatabasesFromCloner(AllDatabaseCloner* cloner) {
         return cloner->_databases;
@@ -855,6 +860,53 @@ TEST_F(AllDatabaseClonerTest, FailsOnListCollectionsOnOnlyDatabase) {
 
     auto cloner = makeAllDatabaseCloner();
     ASSERT_NOT_OK(cloner->run());
+}
+
+
+TEST_F(AllDatabaseClonerTest, StatsAppendSummaryAggregatesCollectionCounts) {
+    // Construct Stats manually to test appendSummary behavior.
+    AllDatabaseCloner::Stats stats;
+    stats.databasesCloned = 2;
+    stats.databasesToClone = 3;
+    stats.dataSize = 1024;
+
+    // Create two database stats with collection counts.
+    DatabaseCloner::Stats db1Stats;
+    db1Stats.dbname = DatabaseName::createDatabaseName_forTest(boost::none, "testdb1");
+    db1Stats.collections = 5;
+    db1Stats.clonedCollections = 3;
+
+    DatabaseCloner::Stats db2Stats;
+    db2Stats.dbname = DatabaseName::createDatabaseName_forTest(boost::none, "testdb2");
+    db2Stats.collections = 10;
+    db2Stats.clonedCollections = 10;
+
+    stats.databaseStats.push_back(std::move(db1Stats));
+    stats.databaseStats.push_back(std::move(db2Stats));
+
+    // Test appendSummary: should output aggregate counts without per-collection detail.
+    BSONObjBuilder summaryBuilder;
+    stats.appendSummary(&summaryBuilder);
+    auto summaryObj = summaryBuilder.obj();
+
+    ASSERT_EQUALS(3, summaryObj.getIntField("databasesToClone"));
+    ASSERT_EQUALS(2, summaryObj.getIntField("databasesCloned"));
+    ASSERT_EQUALS(15, summaryObj.getIntField("collectionsToClone"));
+    ASSERT_EQUALS(13, summaryObj.getIntField("collectionsCloned"));
+
+    // Summary should NOT contain per-database sub-objects.
+    ASSERT_FALSE(summaryObj.hasField("testdb1"));
+    ASSERT_FALSE(summaryObj.hasField("testdb2"));
+
+    // Compare with full append: should contain per-database sub-objects.
+    BSONObjBuilder fullBuilder;
+    stats.append(&fullBuilder);
+    auto fullObj = fullBuilder.obj();
+    ASSERT_TRUE(fullObj.hasField("testdb1"));
+    ASSERT_TRUE(fullObj.hasField("testdb2"));
+    // Full append should NOT have the aggregate collection counts.
+    ASSERT_FALSE(fullObj.hasField("collectionsToClone"));
+    ASSERT_FALSE(fullObj.hasField("collectionsCloned"));
 }
 
 }  // namespace repl

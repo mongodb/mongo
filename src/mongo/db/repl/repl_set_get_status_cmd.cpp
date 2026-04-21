@@ -31,7 +31,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
 
 #include <string>
 
@@ -72,14 +72,43 @@ public:
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
 
-        bool includeInitialSync = true;
-        Status initialSyncStatus =
-            bsonExtractBooleanFieldWithDefault(cmdObj, "initialSync", true, &includeInitialSync);
-        uassertStatusOK(initialSyncStatus);
-
-        auto responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;
-        if (includeInitialSync) {
-            responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
+        // The initialSync parameter accepts:
+        //   0 or false: exclude initial sync data (kBasic)
+        //   1 or true:  include full initial sync data (kInitialSync)
+        //   2:          include summary initial sync data without per-collection detail
+        //               (kInitialSyncSummary)
+        auto responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
+        if (auto initialSyncElem = cmdObj["initialSync"]) {
+            if (initialSyncElem.isNumber()) {
+                auto val = initialSyncElem.safeNumberInt();
+                switch (val) {
+                    case 0:
+                        responseStyle =
+                            ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;
+                        break;
+                    case 1:
+                        responseStyle =
+                            ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
+                        break;
+                    case 2:
+                        responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::
+                            kInitialSyncSummary;
+                        break;
+                    default:
+                        uasserted(ErrorCodes::BadValue,
+                                  str::stream()
+                                      << "initialSync must be 0, 1, or 2, but received: " << val);
+                }
+            } else if (initialSyncElem.type() == BSONType::boolean) {
+                if (!initialSyncElem.boolean()) {
+                    responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;
+                }
+            } else {
+                uasserted(ErrorCodes::TypeMismatch,
+                          str::stream()
+                              << "initialSync must be a boolean or integer, but received: "
+                              << typeName(initialSyncElem.type()));
+            }
         }
         status = ReplicationCoordinator::get(opCtx)->processReplSetGetStatus(
             opCtx, &result, responseStyle);

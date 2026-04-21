@@ -56,6 +56,8 @@ namespace repl {
 
 class DatabaseClonerTest;
 
+struct InitialSyncSummaryStats;
+
 class MONGO_MOD_PUB DatabaseCloner final : public InitialSyncBaseCloner {
 public:
     struct Stats {
@@ -74,7 +76,8 @@ public:
                    const HostAndPort& source,
                    DBClientConnection* client,
                    StorageInterface* storageInterface,
-                   ThreadPool* dbPool);
+                   ThreadPool* dbPool,
+                   std::shared_ptr<InitialSyncSummaryStats> summaryStats);
 
     ~DatabaseCloner() override = default;
 
@@ -127,6 +130,7 @@ private:
         _collections;                                            // (X)
     std::unique_ptr<CollectionCloner> _currentCollectionCloner;  // (MX)
     Stats _stats;                                                // (MX)
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats;      // (R)
 };
 
 }  // namespace repl

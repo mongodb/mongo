@@ -40,6 +40,7 @@
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/repl/initial_sync/initial_sync_cloner_test_fixture.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
@@ -100,8 +101,12 @@ protected:
                                                 _source,
                                                 _mockClient.get(),
                                                 &_storageInterface,
-                                                _dbWorkThreadPool.get());
+                                                _dbWorkThreadPool.get(),
+                                                _summaryStats);
     }
+
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats =
+        std::make_shared<InitialSyncSummaryStats>();
 
     BSONObj createListCollectionsResponse(const std::vector<BSONObj>& collections) {
         auto ns = DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()) +
@@ -568,8 +573,12 @@ protected:
                                                 _source,
                                                 _mockClient.get(),
                                                 &_storageInterface,
-                                                _dbWorkThreadPool.get());
+                                                _dbWorkThreadPool.get(),
+                                                _summaryStats);
     }
+
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats =
+        std::make_shared<InitialSyncSummaryStats>();
 
     DatabaseName _dbName;
 };

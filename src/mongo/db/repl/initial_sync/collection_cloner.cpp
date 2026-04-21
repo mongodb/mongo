@@ -45,6 +45,7 @@
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -120,7 +121,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                                    DBClientConnection* client,
                                    StorageInterface* storageInterface,
                                    ThreadPool* dbPool,
-                                   bool recordIdsReplicated)
+                                   bool recordIdsReplicated,
+                                   std::shared_ptr<InitialSyncSummaryStats> summaryStats)
     : InitialSyncBaseCloner(
           "CollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _sourceNss(sourceNss),
@@ -158,7 +160,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
           _dbWorkTaskRunner.schedule(std::move(task));
           return executor::TaskExecutor::CallbackHandle();
       }),
-      _dbWorkTaskRunner(dbPool) {
+      _dbWorkTaskRunner(dbPool),
+      _summaryStats(summaryStats) {
     invariant(sourceNss.isValid());
     invariant(collectionOptions.uuid);
     _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.dbName(), *collectionOptions.uuid);
@@ -553,7 +556,9 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         }
         _documentsToInsert.swap(docs);
         auto copied = _documentsCopied.fetchAndAddRelaxed(docs.size()) + docs.size();
-        _approxBytesCopied.storeRelaxed(static_cast<long long>(copied) * _avgObjSize.load());
+        auto newApproxBytes = static_cast<long long>(copied) * _avgObjSize.load();
+        _approxBytesCopied.storeRelaxed(newApproxBytes);
+        _summaryStats->approxTotalBytesCopied.incrementRelaxed(docs.size() * _avgObjSize.load());
         _progressMeter.hit(int(docs.size()));
         invariant(_collLoader);
 

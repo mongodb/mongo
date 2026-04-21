@@ -709,11 +709,15 @@ public:
      */
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const = 0;
 
-    enum class ReplSetGetStatusResponseStyle { kBasic, kInitialSync };
+    enum class ReplSetGetStatusResponseStyle {
+        kBasic,              // initialSync: 0 - excludes initial sync data
+        kInitialSync,        // initialSync: 1 - includes full initial sync data
+        kInitialSyncSummary  // initialSync: 2 - includes summary without per-collection detail
+    };
 
     /**
-     * Handles an incoming replSetGetStatus command. Adds BSON to 'result'. If kInitialSync is
-     * requested but initial sync is not running, kBasic will be used.
+     * Handles an incoming replSetGetStatus command. Adds BSON to 'result'. If kInitialSync or
+     * kInitialSyncSummary is requested but initial sync is not running, kBasic will be used.
      */
     virtual Status processReplSetGetStatus(OperationContext* opCtx,
                                            BSONObjBuilder* result,

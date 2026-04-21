@@ -513,6 +513,16 @@ BSONObj InitialSyncer::_getInitialSyncProgress(WithLock lk) const {
     return bob.obj();
 }
 
+BSONObj InitialSyncer::getInitialSyncProgressSummary() const {
+
+    auto phase = _summaryStats->phase.loadRelaxed();
+    if (static_cast<Phase>(phase) == Phase::kNotStarted ||
+        static_cast<Phase>(phase) == Phase::kComplete) {
+        return BSONObj();
+    }
+    return _summaryStats->getReport();
+}
+
 void InitialSyncer::setCreateClientFn_forTest(const CreateClientFn& createClientFn) {
     LockGuard lk(_mutex);
     _createClientFn = createClientFn;
@@ -568,6 +578,10 @@ void InitialSyncer::_setUp(WithLock lk,
     _stats.failedInitialSyncAttempts = 0;
     _stats.exec = std::weak_ptr<executor::TaskExecutor>(_exec);
 
+    _summaryStats->initialSyncStart.storeRelaxed(_stats.initialSyncStart);
+    _summaryStats->maxFailedInitialSyncAttempts.set(initialSyncMaxAttempts);
+    _summaryStats->failedInitialSyncAttempts.set(0);
+
     _allowedOutageDuration = Seconds(initialSyncTransientErrorRetryPeriodSeconds.load());
 }
 
@@ -575,6 +589,7 @@ void InitialSyncer::_tearDown(WithLock lk,
                               OperationContext* opCtx,
                               const StatusWith<OpTimeAndWallTime>& lastApplied) {
     _stats.initialSyncEnd = _exec->now();
+    _summaryStats->initialSyncEnd.storeRelaxed(_stats.initialSyncEnd);
 
     // This might not be necessary if we failed initial sync.
     invariant(_oplogBuffer);
@@ -1198,7 +1213,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                                                 getGlobalServiceContext()->getFastClockSource());
     _client = _createClientFn();
     _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<AllDatabaseCloner>(
-        _sharedData.get(), _syncSource, _client.get(), _storage, _workerPool));
+        _sharedData.get(), _syncSource, _client.get(), _storage, _workerPool, _summaryStats));
 
     // Create oplog applier.
     auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
@@ -1213,6 +1228,11 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     _initialSyncState->beginApplyingTimestamp = lastOpTime.getTimestamp();
     _initialSyncState->beginFetchingTimestamp = beginFetchingOpTime.getTimestamp();
+
+    _summaryStats->beginApplyingTimestamp.storeRelaxed(
+        _initialSyncState->beginApplyingTimestamp.asULL());
+    _summaryStats->beginFetchingTimestamp.storeRelaxed(
+        _initialSyncState->beginFetchingTimestamp.asULL());
 
     invariant(_initialSyncState->beginApplyingTimestamp >=
                   _initialSyncState->beginFetchingTimestamp,
@@ -1472,6 +1492,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         _oplogApplier->setMinValid(resultOpTimeAndWallTime.opTime);
 
         _initialSyncState->stopTimestamp = resultOpTimeAndWallTime.opTime.getTimestamp();
+        _summaryStats->stopTimestamp.storeRelaxed(_initialSyncState->stopTimestamp.asULL());
 
         // If the beginFetchingTimestamp is different from the stopTimestamp, it indicates that
         // there are oplog entries fetched by the oplog fetcher that need to be written to the oplog
@@ -1658,6 +1679,7 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
     }
 
     _initialSyncState->appliedOps += numApplied;
+    _summaryStats->appliedOps.set(_initialSyncState->appliedOps);
     _lastApplied = lastApplied;
     const auto lastAppliedOpTime = _lastApplied.opTime;
     _opts.setMyLastOptime(_lastApplied);
@@ -1799,12 +1821,14 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
         _currentPhase,
         static_cast<unsigned>(time(nullptr) - serverGlobalParams.started),
         std::move(phaseDurations)});
+    _summaryStats->totalAttempts.incrementRelaxed();
     _phaseTransitions.clear();
 
 
     if (!result.isOK()) {
         // This increments the number of failed attempts for the current initial sync request.
         ++_stats.failedInitialSyncAttempts;
+        _summaryStats->failedInitialSyncAttempts.set(_stats.failedInitialSyncAttempts);
         // This increments the number of failed attempts across all initial sync attempts since
         // process startup.
         initial_sync_common_stats::initialSyncFailedAttempts.increment();
@@ -2236,7 +2260,7 @@ Status InitialSyncer::_enqueueDocuments(OplogFetcher::Documents::const_iterator 
 
     _lastFetched = info.lastDocument;
 
-    // TODO: updates metrics with "info".
+    // TODO SERVER-124475: updates metrics with "info".
     return Status::OK();
 }
 
@@ -2278,6 +2302,68 @@ void InitialSyncer::Stats::append(BSONObjBuilder* builder) const {
         arrBuilder.append(initialSyncAttemptInfos[i].toBSON());
     }
     arrBuilder.doneFast();
+}
+
+BSONObj InitialSyncSummaryStats::getReport() const {
+    BSONObjBuilder bob;
+    bob.append("method", "logical");
+    bob.appendNumber("failedInitialSyncAttempts", (long long)failedInitialSyncAttempts.get());
+    bob.appendNumber("maxFailedInitialSyncAttempts", (long long)maxFailedInitialSyncAttempts.get());
+    bob.appendNumber("totalAttempts", totalAttempts.get());
+
+    auto start = initialSyncStart.loadRelaxed();
+    long long elapsedMillis = 0;
+    if (start != Date_t()) {
+        bob.appendDate("initialSyncStart", start);
+        auto end = initialSyncEnd.loadRelaxed();
+        auto elapsedDurationEnd = (end != Date_t()) ? end : Date_t::now();
+        if (end != Date_t()) {
+            bob.appendDate("initialSyncEnd", end);
+        }
+        elapsedMillis = duration_cast<Milliseconds>(elapsedDurationEnd - start).count();
+        bob.appendNumber("totalInitialSyncElapsedMillis", elapsedMillis);
+    }
+
+    bob.appendNumber("phase", phase.loadRelaxed());
+
+    auto totalDataSize = (long long)approxTotalDataSize.get();
+    auto totalBytesCopied = approxTotalBytesCopied.get();
+    bob.appendNumber("approxTotalDataSize", totalDataSize);
+    bob.appendNumber("approxTotalBytesCopied", totalBytesCopied);
+    if (totalBytesCopied > 0 && elapsedMillis > 0) {
+        const auto downloadRate =
+            static_cast<double>(elapsedMillis) / static_cast<double>(totalBytesCopied);
+        const auto remainingEstimatedMillis =
+            downloadRate * static_cast<double>(totalDataSize - totalBytesCopied);
+        bob.appendNumber("remainingInitialSyncEstimatedMillis",
+                         static_cast<long long>(remainingEstimatedMillis));
+    }
+
+    bob.appendNumber("appliedOps", (long long)appliedOps.get());
+
+    auto beginApplying = beginApplyingTimestamp.loadRelaxed();
+    if (beginApplying) {
+        bob.append("initialSyncOplogStart", Timestamp(beginApplying));
+    }
+    auto beginFetching = beginFetchingTimestamp.loadRelaxed();
+    if (beginFetching && beginFetching != beginApplying) {
+        bob.append("initialSyncOplogFetchingStart", Timestamp(beginFetching));
+    }
+    auto stop = stopTimestamp.loadRelaxed();
+    if (stop) {
+        bob.append("initialSyncOplogEnd", Timestamp(stop));
+    }
+
+    {
+        BSONObjBuilder dbsBuilder(bob.subobjStart("databases"));
+        dbsBuilder.appendNumber("databasesToClone", (long long)databasesToClone.get());
+        dbsBuilder.appendNumber("databasesCloned", (long long)databasesCloned.get());
+        dbsBuilder.appendNumber("collectionsToClone", collectionsToClone.get());
+        dbsBuilder.appendNumber("collectionsCloned", collectionsCloned.get());
+        dbsBuilder.doneFast();
+    }
+
+    return bob.obj();
 }
 
 StringData InitialSyncer::phaseToString(Phase phase) {
@@ -2362,6 +2448,7 @@ void InitialSyncer::_setPhase(WithLock, Phase phase) {
         return;
     }
     _currentPhase = phase;
+    _summaryStats->phase.storeRelaxed(static_cast<int>(phase));
     _phaseTransitions.emplace_back(phase, _exec->now());
 }
 }  // namespace repl

@@ -51,6 +51,22 @@ assert(!res.initialSyncStatus, () => "Response should not have an 'initialSyncSt
 
 assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}), ErrorCodes.TypeMismatch);
 
+// Test that initialSync: 2 (summary mode) returns initialSyncStatus.
+res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 2}));
+assert(
+    res.initialSyncStatus,
+    () => "Response with initialSync: 2 should have 'initialSyncStatus' field: " + tojson(res),
+);
+// At this early stage (before copying databases), the databases section has aggregate counts
+// but no per-database sub-objects. Any per-database sub-objects that do appear are a bug.
+if (res.initialSyncStatus.databases) {
+    assert(
+        !res.initialSyncStatus.databases.hasOwnProperty("pretest"),
+        "Summary should not have per-database 'pretest' sub-object before cloning: " +
+            tojson(res.initialSyncStatus.databases),
+    );
+}
+
 assert.commandWorked(coll.insert({a: 3}));
 assert.commandWorked(coll.insert({a: 4}));
 
@@ -91,6 +107,50 @@ if (!FeatureFlagUtil.isPresentAndEnabled(primary.getDB("test"), "ReplicatedFastC
 // The server still has the 'pretest' and 'test' dbs to finish cloning.
 assert.eq(pretestDbRes.initialSyncStatus.databases.databasesCloned, 2);
 assert.eq(pretestDbRes.initialSyncStatus.databases.databasesToClone, 2);
+
+// Test summary mode (initialSync: 2) during mid-clone.
+const summaryRes = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 2}));
+assert(
+    summaryRes.initialSyncStatus,
+    () => "Summary response should have 'initialSyncStatus' field: " + tojson(summaryRes),
+);
+const summaryDbs = summaryRes.initialSyncStatus.databases;
+
+// Summary should have aggregate counts.
+assert(summaryDbs.hasOwnProperty("databasesToClone"), "Should have databasesToClone: " + tojson(summaryDbs));
+assert(summaryDbs.hasOwnProperty("databasesCloned"), "Should have databasesCloned: " + tojson(summaryDbs));
+assert(summaryDbs.hasOwnProperty("collectionsToClone"), "Should have collectionsToClone: " + tojson(summaryDbs));
+assert(summaryDbs.hasOwnProperty("collectionsCloned"), "Should have collectionsCloned: " + tojson(summaryDbs));
+
+// Summary should NOT have per-database sub-objects.
+assert(
+    !summaryDbs.hasOwnProperty("pretest"),
+    "Summary should not have per-database 'pretest' sub-object: " + tojson(summaryDbs),
+);
+assert(
+    !summaryDbs.hasOwnProperty("admin"),
+    "Summary should not have per-database 'admin' sub-object: " + tojson(summaryDbs),
+);
+
+// Compare with full response which should have per-database detail.
+assert(
+    pretestDbRes.initialSyncStatus.databases.hasOwnProperty("pretest"),
+    "Full response should have per-database 'pretest' sub-object: " + tojson(pretestDbRes.initialSyncStatus.databases),
+);
+assert(
+    pretestDbRes.initialSyncStatus.databases.pretest.hasOwnProperty("pretest.bar"),
+    "Full response should have per-collection detail: " + tojson(pretestDbRes.initialSyncStatus.databases.pretest),
+);
+
+// Summary top-level fields should match full response.
+assert.eq(
+    summaryRes.initialSyncStatus.failedInitialSyncAttempts,
+    pretestDbRes.initialSyncStatus.failedInitialSyncAttempts,
+);
+assert.eq(
+    summaryRes.initialSyncStatus.maxFailedInitialSyncAttempts,
+    pretestDbRes.initialSyncStatus.maxFailedInitialSyncAttempts,
+);
 
 failPointAfterNumDocsCopied.off();
 
@@ -168,6 +228,13 @@ res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert(!res.initialSyncStatus, () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
 
 assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}), ErrorCodes.TypeMismatch);
+
+// After initial sync completes, summary mode should also not have initialSyncStatus.
+res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 2}));
+assert(
+    !res.initialSyncStatus,
+    () => "After initial sync, response with initialSync: 2 should not have 'initialSyncStatus' field: " + tojson(res),
+);
 
 // Let initial sync finish and get into secondary state.
 failPointAfterFinish.off();

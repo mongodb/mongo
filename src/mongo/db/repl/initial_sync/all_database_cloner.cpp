@@ -42,6 +42,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/initial_sync/all_database_cloner.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_auth.h"
@@ -69,12 +70,14 @@ AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
                                      const HostAndPort& source,
                                      DBClientConnection* client,
                                      StorageInterface* storageInterface,
-                                     ThreadPool* dbPool)
+                                     ThreadPool* dbPool,
+                                     std::shared_ptr<InitialSyncSummaryStats> summaryStats)
     : InitialSyncBaseCloner(
           "AllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _connectStage("connect", this, &AllDatabaseCloner::connectStage),
       _getInitialSyncIdStage("getInitialSyncId", this, &AllDatabaseCloner::getInitialSyncIdStage),
-      _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage) {}
+      _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage),
+      _summaryStats(summaryStats) {}
 
 BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
     return {&_connectStage, &_getInitialSyncIdStage, &_listDatabasesStage};
@@ -255,6 +258,8 @@ void AllDatabaseCloner::postStage() {
             }
         }
     }
+    _summaryStats->databasesToClone.set(_stats.databasesToClone);
+    _summaryStats->approxTotalDataSize.set(_stats.dataSize);
 
     for (const auto& dbName : _databases) {
         {
@@ -264,7 +269,8 @@ void AllDatabaseCloner::postStage() {
                                                                       getSource(),
                                                                       getClient(),
                                                                       getStorageInterface(),
-                                                                      getDBPool());
+                                                                      getDBPool(),
+                                                                      _summaryStats);
         }
         auto dbStatus = _currentDatabaseCloner->run();
         if (dbStatus.isOK()) {
@@ -289,6 +295,8 @@ void AllDatabaseCloner::postStage() {
             _currentDatabaseCloner = nullptr;
             _stats.databasesCloned++;
             _stats.databasesToClone--;
+            _summaryStats->databasesCloned.set(_stats.databasesCloned);
+            _summaryStats->databasesToClone.set(_stats.databasesToClone);
         }
     }
 }
@@ -320,6 +328,19 @@ void AllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
         db.append(&dbBuilder);
         dbBuilder.doneFast();
     }
+}
+
+void AllDatabaseCloner::Stats::appendSummary(BSONObjBuilder* builder) const {
+    builder->appendNumber("databasesToClone", static_cast<long long>(databasesToClone));
+    builder->appendNumber("databasesCloned", static_cast<long long>(databasesCloned));
+    long long totalCollections = 0;
+    long long totalClonedCollections = 0;
+    for (auto&& db : databaseStats) {
+        totalCollections += db.collections;
+        totalClonedCollections += db.clonedCollections;
+    }
+    builder->appendNumber("collectionsToClone", totalCollections);
+    builder->appendNumber("collectionsCloned", totalClonedCollections);
 }
 
 }  // namespace repl

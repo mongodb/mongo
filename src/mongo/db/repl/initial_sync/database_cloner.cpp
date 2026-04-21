@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/repl/initial_sync/database_cloner.h"
 #include "mongo/db/repl/initial_sync/database_cloner_gen.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/list_collections_filter.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
@@ -65,11 +66,13 @@ DatabaseCloner::DatabaseCloner(const DatabaseName& dbName,
                                const HostAndPort& source,
                                DBClientConnection* client,
                                StorageInterface* storageInterface,
-                               ThreadPool* dbPool)
+                               ThreadPool* dbPool,
+                               std::shared_ptr<InitialSyncSummaryStats> summaryStats)
     : InitialSyncBaseCloner(
           "DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
-      _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage) {
+      _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage),
+      _summaryStats(summaryStats) {
     invariant(!dbName.isEmpty());
     _stats.dbname = dbName;
 }
@@ -157,6 +160,7 @@ void DatabaseCloner::postStage() {
             _stats.collectionStats.back().nss = get<0>(coll);
         }
     }
+    _summaryStats->collectionsToClone.incrementRelaxed(_collections.size());
     for (const auto& [sourceNss, collectionOptions, recordIdsReplicated] : _collections) {
         {
             std::lock_guard<std::mutex> lk(_mutex);
@@ -167,7 +171,8 @@ void DatabaseCloner::postStage() {
                                                                           getClient(),
                                                                           getStorageInterface(),
                                                                           getDBPool(),
-                                                                          recordIdsReplicated);
+                                                                          recordIdsReplicated,
+                                                                          _summaryStats);
         }
         auto collStatus = _currentCollectionCloner->run();
         if (collStatus.isOK()) {
@@ -192,6 +197,7 @@ void DatabaseCloner::postStage() {
             if (!collStatus.isOK())
                 return;
             _stats.clonedCollections++;
+            _summaryStats->collectionsCloned.incrementRelaxed();
         }
     }
     std::lock_guard<std::mutex> lk(_mutex);

@@ -69,6 +69,8 @@ namespace repl {
 
 class CollectionClonerTest;
 
+struct InitialSyncSummaryStats;
+
 inline const int kProgressMeterSecondsBetween = 60;
 inline const int kProgressMeterCheckInterval = 128;
 
@@ -110,7 +112,8 @@ public:
                      DBClientConnection* client,
                      StorageInterface* storageInterface,
                      ThreadPool* dbPool,
-                     bool recordIdsReplicated);
+                     bool recordIdsReplicated,
+                     std::shared_ptr<InitialSyncSummaryStats> summaryStats);
 
     ~CollectionCloner() override = default;
 
@@ -325,6 +328,8 @@ private:
     Atomic<long long> _bytesToCopy{0};
     Atomic<long long> _avgObjSize{0};
     Atomic<long long> _approxBytesCopied{0};
+
+    std::shared_ptr<InitialSyncSummaryStats> _summaryStats;  // (R)
 };
 
 }  // namespace repl

@@ -177,7 +177,7 @@ static const BSONObj getClusterParameterQueryObj =
     BSONObjBuilder{}.append("getClusterParameter", "*").append("omitInFTDC", true).obj();
 
 static const BSONObj replSetGetStatusObj =
-    BSONObjBuilder{}.append("replSetGetStatus", 1).append("initialSync", 0).obj();
+    BSONObjBuilder{}.append("replSetGetStatus", 1).append("initialSync", 2).obj();
 
 repl::ReplicationCoordinator* getGlobalRC() {
     return repl::ReplicationCoordinator::get(getGlobalServiceContext());
