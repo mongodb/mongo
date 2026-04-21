@@ -1811,16 +1811,7 @@ EncryptedFieldConfig QETextSearchCrudTest::getEFC() {
     std::vector<QueryTypeConfig> qtcs;
     for (const auto& schema : _schemas) {
         QueryTypeConfig qtc;
-        // Use the deprecated "Preview" query type names when building the EFC that gets
-        // passed to libmongocrypt, since libmongocrypt does not yet recognize the new names.
-        // TODO SERVER-123416 Remove this mapping once libmongocrypt supports "suffix"/"prefix".
-        auto mongocryptType = schema.type;
-        if (mongocryptType == QueryTypeEnum::Suffix) {
-            mongocryptType = QueryTypeEnum::SuffixPreviewDeprecated;
-        } else if (mongocryptType == QueryTypeEnum::Prefix) {
-            mongocryptType = QueryTypeEnum::PrefixPreviewDeprecated;
-        }
-        qtc.setQueryType(mongocryptType);
+        qtc.setQueryType(schema.type);
         if (schema.type == QueryTypeEnum::SubstringPreview) {
             qtc.setStrMaxLength(schema.mlen);
         }

@@ -1,6 +1,6 @@
 /**
  * Test downgrade to incompatible versions is blocked if substringPreview,
- * suffix, or prefix query types are being used in a FLE2 collection.
+ * suffixPreview, or prefixPreview query types are being used in a FLE2 collection.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
@@ -9,10 +9,12 @@ import {PrefixField, SubstringField, SuffixAndPrefixField, SuffixField} from "js
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "qe_text_downgrade_test";
-const substrField = new SubstringField(20, 2, 10, false, false, 1);
-const suffixField = new SuffixField(2, 5, true, false, 1);
-const prefixField = new PrefixField(2, 5, false, true, 1);
-const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1);
+// TODO: SERVER-123416 test downgrade also prevented by the existence of non-preview types.
+const forcePreview = true;
+const substrField = new SubstringField(20, 2, 10, false, false, 1, forcePreview);
+const suffixField = new SuffixField(2, 5, true, false, 1, forcePreview);
+const prefixField = new PrefixField(2, 5, false, true, 1, forcePreview);
+const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1, forcePreview);
 
 function testBinaryDowngrade(queryTypeConfig) {
     jsTestLog("Testing downgrade from latest to last-lts");

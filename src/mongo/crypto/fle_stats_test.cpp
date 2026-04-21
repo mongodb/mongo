@@ -175,6 +175,8 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
         int64_t equality = 0;
         int64_t unindexed = 0;
         int64_t range = 0;
+        int64_t suffix = 0;
+        int64_t prefix = 0;
         int64_t rangePreview = 0;
         int64_t substringPreview = 0;
         int64_t suffixPreview = 0;
@@ -187,6 +189,8 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
         ASSERT_EQ(actual.getEquality(), expected.equality);
         ASSERT_EQ(actual.getUnindexed(), expected.unindexed);
         ASSERT_EQ(actual.getRange(), expected.range);
+        ASSERT_EQ(actual.getSuffix(), expected.suffix);
+        ASSERT_EQ(actual.getPrefix(), expected.prefix);
         ASSERT_EQ(actual.getRangePreview(), expected.rangePreview);
         ASSERT_EQ(actual.getSubstringPreview(), expected.substringPreview);
         ASSERT_EQ(actual.getSuffixPreview(), expected.suffixPreview);
@@ -203,15 +207,18 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
                 for (auto i = count; i > 0; i--) {
                     fields.emplace_back(keyId, indexType);
                 }
-            } else if (indexType == "multi") {
+            } else if (indexType == "multi" || indexType == "multiPreview") {
+                auto suffixType = (indexType == "multi") ? R"({"queryType": "suffix"})"
+                                                         : R"({"queryType": "suffixPreview"})";
+                auto prefixType = (indexType == "multi") ? R"({"queryType": "prefix"})"
+                                                         : R"({"queryType": "prefixPreview"})";
+
                 for (auto i = count; i > 0; i--) {
                     fields.emplace_back(keyId, indexType);
 
                     std::vector<QueryTypeConfig> queries;
-                    queries.push_back(
-                        QueryTypeConfig::parse(fromjson(R"({"queryType": "suffixPreview"})")));
-                    queries.push_back(
-                        QueryTypeConfig::parse(fromjson(R"({"queryType": "prefixPreview"})")));
+                    queries.push_back(QueryTypeConfig::parse(fromjson(suffixType)));
+                    queries.push_back(QueryTypeConfig::parse(fromjson(prefixType)));
 
                     fields.back().setQueries(
                         std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>(
@@ -237,7 +244,7 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
     IndexTypeCounters expected;
     assertCounters(expected);
 
-    auto efc1 = buildConfig({{"unindexed", 4}, {"equality", 2}, {"multi", 3}});
+    auto efc1 = buildConfig({{"unindexed", 4}, {"equality", 2}, {"multiPreview", 3}});
     instance->updateIndexTypeStatsOnRegisterCollection(efc1);
     expected.unindexed++;
     expected.equality++;
@@ -255,7 +262,8 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
     auto efc3 = buildConfig({{"suffixPreview", 1}, {"multi", 1}});
     instance->updateIndexTypeStatsOnRegisterCollection(efc3);
     expected.suffixPreview++;
-    expected.prefixPreview++;
+    expected.suffix++;
+    expected.prefix++;
     assertCounters(expected);
 
     instance->updateIndexTypeStatsOnDeregisterCollection(efc2);
@@ -266,12 +274,14 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
 
     instance->updateIndexTypeStatsOnRegisterCollection(efc3);
     expected.suffixPreview++;
-    expected.prefixPreview++;
+    expected.suffix++;
+    expected.prefix++;
     assertCounters(expected);
 
     instance->updateIndexTypeStatsOnDeregisterCollection(efc3);
     expected.suffixPreview--;
-    expected.prefixPreview--;
+    expected.suffix--;
+    expected.prefix--;
     assertCounters(expected);
 
     instance->updateIndexTypeStatsOnDeregisterCollection(efc1);
@@ -283,7 +293,8 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
 
     instance->updateIndexTypeStatsOnDeregisterCollection(efc3);
     expected.suffixPreview--;
-    expected.prefixPreview--;
+    expected.suffix--;
+    expected.prefix--;
     assertCounters(expected);
 }
 
