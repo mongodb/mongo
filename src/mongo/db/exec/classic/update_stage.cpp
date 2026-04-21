@@ -215,7 +215,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             return PlanStage::NEED_TIME;
         }
 
-        bool docStillMatches;
+        bool docStillMatches = false;
         const auto ensureStillMatchesRet = handlePlanStageYield(
             expCtx(),
             "UpdateStage ensureStillMatches",
