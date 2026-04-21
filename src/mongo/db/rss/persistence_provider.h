@@ -261,6 +261,11 @@ public:
      * If true, the provider supports cold collections.
      */
     virtual bool supportsColdCollections() const = 0;
+
+    /**
+     * If true, the provider enforces read preference on getMore commands for change stream cursors.
+     */
+    virtual bool enforcesChangeStreamReadPreferenceOnGetMore() const = 0;
 };
 
 }  // namespace rss

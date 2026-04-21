@@ -222,6 +222,11 @@ public:
      * Attached storage does not support cold collections.
      */
     bool supportsColdCollections() const override;
+
+    /**
+     * Attached storage supports read preference enforcement for change streams.
+     */
+    bool enforcesChangeStreamReadPreferenceOnGetMore() const override;
 };
 
 }  // namespace mongo::rss

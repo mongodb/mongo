@@ -11,6 +11,7 @@
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {describe, it, before, after, afterEach} from "jstests/libs/mochalite.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ChangeStreamTest, isResumableChangeStreamError} from "jstests/libs/query/change_stream_util.js";
@@ -60,6 +61,9 @@ describe("change stream readPreference enforcement on sharded cluster elections"
                     periodicNoopIntervalSecs: 1,
                     writePeriodicNoops: true,
                 },
+            },
+            configOptions: {
+                setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
             },
         });
 
@@ -162,8 +166,14 @@ describe("change stream readPreference enforcement on sharded cluster elections"
             const resumeToken = csTest.getResumeToken(cursor);
 
             // Step up a secondary on shard0 to trigger error on next cursor use.
-            const shard0Secondary = st.rs0.getSecondary();
-            st.rs0.stepUp(shard0Secondary, {awaitReplicationBeforeStepUp: false});
+            const shard0OldPrimary = st.rs0.getPrimary();
+            const shard0NewPrimary = st.rs0.getSecondary();
+            st.rs0.stepUp(shard0NewPrimary, {awaitReplicationBeforeStepUp: false});
+
+            // Ensure secondary and primary are set before continuing.
+            st.rs0.awaitNodesAgreeOnPrimary();
+            awaitRSClientHosts(st.s, shard0NewPrimary, {ok: true, ismaster: true});
+            awaitRSClientHosts(st.s, shard0OldPrimary, {ok: true, ismaster: false});
 
             // Insert new data after the election.
             assert.commandWorked(coll.insert({_id: -2}));

@@ -248,6 +248,12 @@ public:
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::supportsColdCollections() method not implemented");
     }
+
+    bool enforcesChangeStreamReadPreferenceOnGetMore() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::enforcesChangeStreamReadPreferenceOnGetMore() method "
+                  "not implemented");
+    }
 };
 
 }  // namespace mongo::rss
