@@ -65,6 +65,7 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_api_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/tenant_id.h"
@@ -946,8 +947,10 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
 void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext* opCtx,
                                                                 const NamespaceString& nss) {
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    const int maxAttempts = maxShardMetadataDiskRecoveryAttempts.loadRelaxed();
+    StringData lastRetryReason;
 
-    while (true) {
+    for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
         std::shared_ptr<CollectionCacheRecoverer> recoverer;
         SharedPromise<void> promise;
         CancellationToken cancellationToken = CancellationToken::uncancelable();
@@ -957,6 +960,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
                 boost::make_optional(CollectionShardingRuntime::acquireExclusive(opCtx, nss));
 
             if (joinPlacementVersionOperations(opCtx, &scopedCsr)) {
+                lastRetryReason = "ongoing critical section or concurrent refresh"_sd;
                 continue;
             }
 
@@ -1013,6 +1017,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
                         logAttrs(nss),
                         "error"_attr = status);
 
+            lastRetryReason = "disk recoverer initial pass failed"_sd;
             continue;
         }
 
@@ -1028,6 +1033,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
                     "Authoritative metadata recovery: interrupted by an invalidate oplog entry",
                     logAttrs(nss));
 
+                lastRetryReason = "interrupted by an invalidate oplog entry"_sd;
                 continue;
             }
 
@@ -1039,6 +1045,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
                     "retrying",
                     logAttrs(nss));
 
+                lastRetryReason = "critical section entered after drain"_sd;
                 continue;
             }
 
@@ -1059,8 +1066,14 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
 
         promise.emplaceValue();
 
-        break;
+        return;
     }
+
+    tasserted(12332300,
+              str::stream() << "Exhausted maximum number (" << maxAttempts
+                            << ") of authoritative collection metadata recovery attempts for "
+                            << nss.toStringForErrorMsg()
+                            << "; last retry reason: " << lastRetryReason);
 }
 
 void FilteringMetadataCache::_tryNoopWriteToAdvanceMajorityCommitPoint(OperationContext* opCtx) {

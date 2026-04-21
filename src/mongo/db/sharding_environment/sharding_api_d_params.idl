@@ -87,6 +87,20 @@ server_parameters:
         default: 10
         redact: false
 
+    maxShardMetadataDiskRecoveryAttempts:
+        description: >-
+            Maximum number of attempts the shard will make while recovering a collection's
+            authoritative collection metadata from the on-disk catalog. Each iteration of the
+            disk-recovery loop (including retries triggered by ongoing critical sections,
+            concurrent refreshes, invalidates, or cancellations) counts toward this cap.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: maxShardMetadataDiskRecoveryAttempts
+        validator:
+            gte: 1
+        default: 10
+        redact: false
+
     # TODO (SERVER-112793) Remove once v9.0 branches out
     enableCompoundWildcardIndexLog:
         description: >-
