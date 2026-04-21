@@ -772,9 +772,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # generate the setter for instances of the storage type.
         if storage_type != setter_type and cpp_type_info.has_storage_type_setter():
             if field.chained_struct_field:
-                storage_setter_body = "{}.{}(std::move(value));".format(
-                    _get_field_member_name(field.chained_struct_field), memfn
-                )
+                storage_setter_body = f"{_get_field_member_getter_name(field.chained_struct_field)}().{memfn}(std::move(value));"
             else:
                 storage_setter_body = cpp_type_info.get_storage_type_setter_body(
                     _get_field_member_name(field), validator
@@ -1715,18 +1713,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if field.chained_struct_field:
             if field.type.is_variant:
                 self._writer.write_line(
-                    "%s.%s(%s(std::move(values)));"
+                    "%s().%s(%s(std::move(values)));"
                     % (
-                        _get_field_member_name(field.chained_struct_field),
+                        _get_field_member_getter_name(field.chained_struct_field),
                         _get_field_member_setter_name(field),
                         field.type.cpp_type,
                     )
                 )
             else:
                 self._writer.write_line(
-                    "%s.%s(std::move(values));"
+                    "%s().%s(std::move(values));"
                     % (
-                        _get_field_member_name(field.chained_struct_field),
+                        _get_field_member_getter_name(field.chained_struct_field),
                         _get_field_member_setter_name(field),
                     )
                 )
@@ -1851,9 +1849,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 cpp_type_info = cpp_types.get_cpp_type(field)
                 value_expr = f"{cpp_type_info.get_getter_setter_type()}({value_expr})"
             if field.chained_struct_field:
-                chain_source = _get_field_member_name(field.chained_struct_field)
+                chain_source = _get_field_member_getter_name(field.chained_struct_field)
                 setter = _get_field_member_setter_name(field)
-                self._writer.write_line(f"{chain_source}.{setter}({value_expr});")
+                self._writer.write_line(f"{chain_source}().{setter}({value_expr});")
             else:
                 self._writer.write_line(f"{field_name} = {value_expr};")
 
