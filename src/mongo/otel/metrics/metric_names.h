@@ -157,6 +157,18 @@ public:
     static constexpr MetricName kIndexBuildKeysGeneratedFromScan = {
         "index_builds.keys_generated_from_scan"};
 
+    // Query Integration Team Metrics
+
+    // Op Counters
+    static constexpr MetricName kInsertOpCount = {"opcounters.inserts"};
+    static constexpr MetricName kQueryOpCount = {"opcounters.queries"};
+    static constexpr MetricName kUpdateOpCount = {"opcounters.updates"};
+    static constexpr MetricName kDeleteOpCount = {"opcounters.deletes"};
+    static constexpr MetricName kGetMoreOpCount = {"opcounters.get_mores"};
+    static constexpr MetricName kCommandOpCount = {"opcounters.commands"};
+    // New in SERVER-123987 - Counts every top-level 'aggregate' command.
+    static constexpr MetricName kAggregateOpCount = {"opcounters.aggregates"};
+
     // Test-only
     static constexpr MetricName kTest1 = {"test_only.metric1"};
     static constexpr MetricName kTest2 = {"test_only.metric2"};
