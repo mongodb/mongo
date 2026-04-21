@@ -151,7 +151,6 @@ let testCases = {
     _refreshQueryAnalyzerConfiguration: {skip: "internal command"},
     _shardsvrAbortReshardCollection: {skip: "internal command"},
     _shardsvrBeginMigrationBlockingOperation: {skip: "internal command"},
-    _shardsvrChangePrimary: {skip: "internal command"},
     _shardsvrCloneAuthoritativeMetadata: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "internal command"},
     _shardsvrCheckMetadataConsistency: {skip: "internal command"},
@@ -312,7 +311,7 @@ let testCases = {
         useLogs: true,
         skipMultiversion: true,
     },
-    changePrimary: {skip: "does not accept read or write concern"},
+    changePrimary: {skip: "removed"}, // TODO (SERVER-123533): Remove once 9.0 is last LTS.
     checkMetadataConsistency: {skip: "does not accept read or write concern"},
     checkShardingIndex: {skip: "does not accept read or write concern"},
     cleanupOrphaned: {skip: "only on shard server"},

@@ -101,7 +101,6 @@ const allCommands = {
     _refreshQueryAnalyzerConfiguration: {skip: isAnInternalCommand},
     _shardsvrAbortReshardCollection: {skip: isAnInternalCommand},
     _shardsvrBeginMigrationBlockingOperation: {skip: isAnInternalCommand},
-    _shardsvrChangePrimary: {skip: isAnInternalCommand},
     _shardsvrCleanupStructuredEncryptionData: {skip: isAnInternalCommand},
     _shardsvrCloneAuthoritativeMetadata: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
@@ -380,7 +379,6 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
-    changePrimary: {skip: cannotRunWhileDowngrading},
     checkMetadataConsistency: {
         isAdminCommand: true,
         isShardedOnly: true,

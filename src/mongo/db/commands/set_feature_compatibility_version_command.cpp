@@ -724,15 +724,6 @@ private:
                                                                    CoordinatorTypeEnum::kCollMod);
                 }
 
-                // TODO (SERVER-76436) Remove once global balancing becomes last lts.
-                if (feature_flags::gBalanceUnshardedCollections
-                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                      originalVersion)) {
-                    ShardingCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, CoordinatorTypeEnum::kMovePrimary);
-                }
-
                 // TODO (SERVER-97816): Remove once 9.0 becomes last lts.
                 if (feature_flags::gUseTopologyChangeCoordinators
                         .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,

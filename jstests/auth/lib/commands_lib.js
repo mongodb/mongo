@@ -246,7 +246,6 @@ const skippedAuthTestingCommands = [
     "authenticate",
     "autoSplitVector",
     "balancerCollectionStatus",
-    "changePrimary",
     "clearLog",
     "commitTransitionToDedicatedConfigServer",
     "configureCollectionBalancing",

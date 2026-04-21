@@ -277,7 +277,6 @@ mongo_cc_library(
         "cluster_update_zone_key_range_cmd.cpp",
         "cluster_user_management_commands.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_add_shard_to_zone_cmd.cpp",
-        "//src/mongo/db/global_catalog/ddl:cluster_change_primary_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_create_unsplittable_collections_command.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_list_shards_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_merge_all_chunks_on_shard_cmd.cpp",

@@ -630,7 +630,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:sharding_coordinator_service.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_begin_migration_blocking_operation.cpp",
-        "//src/mongo/db/global_catalog/ddl:shardsvr_change_primary_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_collmod_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_collmod_participant_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_commit_create_database_metadata_command.cpp",

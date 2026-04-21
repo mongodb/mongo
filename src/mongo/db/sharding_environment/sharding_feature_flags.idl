@@ -46,12 +46,6 @@ feature_flags:
         default: true
         version: 7.1
         fcv_gated: true
-    # TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
-    featureFlagBalanceUnshardedCollections:
-        description: "Feature flag for enabling the balancing of user unsharded collections"
-        cpp_varname: feature_flags::gBalanceUnshardedCollections
-        default: false
-        fcv_gated: true
     featureFlagShardedAggregationCatalogCacheGossiping:
         description:
             "Feature flag that makes routers executing distributed aggregations that involve

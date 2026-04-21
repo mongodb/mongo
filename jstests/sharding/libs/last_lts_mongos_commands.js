@@ -5,6 +5,7 @@
 // test defined without always existing on the servers being used.
 export const commandsRemovedFromMongosSinceLastLTS = [
     "_getAuditConfigGeneration", // Removed in 8.1
+    "changePrimary", // Removed in 9.0
     "startRecordingTraffic",
     "stopRecordingTraffic",
     "cleanupReshardCollection",

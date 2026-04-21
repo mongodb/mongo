@@ -450,18 +450,6 @@ const internalCommandsMap = {
             );
         },
     },
-    _shardsvrChangePrimary: {
-        testname: "_shardsvrChangePrimary",
-        command: {
-            _shardsvrChangePrimary: "test",
-            expectedDatabaseVersion: {
-                uuid: new UUID(),
-                timestamp: new Timestamp(1691525961, 12),
-                lastMod: NumberInt(5),
-            },
-            to: shard0name,
-        },
-    },
     _shardsvrCleanupStructuredEncryptionData: {
         testname: "_shardsvrCleanupStructuredEncryptionData",
         command: {_shardsvrCleanupStructuredEncryptionData: "test", cleanupTokens: {}},

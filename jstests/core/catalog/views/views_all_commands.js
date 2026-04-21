@@ -156,7 +156,6 @@ let viewsCommandTests = {
     _refreshQueryAnalyzerConfiguration: {skip: isAnInternalCommand},
     _shardsvrAbortReshardCollection: {skip: isAnInternalCommand},
     _shardsvrBeginMigrationBlockingOperation: {skip: isAnInternalCommand},
-    _shardsvrChangePrimary: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},
     _shardsvrCleanupStructuredEncryptionData: {skip: isAnInternalCommand},
@@ -288,7 +287,7 @@ let viewsCommandTests = {
     buildInfo: {skip: isUnrelated},
     bulkWrite: {skip: isUnrelated},
     captrunc: {skip: "removed"}, // TODO (SERVER-94847): Remove this case.
-    changePrimary: {skip: "Tested in sharding/change_primary.js"},
+    changePrimary: {skip: "removed"}, // TODO (SERVER-123533): Remove once 9.0 is last LTS.
     checkMetadataConsistency: {
         command: {checkMetadataConsistency: "view"},
         expectFailure: false,
