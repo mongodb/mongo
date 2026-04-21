@@ -1812,12 +1812,11 @@ export class ReplSetTest {
     }
 
     /**
-     * Runs replSetInitiate on the first node of the replica set.
-     *
-     * TODO (SERVER-109841): Replsetinitiate is currently a no-op command for disagg. Determine the
-     * next steps for this function if additional functionality is to be incorporated.
+     *  Blocks until the set is initialized with a primary.
+     *  TODO SERVER-124472: Determine if initiateForDisagg needs additional functionality to
+     *  match ASC ReplSetTest.initiate.
      */
-    initiateForDisagg(cfg, initCmd) {
+    initiateForDisagg() {
         const startTime = new Date(); // Measure the execution time of this function.
 
         // Blocks until there is a primary. We use a faster retry interval here since we expect the
