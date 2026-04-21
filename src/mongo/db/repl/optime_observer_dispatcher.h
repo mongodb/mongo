@@ -32,11 +32,11 @@
 #include "mongo/db/repl/optime_observer.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 #include <memory>
+#include <mutex>
 #include <vector>
 
 namespace mongo::repl {
@@ -78,7 +78,7 @@ public:
      * thread lazily on the first call. Observers are never removed.
      */
     void addObserver(std::unique_ptr<Observer> observer) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _observers.push_back(std::move(observer));
         if (_observers.size() == 1) {
             _thread = stdx::thread(&OpTimeObserverDispatcher::_run, this);
@@ -105,7 +105,7 @@ public:
         _event.notifyAll();
 
         auto thread = [&] {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             return std::exchange(_thread, {});
         }();
         if (thread.joinable()) {
@@ -131,7 +131,7 @@ private:
 
             // Append any observers added since the last wakeup.
             {
-                stdx::lock_guard lk(_mutex);
+                std::lock_guard lk(_mutex);
                 for (size_t i = observers.size(); i < _observers.size(); ++i) {
                     observers.push_back(_observers[i].get());
                 }
@@ -151,7 +151,7 @@ private:
     // changes.
     WaitableAtomic<uint64_t> _event{0};
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     // Observers are only ever appended, so _observers.size() serves as a monotonic
     // generation number: _run() re-snapshots only when the size has grown.
     std::vector<std::unique_ptr<Observer>> _observers;  // guarded by _mutex

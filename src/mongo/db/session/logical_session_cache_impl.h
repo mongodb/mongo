@@ -39,7 +39,6 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/service_liaison.h"
 #include "mongo/db/session/sessions_collection.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
@@ -47,6 +46,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -124,9 +124,9 @@ private:
     const ReapSessionsOlderThanFn _reapSessionsOlderThanFn;
 
     // Mutex to protect the stats object and _activeSessions swap operations.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     // Mutex to ensure that only one _refresh operation runs at a time.
-    mutable stdx::mutex _refreshMutex;
+    mutable std::mutex _refreshMutex;
 
     LogicalSessionIdMap<LogicalSessionRecord> _activeSessions;
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/stdx/new.h"
 #include "mongo/util/modules.h"
 
 #include <algorithm>
@@ -130,11 +129,11 @@ private:
     }
 
     const value_type& _value() const noexcept {
-        return *stdx::launder(_raw());
+        return *std::launder(_raw());
     }
 
     value_type& _value() noexcept {
-        return *stdx::launder(_raw());
+        return *std::launder(_raw());
     }
 
     std::aligned_storage_t<kStorageSize, kAlignment> _storage;
@@ -170,8 +169,8 @@ void swap(Aligned<T, Pack...>& a, Aligned<T, Pack...>& b) noexcept(std::is_nothr
 template <typename T>
 using CacheExclusive =
     Aligned<T,
-            stdx::hardware_destructive_interference_size,
-            aligned_detail::roundUpByStep<stdx::hardware_destructive_interference_size>(sizeof(T))>;
+            std::hardware_destructive_interference_size,
+            aligned_detail::roundUpByStep<std::hardware_destructive_interference_size>(sizeof(T))>;
 
 
 /**
@@ -187,9 +186,9 @@ using CacheExclusive =
  */
 template <typename T>
 using CacheCombined = Aligned<T,
-                              stdx::hardware_constructive_interference_size,
+                              std::hardware_constructive_interference_size,
                               sizeof(T),
-                              stdx::hardware_constructive_interference_size>;
+                              std::hardware_constructive_interference_size>;
 
 
 /**
@@ -204,8 +203,8 @@ using CacheCombined = Aligned<T,
  */
 template <typename T>
 using CacheCombinedExclusive = Aligned<T,
-                                       stdx::hardware_destructive_interference_size,
-                                       stdx::hardware_destructive_interference_size,
-                                       stdx::hardware_constructive_interference_size>;
+                                       std::hardware_destructive_interference_size,
+                                       std::hardware_destructive_interference_size,
+                                       std::hardware_constructive_interference_size>;
 
 }  // namespace MONGO_MOD_PUB mongo

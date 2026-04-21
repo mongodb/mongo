@@ -66,7 +66,7 @@ ConnectionString::ConnectionHook* MockConnRegistry::getConnStrHook() {
 }
 
 void MockConnRegistry::addServer(MockRemoteDBServer* server) {
-    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
+    std::lock_guard<std::mutex> sl(_registryMutex);
 
     const std::string hostName(server->getServerAddress());
     fassert(16533, _registry.count(hostName) == 0);
@@ -75,12 +75,12 @@ void MockConnRegistry::addServer(MockRemoteDBServer* server) {
 }
 
 bool MockConnRegistry::removeServer(const std::string& hostName) {
-    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
+    std::lock_guard<std::mutex> sl(_registryMutex);
     return _registry.erase(hostName) == 1;
 }
 
 MockRemoteDBServer* MockConnRegistry::getMockRemoteDBServer(const std::string& hostName) const {
-    stdx::lock_guard lk(_registryMutex);
+    std::lock_guard lk(_registryMutex);
     auto iter = _registry.find(hostName);
     if (iter == _registry.end())
         return nullptr;
@@ -89,12 +89,12 @@ MockRemoteDBServer* MockConnRegistry::getMockRemoteDBServer(const std::string& h
 }
 
 void MockConnRegistry::clear() {
-    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
+    std::lock_guard<std::mutex> sl(_registryMutex);
     _registry.clear();
 }
 
 std::unique_ptr<MockDBClientConnection> MockConnRegistry::connect(const std::string& connStr) {
-    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
+    std::lock_guard<std::mutex> sl(_registryMutex);
     fassert(16534, _registry.count(connStr) == 1);
     return std::make_unique<MockDBClientConnection>(_registry[connStr], true);
 }

@@ -37,7 +37,6 @@
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/interruptible.h"
@@ -48,6 +47,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 
@@ -154,7 +154,7 @@ private:
         WithLock lk, IndexBuildFilterFn indexBuildFilter) const;
 
     // Manages all of the below state
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Build UUID to index build information
     stdx::unordered_map<UUID, std::shared_ptr<ReplIndexBuildState>, UUID::Hash> _allIndexBuilds;

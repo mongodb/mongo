@@ -33,11 +33,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <cstddef>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -96,7 +96,7 @@ private:
         return "PlacementHistoryCleaner";
     }
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     PeriodicJobAnchor _anchor;
 

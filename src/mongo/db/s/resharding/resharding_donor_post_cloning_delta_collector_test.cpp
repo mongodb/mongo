@@ -41,12 +41,13 @@
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -215,14 +216,14 @@ class BlockingMockExternalState : public StubExternalState {
 public:
     ~BlockingMockExternalState() {
         {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _destroyed = true;
         }
         _cv.notify_all();
 
         // Wait for any in-progress getDocumentsDeltaFromDonors call to release the mutex and
         // exit, so we don't free _mutex/_cv while they are still in use.
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _cv.wait(lk, [this] { return !_inCall; });
     }
 
@@ -234,7 +235,7 @@ public:
         const NamespaceString&,
         const std::vector<ShardId>&) override {
         {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _entered = true;
             _inCall = true;
         }
@@ -244,24 +245,24 @@ public:
         // Must be declared before `lk` so that on unwind, `lk` is destroyed first (releasing
         // the mutex), allowing this guard to re-acquire it.
         ScopeGuard inCallGuard([&] {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _inCall = false;
             _cv.notify_all();
         });
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         opCtx->waitForConditionOrInterrupt(_cv, lk, [this] { return _destroyed; });
 
         return {};
     }
 
     void waitUntilEntered() {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _cv.wait(lk, [this] { return _entered; });
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
     bool _entered = false;
     bool _inCall = false;

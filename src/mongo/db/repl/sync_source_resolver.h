@@ -36,7 +36,6 @@
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -44,6 +43,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 
@@ -197,7 +197,7 @@ private:
     const OnCompletionFn _onCompletion;
 
     // Protects members of this sync source resolver defined below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     mutable stdx::condition_variable _condition;
 
     // State transitions:

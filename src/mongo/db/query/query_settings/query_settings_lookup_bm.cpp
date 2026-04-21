@@ -215,7 +215,7 @@ public:
     QuerySettingsLookupBenchmark() {}
 
     void TearDown(benchmark::State& state) override {
-        stdx::lock_guard lk(_setupMutex);
+        std::lock_guard lk(_setupMutex);
         if (--_configuredThreads) {
             return;
         }
@@ -343,7 +343,7 @@ public:
     virtual bool isMultitenacyEnabled() const = 0;
 
 protected:
-    stdx::mutex _setupMutex;
+    std::mutex _setupMutex;
 
     // Indicates how many threads have executed the setup code.
     size_t _configuredThreads = 0;
@@ -355,7 +355,7 @@ protected:
 
 class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBenchmark {
     void SetUp(benchmark::State& state) override {
-        stdx::lock_guard lk(_setupMutex);
+        std::lock_guard lk(_setupMutex);
         if (!_configuredThreads++) {
             // Setup FCV.
             // (Generic FCV reference): required for enabling the feature flag.
@@ -382,7 +382,7 @@ class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBen
 
 class QuerySettingsMultiTenantLookupBenchmark : public QuerySettingsLookupBenchmark {
     void SetUp(benchmark::State& state) override {
-        stdx::lock_guard lk(_setupMutex);
+        std::lock_guard lk(_setupMutex);
         if (!_configuredThreads++) {
             // Setup FCV.
             // (Generic FCV reference): required for enabling the feature flag.

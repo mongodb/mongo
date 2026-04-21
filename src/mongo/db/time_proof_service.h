@@ -33,9 +33,9 @@
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -97,7 +97,7 @@ private:
     };
 
     // protects _cache
-    stdx::mutex _cacheMutex;
+    std::mutex _cacheMutex;
 
     // one-entry cache
     boost::optional<CacheEntry> _cache;

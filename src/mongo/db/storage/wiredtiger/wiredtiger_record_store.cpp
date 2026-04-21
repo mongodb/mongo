@@ -1183,7 +1183,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx, Recover
     }
 
     // Only one thread needs to do this.
-    stdx::lock_guard<stdx::mutex> lk(_initNextIdMutex);
+    std::lock_guard<std::mutex> lk(_initNextIdMutex);
     if (_nextIdNum.load() > 0) {
         return;
     }

@@ -88,7 +88,7 @@ constexpr const char* trustedEmptyCRL = TEST_CERTS_DIR "crl_from_trusted_ca.pem"
 class SessionManagerUtil : public transport::SessionManager {
 public:
     void startSession(std::shared_ptr<transport::Session> session) override {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         _sessions.push_back(std::move(session));
         LOGV2(2303202, "started session");
         _cv.notify_one();
@@ -100,7 +100,7 @@ public:
         LOGV2(2303302, "end all sessions");
         std::vector<std::shared_ptr<transport::Session>> old_sessions;
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            std::unique_lock<std::mutex> lock(_mutex);
             old_sessions.swap(_sessions);
         }
         old_sessions.clear();
@@ -111,7 +111,7 @@ public:
     }
 
     size_t numOpenSessions() const override {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         return _sessions.size();
     }
 
@@ -120,7 +120,7 @@ public:
     }
 
     void waitForConnect() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         _cv.wait(lock, [&] { return !_sessions.empty(); });
     }
 
@@ -129,7 +129,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _cv;
     std::vector<std::shared_ptr<transport::Session>> _sessions;
     transport::TransportLayer* _transport = nullptr;
@@ -870,7 +870,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
 
     TransientSSLParams transientSSLParams(clusterConnection);
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     std::deque<std::shared_ptr<const transport::SSLConnectionContext>> contexts;
     std::vector<stdx::thread> threads;
     Counter64 iterations;
@@ -883,7 +883,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
                 invariant(swContext.getStatus());
                 std::shared_ptr<const transport::SSLConnectionContext> ctxToDelete;
                 {
-                    auto lk = stdx::lock_guard(mutex);
+                    auto lk = std::lock_guard(mutex);
                     contexts.push_back(std::move(swContext.getValue()));
                     if (contexts.size() > kMaxContexts) {
                         ctxToDelete = contexts.front();
@@ -917,7 +917,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
 
     TransientSSLParams transientParams(clusterConnection);
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     std::deque<std::shared_ptr<SSLManagerInterface>> managers;
     std::vector<stdx::thread> threads;
     Counter64 iterations;
@@ -936,7 +936,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
                                             SSLManagerInterface::ConnectionDirection::kOutgoing));
                 std::shared_ptr<SSLManagerInterface> managerToDelete;
                 {
-                    auto lk = stdx::lock_guard(mutex);
+                    auto lk = std::lock_guard(mutex);
                     managers.push_back(std::move(manager));
                     if (managers.size() > kMaxManagers) {
                         managerToDelete = managers.front();

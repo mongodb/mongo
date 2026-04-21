@@ -188,7 +188,7 @@ public:
         const auto& setName = connStr.getSetName();
         bool updateInProgress = false;
         {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             if (!_hasUpdateState(lock, setName)) {
                 _updateStates.emplace(std::piecewise_construct,
                                       std::forward_as_tuple(setName),
@@ -226,7 +226,7 @@ private:
     void _scheduleUpdateShardIdentityConfigString(const std::string& setName) {
         ConnectionString updatedConnectionString;
         {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             if (!_hasUpdateState(lock, setName)) {
                 return;
             }
@@ -253,7 +253,7 @@ private:
         if (ErrorCodes::isCancellationError(status.code())) {
             LOGV2_DEBUG(
                 22067, 2, "Unable to schedule confirmed replica set update", "error"_attr = status);
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _updateStates.erase(setName);
             return;
         }
@@ -294,7 +294,7 @@ private:
                                              const ConnectionString& update) {
         bool moreUpdates = false;
         {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             invariant(_hasUpdateState(lock, setName));
             auto& updateState = _updateStates.at(setName);
             updateState.updateInProgress = false;
@@ -317,7 +317,7 @@ private:
     }
 
     ServiceContext* _serviceContext;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     struct ReplSetConfigUpdateState {
         ReplSetConfigUpdateState() = default;
@@ -577,7 +577,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
 
     hangDuringShardingInitialization.pauseWhileSet();
 
-    stdx::unique_lock<stdx::mutex> ul(_initSynchronizationMutex);
+    std::unique_lock<std::mutex> ul(_initSynchronizationMutex);
 
     if (shardingState->enabled()) {
         uassert(40371,

@@ -37,11 +37,11 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/sharding_initialization.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -130,7 +130,7 @@ private:
 
     // This mutex ensures that only one thread at a time executes the sharding
     // initialization/teardown sequence
-    stdx::mutex _initSynchronizationMutex;
+    std::mutex _initSynchronizationMutex;
 
     // Function for initializing the sharding environment components (i.e. everything on the Grid)
     ShardingEnvironmentInitFunc _initFunc;

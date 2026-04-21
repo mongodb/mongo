@@ -58,7 +58,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -593,7 +592,7 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _checkApplierProgressAndScheduleGetNextApplierBatch(
-        const stdx::lock_guard<stdx::mutex>& lock,
+        const std::lock_guard<std::mutex>& lock,
         std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
@@ -604,7 +603,7 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _scheduleRollbackCheckerCheckForRollback(
-        const stdx::lock_guard<stdx::mutex>& lock,
+        const std::lock_guard<std::mutex>& lock,
         std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
@@ -683,7 +682,7 @@ private:
     // (MX) Must hold _mutex and be in a callback in _exec to write; must either hold
     //      _mutex or be in a callback in _exec to read.
 
-    mutable stdx::mutex _mutex;                                                 // (S)
+    mutable std::mutex _mutex;                                                  // (S)
     const InitialSyncerInterface::Options _opts;                                // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     std::shared_ptr<executor::TaskExecutor> _exec;                              // (R)

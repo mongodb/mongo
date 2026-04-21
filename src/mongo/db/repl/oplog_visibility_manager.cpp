@@ -59,14 +59,14 @@ RecordStore* OplogVisibilityManager::getRecordStore() const {
 }
 
 void OplogVisibilityManager::reInit(RecordStore* rs, const Timestamp& initialTs) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     invariant(_oplogTimestampList.empty());
     _oplogVisibilityTimestamp.store(initialTs);
     _rs = rs;
 }
 
 void OplogVisibilityManager::clear() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     invariant(_oplogTimestampList.empty());
     _rs = nullptr;
 }
@@ -76,7 +76,7 @@ OplogVisibilityManager::const_iterator OplogVisibilityManager::trackTimestamps(
     bool visibilityChanged = false;
     ON_BLOCK_EXIT(notifyCappedWaitersIfVisibilityChanged(visibilityChanged, _rs));
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     invariant(first <= last && first > _latestTimeSeen,
               str::stream() << "first timestamp: " << first.toString()
                             << ", last timestamp: " << last.toString()
@@ -95,7 +95,7 @@ void OplogVisibilityManager::untrackTimestamps(OplogVisibilityManager::const_ite
     bool visibilityChanged = false;
     ON_BLOCK_EXIT(notifyCappedWaitersIfVisibilityChanged(visibilityChanged, _rs));
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     const bool isFront = _oplogTimestampList.erase(pos);
 
     // Visibility has not changed.
@@ -121,7 +121,7 @@ void OplogVisibilityManager::setOplogVisibilityTimestamp(const Timestamp& visibi
     bool visibilityChanged = false;
     ON_BLOCK_EXIT(notifyCappedWaitersIfVisibilityChanged(visibilityChanged, _rs));
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     visibilityChanged = _setOplogVisibilityTimestamp(lock, visibilityTimestamp);
 
@@ -142,7 +142,7 @@ void OplogVisibilityManager::waitForTimestampToBeVisible(OperationContext* opCtx
                                                          const Timestamp& waitingFor) {
     auto currentVisibilityTimestamp = getOplogVisibilityTimestamp();
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_oplogEntriesBecameVisibleCV, lock, [&] {
         const auto newVisibilityTimestamp = getOplogVisibilityTimestamp();

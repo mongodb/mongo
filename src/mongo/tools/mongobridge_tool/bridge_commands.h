@@ -32,11 +32,12 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
 
 namespace mongo {
 
@@ -65,7 +66,7 @@ public:
     virtual ~BridgeCommand() = 0;
 
     virtual Status run(const BSONObj& cmdObj,
-                       stdx::mutex* settingsMutex,
+                       std::mutex* settingsMutex,
                        HostSettingsMap* settings) = 0;
 };
 

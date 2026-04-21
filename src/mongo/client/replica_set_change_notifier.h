@@ -31,7 +31,6 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
@@ -39,6 +38,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -109,7 +109,7 @@ public:
 private:
     void _addListener(std::shared_ptr<Listener> listener);
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::vector<std::weak_ptr<Listener>> _listeners;
     stdx::unordered_map<Key, State> _replicaSetStates;
 };

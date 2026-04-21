@@ -225,7 +225,7 @@ public:
 private:
     // Ensures concurrent accesses to `get()`, `appendInternalClientWireVersionIfNeeded()`, and
     // `reset()` are thread-safe.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     std::shared_ptr<const Specification> _spec;
 

@@ -40,7 +40,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -170,7 +170,7 @@ private:
     synchronized_value<std::unique_ptr<ThreadPool>> _threadPool;
 
     // Manages _numActiveIndexBuilds and _indexBuildFinished.
-    mutable stdx::mutex _throttlingMutex;
+    mutable std::mutex _throttlingMutex;
 
     // Protected by _throttlingMutex.
     int _numActiveIndexBuilds = 0;

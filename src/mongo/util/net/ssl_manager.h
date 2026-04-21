@@ -436,7 +436,7 @@ public:
     void rotate();
 
 private:
-    stdx::mutex _lock;
+    std::mutex _lock;
     synchronized_value<std::shared_ptr<SSLManagerInterface>> _manager;
 };
 

@@ -34,11 +34,11 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -169,7 +169,7 @@ private:
     /**
      * Protects data in query settings.
      */
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 };
 
 }  // namespace mongo

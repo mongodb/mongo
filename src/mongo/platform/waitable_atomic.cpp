@@ -39,7 +39,7 @@
 #endif
 
 namespace mongo::waitable_atomic_details {
-using stdx::chrono::system_clock;
+using std::chrono::system_clock;
 
 #ifdef __linux__
 
@@ -78,7 +78,7 @@ int futexWait(const void* uaddr, uint32_t val, boost::optional<system_clock::tim
     if (deadline) {
         deadlineSpec.tv_sec = durationCount<Seconds>(deadline->time_since_epoch());
         deadlineSpec.tv_nsec = durationCount<Nanoseconds>(
-            deadline->time_since_epoch() - stdx::chrono::seconds(deadlineSpec.tv_sec));
+            deadline->time_since_epoch() - std::chrono::seconds(deadlineSpec.tv_sec));
         tsAddr = &deadlineSpec;
     }
 

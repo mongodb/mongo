@@ -32,7 +32,6 @@
 #include "mongo/base/counter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -171,7 +171,7 @@ public:
         std::shared_ptr<ChannelState> cs = [&] {
             const auto useSSL = _sslModeResolver(sslMode);
             ChannelMapKeyType key{remote, useSSL};
-            auto lk = stdx::unique_lock(_mutex);
+            auto lk = std::unique_lock(_mutex);
             if (auto iter = _channels.find(key); iter != _channels.end()) {
                 return iter->second;
             } else {
@@ -272,7 +272,7 @@ private:
     std::vector<std::shared_ptr<ChannelState>> _dropChannels(
         std::function<bool(const std::shared_ptr<ChannelState>&)> keepCb) {
         std::vector<std::shared_ptr<ChannelState>> droppedChannels;
-        auto lk = stdx::lock_guard(_mutex);
+        auto lk = std::lock_guard(_mutex);
         for (auto iter = _channels.begin(); iter != _channels.end();) {
             auto prev = iter++;
             const auto& cs = prev->second;
@@ -286,7 +286,7 @@ private:
     }
 
     void _setKeepOpen(ChannelMapKeyType key, bool keepOpen) {
-        auto lk = stdx::lock_guard(_mutex);
+        auto lk = std::lock_guard(_mutex);
         auto channel = _channels.find(key);
         if (channel != _channels.end()) {
             channel->second->setKeepOpen(keepOpen);
@@ -298,7 +298,7 @@ private:
     ChannelFactory _channelFactory;
     StubFactory _stubFactory;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     stdx::unordered_map<ChannelMapKeyType, std::shared_ptr<ChannelState>> _channels;
     Counter64 _channelsSize;

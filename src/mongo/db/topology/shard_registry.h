@@ -41,7 +41,6 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -56,6 +55,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -508,8 +508,7 @@ private:
     enum class Singleton { Only };
     static constexpr auto _kSingleton = Singleton::Only;
 
-    using Cache =
-        ReadThroughCache<Singleton, ShardRegistryData, Time, ObservableMutex<stdx::mutex>>;
+    using Cache = ReadThroughCache<Singleton, ShardRegistryData, Time, ObservableMutex<std::mutex>>;
 
     Cache::LookupResult _lookup(OperationContext* opCtx,
                                 const Singleton& key,
@@ -601,11 +600,11 @@ private:
     std::shared_ptr<executor::TaskExecutor> _executor{};
 
     // Mutex for the exclusive use by Cache. Must not be used for any other purpose.
-    ObservableMutex<stdx::mutex> _cacheMutex;
+    ObservableMutex<std::mutex> _cacheMutex;
     std::unique_ptr<Cache> _cache;
 
     // Protects the mutable state below
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     // Set to true once one of the init methods have been called.
     AtomicWord<bool> _isInitialized{false};

@@ -31,7 +31,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/config.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_util.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/net/ssl_types.h"
 
 #include <list>
+#include <mutex>
 
 namespace mongo {
 namespace transport {
@@ -191,13 +191,13 @@ public:
 
     Future<void> asyncWaitForData() override {
         auto fp = makePromiseFuture<void>();
-        stdx::lock_guard<stdx::mutex> lk(_waitForDataMutex);
+        std::lock_guard<std::mutex> lk(_waitForDataMutex);
         _waitForDataQueue.emplace_back(std::move(fp.promise));
         return std::move(fp.future);
     }
 
     void signalAvailableData() {
-        stdx::lock_guard<stdx::mutex> lk(_waitForDataMutex);
+        std::lock_guard<std::mutex> lk(_waitForDataMutex);
         if (_waitForDataQueue.size() == 0)
             return;
         Promise<void> promise = std::move(_waitForDataQueue.front());
@@ -233,7 +233,7 @@ public:
 protected:
     TransportLayerMock* const _tl;
 
-    mutable stdx::mutex _waitForDataMutex;
+    mutable std::mutex _waitForDataMutex;
     std::list<Promise<void>> _waitForDataQueue;
 };
 

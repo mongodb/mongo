@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
@@ -197,9 +196,9 @@ private:
     using AlarmMap = std::multimap<Date_t, AlarmData>;
     using AlarmMapIt = AlarmMap::iterator;
 
-    void _clearAllAlarmsImpl(stdx::unique_lock<stdx::mutex>& lk);
+    void _clearAllAlarmsImpl(std::unique_lock<std::mutex>& lk);
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     bool _shutdown = false;
     AlarmMap _alarms;
 };

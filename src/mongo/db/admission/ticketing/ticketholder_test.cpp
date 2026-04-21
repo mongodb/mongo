@@ -220,7 +220,7 @@ public:
     Hotel(int nRooms) : _nRooms(nRooms), _checkedIn(0), _maxRooms(0) {}
 
     void checkIn() {
-        stdx::lock_guard<stdx::mutex> lk(_frontDesk);
+        std::lock_guard<std::mutex> lk(_frontDesk);
         _checkedIn++;
         ASSERT_TRUE(_checkedIn <= _nRooms);
         if (_checkedIn > _maxRooms)
@@ -228,7 +228,7 @@ public:
     }
 
     void checkOut() {
-        stdx::lock_guard<stdx::mutex> lk(_frontDesk);
+        std::lock_guard<std::mutex> lk(_frontDesk);
         _checkedIn--;
         ASSERT_TRUE(_checkedIn >= 0);
     }
@@ -238,7 +238,7 @@ public:
     }
 
 private:
-    stdx::mutex _frontDesk;
+    std::mutex _frontDesk;
     int _nRooms;
     int _checkedIn;
     int _maxRooms;

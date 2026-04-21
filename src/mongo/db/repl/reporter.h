@@ -35,13 +35,13 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>
+#include <mutex>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -212,7 +212,7 @@ private:
     const Milliseconds _updatePositionTimeout;
 
     // Protects member data of this Reporter declared below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     mutable stdx::condition_variable _condition;
 

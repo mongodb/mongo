@@ -40,7 +40,6 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -50,6 +49,7 @@
 #include "mongo/util/timer.h"
 
 #include <cstdlib>
+#include <mutex>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -188,7 +188,7 @@ void DDLLockManager::_unlock(
 }
 
 void DDLLockManager::_registerResourceName(ResourceId resId, StringData resName) {
-    stdx::lock_guard<stdx::mutex> guard{_mutex};
+    std::lock_guard<std::mutex> guard{_mutex};
     const auto currentNumHolders = _numHoldersPerResource[resId]++;
     if (currentNumHolders == 0) {
         ResourceCatalog::get().add(resId, DDLResourceName(resName));
@@ -196,7 +196,7 @@ void DDLLockManager::_registerResourceName(ResourceId resId, StringData resName)
 }
 
 void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(ResourceId resId, StringData resName) {
-    stdx::lock_guard<stdx::mutex> guard{_mutex};
+    std::lock_guard<std::mutex> guard{_mutex};
     const auto currentNumHolders = --_numHoldersPerResource[resId];
     if (currentNumHolders <= 0) {
         _numHoldersPerResource.erase(resId);

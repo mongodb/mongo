@@ -358,7 +358,7 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
 
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), numThreads);
 
-        stdx::mutex mutex;
+        std::mutex mutex;
         stdx::condition_variable cv;
 
         std::vector<double> tokenAcquisitionTimes;
@@ -367,7 +367,7 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         for (int64_t i = 0; i < numThreads; i++) {
             threads.emplace_back(monitor.spawn([&, threadNum = i]() {
                 ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[threadNum].second.get()));
-                stdx::lock_guard lg(mutex);
+                std::lock_guard lg(mutex);
                 LOGV2(10440801,
                       "Acquired token",
                       "threadNum"_attr = threadNum,
@@ -381,7 +381,7 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
 
         // Make sure the initial burstRate fulfills the first requests
         {
-            stdx::unique_lock<stdx::mutex> lk(mutex);
+            std::unique_lock<std::mutex> lk(mutex);
             ASSERT_DOES_NOT_THROW(
                 cv.wait(lk, [&] { return (int)tokenAcquisitionTimes.size() == maxTokens; }));
         }
@@ -437,7 +437,7 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         advanceTime(totalAdvance);
 
         {
-            stdx::unique_lock<stdx::mutex> lk(mutex);
+            std::unique_lock<std::mutex> lk(mutex);
             // Wait for all threads to acquire tokens.
             if (!cv.wait_until(lk, deadline, [&] {
                     return (int)tokenAcquisitionTimes.size() == numThreads;

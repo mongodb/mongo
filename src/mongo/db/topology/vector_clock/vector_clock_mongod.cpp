@@ -105,17 +105,17 @@ VectorClockMongoD::~VectorClockMongoD() {
 }
 
 void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
-    stdx::lock_guard lg(_durableTimeMutex);
+    std::lock_guard lg(_durableTimeMutex);
     _durableTime.reset();
 }
 
 void VectorClockMongoD::onStepDown() {
-    stdx::lock_guard lg(_durableTimeMutex);
+    std::lock_guard lg(_durableTimeMutex);
     _durableTime.reset();
 }
 
 void VectorClockMongoD::onShutdown() {
-    stdx::lock_guard lg(_durableTimeMutex);
+    std::lock_guard lg(_durableTimeMutex);
     _shutdownInitiated.store(true);
 }
 
@@ -175,7 +175,7 @@ void VectorClockMongoD::onBecomeArbiter() {
 SharedSemiFuture<void> VectorClockMongoD::waitForDurableConfigTime() {
     auto time = getTime();
 
-    stdx::unique_lock ul(_durableTimeMutex);
+    std::unique_lock ul(_durableTimeMutex);
     if (_durableTime && _durableTime->configTime() >= time.configTime())
         return SharedSemiFuture<void>();
 
@@ -185,7 +185,7 @@ SharedSemiFuture<void> VectorClockMongoD::waitForDurableConfigTime() {
 SharedSemiFuture<void> VectorClockMongoD::waitForDurableTopologyTime() {
     auto time = getTime();
 
-    stdx::unique_lock ul(_durableTimeMutex);
+    std::unique_lock ul(_durableTimeMutex);
     if (_durableTime && _durableTime->topologyTime() >= time.topologyTime())
         return SharedSemiFuture<void>();
 
@@ -195,7 +195,7 @@ SharedSemiFuture<void> VectorClockMongoD::waitForDurableTopologyTime() {
 SharedSemiFuture<void> VectorClockMongoD::waitForDurable() {
     auto time = getTime();
 
-    stdx::unique_lock ul(_durableTimeMutex);
+    std::unique_lock ul(_durableTimeMutex);
     if (_durableTime && _durableTime->configTime() >= time.configTime() &&
         _durableTime->topologyTime() >= time.topologyTime())
         return SharedSemiFuture<void>();
@@ -275,7 +275,7 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
 
                 auto vectorTime = std::invoke([&]() {
                     if (std::invoke([&] {
-                            stdx::lock_guard lg(_durableTimeMutex);
+                            std::lock_guard lg(_durableTimeMutex);
                             return !_durableTime;
                         })) {
                         return recoverDirect(opCtx);
@@ -297,7 +297,7 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
                 });
 
                 {
-                    stdx::lock_guard lg(_durableTimeMutex);
+                    std::lock_guard lg(_durableTimeMutex);
                     _durableTime = vectorTime;
                     ComparableVectorTime comparableDurableTime{*_durableTime};
 
@@ -316,7 +316,7 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
             }
         })
         .onError([this](Status status) {
-            stdx::lock_guard lg(_durableTimeMutex);
+            std::lock_guard lg(_durableTimeMutex);
 
             for (const auto& element : _queue) {
                 element._promise->setError(status);

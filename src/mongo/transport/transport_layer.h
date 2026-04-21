@@ -38,7 +38,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_metrics.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/duration.h"
@@ -50,6 +49,7 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
+#include <chrono>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -305,7 +305,7 @@ public:
     /**
      * Get the time according to the clock driving the event engine of the reactor.
      */
-    virtual stdx::chrono::system_clock::time_point systemTime() = 0;
+    virtual std::chrono::system_clock::time_point systemTime() = 0;
 
     Date_t now() {
         return Date_t(systemTime());

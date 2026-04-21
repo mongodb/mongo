@@ -104,7 +104,7 @@ void WiredTigerConnection::waitUntilPreparedUnitOfWorkCommitsOrAborts(Interrupti
     // caller is already expecting spurious wakeups, we impose a large timeout to periodically force
     // the caller to retry its operation.
     const auto deadline = Date_t::max();
-    stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
+    std::unique_lock<std::mutex> lk(_prepareCommittedOrAbortedMutex);
     if (lastCount == _prepareCommitOrAbortCounter.loadRelaxed()) {
         interruptible.waitForConditionOrInterruptUntil(
             _prepareCommittedOrAbortedCond, lk, deadline, [&] {
@@ -114,18 +114,18 @@ void WiredTigerConnection::waitUntilPreparedUnitOfWorkCommitsOrAborts(Interrupti
 }
 
 void WiredTigerConnection::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
-    stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
+    std::unique_lock<std::mutex> lk(_prepareCommittedOrAbortedMutex);
     _prepareCommitOrAbortCounter.fetchAndAdd(1);
     _prepareCommittedOrAbortedCond.notify_all();
 }
 
 size_t WiredTigerConnection::getIdleSessionsCount() {
-    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    std::lock_guard<std::mutex> lock(_cacheLock);
     return _sessions.size();
 }
 
 Microseconds WiredTigerConnection::getTotalEngineTime() {
-    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    std::lock_guard<std::mutex> lock(_cacheLock);
     return _totalEngineTime;
 }
 
@@ -141,7 +141,7 @@ void WiredTigerConnection::closeExpiredIdleSessions(int64_t idleTimeMillis) {
     // to avoid periodic operation latency spikes as seen in SERVER-52879.
     SessionCache sessionsToClose;
     {
-        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        std::lock_guard<std::mutex> lock(_cacheLock);
 
         // Discard all sessions that became idle before the cutoff time
         auto isSessionExpired = [cutoffTime](auto& session) {
@@ -166,7 +166,7 @@ void WiredTigerConnection::closeAll(ShutdownReason reason) {
     SessionCache swap;
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        std::lock_guard<std::mutex> lock(_cacheLock);
         switch (reason) {
             case ShutdownReason::kCleanShutdown:
                 // Bump the engine epoch during clean shutdowns to ensure that any session or cursor
@@ -203,7 +203,7 @@ WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession(const c
     invariant(!(_shuttingDown.load() & kShuttingDownMask));
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        std::lock_guard<std::mutex> lock(_cacheLock);
         if (!_sessions.empty()) {
             // Get the most recently used session so that if we discard sessions, we're
             // discarding older ones
@@ -266,7 +266,7 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
     // Set the time this session got idle at.
     session->setIdleExpireTime(_clockSource->now());
     {
-        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        std::lock_guard<std::mutex> lock(_cacheLock);
 
         if (static_cast<int32_t>(_sessions.size()) < _sessionCacheMax) {
             _sessions.emplace_back(std::move(session));

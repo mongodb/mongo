@@ -34,7 +34,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
@@ -44,6 +43,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -260,7 +260,7 @@ private:
     AtomicWord<unsigned> _shuttingDown{0};
     static const uint32_t kShuttingDownMask = 1 << 31;
 
-    stdx::mutex _cacheLock;
+    std::mutex _cacheLock;
     typedef std::vector<std::unique_ptr<WiredTigerSession>> SessionCache;
     SessionCache _sessions;
     Microseconds _totalEngineTime;  // protected by _cacheLock
@@ -276,7 +276,7 @@ private:
     AtomicWord<unsigned long long> _rtsEpoch;     // atomic so we can check it outside of the lock
 
     // Mutex and cond var for waiting on prepare commit or abort.
-    stdx::mutex _prepareCommittedOrAbortedMutex;
+    std::mutex _prepareCommittedOrAbortedMutex;
     stdx::condition_variable _prepareCommittedOrAbortedCond;
     AtomicWord<std::uint64_t> _prepareCommitOrAbortCounter{0};
 

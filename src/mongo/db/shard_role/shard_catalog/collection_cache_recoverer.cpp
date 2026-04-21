@@ -121,7 +121,7 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
 Status CollectionCacheRecoverer::waitForInitialPass(
     OperationContext* opCtx, CollectionCacheRecoverer::RecoveryRoundId recoveryRound) {
     const auto [future, roundId] = [&] {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         // We copy the future in order to avoid racing with a concurrent drainAndApply that will
         // reset the recoverer.
         return std::make_pair(_collMetadata, _timestampToReadAt);
@@ -214,7 +214,7 @@ void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
                "Received oplog entry for invalidation",
                "nss"_attr = _nss,
                "timestamp"_attr = entryTs);
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (entryTs < _timestampToReadAt.getTimestamp()) {
         return;
     }
@@ -228,7 +228,7 @@ void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
                "Received oplog entry for delta application",
                "nss"_attr = _nss,
                "timestamp"_attr = entryTs);
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (entryTs < _timestampToReadAt.getTimestamp()) {
         return;
     }
@@ -254,7 +254,7 @@ boost::optional<CollectionMetadata> applyOplogEntry(
 
 boost::optional<CollectionMetadata> CollectionCacheRecoverer::drainAndApply(
     OperationContext* opCtx, CollectionCacheRecoverer::RecoveryRoundId recoveryRound) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     if (recoveryRound.id != _timestampToReadAt) {
         // The wait that preceeded this call was invalidated, we fail the drain on purpose since it

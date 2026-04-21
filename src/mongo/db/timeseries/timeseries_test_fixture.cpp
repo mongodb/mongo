@@ -500,7 +500,7 @@ void TimeseriesTestFixture::_stageInsertOneBatchIntoEligibleBucketHelper(
     _assertBatchDoesNotRollover(options, batch, bucket);
     size_t currentPosition = 0;
     auto& stripe = *_bucketCatalog->stripes[batch.stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    std::lock_guard stripeLock{stripe.mutex};
     auto writeBatch = activeBatch(_bucketCatalog->trackingContexts,
                                   *bucket,
                                   _opCtx->getOpID(),

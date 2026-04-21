@@ -120,7 +120,7 @@ bool MigrationBlockingOperationCoordinator::isInCriticalSection(Phase phase) con
 
 MigrationBlockingOperationCoordinatorPhaseEnum
 MigrationBlockingOperationCoordinator::_getCurrentPhase() const {
-    stdx::unique_lock lock(_docMutex);
+    std::unique_lock lock(_docMutex);
     return _doc.getPhase();
 }
 
@@ -170,7 +170,7 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
                                                            const UUID& operationUUID) {
     getConstructionCompletionFuture().get();
 
-    stdx::unique_lock lock(_mutex);
+    std::unique_lock lock(_mutex);
 
     _throwIfCleaningUp(lock);
     _recoverIfNecessary(lock, opCtx, true);
@@ -220,7 +220,7 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
                                                          const UUID& operationUUID) {
     getConstructionCompletionFuture().get();
 
-    stdx::unique_lock lock(_mutex);
+    std::unique_lock lock(_mutex);
 
     _recoverIfNecessary(lock, opCtx, false);
 

@@ -82,7 +82,7 @@ ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx,
 
 void ServiceExecutorReserved::start() {
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         _stillRunning.store(true);
         _numStartingThreads = _reservedThreads;
     }
@@ -95,7 +95,7 @@ void ServiceExecutorReserved::start() {
 Status ServiceExecutorReserved::_startWorker() {
     LOGV2(22978, "Starting new worker thread for service executor", "name"_attr = _name);
     return launchServiceWorkerThread([this] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         _numRunningWorkerThreads.addAndFetch(1);
         ScopeGuard numRunningGuard([&] {
             _numRunningWorkerThreads.subtractAndFetch(1);
@@ -167,7 +167,7 @@ ServiceExecutorReserved* ServiceExecutorReserved::get(ServiceContext* ctx) {
 Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
     LOGV2_DEBUG(22980, 3, "Shutting down reserved executor");
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     _stillRunning.store(false);
     _threadWakeup.notify_all();
 
@@ -192,7 +192,7 @@ void ServiceExecutorReserved::_schedule(Task task) {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _readyTasks.push_back(std::move(task));
     _threadWakeup.notify_one();
 }
@@ -208,7 +208,7 @@ void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
     };
 
     auto statlet = [&] {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         auto threads = static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
         auto total = static_cast<int>(threads - _numReadyThreads - _numStartingThreads);
         auto running = total;

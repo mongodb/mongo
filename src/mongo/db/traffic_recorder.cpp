@@ -211,7 +211,7 @@ TrafficRecorder::Recording::Recording(const StartTrafficRecording& options,
 void TrafficRecorder::Recording::start() {
     _started.store(true);
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _trafficStats.setRunning(true);
     }
     startTime.store(_tickSource->ticksTo<Microseconds>(_tickSource->getTicks()));
@@ -247,7 +247,7 @@ void TrafficRecorder::Recording::start() {
             recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
             recordingFile += ".bin";
             while (boost::filesystem::exists(recordingFile)) {
-                stdx::this_thread::sleep_for(stdx::chrono::milliseconds(5));
+                stdx::this_thread::sleep_for(std::chrono::milliseconds(5));
                 recordingFile = boost::filesystem::absolute(_path);
                 recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
                 recordingFile += ".bin";
@@ -278,7 +278,7 @@ void TrafficRecorder::Recording::start() {
                     }
 
                     {
-                        stdx::lock_guard<stdx::mutex> lk(_mutex);
+                        std::lock_guard<std::mutex> lk(_mutex);
                         // Track written bytes for stats.
                         _written = writer.getCurrentFileSize();
                     }
@@ -291,7 +291,7 @@ void TrafficRecorder::Recording::start() {
             writeChecksum();
             auto status = exceptionToStatus();
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             _result = status;
         }
     });
@@ -310,7 +310,7 @@ bool TrafficRecorder::Recording::pushRecord(const uint64_t id,
         // If we couldn't push our packet begin the process of failing the recording
         _pcqPipe.producer.close();
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         // If the result was otherwise okay, mark it as failed due to the queue blocking.  If
         // it failed for another reason, don't overwrite that.
@@ -324,7 +324,7 @@ bool TrafficRecorder::Recording::pushRecord(const uint64_t id,
 }
 
 Status TrafficRecorder::Recording::shutdown() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     if (!_inShutdown) {
         _inShutdown = true;
@@ -342,7 +342,7 @@ Status TrafficRecorder::Recording::shutdown() {
 }
 
 BSONObj TrafficRecorder::Recording::getStats() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _trafficStats.setBufferedBytes(_pcqPipe.controller.getStats().queueDepth);
     _trafficStats.setCurrentFileSize(_written);
     return _trafficStats.toBSON();

@@ -43,9 +43,9 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/otel/telemetry_context.h"
 #include "mongo/otel/traces/span/span.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <shared_mutex>
 #include <vector>
 
@@ -648,12 +648,12 @@ private:
     /**
      * Must be locked while the `_canEnterCritical` promise is being fulfilled.
      */
-    mutable stdx::mutex _fulfillmentMutex;
+    mutable std::mutex _fulfillmentMutex;
 
     /**
      * Must be locked while the _abortRequest is being set.
      */
-    mutable stdx::mutex _abortRequestMutex;
+    mutable std::mutex _abortRequestMutex;
 
     /**
      * Coordinator does not enter the critical section until this is fulfilled.

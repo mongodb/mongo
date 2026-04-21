@@ -148,7 +148,7 @@ protected:
 
 private:
     // Protects member data of this OplogWriter.
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     // Used to schedule task for oplog write loop.
     // Not owned by us.

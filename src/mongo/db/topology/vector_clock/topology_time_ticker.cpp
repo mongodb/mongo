@@ -70,7 +70,7 @@ TopologyTimeTicker& TopologyTimeTicker::get(OperationContext* opCtx) {
 void TopologyTimeTicker::onNewLocallyCommittedTopologyTimeAvailable(Timestamp commitTime,
                                                                     Timestamp topologyTime) {
     const auto numTickPoints = [&] {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
 
         // Inserts only if commitTime was not present yet.
         auto [iter, inserted] =
@@ -99,7 +99,7 @@ void TopologyTimeTicker::onMajorityCommitPointUpdate(ServiceContext* service,
     Timestamp newMajorityTimestamp = newCommitPoint.getTimestamp();
 
     const auto optMaxMajorityCommittedTopologyTime = [&]() -> boost::optional<LogicalTime> {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
 
         if (_topologyTimeByLocalCommitTime.empty()) {
             return boost::none;
@@ -138,7 +138,7 @@ void TopologyTimeTicker::onMajorityCommitPointUpdate(ServiceContext* service,
 void TopologyTimeTicker::onReplicationRollback(const repl::OpTime& lastAppliedOpTime) {
     Timestamp newestTimestamp = lastAppliedOpTime.getTimestamp();
 
-    stdx::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex);
     auto itFirstElemToBeRemoved = _topologyTimeByLocalCommitTime.upper_bound(newestTimestamp);
 
     _topologyTimeByLocalCommitTime.erase(itFirstElemToBeRemoved,
@@ -147,7 +147,7 @@ void TopologyTimeTicker::onReplicationRollback(const repl::OpTime& lastAppliedOp
 
 std::map<Timestamp, Timestamp> TopologyTimeTicker::getTopologyTimeByLocalCommitTime_forTest()
     const {
-    stdx::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex);
     return _topologyTimeByLocalCommitTime;
 };
 

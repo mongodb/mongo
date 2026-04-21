@@ -60,7 +60,7 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 
 void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
     auto isSteppingDown = [&]() {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         // If true, we know that a stepdown is underway.
         return (_topCoord->isSteppingDown());
     };
@@ -71,7 +71,7 @@ void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
 }
 
 void ReplicationCoordinatorImpl::autoGetRstlEnterStepDown() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // This makes us tell the 'hello' command we can't accept writes (though in fact we can,
     // it is not valid to disable writes until we actually acquire the RSTL).
     if (_stepDownPending++ == 0)
@@ -79,7 +79,7 @@ void ReplicationCoordinatorImpl::autoGetRstlEnterStepDown() {
 }
 
 void ReplicationCoordinatorImpl::autoGetRstlExitStepDown() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // Once we release the RSTL, we announce either that we can accept writes or that we're now
     // a real secondary.
     invariant(_stepDownPending > 0);
@@ -134,7 +134,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     stepdownHangAfterGrabbingRSTL.pauseWhileSet();
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     opCtx->checkForInterrupt();
 
@@ -173,7 +173,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
                 mongo::sleepsecs(1);
                 {
-                    stdx::lock_guard lock(_mutex);
+                    std::lock_guard lock(_mutex);
                     if (_inShutdown) {
                         break;
                     }
@@ -363,7 +363,7 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx, boo
 
     EventHandle finishEvent;
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         // A null _electionState indicates that the election has already completed.
         if (_electionState) {
             finishEvent = _electionState->getElectionFinishedEvent(lk);
@@ -377,7 +377,7 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx, boo
         // Step up is considered successful only if we are currently a primary and we are not in the
         // process of stepping down. If we know we are going to step down, we should fail the
         // replSetStepUp command so caller can retry if necessary.
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (!_getMemberState(lk).primary())
             return Status(ErrorCodes::CommandFailed, "Election failed.");
         else if (_topCoord->isSteppingDown())

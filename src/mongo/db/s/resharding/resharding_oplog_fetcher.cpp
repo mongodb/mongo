@@ -282,13 +282,13 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
       _storeProgress(storeProgress),
       _startAt(startAt) {
     auto [p, f] = makePromiseFuture<void>();
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _onInsertPromise = std::move(p);
     _onInsertFuture = std::move(f);
 }
 
 ReshardingOplogFetcher::~ReshardingOplogFetcher() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _onInsertPromise.setError(
         {ErrorCodes::CallbackCanceled, "explicitly breaking promise from ReshardingOplogFetcher"});
 }
@@ -301,7 +301,7 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
     // ReshardingOplogFetcher to reflect the newer resume point if a new aggregation request was
     // being issued. It is also updated with the latest oplog timestamp from donor's cursor response
     // after we finish inserting the entire batch.
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (lastSeen < _startAt) {
         // `lastSeen < _startAt` means there's at least one document which has been inserted by
         // ReshardingOplogFetcher and hasn't been returned by
@@ -322,7 +322,7 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
 }
 
 void ReshardingOplogFetcher::awaitBatchProcessed(int numBatchesProcessed) {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     _batchProcessedCV.wait(lk, [this, numBatchesProcessed] {
         return _totalNumBatchesProcessed == numBatchesProcessed;
     });
@@ -369,7 +369,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
 
                    std::shared_ptr<HierarchicalCancelableOperationContextFactory> aggOpCtxFactory;
                    {
-                       stdx::lock_guard lk(_mutex);
+                       std::lock_guard lk(_mutex);
                        _aggCancelSource.emplace(cancelToken);
                        aggOpCtxFactory =
                            std::make_shared<HierarchicalCancelableOperationContextFactory>(
@@ -563,7 +563,7 @@ bool ReshardingOplogFetcher::_needToUpdateAverageTimeToApply(WithLock,
 boost::optional<ReshardingDonorOplogId>
 ReshardingOplogFetcher::_makeProgressMarkOplogIdIfNeedToInsert(
     OperationContext* opCtx, const Timestamp& currBatchLastOplogTs) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     // If the recipient has been configured to estimate the remaining time based on moving average
     // of the time it takes to fetch and apply oplog entries, write a progress mark noop oplog
@@ -660,7 +660,7 @@ bool ReshardingOplogFetcher::consume(
             auto opCtx = opCtxRaii.get();
 
             auto prevBatchLastOplogId = [&] {
-                stdx::lock_guard lk(_mutex);
+                std::lock_guard lk(_mutex);
                 return _startAt;
             }();
 
@@ -704,7 +704,7 @@ bool ReshardingOplogFetcher::consume(
 
                 auto [p, f] = makePromiseFuture<void>();
                 {
-                    stdx::lock_guard lk(_mutex);
+                    std::lock_guard lk(_mutex);
                     _startAt = insertBatch.moreToCome
                         ? insertBatch.lastOplogId
                         : ReshardingOplogFetcher::kFinalOpAlreadyFetched;
@@ -753,7 +753,7 @@ bool ReshardingOplogFetcher::consume(
 
                         auto [p, f] = makePromiseFuture<void>();
                         {
-                            stdx::lock_guard lk(_mutex);
+                            std::lock_guard lk(_mutex);
                             _startAt = *oplogId;
                             _lastUpdatedProgressMarkAt = opCtx->fastClockSource().now();
                             _onInsertPromise.emplaceValue();
@@ -776,7 +776,7 @@ bool ReshardingOplogFetcher::consume(
 
             batchTimer.reset();
 
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             ++_totalNumBatchesProcessed;
             _batchProcessedCV.notify_all();
             if (_maxBatches > -1 && ++currentNumBatchesProcessed >= _maxBatches) {
@@ -797,7 +797,7 @@ void ReshardingOplogFetcher::onStartingOplogApplication() {
 }
 
 void ReshardingOplogFetcher::prepareForCriticalSection() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     if (_isPreparingForCriticalSection.load()) {
         return;

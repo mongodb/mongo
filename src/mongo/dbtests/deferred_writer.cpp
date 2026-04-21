@@ -385,10 +385,10 @@ public:
         launcher.launch(kNWorkers, &DeferredWriterTestAsync::worker, this, writer);
         launcher.await();
 
-        auto start = stdx::chrono::system_clock::now();
+        auto start = std::chrono::system_clock::now();
 
         // Spin-wait for one minute or until something has been added to the collection.
-        while (stdx::chrono::system_clock::now() - start < 1min && readCollection().size() == 0) {
+        while (std::chrono::system_clock::now() - start < 1min && readCollection().size() == 0) {
             stdx::this_thread::yield();
         }
 

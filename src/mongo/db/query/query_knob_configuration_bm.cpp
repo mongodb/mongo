@@ -32,8 +32,9 @@
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/processinfo.h"
+
+#include <mutex>
 
 #include <benchmark/benchmark.h>
 
@@ -126,7 +127,7 @@ template <typename SettingsPolicy, typename WorkloadPolicy>
 class QKCBenchmark : public benchmark::Fixture {
 public:
     void SetUp(benchmark::State&) override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (!_threads++) {
             QueryFCVEnvironmentForTest::setUp();
             _serviceContext = std::make_unique<QueryTestServiceContext>();
@@ -134,7 +135,7 @@ public:
     }
 
     void TearDown(benchmark::State&) override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (!--_threads) {
             _serviceContext.reset();
         }
@@ -150,7 +151,7 @@ public:
     }
 
 private:
-    inline static stdx::mutex _mutex{};
+    inline static std::mutex _mutex{};
     inline static size_t _threads = 0;
     inline static std::unique_ptr<QueryTestServiceContext> _serviceContext{};
 };

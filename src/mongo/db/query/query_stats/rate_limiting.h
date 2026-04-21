@@ -31,7 +31,6 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -41,6 +40,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <mutex>
 #include <utility>
 
 namespace mongo {
@@ -131,7 +131,7 @@ class RateLimiter {
         /*
          * Mutex used when reading/writing the window.
          */
-        ObservableMutex<stdx::mutex> _windowMutex;
+        ObservableMutex<std::mutex> _windowMutex;
     };
 
     struct SampleBasedPolicy {

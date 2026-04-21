@@ -449,7 +449,7 @@ public:
 
             {
                 CurOp::get(opCtx)->ensureStarted();
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setNS(lk, dbname);
             }
 
@@ -489,7 +489,7 @@ public:
 
             } else {
                 {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    std::lock_guard<Client> lk(*opCtx->getClient());
                     CurOp::get(opCtx)->enter(
                         lk,
                         dbname,

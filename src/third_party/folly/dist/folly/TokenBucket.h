@@ -28,7 +28,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/new.h"
+#include <new>
 #include "mongo/util/assert_util.h"
 
 namespace folly {
@@ -62,7 +62,7 @@ constexpr T constexpr_max(T a, Ts... ts) {
 
 struct TokenBucketPolicyDefault {
   using align =
-      std::integral_constant<size_t, mongo::stdx::hardware_destructive_interference_size>;
+      std::integral_constant<size_t, std::hardware_destructive_interference_size>;
 
   template <typename T>
   using atom = std::atomic<T>;

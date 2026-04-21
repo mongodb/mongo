@@ -174,7 +174,7 @@ int64_t ReshardingCumulativeMetrics::getOldestOperationLowEstimateRemainingTimeM
 int64_t ReshardingCumulativeMetrics::getOldestOperationEstimateRemainingTimeMillis(
     Role role, EstimateType type) const {
 
-    stdx::unique_lock guard(_mutex);
+    std::unique_lock guard(_mutex);
     auto op = getOldestOperation(guard, role);
     if (!op) {
         return kEstimateNotAvailable;
@@ -195,7 +195,7 @@ boost::optional<Milliseconds> ReshardingCumulativeMetrics::getEstimate(
 }
 
 size_t ReshardingCumulativeMetrics::getObservedMetricsCount() const {
-    stdx::unique_lock guard(_mutex);
+    std::unique_lock guard(_mutex);
     size_t count = 0;
     for (const auto& set : _instanceMetricsForAllRoles) {
         count += set.size();
@@ -204,7 +204,7 @@ size_t ReshardingCumulativeMetrics::getObservedMetricsCount() const {
 }
 
 size_t ReshardingCumulativeMetrics::getObservedMetricsCount(Role role) const {
-    stdx::unique_lock guard(_mutex);
+    std::unique_lock guard(_mutex);
     return getMetricsSetForRole(role).size();
 }
 
@@ -305,7 +305,7 @@ void ReshardingCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const 
 
 void ReshardingCumulativeMetrics::appendOldestDiagnosticMetrics(Role role,
                                                                 BSONObjBuilder* bob) const {
-    stdx::unique_lock guard(_mutex);
+    std::unique_lock guard(_mutex);
     auto op = getOldestOperation(guard, role);
     if (op) {
         bob->appendElements(op->getDiagnosticMetrics());
@@ -392,7 +392,7 @@ const ReshardingCumulativeMetrics::MetricsSet& ReshardingCumulativeMetrics::getM
 
 ReshardingCumulativeMetrics::MetricsSet::iterator ReshardingCumulativeMetrics::insertMetrics(
     const ReshardingMetricsObserver* metrics, MetricsSet& set) {
-    stdx::unique_lock guard(_mutex);
+    std::unique_lock guard(_mutex);
     auto before = set.size();
     auto it = set.insert(set.end(), metrics);
     invariant(before + 1 == set.size());
@@ -401,7 +401,7 @@ ReshardingCumulativeMetrics::MetricsSet::iterator ReshardingCumulativeMetrics::i
 
 void ReshardingCumulativeMetrics::deregisterMetrics(
     const Role& role, const ReshardingCumulativeMetrics::MetricsSet::iterator& metricsIterator) {
-    stdx::unique_lock guard(_mutex);
+    std::unique_lock guard(_mutex);
     getMetricsSetForRole(role).erase(metricsIterator);
 }
 
@@ -491,7 +491,7 @@ ReshardingCumulativeMetrics::ScopedObserver::~ScopedObserver() {
 
 void ReshardingCumulativeMetrics::onStarted(bool isSameKeyResharding, const UUID& reshardingUUID) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        std::lock_guard<std::mutex> lk(_activeReshardingOperationsMutex);
         if (_activeReshardingOperations.contains(reshardingUUID)) {
             return;
         }
@@ -506,7 +506,7 @@ void ReshardingCumulativeMetrics::onStarted(bool isSameKeyResharding, const UUID
 
 void ReshardingCumulativeMetrics::onSuccess(bool isSameKeyResharding, const UUID& reshardingUUID) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        std::lock_guard<std::mutex> lk(_activeReshardingOperationsMutex);
         if (!_activeReshardingOperations.contains(reshardingUUID)) {
             return;
         }
@@ -521,7 +521,7 @@ void ReshardingCumulativeMetrics::onSuccess(bool isSameKeyResharding, const UUID
 
 void ReshardingCumulativeMetrics::onFailure(bool isSameKeyResharding, const UUID& reshardingUUID) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        std::lock_guard<std::mutex> lk(_activeReshardingOperationsMutex);
         if (!_activeReshardingOperations.contains(reshardingUUID)) {
             return;
         }
@@ -536,7 +536,7 @@ void ReshardingCumulativeMetrics::onFailure(bool isSameKeyResharding, const UUID
 
 void ReshardingCumulativeMetrics::onCanceled(bool isSameKeyResharding, const UUID& reshardingUUID) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        std::lock_guard<std::mutex> lk(_activeReshardingOperationsMutex);
         if (!_activeReshardingOperations.contains(reshardingUUID)) {
             return;
         }

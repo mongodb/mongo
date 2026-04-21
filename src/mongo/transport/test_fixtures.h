@@ -56,14 +56,14 @@ template <typename T>
 class BlockingQueue {
 public:
     void push(T t) {
-        stdx::unique_lock lk(_mu);
+        std::unique_lock lk(_mu);
         _q.push(std::move(t));
         lk.unlock();
         _cv.notify_one();
     }
 
     T pop() {
-        stdx::unique_lock lk(_mu);
+        std::unique_lock lk(_mu);
         _cv.wait(lk, [&] { return !_q.empty(); });
         T r = std::move(_q.front());
         _q.pop();
@@ -71,7 +71,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mu;
+    mutable std::mutex _mu;
     mutable stdx::condition_variable _cv;
     std::queue<T> _q;
 };
@@ -135,7 +135,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    stdx::chrono::system_clock::time_point systemTime() override {
+    std::chrono::system_clock::time_point systemTime() override {
         MONGO_UNREACHABLE;
     }
 
@@ -161,7 +161,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    stdx::chrono::system_clock::time_point systemTime() override {
+    std::chrono::system_clock::time_point systemTime() override {
         MONGO_UNREACHABLE;
     }
 

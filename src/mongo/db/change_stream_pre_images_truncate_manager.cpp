@@ -37,10 +37,10 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/timer.h"
 
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 
 #include <boost/optional/optional.hpp>

@@ -39,8 +39,9 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -142,7 +143,7 @@ private:
     const NamespaceString _initialSyncIdNss;
 
     // Protects modifying and reading _isPrimary below.
-    mutable stdx::mutex _truncatePointIsPrimaryMutex;
+    mutable std::mutex _truncatePointIsPrimaryMutex;
 
     // Tracks whether or not the node is primary. Avoids potential deadlocks taking the replication
     // coordinator's mutex to check replication state. Also remains false for standalones that do
@@ -152,7 +153,7 @@ private:
     // Locks around fetching the 'all_durable' timestamp from the storage engine and updating the
     // oplogTruncateAfterPoint. This prevents the oplogTruncateAfterPoint from going backwards in
     // time in case of multiple callers to refreshOplogTruncateAfterPointIfPrimary.
-    mutable stdx::mutex _refreshOplogTruncateAfterPointMutex;
+    mutable std::mutex _refreshOplogTruncateAfterPointMutex;
 
     // In-memory cache of the of the oplog entry LTE to the oplogTruncateAfterPoint timestamp.
     // Eventually matches the oplogTruncateAfterPoint timestamp when parallel writes finish. Avoids

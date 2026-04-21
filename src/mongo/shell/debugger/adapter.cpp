@@ -34,7 +34,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/shell/debugger/debugger.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
+
+#include <mutex>
 
 #include <boost/filesystem.hpp>
 
@@ -59,7 +60,7 @@ AtomicWord<bool> _running{false};
 std::unique_ptr<std::thread> _messageThread;
 
 // Configuration state
-stdx::mutex _configMutex;
+std::mutex _configMutex;
 stdx::condition_variable _configCV;
 static AtomicWord<bool> _configured{false};
 

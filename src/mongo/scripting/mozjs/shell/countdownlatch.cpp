@@ -40,7 +40,6 @@
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
 #include "mongo/scripting/mozjs/shell/countdownlatch.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 
@@ -75,7 +74,7 @@ public:
 
     int32_t make(int32_t count) {
         uassert(ErrorCodes::JSInterpreterFailure, "argument must be >= 0", count >= 0);
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         int32_t desc = ++_counter;
         _latches.insert(std::make_pair(desc, std::make_shared<CountDownLatch>(count)));
@@ -85,7 +84,7 @@ public:
 
     void await(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
+        std::unique_lock<std::mutex> lock(latch->mutex);
 
         while (latch->count != 0) {
             latch->cv.wait(lock);
@@ -94,7 +93,7 @@ public:
 
     void countDown(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
+        std::unique_lock<std::mutex> lock(latch->mutex);
 
         if (latch->count > 0)
             latch->count--;
@@ -105,7 +104,7 @@ public:
 
     int32_t getCount(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
+        std::unique_lock<std::mutex> lock(latch->mutex);
 
         return latch->count;
     }
@@ -117,13 +116,13 @@ private:
     struct CountDownLatch {
         CountDownLatch(int32_t count) : count(count) {}
 
-        stdx::mutex mutex;
+        std::mutex mutex;
         stdx::condition_variable cv;
         int32_t count;
     };
 
     std::shared_ptr<CountDownLatch> get(int32_t desc) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         auto iter = _latches.find(desc);
         uassert(ErrorCodes::JSInterpreterFailure,
@@ -135,7 +134,7 @@ private:
 
     using Map = stdx::unordered_map<int32_t, std::shared_ptr<CountDownLatch>>;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     Map _latches;
     int32_t _counter;
 };

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/client_cache.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/serialization.h"
@@ -39,6 +38,7 @@
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <mutex>
 
 #include <grpcpp/impl/service_type.h>
 #include <grpcpp/support/status.h>
@@ -119,7 +119,7 @@ private:
     std::shared_ptr<WireVersionProvider> _wvProvider;
     std::shared_ptr<ClientCache> _clientCache;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _shutdownCV;
     std::list<InSessionPtr> _sessions;
     bool _acceptNewRequests = true;

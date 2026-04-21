@@ -36,11 +36,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -64,7 +64,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT CatalogEntryMetaData {
         IndexMetaData(const IndexMetaData& other)
             : spec(other.spec), ready(other.ready), buildUUID(other.buildUUID) {
             // We need to hold the multikey mutex when copying, someone else might be modifying this
-            stdx::lock_guard lock(other.multikeyMutex);
+            std::lock_guard lock(other.multikeyMutex);
             multikey = other.multikey;
             multikeyPaths = other.multikeyPaths;
         }
@@ -125,7 +125,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT CatalogEntryMetaData {
         // (starting at 0) into the corresponding indexed field that represent what prefixes of the
         // indexed field cause the index to be multikey.
         // multikeyMutex must be held when accessing multikey or multikeyPaths
-        mutable stdx::mutex multikeyMutex;
+        mutable std::mutex multikeyMutex;
         mutable bool multikey = false;
         mutable MultikeyPaths multikeyPaths;
         mutable AtomicWord<int32_t> concurrentWriters;

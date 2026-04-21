@@ -148,7 +148,7 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     {
         // Have the new client use the dedicated threading model. This ensures the synchronous
         // execution of the command by the client thread.
-        stdx::lock_guard lk(*client.get());
+        std::lock_guard lk(*client.get());
         auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
         seCtx->setThreadModel(seCtx->kSynchronous);
         transport::ServiceExecutorContext::set(client.get(), std::move(seCtx));

@@ -50,7 +50,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -61,6 +60,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <utility>
 #include <vector>
@@ -184,7 +184,7 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     // Run 2 concurrent logOp() requests using the thread pool.
     // Use a barrier with a thread count of 3 to ensure both logOp() tasks are complete before this
     // test thread can proceed with shutting the thread pool down.
-    stdx::mutex mtx;
+    std::mutex mtx;
     ;
     unittest::Barrier barrier(3U);
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test1.coll");
@@ -222,7 +222,7 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     std::reverse(oplogEntries->begin(), oplogEntries->end());
 
     // Look up namespaces and their respective optimes (returned by logOp()) in the map.
-    stdx::lock_guard<stdx::mutex> lock(mtx);
+    std::lock_guard<std::mutex> lock(mtx);
     ASSERT_EQUALS(2U, opTimeNssMap->size());
 }
 
@@ -232,7 +232,7 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
  * Returns optime of generated oplog entry.
  */
 OpTime _logOpNoopWithMsg(OperationContext* opCtx,
-                         stdx::mutex* mtx,
+                         std::mutex* mtx,
                          OpTimeNamespaceStringMap* opTimeNssMap,
                          const NamespaceString& nss) {
     MutableOplogEntry oplogEntry;
@@ -243,7 +243,7 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
     auto opTime = logOp(opCtx, &oplogEntry);
     ASSERT_FALSE(opTime.isNull());
 
-    stdx::lock_guard<stdx::mutex> lock(*mtx);
+    std::lock_guard<std::mutex> lock(*mtx);
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())
         << "Unable to add namespace " << nss.toStringForErrorMsg()
         << " to map - map contains duplicate entry for optime " << opTime;
@@ -258,7 +258,7 @@ TEST_F(OplogTest, ConcurrentLogOp) {
 
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
-           stdx::mutex* mtx,
+           std::mutex* mtx,
            OpTimeNamespaceStringMap* opTimeNssMap,
            unittest::Barrier* barrier) {
             return [=] {
@@ -289,7 +289,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertFirstOplogEntry) {
 
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
-           stdx::mutex* mtx,
+           std::mutex* mtx,
            OpTimeNamespaceStringMap* opTimeNssMap,
            unittest::Barrier* barrier) {
             return [=] {
@@ -307,7 +307,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertFirstOplogEntry) {
                 // Revert the first logOp() call and confirm that there are no holes in the
                 // oplog after committing the oplog entry with the more recent optime.
                 {
-                    stdx::lock_guard<stdx::mutex> lock(*mtx);
+                    std::lock_guard<std::mutex> lock(*mtx);
                     auto firstOpTimeAndNss = *(opTimeNssMap->cbegin());
                     if (opTime == firstOpTimeAndNss.first) {
                         ASSERT_EQUALS(nss, firstOpTimeAndNss.second)
@@ -335,7 +335,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
 
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
-           stdx::mutex* mtx,
+           std::mutex* mtx,
            OpTimeNamespaceStringMap* opTimeNssMap,
            unittest::Barrier* barrier) {
             return [=] {
@@ -353,7 +353,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
                 // Revert the last logOp() call and confirm that there are no holes in the
                 // oplog after committing the oplog entry with the earlier optime.
                 {
-                    stdx::lock_guard<stdx::mutex> lock(*mtx);
+                    std::lock_guard<std::mutex> lock(*mtx);
                     auto lastOpTimeAndNss = *(opTimeNssMap->crbegin());
                     if (opTime == lastOpTimeAndNss.first) {
                         ASSERT_EQUALS(nss, lastOpTimeAndNss.second)

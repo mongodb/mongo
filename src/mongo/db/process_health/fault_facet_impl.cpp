@@ -50,7 +50,7 @@ FaultFacetType FaultFacetImpl::getType() const {
 }
 
 HealthCheckStatus FaultFacetImpl::getStatus() const {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     return HealthCheckStatus(getType(), _severity, _description);
 }
 
@@ -59,7 +59,7 @@ Milliseconds FaultFacetImpl::getDuration() const {
 }
 
 void FaultFacetImpl::update(HealthCheckStatus status) {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     _severity = status.getSeverity();
     _description = std::string{status.getShortDescription()};
 }
@@ -68,7 +68,7 @@ void FaultFacetImpl::appendDescription(BSONObjBuilder* builder) const {
     decltype(_severity) severity;
     decltype(_description) description;
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         severity = _severity;
         description = _description;
     }

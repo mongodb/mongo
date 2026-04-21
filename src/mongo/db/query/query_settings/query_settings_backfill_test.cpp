@@ -80,7 +80,7 @@ public:
         : query_settings::BackfillCoordinator(std::move(hook)), _executor(std::move(executor)) {}
 
     State* peekState() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _state.get();
     }
 

@@ -61,7 +61,7 @@ NetworkInterfaceThreadPool::~NetworkInterfaceThreadPool() {
 
 void NetworkInterfaceThreadPool::_dtorImpl() {
     {
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
 
         if (_tasks.empty())
             return;
@@ -75,7 +75,7 @@ void NetworkInterfaceThreadPool::_dtorImpl() {
 }
 
 void NetworkInterfaceThreadPool::startup() {
-    stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
     if (_started) {
         LOGV2_FATAL(34358, "Attempting to start pool, but it has already started");
     }
@@ -86,7 +86,7 @@ void NetworkInterfaceThreadPool::startup() {
 
 void NetworkInterfaceThreadPool::shutdown() {
     {
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
         _inShutdown = true;
     }
 
@@ -95,7 +95,7 @@ void NetworkInterfaceThreadPool::shutdown() {
 
 void NetworkInterfaceThreadPool::join() {
     {
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
 
         if (_joining) {
             LOGV2_FATAL(34357, "Attempted to join pool more than once");
@@ -110,13 +110,13 @@ void NetworkInterfaceThreadPool::join() {
 
     _net->signalWorkAvailable();
 
-    stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
     _joiningCondition.wait(
         lk, [&] { return _tasks.empty() && (_consumeState == ConsumeState::kNeutral); });
 }
 
 void NetworkInterfaceThreadPool::schedule(Task task) {
-    stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
     if (_inShutdown) {
         lk.unlock();
         task({ErrorCodes::ShutdownInProgress, "Shutdown in progress"});
@@ -137,7 +137,7 @@ void NetworkInterfaceThreadPool::schedule(Task task) {
  * allows us to use the network interface's threads as our own pool, which should reduce context
  * switches if our tasks are getting scheduled by network interface tasks.
  */
-void NetworkInterfaceThreadPool::_consumeTasks(stdx::unique_lock<ObservableMutex<stdx::mutex>> lk) {
+void NetworkInterfaceThreadPool::_consumeTasks(std::unique_lock<ObservableMutex<std::mutex>> lk) {
     if ((_consumeState != ConsumeState::kNeutral) || _tasks.empty())
         return;
 
@@ -150,7 +150,7 @@ void NetworkInterfaceThreadPool::_consumeTasks(stdx::unique_lock<ObservableMutex
     _consumeState = ConsumeState::kScheduled;
     lk.unlock();
     auto ret = _net->schedule([this](Status status) {
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
 
         if (_consumeState != ConsumeState::kScheduled)
             return;
@@ -160,7 +160,7 @@ void NetworkInterfaceThreadPool::_consumeTasks(stdx::unique_lock<ObservableMutex
 }
 
 void NetworkInterfaceThreadPool::_consumeTasksInline(
-    stdx::unique_lock<ObservableMutex<stdx::mutex>> lk) {
+    std::unique_lock<ObservableMutex<std::mutex>> lk) {
     _consumeState = ConsumeState::kConsuming;
     const ScopeGuard consumingTasksGuard([&] { _consumeState = ConsumeState::kNeutral; });
 

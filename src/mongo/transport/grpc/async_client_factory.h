@@ -33,7 +33,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
@@ -44,6 +43,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace mongo::transport::grpc {
 
@@ -180,7 +181,7 @@ private:
     std::string _instanceName;
 
     stdx::condition_variable _cv;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     enum class State { kNew, kStarted, kShutdown };
     State _state{State::kNew};

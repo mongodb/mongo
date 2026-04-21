@@ -34,7 +34,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
@@ -77,7 +76,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     }
 
     for (const auto& server : servers) {
-        stdx::unique_lock<stdx::mutex> lk(state->mutex);
+        std::unique_lock<std::mutex> lk(state->mutex);
         // spin up no more than maxConcurrency tasks at once
         opCtx->waitForConditionOrInterrupt(
             state->cv, lk, [&] { return state->running < _options.maxConcurrency; });
@@ -86,7 +85,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
         _scheduleAttempt(state, request, opCtx->getCancellationToken(), server);
     }
 
-    stdx::unique_lock<stdx::mutex> lk(state->mutex);
+    std::unique_lock<std::mutex> lk(state->mutex);
     opCtx->waitForConditionOrInterrupt(state->cv, lk, [&] { return state->leftToDo == 0; });
 
     return std::move(state->out);
@@ -100,7 +99,7 @@ void AsyncMulticaster::_scheduleAttempt(std::shared_ptr<State> state,
         request,
         [this, state, server, request, cancellationToken](
             const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-            stdx::lock_guard<stdx::mutex> lk(state->mutex);
+            std::lock_guard<std::mutex> lk(state->mutex);
 
             auto it = state->strategies.find(cbData.request.target);
             tassert(10944600,
@@ -129,7 +128,7 @@ void AsyncMulticaster::_scheduleAttempt(std::shared_ptr<State> state,
                                cancellationToken,
                                originalResponse = cbData.response,
                                delay](Status s) {
-                        stdx::lock_guard<stdx::mutex> lk(state->mutex);
+                        std::lock_guard<std::mutex> lk(state->mutex);
                         if (s.isOK()) {
                             auto it = state->strategies.find(server);
                             if (it != state->strategies.end()) {

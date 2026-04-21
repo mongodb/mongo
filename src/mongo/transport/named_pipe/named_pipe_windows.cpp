@@ -147,7 +147,7 @@ void NamedPipeInput::doOpen() {
         _pipe = CreateFileA(
             _pipeAbsolutePath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
         if (_pipe == INVALID_HANDLE_VALUE) {
-            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(sleepMs));
+            stdx::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
             ++retries;
             if (retries % 1000 == 0) {
                 sleepMs *= 2;

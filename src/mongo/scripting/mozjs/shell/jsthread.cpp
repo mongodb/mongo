@@ -45,7 +45,6 @@
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/shell/engine.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 
@@ -189,12 +188,12 @@ private:
         SharedData() = default;
 
         void setErrorStatus(Status status) {
-            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
+            std::lock_guard<std::mutex> lck(_statusMutex);
             _status = std::move(status);
         }
 
         Status getErrorStatus() {
-            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
+            std::lock_guard<std::mutex> lck(_statusMutex);
             return _status;
         }
 
@@ -208,7 +207,7 @@ private:
         std::string _stack;
 
     private:
-        stdx::mutex _statusMutex;
+        std::mutex _statusMutex;
         Status _status = Status::OK();
     };
 

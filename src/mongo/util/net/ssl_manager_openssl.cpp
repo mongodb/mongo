@@ -1235,7 +1235,7 @@ private:
     // and the manager it owns still matches the manager.
     std::weak_ptr<const SSLConnectionContext> _ownedByContext;
 
-    stdx::mutex _staplingMutex;
+    std::mutex _staplingMutex;
     PeriodicRunner::JobAnchor _ocspStaplingAnchor;
     bool _shutdown{false};
 };
@@ -1328,7 +1328,7 @@ public:
     SSLInformationToLog getSSLInformationToLog() const final;
 
     std::shared_ptr<OCSPStaplingContext> getOcspStaplingContext() {
-        stdx::lock_guard<stdx::mutex> guard(_sharedResponseMutex);
+        std::lock_guard<std::mutex> guard(_sharedResponseMutex);
         return _ocspStaplingContext;
     }
 
@@ -1352,7 +1352,7 @@ private:
     // Weak pointer to verify that this manager is still owned by this context.
     synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
 
-    stdx::mutex _sharedResponseMutex;
+    std::mutex _sharedResponseMutex;
     std::shared_ptr<OCSPStaplingContext> _ocspStaplingContext;
 
     OCSPFetcher _fetcher;
@@ -1374,7 +1374,7 @@ private:
 
         /** Either returns a cached password, or prompts the user to enter one. */
         StatusWith<StringData> fetchPassword() {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             if (_password->size()) {
                 return StringData(_password->c_str());
             }
@@ -1403,7 +1403,7 @@ private:
          * @returns cached password if available, error if password is not cached.
          */
         StatusWith<StringData> fetchCachedPasswordNoPrompt() {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             if (_password->size()) {
                 return StringData(_password->c_str());
             }
@@ -1412,7 +1412,7 @@ private:
         }
 
     private:
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         SecureString _password;  // Protected by _mutex
 
         std::string _prompt;
@@ -2242,7 +2242,7 @@ Milliseconds getPeriodForStapleJob(StatusWith<Milliseconds> swDuration) {
 }
 
 void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
-    stdx::lock_guard<stdx::mutex> lock(_staplingMutex);
+    std::lock_guard<std::mutex> lock(_staplingMutex);
 
     if (_ocspStaplingAnchor) {
         return;
@@ -2272,7 +2272,7 @@ void OCSPFetcher::doPeriodicJob() try {
                               "reason"_attr = swDuration.getStatus());
             }
 
-            stdx::lock_guard<stdx::mutex> lock(this->_staplingMutex);
+            std::lock_guard<std::mutex> lock(this->_staplingMutex);
 
             if (_isShutdownConditionLocked(lock)) {
                 return;
@@ -2365,7 +2365,7 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
         .onCompletion(
             [this, promise](StatusWith<OCSPFetchResponse> swResponse) mutable -> Milliseconds {
                 LOGV2_INFO(577165, "OCSP fetch/staple completion");
-                stdx::lock_guard<stdx::mutex> lock(this->_staplingMutex);
+                std::lock_guard<std::mutex> lock(this->_staplingMutex);
 
                 if (_isShutdownConditionLocked(lock)) {
                     return kOCSPUnknownStatusRefreshRate;
@@ -2397,7 +2397,7 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
 }
 
 void OCSPFetcher::shutdown() {
-    stdx::lock_guard<stdx::mutex> lock(_staplingMutex);
+    std::lock_guard<std::mutex> lock(_staplingMutex);
     _shutdownLocked(lock);
 }
 
@@ -2416,7 +2416,7 @@ void SSLManagerOpenSSL::stopJobs() {
 
 Milliseconds SSLManagerOpenSSL::updateOcspStaplingContextWithResponse(
     StatusWith<OCSPFetchResponse> swResponse) {
-    stdx::lock_guard<stdx::mutex> guard(_sharedResponseMutex);
+    std::lock_guard<std::mutex> guard(_sharedResponseMutex);
 
     if (!swResponse.isOK() || !swResponse.getValue().cacheable()) {
         if (!swResponse.isOK()) {

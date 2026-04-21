@@ -44,7 +44,6 @@
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
@@ -52,6 +51,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -266,7 +266,7 @@ private:
                                                ActionsStreamPolicy* policy);
 
     // Protects the state below
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // Indicates the current state of the worker threads instantiated by the balancer
     // (_thread, _actionStreamConsumerThread and _commandScheduler)

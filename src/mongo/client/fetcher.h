@@ -43,7 +43,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -55,6 +54,7 @@
 #include <functional>
 #include <iosfwd>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -283,7 +283,7 @@ private:
     CallbackFn _work;
 
     // Protects member data of this Fetcher.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     mutable stdx::condition_variable _condition;
 

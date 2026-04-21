@@ -45,7 +45,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 
@@ -288,7 +287,7 @@ void StreamableReplicaSetMonitor::initForTesting(sdam::TopologyManagerPtr topolo
 
 void StreamableReplicaSetMonitor::drop() {
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         if (_isDropped.swap(true))
             return;
 
@@ -371,7 +370,7 @@ Future<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefresh(
     return _topologyManager->executeWithLock(
         [this, criteria, cancelToken, deadline, targetingMetadata](
             const TopologyDescriptionPtr& topologyDescription) -> Future<std::vector<HostAndPort>> {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
 
             // We check if we are closed under the mutex here since someone could have called
             // close() concurrently with the code above.
@@ -429,7 +428,7 @@ Future<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutstandin
                                "replicaSet"_attr = self->getName(),
                                "error"_attr = errorStatus.toString());
 
-                    stdx::lock_guard lk(_mutex);
+                    std::lock_guard lk(_mutex);
                     // Check that the RSM hasn't been dropped (and _outstandingQueries has not
                     // been cleared) before erasing.
                     if (!_isDropped.load()) {
@@ -504,7 +503,7 @@ void StreamableReplicaSetMonitor::_doErrorActions(
     const StringData reason,
     const StreamableReplicaSetMonitorErrorHandler::ErrorActions& errorActions) const {
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         if (_isDropped.load())
             return;
 
@@ -675,7 +674,7 @@ void StreamableReplicaSetMonitor::_setConfirmedNotifierState(
 
 void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
     TopologyDescriptionPtr previousDescription, TopologyDescriptionPtr newDescription) {
-    stdx::unique_lock<ObservableMutex<stdx::mutex>> lock(_mutex);
+    std::unique_lock<ObservableMutex<std::mutex>> lock(_mutex);
     if (_isDropped.load())
         return;
 
@@ -811,7 +810,7 @@ void StreamableReplicaSetMonitor::_processOutstanding(
     // instead of calling _getHosts for every outstanding query, we could
     // first group into equivalence classes then call _getHosts once per class.
 
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     auto it = _outstandingQueries.begin();
     bool hadUnresolvedQuery{false};

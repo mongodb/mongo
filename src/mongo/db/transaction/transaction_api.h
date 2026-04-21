@@ -52,7 +52,6 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/notification.h"
@@ -64,6 +63,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -597,7 +597,7 @@ private:
 
     // Protects the members below that are accessed by the TxnHooks, which are called by the user's
     // callback and may run on a separate thread than the one that is driving the Transaction.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     LogicalTime _lastOperationTime;
     bool _latestResponseHasTransientTransactionErrorLabel{false};

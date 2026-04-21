@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 MONGO_MOD_PUBLIC;
 
@@ -97,7 +98,7 @@ public:
 
     private:
         SV& _sv;
-        stdx::unique_lock<stdx::mutex> _lock;
+        std::unique_lock<std::mutex> _lock;
     };
 
     synchronized_value() = default;
@@ -167,7 +168,7 @@ public:
 
 private:
     value_type _value;  ///< guarded by _mutex
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 };
 
 }  // namespace mongo

@@ -710,8 +710,8 @@ TEST_F(CollectionMarkersTest, SamplingWorksWithTruncate) {
         opCtx.get(), coll->getRecordStore(), &mockTickSource, {Milliseconds(0)});
 
     // Synchronize to avoid sampling the collection before the yield thread is ready.
-    stdx::mutex waitingMutex;
-    stdx::unique_lock waitingLock(waitingMutex);
+    std::mutex waitingMutex;
+    std::unique_lock waitingLock(waitingMutex);
     stdx::condition_variable waitingCv;
 
     AtomicWord<bool> hasYielded(false);
@@ -721,7 +721,7 @@ TEST_F(CollectionMarkersTest, SamplingWorksWithTruncate) {
         auto opCtx = innerOpCtx.get();
 
         {
-            stdx::unique_lock readyLock(waitingMutex);
+            std::unique_lock readyLock(waitingMutex);
         }
         waitingCv.notify_one();
 
@@ -763,8 +763,8 @@ TEST_F(CollectionMarkersTest, ScanningWorksWithTruncate) {
         opCtx.get(), coll->getRecordStore(), &mockTickSource, {Milliseconds(0)});
 
     // Synchronize to avoid scanning the collection before the yield thread is ready.
-    stdx::mutex waitingMutex;
-    stdx::unique_lock waitingLock(waitingMutex);
+    std::mutex waitingMutex;
+    std::unique_lock waitingLock(waitingMutex);
     stdx::condition_variable waitingCv;
 
     AtomicWord<bool> hasYielded(false);
@@ -774,7 +774,7 @@ TEST_F(CollectionMarkersTest, ScanningWorksWithTruncate) {
         auto opCtx = innerOpCtx.get();
 
         {
-            stdx::unique_lock readyLock(waitingMutex);
+            std::unique_lock readyLock(waitingMutex);
         }
         waitingCv.notify_one();
 

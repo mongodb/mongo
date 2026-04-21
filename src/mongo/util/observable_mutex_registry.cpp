@@ -112,11 +112,11 @@ BSONObj ObservableMutexRegistry::report(bool listAll) {
 
 StringMap<std::vector<ObservableMutexRegistry::StatsRecord>>
 ObservableMutexRegistry::_collectStats() {
-    stdx::lock_guard lk(_collectionMutex);
+    std::lock_guard lk(_collectionMutex);
 
     std::list<NewMutexEntry> newEntries;
     {
-        stdx::lock_guard lk(_registrationMutex);
+        std::lock_guard lk(_registrationMutex);
         newEntries.splice(newEntries.end(), _newMutexEntries);
     }
     // Integrate the new entries into `_mutexEntries`.

@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
@@ -46,6 +45,7 @@
 
 #include <concepts>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -551,7 +551,7 @@ private:
         const std::string _name;
 
         // protects _mode, _modeValue, _data
-        mutable stdx::mutex _modMutex;
+        mutable std::mutex _modMutex;
     };
     const Impl* _rawImpl() const {
         return reinterpret_cast<const Impl*>(&_implStorage);

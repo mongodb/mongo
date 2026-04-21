@@ -77,7 +77,6 @@
 #include "mongo/scripting/mozjs/shell/session.h"
 #include "mongo/scripting/mozjs/shell/uri.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
@@ -89,6 +88,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -536,7 +536,7 @@ public:
         ASANHandles& operator=(const ASANHandles&) = delete;
 #if __has_feature(address_sanitizer)
     private:
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         ASANHandlesNoLock _handles;
 #endif
     };
@@ -620,7 +620,7 @@ private:
     StringMap<ScriptingFunction> _funcCodeToHandleMap;
     InternedStringTable _internedStrings;
     Status _killStatus;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _sleepCondition;
     OperationContext* _opCtx;         // Op context for DbEval
     stdx::thread::id _opCtxThreadId;  // Id of the thread that owns '_opCtx'

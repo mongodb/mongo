@@ -31,13 +31,13 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/executor/egress_connection_closer.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 
@@ -73,7 +73,7 @@ public:
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen);
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::unordered_set<EgressConnectionCloser*> _egressConnectionClosers;
 };
 

@@ -80,7 +80,7 @@ private:
     OIDorTimestamp _previousGeneration;
 
     // this mutex serializes start and stop+detach on the periodic job
-    stdx::mutex _jobMutex;
+    std::mutex _jobMutex;
 };
 
 Status userCacheInvalidationIntervalSecsNotify(const int& newValue);

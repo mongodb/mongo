@@ -382,19 +382,19 @@ MigrationDestinationManager* MigrationDestinationManager::get(OperationContext* 
 }
 
 MigrationDestinationManager::State MigrationDestinationManager::getState() const {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     return _state;
 }
 
 void MigrationDestinationManager::_setState(State newState) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     _state = newState;
     _stateChangedCV.notify_all();
 }
 
 void MigrationDestinationManager::_setStateFailNoLog(StringData msg) {
     {
-        stdx::lock_guard<stdx::mutex> sl(_mutex);
+        std::lock_guard<std::mutex> sl(_mutex);
         _errmsg = std::string{msg};
         _state = kFail;
         _stateChangedCV.notify_all();
@@ -428,7 +428,7 @@ void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
 }
 
 bool MigrationDestinationManager::isActive() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _isActive(lk);
 }
 
@@ -440,7 +440,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
                                          OperationContext* opCtx,
                                          bool waitForSteadyOrDone) {
     if (waitForSteadyOrDone) {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         try {
             opCtx->waitForConditionOrInterruptFor(_stateChangedCV, lock, Seconds(1), [&]() -> bool {
                 return _state != kReady && _state != kClone && _state != kCatchup;
@@ -451,7 +451,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
         }
         b.append("waited", true);
     }
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
 
     b.appendBool("active", _sessionId.has_value());
 
@@ -484,7 +484,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
 
 BSONObj MigrationDestinationManager::getMigrationStatusReport(
     const CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime& scopedCsrLock) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (_isActive(lk)) {
         boost::optional<long long> sessionOplogEntriesMigrated;
         if (_sessionMigration) {
@@ -542,7 +542,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
                     "currentMigrationId"_attr = cloneRequest.getMigrationId());
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(!_sessionId);
     invariant(!_scopedReceiveChunk);
 
@@ -622,7 +622,7 @@ Status MigrationDestinationManager::restoreRecoveredMigrationState(
             "migrationId"_attr = _migrationId);
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(!_sessionId);
 
     _scopedReceiveChunk = std::move(scopedReceiveChunk);
@@ -723,7 +723,7 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
 }
 
 Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
 
     if (!_sessionId) {
         return Status::OK();
@@ -744,14 +744,14 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
 }
 
 void MigrationDestinationManager::abortWithoutSessionIdCheck() {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     _state = kAbort;
     _stateChangedCV.notify_all();
     _errmsg = "aborted without session id check";
 }
 
 Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessionId) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
 
     const auto convergenceTimeout = Milliseconds(defaultConfigCommandTimeoutMS.load()) +
         Milliseconds(defaultConfigCommandTimeoutMS.load()) / 4;
@@ -822,7 +822,7 @@ Status MigrationDestinationManager::exitCriticalSection(OperationContext* opCtx,
                                                         const MigrationSessionId& sessionId) {
     SharedSemiFuture<State> threadFinishedFuture;
     {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         if (!_sessionId || !_sessionId->matches(sessionId)) {
             LOGV2_DEBUG(5899104,
                         2,
@@ -1318,7 +1318,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
             // preserving the guarantee that orphans cannot be created after the txnNumber is
             // advanced.
             {
-                auto lk = stdx::lock_guard(*opCtx->getClient());
+                auto lk = std::lock_guard(*opCtx->getClient());
                 opCtx->setLogicalSessionId(_lsid);
                 opCtx->setTxnNumber(_txnNumber);
             }
@@ -1345,7 +1345,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
         break;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _sessionId.reset();
     _scopedReceiveChunk.reset();
     _isActiveCV.notify_all();
@@ -1379,7 +1379,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // Set the error message to MoveTimingHelper just before it is destroyed. The destructor
         // sends that message (among other things) to the ShardingLogging.
         if (timing) {
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            std::lock_guard<std::mutex> sl(_mutex);
             timing->setCmdErrMsg(_errmsg);
         }
     }};
@@ -1845,7 +1845,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             runWithoutSession(outerOpCtx, [&] {
                 MigrationRecipientRecoveryDocument recoveryDoc;
                 {
-                    stdx::lock_guard<stdx::mutex> lg(_mutex);
+                    std::lock_guard<std::mutex> lg(_mutex);
                     recoveryDoc = {
                         *_migrationId, _nss, *_sessionId, range, _fromShard, _lsid, _txnNumber};
                 }
@@ -1914,7 +1914,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // At this point, the critical section has been engaged.
         {
             // Make sure we don't overwrite a FAIL or ABORT state.
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            std::lock_guard<std::mutex> sl(_mutex);
             if (_state != kFail && _state != kAbort) {
                 _state = kEnteredCritSec;
                 _stateChangedCV.notify_all();
@@ -1944,7 +1944,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     "migrationId"_attr = _migrationId);
 
         {
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            std::lock_guard<std::mutex> sl(_mutex);
             _state = kEnteredCritSec;
             _stateChangedCV.notify_all();
         }
@@ -2193,7 +2193,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
 }
 
 void MigrationDestinationManager::onStepUpBegin(OperationContext* opCtx, long long term) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     auto newCancellationSource = CancellationSource();
     std::swap(_cancellationSource, newCancellationSource);
 }
@@ -2201,7 +2201,7 @@ void MigrationDestinationManager::onStepUpBegin(OperationContext* opCtx, long lo
 void MigrationDestinationManager::onStepDown() {
     boost::optional<SharedSemiFuture<State>> migrateThreadFinishedFuture;
     {
-        stdx::lock_guard<stdx::mutex> sl(_mutex);
+        std::lock_guard<std::mutex> sl(_mutex);
         // Cancel any migrateThread work.
         _cancellationSource.cancel();
 

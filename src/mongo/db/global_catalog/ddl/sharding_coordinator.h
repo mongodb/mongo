@@ -54,7 +54,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
@@ -63,6 +62,7 @@
 #include "mongo/util/version/releases.h"
 
 #include <memory>
+#include <mutex>
 #include <set>
 #include <stack>
 #include <string>
@@ -185,7 +185,7 @@ protected:
     }
 
     virtual void setMetadata(ShardingCoordinatorMetadata&& metadata) {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         getDoc().setShardingCoordinatorMetadata(std::move(metadata));
     }
 
@@ -276,7 +276,7 @@ protected:
     virtual BSONObjBuilder basicReportBuilder() const noexcept;
 
     const std::string _coordinatorName;
-    mutable stdx::mutex _docMutex;
+    mutable std::mutex _docMutex;
 
     ShardingCoordinatorService* _service;
     const ShardingCoordinatorId _coordId;
@@ -322,7 +322,7 @@ private:
 
     virtual boost::optional<Status> getAbortReason() const;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     SharedPromise<void> _constructionCompletionPromise;
     SharedPromise<void> _completionPromise;
 
@@ -379,7 +379,7 @@ protected:
         std::function<void(OperationContext*)>&& handlerFn);
 
     auto _cloneDoc() const {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         return getDoc().clone();
     }
 
@@ -575,7 +575,7 @@ protected:
     }
 
     StateDoc _copyDoc() const {
-        stdx::lock_guard lk{self()._docMutex};
+        std::lock_guard lk{self()._docMutex};
         return this->_doc;
     }
 

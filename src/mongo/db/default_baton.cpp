@@ -34,7 +34,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -66,7 +65,7 @@ void DefaultBaton::detachImpl() {
     decltype(_timers) timers;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         invariant(_opCtx->getBaton().get() == this);
         _opCtx->setBaton(nullptr);
@@ -89,7 +88,7 @@ void DefaultBaton::detachImpl() {
 }
 
 void DefaultBaton::schedule(Task func) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     if (!_opCtx) {
         lk.unlock();
@@ -106,7 +105,7 @@ void DefaultBaton::schedule(Task func) {
     }
 }
 
-void DefaultBaton::_notify(stdx::unique_lock<stdx::mutex> lk) noexcept {
+void DefaultBaton::_notify(std::unique_lock<std::mutex> lk) noexcept {
     dassert(lk.mutex() == &_mutex);
 
     _notified = true;
@@ -114,14 +113,14 @@ void DefaultBaton::_notify(stdx::unique_lock<stdx::mutex> lk) noexcept {
 }
 
 void DefaultBaton::notify() noexcept {
-    _notify(stdx::unique_lock<stdx::mutex>(_mutex));
+    _notify(std::unique_lock<std::mutex>(_mutex));
 }
 
 Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
                                                Date_t oldDeadline) noexcept {
     // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
     const ScopeGuard guard([&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
 
         // Fire expired timers
         std::vector<Timer> expiredTimers;
@@ -150,7 +149,7 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
         }
     });
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     // If anything was scheduled, run it now.
     if (_scheduled.size()) {
@@ -183,7 +182,7 @@ void DefaultBaton::run(ClockSource* clkSource) noexcept {
     run_until(clkSource, Date_t::max());
 }
 
-void DefaultBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job) {
+void DefaultBaton::_safeExecute(std::unique_lock<std::mutex> lk, Job job) {
     dassert(lk.mutex() == &_mutex);
 
     if (!_opCtx) {
@@ -194,7 +193,7 @@ void DefaultBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job) {
     if (_sleeping) {
         _scheduled.push_back([this, job = std::move(job)](auto status) mutable {
             if (status.isOK()) {
-                job(stdx::unique_lock<stdx::mutex>(_mutex));
+                job(std::unique_lock<std::mutex>(_mutex));
             }
         });
         _notify(std::move(lk));
@@ -206,7 +205,7 @@ void DefaultBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job) {
 Future<void> DefaultBaton::waitUntil(Date_t expiration, const CancellationToken& token) try {
     auto pf = makePromiseFuture<void>();
     auto id = _nextTimerId.fetchAndAdd(1);
-    _safeExecute(stdx::unique_lock(_mutex),
+    _safeExecute(std::unique_lock(_mutex),
                  [this, id, expiration, promise = std::move(pf.promise)](auto lk) mutable {
                      auto iter = _timers.emplace(expiration, Timer{id, std::move(promise)});
                      _timersById[iter->second.id] = iter;
@@ -214,7 +213,7 @@ Future<void> DefaultBaton::waitUntil(Date_t expiration, const CancellationToken&
 
     token.onCancel().thenRunOn(shared_from_this()).getAsync([this, id](Status s) {
         if (s.isOK()) {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             if (_timersById.find(id) == _timersById.end()) {
                 return;
             }

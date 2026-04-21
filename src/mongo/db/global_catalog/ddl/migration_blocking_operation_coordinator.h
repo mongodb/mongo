@@ -71,7 +71,7 @@ private:
                                       OperationContext* opCtx,
                                       StateDoc newStateDocument);
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     UUIDSet _operations;
     SharedPromise<void> _beginCleanupPromise;

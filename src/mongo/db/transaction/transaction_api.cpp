@@ -220,7 +220,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(const DatabaseName& dbName, Stri
     cmdBuilder.append(cmdName, 1);
 
     {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
 
         if (_state.is(TransactionState::kInit)) {
             LOGV2_DEBUG(
@@ -322,7 +322,7 @@ bool isRunningLocalTransaction(const TransactionClient& txnClient) {
 
 Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitResult>& swResult,
                                                         int attemptCounter) const noexcept {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     // Errors aborting are always ignored.
     invariant(!_state.is(TransactionState::kNeedsCleanup));
     invariant(!_state.is(TransactionState::kStartedAbort));
@@ -423,7 +423,7 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
                 !cmdBuilder->hasField(fieldName));
     };
 
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
 
     for (auto fieldName : OperationSessionInfo::fieldNames) {
         assertDoesNotHaveField(fieldName);
@@ -459,7 +459,7 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
 }
 
 void Transaction::processResponse(const BSONObj& reply) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
 
     if (auto errorLabels = reply[kErrorLabelsFieldName]) {
         for (const auto& label : errorLabels.Array()) {
@@ -475,7 +475,7 @@ void Transaction::processResponse(const BSONObj& reply) {
 }
 
 void Transaction::primeForTransactionRetry() noexcept {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     _lastOperationTime = LogicalTime();
     _latestResponseHasTransientTransactionErrorLabel = false;
     switch (_execContext) {
@@ -494,13 +494,13 @@ void Transaction::primeForTransactionRetry() noexcept {
 }
 
 void Transaction::primeForCommitRetry() noexcept {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     _latestResponseHasTransientTransactionErrorLabel = false;
     _state.transitionTo(TransactionState::kRetryingCommit);
 }
 
 void Transaction::primeForCleanup() noexcept {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     if (!_state.is(TransactionState::kInit)) {
         // Only cleanup if we've sent at least one command.
         _state.transitionTo(TransactionState::kNeedsCleanup);
@@ -508,7 +508,7 @@ void Transaction::primeForCleanup() noexcept {
 }
 
 bool Transaction::needsCleanup() const noexcept {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     return _state.is(TransactionState::kNeedsCleanup);
 }
 
@@ -522,7 +522,7 @@ CancellationToken Transaction::getTokenForCommand() const {
 }
 
 BSONObj Transaction::reportStateForLog() const {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     return _reportStateForLog(lg);
 }
 
@@ -560,7 +560,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
             "database versions without using router commands",
             !OperationShardingState::isShardingAware(opCtx) || _txnClient->runsClusterOperations());
     {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
 
         // Extract session options and infer execution context from client's opCtx.
         auto clientSession = opCtx->getLogicalSessionId();
@@ -649,7 +649,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
 }
 
 LogicalTime Transaction::getOperationTime() const {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     return _lastOperationTime;
 }
 

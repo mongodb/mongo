@@ -31,8 +31,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/future_util.h"
+
+#include <mutex>
 
 #include <grpcpp/support/time.h>
 
@@ -105,7 +106,7 @@ void GRPCReactor::drain() {
         _processCompletionQueueNotification(tag, ok);
     }
 
-    stdx::lock_guard lk(_taskMutex);
+    std::lock_guard lk(_taskMutex);
     invariant(_cqTaskStash.size() == 0, "GRPCReactor did not properly drain all tasks");
 }
 
@@ -124,7 +125,7 @@ GRPCReactor::CompletionQueueEntry* GRPCReactor::_registerCompletionQueueEntry(Pr
     auto cqTask =
         std::make_unique<CompletionQueueEntry>(CompletionQueueEntry::Passkey(), std::move(p));
 
-    stdx::lock_guard lg(_taskMutex);
+    std::lock_guard lg(_taskMutex);
     auto iter = _cqTaskStash.insert(_cqTaskStash.end(), std::move(cqTask));
     _cqTaskStash.back()->_iter = iter;
     return _cqTaskStash.back().get();
@@ -151,7 +152,7 @@ void GRPCReactor::_processCompletionQueueNotification(void* tag, bool ok) {
             {ErrorCodes::CallbackCanceled, "Completion queue task did not execute"});
     }
 
-    stdx::lock_guard lg(_taskMutex);
+    std::lock_guard lg(_taskMutex);
     _cqTaskStash.erase(cqTask->_iter);
 }
 

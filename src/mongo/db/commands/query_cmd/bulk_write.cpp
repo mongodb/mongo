@@ -492,7 +492,7 @@ void setCurOpInfoAndEnsureStarted(OperationContext* opCtx,
                                   LogicalOp logicalOp,
                                   const NamespaceInfoEntry& nsEntry,
                                   const BSONObj& opDescription) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
 
     // For timeseries operations with the 'isTimeseriesNamespace' field set (i.e. sent from mongos),
     // use the view namespace for logging/profiling purposes.
@@ -749,7 +749,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
     if (nsEntry.getEncryptionInformation().has_value()) {
         {
             // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 
@@ -1089,7 +1089,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         // Handle FLE deletes.
         if (nsEntry.getEncryptionInformation().has_value()) {
             {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
 
@@ -1669,7 +1669,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         // Handle FLE updates.
         if (nsEntry.getEncryptionInformation().has_value()) {
             {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
 

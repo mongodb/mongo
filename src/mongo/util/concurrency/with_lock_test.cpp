@@ -32,8 +32,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -46,15 +47,15 @@ struct Beerp {
     explicit Beerp(int i) {
         _blerp(WithLock::withoutLock(), i);
     }
-    Beerp(stdx::lock_guard<stdx::mutex> const& lk, int i) {
+    Beerp(std::lock_guard<std::mutex> const& lk, int i) {
         _blerp(lk, i);
     }
     int bleep(char n) {
-        stdx::lock_guard<stdx::mutex> lk(_m);
+        std::lock_guard<std::mutex> lk(_m);
         return _bloop(lk, n - '0');
     }
     int bleep(int i) {
-        stdx::unique_lock<stdx::mutex> lk(_m);
+        std::unique_lock<std::mutex> lk(_m);
         return _bloop(lk, i);
     }
 
@@ -66,7 +67,7 @@ private:
         LOGV2(23122, "{i} bleep(s)\n", "i"_attr = i);
         return i;
     }
-    stdx::mutex _m;
+    std::mutex _m;
 };
 
 TEST(WithLockTest, OverloadSet) {
@@ -74,8 +75,8 @@ TEST(WithLockTest, OverloadSet) {
     ASSERT_EQ(1, b.bleep('1'));
     ASSERT_EQ(2, b.bleep(2));
 
-    stdx::mutex m;
-    stdx::lock_guard<stdx::mutex> lk(m);
+    std::mutex m;
+    std::lock_guard<std::mutex> lk(m);
     Beerp(lk, 3);
 }
 

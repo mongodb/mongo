@@ -196,7 +196,7 @@ void PlacementHistoryCleaner::resume(OperationContext* opCtx) {
 
 void PlacementHistoryCleaner::_start(OperationContext* opCtx, bool steppingUp) {
     LOGV2(10898601, "Starting PlacementHistoryCleaner", "steppingUp"_attr = steppingUp);
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    std::lock_guard<std::mutex> scopedLock(_mutex);
 
     if (steppingUp) {
         _runningAsPrimary = true;
@@ -219,7 +219,7 @@ void PlacementHistoryCleaner::_start(OperationContext* opCtx, bool steppingUp) {
 
 void PlacementHistoryCleaner::_stop(bool steppingDown) {
     LOGV2(10898600, "Stopping PlacementHistoryCleaner", "steppingDown"_attr = steppingDown);
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    std::lock_guard<std::mutex> scopedLock(_mutex);
 
     if (steppingDown) {
         _runningAsPrimary = false;

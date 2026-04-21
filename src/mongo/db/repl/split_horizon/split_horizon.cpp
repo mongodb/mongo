@@ -179,7 +179,7 @@ SplitHorizon::ForwardMapping computeForwardMappings(
 }  // namespace
 
 void SplitHorizon::setParameters(Client* const client, boost::optional<std::string> sniName) {
-    stdx::lock_guard<Client> lk(*client);
+    std::lock_guard<Client> lk(*client);
     getSplitHorizonParameters(*client) = Parameters{std::move(sniName)};
 }
 

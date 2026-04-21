@@ -51,7 +51,7 @@ const int kMaxPerfThreads = 16;  // max number of threads to use for lock perf
 class LockManagerTest : public benchmark::Fixture {
 protected:
     void SetUp(benchmark::State& state) override {
-        stdx::unique_lock ul(_mutex);
+        std::unique_lock ul(_mutex);
         if (state.thread_index == 0) {
             _serviceContextHolder = ServiceContext::make();
             makeKClientsWithLockers(state.threads);
@@ -62,7 +62,7 @@ protected:
     }
 
     void TearDown(benchmark::State& state) override {
-        stdx::unique_lock ul(_mutex);
+        std::unique_lock ul(_mutex);
         if (state.thread_index == 0) {
             clients.clear();
             _serviceContextHolder = nullptr;
@@ -87,7 +87,7 @@ protected:
         return _serviceContextHolder.get();
     }
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
 
     ServiceContext::UniqueServiceContext _serviceContextHolder;
@@ -97,10 +97,10 @@ protected:
 };
 
 BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_Mutex)(benchmark::State& state) {
-    static stdx::mutex mtx;
+    static std::mutex mtx;
 
     for (auto keepRunning : state) {
-        stdx::unique_lock<stdx::mutex> lk(mtx);
+        std::unique_lock<std::mutex> lk(mtx);
     }
 }
 

@@ -145,7 +145,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     bool _isShutdown = false;
 
     // This default client is used in synchronous networking (DBClientGRPCStream). Asynchronous

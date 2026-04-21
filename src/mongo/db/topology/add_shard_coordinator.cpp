@@ -508,7 +508,7 @@ void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const 
         stateDoc, IDLParserContext("AddShardCoordinatorDocument"));
 
     const auto optionsMatch = [&] {
-        stdx::lock_guard lk(_docMutex);
+        std::lock_guard lk(_docMutex);
         auto apiParamsMatch = [&]() -> bool {
             // Either both initialized or neither
             if (_doc.getApiParams().is_initialized() != otherDoc.getApiParams().is_initialized())

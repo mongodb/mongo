@@ -278,7 +278,7 @@ void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
     OperationContext* opCtx,
     query_shape::QueryShapeHash queryShapeHash,
     QueryInstance queryInstance) try {
-    stdx::lock_guard lock{_mutex};
+    std::lock_guard lock{_mutex};
     auto&& tracker = QuerySettingsUsageTracker::get(opCtx);
     constexpr auto onTaskCompletion = [](Status status) {
         LOGV2_DEBUG(10493705,
@@ -463,7 +463,7 @@ void BackfillCoordinator::cancel() {
 }
 
 std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume() {
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     return consume_inlock();
 }
 

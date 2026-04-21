@@ -162,12 +162,12 @@ OplogTruncateMarkers::OplogTruncateMarkers(
       _oplog(oplog) {}
 
 bool OplogTruncateMarkers::isDead() {
-    stdx::lock_guard<stdx::mutex> lk(_reclaimMutex);
+    std::lock_guard<std::mutex> lk(_reclaimMutex);
     return _isDead;
 }
 
 void OplogTruncateMarkers::kill() {
-    stdx::lock_guard<stdx::mutex> lk(_reclaimMutex);
+    std::lock_guard<std::mutex> lk(_reclaimMutex);
     _isDead = true;
     _reclaimCv.notify_one();
 }
@@ -233,7 +233,7 @@ void OplogTruncateMarkers::updateMarkersAfterCappedTruncateAfter(int64_t records
 
 bool OplogTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
     // Wait until kill() is called or there are too many collection markers.
-    stdx::unique_lock<stdx::mutex> lock(_reclaimMutex);
+    std::unique_lock<std::mutex> lock(_reclaimMutex);
     MONGO_IDLE_THREAD_BLOCK;
     LOGV2_DEBUG(10621102, 1, "OplogCapMaintainerThread is idle");
     auto isWaitConditionSatisfied = opCtx->waitForConditionOrInterruptFor(
@@ -274,7 +274,7 @@ bool OplogTruncateMarkers::awaitHasExpiredOplogOrDead(OperationContext* opCtx, R
     // When truncating by time, use a smaller wake time to prevent too much oplog from accumulating.
     Seconds checkPeriod((minRetentionSeconds != 0.0) ? std::min<int>(30, minRetentionSeconds) : 30);
     // Wait until kill() is called or oplog can be truncated.
-    stdx::unique_lock<stdx::mutex> lock(_reclaimMutex);
+    std::unique_lock<std::mutex> lock(_reclaimMutex);
     MONGO_IDLE_THREAD_BLOCK;
     auto isWaitConditionSatisfied =
         opCtx->waitForConditionOrInterruptFor(_reclaimCv, lock, checkPeriod, [&] {

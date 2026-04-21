@@ -46,7 +46,7 @@ using std::string;
 
 namespace {
 typedef std::map<string, RamLog*> RM;
-stdx::mutex* _namedLock = NULL;
+std::mutex* _namedLock = NULL;
 RM* _named = NULL;
 // TODO(SERVER-113226): Move these globals into a single structure to manage them better.
 Atomic<size_t> _globalMaxLines = 1024;
@@ -64,7 +64,7 @@ RamLog::RamLog(StringData name, size_t maxLines, size_t maxSizeBytes)
 RamLog::~RamLog() {}
 
 void RamLog::write(const std::string& str) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _totalLinesWritten++;
 
     if (0 == str.size()) {
@@ -119,7 +119,7 @@ void RamLog::trimIfNeeded(size_t newStr) {
 }
 
 void RamLog::clear() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _totalLinesWritten = 0;
     _firstLinePosition = 0;
     _lastLinePosition = 0;
@@ -136,12 +136,12 @@ StringData RamLog::getLine(size_t lineNumber) const {
         return "";
     }
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _lines[(lineNumber + _firstLinePosition) % _maxLines].c_str();
 }
 
 size_t RamLog::getLineCount() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     if (_lastLinePosition < _firstLinePosition) {
         return (_maxLines - _firstLinePosition) + _lastLinePosition;
@@ -154,7 +154,7 @@ RamLog::LineIterator::LineIterator(RamLog* ramlog)
     : _ramlog(ramlog), _lock(ramlog->_mutex), _nextLineIndex(0) {}
 
 size_t RamLog::LineIterator::getTotalLinesWritten() {
-    stdx::lock_guard lk(_ramlog->_mutex);
+    std::lock_guard lk(_ramlog->_mutex);
 
     return _ramlog->_totalLinesWritten;
 }
@@ -174,10 +174,10 @@ RamLog* RamLog::get(const std::string& name, size_t maxLines, size_t maxSizeByte
 RamLog* RamLog::getImpl(const std::string& name, size_t maxLines, size_t maxSizeBytes) {
     if (!_namedLock) {
         // Guaranteed to happen before multi-threaded operation.
-        _namedLock = new stdx::mutex();
+        _namedLock = new std::mutex();
     }
 
-    stdx::lock_guard<stdx::mutex> lk(*_namedLock);
+    std::lock_guard<std::mutex> lk(*_namedLock);
     if (!_named) {
         // Guaranteed to happen before multi-threaded operation.
         _named = new RM();
@@ -193,7 +193,7 @@ RamLog* RamLog::getIfExists(const std::string& name) {
     if (!_named) {
         return NULL;
     }
-    stdx::lock_guard<stdx::mutex> lk(*_namedLock);
+    std::lock_guard<std::mutex> lk(*_namedLock);
     auto iter = _named->find(name);
     return iter == _named->end() ? nullptr : iter->second;
 }
@@ -203,7 +203,7 @@ void RamLog::getNames(std::vector<string>& names) {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(*_namedLock);
+    std::lock_guard<std::mutex> lk(*_namedLock);
     for (RM::iterator i = _named->begin(); i != _named->end(); ++i) {
         if (i->second->getLineCount()) {
             names.push_back(i->first);
@@ -237,7 +237,7 @@ MONGO_INITIALIZER(RamLogCatalogV2)(InitializerContext*) {
             uasserted(ErrorCodes::InternalError, "Inconsistent intiailization of RamLogCatalog.");
         }
 
-        _namedLock = new stdx::mutex();
+        _namedLock = new std::mutex();
         _named = new RM();
     }
 }

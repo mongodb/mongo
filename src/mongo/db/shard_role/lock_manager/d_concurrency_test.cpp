@@ -54,7 +54,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -139,17 +138,17 @@ public:
         return clients;
     }
 
-    stdx::future<void> runTaskAndKill(OperationContext* opCtx,
-                                      std::function<void()> fn,
-                                      std::function<void()> postKill = nullptr) {
-        auto task = stdx::packaged_task<void()>(fn);
+    std::future<void> runTaskAndKill(OperationContext* opCtx,
+                                     std::function<void()> fn,
+                                     std::function<void()> postKill = nullptr) {
+        auto task = std::packaged_task<void()>(fn);
         auto result = task.get_future();
         stdx::thread taskThread{std::move(task)};
 
         ScopeGuard taskThreadJoiner([&] { taskThread.join(); });
 
         {
-            stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+            std::lock_guard<Client> clientLock(*opCtx->getClient());
             opCtx->markKilled();
         }
 
@@ -837,7 +836,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockNotInterruptedWithLeaveUnlockedBehavio
 
     // Kill the operation before acquiring the uncontested lock.
     {
-        stdx::lock_guard<Client> clientLock(*opCtx1->getClient());
+        std::lock_guard<Client> clientLock(*opCtx1->getClient());
         opCtx1->markKilled();
     }
     // This should not throw or acquire the lock.
@@ -1055,7 +1054,7 @@ TEST_F(DConcurrencyTestFixture, LockCompleteInterruptedWhenUncontested) {
     lockXGranted.reset();
 
     {
-        stdx::lock_guard<Client> clientLock(*opCtx2->getClient());
+        std::lock_guard<Client> clientLock(*opCtx2->getClient());
         opCtx2->markKilled();
     }
 

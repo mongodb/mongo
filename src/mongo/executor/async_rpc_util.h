@@ -105,7 +105,7 @@ Future<std::vector<SingleResult>> getAllResponses(std::vector<ExecutorFuture<Fut
 
     struct SharedUtil {
         SharedUtil(int responsesLeft) : responsesLeft(responsesLeft) {}
-        stdx::mutex mutex;
+        std::mutex mutex;
         int responsesLeft;
         StatusWith<std::vector<SingleResult>> results =
             StatusWith<std::vector<SingleResult>>(std::vector<SingleResult>());
@@ -118,24 +118,24 @@ Future<std::vector<SingleResult>> getAllResponses(std::vector<ExecutorFuture<Fut
                               size_t index) mutable {
         if (!sw.isOK()) {
             // TODO(SERVER-98556): Debug statement for the purpose of helping with diagnosing BFs.
-            stdx::lock_guard<stdx::mutex> lk(sharedUtil->mutex);
+            std::lock_guard<std::mutex> lk(sharedUtil->mutex);
             logErrorDetails(sharedUtil->responsesLeft, sw.getStatus());
         }
 
         try {
             auto response = processResponse(sw, index);
-            stdx::lock_guard<stdx::mutex> lk(sharedUtil->mutex);
+            std::lock_guard<std::mutex> lk(sharedUtil->mutex);
             if (sharedUtil->results.getStatus().isOK()) {
                 sharedUtil->results.getValue().push_back(response);
             }
         } catch (const DBException& ex) {
-            stdx::lock_guard<stdx::mutex> lk(sharedUtil->mutex);
+            std::lock_guard<std::mutex> lk(sharedUtil->mutex);
             if (sharedUtil->results.getStatus().isOK()) {
                 sharedUtil->results = ex.toStatus();
             }
         }
 
-        stdx::lock_guard<stdx::mutex> lk(sharedUtil->mutex);
+        std::lock_guard<std::mutex> lk(sharedUtil->mutex);
         if (--sharedUtil->responsesLeft == 0) {
             sharedPromise->setFrom(sharedUtil->results);
         }

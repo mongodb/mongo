@@ -146,7 +146,7 @@ TEST_F(ProfileFilterTest, FilterOnNestedField) {
     ASSERT_FALSE(profileFilter.matches(opCtx, *opDebug, *curop));
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         curop->setOriginatingCommand(lk, BSON("pipeline" << BSON_ARRAY(BSON("limit" << 1))));
     }
 

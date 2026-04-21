@@ -31,10 +31,10 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -137,7 +137,7 @@ private:
         executor::TaskExecutor::EventHandle _sufficientResponsesReceived;
         std::vector<executor::TaskExecutor::CallbackHandle> _callbacks;
         bool _started = false;
-        stdx::mutex _mutex;
+        std::mutex _mutex;
     };
 
     executor::TaskExecutor* _executor;  // Not owned here.

@@ -53,13 +53,13 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
+#include <mutex>
 #include <string>
 #include <type_traits>
 
@@ -369,7 +369,7 @@ stdx::unordered_set<CursorId> CursorManager::getCursorsForOpKeys(
     const std::vector<OperationKey>& opKeys) const {
     stdx::unordered_set<CursorId> cursors;
 
-    stdx::lock_guard<stdx::mutex> lk(_opKeyMutex);
+    std::lock_guard<std::mutex> lk(_opKeyMutex);
     for (auto&& opKey : opKeys) {
         if (auto it = _opKeyMap.find(opKey); it != _opKeyMap.end()) {
             for (auto cursor : it->second) {
@@ -396,7 +396,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     // Note we must hold the registration lock from now until insertion into '_cursorMap' to ensure
     // we don't insert two cursors with the same cursor id.
-    stdx::lock_guard<stdx::mutex> lock(_registrationLock);
+    std::lock_guard<std::mutex> lock(_registrationLock);
     CursorId cursorId = generic_cursor::allocateCursorId(
         [&](CursorId cursorId) -> bool {
             // Even though we drop the lock on the '_cursorMap' partition, another thread cannot
@@ -418,7 +418,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     // If set, store the mapping of OperationKey to the generated CursorID.
     if (auto opKey = opCtx->getOperationKey()) {
-        stdx::lock_guard<stdx::mutex> lk(_opKeyMutex);
+        std::lock_guard<std::mutex> lk(_opKeyMutex);
         auto it = _opKeyMap.find(*opKey);
         if (it != _opKeyMap.end()) {
             it->second.insert(cursorId);

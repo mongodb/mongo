@@ -33,12 +33,12 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/sessions_collection.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 namespace mongo {
@@ -97,7 +97,7 @@ private:
         const LogicalSessionRecordSet& sessions);
     void _removeRecords(const LogicalSessionIdSet& sessions);
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     SessionMap _sessions;
 
     RefreshHook _refresh;

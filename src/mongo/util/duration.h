@@ -35,7 +35,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -115,7 +114,7 @@ template <typename ToDuration,
           typename FromRep,
           typename FromPeriod,
           std::enable_if_t<duration_detail::isMongoDuration<ToDuration>, int> = 0>
-constexpr ToDuration duration_cast(const stdx::chrono::duration<FromRep, FromPeriod>& d) {
+constexpr ToDuration duration_cast(const std::chrono::duration<FromRep, FromPeriod>& d) {
     return duration_cast<ToDuration>(Duration<FromPeriod>{d.count()});
 }
 
@@ -133,7 +132,7 @@ inline long long durationCount(DIn d) {
 }
 
 template <typename DOut, typename RepIn, typename PeriodIn>
-inline long long durationCount(const stdx::chrono::duration<RepIn, PeriodIn>& d) {
+inline long long durationCount(const std::chrono::duration<RepIn, PeriodIn>& d) {
     return durationCount<DOut>(Duration<PeriodIn>{d.count()});
 }
 
@@ -282,8 +281,8 @@ public:
             "precision ones");
     }
 
-    stdx::chrono::system_clock::duration toSystemDuration() const {
-        using SystemDuration = stdx::chrono::system_clock::duration;
+    std::chrono::system_clock::duration toSystemDuration() const {
+        using SystemDuration = std::chrono::system_clock::duration;
         return SystemDuration{duration_cast<Duration<SystemDuration::period>>(*this).count()};
     }
 
@@ -542,7 +541,7 @@ auto format_as(const Duration<Period>& dur) {
  */
 template <typename Per = std::ratio<1>, typename Rep>
 constexpr auto deduceChronoDuration(const Rep& count) {
-    return stdx::chrono::duration<Rep, Per>{count};
+    return std::chrono::duration<Rep, Per>{count};
 }
 
 }  // namespace MONGO_MOD_PUB mongo

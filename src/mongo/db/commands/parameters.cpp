@@ -59,7 +59,6 @@
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -225,7 +224,7 @@ GetParameterOptions parseGetParameterOptions(BSONElement elem) {
 }
 
 // for automationServiceDescription
-stdx::mutex autoServiceDescriptorMutex;
+std::mutex autoServiceDescriptorMutex;
 std::string autoServiceDescriptorValue;
 }  // namespace
 
@@ -574,7 +573,7 @@ void AutomationServiceDescriptorServerParameter::append(OperationContext*,
                                                         BSONObjBuilder* builder,
                                                         StringData name,
                                                         const boost::optional<TenantId>&) {
-    const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
+    const std::lock_guard<std::mutex> lock(autoServiceDescriptorMutex);
     if (!autoServiceDescriptorValue.empty()) {
         builder->append(name, autoServiceDescriptorValue);
     }
@@ -598,7 +597,7 @@ Status AutomationServiceDescriptorServerParameter::setFromString(StringData str,
                               << " must be no more than " << kMaxSize << " bytes"};
 
     {
-        const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
+        const std::lock_guard<std::mutex> lock(autoServiceDescriptorMutex);
         autoServiceDescriptorValue = std::string{str};
     }
 

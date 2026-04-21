@@ -108,7 +108,7 @@ TEST(Aligned, Swap) {
 }
 
 TEST(CacheExclusive, IsAlignedToPlatformCacheLine) {
-    static constexpr size_t a = stdx::hardware_destructive_interference_size;
+    static constexpr size_t a = std::hardware_destructive_interference_size;
     MONGO_STATIC_ASSERT(alignof(CacheExclusive<char>) == a);
     MONGO_STATIC_ASSERT(alignof(CacheExclusive<char>) == a);
 }

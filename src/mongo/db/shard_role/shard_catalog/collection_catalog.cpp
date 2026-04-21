@@ -73,7 +73,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/observable_mutex.h"
@@ -83,6 +82,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <mutex>
 #include <shared_mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -262,7 +262,7 @@ private:
     // supported in our toolchain. The writer/writer synchronization (_writeMutex) needs to remain a
     // mutex.
     mutable RWMutex _readMutex;
-    mutable ObservableMutex<stdx::mutex> _writeMutex;
+    mutable ObservableMutex<std::mutex> _writeMutex;
     std::shared_ptr<CollectionCatalog> _catalog = std::make_shared<CollectionCatalog>();
 };
 const ServiceContext::Decoration<LatestCollectionCatalog> getCatalogStore =

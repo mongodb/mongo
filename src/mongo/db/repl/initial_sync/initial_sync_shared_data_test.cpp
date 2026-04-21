@@ -45,7 +45,7 @@ TEST(InitialSyncSharedDataTest, SingleFailedOperation) {
     ClockSourceMock clock;
     InitialSyncSharedData data(1 /* rollBackId */, timeout, &clock);
 
-    stdx::unique_lock<InitialSyncSharedData> lk(data);
+    std::unique_lock<InitialSyncSharedData> lk(data);
     // No current outage.
     ASSERT_EQ(Milliseconds::min(), data.getCurrentOutageDuration(lk));
     ASSERT_EQ(Milliseconds::zero(), data.getTotalTimeUnreachable(lk));
@@ -80,7 +80,7 @@ TEST(InitialSyncSharedDataTest, SequentialFailedOperations) {
     ClockSourceMock clock;
     InitialSyncSharedData data(1 /* rollBackId */, timeout, &clock);
 
-    stdx::unique_lock<InitialSyncSharedData> lk(data);
+    std::unique_lock<InitialSyncSharedData> lk(data);
     // No current outage.
     ASSERT_EQ(Milliseconds::min(), data.getCurrentOutageDuration(lk));
     ASSERT_EQ(Milliseconds::zero(), data.getTotalTimeUnreachable(lk));
@@ -142,7 +142,7 @@ TEST(InitialSyncSharedDataTest, OverlappingFailedOperations) {
     ClockSourceMock clock;
     InitialSyncSharedData data(1 /* rollBackId */, timeout, &clock);
 
-    stdx::unique_lock<InitialSyncSharedData> lk(data);
+    std::unique_lock<InitialSyncSharedData> lk(data);
     // No current outage.
     ASSERT_EQ(Milliseconds::min(), data.getCurrentOutageDuration(lk));
     ASSERT_EQ(Milliseconds::zero(), data.getTotalTimeUnreachable(lk));
@@ -202,7 +202,7 @@ TEST(InitialSyncSharedDataTest, OperationTimesOut) {
 
     InitialSyncSharedData::RetryableOperation op1;
     InitialSyncSharedData::RetryableOperation op2;
-    stdx::unique_lock<InitialSyncSharedData> lk(data);
+    std::unique_lock<InitialSyncSharedData> lk(data);
 
     // First operation fails
     ASSERT_TRUE(data.shouldRetryOperation(lk, &op1));

@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/vector_clock/vector_clock_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
@@ -45,6 +44,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -370,7 +370,7 @@ protected:
     // Note that ConfigTime is advanced under the ReplicationCoordinator mutex, so to avoid
     // potential deadlocks the ReplicationCoordinator mutex should never be acquired while the
     // VectorClock mutex is held.
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     AtomicWord<bool> _isEnabled{true};
 

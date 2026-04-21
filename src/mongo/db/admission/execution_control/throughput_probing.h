@@ -36,13 +36,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/timer.h"
 
 #include <cstdint>
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -146,7 +146,7 @@ private:
         AtomicWord<int64_t> timesProbedDown;
     } _stats;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     PeriodicJobAnchor _job;
 };

@@ -68,7 +68,7 @@ public:
     size_t getTrackedTermsCount() const;
 
 private:
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     boost::optional<Term> _highestEndedTerm;
 

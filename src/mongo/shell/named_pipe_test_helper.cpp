@@ -106,7 +106,7 @@ std::vector<size_t> randomLengths(size_t n, size_t min, size_t max) {
  *   }
  */
 BSONObj NamedPipeHelper::readFromPipes(const std::vector<std::string>& pipeRelativePaths) {
-    stdx::chrono::system_clock::time_point startTime = stdx::chrono::system_clock::now();
+    std::chrono::system_clock::time_point startTime = std::chrono::system_clock::now();
     double objects = 0.0;         // return stat
     double totalSizeBytes = 0.0;  // return stat
 
@@ -130,13 +130,13 @@ BSONObj NamedPipeHelper::readFromPipes(const std::vector<std::string>& pipeRelat
             totalSizeBytes += record->data.size();
         }
     } while (record);
-    stdx::chrono::system_clock::time_point finishTime = stdx::chrono::system_clock::now();
+    std::chrono::system_clock::time_point finishTime = std::chrono::system_clock::now();
     auto duration = finishTime - startTime;
 
-    double sec = stdx::chrono::duration_cast<stdx::chrono::seconds>(duration).count();
-    double msec = stdx::chrono::duration_cast<stdx::chrono::milliseconds>(duration).count();
-    double usec = stdx::chrono::duration_cast<stdx::chrono::microseconds>(duration).count();
-    double nsec = stdx::chrono::duration_cast<stdx::chrono::nanoseconds>(duration).count();
+    double sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    double msec = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    double usec = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+    double nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
     double mbps = (totalSizeBytes / (1024.0 * 1024.0)) / (nsec / (1000.0 * 1000.0 * 1000.0));
     double gbps = mbps / 1024.0;
     return BSON("" << BSON("objects"

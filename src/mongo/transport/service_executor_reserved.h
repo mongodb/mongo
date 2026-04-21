@@ -34,7 +34,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
@@ -43,6 +42,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -91,7 +91,7 @@ private:
 
     AtomicWord<bool> _stillRunning{false};
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _threadWakeup;
     stdx::condition_variable _shutdownCondition;
 

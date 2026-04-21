@@ -43,7 +43,7 @@ namespace MONGO_MOD_PUB mongo {
 //
 // Example:
 //      void wait(BasicLockableAdapter lock) {
-//          stdx::lock_guard lg(lock);
+//          std::lock_guard lg(lock);
 //      }
 //
 //      mongo::ResourceMutex mut;

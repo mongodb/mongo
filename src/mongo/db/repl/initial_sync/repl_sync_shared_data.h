@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -50,8 +49,8 @@ public:
 
     /**
      * BasicLockable C++ methods; they merely delegate to the mutex.
-     * The presence of these methods means we can use stdx::unique_lock<ReplSyncSharedData> and
-     * stdx::lock_guard<ReplSyncSharedData>.
+     * The presence of these methods means we can use std::unique_lock<ReplSyncSharedData> and
+     * std::lock_guard<ReplSyncSharedData>.
      */
     void lock();
 
@@ -72,7 +71,7 @@ private:
     // Clock source used for timing outages and recording stats.
     ClockSource* const _clock;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Status of the entire sync process.  All syncing tasks should exit if this becomes non-OK.
     Status _status = Status::OK();

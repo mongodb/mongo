@@ -151,13 +151,13 @@ TEST_F(TimestampKVEngineTest, TimestampListeners) {
 }
 
 TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
-    stdx::mutex mutex;
+    std::mutex mutex;
     stdx::condition_variable cv;
 
     bool changes[] = {false, false, false};
 
     TimestampListener first([&](OperationContext* opCtx, auto& timestamps) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         if (!timestamps.checkpoint.isNull() && !changes[0]) {
             changes[0] = true;
             cv.notify_all();
@@ -165,7 +165,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener second([&](OperationContext* opCtx, auto& timestamps) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         if (!timestamps.oldest.isNull() && !changes[1]) {
             changes[1] = true;
             cv.notify_all();
@@ -173,7 +173,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener third([&](OperationContext* opCtx, auto& timestamps) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         if (!timestamps.stable.isNull() && !changes[2]) {
             changes[2] = true;
             cv.notify_all();
@@ -186,7 +186,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
 
     // Wait until all 3 listeners get notified at least once.
     {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         cv.wait(lk, [&] {
             return std::all_of(std::begin(changes), std::end(changes), std::identity());
         });

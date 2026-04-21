@@ -33,7 +33,6 @@
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -44,6 +43,7 @@
 
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <typeinfo>
 
@@ -231,7 +231,7 @@ private:
     }
 };
 
-class StdxMutexSlackTest : public Slack<stdx::mutex, stdx::lock_guard<stdx::mutex>> {};
+class StdxMutexSlackTest : public Slack<std::mutex, std::lock_guard<std::mutex>> {};
 class UIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned>> {};
 class ULLIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned long long>> {};
 

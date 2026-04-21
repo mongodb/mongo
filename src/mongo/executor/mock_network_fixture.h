@@ -35,7 +35,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -43,6 +42,7 @@
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -377,7 +377,7 @@ public:
     // Run until both the executor and the network are idle and all expectations are satisfied.
     // Otherwise, it fatal logs after timeoutSeconds.
     void runUntilExpectationsSatisfied(
-        stdx::chrono::seconds timeoutSeconds = stdx::chrono::seconds(120));
+        std::chrono::seconds timeoutSeconds = std::chrono::seconds(120));
 
 private:
     bool _allExpectationsSatisfied() const;

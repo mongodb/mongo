@@ -113,7 +113,7 @@ double MockWorkloadCharacteristics::_jitter() const {
     if (_jitterDev == 0.0) {
         return 0.0;
     }
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     return _jitterDist(_rng);
 }
 

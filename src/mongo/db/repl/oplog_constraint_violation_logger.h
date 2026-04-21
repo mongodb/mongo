@@ -32,11 +32,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
+#include <mutex>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -88,7 +88,7 @@ public:
                              boost::optional<Status> status);
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     std::vector<Date_t> _lastLogTimes = std::vector<Date_t>(
         static_cast<int>(OplogConstraintViolationEnum::NUM_VIOLATION_TYPES));  // (M)

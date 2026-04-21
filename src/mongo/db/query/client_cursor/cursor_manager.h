@@ -46,7 +46,6 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source.h"
@@ -58,6 +57,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -265,7 +265,7 @@ private:
         // Remove from the opKey map first since erasing from the map may free the pointer for
         // 'cursor'.
         if (auto opKey = cursor->getOperationKey()) {
-            stdx::lock_guard<stdx::mutex> lk(_opKeyMutex);
+            std::lock_guard<std::mutex> lk(_opKeyMutex);
             auto it = _opKeyMap.find(*opKey);
             if (it != _opKeyMap.end()) {
                 it->second.erase(cursor->cursorid());
@@ -298,14 +298,14 @@ private:
     // - If you need to access multiple partitions within '_cursorMap' at once, you must acquire the
     // mutexes for those partitions in ascending order, or use the partition helpers to acquire
     // mutexes for all partitions.
-    mutable stdx::mutex _registrationLock;
+    mutable std::mutex _registrationLock;
     std::unique_ptr<PseudoRandom> _random;
     std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>> _cursorMap;
 
     // A mapping from client OperationKey to corresponding CursorID. Note that it's possible that
     // cursors in the map above are not present in this map, since OperationKey is not required when
     // registering a cursor.
-    mutable stdx::mutex _opKeyMutex;
+    mutable std::mutex _opKeyMutex;
     stdx::unordered_map<OperationKey, std::set<CursorId>, UUID::Hash> _opKeyMap;
 };
 

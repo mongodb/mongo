@@ -71,7 +71,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -83,6 +82,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -677,7 +677,7 @@ public:
         auto indexEntry = createIndex(keyPattern);
         auto collection = getCollection();
 
-        stdx::mutex mutex;
+        std::mutex mutex;
         stdx::condition_variable cv;
         int numMultikeyCalls = 0;
 
@@ -703,7 +703,7 @@ public:
             shard_role_details::getRecoveryUnit(opCtx.get())
                 ->onCommit([&mutex, &cv, &numMultikeyCalls](OperationContext*,
                                                             boost::optional<Timestamp> commitTime) {
-                    stdx::unique_lock lock(mutex);
+                    std::unique_lock lock(mutex);
 
                     // Let the main thread now we have committed to the storage engine
                     numMultikeyCalls = 1;
@@ -721,7 +721,7 @@ public:
 
         // Wait for the thread above to commit its multikey write to the storage engine
         {
-            stdx::unique_lock lock(mutex);
+            std::unique_lock lock(mutex);
             cv.wait(lock, [&numMultikeyCalls]() { return numMultikeyCalls == 1; });
         }
 
@@ -744,7 +744,7 @@ public:
 
         // Notify the thread that our multikey write is committed
         {
-            stdx::unique_lock lock(mutex);
+            std::unique_lock lock(mutex);
             numMultikeyCalls = 2;
             cv.notify_all();
         }

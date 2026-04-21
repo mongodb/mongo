@@ -103,7 +103,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1293,14 +1292,14 @@ public:
                                     bool isDataConsistent) override;
 
     std::vector<OplogEntry> getOperationsApplied() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _operationsApplied;
     }
 
 private:
     std::vector<OplogEntry> _operationsApplied;
     // Synchronize reads and writes to 'operationsApplied'.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 Status TrackOpsAppliedApplier::applyOplogBatchPerWorker(
@@ -1308,7 +1307,7 @@ Status TrackOpsAppliedApplier::applyOplogBatchPerWorker(
     std::vector<ApplierOperation>& ops,
     WorkerMultikeyPathInfo& workerMultikeyPathInfo,
     const bool isDataConsistent) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     for (auto&& opPtr : ops) {
         _operationsApplied.push_back(*opPtr);
     }
@@ -2437,7 +2436,7 @@ protected:
             _insertOp2->getOpTime());
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-                stdx::lock_guard<stdx::mutex> lock(_insertMutex);
+                std::lock_guard<std::mutex> lock(_insertMutex);
                 if (nss == _nss1 || nss == _nss2 ||
                     nss == NamespaceString::kSessionTransactionsTableNamespace) {
                     // Storing the inserted documents in a sorted data structure to make checking
@@ -2486,7 +2485,7 @@ protected:
     std::unique_ptr<ThreadPool> _workerPool;
 
 private:
-    stdx::mutex _insertMutex;
+    std::mutex _insertMutex;
 };
 
 TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionSeparate) {
@@ -2964,7 +2963,7 @@ protected:
                                                 const BSONObj&,
                                                 const boost::optional<CreateCollCatalogIdentifier>&,
                                                 bool recordIdsReplicated) {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             if (collNss == _nss || collNss == NamespaceString::kSessionTransactionsTableNamespace) {
                 // Storing the documents in a sorted data structure to make checking for valid
                 // results easier. The inserts will be performed by different threads and
@@ -2976,7 +2975,7 @@ protected:
 
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
                 if (nss == _nss || nss == NamespaceString::kSessionTransactionsTableNamespace) {
                     // Storing the inserted documents in a sorted data structure to make checking
                     // for valid results easier. The inserts will be performed by different threads
@@ -3008,7 +3007,7 @@ protected:
     std::unique_ptr<ThreadPool> _workerPool;
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
@@ -3216,7 +3215,7 @@ protected:
         _abortSinglePrepareApplyOp;
 
 private:
-    stdx::mutex _insertMutex;
+    std::mutex _insertMutex;
 };
 
 TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionSteadyState) {
@@ -3774,7 +3773,7 @@ protected:
                                       StmtId,
                                       const BSONObj&,
                                       const OplogDeleteEntryArgs& args) {
-            stdx::lock_guard<stdx::mutex> lock(_deleteMutex);
+            std::lock_guard<std::mutex> lock(_deleteMutex);
             auto nss = coll->ns();
             if (nss == _nss1 || nss == _nss2 ||
                 nss == NamespaceString::kSessionTransactionsTableNamespace) {
@@ -3796,8 +3795,8 @@ protected:
     std::map<NamespaceString, int> _deletedDocs;
 
 private:
-    stdx::mutex _insertMutex;
-    stdx::mutex _deleteMutex;
+    std::mutex _insertMutex;
+    std::mutex _deleteMutex;
 };
 
 TEST_F(MultiPreparedTransactionsInOneBatchTest, CommitAndAbortMultiPreparedTransactionsInOneBatch) {

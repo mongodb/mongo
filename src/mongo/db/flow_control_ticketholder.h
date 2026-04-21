@@ -32,11 +32,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 
@@ -97,7 +97,7 @@ private:
     // Use an int64_t as this is serialized to bson which does not support unsigned 64-bit numbers.
     AtomicWord<std::int64_t> _totalTimeAcquiringMicros;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
     int _tickets;
 

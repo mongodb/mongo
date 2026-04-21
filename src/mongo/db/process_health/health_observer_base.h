@@ -36,7 +36,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -47,6 +46,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -115,14 +115,14 @@ protected:
     template <typename T>
     T randDuration(T upperBound) const {
         auto upperCount = durationCount<T>(upperBound);
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         auto resultCount = _rand.nextInt64(upperCount);
         return T(resultCount);
     }
 
     ServiceContext* const _svcCtx;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Indicates if there any check running to prevent running checks concurrently.
     bool _currentlyRunningHealthCheck = false;

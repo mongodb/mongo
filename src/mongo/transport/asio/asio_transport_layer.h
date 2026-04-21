@@ -34,7 +34,6 @@
 #include "mongo/db/ftdc/rolling_stats.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
@@ -46,6 +45,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_set>
 
@@ -165,7 +165,7 @@ public:
 
         // Serializes invocations of `start()` and `stop()`, and allows updating `_state` and
         // `_thread` as a single atomic operation.
-        stdx::mutex _mutex;
+        std::mutex _mutex;
 
         // State transitions: `kInitialized` --> `kStarted` --> `kStopped`
         //                          |_______________________________^
@@ -301,8 +301,8 @@ private:
 
     void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor);
 
-    stdx::mutex _mutex;
-    void stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::mutex> lk);
+    std::mutex _mutex;
+    void stopAcceptingSessionsWithLock(std::unique_lock<std::mutex> lk);
 
     // AsioTransportLayer uses three reactor roles:
     //  - Ingress reactor (`_ingressReactor`): provides the I/O context used to create accepted
@@ -357,7 +357,7 @@ private:
 
     class ListenerInterface {
     public:
-        ListenerInterface(stdx::mutex& sharedMutex,
+        ListenerInterface(std::mutex& sharedMutex,
                           std::shared_ptr<AsioReactor> reactor,
                           AsioTransportLayer* layer);
 
@@ -369,7 +369,7 @@ private:
                      const std::vector<std::string>& listenProxyUnixSocketsAddrs,
                      Options& listenerOptions);
 
-        void stopListenerWithLock(stdx::unique_lock<stdx::mutex>& lk);
+        void stopListenerWithLock(std::unique_lock<std::mutex>& lk);
 
         AsioTransportLayer::Listener::State getListenerState() const;
 
@@ -383,7 +383,7 @@ private:
             return _listenerPort;
         }
 
-        void waitUntilListenerStarted(stdx::unique_lock<stdx::mutex>& lk);
+        void waitUntilListenerStarted(std::unique_lock<std::mutex>& lk);
 
         void waitListenerThreadJoin();
 
@@ -399,7 +399,7 @@ private:
         /** Unconditionally starts listening on all acceptors. */
         void _startListening(WithLock lk);
 
-        void _waitForConnections(stdx::unique_lock<stdx::mutex>& lk);
+        void _waitForConnections(std::unique_lock<std::mutex>& lk);
 
         void _stopAcceptors(WithLock lk);
 
@@ -422,7 +422,7 @@ private:
         // (ephemeral).
         int _listenerPort = 0;
 
-        stdx::mutex& _sharedMutex;
+        std::mutex& _sharedMutex;
 
         // The _acceptorReactor contains all the sockets in _acceptors.
         std::shared_ptr<AsioReactor> _acceptorReactor;

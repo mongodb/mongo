@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
+#include <mutex>
 
 #include <boost/filesystem/operations.hpp>
 
@@ -97,7 +97,7 @@ private:
     boost::filesystem::path _dbpath;
     // This mutex protects _actions and the entire run loop of the disk space monitor.
     // The mutex also enables us to increment the _actionId for each new action added to _actions.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::unordered_map<int64_t, Action> _actions;
 
     int64_t _actionId = 0;

@@ -547,13 +547,13 @@ TEST(InvalidatingLRUCacheParallelTest, CacheSizeZeroInsertOrAssignAndGet) {
 
 TEST(InvalidatingLRUCacheParallelTest, AdvanceTime) {
     AtomicWord<uint64_t> counter{1};
-    stdx::mutex insertOrAssignMutex;
+    std::mutex insertOrAssignMutex;
 
     parallelTest<TestValueCacheCausallyConsistent>(0, [&](auto& cache) {
         const int key = 300;
         {
             // The calls to insertOrAssign must always pass strictly incrementing time
-            stdx::lock_guard lg(insertOrAssignMutex);
+            std::lock_guard lg(insertOrAssignMutex);
             cache.insertOrAssign(
                 key, TestValue{"Parallel tester value"}, Timestamp(counter.fetchAndAdd(1)));
         }

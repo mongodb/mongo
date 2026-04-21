@@ -52,7 +52,7 @@ void TicketedWorkloadDriver::start(ServiceContext* svcCtx,
                                    TicketHolder* writeTicketHolder,
                                    int32_t numReaders,
                                    int32_t numWriters) {
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
 
     _svcCtx = svcCtx;
     _readTicketHolder = readTicketHolder;
@@ -72,7 +72,7 @@ void TicketedWorkloadDriver::start(ServiceContext* svcCtx,
 }
 
 void TicketedWorkloadDriver::resize(int32_t numReaders, int32_t numWriters) {
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
 
     invariant(numReaders > 0);
     invariant(numWriters > 0);
@@ -109,7 +109,7 @@ void TicketedWorkloadDriver::resize(int32_t numReaders, int32_t numWriters) {
 
 
 void TicketedWorkloadDriver::stop() {
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
 
     // Request all threads stop asynchronously
     _readRunning.store(-1);
@@ -134,7 +134,7 @@ void TicketedWorkloadDriver::stop() {
 }
 
 BSONObj TicketedWorkloadDriver::metrics() const {
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     BSONObjBuilder builder;
 
     {

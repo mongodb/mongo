@@ -127,7 +127,7 @@ ClusterGetQueryableEncryptionCountInfoCmd::Reply
 ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 

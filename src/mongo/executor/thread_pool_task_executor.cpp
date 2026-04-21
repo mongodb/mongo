@@ -46,7 +46,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/fail_point.h"
@@ -56,6 +55,7 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
+#include <mutex>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
@@ -180,14 +180,14 @@ ThreadPoolTaskExecutor::~ThreadPoolTaskExecutor() {
 
 void ThreadPoolTaskExecutor::startup() {
     _net->startup();
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_state == preStart);
     _setState_inlock(running);
     _pool->startup();
 }
 
 void ThreadPoolTaskExecutor::shutdown() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     if (_inShutdown_inlock()) {
         return;
     }
@@ -209,7 +209,7 @@ SharedSemiFuture<void> ThreadPoolTaskExecutor::joinAsync() {
 void ThreadPoolTaskExecutor::join() {
     tpteHangsBeforeDrainingCallbacks.pauseWhileSet();
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     _stateChange.wait(lk, [this] {
         if (!_inProgress.empty()) {
@@ -245,7 +245,7 @@ void ThreadPoolTaskExecutor::join() {
         EventHandle event;
         setEventForHandle(&event, std::move(eventState));
         signalEvent_inlock(event, std::move(lk));
-        lk = stdx::unique_lock<stdx::mutex>(_mutex);
+        lk = std::unique_lock<std::mutex>(_mutex);
     }
     lk.unlock();
     _net->shutdown();
@@ -256,12 +256,12 @@ void ThreadPoolTaskExecutor::join() {
 }
 
 bool ThreadPoolTaskExecutor::isShuttingDown() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _inShutdown_inlock();
 }
 
 void ThreadPoolTaskExecutor::appendDiagnosticBSON(BSONObjBuilder* b) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     // ThreadPool details
     // TODO: fill in
@@ -286,7 +286,7 @@ Date_t ThreadPoolTaskExecutor::now() {
 
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::_registerCallbackState(
     std::shared_ptr<CallbackState> cbState) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_inShutdown_inlock()) {
         return kTaskExecutorShutdownInProgress;
     }
@@ -304,7 +304,7 @@ void ThreadPoolTaskExecutor::_unregisterCallbackState(
     cbState->isFinished.store(true);
     cbState->resetCallback();
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(cbState->iter);
     _inProgress.erase(*cbState->iter);
     cbState->iter.reset();
@@ -320,7 +320,7 @@ StatusWith<TaskExecutor::EventHandle> ThreadPoolTaskExecutor::makeEvent() {
     auto el = makeSingletonEventList();
     EventHandle event;
     setEventForHandle(&event, el.front());
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (_inShutdown_inlock()) {
         return kTaskExecutorShutdownInProgress;
     }
@@ -329,7 +329,7 @@ StatusWith<TaskExecutor::EventHandle> ThreadPoolTaskExecutor::makeEvent() {
 }
 
 void ThreadPoolTaskExecutor::signalEvent(const EventHandle& event) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     signalEvent_inlock(event, std::move(lk));
 }
 
@@ -360,7 +360,7 @@ StatusWith<stdx::cv_status> ThreadPoolTaskExecutor::waitForEvent(OperationContex
     invariant(opCtx);
     invariant(event.isValid());
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     try {
         if (opCtx->waitForConditionOrInterruptUntil(
@@ -379,7 +379,7 @@ StatusWith<stdx::cv_status> ThreadPoolTaskExecutor::waitForEvent(OperationContex
 void ThreadPoolTaskExecutor::waitForEvent(const EventHandle& event) {
     invariant(event.isValid());
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     while (!eventState->isSignaledFlag) {
         eventState->isSignaledCondition.wait(lk);
@@ -397,7 +397,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWork(Ca
     if (MONGO_unlikely(scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown.shouldFail())) {
         scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown.setMode(FailPoint::off);
 
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _stateChange.wait(lk, [&] { return _inShutdown_inlock(); });
         // Wait until the executor has reached shutdown state and canceled all outstanding work
         // before proceeding.
@@ -500,7 +500,7 @@ void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle, Interruptible*
     if (cbState->isFinished.load()) {
         return;
     }
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     if (!cbState->finishedCondition) {
         cbState->finishedCondition.emplace();
     }
@@ -526,7 +526,7 @@ ThreadPoolTaskExecutor::EventList ThreadPoolTaskExecutor::makeSingletonEventList
 }
 
 void ThreadPoolTaskExecutor::signalEvent_inlock(const EventHandle& event,
-                                                stdx::unique_lock<stdx::mutex> lk) {
+                                                std::unique_lock<std::mutex> lk) {
     invariant(event.isValid());
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
     const auto wasSignaled = std::exchange(eventState->isSignaledFlag, true);
@@ -656,7 +656,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
 }
 
 bool ThreadPoolTaskExecutor::hasTasks() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     return !_inProgress.empty();
 }
 

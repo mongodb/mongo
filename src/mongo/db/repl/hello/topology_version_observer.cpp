@@ -63,7 +63,7 @@ void TopologyVersionObserver::init(ServiceContext* serviceContext,
                                    ReplicationCoordinator* replCoordinator) noexcept {
     LOGV2_INFO(40440, "Starting the TopologyVersionObserver");
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     _serviceContext = serviceContext;
     invariant(_serviceContext);
@@ -83,7 +83,7 @@ void TopologyVersionObserver::shutdown() noexcept {
     auto shouldWaitForShutdown = _shouldShutdown.swap(true);
     if (shouldWaitForShutdown) {
         // If we aren't the first ones to call shutdown, wait for the thread to stop
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
 
         _cv.wait(lk, [&] { return _state.load() == State::kShutdown; });
         invariant(_state.load() == State::kShutdown);
@@ -94,7 +94,7 @@ void TopologyVersionObserver::shutdown() noexcept {
 
     // Wait for the thread to stop and steal it to the local stack
     auto thread = [&] {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
 
         // If we are still running, attempt to kill any opCtx
         if (_workerOpCtx) {
@@ -127,12 +127,12 @@ std::shared_ptr<const HelloResponse> TopologyVersionObserver::getCached() noexce
 
     // Acquires the lock to avoid potential races with `_workerThreadBody()`.
     // Atomics cannot be used here as `shared_ptr` cannot be atomically updated.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _cache;
 }
 
 void TopologyVersionObserver::registerTopologyChangeObserver(TopologyChangeCallback cb) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _callbacks.push_back(std::move(cb));
 }
 
@@ -149,7 +149,7 @@ void TopologyVersionObserver::_handleTopologyUpdate(
     {
         ScopeGuard cacheGuard([&] {
             // If we're not dismissed, reset the _cache.
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _cache.reset();
         });
 
@@ -163,7 +163,7 @@ void TopologyVersionObserver::_handleTopologyUpdate(
 
             std::vector<TopologyChangeCallback> tmpCallbacks;
 
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             _cache = response;
 
             ON_BLOCK_EXIT([&] {
@@ -228,7 +228,7 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
     LOGV2_INFO(40445, "Started TopologyVersionObserver");
 
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         invariant(_state.load() == State::kUninitialized);
         if (_shouldShutdown.load()) {
             _state.store(State::kShutdown);
@@ -244,7 +244,7 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
 
     ON_BLOCK_EXIT([&] {
         {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             invariant(_state.load() == State::kRunning);
             invariant(_workerOpCtx == nullptr);
             _state.store(State::kShutdown);
@@ -269,7 +269,7 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
 
         {
             // Set the _workerOpCtx to our newly formed opCtxHandle before we unlock.
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             // Checking `_shouldShutdown` under the lock is necessary to ensure the shutdown
             // method can interrupt the new operation.
             if (_shouldShutdown.load())
@@ -279,7 +279,7 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
 
         ON_BLOCK_EXIT([&] {
             // We're done with our opCtxHandle, unset _workerOpCtx.
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _workerOpCtx = nullptr;
         });
 

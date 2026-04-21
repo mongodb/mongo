@@ -846,7 +846,7 @@ public:
                 _deadline, _maxTime, _timeoutError, _hasArtificialDeadline};
             ScopeGuard guard([&] {
                 // Restore the original interruption and deadline state.
-                stdx::lock_guard lg(*_client);
+                std::lock_guard lg(*_client);
                 _ignoreInterrupts = prevIgnoringInterrupts;
                 setDeadlineAndMaxTime(
                     prevDeadlineState.deadline, prevDeadlineState.maxTime, prevDeadlineState.error);
@@ -861,7 +861,7 @@ public:
             });
             // Ignore interrupts until the callback completes.
             {
-                stdx::lock_guard lg(*_client);
+                std::lock_guard lg(*_client);
                 _hasArtificialDeadline = true;
                 setDeadlineByDate(Date_t::max(), ErrorCodes::ExceededTimeLimit);
                 _ignoreInterrupts = true;

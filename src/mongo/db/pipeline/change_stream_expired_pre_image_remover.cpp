@@ -36,12 +36,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 
+#include <mutex>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -81,7 +81,7 @@ void ChangeStreamExpiredPreImagesRemoverService::onConsistentDataAvailable(Opera
     const bool useReplicatedTruncates =
         change_stream_pre_image_util::shouldUseReplicatedTruncatesForPreImages(opCtx);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     if (useReplicatedTruncates) {
         // If replicated truncates are enabled, the pre-images removal job is only executed on the
@@ -108,7 +108,7 @@ void ChangeStreamExpiredPreImagesRemoverService::onStepUpComplete(OperationConte
     // If replicated truncates are disabled, the pre-images removal job is executed locally and
     // independently on each node. It then does not need to be started here, but instead it is
     // started in in 'onConsistentDataAvailable()'.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _isPrimary = true;
     if (useReplicatedTruncates) {
         _startChangeStreamExpiredPreImagesRemoverServiceJob(
@@ -126,7 +126,7 @@ void ChangeStreamExpiredPreImagesRemoverService::onStepDown() {
 
     // 'onStepDown()' can be called without a prior call to 'onStepUpComplete()', so we cannot
     // assume that '_useReplicatedTruncates' was already populated.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _isPrimary = false;
     if (_periodicJob.has_value() && _periodicJob->context.usesReplicatedTruncates) {
         // If the removal job was installed while replicated truncates were still enabled, stop it.
@@ -136,7 +136,7 @@ void ChangeStreamExpiredPreImagesRemoverService::onStepDown() {
 
 void ChangeStreamExpiredPreImagesRemoverService::onShutdown() {
     // Unconditionally stop the pre-images removal job.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _isPrimary = false;
     _stopChangeStreamExpiredPreImagesRemoverServiceJob(lk);
 }
@@ -147,7 +147,7 @@ void ChangeStreamExpiredPreImagesRemoverService::onFCVChange(
         change_stream_pre_image_util::shouldUseReplicatedTruncatesForPreImages(opCtx,
                                                                                newFcvSnapshot);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (_periodicJob.has_value() &&
         _periodicJob->context.usesReplicatedTruncates != useReplicatedTruncates) {
         // The job is currently running, but the value of the feature flag has changed.
@@ -173,7 +173,7 @@ boost::optional<ChangeStreamExpiredPreImagesRemoverService::PreImagesRemovalJobC
 ChangeStreamExpiredPreImagesRemoverService::getJobContext_forTest() const {
     boost::optional<PreImagesRemovalJobContext> result;
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (_periodicJob.has_value()) {
         result.emplace(_periodicJob->context);
     }

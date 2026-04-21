@@ -343,7 +343,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     auto requestAndMsg = [&]() {
         if (request().getEncryptionInformation()) {
             {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
 
@@ -488,7 +488,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
             opCtx, req.getNamespace(), request(), /*expectedUUID=*/boost::none);
     if (req.getEncryptionInformation().has_value()) {
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             curOp.setShouldOmitDiagnosticInformation(lk, true);
         }
         if (!req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
@@ -541,7 +541,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     // Initialize curOp information.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         if (req.getIsTimeseriesNamespace() && nsString.isTimeseriesBucketsCollection()) {
             auto viewNss = nsString.getTimeseriesViewNamespace();
             curOp.setNS(lk, viewNss);

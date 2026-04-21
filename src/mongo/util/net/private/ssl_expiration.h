@@ -58,7 +58,7 @@ private:
 
     std::unique_ptr<PeriodicJobAnchor> _job;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     Date_t _certExpiration{Date_t::max()};
 };
 

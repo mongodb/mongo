@@ -63,7 +63,7 @@
 
 namespace mongo {
 
-stdx::mutex ConnectionString::_connectHookMutex;
+std::mutex ConnectionString::_connectHookMutex;
 ConnectionString::ConnectionHook* ConnectionString::_connectHook = nullptr;
 
 StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
@@ -154,7 +154,7 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
 
         case ConnectionType::kCustom: {
             // Lock in case other things are modifying this at the same time
-            stdx::lock_guard<stdx::mutex> lk(_connectHookMutex);
+            std::lock_guard<std::mutex> lk(_connectHookMutex);
 
             // Allow the replacement of connections with other connections - useful for testing.
 

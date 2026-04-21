@@ -86,7 +86,6 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/buildinfo.h"
@@ -97,6 +96,8 @@
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <mutex>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -1405,14 +1406,14 @@ void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri
     }
 
     if (client.runCommand(DatabaseName::kAdmin, command, info)) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _connectionUris[std::string{uri}].insert(info["you"].str());
     }
 }
 
 void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
     Prompter prompter("do you want to kill the current op(s) on the server?");
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     for (auto& connection : _connectionUris) {
         std::string errmsg;
 

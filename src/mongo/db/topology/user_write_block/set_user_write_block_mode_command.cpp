@@ -50,12 +50,12 @@
 #include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
+#include <mutex>
 #include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -93,7 +93,7 @@ public:
 
             // Only one attempt to change write block mode may make progress at once, because the
             // way we enable/disable user index build blocking is not concurrency-safe.
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             {
                 if (request().getGlobal()) {
                     // Enabling write block mode on a replicaset requires several steps
@@ -148,7 +148,7 @@ public:
                             ActionType::setUserWriteBlockMode}));
         }
 
-        stdx::mutex _mutex;
+        std::mutex _mutex;
     };
 };
 MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand).forShard();

@@ -868,7 +868,7 @@ void MigrationSourceManager::withChangelogErrMsg(const std::string errMsg, F&& f
 }
 
 SharedSemiFuture<void> MigrationSourceManager::abort() {
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    std::lock_guard<Client> lk(*_opCtx->getClient());
     _opCtx->markKilled();
     _stats.countDonorMoveChunkAbortConflictingIndexOperation.addAndFetch(1);
 

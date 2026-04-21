@@ -1172,13 +1172,13 @@ public:
         std::function<stdx::thread(std::function<void()>)> makeSpawnFunc() {
             return [core = _core](std::function<void()> cb) {
                 {
-                    stdx::lock_guard lk(core->mutex);
+                    std::lock_guard lk(core->mutex);
                     ++core->created;
                     core->cv.notify_all();
                 }
                 return stdx::thread{[core, cb = std::move(cb)]() mutable {
                     {
-                        stdx::lock_guard lk(core->mutex);
+                        std::lock_guard lk(core->mutex);
                         ++core->started;
                         core->cv.notify_all();
                     }
@@ -1188,24 +1188,24 @@ public:
         }
 
         int64_t created() const {
-            stdx::lock_guard lk(_core->mutex);
+            std::lock_guard lk(_core->mutex);
             return _core->created;
         }
 
         int64_t started() const {
-            stdx::lock_guard lk(_core->mutex);
+            std::lock_guard lk(_core->mutex);
             return _core->started;
         }
 
         template <typename Pred>
         void waitForStarted(const Pred& pred) const {
-            stdx::unique_lock lk(_core->mutex);
+            std::unique_lock lk(_core->mutex);
             _core->cv.wait(lk, [&] { return pred(_core->started); });
         }
 
     private:
         struct Core {
-            mutable stdx::mutex mutex;
+            mutable std::mutex mutex;
             mutable stdx::condition_variable cv;
             int64_t created = 0;
             int64_t started = 0;
@@ -1429,7 +1429,7 @@ public:
         }
 
         void startSession(std::shared_ptr<Session> session) override {
-            stdx::lock_guard lk{_mutex};
+            std::lock_guard lk{_mutex};
             _sessions.push_back(session);
             if (_promise) {
                 _promise->emplaceValue(std::move(session));
@@ -1451,7 +1451,7 @@ public:
         }
 
         size_t numOpenSessions() const override {
-            stdx::lock_guard lk{_mutex};
+            std::lock_guard lk{_mutex};
             return _sessions.size();
         }
 
@@ -1465,12 +1465,12 @@ public:
 
     private:
         void _join() {
-            stdx::lock_guard lk{_mutex};
+            std::lock_guard lk{_mutex};
             _sessions.clear();
         }
 
         bool _allowMultipleSessions = false;
-        mutable stdx::mutex _mutex;
+        mutable std::mutex _mutex;
         std::vector<std::shared_ptr<Session>> _sessions;
         boost::optional<Promise<std::shared_ptr<Session>>> _promise;
     };

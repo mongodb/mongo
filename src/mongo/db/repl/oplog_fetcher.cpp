@@ -293,12 +293,12 @@ void OplogFetcher::_doShutdown(WithLock lk) noexcept {
     _shutdownCondVar.notify_all();
 }
 
-ObservableMutex<stdx::mutex>* OplogFetcher::_getMutex() noexcept {
+ObservableMutex<std::mutex>* OplogFetcher::_getMutex() noexcept {
     return &_mutex;
 }
 
 std::string OplogFetcher::toString() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     str::stream output;
     output << "OplogFetcher -";
     output << " last optime fetched: " << _lastFetched.toString();
@@ -326,12 +326,12 @@ Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
 }
 
 void OplogFetcher::setCreateClientFn_forTest(const CreateClientFn& createClientFn) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _createClientFn = createClientFn;
 }
 
 DBClientConnection* OplogFetcher::getDBClientConnection_forTest() const {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _conn.get();
 }
 
@@ -344,7 +344,7 @@ Milliseconds OplogFetcher::getRetriedFindMaxTime_forTest() const {
 }
 
 void OplogFetcher::_setSocketTimeout(long long timeout) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     invariant(_conn);
     // setSoTimeout takes a double representing the number of seconds for send and receive
     // timeouts. Thus, we must express the timeout in milliseconds and divide by 1000.0 to get
@@ -353,7 +353,7 @@ void OplogFetcher::_setSocketTimeout(long long timeout) {
 }
 
 OpTime OplogFetcher::getLastOpTimeFetched() const {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _lastFetched;
 }
 
@@ -377,7 +377,7 @@ void OplogFetcher::_finishCallback(Status status) {
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _transitionToComplete(lock);
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.
@@ -401,7 +401,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
 
     bool hadExistingConnection = true;
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         if (!_conn) {
             _conn = _createClientFn();
             hadExistingConnection = false;
@@ -427,7 +427,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         {
             // Both of these checks need to happen while holding the mutex since they could race
             // with shutdown.
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             if (_isShuttingDown(lock)) {
                 status = {ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"};
             } else if (_runQueryHandle.isCanceled()) {
@@ -479,7 +479,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
             if (!_cursor->tailable()) {
                 try {
                     auto opCtx = cc().makeOperationContext();
-                    stdx::unique_lock lk(_mutex);
+                    std::unique_lock lk(_mutex);
                     // Wait a little before re-running the aggregation command on the donor's
                     // oplog. We are not actually intending to wait for shutdown here, we use
                     // this as a way to wait while still being able to be interrupted outside of
@@ -953,7 +953,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                     "Oplog fetcher setting last fetched optime ahead after batch",
                     "lastDocOpTime"_attr = lastDocOpTime);
 
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         _lastFetched = lastDocOpTime;
     }
 

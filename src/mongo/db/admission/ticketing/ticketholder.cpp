@@ -74,7 +74,7 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
 }
 
 bool TicketHolder::resize(OperationContext* opCtx, int newSize, Date_t deadline) {
-    stdx::lock_guard<stdx::mutex> lk(_resizeMutex);
+    std::lock_guard<std::mutex> lk(_resizeMutex);
     auto difference = newSize - _outof.load();
     MockAdmissionContext admCtx;
 

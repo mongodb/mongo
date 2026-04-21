@@ -162,7 +162,7 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
     static const char* curopMessage = "Index Build: checking for duplicate keys";
     ProgressMeterHolder progress;
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(lk,
                      CurOp::get(opCtx)->setProgress(lk, curopMessage, _duplicateCounter.load(), 1),
                      opCtx);
@@ -198,14 +198,14 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
         constraintsCursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
 
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             progress.get(lk)->hit();
         }
         record = constraintsCursor->next();
     }
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.get(lk)->finished();
     }
 

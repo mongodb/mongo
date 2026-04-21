@@ -43,7 +43,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -590,16 +589,16 @@ class PrintAllThreadStacksTest : public unittest::Test {
 public:
     struct WatchInt {
         int v = 0;
-        stdx::mutex* m;
+        std::mutex* m;
         stdx::condition_variable cond;
 
         void incr(int i) {
-            stdx::unique_lock lock{*m};
+            std::unique_lock lock{*m};
             v += i;
             cond.notify_all();
         }
         void wait(int target) {
-            stdx::unique_lock lock{*m};
+            std::unique_lock lock{*m};
             cond.wait(lock, [&] { return v == target; });
         }
     };
@@ -662,7 +661,7 @@ public:
             ASSERT(seenTids.find(w.tid) != seenTids.end()) << "missing tid:" << w.tid;
     }
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     WatchInt endAll{0, &mutex};
     WatchInt pending{0, &mutex};
     std::deque<Worker> workers;

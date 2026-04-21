@@ -34,14 +34,14 @@
 namespace mongo {
 namespace {
 TEST(MutexTest, LockGuardShouldLock) {
-    stdx::mutex m;
+    std::mutex m;
     clang_checked::lock_guard lk(m);
     // If lock_guard locked m, then try_lock() should return false.
     ASSERT_FALSE(m.try_lock());
 }
 
 TEST(MutexTest, UniqueLockShouldLockAndUnlock) {
-    stdx::mutex m;
+    std::mutex m;
     clang_checked::unique_lock lk(m);
     ASSERT_TRUE(lk.owns_lock());
     lk.unlock();
@@ -49,7 +49,7 @@ TEST(MutexTest, UniqueLockShouldLockAndUnlock) {
 }
 
 TEST(MutexTest, UniqueLockShouldTryLockAndOwnsLock) MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
-    stdx::mutex m;
+    std::mutex m;
     clang_checked::unique_lock lk(m);
     ASSERT_FALSE(lk.try_lock());
     ASSERT_TRUE(lk.owns_lock());
@@ -62,7 +62,7 @@ TEST(MutexTest, UniqueLockShouldTryLockAndOwnsLock) MONGO_LOCKING_NO_THREAD_SAFE
 }
 
 TEST(MutexTest, UniqueLockShouldConvertToBoolean) MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
-    stdx::mutex m;
+    std::mutex m;
     clang_checked::unique_lock lk(m);
     ASSERT_FALSE(lk.try_lock());
     ASSERT_TRUE(lk);
@@ -173,13 +173,13 @@ MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
 void takesWithLock(WithLock) {}
 
 TEST(MutexTest, LockGuardShouldConvertToWithLock) {
-    stdx::mutex m;
+    std::mutex m;
     clang_checked::lock_guard lk(m);
     takesWithLock(lk);
 }
 
 TEST(MutexTest, UniqueLockShouldConvertToWithLock) {
-    stdx::mutex m;
+    std::mutex m;
     clang_checked::unique_lock lk(m);
     takesWithLock(lk);
 }

@@ -60,7 +60,7 @@
 namespace mongo {
 namespace repl {
 void OplogBufferMock::startup(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(!_hasShutDown);
     invariant(!_hasStartedUp);
     _hasStartedUp = true;
@@ -68,7 +68,7 @@ void OplogBufferMock::startup(OperationContext* opCtx) {
 }
 
 void OplogBufferMock::shutdown(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     clear(lk);
     _hasShutDown = true;
@@ -79,7 +79,7 @@ void OplogBufferMock::push(OperationContext* opCtx,
                            Batch::const_iterator begin,
                            Batch::const_iterator end,
                            boost::optional<const Cost&> cost) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);
     _data.insert(_data.end(), begin, end);
@@ -87,14 +87,14 @@ void OplogBufferMock::push(OperationContext* opCtx,
 }
 
 bool OplogBufferMock::isEmpty() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);
     return _curIndex == _data.size();
 }
 
 std::size_t OplogBufferMock::getSize() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);
     std::size_t total = 0;
@@ -105,14 +105,14 @@ std::size_t OplogBufferMock::getSize() const {
 }
 
 std::size_t OplogBufferMock::getCount() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);
     return _data.size() - _curIndex;
 }
 
 void OplogBufferMock::clear(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     clear(lk);
 }
 
@@ -124,7 +124,7 @@ void OplogBufferMock::clear(WithLock) {
 }
 
 bool OplogBufferMock::tryPop(OperationContext* opCtx, Value* value) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);
     if (_curIndex == _data.size())
@@ -134,21 +134,21 @@ bool OplogBufferMock::tryPop(OperationContext* opCtx, Value* value) {
 }
 
 bool OplogBufferMock::waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     interruptible->waitForConditionOrInterruptFor(
         _notEmptyCv, lk, waitDuration, [&] { return _hasShutDown || _curIndex < _data.size(); });
     return _curIndex < _data.size();
 }
 
 bool OplogBufferMock::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     interruptible->waitForConditionOrInterruptUntil(
         _notEmptyCv, lk, deadline, [&] { return _hasShutDown || _curIndex < _data.size(); });
     return _curIndex < _data.size();
 }
 
 bool OplogBufferMock::peek(OperationContext* opCtx, Value* value) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);
     if (_curIndex == _data.size())
@@ -159,7 +159,7 @@ bool OplogBufferMock::peek(OperationContext* opCtx, Value* value) {
 
 boost::optional<OplogBufferMock::Value> OplogBufferMock::lastObjectPushed(
     OperationContext* opCtx) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     invariant(_hasStartedUp);
     invariant(!_hasShutDown);
     if (_data.size() == _curIndex)
@@ -169,7 +169,7 @@ boost::optional<OplogBufferMock::Value> OplogBufferMock::lastObjectPushed(
 
 StatusWith<OplogBufferMock::Value> OplogBufferMock::findByTimestamp(OperationContext* opCtx,
                                                                     const Timestamp& ts) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     for (const auto& item : _data) {
         if (item["ts"].timestamp() == ts) {
             return item;
@@ -182,7 +182,7 @@ StatusWith<OplogBufferMock::Value> OplogBufferMock::findByTimestamp(OperationCon
 Status OplogBufferMock::seekToTimestamp(OperationContext* opCtx,
                                         const Timestamp& ts,
                                         SeekStrategy exact) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     for (std::size_t i = 0; i < _data.size(); i++) {
         if (_data[i]["ts"].timestamp() == ts) {
             _curIndex = i;

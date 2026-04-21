@@ -203,7 +203,7 @@ public:
     }
 
     void updateMinThreads(size_t newValue) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _minThreads = newValue;
 
         _shutdownPool_inlock(lk);
@@ -211,7 +211,7 @@ public:
     }
 
     void updateMaxThreads(size_t newValue) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _maxThreads = newValue;
 
         _shutdownPool_inlock(lk);
@@ -232,7 +232,7 @@ private:
     size_t _minThreads;
     size_t _maxThreads;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::unique_ptr<ThreadPool> _pool;
 };
 

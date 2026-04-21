@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
+#include <chrono>
 #include <cstring>
 #include <type_traits>
 
@@ -57,7 +57,7 @@ void notifyAll(const void* uaddr);
  */
 bool waitUntil(const void* uaddr,
                uint32_t old,
-               boost::optional<stdx::chrono::system_clock::time_point> deadline);
+               boost::optional<std::chrono::system_clock::time_point> deadline);
 
 }  // namespace waitable_atomic_details
 
@@ -112,7 +112,7 @@ public:
      * Like wait(), but returns boost::none if optional deadline expires.
      */
     boost::optional<T> waitUntil(
-        T old, boost::optional<stdx::chrono::system_clock::time_point> deadline) const {
+        T old, boost::optional<std::chrono::system_clock::time_point> deadline) const {
         // We know that T and AtomicWord<T> are 4 bytes but we should also ensure we are too.
         static_assert(sizeof(*this) == 4);
 
@@ -135,7 +135,7 @@ public:
     boost::optional<T> waitFor(T old, Nanoseconds timeout) const {
         if (auto curr = this->load(); memcmp(&curr, &old, 4) != 0)
             return curr;
-        return waitUntil(old, stdx::chrono::system_clock::now() + timeout.toSystemDuration());
+        return waitUntil(old, std::chrono::system_clock::now() + timeout.toSystemDuration());
     }
 
     /**
@@ -231,7 +231,7 @@ public:
      * Like wait(), but returns boost::none if optional deadline expires.
      */
     boost::optional<T> waitUntil(
-        T old, boost::optional<stdx::chrono::system_clock::time_point> deadline) const {
+        T old, boost::optional<std::chrono::system_clock::time_point> deadline) const {
         while (true) {
             // Short story of correctness: we want load 1 and 2 to happen in order, and happen
             // before 3 and 4. This is ensured 1 and 2 being at least acquire. Load 3 can be relaxed
@@ -290,7 +290,7 @@ public:
         // Note: not using curr != old for correct handling of NaNs.
         if (auto curr = this->load(); !(curr == old))
             return curr;
-        return waitUntil(old, stdx::chrono::system_clock::now() + timeout.toSystemDuration());
+        return waitUntil(old, std::chrono::system_clock::now() + timeout.toSystemDuration());
     }
 
     /**

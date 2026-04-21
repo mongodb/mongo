@@ -36,7 +36,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -51,6 +50,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -116,7 +116,7 @@ private:
     //
     // Has a lock level of 2, meaning what while held, any code is only allowed to take the Client
     // lock.
-    stdx::mutex _cancelTokensMutex;
+    std::mutex _cancelTokensMutex;
 };
 
 template <typename Result, typename Key, typename Value, typename Time, typename... LookupArgs>
@@ -150,7 +150,7 @@ struct MONGO_MOD_PUBLIC
 template <typename Key,
           typename Value,
           typename Time = CacheNotCausallyConsistent,
-          typename MutexType = stdx::mutex,
+          typename MutexType = std::mutex,
           typename... LookupArgs>
 class MONGO_MOD_OPEN ReadThroughCache : public ReadThroughCacheBase {
     /**
@@ -298,7 +298,7 @@ public:
         if (auto cachedValue = _cache.get(key, causalConsistency))
             return {std::move(cachedValue)};
 
-        stdx::unique_lock ul(_mutex);
+        std::unique_lock ul(_mutex);
 
         // Re-check the cache under a mutex, before kicking-off the asynchronous lookup
         if (auto cachedValue = _cache.get(key, causalConsistency))
@@ -386,7 +386,7 @@ public:
     template <typename Pred>
     std::vector<ValueHandle> peekLatestCachedIf(const Pred& pred) {
         auto invalidatingCacheValues = [&] {
-            stdx::lock_guard lg(_mutex);
+            std::lock_guard lg(_mutex);
             return _cache.getLatestCachedIf(
                 [&](const Key& key, const StoredValue* value) { return pred(key, value->value); });
         }();
@@ -420,7 +420,7 @@ public:
                         Value&& value,
                         Date_t updateWallClockTime,
                         const Time& time) {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->invalidateAndCancelCurrentLookupRound(lg);
         _cache.insertOrAssign(key, {std::move(value), updateWallClockTime}, time);
@@ -444,7 +444,7 @@ public:
                                      Value&& value,
                                      Date_t updateWallClockTime,
                                      const Time& time) {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->invalidateAndCancelCurrentLookupRound(lg);
         return _cache.insertOrAssignAndGet(key, {std::move(value), updateWallClockTime}, time);
@@ -465,7 +465,7 @@ public:
     template <typename KeyType>
     requires IsComparable<KeyType>
     bool advanceTimeInStore(const KeyType& key, const Time& newTime) {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->advanceTimeInStore(lg, newTime);
         return _cache.advanceTimeInStore(key, newTime);
@@ -485,7 +485,7 @@ public:
     template <typename KeyType>
     requires IsComparable<KeyType>
     void invalidateKey(const KeyType& key) {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->invalidateAndCancelCurrentLookupRound(lg);
         _cache.invalidate(key);
@@ -496,7 +496,7 @@ public:
      */
     template <typename Pred>
     void invalidateKeyIf(const Pred& pred) {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         for (auto& entry : _inProgressLookups) {
             if (pred(entry.first))
                 entry.second->invalidateAndCancelCurrentLookupRound(lg);
@@ -561,7 +561,7 @@ private:
      * object for 'key', which must have been previously placed on the in-progress map.
      */
     Future<LookupResult> _doLookupWhileNotValid(Key key, StatusWith<LookupResult> sw) noexcept {
-        stdx::unique_lock ul(_mutex);
+        std::unique_lock ul(_mutex);
         auto it = _inProgressLookups.find(key);
         invariant(it != _inProgressLookups.end());
         auto& inProgressLookup = *it->second;
@@ -737,7 +737,7 @@ public:
     Future<LookupResult> asyncLookupRound() {
         auto [promise, future] = makePromiseFuture<LookupResult>();
 
-        stdx::lock_guard lg(_cache._mutex);
+        std::lock_guard lg(_cache._mutex);
         _valid = true;
         _cancelToken.emplace(_cache._asyncWork(
             [this, promise = std::move(promise)](
@@ -751,7 +751,7 @@ public:
                                                          _lookupArgs));
                     } else {
                         auto minTimeInStore = [&] {
-                            stdx::lock_guard lg(_cache._mutex);
+                            std::lock_guard lg(_cache._mutex);
                             return _minTimeInStore;
                         }();
                         return std::apply(

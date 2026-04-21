@@ -97,7 +97,7 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
         {
             // We must obtain the client lock to set the OperationKey on the operation context as
             // it may be concurrently read by CurrentOp.
-            stdx::lock_guard lg(*opCtx->getClient());
+            std::lock_guard lg(*opCtx->getClient());
             opCtx->setOperationKey(std::move(*requestArgs.getClientOperationKey()));
         }
         failIfOperationKeyMismatch.execute([&](const BSONObj& data) {

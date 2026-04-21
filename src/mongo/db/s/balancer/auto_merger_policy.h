@@ -37,7 +37,6 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
@@ -45,6 +44,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -105,7 +105,7 @@ private:
         OperationContext* opCtx);
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     inline static constexpr int MAX_NUMBER_OF_CONCURRENT_MERGE_ACTIONS = 10;
 

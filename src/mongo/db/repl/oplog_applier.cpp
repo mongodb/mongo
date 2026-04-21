@@ -90,12 +90,12 @@ void OplogApplier::shutdown() {
         LOGV2_FATAL_NOTRACE(40304, "Turn off rsSyncApplyStop before attempting clean shutdown");
     }
 
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _inShutdown = true;
 }
 
 bool OplogApplier::inShutdown() const {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _inShutdown;
 }
 

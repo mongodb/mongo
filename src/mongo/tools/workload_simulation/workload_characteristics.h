@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <random>
 
 namespace mongo::workload_simulation {
@@ -110,7 +110,7 @@ protected:
     AtomicWord<RWPair> _optimalConcurrency;
     AtomicWord<RWPair> _throughputAtOptimalConcurrency;
     double _jitterDev = 0.0;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     mutable std::mt19937 _rng;
     mutable std::normal_distribution<double> _jitterDist;
 };

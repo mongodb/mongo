@@ -72,7 +72,7 @@ void RSLocalClient::_updateLastOpTimeFromClient(OperationContext* opCtx,
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (lastOpTimeFromClient >= _lastOpTime) {
         // It's always possible for lastOpTimeFromClient to be less than _lastOpTime if another
         // thread started and completed a write through this ShardLocal (updating _lastOpTime)
@@ -82,7 +82,7 @@ void RSLocalClient::_updateLastOpTimeFromClient(OperationContext* opCtx,
 }
 
 repl::OpTime RSLocalClient::_getLastOpTime() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _lastOpTime;
 }
 

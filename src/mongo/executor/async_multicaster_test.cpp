@@ -40,12 +40,12 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <chrono>
+#include <future>
 #include <memory>
 #include <string>
 #include <vector>
@@ -224,8 +224,8 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticasterTest::runMulticastWithRespo
     Milliseconds timeout,
     AsyncMulticaster::Options options) {
 
-    auto future = stdx::async(stdx::launch::async,
-                              [&]() { return runMulticast(opCtx, hosts, timeout, options); });
+    auto future = std::async(std::launch::async,
+                             [&]() { return runMulticast(opCtx, hosts, timeout, options); });
 
     processAllNetworkRequests(responses);
 
@@ -305,7 +305,7 @@ TEST_F(AsyncMulticasterTest, MulticastWithLimitedConcurrency) {
     auto hosts = makeHostList(5);
 
     auto future =
-        stdx::async(stdx::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
 
     std::vector<RemoteCommandResponse> responses(
         5, RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(100)));
@@ -346,7 +346,7 @@ TEST_F(AsyncMulticasterTest, MulticastWithEmptyHostList) {
 
 TEST_F(AsyncMulticasterTest, MulticastWithTimeout) {
     auto opCtx = makeOperationContext();
-    auto future = stdx::async(stdx::launch::async, [&]() {
+    auto future = std::async(std::launch::async, [&]() {
         return runMulticast(opCtx.get(), makeHostList(2), Milliseconds(100));  // Short timeout
     });
 
@@ -356,7 +356,7 @@ TEST_F(AsyncMulticasterTest, MulticastWithTimeout) {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
         while (net->getNumReadyRequests() < 2) {
-            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
+            stdx::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
         // Advance time beyond the timeout
@@ -379,7 +379,7 @@ TEST_F(AsyncMulticasterTest, MulticastToSingleHostSuccessfulResponseWithRetry) {
     auto opCtx = makeOperationContext();
     auto hosts = makeHostList(1);
     auto future =
-        stdx::async(stdx::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
 
     auto successResponse = {makeSuccessResponse()};
 
@@ -394,7 +394,7 @@ TEST_F(AsyncMulticasterTest, MulticastToMultipleHostSuccessfulResponseWithRetry)
     auto opCtx = makeOperationContext();
     auto hosts = makeHostList(3);
     auto future =
-        stdx::async(stdx::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
 
     auto successResponses = std::vector<RemoteCommandResponse>(3, makeSuccessResponse());
 
@@ -409,7 +409,7 @@ TEST_F(AsyncMulticasterTest, MulticastToSingleHostSuccessfulResponseWithMaxRetry
     auto opCtx = makeOperationContext();
     auto hosts = makeHostList(1);
     auto future =
-        stdx::async(stdx::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
     for (int i = 0; i < 4; ++i) {
         processAllNetworkRequests({makeRetryableErrorResponse()});
     }
@@ -425,7 +425,7 @@ TEST_F(AsyncMulticasterTest, MulticastToSingleHostSuccessfulResponseWithDelay) {
                             BSON("backoffDelayMs" << testBaseBackoffMillis)};
 
     auto future =
-        stdx::async(stdx::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
 
     // First request fails
     processAllNetworkRequests({makeSystemOverloadedErrorResponse()});
@@ -450,7 +450,7 @@ TEST_F(AsyncMulticasterTest, MulticastToMultipleHostSuccessfulResponseWithDelay)
                             BSON("backoffDelayMs" << testBaseBackoffMillis)};
 
     auto future =
-        stdx::async(stdx::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
 
     auto successResponses = std::vector<RemoteCommandResponse>(3, makeSuccessResponse());
     auto errorResponses =
@@ -480,7 +480,7 @@ TEST_F(AsyncMulticasterTest, MulticastToMultipleHostSuccessfulResponseWithDelayL
     FailPointEnableBlock fp{"setBackoffDelayForTesting",
                             BSON("backoffDelayMs" << testBaseBackoffMillis)};
 
-    auto future = stdx::async(stdx::launch::async, [&]() {
+    auto future = std::async(std::launch::async, [&]() {
         return runMulticast(opCtx.get(), hosts, Milliseconds(5000), options);
     });
 

@@ -111,7 +111,7 @@ MONGO_REGISTER_COMMAND(ClusterCompactStructuredEncryptionDataCmd).forRouter();
 using Cmd = ClusterCompactStructuredEncryptionDataCmd;
 Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 

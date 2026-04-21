@@ -155,13 +155,13 @@ public:
 }  // namespace
 
 void AsioNetworkingBaton::schedule(Task func) {
-    auto task = [this, func = std::move(func)](stdx::unique_lock<stdx::mutex> lk) mutable {
+    auto task = [this, func = std::move(func)](std::unique_lock<std::mutex> lk) mutable {
         auto status = _opCtx ? Status::OK() : getDetachedError();
         lk.unlock();
         func(std::move(status));
     };
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     if (!_opCtx) {
         // Run the task inline if the baton is detached.
         task(std::move(lk));
@@ -213,18 +213,18 @@ void AsioNetworkingBaton::run(ClockSource* clkSource) noexcept {
             promise.setError(getCanceledError());
         }
 
-        auto lk = stdx::unique_lock(_mutex);
+        auto lk = std::unique_lock(_mutex);
         while (!_scheduled.empty()) {
             auto scheduled = std::exchange(_scheduled, {});
             for (auto& job : scheduled) {
                 job(std::move(lk));
                 job = nullptr;
-                lk = stdx::unique_lock(_mutex);
+                lk = std::unique_lock(_mutex);
             }
         }
     });
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     // If anything was scheduled, run it now and skip polling and processing timers.
     if (!_scheduled.empty())
@@ -293,7 +293,7 @@ Future<void> AsioNetworkingBaton::waitUntil(Date_t expiration, const Cancellatio
 void AsioNetworkingBaton::_addTimer(Date_t expiration, Timer timer) {
     const size_t timerId = timer.id;
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     // The timer could exist already, and we need to assert that it's canceled if so.
     auto it = _timersById.find(timerId);
@@ -305,7 +305,7 @@ void AsioNetworkingBaton::_addTimer(Date_t expiration, Timer timer) {
               "Tried to add an already-existing timer to the baton");
 
     // _safeExecute moving the timer from _pendingTimers to _timers.
-    _safeExecute(std::move(lk), [this, id = timerId](stdx::unique_lock<stdx::mutex> lk) {
+    _safeExecute(std::move(lk), [this, id = timerId](std::unique_lock<std::mutex> lk) {
         auto pendingIt = _pendingTimers.find(id);
         // The timer may have been canceled out of _pendingTimers
         if (pendingIt == _pendingTimers.end()) {
@@ -340,7 +340,7 @@ void AsioNetworkingBaton::_addTimer(Date_t expiration, Timer timer) {
 bool AsioNetworkingBaton::cancelSession(Session& session) {
     const auto id = session.id();
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     // If the session is still pending, cancel it immediately, inline.
     if (auto it = _pendingSessions.find(id); it != _pendingSessions.end()) {
@@ -367,7 +367,7 @@ bool AsioNetworkingBaton::cancelSession(Session& session) {
     it->second.canceled = true;
 
     // The session is active. Remove it and fulfill the promise out-of-line.
-    _safeExecuteNoThrow(std::move(lk), [this, id](stdx::unique_lock<stdx::mutex> lk) {
+    _safeExecuteNoThrow(std::move(lk), [this, id](std::unique_lock<std::mutex> lk) {
         auto iter = _sessions.find(id);
         // The session may have been removed already elsewhere, and it may have even been added
         // back to the baton. So we may find it's absent or no longer canceled.
@@ -391,7 +391,7 @@ bool AsioNetworkingBaton::cancelTimer(const ReactorTimer& timer) {
 }
 
 bool AsioNetworkingBaton::_cancelTimer(size_t id) {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     // If the timer is pending, cancel it immediately, inline.
     if (auto it = _pendingTimers.find(id); it != _pendingTimers.end()) {
@@ -415,7 +415,7 @@ bool AsioNetworkingBaton::_cancelTimer(size_t id) {
     timer.canceled = true;
 
     // The timer is active. Remove it and fulfill the promise out-of-line.
-    _safeExecuteNoThrow(std::move(lk), [this, id](stdx::unique_lock<stdx::mutex> lk) {
+    _safeExecuteNoThrow(std::move(lk), [this, id](std::unique_lock<std::mutex> lk) {
         auto iter = _timersById.find(id);
         // The timer may have already been canceled and removed elsewhere.
         if (iter == _timersById.end())
@@ -433,11 +433,11 @@ bool AsioNetworkingBaton::_cancelTimer(size_t id) {
 }
 
 bool AsioNetworkingBaton::canWait() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _opCtx;
 }
 
-void AsioNetworkingBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk,
+void AsioNetworkingBaton::_safeExecute(std::unique_lock<std::mutex> lk,
                                        AsioNetworkingBaton::Job job) {
     if (!_opCtx) {
         // If we're detached, no job can safely execute.
@@ -452,7 +452,7 @@ void AsioNetworkingBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk,
     }
 }
 
-void AsioNetworkingBaton::_safeExecuteNoThrow(stdx::unique_lock<stdx::mutex> lk,
+void AsioNetworkingBaton::_safeExecuteNoThrow(std::unique_lock<std::mutex> lk,
                                               AsioNetworkingBaton::Job job) noexcept try {
     _safeExecute(std::move(lk), std::move(job));
 } catch (...) {
@@ -460,7 +460,7 @@ void AsioNetworkingBaton::_safeExecuteNoThrow(stdx::unique_lock<stdx::mutex> lk,
 }
 
 std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBaton::_poll(
-    stdx::unique_lock<stdx::mutex>& lk, ClockSource* clkSource) {
+    std::unique_lock<std::mutex>& lk, ClockSource* clkSource) {
     const auto now = clkSource->now();
 
     // If we have a timer, then use it to enforce a timeout for polling.
@@ -600,7 +600,7 @@ Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) tr
                         std::move(pf.promise)};
     SessionId id = session.id();
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     // The session could exist in _sessions, and we need to assert that it's canceled if so.
     auto it = _sessions.find(id);
@@ -613,7 +613,7 @@ Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) tr
               "Tried to add an already existing session");
 
     // _safeExecute moving the session from _pendingSessions to _sessions.
-    _safeExecute(std::move(lk), [this, id](stdx::unique_lock<stdx::mutex> lk) {
+    _safeExecute(std::move(lk), [this, id](std::unique_lock<std::mutex> lk) {
         auto it = _pendingSessions.find(id);
         if (it == _pendingSessions.end()) {
             // The session may have been canceled out of _pendingSessions
@@ -647,7 +647,7 @@ Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) tr
 
 void AsioNetworkingBaton::detachImpl() {
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     invariant(_opCtx->getBaton().get() == this);
     _opCtx->setBaton(nullptr);
@@ -668,7 +668,7 @@ void AsioNetworkingBaton::detachImpl() {
     lk.unlock();
 
     for (auto& job : scheduled) {
-        job(stdx::unique_lock(_mutex));
+        job(std::unique_lock(_mutex));
         job = nullptr;
     }
 

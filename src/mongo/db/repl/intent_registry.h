@@ -35,12 +35,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
+#include <chrono>
+#include <future>
+#include <mutex>
 #include <vector>
 
 
@@ -155,7 +155,7 @@ public:
      * Returns true if there is an active Replication state transition ongoing, false otherwise.
      */
     bool activeStateTransition() {
-        stdx::unique_lock lock(_stateMutex);
+        std::unique_lock lock(_stateMutex);
         return _interruptionCtx != nullptr;
     }
 
@@ -164,7 +164,7 @@ public:
      * boost::none otherwise.
      */
     boost::optional<OperationContext*> replicationStateTransitionInterruptionCtx() {
-        stdx::unique_lock lock(_stateMutex);
+        std::unique_lock lock(_stateMutex);
         if (_interruptionCtx != nullptr) {
             return _interruptionCtx;
         } else {
@@ -180,7 +180,7 @@ public:
      * intent, except those that originate from the same OperationContext to allow transition
      * threads to perform necessary work.
      */
-    stdx::future<ReplicationStateTransitionGuard> killConflictingOperations(
+    std::future<ReplicationStateTransitionGuard> killConflictingOperations(
         InterruptionType interruption,
         OperationContext* opCtx,
         boost::optional<uint32_t> timeout_sec = boost::none);
@@ -214,14 +214,14 @@ public:
 
 private:
     struct tokenMap {
-        mutable stdx::mutex lock;
+        mutable std::mutex lock;
         stdx::condition_variable cv;
         absl::flat_hash_map<IntentToken::idType, OperationContext*> map;
     };
 
     bool _validIntent(Intent intent) const;
     void _killOperationsByIntent(Intent intent, InterruptionType interruption);
-    void _waitForDrain(Intent intent, stdx::chrono::milliseconds timeout);
+    void _waitForDrain(Intent intent, std::chrono::milliseconds timeout);
 
     bool _enabled = true;
     RWMutex _stateMutex;

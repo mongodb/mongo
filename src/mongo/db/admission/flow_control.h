@@ -39,7 +39,6 @@
 #include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
@@ -47,6 +46,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <vector>
 
@@ -225,7 +225,7 @@ private:
     AtomicWord<std::int64_t> _isLaggedTimeMicros{0};
     AtomicWord<Date_t> _disableUntil;
 
-    mutable stdx::mutex _sampledOpsMutex;
+    mutable std::mutex _sampledOpsMutex;
     std::deque<Sample> _sampledOpsApplied;
 
     // These values are used in the sampling process.

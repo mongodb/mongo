@@ -196,7 +196,7 @@ bool IndexBuildInterceptor::_checkAllWritesApplied(OperationContext* opCtx, bool
 }
 
 boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
-    stdx::unique_lock<stdx::mutex> lk(_multikeyPathMutex);
+    std::unique_lock<std::mutex> lk(_multikeyPathMutex);
     return _multikeyPaths;
 }
 
@@ -224,7 +224,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         // SERVER-39705: It's worth noting that a document may not generate any keys, but be
         // described as being multikey. This step must be done to maintain parity with `validate`s
         // expectations.
-        stdx::unique_lock<stdx::mutex> lk(_multikeyPathMutex);
+        std::unique_lock<std::mutex> lk(_multikeyPathMutex);
         if (_multikeyPaths) {
             MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.value(), multikeyPaths);
         } else {

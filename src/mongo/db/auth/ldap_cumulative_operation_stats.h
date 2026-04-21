@@ -32,13 +32,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 
@@ -109,6 +109,6 @@ private:
     /**
      * Protects access to member variables.
      */
-    mutable stdx::mutex _memberAccessMutex;
+    mutable std::mutex _memberAccessMutex;
 };
 }  // namespace mongo

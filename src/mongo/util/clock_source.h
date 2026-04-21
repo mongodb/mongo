@@ -132,7 +132,7 @@ public:
 
     /**
      * Like cv.wait_until(m, deadline), but uses this ClockSource instead of
-     * stdx::chrono::system_clock to measure the passage of time.
+     * std::chrono::system_clock to measure the passage of time.
      *
      * Note that this can suffer spurious wakeups like cw.wait_until() and, when used with a mocked
      * clock source, may sleep in system time for kMaxTimeoutForArtificialClocks due to unfortunate
@@ -145,7 +145,7 @@ public:
 
     /**
      * Like cv.wait_until(m, deadline, pred), but uses this ClockSource instead of
-     * stdx::chrono::system_clock to measure the passage of time.
+     * std::chrono::system_clock to measure the passage of time.
      */
     template <typename LockT,
               typename PredicateT,
@@ -165,7 +165,7 @@ public:
 
     /**
      * Like cv.wait_for(m, duration, pred), but uses this ClockSource instead of
-     * stdx::chrono::system_clock to measure the passage of time.
+     * std::chrono::system_clock to measure the passage of time.
      */
     template <typename LockT,
               typename Duration,

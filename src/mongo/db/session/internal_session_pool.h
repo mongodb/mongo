@@ -37,7 +37,6 @@
 #include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -46,6 +45,7 @@
 
 #include <cstddef>
 #include <list>
+#include <mutex>
 #include <ratio>
 #include <stack>
 #include <utility>
@@ -131,7 +131,7 @@ private:
     stdx::unordered_map<SHA256Block, std::list<Session>> _perUserSessionPool;
 
     // Protects the internal data structures.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 };
 
 }  // namespace mongo

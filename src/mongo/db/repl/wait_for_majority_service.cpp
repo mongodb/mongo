@@ -107,7 +107,7 @@ void WaitForMajorityService::shutDown() {
 }
 
 void WaitForMajorityServiceImplBase::startup(ServiceContext* ctx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(_state == State::kNotStarted);
     _pool = makeThreadPool(_getReadOrWrite());
     _waitForMajorityClient = ClientStrand::make(ctx->getService()->makeClient(
@@ -131,7 +131,7 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajorityForWrite(
 
 void WaitForMajorityServiceImplBase::shutDown() {
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
 
         if (_state != State::kRunning) {
             return;
@@ -165,7 +165,7 @@ SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
     auto [promise, future] = makePromiseFuture<void>();
     auto request = std::make_shared<Request>(std::move(promise));
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     tassert(5065600,
             "WaitForMajorityService must be started before calling waitUntilMajority",
@@ -213,7 +213,7 @@ SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
         auto clientGuard = _waitForMajorityCancellationClient->bind();
         if (!request->hasBeenProcessed.swap(true)) {
             request->result.setError(WaitForMajorityService::waitUntilMajorityCanceledStatus());
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             auto it = std::find_if(
                 std::begin(_queuedOpTimes),
                 std::end(_queuedOpTimes),
@@ -247,7 +247,7 @@ SemiFuture<void> WaitForMajorityServiceImplBase::_periodicallyWaitForMajority() 
      */
     return AsyncTry([this] {
                auto clientGuard = _waitForMajorityClient->bind();
-               stdx::unique_lock<stdx::mutex> lk(_mutex);
+               std::unique_lock<std::mutex> lk(_mutex);
                if (_queuedOpTimes.empty()) {
                    return _hasNewOpTimeCV.onNotify();
                }

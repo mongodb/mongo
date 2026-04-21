@@ -38,7 +38,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
@@ -46,6 +45,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -168,7 +168,7 @@ protected:
 
     typedef std::vector<BaseClonerStage*> ClonerStages;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     StringData getClonerName() const {
         return _clonerName;

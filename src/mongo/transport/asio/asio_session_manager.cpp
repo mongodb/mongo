@@ -77,7 +77,7 @@ void AsioSessionManager::configureServiceExecutorContext(Client* client,
     auto seCtx = std::make_unique<ServiceExecutorContext>();
     seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
     seCtx->setCanUseReserved(isPrivilegedSession);
-    stdx::lock_guard lk(*client);
+    std::lock_guard lk(*client);
     ServiceExecutorContext::set(client, std::move(seCtx));
 }
 

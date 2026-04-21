@@ -36,12 +36,12 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/timer.h"
 
 #include <algorithm>
 #include <cmath>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -78,7 +78,7 @@ StringData CollectionTruncateMarkers::toString(
 
 boost::optional<CollectionTruncateMarkers::Marker>
 CollectionTruncateMarkers::peekOldestMarkerIfNeeded(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+    std::lock_guard<std::mutex> lk(_markersMutex);
 
     if (!_hasExcessMarkers(opCtx)) {
         return {};
@@ -125,7 +125,7 @@ boost::optional<CollectionTruncateMarkers::Marker> CollectionTruncateMarkers::ne
 }
 
 void CollectionTruncateMarkers::popOldestMarker() {
-    stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+    std::lock_guard<std::mutex> lk(_markersMutex);
     _markers.pop_front();
 }
 
@@ -148,7 +148,7 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(const RecordId& lastReco
     // Try to lock the mutex, if we fail to lock then someone else is either already creating a new
     // marker or popping the oldest one. In the latter case, we let the next insert trigger the new
     // marker's creation.
-    stdx::unique_lock<stdx::mutex> lk(_markersMutex, stdx::try_to_lock);
+    std::unique_lock<std::mutex> lk(_markersMutex, std::try_to_lock);
     if (!lk) {
         logFailedLockAcquisition("_markersMutex");
         return;
@@ -220,7 +220,7 @@ void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
 }
 
 void CollectionTruncateMarkers::initialSamplingFinished() {
-    stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+    std::lock_guard<std::mutex> lk(_markersMutex);
     LOGV2_DEBUG(10167200, 2, "Initial sampling finished marked true.");
     _initialSamplingFinished = true;
 }
@@ -580,13 +580,13 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
     // creating a new marker or popping the oldest one. In the latter case, we let the next check
     // trigger the new partial marker's creation.
 
-    stdx::unique_lock<stdx::mutex> lk(_markersMutex, stdx::try_to_lock);
+    std::unique_lock<std::mutex> lk(_markersMutex, std::try_to_lock);
     if (!lk) {
         logFailedLockAcquisition("_markersMutex");
         return;
     }
 
-    stdx::unique_lock<stdx::mutex> highestRecordLock(_highestRecordMutex, stdx::try_to_lock);
+    std::unique_lock<std::mutex> highestRecordLock(_highestRecordMutex, std::try_to_lock);
     if (!highestRecordLock) {
         logFailedLockAcquisition("_highestRecordMutex");
         return;
@@ -618,7 +618,7 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
 
 void CollectionTruncateMarkersWithPartialExpiration::_updateHighestSeenRecordIdAndWallTime(
     const RecordId& rId, Date_t wallTime) {
-    stdx::unique_lock lk(_highestRecordMutex);
+    std::unique_lock lk(_highestRecordMutex);
     if (_highestRecordId < rId) {
         _highestRecordId = rId;
     }

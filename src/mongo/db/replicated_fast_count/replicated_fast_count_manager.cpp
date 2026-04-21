@@ -103,7 +103,7 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
 
     // Shutdown background thread.
     {
-        stdx::lock_guard lock(_metadataMutex);
+        std::lock_guard lock(_metadataMutex);
         _isEnabled.store(false);
     }
     _backgroundThreadReadyForFlush.notify_one();
@@ -119,7 +119,7 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
 int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
     OperationContext* opCtx, const CollectionOrViewAcquisition& acquisition) {
     int numRecordsScanned = 0;
-    stdx::lock_guard lock(_metadataMutex);
+    std::lock_guard lock(_metadataMutex);
     auto cursor = acquisition.getCollectionPtr()->getCursor(opCtx);
     while (auto record = cursor->next()) {
         Record& rec = *record;
@@ -165,7 +165,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
 void ReplicatedFastCountManager::commit(
     const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
     boost::optional<Timestamp> commitTime) {
-    stdx::lock_guard lock(_metadataMutex);
+    std::lock_guard lock(_metadataMutex);
     for (const auto& [uuid, metadata] : changes) {
         // Ignore changes that don't need to be flushed. Count and size can both be zero if two or
         // more UncommittedFastCountChange::record() calls between checkpoints for the same UUID
@@ -192,7 +192,7 @@ void ReplicatedFastCountManager::commit(
 }
 
 CollectionSizeCount ReplicatedFastCountManager::find(const UUID& uuid) const {
-    stdx::lock_guard lock(_metadataMutex);
+    std::lock_guard lock(_metadataMutex);
     auto it = _metadata.find(uuid);
     if (it != _metadata.end()) {
         return it->second.sizeCount;
@@ -239,7 +239,7 @@ CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* 
 }
 
 void ReplicatedFastCountManager::flushAsync() {
-    stdx::lock_guard lock(_metadataMutex);
+    std::lock_guard lock(_metadataMutex);
     _flushRequested = true;
     _backgroundThreadReadyForFlush.notify_one();
 }
@@ -247,7 +247,7 @@ void ReplicatedFastCountManager::flushAsync() {
 void ReplicatedFastCountManager::flushSync(OperationContext* opCtx) {
     FastSizeCountMap dirtyMetadata;
     {
-        stdx::unique_lock lock(_metadataMutex);
+        std::unique_lock lock(_metadataMutex);
         dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
     }
 
@@ -364,7 +364,7 @@ void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
     while (_isEnabled.load()) {
         FastSizeCountMap dirtyMetadata;
         {
-            stdx::unique_lock lock(_metadataMutex);
+            std::unique_lock lock(_metadataMutex);
             _backgroundThreadReadyForFlush.wait(
                 lock, [this] { return _flushRequested || !_isEnabled.load(); });
             _flushRequested = false;

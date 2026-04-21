@@ -33,13 +33,13 @@
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <algorithm>
+#include <mutex>
 #include <ostream>
 #include <vector>
 
@@ -133,7 +133,7 @@ public:
         auto getIntensity = [this, intensities](FaultFacetType type) {
             auto observerType = toObserverType(type);
             if (observerType) {
-                stdx::lock_guard lock(_mutex);
+                std::lock_guard lock(_mutex);
                 if (_facetToIntensityMapForTest.contains(type)) {
                     return _facetToIntensityMapForTest.at(type);
                 }
@@ -150,7 +150,7 @@ public:
             } else {
                 // TODO SERVER-61944: this is for kMock1 & kMock2. Remove this branch once mock
                 // types are deleted.
-                stdx::lock_guard lock(_mutex);
+                std::lock_guard lock(_mutex);
                 if (_facetToIntensityMapForTest.contains(type)) {
                     return _facetToIntensityMapForTest.at(type);
                 }
@@ -166,7 +166,7 @@ public:
     }
 
     void setIntensityForType(FaultFacetType type, HealthObserverIntensityEnum intensity) {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         _facetToIntensityMapForTest.insert({type, intensity});
     }
 
@@ -235,7 +235,7 @@ private:
     bool _periodicChecksDisabledForTests = false;
 
     stdx::unordered_map<FaultFacetType, HealthObserverIntensityEnum> _facetToIntensityMapForTest;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 };
 
 }  // namespace process_health

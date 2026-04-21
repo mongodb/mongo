@@ -32,11 +32,11 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -76,10 +76,10 @@ private:
 
     void _remove(ResourceId id, const std::string& name);
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::unordered_map<ResourceId, StringSet> _resources;
 
-    mutable stdx::mutex _mutexResourceIdLabelsMutex;
+    mutable std::mutex _mutexResourceIdLabelsMutex;
     std::vector<std::string> _mutexResourceIdLabels;
 };
 

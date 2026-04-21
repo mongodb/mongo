@@ -44,7 +44,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
@@ -62,6 +61,7 @@
 
 #include <array>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -229,7 +229,7 @@ private:
 
         CancellationSource cancelSource;
 
-        stdx::mutex cancelMutex;
+        std::mutex cancelMutex;
         // Overwrites the generic cancellation status when the operation is cancelled.
         Status cancelStatus = Status::OK();
 
@@ -332,7 +332,7 @@ private:
     }
 
     // Guards _svcCtx, _state, _inProgress, and _inProgressAlarms.
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     ServiceContext* _svcCtx = nullptr;
 

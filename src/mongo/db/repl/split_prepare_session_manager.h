@@ -32,10 +32,10 @@
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -128,7 +128,7 @@ public:
 
 private:
     // Guards access to member variables.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // The global session pool storing reusable sessions, from which split sessions are acquired.
     InternalSessionPool* _sessionPool;

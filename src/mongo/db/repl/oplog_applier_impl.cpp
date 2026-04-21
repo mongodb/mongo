@@ -76,7 +76,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -415,7 +414,7 @@ private:
     void _run();
 
     // Protects _cond, _shutdownSignaled, and _latestOpTime.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     // Used to alert our thread of a new OpTime.
     stdx::condition_variable _cond;
     // The next OpTime to set as the ReplicationCoordinator's lastOpTime after flushing.
@@ -427,7 +426,7 @@ private:
 };
 
 ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     _shutdownSignaled = true;
     _cond.notify_all();
     lock.unlock();
@@ -438,7 +437,7 @@ ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
 void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAndWallTime) {
     _recordApplied(newOpTimeAndWallTime);
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     _latestOpTimeAndWallTime = newOpTimeAndWallTime;
     _cond.notify_all();
 }
@@ -451,7 +450,7 @@ void ApplyBatchFinalizerForJournal::_run() {
 
     while (true) {
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            std::unique_lock<std::mutex> lock(_mutex);
             while (_latestOpTimeAndWallTime.opTime.isNull() && !_shutdownSignaled) {
                 _cond.wait(lock);
             }
@@ -601,7 +600,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         }
 
         // Don't allow the fsync+lock thread to see intermediate states of batch application.
-        stdx::lock_guard<stdx::mutex> fsynclk(oplogApplierLockedFsync);
+        std::lock_guard<std::mutex> fsynclk(oplogApplierLockedFsync);
 
         // Obtain the validation lock to synchronise batch application with validation.
         auto lk = CollectionValidation::obtainExclusiveValidationLock(&opCtx);

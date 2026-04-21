@@ -91,7 +91,7 @@ protected:
     void _doWrite(OperationContext* opCtx, AdmissionContext* admCtx);
 
 protected:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     EventQueue& _queue;
     std::unique_ptr<MockWorkloadCharacteristics> _characteristics;

@@ -99,7 +99,7 @@ public:
             queue->closeConsumerEnd();
         }
         {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             _allProducerConsumerClosed.wait(
                 lk, [this]() { return _openConsumers == 0 && _activeCursors == 0; });
         }
@@ -138,7 +138,7 @@ private:
     };
     std::vector<boost::optional<MultiProducerSingleConsumerQueue<QueueData>>> _queues;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     int _activeCursors;                  // (M)
     int _openConsumers;                  // (M)
     Status _finalResult = Status::OK();  // (M)

@@ -32,7 +32,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/mongos_hello_response.h"
 #include "mongo/rpc/topology_version_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -83,12 +83,12 @@ public:
     void enterQuiesceModeAndWait(OperationContext* opCtx, Milliseconds quiesceTime);
 
     TopologyVersion getTopologyVersion() const {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _topologyVersion;
     }
 
     bool inQuiesceMode() const {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _inQuiesceMode;
     }
 
@@ -114,7 +114,7 @@ private:
     // (M)  Reads and writes guarded by _mutex
 
     // Protects member data of this MongosTopologyCoordinator.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Keeps track of the current mongos TopologyVersion.
     TopologyVersion _topologyVersion;  // (M)

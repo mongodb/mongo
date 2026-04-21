@@ -45,12 +45,12 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -222,7 +222,7 @@ private:
     StatusWith<MultiIndexBlock*> _getBuilder(const UUID& buildUUID);
 
     // Protects the map data structures below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Map of index builders by build UUID. Allows access to the builders so that actions can be
     // taken on and information passed to and from index builds.

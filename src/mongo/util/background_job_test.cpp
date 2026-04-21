@@ -29,7 +29,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -115,7 +114,7 @@ TEST(BackgroundJobLifeCycle, Go) {
 
         void run() override {
             {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
                 ASSERT_FALSE(_hasRun);
                 _hasRun = true;
             }
@@ -128,7 +127,7 @@ TEST(BackgroundJobLifeCycle, Go) {
         }
 
     private:
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         bool _hasRun;
         Notification<void> _n;
     };

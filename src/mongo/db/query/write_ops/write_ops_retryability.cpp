@@ -206,7 +206,7 @@ BSONObj fetchPreOrPostImageFromImageCollection(OperationContext* opCtx,
         client.findOne(NamespaceString::kConfigImagesNamespace, BSON("_id" << sessionId.toBSON()));
 
     {
-        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
         curOp->setNS(clientLock, existingNS);
     }
 

@@ -137,7 +137,7 @@ void NetworkInterfaceIntegrationFixture::tearDown() {
         _fixtureNet->shutdown();
     }
 
-    auto lk = stdx::unique_lock(_mutex);
+    auto lk = std::unique_lock(_mutex);
     auto checkIdle = [&]() {
         return _workInProgress == 0;
     };
@@ -268,13 +268,13 @@ void NetworkInterfaceIntegrationFixture::assertWriteError(const DatabaseName& db
 }
 
 void NetworkInterfaceIntegrationFixture::_onSchedulingCommand() {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     _workInProgress++;
 }
 
 void NetworkInterfaceIntegrationFixture::_onCompletingCommand() {
     networkInterfaceFixtureHangOnCompletion.pauseWhileSet();
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     if (--_workInProgress == 0) {
         _fixtureIsIdle.notify_all();
     }

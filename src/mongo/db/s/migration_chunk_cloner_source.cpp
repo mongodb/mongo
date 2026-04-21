@@ -351,7 +351,7 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
 
         auto storeCurrentRecordIdStatus = _storeCurrentRecordId(opCtx);
         if (storeCurrentRecordIdStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            std::lock_guard<std::mutex> sl(_mutex);
             _jumboChunkCloneState.emplace();
         } else if (!storeCurrentRecordIdStatus.isOK()) {
             return storeCurrentRecordIdStatus;
@@ -399,7 +399,7 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
     // between cancellations for different migration sessions. It is thus possible that a second
     // migration from different donor, but the same recipient would certainly abort an already
     // running migration.
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     _state = kCloning;
 
     return Status::OK();
@@ -435,7 +435,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
                 return status;
             }
         } else {
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            std::lock_guard<std::mutex> sl(_mutex);
             invariant(PlanExecutor::IS_EOF == _jumboChunkCloneState->clonerState);
             invariant(!_cloneList.hasMore());
         }
@@ -619,7 +619,7 @@ void MigrationChunkClonerSource::_addToTransferModsQueue(const BSONObj& idObj,
                                                          const repl::OpTime& opTime) {
     switch (op) {
         case 'd': {
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            std::lock_guard<std::mutex> sl(_mutex);
             _deleted.push_back(idObj);
             ++_untransferredDeletesCounter;
             _memoryUsed += idObj.firstElement().size() + 5;
@@ -627,7 +627,7 @@ void MigrationChunkClonerSource::_addToTransferModsQueue(const BSONObj& idObj,
 
         case 'i':
         case 'u': {
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            std::lock_guard<std::mutex> sl(_mutex);
             _reload.push_back(idObj);
             ++_untransferredUpsertsCounter;
             _memoryUsed += idObj.firstElement().size() + 5;
@@ -642,7 +642,7 @@ void MigrationChunkClonerSource::_addToTransferModsQueue(const BSONObj& idObj,
 }
 
 bool MigrationChunkClonerSource::_addedOperationToOutstandingOperationTrackRequests() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     if (!_acceptingNewOperationTrackRequests) {
         return false;
     }
@@ -652,7 +652,7 @@ bool MigrationChunkClonerSource::_addedOperationToOutstandingOperationTrackReque
 }
 
 void MigrationChunkClonerSource::_drainAllOutstandingOperationTrackRequests(
-    stdx::unique_lock<stdx::mutex>& lk) {
+    std::unique_lock<std::mutex>& lk) {
     invariant(_state == kDone);
     _acceptingNewOperationTrackRequests = false;
     _allOutstandingOperationTrackRequestsDrained.wait(
@@ -666,7 +666,7 @@ void MigrationChunkClonerSource::_incrementOutstandingOperationTrackRequests(Wit
 }
 
 void MigrationChunkClonerSource::_decrementOutstandingOperationTrackRequests() {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     --_outstandingOperationTrackRequests;
     if (_outstandingOperationTrackRequests == 0) {
         _allOutstandingOperationTrackRequestsDrained.notify_all();
@@ -705,7 +705,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
         while (PlanExecutor::ADVANCED ==
                (execState = _jumboChunkCloneState->clonerExec->getNext(&obj, nullptr))) {
 
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            std::unique_lock<std::mutex> lk(_mutex);
             _jumboChunkCloneState->clonerState = execState;
             lk.unlock();
 
@@ -733,7 +733,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
         throw;
     }
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     _jumboChunkCloneState->clonerState = execState;
     lk.unlock();
 
@@ -762,7 +762,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(
             _cloneList.getNextDoc(opCtx, collection.getCollectionPtr(), &recordsNoLongerExist);
 
         if (recordsNoLongerExist) {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _numRecordsPassedOver += recordsNoLongerExist;
         }
 
@@ -786,7 +786,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(
         if (!isDocumentKeyInRange(
                 doc->value(), _args.getMin().value(), _args.getMax().value(), _shardKeyPattern)) {
             {
-                stdx::lock_guard lk(_mutex);
+                std::lock_guard lk(_mutex);
                 _numRecordsPassedOver++;
             }
             continue;
@@ -801,7 +801,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(
         }
 
         {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _numRecordsCloned++;
         }
 
@@ -812,7 +812,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(
 }
 
 uint64_t MigrationChunkClonerSource::getCloneBatchBufferAllocationSize() {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     if (_jumboChunkCloneState && _forceJumbo)
         return static_cast<uint64_t>(BSONObjMaxUserSize);
 
@@ -892,7 +892,7 @@ bool MigrationChunkClonerSource::_processUpdateForXferMod(const BSONObj& preImag
 }
 
 void MigrationChunkClonerSource::_deferProcessingForXferMod(const BSONObj& preImageDocKey) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    std::lock_guard<std::mutex> sl(_mutex);
     _deferredReloadOrDeletePreImageDocKeys.push_back(preImageDocKey.getOwned());
     _deferredUntransferredOpsCounter++;
 }
@@ -901,7 +901,7 @@ void MigrationChunkClonerSource::_processDeferredXferMods(OperationContext* opCt
     std::vector<BSONObj> deferredReloadOrDeletePreImageDocKeys;
 
     {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         deferredReloadOrDeletePreImageDocKeys.swap(_deferredReloadOrDeletePreImageDocKeys);
     }
 
@@ -942,7 +942,7 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
 
     {
         // All clone data must have been drained before starting to fetch the incremental changes.
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         invariant(!_cloneList.hasMore());
 
         // The "snapshot" for delete and update list must be taken under a single lock. This is to
@@ -980,7 +980,7 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
     builder->append("size", totalDocSize);
 
     // Put back remaining ids we didn't consume
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     _deleted.splice(_deleted.cbegin(), deleteList);
     _untransferredDeletesCounter = _deleted.size();
     _reload.splice(_reload.cbegin(), updateList);
@@ -991,7 +991,7 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
 }
 
 void MigrationChunkClonerSource::_cleanup(bool wasSuccessful) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     _state = kDone;
 
     _drainAllOutstandingOperationTrackRequests(lk);
@@ -1201,7 +1201,7 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
                           << getMax()};
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _averageObjectSizeForCloneRecordIds = collectionAverageObjectSize + defaultObjectIdSize;
     _averageObjectIdSize = std::max(averageObjectIdSize, defaultObjectIdSize);
     return Status::OK();
@@ -1265,7 +1265,7 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
             ? _sessionCatalogSource->untransferredCatchUpDataSize()
             : std::numeric_limits<int64_t>::max();
 
-        stdx::lock_guard<stdx::mutex> sl(_mutex);
+        std::lock_guard<std::mutex> sl(_mutex);
 
         int64_t untransferredModsSizeBytes = _untransferredDeletesCounter * _averageObjectIdSize +
             (_untransferredUpsertsCounter + _deferredUntransferredOpsCounter) *
@@ -1499,19 +1499,19 @@ MigrationChunkClonerSource::CloneList::CloneList() {
 }
 
 void MigrationChunkClonerSource::CloneList::populateList(RecordIdSet recordIds) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _recordIds = std::move(recordIds);
     _recordIdsIter = _recordIds.begin();
 }
 
 void MigrationChunkClonerSource::CloneList::insertOverflowDoc(Snapshotted<BSONObj> doc) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(_inProgressReads >= 1);
     _overflowDocs.push_back(std::move(doc));
 }
 
 bool MigrationChunkClonerSource::CloneList::hasMore() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _recordIdsIter != _recordIds.cend() && _inProgressReads > 0;
 }
 
@@ -1520,7 +1520,7 @@ MigrationChunkClonerSource::CloneList::getNextDoc(OperationContext* opCtx,
                                                   const CollectionPtr& collection,
                                                   int* numRecordsNoLongerExist) {
     while (true) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         invariant(_inProgressReads >= 0);
         RecordId nextRecordId;
 
@@ -1565,7 +1565,7 @@ MigrationChunkClonerSource::CloneList::getNextDoc(OperationContext* opCtx,
 }
 
 size_t MigrationChunkClonerSource::CloneList::size() const {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     return _recordIds.size();
 }
 
@@ -1574,7 +1574,7 @@ void MigrationChunkClonerSource::CloneList::_startedOneInProgressRead(WithLock) 
 }
 
 void MigrationChunkClonerSource::CloneList::_finishedOneInProgressRead() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _inProgressReads--;
     _moreDocsCV.notify_one();
 }

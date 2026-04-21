@@ -39,8 +39,9 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -106,7 +107,7 @@ private:
                                               ShardingCatalogClient* catalogClient,
                                               const repl::ReadConcernLevel& readConcernLevel);
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _inReloadCV;
 
     // Used to ensure that only one thread at a time attempts to reload the cluster ID from the

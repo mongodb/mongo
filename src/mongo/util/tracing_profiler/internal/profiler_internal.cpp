@@ -287,7 +287,7 @@ ProfilerMetrics Profiler::getMetricsImpl(double frequency) {
 }
 
 Profiler::ShardUniquePtr Profiler::createShard() {
-    void* p = boost::alignment::aligned_alloc(stdx::hardware_destructive_interference_size,
+    void* p = boost::alignment::aligned_alloc(std::hardware_destructive_interference_size,
                                               sizeof(Profiler::ThreadLocalShard));
 
     return Profiler::ShardUniquePtr(new (p) Profiler::ThreadLocalShard(this));

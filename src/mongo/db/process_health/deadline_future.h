@@ -56,7 +56,7 @@ public:
 
     ~DeadlineFuture() {
         {
-            auto lk = stdx::lock_guard(_mutex);
+            auto lk = std::lock_guard(_mutex);
             if (_timeoutCbHandle) {
                 _executor->cancel(_timeoutCbHandle.get());
             }
@@ -80,7 +80,7 @@ private:
         auto swCbHandle = _executor->scheduleWorkAt(
             _executor->now() + timeout,
             [this, self](const executor::TaskExecutor::CallbackArgs& cbData) {
-                auto lk = stdx::lock_guard(_mutex);
+                auto lk = std::lock_guard(_mutex);
                 if (!cbData.status.isOK()) {
                     if (!get().isReady()) {
                         _outputFuturePromise->setError(cbData.status);
@@ -95,7 +95,7 @@ private:
             });
 
         {
-            auto lk = stdx::lock_guard(_mutex);
+            auto lk = std::lock_guard(_mutex);
             if (!swCbHandle.isOK() && !get().isReady()) {
                 _outputFuturePromise->setError(swCbHandle.getStatus());
                 return;
@@ -106,7 +106,7 @@ private:
 
         _inputFuture =
             std::move(inputFuture).onCompletion([this, self](StatusWith<ResultStatus> status) {
-                auto lk = stdx::lock_guard(_mutex);
+                auto lk = std::lock_guard(_mutex);
                 _executor->cancel(_timeoutCbHandle.get());
                 _timeoutCbHandle = boost::none;
                 if (!get().isReady()) {
@@ -119,7 +119,7 @@ private:
 private:
     const std::shared_ptr<executor::TaskExecutor> _executor;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     Future<ResultStatus> _inputFuture;
     boost::optional<executor::TaskExecutor::CallbackHandle> _timeoutCbHandle;
     std::unique_ptr<SharedPromise<ResultStatus>> _outputFuturePromise;

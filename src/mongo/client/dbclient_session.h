@@ -50,7 +50,6 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/unique_message.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -67,6 +66,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -274,7 +274,7 @@ protected:
     // rebind the handle from the owning thread. The thread that owns this DBClientSession is
     // allowed to use the _session without locking the mutex. This mutex also guards writes to
     // _stayFailed, although reads are allowed outside the mutex.
-    stdx::mutex _sessionMutex;
+    std::mutex _sessionMutex;
     std::shared_ptr<transport::Session> _session;
     boost::optional<Milliseconds> _socketTimeout;
     uint64_t _sessionCreationTimeMicros = INVALID_SOCK_CREATION_TIME;

@@ -54,13 +54,13 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
 
 void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+        std::lock_guard<std::mutex> lock(_ttlInfosLock);
         _ttlInfos[uuid].push_back(info);
     }
 }
 
 void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
     auto infoIt = _ttlInfos.find(uuid);
     if (infoIt == _ttlInfos.end()) {
         LOGV2_DEBUG(9150100,
@@ -118,7 +118,7 @@ void TTLCollectionCache::deregisterTTLClusteredIndex(UUID uuid) {
 void TTLCollectionCache::setTTLIndexExpireAfterSecondsType(UUID uuid,
                                                            const IndexName& indexName,
                                                            Info::ExpireAfterSecondsType type) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
     auto infoIt = _ttlInfos.find(uuid);
     if (infoIt == _ttlInfos.end()) {
         return;
@@ -134,7 +134,7 @@ void TTLCollectionCache::setTTLIndexExpireAfterSecondsType(UUID uuid,
 }
 
 TTLCollectionCache::InfoMap TTLCollectionCache::getTTLInfos() {
-    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
     return _ttlInfos;
 }
 };  // namespace mongo

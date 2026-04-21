@@ -38,7 +38,6 @@
 #include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/kms_message_support.h"
@@ -59,7 +58,7 @@ namespace mongo {
 namespace awsIam {
 namespace {
 // Secure Random for AWS SASL Nonce generation
-stdx::mutex saslAWSClientMutex;
+std::mutex saslAWSClientMutex;
 SecureRandom saslAWSClientGen;
 
 std::vector<char> generateClientNonce() {
@@ -68,7 +67,7 @@ std::vector<char> generateClientNonce() {
     ret.resize(kClientFirstNonceLength);
 
     {
-        stdx::lock_guard<stdx::mutex> lk(saslAWSClientMutex);
+        std::lock_guard<std::mutex> lk(saslAWSClientMutex);
         saslAWSClientGen.fill(ret.data(), ret.size());
     }
 

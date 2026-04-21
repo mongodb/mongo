@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/static_assert.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <mutex>
 
 namespace MONGO_MOD_PUBLIC mongo {
 class ServiceContext;
@@ -92,7 +92,7 @@ private:
     struct IdPool;
     friend struct ClientState;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     std::unique_ptr<IdPool> _pool;
     stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 

@@ -59,7 +59,7 @@ public:
 
     void run(OperationContext* opCtx) final {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             ++_counter;
         }
 
@@ -75,7 +75,7 @@ public:
     void waitForCount() {
         invariant(_wait != 0);
 
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lock);
         }
@@ -85,7 +85,7 @@ public:
 
     std::uint32_t getCounter() {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             return _counter;
         }
     }
@@ -93,7 +93,7 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
@@ -203,7 +203,7 @@ class TestCounterCheck : public WatchdogCheck {
 public:
     void run(OperationContext* opCtx) final {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             ++_counter;
         }
 
@@ -228,7 +228,7 @@ public:
     void waitForCount() {
         invariant(_wait != 0);
 
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lock);
         }
@@ -236,7 +236,7 @@ public:
 
     std::uint32_t getCounter() {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             return _counter;
         }
     }
@@ -244,7 +244,7 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
@@ -284,14 +284,14 @@ TEST_F(WatchdogCheckThreadTest, Basic) {
 class ManualResetEvent {
 public:
     void set() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         _set = true;
         _condvar.notify_one();
     }
 
     void wait() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
 
         _condvar.wait(lock, [this]() { return _set; });
     }
@@ -299,7 +299,7 @@ public:
 private:
     bool _set{false};
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _condvar;
 };
 
@@ -344,7 +344,7 @@ TEST_F(WatchdogMonitorThreadTest, Basic) {
 class SleepyCheck : public WatchdogCheck {
 public:
     void run(OperationContext* opCtx) final {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         ++_counter;
 
         _condvar.notify_all();
@@ -357,7 +357,7 @@ public:
 
     // Test only method to ensure SleepyCheck runs at least once.
     void waitForRun() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         _condvar.wait(lock, [this]() { return _counter > 0; });
     }
 
@@ -366,7 +366,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _counter{0};
 };

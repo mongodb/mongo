@@ -45,7 +45,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -54,6 +53,7 @@
 #include <deque>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -221,7 +221,7 @@ private:
     const size_t _maxBufferSize;
 
     // Synchronization.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _haveBufferSpace;
 
     // A thread that is currently loading the exchange buffers.

@@ -86,7 +86,7 @@ public:
     }
 
     // Run callback with a CallbackCanceled error.
-    static void runCallbackCanceled(stdx::unique_lock<stdx::mutex>& lk,
+    static void runCallbackCanceled(std::unique_lock<std::mutex>& lk,
                                     RequestAndCallback rcb,
                                     TaskExecutor* exec) {
         CallbackHandle cbHandle;
@@ -100,7 +100,7 @@ public:
     }
 
     // Run callback with the provided result.
-    static void runCallbackFinished(stdx::unique_lock<stdx::mutex>& lk,
+    static void runCallbackFinished(std::unique_lock<std::mutex>& lk,
                                     RequestAndCallback rcb,
                                     TaskExecutor* exec,
                                     const StatusWith<RemoteCommandResponse>& result) {
@@ -179,7 +179,7 @@ StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleR
     const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
 
-    stdx::unique_lock<stdx::mutex> lk{_mutex};
+    std::unique_lock<std::mutex> lk{_mutex};
     if (_state != State::running) {
         return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
     }
@@ -228,7 +228,7 @@ void PinnedConnectionTaskExecutor::cancel(const CallbackHandle& cbHandle) {
         _executor->cancel(cbHandle);
         return;
     }
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _cancel(std::move(lk), cbState);
 }
 
@@ -250,7 +250,7 @@ ExecutorFuture<void> PinnedConnectionTaskExecutor::_ensureStream(
         return std::move(streamFuture)
             .thenRunOn(*_executor)
             .then([this](std::unique_ptr<NetworkInterface::LeasedStream> stream) {
-                stdx::lock_guard lk{_mutex};
+                std::lock_guard lk{_mutex};
                 _stream = std::move(stream);
             });
     }
@@ -267,7 +267,7 @@ ExecutorFuture<void> PinnedConnectionTaskExecutor::_ensureStream(
 
 Future<executor::RemoteCommandResponse> PinnedConnectionTaskExecutor::_runSingleCommand(
     RemoteCommandRequest command, std::shared_ptr<CallbackState> cbState) {
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     if (auto& state = cbState->state; MONGO_unlikely(state == CallbackState::State::kCanceled)) {
         // It's possible this callback was canceled after it was moved
         // out of the queue, but before we actually started work on the client.
@@ -280,7 +280,7 @@ Future<executor::RemoteCommandResponse> PinnedConnectionTaskExecutor::_runSingle
 }
 
 boost::optional<PinnedConnectionTaskExecutor::RequestAndCallback>
-PinnedConnectionTaskExecutor::_getFirstUncanceledRequest(stdx::unique_lock<stdx::mutex>& lk) {
+PinnedConnectionTaskExecutor::_getFirstUncanceledRequest(std::unique_lock<std::mutex>& lk) {
     while (!_requestQueue.empty()) {
         auto req = std::move(_requestQueue.front());
         _requestQueue.pop_front();
@@ -293,7 +293,7 @@ PinnedConnectionTaskExecutor::_getFirstUncanceledRequest(stdx::unique_lock<stdx:
     return boost::none;
 }
 
-void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<stdx::mutex>&& lk) {
+void PinnedConnectionTaskExecutor::_doNetworking(std::unique_lock<std::mutex>&& lk) {
     _isDoingNetworking = true;
     // Find the first non-canceled request.
     boost::optional<RequestAndCallback> maybeReqToRun = _getFirstUncanceledRequest(lk);
@@ -317,7 +317,7 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<stdx::mutex>&
         .then([req, this]() { return _runSingleCommand(req.first, req.second); })
         .thenRunOn(makeGuaranteedExecutor(req.second->baton, _cancellationExecutor))
         .getAsync([req, this](StatusWith<RemoteCommandResponse> result) {
-            stdx::unique_lock<stdx::mutex> lk{_mutex};
+            std::unique_lock<std::mutex> lk{_mutex};
             _inProgressRequest.reset();
             // If we used the _stream, update it accordingly.
             if (req.second->startedNetworking) {
@@ -375,7 +375,7 @@ void PinnedConnectionTaskExecutor::_shutdown(WithLock lk) {
 }
 
 void PinnedConnectionTaskExecutor::shutdown() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _shutdown(lk);
 }
 
@@ -383,7 +383,7 @@ void PinnedConnectionTaskExecutor::shutdown() {
 // Any thread that calls this will block until no work remains scheduled but not completed
 // on this executor. After join() completes, the state if this executor will be 'shutdownComplete'.
 void PinnedConnectionTaskExecutor::join() {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     if (_state == State::shutdownComplete) {
         return;
     }
@@ -404,7 +404,7 @@ SharedSemiFuture<void> PinnedConnectionTaskExecutor::joinAsync() {
 }
 
 bool PinnedConnectionTaskExecutor::isShuttingDown() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _state != State::running;
 }
 
@@ -424,7 +424,7 @@ StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleE
 }
 
 bool PinnedConnectionTaskExecutor::hasTasks() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return (!_requestQueue.empty()) || _executor->hasTasks();
 }
 

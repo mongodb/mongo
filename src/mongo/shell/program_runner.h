@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -61,7 +60,7 @@ public:
 
 private:
     std::stringstream _buffer;
-    mutable stdx::mutex _mongoProgramOutputMutex;
+    mutable std::mutex _mongoProgramOutputMutex;
 };
 
 /**
@@ -125,8 +124,8 @@ private:
     stdx::unordered_map<ProcessId, int> _pidToExitCode;
     stdx::unordered_map<ProcessId, stdx::thread> _outputReaderThreads;
     ProgramOutputMultiplexer _programOutputMultiplexer;
-    mutable stdx::recursive_mutex _mutex;
-    mutable stdx::mutex _createProcessMtx;
+    mutable std::recursive_mutex _mutex;  //  NOLINT
+    mutable std::mutex _createProcessMtx;
 
 #ifdef _WIN32
 private:

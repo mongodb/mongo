@@ -125,7 +125,7 @@ public:
 private:
     // The following convention is used to denote what protects what:
     // (M) denotes protection via the _mutex
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     CancellationSource _cancellationSource;
     SharedSemiFuture<CollectionMetadata> _collMetadata;
 

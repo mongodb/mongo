@@ -141,7 +141,7 @@ grpc_ssl_certificate_config_reload_status Server::_certificateConfigCallback(
     void* certState, grpc_ssl_server_certificate_config** config) {
     CertificateState* certStatePtr = reinterpret_cast<CertificateState*>(certState);
     {
-        stdx::lock_guard<stdx::mutex> lk(certStatePtr->_mutex);
+        std::lock_guard<std::mutex> lk(certStatePtr->_mutex);
         if (certStatePtr->shouldReload) {
             // gRPC library will take ownership of and free the certificate config.
             *config = certStatePtr->cache.toGRPCConfig().release();
@@ -199,7 +199,7 @@ Status Server::rotateCertificates() {
     // Set the cache to the new certs and update each port's certificate state to notify gRPC to
     // rotate them on the next new connection.
     for (auto& certState : _certificateStates) {
-        stdx::lock_guard<stdx::mutex> lk(certState->_mutex);
+        std::lock_guard<std::mutex> lk(certState->_mutex);
         certState->cache = swNewCertificates.getValue();
         certState->shouldReload = true;
     }
@@ -207,7 +207,7 @@ Status Server::rotateCertificates() {
 }
 
 void Server::start() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(!_shutdown, "Cannot start the server once it's stopped");
     invariant(!_server, "The server is already started");
 
@@ -258,7 +258,7 @@ void Server::start() {
 }
 
 bool Server::isRunning() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _server && !_shutdown;
 }
 
@@ -268,7 +268,7 @@ const std::vector<HostAndPort>& Server::getListeningAddresses() const {
 }
 
 void Server::shutdown() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(!_shutdown, "Cannot shutdown the server once it's stopped");
     _shutdown = true;
     if (!_server) {
@@ -287,7 +287,7 @@ void Server::shutdown() {
 }
 
 void Server::stopAcceptingRequests() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     for (auto& service : _services) {
         service->stopAcceptingRequests();

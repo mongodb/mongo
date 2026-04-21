@@ -96,17 +96,17 @@ auto PeriodicThreadToRollbackUnderCachePressure::get(ServiceContext* serviceCont
     return jobContainer;
 }
 auto PeriodicThreadToRollbackUnderCachePressure::operator*() const noexcept -> PeriodicJobAnchor& {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return *_anchor;
 }
 
 auto PeriodicThreadToRollbackUnderCachePressure::operator->() const noexcept -> PeriodicJobAnchor* {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _anchor.get();
 }
 
 void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceContext) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_anchor) {
         return;
     }

@@ -32,7 +32,6 @@
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/sdam/topology_state_machine.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
@@ -42,6 +41,7 @@
 #include <concepts>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 namespace mongo::sdam {
@@ -60,12 +60,12 @@ public:
      * Executes the given function with the current TopologyDescription while holding the mutex.
      */
     decltype(auto) executeWithLock(std::invocable<std::shared_ptr<TopologyDescription>> auto func) {
-        auto lock = stdx::lock_guard{_mutex};
+        auto lock = std::lock_guard{_mutex};
         return func(_getTopologyDescriptionWithLock(lock));
     }
 
 protected:
-    mutable mongo::ObservableMutex<mongo::stdx::mutex> _mutex;
+    mutable mongo::ObservableMutex<std::mutex> _mutex;
     virtual std::shared_ptr<TopologyDescription> _getTopologyDescriptionWithLock(
         WithLock) const = 0;
 };

@@ -54,11 +54,11 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
@@ -102,7 +102,7 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
         Status status(ErrorCodes::NotPrimaryOrSecondary,
                       str::stream() << "Sync source " << getSource()
                                     << " has been removed from the replication configuration.");
-        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        std::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         // Setting the status in the shared data will cancel the initial sync.
         getSharedData()->setStatusIfOK(lk, status);
         return status;
@@ -116,7 +116,7 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
     if (syncSourceIter->getState().startup2() && !syncSourceIter->getSyncSource().empty()) {
         Status status(ErrorCodes::NotPrimaryOrSecondary,
                       str::stream() << "Sync source " << getSource() << " has been resynced.");
-        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        std::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         // Setting the status in the shared data will cancel the initial sync.
         getSharedData()->setStatusIfOK(lk, status);
         return status;
@@ -153,7 +153,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
     InitialSyncIdDocument initialSyncIdDoc =
         InitialSyncIdDocument::parse(initialSyncId, IDLParserContext("initialSyncId"));
     {
-        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        std::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         getSharedData()->setInitialSyncSourceId(lk, initialSyncIdDoc.get_id());
     }
     return kContinueNormally;
@@ -224,7 +224,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
 
 void AllDatabaseCloner::postStage() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _stats.databasesCloned = 0;
         _stats.databasesToClone = _databases.size();
         _stats.databaseStats.reserve(_databases.size());
@@ -258,7 +258,7 @@ void AllDatabaseCloner::postStage() {
 
     for (const auto& dbName : _databases) {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             _currentDatabaseCloner = std::make_unique<DatabaseCloner>(dbName,
                                                                       getSharedData(),
                                                                       getSource(),
@@ -284,7 +284,7 @@ void AllDatabaseCloner::postStage() {
             return;
         }
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             _stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
             _currentDatabaseCloner = nullptr;
             _stats.databasesCloned++;
@@ -294,7 +294,7 @@ void AllDatabaseCloner::postStage() {
 }
 
 AllDatabaseCloner::Stats AllDatabaseCloner::getStats() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     AllDatabaseCloner::Stats stats = _stats;
     if (_currentDatabaseCloner) {
         stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
@@ -303,7 +303,7 @@ AllDatabaseCloner::Stats AllDatabaseCloner::getStats() const {
 }
 
 std::string AllDatabaseCloner::toString() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return str::stream() << "initial sync --"
                          << " active:" << isActive(lk) << " status:" << getStatus(lk).toString()
                          << " source:" << getSource()

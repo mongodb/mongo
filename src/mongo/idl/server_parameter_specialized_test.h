@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/stdx/mutex.h"
 
 #include <cstdint>
 #include <mutex>
@@ -64,49 +63,49 @@ public:
         : _strData(newStrData), _intData(newIntData) {}
 
     LogicalTime getClusterParameterTime() const {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         return _clusterParameterTime;
     }
 
     StringData getStrData() const {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         return _strData;
     }
 
     std::uint32_t getIntData() const {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         return _intData;
     }
 
     void setClusterParameterTime(const LogicalTime& clusterParameterTime) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _clusterParameterTime = clusterParameterTime;
     }
 
     void setStrData(const std::string& strData) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _strData = strData;
     }
 
     void setIntData(std::int32_t intData) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _intData = intData;
     }
 
     void setId(StringData id) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _id = std::string{id};
     }
 
     void parse(const BSONObj& updatedObj) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _clusterParameterTime = LogicalTime(updatedObj["clusterParameterTime"].timestamp());
         _strData = updatedObj["strData"].String();
         _intData = updatedObj["intData"].Int();
     }
 
     void serialize(BSONObjBuilder* builder) const {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         if (_id.is_initialized()) {
             builder->append("_id"_sd, _id.get());
         }
@@ -122,7 +121,7 @@ public:
     }
 
     void reset() {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _clusterParameterTime = LogicalTime();
         _strData = "default";
         _intData = 30;
@@ -135,7 +134,7 @@ private:
     std::string _strData;
     std::int32_t _intData;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 };
 
 }  // namespace test

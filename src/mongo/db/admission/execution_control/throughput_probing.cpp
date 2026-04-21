@@ -96,7 +96,7 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
       _timer(svcCtx->getTickSource()) {}
 
 void ThroughputProbing::start() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     _initState();
 
@@ -115,7 +115,7 @@ void ThroughputProbing::start() {
 }
 
 void ThroughputProbing::stop() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     if (_job.isValid()) {
         _job.stop();
@@ -128,14 +128,14 @@ void ThroughputProbing::appendStats(BSONObjBuilder& builder) const {
 }
 
 void ThroughputProbing::setPeriod(Milliseconds period) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     if (_job.isValid()) {
         _job.setPeriod(period);
     }
 }
 
 Milliseconds ThroughputProbing::getPeriod() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     if (_job.isValid()) {
         return _job.getPeriod();
     }

@@ -699,7 +699,7 @@ void Balancer::onBecomeArbiter() {
 }
 
 void Balancer::initiate(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    std::lock_guard<std::mutex> scopedLock(_mutex);
     _imbalancedCollectionsCache.clear();
     invariant(_threadSetState == ThreadSetState::Terminated);
     _threadSetState = ThreadSetState::Running;
@@ -711,7 +711,7 @@ void Balancer::initiate(OperationContext* opCtx) {
 }
 
 void Balancer::requestTermination() {
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    std::lock_guard<std::mutex> scopedLock(_mutex);
     if (_threadSetState != ThreadSetState::Running) {
         return;
     }
@@ -721,7 +721,7 @@ void Balancer::requestTermination() {
     // Interrupt the balancer thread if it has been started. We are guaranteed that the operation
     // context of that thread is still alive, because we hold the balancer mutex.
     if (_threadOperationContext) {
-        stdx::lock_guard<Client> scopedClientLock(*_threadOperationContext->getClient());
+        std::lock_guard<Client> scopedClientLock(*_threadOperationContext->getClient());
         _threadOperationContext->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
     }
 
@@ -730,7 +730,7 @@ void Balancer::requestTermination() {
 }
 
 void Balancer::joinTermination() {
-    stdx::unique_lock<stdx::mutex> scopedLock(_mutex);
+    std::unique_lock<std::mutex> scopedLock(_mutex);
     _joinCond.wait(scopedLock, [this] { return _threadSetState == ThreadSetState::Terminated; });
     if (_thread.joinable()) {
         _thread.join();
@@ -738,7 +738,7 @@ void Balancer::joinTermination() {
 }
 
 void Balancer::joinCurrentRound(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> scopedLock(_mutex);
+    std::unique_lock<std::mutex> scopedLock(_mutex);
     const auto numRoundsAtStart = _numBalancerRounds;
     opCtx->waitForConditionOrInterrupt(_condVar, scopedLock, [&] {
         return !_inBalancerRound || _numBalancerRounds != numRoundsAtStart;
@@ -834,7 +834,7 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 
     const auto mode = balancerConfig->getBalancerMode();
 
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    std::lock_guard<std::mutex> scopedLock(_mutex);
     builder->append("mode", idl::serialize(mode));
     builder->append("inBalancerRound", _inBalancerRound);
     builder->append("numBalancerRounds", _numBalancerRounds);
@@ -888,7 +888,7 @@ void Balancer::_consumeActionStreamLoop() {
 
     while (true) {
         {
-            stdx::unique_lock<stdx::mutex> ul(_mutex);
+            std::unique_lock<std::mutex> ul(_mutex);
 
             // Keep asking for more actions if we meet all these conditions:
             //  - Balancer is in kRunning state
@@ -1026,7 +1026,7 @@ void Balancer::_consumeActionStreamLoop() {
 void Balancer::_mainThread() {
     ON_BLOCK_EXIT([this] {
         {
-            stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+            std::lock_guard<std::mutex> scopedLock(_mutex);
             _threadSetState = ThreadSetState::Terminated;
             LOGV2_DEBUG(21855, 1, "Balancer thread set terminated");
         }
@@ -1041,7 +1041,7 @@ void Balancer::_mainThread() {
     LOGV2(21856, "CSRS balancer is starting");
 
     {
-        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+        std::lock_guard<std::mutex> scopedLock(_mutex);
         _threadOperationContext = opCtx.get();
     }
 
@@ -1240,7 +1240,7 @@ void Balancer::_mainThread() {
     }
 
     {
-        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+        std::lock_guard<std::mutex> scopedLock(_mutex);
         invariant(_threadSetState == ThreadSetState::Terminating);
     }
 
@@ -1250,7 +1250,7 @@ void Balancer::_mainThread() {
 
 
     {
-        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+        std::lock_guard<std::mutex> scopedLock(_mutex);
         _threadOperationContext = nullptr;
     }
 
@@ -1269,19 +1269,19 @@ void Balancer::_applyStreamingActionResponseToPolicy(const BalancerStreamAction&
 };
 
 bool Balancer::_terminationRequested() {
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    std::lock_guard<std::mutex> scopedLock(_mutex);
     return (_threadSetState != ThreadSetState::Running);
 }
 
 void Balancer::_beginRound(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     _inBalancerRound = true;
     _condVar.notify_all();
 }
 
 void Balancer::_endRound(OperationContext* opCtx, Milliseconds waitTimeout) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         _inBalancerRound = false;
         _numBalancerRounds++;
         _condVar.notify_all();
@@ -1292,7 +1292,7 @@ void Balancer::_endRound(OperationContext* opCtx, Milliseconds waitTimeout) {
 }
 
 void Balancer::_sleepFor(OperationContext* opCtx, Milliseconds waitTimeout) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     _condVar.wait_for(lock, waitTimeout.toSystemDuration(), [&] {
         return _threadSetState != ThreadSetState::Running;
     });

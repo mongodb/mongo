@@ -178,7 +178,7 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
             "sharding state is not yet initialized",
             Grid::get(opCtx)->isShardingInitialized());
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Cannot setup the sessions collection when failpoint "

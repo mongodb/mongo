@@ -46,7 +46,7 @@ public:
 private:
     void _init(ServiceContext* serviceContext);
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     std::shared_ptr<PeriodicJobAnchor> _anchor;
 };
 

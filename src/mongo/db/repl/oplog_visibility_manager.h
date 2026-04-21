@@ -31,8 +31,9 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/slotted_timestamp_list.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace mongo {
 namespace repl {
@@ -102,7 +103,7 @@ private:
     // Updates the oplog visibility timestamp and returns true if a visibilty update occurred.
     bool _setOplogVisibilityTimestamp(WithLock lock, const Timestamp& visibilityTimestamp);
     // Protects timestamp related variables and ensures operations are thread safe.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     // Latest oplog timestamp that has been handed out.
     Timestamp _latestTimeSeen;
     // Timestamp indicating point in the oplog with no holes.

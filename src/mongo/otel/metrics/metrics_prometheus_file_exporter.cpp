@@ -33,7 +33,6 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
@@ -42,6 +41,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -157,20 +157,20 @@ private:
      * behaviors. This is separated from the failpoint call so that it is not too distracting in the
      * non-test code path.
      */
-    void _testOnlyFailpointHandler(const BSONObj& data, stdx::unique_lock<stdx::timed_mutex>& lock);
+    void _testOnlyFailpointHandler(const BSONObj& data, std::unique_lock<std::timed_mutex>& lock);
 
     /**
      * Unlocks the lock, calls the provided callback, and locks again. This is called from the
      * failpoint.
      */
-    void _testOnlyUnlockAndCallCallback(stdx::unique_lock<stdx::timed_mutex>& lock);
+    void _testOnlyUnlockAndCallCallback(std::unique_lock<std::timed_mutex>& lock);
 
     /**
      * Waits for the provided bool to be true, calls _testOnlyFailpointCallback, then waits for
      * the next time the clock is advanced. This is used in the failpoint to make sure we
      * timeout correctly in certain places.
      */
-    void _testOnlyWaitOnBoolAndClock(bool& waitBool, stdx::unique_lock<stdx::timed_mutex>& lock);
+    void _testOnlyWaitOnBoolAndClock(bool& waitBool, std::unique_lock<std::timed_mutex>& lock);
 
     ClockSource& _clockSource;
     // The name of the file to export to. This will export first to a file with this name + .tmp,
@@ -183,7 +183,7 @@ private:
     unique_function<void()> _testOnlyFailpointCallback;
 
     // Guards _condition, _metricsToWrite, the bools, and _consecutiveFailures.
-    stdx::timed_mutex _mutex;
+    std::timed_mutex _mutex;  //  NOLINT
     stdx::condition_variable _condition;
     // The metrics that will be next exported.
     boost::optional<std::vector<MetricFamily>> _metricsToWrite;
@@ -235,7 +235,7 @@ Status PrometheusFileExporter::_startFileWriterThread() {
     }
     _writer = stdx::thread([&]() {
         setThreadName("PrometheusFileExporter");
-        stdx::unique_lock lock(_mutex);
+        std::unique_lock lock(_mutex);
         while (true) {
             metricsPrometheusFileExporterThreadCallback.execute(
                 [this, &lock](const BSONObj& data) { _testOnlyFailpointHandler(data, lock); });
@@ -320,7 +320,7 @@ ExportResult PrometheusFileExporter::Export(const ResourceMetrics& data) noexcep
     invariant(_writer.joinable());
     std::vector<MetricFamily> convertedMetrics =
         opentelemetry::exporter::metrics::PrometheusExporterUtils::TranslateToPrometheus(data);
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (_metricsToWrite.has_value()) {
         skippedWritesCounter.add(1);
         LOGV2_INFO(11990701, "Skipping a set of metrics that were never written out");
@@ -341,8 +341,8 @@ bool PrometheusFileExporter::_safeWaitForConditionWithTimeout(std::chrono::micro
     Microseconds maxNonInfiniteTimeout =
         Microseconds::max() - Microseconds(start.toDurationSinceEpoch());
     bool infiniteTimeout = maxNonInfiniteTimeout.count() <= timeout.count();
-    stdx::unique_lock lock =
-        infiniteTimeout ? stdx::unique_lock(_mutex) : stdx::unique_lock(_mutex, timeout);
+    std::unique_lock lock =
+        infiniteTimeout ? std::unique_lock(_mutex) : std::unique_lock(_mutex, timeout);
     if (!lock.owns_lock()) {
         // We timed out without getting the lock.
         return false;
@@ -381,7 +381,7 @@ bool PrometheusFileExporter::Shutdown(std::chrono::microseconds timeout) noexcep
 }
 
 void PrometheusFileExporter::_testOnlyFailpointHandler(const BSONObj& data,
-                                                       stdx::unique_lock<stdx::timed_mutex>& lock) {
+                                                       std::unique_lock<std::timed_mutex>& lock) {
     invariant(_testOnlyFailpointCallback);
     if (data["CallbackOnly"]) {
         _testOnlyFailpointCallback();
@@ -397,7 +397,7 @@ void PrometheusFileExporter::_testOnlyFailpointHandler(const BSONObj& data,
 }
 
 void PrometheusFileExporter::_testOnlyWaitOnBoolAndClock(
-    bool& waitBool, stdx::unique_lock<stdx::timed_mutex>& unique_lock) {
+    bool& waitBool, std::unique_lock<std::timed_mutex>& unique_lock) {
     // Wait for the waitBool.
     _condition.wait(unique_lock, [&waitBool]() { return waitBool; });
     // Trigger the callback.
@@ -406,7 +406,7 @@ void PrometheusFileExporter::_testOnlyWaitOnBoolAndClock(
     bool doneWaiting = false;
     _clockSource.setAlarm(_clockSource.now() + Milliseconds(1),
                           [this, &doneWaiting, &unique_lock]() {
-                              stdx::lock_guard lock(*unique_lock.mutex());
+                              std::lock_guard lock(*unique_lock.mutex());
                               doneWaiting = true;
                               _condition.notify_all();
                           });
@@ -414,7 +414,7 @@ void PrometheusFileExporter::_testOnlyWaitOnBoolAndClock(
 }
 
 void PrometheusFileExporter::_testOnlyUnlockAndCallCallback(
-    stdx::unique_lock<stdx::timed_mutex>& lock) {
+    std::unique_lock<std::timed_mutex>& lock) {
     lock.unlock();
     _testOnlyFailpointCallback();
     lock.lock();

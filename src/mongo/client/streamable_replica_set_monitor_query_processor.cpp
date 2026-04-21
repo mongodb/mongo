@@ -42,7 +42,7 @@
 
 namespace mongo {
 void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::shutdown() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _isShutdown = true;
 }
 
@@ -50,7 +50,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::
     onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
                                       sdam::TopologyDescriptionPtr newDescription) {
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         if (_isShutdown)
             return;
     }

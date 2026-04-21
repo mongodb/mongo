@@ -1479,7 +1479,7 @@ CreateCollectionResponse CreateCollectionCoordinator::getResult(OperationContext
 const NamespaceString& CreateCollectionCoordinator::nss() const {
     // Rely on the resolved request parameters to retrieve the nss to be targeted by the
     // coordinator.
-    stdx::lock_guard lk{_docMutex};
+    std::lock_guard lk{_docMutex};
     tassert(10644507,
             "Expected translatedRequestParams to be set in the coordinator document",
             _doc.getTranslatedRequestParams());

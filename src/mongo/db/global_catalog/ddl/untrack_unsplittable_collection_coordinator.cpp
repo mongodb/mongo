@@ -53,7 +53,7 @@ void UntrackUnsplittableCollectionCoordinator::appendCommandInfo(
 
 void UntrackUnsplittableCollectionCoordinator::checkIfOptionsConflict(
     const BSONObj& coorDoc) const {
-    stdx::lock_guard lk{_docMutex};
+    std::lock_guard lk{_docMutex};
     const auto otherDoc = UntrackUnsplittableCollectionCoordinatorDocument::parse(
         coorDoc, IDLParserContext("UntrackUnsplittableCollectionCoordinatorDocument"));
     uassert(ErrorCodes::ConflictingOperationInProgress,

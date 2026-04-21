@@ -34,8 +34,6 @@
 #include "mongo/util/ntservice.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
@@ -45,6 +43,9 @@
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/winutil.h"
+
+#include <chrono>
+#include <future>
 
 #include <boost/range/size.hpp>
 
@@ -569,13 +570,13 @@ const int kStopWaitHintMillis = 30000;
 // On client OSes, SERVICE_CONTROL_SHUTDOWN has a 5 second timeout configured in
 // HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control
 static void serviceStop() {
-    stdx::packaged_task<void()> shutdownNoTerminateTask([] {
+    std::packaged_task<void()> shutdownNoTerminateTask([] {
         setThreadName("serviceStopWorker");
         // Stop the process
         shutdownNoTerminate();
         return true;
     });
-    stdx::future<void> exitedCleanly = shutdownNoTerminateTask.get_future();
+    std::future<void> exitedCleanly = shutdownNoTerminateTask.get_future();
 
     // Launch the packaged task in a thread. We needn't ever join it,
     // so it doesn't even need a name.
@@ -584,7 +585,7 @@ static void serviceStop() {
     const auto timeout = Milliseconds(kStopWaitHintMillis / 2);
 
     // We periodically check if we are done exiting by polling at half of each wait interval
-    while (exitedCleanly.wait_for(timeout.toSystemDuration()) != stdx::future_status::ready) {
+    while (exitedCleanly.wait_for(timeout.toSystemDuration()) != std::future_status::ready) {
         reportStatus(SERVICE_STOP_PENDING, kStopWaitHintMillis);
         LOGV2(23314, "Service Stop is waiting for storage engine to finish shutdown");
     }

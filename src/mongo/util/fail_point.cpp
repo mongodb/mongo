@@ -86,7 +86,7 @@ void spinWait(const Pred& pred) {
     while (true) {
         if (pred())
             return;
-        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
+        stdx::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
@@ -116,7 +116,7 @@ auto FailPoint::Impl::setMode(Mode mode, ValType val, BSONObj extra) -> EntryCou
      * 3. Sets the new mode.
      */
 
-    stdx::lock_guard scoped(_modMutex);
+    std::lock_guard scoped(_modMutex);
 
     // Step 1
     _disable();
@@ -258,7 +258,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
 BSONObj FailPoint::Impl::toBSON() const {
     BSONObjBuilder builder;
 
-    stdx::lock_guard scoped(_modMutex);
+    std::lock_guard scoped(_modMutex);
     builder.append("mode", _mode);
     builder.append("data", _data);
     builder.append("timesEntered", _hitCount.load());

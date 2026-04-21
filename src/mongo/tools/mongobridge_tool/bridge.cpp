@@ -48,7 +48,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/tools/mongobridge_tool/bridge_commands.h"
 #include "mongo/tools/mongobridge_tool/mongobridge_options.h"
 #include "mongo/transport/asio/asio_session_manager.h"
@@ -115,12 +114,12 @@ public:
     explicit SyncSeedGenerator(int64_t seed) : _rand{seed} {}
 
     int64_t operator()() {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         return _rand.nextInt64();
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     PseudoRandom _rand;
 };
 
@@ -157,7 +156,7 @@ public:
 
     HostSettings getHostSettings(boost::optional<HostAndPort> host) {
         if (host) {
-            stdx::lock_guard<stdx::mutex> lk(_settingsMutex);
+            std::lock_guard<std::mutex> lk(_settingsMutex);
             return (_settings)[*host];
         }
         return {};
@@ -173,7 +172,7 @@ public:
 private:
     static const ServiceContext::Decoration<BridgeContext> _get;
 
-    stdx::mutex _settingsMutex;
+    std::mutex _settingsMutex;
     HostSettingsMap _settings;
 };
 

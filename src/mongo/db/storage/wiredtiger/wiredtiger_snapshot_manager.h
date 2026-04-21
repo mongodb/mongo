@@ -33,8 +33,9 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 #include <wiredtiger.h>
 
@@ -86,11 +87,11 @@ public:
 
 private:
     // Snapshot to use for reads at a commit timestamp.
-    mutable stdx::mutex _committedSnapshotMutex;  // Guards _committedSnapshot.
+    mutable std::mutex _committedSnapshotMutex;  // Guards _committedSnapshot.
     boost::optional<Timestamp> _committedSnapshot;
 
     // Timestamp to use for reads at a the lastApplied timestamp.
-    mutable stdx::mutex _lastAppliedMutex;  // Guards _lastApplied.
+    mutable std::mutex _lastAppliedMutex;  // Guards _lastApplied.
     boost::optional<Timestamp> _lastApplied;
 };
 }  // namespace mongo

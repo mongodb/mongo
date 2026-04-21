@@ -62,7 +62,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -328,7 +327,7 @@ public:
 
     private:
         // Mutex used only to serialize updates to _hosts
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         repl::TopologyVersionObserver* _topologyVersionObserver{nullptr};
         static thread_local VersionedTaggedHostsType::Snapshot _taggedHostsSnapshot;
         VersionedTaggedHostsType _hosts;
@@ -386,7 +385,7 @@ private:
 
     // InitializationGuard guards and serializes the initialization and shutdown of members
     struct InitializationGuard {
-        stdx::mutex mutex;
+        std::mutex mutex;
         Liveness liveness;
     };
     InitializationGuard _initGuard;
@@ -400,7 +399,7 @@ private:
     // The mirrorReads server parameter options. _paramsMutex serializes updates to the stored
     // params and _cachedHostsForTargetedMirroring, which stores the list of hosts to mirror reads
     // to for targeted mirroring
-    stdx::mutex _paramsMutex;
+    std::mutex _paramsMutex;
     static thread_local VersionedParamsType::Snapshot _paramsSnapshot;
     VersionedParamsType _params;
     TargetedHostsCacheManager _cachedHostsForTargetedMirroring;
@@ -469,7 +468,7 @@ public:
     public:
         void onResponseReceived(const HostAndPort& host) {
             const auto hostName = host.toString();
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
 
             if (_resolved.find(hostName) == _resolved.end()) {
                 _resolved[hostName] = 0;
@@ -479,7 +478,7 @@ public:
         }
 
         BSONObj toBSON() const {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             BSONObjBuilder bob;
             for (const auto& entry : _resolved) {
                 bob.append(entry.first, entry.second);
@@ -488,7 +487,7 @@ public:
         }
 
     private:
-        mutable stdx::mutex _mutex;
+        mutable std::mutex _mutex;
 
         stdx::unordered_map<std::string, CounterT> _resolved;
     };
@@ -955,7 +954,7 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
 
     // Until the end of this scope, no other thread can mutate _initGuard.liveness, so no other
     // thread can be in the critical section of init() or shutdown().
-    stdx::lock_guard lk(_initGuard.mutex);
+    std::lock_guard lk(_initGuard.mutex);
     switch (_initGuard.liveness) {
         case Liveness::kUninitialized: {
             // We can init
@@ -1017,7 +1016,7 @@ void MirrorMaestroImpl::shutdown() {
 
     // Until the end of this scope, no other thread can mutate _initGuard.liveness, so no other
     // thread can be in the critical section of init() or shutdown().
-    stdx::lock_guard lk(_initGuard.mutex);
+    std::lock_guard lk(_initGuard.mutex);
     switch (_initGuard.liveness) {
         case Liveness::kUninitialized:
         case Liveness::kShutdown: {

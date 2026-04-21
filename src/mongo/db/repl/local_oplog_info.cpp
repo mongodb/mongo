@@ -83,7 +83,7 @@ OplogSlotTimeContext& LocalOplogInfo::getOplogSlotTimeContext(OperationContext* 
 }
 
 RecordStore* LocalOplogInfo::getRecordStore() const {
-    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
+    std::lock_guard<std::mutex> lk(_rsMutex);
     return _rs;
 }
 
@@ -94,7 +94,7 @@ void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
             repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp();
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
+    std::lock_guard<std::mutex> lk(_rsMutex);
     _rs = rs;
     // If the server was started in read-only mode, or we are restoring the node, don't truncate.
     // If async sampling is enabled, skip calculating the oplog truncate markers here.
@@ -113,7 +113,7 @@ void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
 }
 
 void LocalOplogInfo::resetRecordStore() {
-    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
+    std::lock_guard<std::mutex> lk(_rsMutex);
     _rs = nullptr;
 
     if (repl::feature_flags::gFeatureFlagOplogVisibility.isEnabled()) {
@@ -124,12 +124,12 @@ void LocalOplogInfo::resetRecordStore() {
 }
 
 std::shared_ptr<OplogTruncateMarkers> LocalOplogInfo::getTruncateMarkers() const {
-    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
+    std::lock_guard<std::mutex> lk(_rsMutex);
     return _truncateMarkers;
 }
 
 void LocalOplogInfo::setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> markers) {
-    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
+    std::lock_guard<std::mutex> lk(_rsMutex);
     _truncateMarkers = std::move(markers);
     // Re-adjust in case the max size changed while sampling.
     if (_truncateMarkers) {
@@ -173,7 +173,7 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
     // Allow the storage engine to start the transaction outside the critical section.
     shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
     {
-        stdx::lock_guard<stdx::mutex> lk(_newOpMutex);
+        std::lock_guard<std::mutex> lk(_newOpMutex);
 
         ts = VectorClockMutable::get(opCtx)->tickClusterTime(count).asTimestamp();
         const bool orderedCommit = false;

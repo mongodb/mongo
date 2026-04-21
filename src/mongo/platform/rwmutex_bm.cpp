@@ -33,11 +33,11 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager.h"
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/processinfo.h"
 
 #include <array>
+#include <mutex>
 #include <shared_mutex>
 #include <vector>
 
@@ -76,7 +76,7 @@ template <typename DataType>
 class SharedMutexController {
 public:
     explicit SharedMutexController(DataType value) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _data = value;
     }
 
@@ -94,17 +94,17 @@ template <typename DataType>
 class MutexController {
 public:
     explicit MutexController(DataType value) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _data = value;
     }
 
     auto read() const {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         return _data;
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     DataType _data;
 };
 
@@ -112,7 +112,7 @@ template <typename DataType>
 class RWMutexController {
 public:
     explicit RWMutexController(DataType value) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _data = value;
     }
 
@@ -170,7 +170,7 @@ class ResourceMutexBm : public benchmark::Fixture {
 
 public:
     void SetUp(benchmark::State& state) override {
-        stdx::unique_lock lk(_initializationMutex);
+        std::unique_lock lk(_initializationMutex);
         if (state.thread_index == 0) {
             _svcCtx = ServiceContext::make();
             _locker = std::make_unique<Locker>(_svcCtx.get());
@@ -187,7 +187,7 @@ public:
     }
 
     void TearDown(benchmark::State& state) override {
-        stdx::unique_lock lk(_initializationMutex);
+        std::unique_lock lk(_initializationMutex);
         if (state.thread_index == 0) {
             _threadStates.clear();
             _locker.reset();
@@ -222,7 +222,7 @@ private:
     ResourceMutex _mutex{"BM_ResourceMutexController"};
     DataType _data = 0xABCDEF;
 
-    stdx::mutex _initializationMutex;
+    std::mutex _initializationMutex;
     stdx::condition_variable _initializationCv;
 };
 

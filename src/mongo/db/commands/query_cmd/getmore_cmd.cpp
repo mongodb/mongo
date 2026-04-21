@@ -330,7 +330,7 @@ void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
 
     auto originatingCommand = cursor.getOriginatingCommandObj();
     if (!originatingCommand.isEmpty()) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
 
         // Ensure that the original query or command object is available in the slow query log,
         // profiler and currentOp.
@@ -593,7 +593,7 @@ public:
             {
                 auto planSummary = exec->getPlanExplainer().getPlanSummary();
 
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 curOp->setPlanSummary(lk, std::move(planSummary));
 
                 curOp->debug().queryFramework = exec->getQueryFramework();

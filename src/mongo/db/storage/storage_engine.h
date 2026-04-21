@@ -427,7 +427,7 @@ public:
         PeriodicRunner* _periodicRunner;
 
         // Protects access to _listeners below.
-        stdx::mutex _monitorMutex;
+        std::mutex _monitorMutex;
         std::vector<TimestampListener*> _listeners;
 
         // This should remain as the last member variable so that its destructor gets executed first

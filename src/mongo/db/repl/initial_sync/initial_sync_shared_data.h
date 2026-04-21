@@ -129,7 +129,7 @@ private:
         RetryingOperation(RetryingOperation&&) = delete;
         ~RetryingOperation() {
             if (_sharedData) {
-                stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+                std::lock_guard<InitialSyncSharedData> lk(*_sharedData);
                 release(lk);
             }
         }

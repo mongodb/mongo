@@ -192,7 +192,7 @@ public:
     void statsTest(MutexType& m, Locker locker) {
         ObservationToken& token = *m.token();
         boost::optional<unittest::JoinThread> waiter;
-        stdx::lock_guard lk(m);
+        std::lock_guard lk(m);
         const MutexStats expected = MutexStats{{1, 0, 0}, {0, 0, 0}};
         verifyMutexStats(token.getStats(), expected);
         waiter.emplace([&] {
@@ -206,7 +206,7 @@ public:
     void throwTest(MutexType& m, Locker locker) {
         boost::optional<unittest::JoinThread> waiter;
         Notification<void> waiterThrew;
-        stdx::lock_guard lk(m);
+        std::lock_guard lk(m);
         waiter.emplace([&] {
             try {
                 locker.lock(m);  // Expected to throw.

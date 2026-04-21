@@ -148,14 +148,14 @@ logv2::DynamicAttributes MovePrimaryCoordinator::getCoordinatorLogAttrs() const 
 }
 
 void MovePrimaryCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
-    stdx::lock_guard lk(_docMutex);
+    std::lock_guard lk(_docMutex);
     cmdInfoBuilder->append(
         "request",
         BSON(MovePrimaryCoordinatorDocument::kToShardIdFieldName << _doc.getToShardId()));
 };
 
 bool MovePrimaryCoordinator::_mustAlwaysMakeProgress() {
-    stdx::lock_guard lk(_docMutex);
+    std::lock_guard lk(_docMutex);
 
     // Any non-retryable errors while checking the preconditions should cause the operation to be
     // terminated. Instead, in any of the subsequent phases, any non-retryable errors that do not
@@ -168,7 +168,7 @@ void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
         doc, IDLParserContext("MovePrimaryCoordinatorDocument"));
 
     const auto toShardIdAreEqual = [&] {
-        stdx::lock_guard lk(_docMutex);
+        std::lock_guard lk(_docMutex);
         return _doc.getToShardId() == otherDoc.getToShardId();
     }();
 

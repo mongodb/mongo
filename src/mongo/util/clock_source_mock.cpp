@@ -49,18 +49,18 @@ namespace {
 class ClockSourceMockImpl {
 public:
     Date_t now() const {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _now;
     }
 
     void advance(Milliseconds ms) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _now += ms;
         _processAlarms(lk);
     }
 
     void reset(Date_t newNow) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _now = newNow;
         _processAlarms(lk);
     }
@@ -68,7 +68,7 @@ public:
     void setAlarm(Date_t when, unique_function<void()> action) {
         if (!action)
             return;
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _alarms.push({when, std::move(action)});
         _processAlarms(lk);
     }
@@ -97,7 +97,7 @@ private:
         }
     };
 
-    void _processAlarms(stdx::unique_lock<stdx::mutex>& lk) {
+    void _processAlarms(std::unique_lock<std::mutex>& lk) {
         while (!_alarms.empty() && _alarms.top().when <= _now) {
             auto action = _alarms.consumeNextAction();
             lk.unlock();
@@ -106,7 +106,7 @@ private:
         }
     }
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     Date_t _now = ClockSourceMock::kInitialNow;
     AlarmQueue _alarms;
 };

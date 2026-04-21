@@ -35,12 +35,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <mutex>
 #include <random>
 #include <string>
 
@@ -322,7 +322,7 @@ public:
     void setRecoverable(Recoverable* recoverable);
 
 protected:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // Stored Recoverable instance to use when we have to wait for recovery on locking
     // For more information, check the documentation at Recoverable interface

@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -59,7 +59,7 @@ private:
     inline static const auto _serviceDecoration =
         ServiceContext::declareDecoration<PeriodicThreadToAbortExpiredTransactions>();
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     std::shared_ptr<PeriodicJobAnchor> _anchor;
 };
 

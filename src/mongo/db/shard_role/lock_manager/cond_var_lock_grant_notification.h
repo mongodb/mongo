@@ -31,8 +31,9 @@
 
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace mongo {
 
@@ -73,7 +74,7 @@ public:
 
 private:
     // These two go together to implement the conditional variable pattern.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cond;
 
     // Result from the last call to notify

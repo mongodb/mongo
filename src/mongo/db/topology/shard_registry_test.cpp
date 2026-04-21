@@ -206,12 +206,12 @@ protected:
     }
 
     void setLatestConnString(const ConnectionString& cs) {
-        stdx::lock_guard lk(shardRegistry()->_mutex);
+        std::lock_guard lk(shardRegistry()->_mutex);
         shardRegistry()->_latestConnStrings[cs.getSetName()] = cs;
     }
 
     bool hasLatestConnString(const std::string& rsName) {
-        stdx::lock_guard lk(shardRegistry()->_mutex);
+        std::lock_guard lk(shardRegistry()->_mutex);
         return shardRegistry()->_latestConnStrings.count(rsName) > 0;
     }
 

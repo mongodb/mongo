@@ -1331,7 +1331,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
 
     unsigned int numCalls = 0;
     stdx::condition_variable cv;
-    stdx::mutex mutex;
+    std::mutex mutex;
 
     stdx::thread parallelThread([&] {
         ThreadClient client(operationContext()->getService());
@@ -1342,7 +1342,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
         // Register a hook that will block until the main thread has finished its openCollection
         // lookup.
         auto commitHandler = [&]() {
-            stdx::unique_lock lock(mutex);
+            std::unique_lock lock(mutex);
 
             // Let the main thread know we have committed to the storage engine.
             numCalls = 1;
@@ -1379,7 +1379,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
 
     // Wait for the thread above to start its commit of the DDL operation.
     {
-        stdx::unique_lock lock(mutex);
+        std::unique_lock lock(mutex);
         cv.wait(lock, [&numCalls]() { return numCalls == 1; });
     }
 
@@ -1399,7 +1399,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
                        ErrorCodes::NamespaceNotFound);
 
     {
-        stdx::unique_lock lock(mutex);
+        std::unique_lock lock(mutex);
         numCalls = 2;
         cv.notify_all();
     }
@@ -1413,7 +1413,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollectionAfterDurab
 
     unsigned int numCalls = 0;
     stdx::condition_variable cv;
-    stdx::mutex mutex;
+    std::mutex mutex;
 
     stdx::thread parallelThread([&] {
         ThreadClient client(operationContext()->getService());
@@ -1424,7 +1424,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollectionAfterDurab
         // Register a hook either that will block until the main thread has finished its
         // openCollection lookup.
         auto commitHandler = [&]() {
-            stdx::unique_lock lock(mutex);
+            std::unique_lock lock(mutex);
 
             // Let the main thread know we have committed to the storage engine.
             numCalls = 1;
@@ -1457,7 +1457,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollectionAfterDurab
 
     // Wait for the thread above to start its commit of the DDL operation.
     {
-        stdx::unique_lock lock(mutex);
+        std::unique_lock lock(mutex);
         cv.wait(lock, [&numCalls]() { return numCalls == 1; });
     }
 
@@ -1476,7 +1476,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollectionAfterDurab
                .exists());
 
     {
-        stdx::unique_lock lock(mutex);
+        std::unique_lock lock(mutex);
         numCalls = 2;
         cv.notify_all();
     }

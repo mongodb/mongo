@@ -72,15 +72,15 @@ MONGO_FAIL_POINT_DEFINE(throwClientDisconnectInSignLogicalTimeForExternalClients
 const auto getLogicalTimeValidator =
     ServiceContext::declareDecoration<std::shared_ptr<LogicalTimeValidator>>();
 
-stdx::mutex validatorMutex;  // protects access to decoration instance of
-                             // LogicalTimeValidator.
+std::mutex validatorMutex;  // protects access to decoration instance of
+                            // LogicalTimeValidator.
 
 Milliseconds kRefreshIntervalIfErrored(200);
 
 }  // unnamed namespace
 
 std::shared_ptr<LogicalTimeValidator> LogicalTimeValidator::get(ServiceContext* service) {
-    stdx::lock_guard<stdx::mutex> lk(validatorMutex);
+    std::lock_guard<std::mutex> lk(validatorMutex);
     return getLogicalTimeValidator(service);
 }
 
@@ -90,7 +90,7 @@ std::shared_ptr<LogicalTimeValidator> LogicalTimeValidator::get(OperationContext
 
 void LogicalTimeValidator::set(ServiceContext* service,
                                std::unique_ptr<LogicalTimeValidator> newValidator) {
-    stdx::lock_guard<stdx::mutex> lk(validatorMutex);
+    std::lock_guard<std::mutex> lk(validatorMutex);
     auto& validator = getLogicalTimeValidator(service);
     validator = std::move(newValidator);
 }
@@ -104,7 +104,7 @@ SignedLogicalTime LogicalTimeValidator::_getProof(const KeysCollectionDocument& 
 
     // Compare and calculate HMAC inside mutex to prevent multiple threads computing HMAC for the
     // same cluster time.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     // Note: _lastSeenValidTime will initially not have a proof set.
     if (newTime == _lastSeenValidTime.getTime() && _lastSeenValidTime.getProof()) {
         return _lastSeenValidTime;
@@ -164,7 +164,7 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
 
 Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogicalTime& newTime) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         if (newTime.getTime() <= _lastSeenValidTime.getTime() &&
             !MONGO_unlikely(alwaysValidateClientsClusterTime.shouldFail())) {
             return Status::OK();
@@ -239,7 +239,7 @@ void LogicalTimeValidator::resetKeyManagerCache() {
     LOGV2(20716, "Resetting key manager cache");
     invariant(_keyManager);
     _keyManager->clearCache();
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _lastSeenValidTime = SignedLogicalTime();
     _timeProofService.resetCache();
 }
@@ -250,7 +250,7 @@ void LogicalTimeValidator::stopKeyManager() {
         _keyManager->stopMonitoring();
         _keyManager->clearCache();
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _lastSeenValidTime = SignedLogicalTime();
         _timeProofService.resetCache();
     } else {

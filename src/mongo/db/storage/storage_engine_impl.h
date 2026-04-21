@@ -49,7 +49,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -59,6 +58,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <utility>

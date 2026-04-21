@@ -82,7 +82,7 @@ private:
     std::shared_ptr<State> _state;
 
     // Protects the below private members.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     bool _discoveryStarted = false;
     bool _discoveryComplete = false;
     long long _remainingToTrack = 0;

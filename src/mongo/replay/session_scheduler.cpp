@@ -48,7 +48,7 @@ void SessionScheduler::join() {
         // _tasks while setting the stop variable. This should not happen. Without the mutex, a
         // thread could wake up prematurely and see _tasks.empty() before _stop.load() is visible.
         // This could result in missed wakeups.
-        stdx::unique_lock<stdx::mutex> lock(_queueMutex);
+        std::unique_lock<std::mutex> lock(_queueMutex);
         if (_stop.swap(true)) {
             // Stop already set; workers have been notified and joined already.
             return;
@@ -81,7 +81,7 @@ bool SessionScheduler::executeTask() {
     SessionTask task;
     // Queue management with a lock
     {
-        stdx::unique_lock<stdx::mutex> lock(_queueMutex);
+        std::unique_lock<std::mutex> lock(_queueMutex);
         _condition.wait(lock, [this] { return _stop.load() || !_tasks.empty(); });
 
         if (_tasks.empty() && _stop.load()) {
@@ -100,12 +100,12 @@ bool SessionScheduler::executeTask() {
 void SessionScheduler::recordError(std::exception_ptr err) {
     _hasRecordedErrors.store(true);
     {
-        stdx::unique_lock<stdx::mutex> lock(_errorMutex);
+        std::unique_lock<std::mutex> lock(_errorMutex);
         _errors.push_back(err);
     }
 }
 
 std::vector<std::exception_ptr> SessionScheduler::getExecutionErrors() {
-    stdx::unique_lock<stdx::mutex> lock(_errorMutex);
+    std::unique_lock<std::mutex> lock(_errorMutex);
     return _errors;
 }

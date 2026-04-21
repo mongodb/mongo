@@ -45,7 +45,7 @@ namespace mongo {
 namespace repl {
 
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using UniqueLock = std::unique_lock<std::mutex>;
 
 RollbackChecker::RollbackChecker(executor::TaskExecutor* executor, HostAndPort syncSource)
     : _executor(executor), _syncSource(syncSource), _baseRBID(-1), _lastRBID(-1) {
@@ -126,12 +126,12 @@ Status RollbackChecker::reset_sync() {
 }
 
 int RollbackChecker::getBaseRBID() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _baseRBID;
 }
 
 int RollbackChecker::getLastRBID_forTest() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _lastRBID;
 }
 

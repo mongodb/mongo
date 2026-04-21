@@ -34,12 +34,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
+#include <mutex>
 #include <vector>
 
 namespace mongo::sdam {
@@ -89,7 +89,7 @@ public:
     std::vector<StatusWith<HelloRTT>> getPingResponse(const HostAndPort& hostAndPort);
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::unordered_map<HostAndPort, std::vector<Status>> _serverHelloReplies;
     stdx::unordered_map<HostAndPort, std::vector<StatusWith<HelloRTT>>> _serverPingRTTs;
     Counts _serverHeartbeatCounts;

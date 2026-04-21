@@ -148,7 +148,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         writeIntentCountOnOpCtx(opCtx).fetchAndAdd(1);
     }
     {
-        stdx::unique_lock<stdx::mutex> lockTokenMap(tokenMap.lock);
+        std::unique_lock<std::mutex> lockTokenMap(tokenMap.lock);
         tokenMap.map.insert({token.id(), opCtx});
     }
 
@@ -156,7 +156,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
 }
 void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     auto& tokenMap = _tokenMaps[(size_t)token.intent()];
-    stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
+    std::lock_guard<std::mutex> lock(tokenMap.lock);
 
     if (token.intent() == Intent::Write || token.intent() == Intent::BlockingWrite) {
         writeIntentCountOnOpCtx(tokenMap.map[token.id()]).fetchAndSubtract(1);
@@ -193,19 +193,19 @@ bool IntentRegistry::canDeclareIntent(Intent intent, OperationContext* opCtx) {
     return true;
 }
 
-stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
+std::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
     IntentRegistry::InterruptionType interrupt,
     OperationContext* opCtx,
     boost::optional<uint32_t> timeout_sec) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
     _pendingStateChange.fetchAndAdd(1);
-    auto timeOutSec = stdx::chrono::seconds(
+    auto timeOutSec = std::chrono::seconds(
         timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
 
     _waitForDrain(Intent::BlockingWrite,
-                  stdx::chrono::duration_cast<stdx::chrono::milliseconds>(timeOutSec));
+                  std::chrono::duration_cast<std::chrono::milliseconds>(timeOutSec));
     {
-        stdx::unique_lock lock(_stateMutex);
+        std::unique_lock lock(_stateMutex);
         if (_interruptionCtx) {
             LOGV2(9945001, "Existing kill ongoing. Blocking until it is finished.");
         }
@@ -215,7 +215,8 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
         _interruptionCtx = opCtx;
     }
 
-    return stdx::async(stdx::launch::async, [&, interrupt, timeOutSec] {
+    //  NOLINTNEXTLINE
+    return std::async(std::launch::async, [&, interrupt, timeOutSec] {
         const std::vector<Intent>* intents = nullptr;
         switch (interrupt) {
             case InterruptionType::Rollback: {
@@ -242,7 +243,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 _killOperationsByIntent(intent, interrupt);
             }
             Timer timer;
-            auto timeout = stdx::chrono::duration_cast<stdx::chrono::milliseconds>(timeOutSec);
+            auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(timeOutSec);
             for (auto intent : *intents) {
                 _waitForDrain(intent, timeout);
                 // Negative duration to cv::wait_for can cause undefined behavior
@@ -250,7 +251,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 // non-zero timeout to ever drop to 0 by setting it to at least to 1ms
                 if (timeout.count()) {
                     timeout -= std::min(
-                        stdx::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
+                        std::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
                         timeout - 1ms);
                 }
             }
@@ -260,7 +261,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
         _totalOpsKilled = 0;
 
         return ReplicationStateTransitionGuard([&]() {
-            stdx::lock_guard lock(_stateMutex);
+            std::lock_guard lock(_stateMutex);
             _interruptionCtx = nullptr;
             _lastInterruption = InterruptionType::None;
             _activeInterruptionCV.notify_one();
@@ -290,7 +291,7 @@ bool IntentRegistry::hasWriteIntentDeclared(const OperationContext* opCtx) {
 }
 
 void IntentRegistry::enable() {
-    stdx::lock_guard lock(_stateMutex);
+    std::lock_guard lock(_stateMutex);
     _enabled = true;
     _lastInterruption = InterruptionType::None;
     _interruptionCtx = nullptr;
@@ -298,7 +299,7 @@ void IntentRegistry::enable() {
 }
 
 void IntentRegistry::disable() {
-    stdx::lock_guard lock(_stateMutex);
+    std::lock_guard lock(_stateMutex);
     _enabled = false;
 }
 
@@ -321,7 +322,7 @@ bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {
 void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
                                              InterruptionType interruption) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
-    stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
+    std::lock_guard<std::mutex> lock(tokenMap.lock);
     for (auto& [token, toKill] : tokenMap.map) {
         auto serviceCtx = toKill->getServiceContext();
         auto client = toKill->getClient();
@@ -356,9 +357,9 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
 }
 
 void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
-                                   stdx::chrono::milliseconds timeout) {
+                                   std::chrono::milliseconds timeout) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
-    stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
+    std::unique_lock<std::mutex> lock(tokenMap.lock);
     if (timeout.count() &&
         !tokenMap.cv.wait_for(lock, timeout, [&tokenMap] { return tokenMap.map.empty(); })) {
         LOGV2(
@@ -391,7 +392,7 @@ size_t IntentRegistry::getTotalOpsKilled() const {
 std::vector<size_t> IntentRegistry::getTotalIntentsDeclared() const {
     auto getTotalIntents = [&](IntentRegistry::Intent intent) {
         auto& tokenMap = _tokenMaps[(size_t)intent];
-        stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
+        std::unique_lock<std::mutex> lock(tokenMap.lock);
         return tokenMap.map.size();
     };
     auto res = std::vector<size_t>();

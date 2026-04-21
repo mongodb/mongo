@@ -49,7 +49,7 @@ ReclaimedPreparedTxnTracker* ReclaimedPreparedTxnTracker::get(OperationContext* 
 }
 
 SharedSemiFuture<void> ReclaimedPreparedTxnTracker::onAllReclaimedPreparedTxnsResolved() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_discoveryStarted,
               "Attempting to wait on all reclaimed prepared txn before discovery of reclaimed "
               "prepared txns has started");
@@ -60,7 +60,7 @@ SharedSemiFuture<void> ReclaimedPreparedTxnTracker::onAllReclaimedPreparedTxnsRe
 }
 
 void ReclaimedPreparedTxnTracker::trackPrepareExit(SharedSemiFuture<void> onExitPrepareFuture) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_discoveryStarted,
               "Attempting to track reclaimed prepared txn before discovery has started");
     invariant(!_discoveryComplete,
@@ -78,7 +78,7 @@ void ReclaimedPreparedTxnTracker::trackPrepareExit(SharedSemiFuture<void> onExit
 }
 
 void ReclaimedPreparedTxnTracker::beginDiscovery(long long expectedCount) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(!_discoveryStarted,
               "Beginning discovery of reclaimed prepared txns after it has already started");
     invariant(!_discoveryComplete,
@@ -94,7 +94,7 @@ void ReclaimedPreparedTxnTracker::beginDiscovery(long long expectedCount) {
 }
 
 void ReclaimedPreparedTxnTracker::discoveryComplete() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_discoveryStarted,
               "Completing discovery of reclaimed prepared txns before explicitly starting it");
     invariant(!_discoveryComplete,
@@ -106,7 +106,7 @@ void ReclaimedPreparedTxnTracker::discoveryComplete() {
 }
 
 long long ReclaimedPreparedTxnTracker::getNumReclaimedPreparedTxnsRemaining() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (!_state) {
         return 0;
     }
@@ -114,7 +114,7 @@ long long ReclaimedPreparedTxnTracker::getNumReclaimedPreparedTxnsRemaining() co
 }
 
 long long ReclaimedPreparedTxnTracker::getRecoveryDurationMicros() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _recoveryDurationMicros;
 }
 

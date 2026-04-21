@@ -50,7 +50,7 @@ public:
     StateTransitionController() = default;
 
     void waitUntilStateIsReached(StateEnum state) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _waitUntilUnpausedCond.wait(lk, [this, state] { return _state == state; });
     }
 
@@ -62,18 +62,18 @@ private:
     friend class PauseDuringStateTransitions;
 
     void _setPauseDuringTransition(StateEnum state) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _pauseDuringTransition.insert(state);
     }
 
     void _unsetPauseDuringTransition(StateEnum state) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _pauseDuringTransition.erase(state);
         _pauseDuringTransitionCond.notify_all();
     }
 
     void _notifyNewStateAndWaitUntilUnpaused(OperationContext* opCtx, StateEnum newState) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         ScopeGuard guard([this, prevState = _state] { _state = prevState; });
         _state = newState;
         _waitUntilUnpausedCond.notify_all();
@@ -84,11 +84,11 @@ private:
     }
 
     void _resetReachedState() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _state = StateEnum::kUnused;
     }
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _pauseDuringTransitionCond;
     stdx::condition_variable _waitUntilUnpausedCond;
 

@@ -144,7 +144,7 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
 
         // Serialize concurrent access to CurOp dataThroughputLastSecond and dataThroughputAverage
         // metrics.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
 
         // Update how much data we've seen in the last second for CurOp.
         CurOp::get(opCtx)->debug().dataThroughputLastSecond = mbProcessed / elapsedTimeSec;

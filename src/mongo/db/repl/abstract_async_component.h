@@ -34,7 +34,6 @@
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
@@ -42,6 +41,7 @@
 
 #include <iosfwd>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -57,7 +57,7 @@ namespace repl {
  * The _state variable in this class is protected by the concrete class's mutex (returned by
  * _getMutex()).
  */
-template <typename Mutex = stdx::mutex>
+template <typename Mutex = std::mutex>
 class MONGO_MOD_OPEN AbstractAsyncComponent {
     AbstractAsyncComponent(const AbstractAsyncComponent&) = delete;
     AbstractAsyncComponent& operator=(const AbstractAsyncComponent&) = delete;
@@ -74,7 +74,7 @@ public:
      * Returns true if this component is currently running or in the process of shutting down.
      */
     bool isActive() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
+        std::lock_guard<Mutex> lock(*_getMutex());
         return _isActive(lock);
     }
 
@@ -84,7 +84,7 @@ public:
      * component will transition to Complete and any restarts after this will be disallowed.
      */
     Status startup() {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
+        std::lock_guard<Mutex> lock(*_getMutex());
         switch (_state) {
             case State::kPreStart:
                 _state = State::kRunning;
@@ -116,7 +116,7 @@ public:
      * Transition directly from PreStart to Complete if not started yet.
      */
     void shutdown() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
+        std::lock_guard<Mutex> lock(*_getMutex());
         switch (_state) {
             case State::kPreStart:
                 // Transition directly from PreStart to Complete if not started yet.
@@ -139,7 +139,7 @@ public:
      */
     void join() noexcept {
         _preJoin();
-        stdx::unique_lock<Mutex> lk(*_getMutex());
+        std::unique_lock<Mutex> lk(*_getMutex());
         _stateCondition.wait(lk, [&]() { return !_isActive(lk); });
     }
 
@@ -156,7 +156,7 @@ public:
      * For testing only.
      */
     State getState_forTest() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
+        std::lock_guard<Mutex> lock(*_getMutex());
         return _state;
     }
 
@@ -179,7 +179,7 @@ protected:
      * Returns true if this component has received a shutdown request ('_state' is ShuttingDown).
      */
     bool _isShuttingDown() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
+        std::lock_guard<Mutex> lock(*_getMutex());
         return _isShuttingDown(lock);
     }
 
@@ -192,7 +192,7 @@ protected:
      * May be called at most once.
      */
     void _transitionToComplete() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
+        std::lock_guard<Mutex> lock(*_getMutex());
         _transitionToComplete(lock);
     }
 
@@ -231,12 +231,12 @@ protected:
 
     Status _checkForShutdownAndConvertStatus(
         const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message) {
-        stdx::unique_lock<Mutex> lk(*_getMutex());
+        std::unique_lock<Mutex> lk(*_getMutex());
         return _checkForShutdownAndConvertStatus(lk, callbackArgs, message);
     }
 
     Status _checkForShutdownAndConvertStatus(const Status& status, const std::string& message) {
-        stdx::unique_lock<Mutex> lk(*_getMutex());
+        std::unique_lock<Mutex> lk(*_getMutex());
         return _checkForShutdownAndConvertStatus(lk, status, message);
     }
 
@@ -396,7 +396,7 @@ template <typename T>
 Status AbstractAsyncComponent<Mutex>::_startupComponent(WithLock lk,
                                                         std::unique_ptr<T>& component) {
     MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent<Mutex>, T>::value ||
-                        std::is_base_of<AbstractAsyncComponent<stdx::mutex>, T>::value);
+                        std::is_base_of<AbstractAsyncComponent<std::mutex>, T>::value);
 
     if (_isShuttingDown(lk)) {
         // Save name of 'component' before resetting unique_ptr.
@@ -417,7 +417,7 @@ Status AbstractAsyncComponent<Mutex>::_startupComponent(WithLock lk,
 template <typename Mutex>
 template <typename T>
 Status AbstractAsyncComponent<Mutex>::_startupComponent(std::unique_ptr<T>& component) {
-    stdx::lock_guard<Mutex> lock(*_getMutex());
+    std::lock_guard<Mutex> lock(*_getMutex());
     return _startupComponent(lock, component);
 }
 
@@ -426,7 +426,7 @@ template <typename T>
 void AbstractAsyncComponent<Mutex>::_shutdownComponent(WithLock lk,
                                                        const std::unique_ptr<T>& component) {
     MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent<Mutex>, T>::value ||
-                        std::is_base_of<AbstractAsyncComponent<stdx::mutex>, T>::value);
+                        std::is_base_of<AbstractAsyncComponent<std::mutex>, T>::value);
 
     if (!component) {
         return;
@@ -437,7 +437,7 @@ void AbstractAsyncComponent<Mutex>::_shutdownComponent(WithLock lk,
 template <typename Mutex>
 template <typename T>
 void AbstractAsyncComponent<Mutex>::_shutdownComponent(const std::unique_ptr<T>& component) {
-    stdx::lock_guard<Mutex> lock(*_getMutex());
+    std::lock_guard<Mutex> lock(*_getMutex());
     _shutdownComponent(lock, component);
 }
 

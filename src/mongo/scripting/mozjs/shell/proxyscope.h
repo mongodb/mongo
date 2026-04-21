@@ -42,12 +42,12 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/shell/engine.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <mutex>
 #include <string>
 
 #include <vm/PosixNSPR.h>
@@ -217,7 +217,7 @@ private:
      * This mutex protects _function, _state and _status as channels for
      * function invocation and exception handling
      */
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     unique_function<void()> _function;
     State _state;
     Status _status;

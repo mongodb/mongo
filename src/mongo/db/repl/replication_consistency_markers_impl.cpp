@@ -365,7 +365,7 @@ void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationCont
     // cached last no-holes oplog entry. This is important so that
     // refreshOplogTruncateAfterPointIfPrimary always returns the latest oplog entry without
     // skipping it.
-    stdx::lock_guard<stdx::mutex> lk(_refreshOplogTruncateAfterPointMutex);
+    std::lock_guard<std::mutex> lk(_refreshOplogTruncateAfterPointMutex);
     _lastNoHolesOplogTimestamp = boost::none;
     _lastNoHolesOplogOpTimeAndWallTime = boost::none;
 }
@@ -408,19 +408,19 @@ Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
 }
 
 void ReplicationConsistencyMarkersImpl::startUsingOplogTruncateAfterPointForPrimary() {
-    stdx::lock_guard<stdx::mutex> lk(_truncatePointIsPrimaryMutex);
+    std::lock_guard<std::mutex> lk(_truncatePointIsPrimaryMutex);
     // There is only one path to stepup and it is not called redundantly.
     invariant(!_isPrimary);
     _isPrimary = true;
 }
 
 void ReplicationConsistencyMarkersImpl::stopUsingOplogTruncateAfterPointForPrimary() {
-    stdx::lock_guard<stdx::mutex> lk(_truncatePointIsPrimaryMutex);
+    std::lock_guard<std::mutex> lk(_truncatePointIsPrimaryMutex);
     _isPrimary = false;
 }
 
 bool ReplicationConsistencyMarkersImpl::isOplogTruncateAfterPointBeingUsedForPrimary() const {
-    stdx::lock_guard<stdx::mutex> lk(_truncatePointIsPrimaryMutex);
+    std::lock_guard<std::mutex> lk(_truncatePointIsPrimaryMutex);
     return _isPrimary;
 }
 
@@ -468,7 +468,7 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // operations without causing deadlocks.
     AutoGetCollection autoTruncateColl(opCtx, _oplogTruncateAfterPointNss, MODE_IX);
     AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-    stdx::lock_guard<stdx::mutex> lk(_refreshOplogTruncateAfterPointMutex);
+    std::lock_guard<std::mutex> lk(_refreshOplogTruncateAfterPointMutex);
 
     // Update the oplogTruncateAfterPoint to the storage engine's reported oplog timestamp with no
     // holes behind it in-memory (only, not on disk, despite the name).

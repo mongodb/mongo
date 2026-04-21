@@ -92,7 +92,7 @@ void Checkpointer::run() {
         auto opCtx = tc->makeOperationContext();
 
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            std::unique_lock<std::mutex> lock(_mutex);
             MONGO_IDLE_THREAD_BLOCK;
 
             // Wait for 'storageGlobalParams.syncdelay' seconds; or until either shutdown is
@@ -103,7 +103,7 @@ void Checkpointer::run() {
                         "duration"_attr =
                             static_cast<std::int64_t>(storageGlobalParams.syncdelay.load()));
             _sleepCV.wait_for(lock,
-                              stdx::chrono::seconds(
+                              std::chrono::seconds(
                                   static_cast<std::int64_t>(storageGlobalParams.syncdelay.load())),
                               [&] { return _shuttingDown || _triggerCheckpoint; });
 
@@ -112,7 +112,7 @@ void Checkpointer::run() {
             // periodically. The wakeup to check period is arbitrary.
             while (storageGlobalParams.syncdelay.load() == 0 && !_shuttingDown &&
                    !_triggerCheckpoint) {
-                _sleepCV.wait_for(lock, stdx::chrono::seconds(static_cast<std::int64_t>(3)), [&] {
+                _sleepCV.wait_for(lock, std::chrono::seconds(static_cast<std::int64_t>(3)), [&] {
                     return _shuttingDown || _triggerCheckpoint;
                 });
             }
@@ -152,7 +152,7 @@ void Checkpointer::run() {
 void Checkpointer::triggerFirstStableCheckpoint(Timestamp prevStable,
                                                 Timestamp initialData,
                                                 Timestamp currStable) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     invariant(!_hasTriggeredFirstStableCheckpoint);
     if (prevStable < initialData && currStable >= initialData) {
         LOGV2(22310,
@@ -167,7 +167,7 @@ void Checkpointer::triggerFirstStableCheckpoint(Timestamp prevStable,
 }
 
 bool Checkpointer::hasTriggeredFirstStableCheckpoint() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     return _hasTriggeredFirstStableCheckpoint;
 }
 
@@ -175,7 +175,7 @@ void Checkpointer::shutdown(const Status& reason) {
     LOGV2(22322, "Shutting down checkpoint thread");
 
     {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         _shuttingDown = true;
         _shutdownReason = reason;
 

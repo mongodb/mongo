@@ -55,7 +55,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProces
     const auto newHost = newPrimary ? (*newPrimary)->getAddress().toString() : "Unknown";
 
     if (newHost != oldHost) {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         LOGV2(6006301,
               "Replica set primary server change detected",
               "replicaSet"_attr = newDescription->getSetName(),
@@ -67,7 +67,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProces
 }
 Milliseconds StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProcessor::
     getPrimaryServerChangeElapsedTime() const {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return Milliseconds(_elapsedTime.millis());
 }
 

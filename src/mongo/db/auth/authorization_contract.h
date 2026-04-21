@@ -34,13 +34,13 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <array>
 #include <bitset>
 #include <initializer_list>
+#include <mutex>
 
 namespace mongo {
 
@@ -76,7 +76,7 @@ public:
     }
 
     AuthorizationContract(const AuthorizationContract& other) {
-        stdx::lock_guard<stdx::mutex> lck(other._mutex);
+        std::lock_guard<std::mutex> lck(other._mutex);
         _checks = other._checks;
         _privilegeChecks = other._privilegeChecks;
         _isPermissionChecked = other._isPermissionChecked;
@@ -191,7 +191,7 @@ private:
      */
     bool isCommonPrivilege(const Privilege& p) const;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Set of access checks performed
     std::bitset<idlEnumCount<AccessCheckEnum>> _checks;

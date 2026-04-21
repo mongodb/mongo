@@ -60,7 +60,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -196,7 +195,7 @@ public:
     }
 
     SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override {
-        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        std::unique_lock<std::mutex> ul(_mutex);
         [&]() {
             StringData cmdName = cmd.firstElementFieldNameStringData();
             if (!(cmdName == AbortTransaction::kCommandName ||
@@ -278,7 +277,7 @@ public:
     }
 
     BSONObj getLastSentRequest() {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         if (_sentRequests.empty()) {
             return BSONObj();
         }
@@ -286,17 +285,17 @@ public:
     }
 
     const std::vector<BSONObj>& getSentRequests() {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         return _sentRequests;
     }
 
     void setNextCommandResponse(StatusWith<BSONObj> res) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _responses.push(res);
     }
 
     void setHangNextCommitOrAbortCommand(bool enable) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _hangNextCommitOrAbortCommand = enable;
 
         // Wake up any waiting threads.
@@ -314,7 +313,7 @@ private:
     mutable std::vector<BSONObj> _sentRequests;
     bool _runningLocalTransaction{false};
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     mutable stdx::condition_variable _hangNextCommitOrAbortCommandCV;
     bool _hangNextCommitOrAbortCommand{false};
     mutable unittest::Barrier _hitHungCommitOrAbort{2};
@@ -2648,7 +2647,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
     mockClient()->setHangNextCommitOrAbortCommand(true);
     mockClient()->setNextCommandResponse(kOKCommandResponse);
 
-    auto future = stdx::async(stdx::launch::async, [&] {
+    auto future = std::async(std::launch::async, [&] {
         auto swResult = txnWithRetries().runNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 txnClient
@@ -2668,7 +2667,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
     });
 
     // The future should time out since it's blocked waiting for the best effort abort to finish.
-    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+    ASSERT(std::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
     // The abort should get hung and not have been processed yet.
     mockClient()->waitForHungCommitOrAbort();
@@ -2712,7 +2711,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
     mockClient()->setNextCommandResponse(kOKInsertResponse);
     mockClient()->setNextCommandResponse(kOKCommandResponse);
 
-    auto future = stdx::async(stdx::launch::async, [&] {
+    auto future = std::async(std::launch::async, [&] {
         int attempt = 0;
         auto swResult = txnWithRetries().runNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
@@ -2732,7 +2731,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
     });
 
     // The future should time out since it's blocked waiting for the best effort abort to finish.
-    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+    ASSERT(std::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
     // The abort should get hung and not have been processed yet.
     mockClient()->waitForHungCommitOrAbort();
@@ -2768,7 +2767,7 @@ TEST_F(TxnAPITest, WriteConcernErrorFromCleanupAbortExposedInResult) {
 
         mockClient()->setNextCommandResponse(cleanupAbortResponse);
 
-        auto future = stdx::async(stdx::launch::async, [&] {
+        auto future = std::async(std::launch::async, [&] {
             auto swResult = txnWithRetries().runNoThrow(
                 opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                     txnClient

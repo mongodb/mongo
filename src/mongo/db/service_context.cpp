@@ -155,7 +155,7 @@ ServiceContext::ServiceContext(std::unique_ptr<ClockSource> fastClockSource,
 
 
 ServiceContext::~ServiceContext() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     for (const auto& [client, _] : _clients) {
         LOGV2_ERROR(23828,
                     "Non-empty client list when destroying service context",
@@ -240,7 +240,7 @@ ServiceContext::UniqueClient ServiceContext::makeClientForService(
     onCreate(client.get(), _clientObservers);
     auto entry = _clientsList.add(client.get());
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         invariant(_clients.insert({client.get(), entry}).second);
     }
     return UniqueClient(client.release());
@@ -284,7 +284,7 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
     ServiceContext* const svcCtx = client->getServiceContext();
     OperationIdManager::get(svcCtx).eraseClientFromMap(client);
     auto entry = [&] {
-        stdx::lock_guard lk(svcCtx->_mutex);
+        std::lock_guard lk(svcCtx->_mutex);
         auto it = svcCtx->_clients.find(client);
         invariant(it != svcCtx->_clients.end(), "Cannot find client in the list of clients!");
         auto entry = it->second;
@@ -468,7 +468,7 @@ void ServiceContext::killOperation(ClientLock& clientLock,
 void ServiceContext::_delistOperation(OperationContext* opCtx) {
     auto client = opCtx->getClient();
     {
-        stdx::lock_guard clientLock(*client);
+        std::lock_guard clientLock(*client);
         if (!client->getOperationContext()) {
             // We've already delisted this operation.
             return;
@@ -510,12 +510,12 @@ void ServiceContext::unsetKillAllOperations() {
 }
 
 void ServiceContext::registerKillOpListener(KillOpListenerInterface* listener) {
-    stdx::lock_guard clientLock(_mutex);
+    std::lock_guard clientLock(_mutex);
     _killOpListeners.push_back(listener);
 }
 
 void ServiceContext::waitForStartupComplete() {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     _startupCompleteCondVar.wait(lk, [this] { return _startupComplete; });
 }
 
@@ -525,7 +525,7 @@ void ServiceContext::notifyStorageStartupRecoveryComplete() {
         hangBeforeNotifyStorageStartupRecoveryComplete.pauseWhileSet();
     }
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _startupComplete = true;
     }
     _startupCompleteCondVar.notify_all();

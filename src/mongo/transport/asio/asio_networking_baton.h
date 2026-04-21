@@ -31,7 +31,6 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/baton.h"
@@ -41,6 +40,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <poll.h>
@@ -134,7 +134,7 @@ private:
      * any task external to the baton (e.g., `OutOfLineExecutor::Task`, `TransportSession:promise`,
      * and `ReactorTimer::promise`).
      */
-    using Job = unique_function<void(stdx::unique_lock<stdx::mutex>)>;
+    using Job = unique_function<void(std::unique_lock<std::mutex>)>;
 
     /**
      * Invokes a job with exclusive access to the baton's internals.
@@ -150,8 +150,8 @@ private:
      * Also note that the job may not run inline, and may get scheduled to run by the baton, so it
      * should never throw.
      */
-    void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job);
-    void _safeExecuteNoThrow(stdx::unique_lock<stdx::mutex> lk, Job job) noexcept;
+    void _safeExecute(std::unique_lock<std::mutex> lk, Job job);
+    void _safeExecuteNoThrow(std::unique_lock<std::mutex> lk, Job job) noexcept;
 
     /**
      * Blocks polling on the registered sessions until one of the following happens:
@@ -162,13 +162,13 @@ private:
      * must be fulfilled successfully and the second must be fulfilled with a cancellation error.
      */
     std::pair<std::list<Promise<void>>, std::list<Promise<void>>> _poll(
-        stdx::unique_lock<stdx::mutex>&, ClockSource*);
+        std::unique_lock<std::mutex>&, ClockSource*);
 
     Future<void> _addSession(Session& session, short events);
 
     void detachImpl() override;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     OperationContext* _opCtx;
 

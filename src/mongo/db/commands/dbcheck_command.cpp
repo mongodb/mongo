@@ -114,7 +114,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeAddingDBCheckBatchToOplog);
 
 namespace {
 // Makes sure that only one dbcheck operation is running at a time.
-stdx::mutex _dbCheckMutex;
+std::mutex _dbCheckMutex;
 
 // Queue for dbcheck commands that are waiting to be run. There can be at most
 // `gDbCheckMaxRunsOnQueue` (default 5) dbchecks in the queue, including 1 currently running. An
@@ -170,7 +170,7 @@ void _initializeCurOp(OperationContext* opCtx, boost::optional<DbCheckCollection
         return;
     }
 
-    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    std::unique_lock<Client> lk(*opCtx->getClient());
     auto curOp = CurOp::get(opCtx);
     curOp->setNS(lk, info->nss);
     curOp->setOpDescription(lk, info->toBSON());
@@ -553,7 +553,7 @@ void DbCheckJob::run() {
     // TODO SERVER-78399: Clean up this check once feature flag is removed.
     // Only one dbcheck operation can be in progress.
     if (info && info.value().secondaryIndexCheckParameters) {
-        stdx::unique_lock<stdx::mutex> lock(_dbCheckMutex);
+        std::unique_lock<std::mutex> lock(_dbCheckMutex);
 
         size_t queueCapacity = gDbCheckMaxRunsOnQueue.load();
         if (_dbChecksInProgress.size() >= queueCapacity) {
@@ -616,7 +616,7 @@ void DbCheckJob::run() {
             // The thread holds onto the _dbcheckMutex and waits for its dbcheck job to be at the
             // front of the queue. The `waitForConditionOrInterrupt` releases the lock so we
             // shouldn't run into a deadlock here.
-            stdx::lock_guard<stdx::mutex> lock(_dbCheckMutex);
+            std::lock_guard<std::mutex> lock(_dbCheckMutex);
             _dbChecksInProgress.pop_front();
             _dbCheckNotifier.notify_all();
         }
@@ -771,7 +771,7 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
 
         // TODO SERVER-79846: Add testing for progress meter
         // {
-        //     stdx::unique_lock<Client> lk(*opCtx->getClient());
+        //     std::unique_lock<Client> lk(*opCtx->getClient());
         //     progress.get(lk)->hit(batchStats.nDocs);
         // }
 
@@ -786,7 +786,7 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
 
     // TODO SERVER-79846: Add testing for progress meter
     // {
-    //     stdx::unique_lock<Client> lk(*opCtx->getClient());
+    //     std::unique_lock<Client> lk(*opCtx->getClient());
     //     progress.get(lk)->finished();
     // }
 }
@@ -1234,7 +1234,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     // {
     //     const std::string curOpMessage = "Scanning index " + indexName +
     //         " for namespace " + NamespaceStringUtil::serialize(info.nss);
-    //     stdx::unique_lock<Client> lk(*opCtx->getClient());
+    //     std::unique_lock<Client> lk(*opCtx->getClient());
     //     progress.set(lk,
     //                  CurOp::get(opCtx)->setProgress_inlock(
     //                      StringData(curOpMessage), collection->numRecords(opCtx)),
@@ -1774,7 +1774,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
 
         // Set up progress tracker.
         const CollectionAcquisition collAcquisition = acquisitionSW.getValue()->collection();
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(
             lk,
             CurOp::get(opCtx)->setProgress(lk,
@@ -1870,7 +1870,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         totalDocsSeen += stats.nCount;
         totalBytesSeen += stats.nBytes;
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             progress.get(lk)->hit(stats.nDocs);
         }
 
@@ -1886,7 +1886,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
     } while (!reachedEnd);
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.get(lk)->finished();
     }
 }

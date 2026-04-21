@@ -287,10 +287,10 @@ public:
 
         while (!_shuttingDown.load()) {
             {
-                stdx::unique_lock<stdx::mutex> lock(_mutex);
+                std::unique_lock<std::mutex> lock(_mutex);
                 MONGO_IDLE_THREAD_BLOCK;
                 // Check every 10 seconds or sooner in the debug builds
-                _condvar.wait_for(lock, stdx::chrono::seconds(kDebugBuild ? 1 : 10));
+                _condvar.wait_for(lock, std::chrono::seconds(kDebugBuild ? 1 : 10));
             }
 
             _connection->closeExpiredIdleSessions(gWiredTigerSessionCloseIdleTimeSecs.load() *
@@ -302,7 +302,7 @@ public:
     void shutdown() {
         _shuttingDown.store(true);
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            std::unique_lock<std::mutex> lock(_mutex);
             // Wake up the session sweeper thread early, we do not want the shutdown
             // to wait for us too long.
             _condvar.notify_one();
@@ -314,7 +314,7 @@ private:
     WiredTigerConnection* _connection;
     AtomicWord<bool> _shuttingDown{false};
 
-    stdx::mutex _mutex;  // protects _condvar
+    std::mutex _mutex;  // protects _condvar
     // The session sweeper thread idles on this condition variable for a particular time
     // duration between cleaning up expired sessions. It can be triggered early to expedite
     // shutdown.
@@ -499,7 +499,7 @@ void WiredTigerKVEngineBase::setRecordStoreExtraOptions(const std::string& optio
 }
 
 uint64_t WiredTigerKVEngineBase::_getTableIdForIdent(StringData ident) {
-    stdx::lock_guard lk(_identTableIdMutex);
+    std::lock_guard lk(_identTableIdMutex);
     auto& id = _identTableIds[ident];
     if (id == 0) {
         id = WiredTigerUtil::genTableId();
@@ -786,7 +786,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             // 2) This temporary pinning lasts long enough for the catalog to be loaded and
             //    accessed.
             {
-                stdx::lock_guard<stdx::mutex> lk(_oldestTimestampPinRequestsMutex);
+                std::lock_guard<std::mutex> lk(_oldestTimestampPinRequestsMutex);
                 uassertStatusOK(_pinOldestTimestamp(lk,
                                                     kPinOldestTimestampAtStartupName,
                                                     Timestamp(_oldestTimestamp.load()),
@@ -1300,9 +1300,9 @@ public:
         int wtRet = 0;
         std::deque<KVBackupBlock> kvBackupBlocks;
 
-        stdx::lock_guard<stdx::mutex> backupCursorLk(_wtBackup->wtBackupCursorMutex);
+        std::lock_guard<std::mutex> backupCursorLk(_wtBackup->wtBackupCursorMutex);
         while (kvBackupBlocks.size() < batchSize) {
-            stdx::lock_guard<stdx::mutex> backupDupCursorLk(_wtBackup->wtBackupDupCursorMutex);
+            std::lock_guard<std::mutex> backupDupCursorLk(_wtBackup->wtBackupDupCursorMutex);
 
             // We may still have backup blocks to retrieve for the existing file that
             // _wtBackup->cursor is open on if _wtBackup->dupCursor exists. In this case, do not
@@ -1487,7 +1487,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
         ss << ")";
     }
 
-    stdx::lock_guard<stdx::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
+    std::lock_guard<std::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
 
     // Create ongoingBackup.lock file to signal recovery that it should delete WiredTiger.backup
     // if we have an unclean shutdown with the cursor still open.
@@ -1497,7 +1497,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
 
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup
     // cursor.
-    stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
+    std::lock_guard<std::mutex> lock(_oplogPinnedByBackupMutex);
     _oplogPinnedByBackup = Timestamp(_oplogNeededForCrashRecovery.load());
     ScopeGuard pinOplogGuard([&] { _oplogPinnedByBackup = boost::none; });
 
@@ -1517,7 +1517,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
     }
 
     // A nullptr indicates that no duplicate cursor is open during an incremental backup.
-    stdx::lock_guard<stdx::mutex> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
+    std::lock_guard<std::mutex> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
     _wtBackup.dupCursor = nullptr;
 
     invariant(_wtBackup.logFilePathsSeenByExtendBackupCursor.empty());
@@ -1534,7 +1534,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
 }
 
 void WiredTigerKVEngine::endNonBlockingBackup() {
-    stdx::lock_guard<stdx::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
+    std::lock_guard<std::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
     // There could be a race with clean shutdown which unconditionally closes all the sessions.
     WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
     if (_connection->isShuttingDown()) {
@@ -1543,10 +1543,10 @@ void WiredTigerKVEngine::endNonBlockingBackup() {
     _backupSession.reset();
     {
         // Oplog truncation thread can now remove the pinned oplog.
-        stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
+        std::lock_guard<std::mutex> lock(_oplogPinnedByBackupMutex);
         _oplogPinnedByBackup = boost::none;
     }
-    stdx::lock_guard<stdx::mutex> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
+    std::lock_guard<std::mutex> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
     _wtBackup.cursor = nullptr;
     _wtBackup.dupCursor = nullptr;
     _wtBackup.logFilePathsSeenByExtendBackupCursor = {};
@@ -1557,8 +1557,8 @@ void WiredTigerKVEngine::endNonBlockingBackup() {
 
 StatusWith<std::deque<std::string>> WiredTigerKVEngine::extendBackupCursor() {
     uassert(51033, "Cannot extend backup cursor with in-memory mode.", !isEphemeral());
-    stdx::lock_guard<stdx::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
-    stdx::unique_lock<stdx::mutex> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
+    std::lock_guard<std::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
+    std::unique_lock<std::mutex> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
     invariant(_wtBackup.cursor);
 
     MONGO_IDLE_THREAD_BLOCK;
@@ -1629,7 +1629,7 @@ void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
 
 void WiredTigerKVEngine::setOldestActiveTransactionTimestampCallback(
     StorageEngine::OldestActiveTransactionTimestampCallback callback) {
-    stdx::lock_guard<stdx::mutex> lk(_oldestActiveTransactionTimestampCallbackMutex);
+    std::lock_guard<std::mutex> lk(_oldestActiveTransactionTimestampCallbackMutex);
     _oldestActiveTransactionTimestampCallback = std::move(callback);
 };
 
@@ -2099,7 +2099,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     wtRu.getSessionNoTxn()->closeAllCursors(uri);
 
     {
-        stdx::lock_guard lk(_identTableIdMutex);
+        std::lock_guard lk(_identTableIdMutex);
         _identTableIds.erase(ident);
     }
 
@@ -2216,7 +2216,7 @@ void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session) try {
     // times so this is only to protect our internal updates.
     // TODO: SERVER-64507: Investigate whether we can smartly rely on one checkpointer if two or
     // more threads checkpoint at the same time.
-    stdx::lock_guard lk(_checkpointMutex);
+    std::lock_guard lk(_checkpointMutex);
 
     const Timestamp stableTimestamp = getStableTimestamp();
     const Timestamp initialDataTimestamp = getInitialDataTimestamp();
@@ -2333,13 +2333,13 @@ boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForI
     return identPath;
 }
 
-stdx::unique_lock<stdx::mutex> WiredTigerKVEngine::_ensureIdentPath(StringData ident) {
+std::unique_lock<std::mutex> WiredTigerKVEngine::_ensureIdentPath(StringData ident) {
     size_t idx = ident.find('/');
     if (idx == string::npos) {
         // If there is no directory for this ident, we don't need to take the lock.
         return {};
     }
-    stdx::unique_lock<stdx::mutex> directoryModifyLock(_directoryModificationMutex);
+    std::unique_lock<std::mutex> directoryModifyLock(_directoryModificationMutex);
     do {
         StringData dir = ident.substr(0, idx);
 
@@ -2372,7 +2372,7 @@ bool WiredTigerKVEngine::_removeIdentDirectoryIfEmpty(StringData ident, size_t s
     }
     boost::filesystem::path subdir = _path;
     subdir /= std::string{ident.substr(0, separatorPos)};
-    stdx::unique_lock<stdx::mutex> directoryModifyLock(_directoryModificationMutex);
+    std::unique_lock<std::mutex> directoryModifyLock(_directoryModificationMutex);
     if (!boost::filesystem::exists(subdir)) {
         return true;
     }
@@ -2395,7 +2395,7 @@ bool WiredTigerKVEngine::_removeIdentDirectoryIfEmpty(StringData ident, size_t s
 }
 
 void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
-    stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
+    std::unique_lock<std::mutex> lk(_journalListenerMutex);
 
     // A JournalListener can only be set once. Otherwise, accessing a copy of the
     // _journalListener pointer without a mutex would be unsafe.
@@ -2491,7 +2491,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
 
     // This mutex is not intended to synchronize updates to the oldest timestamp, but to ensure
     // that there are no races with pinning the oldest timestamp.
-    stdx::lock_guard<stdx::mutex> lock(_oldestTimestampPinRequestsMutex);
+    std::lock_guard<std::mutex> lock(_oldestTimestampPinRequestsMutex);
     const Timestamp currOldestTimestamp = Timestamp(_oldestTimestamp.load());
     for (const auto& it : _oldestTimestampPinRequests) {
         invariant(it.second >= currOldestTimestamp);
@@ -2700,13 +2700,13 @@ Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
 }
 
 void WiredTigerKVEngine::pinAllDurableTimestamp(uint64_t ts) {
-    stdx::lock_guard<stdx::mutex> lock(_allDurablePinMutex);
+    std::lock_guard<std::mutex> lock(_allDurablePinMutex);
     _pinnedAllDurableTimestamps.insert(ts);
     _minPinnedTimestamp.store(*_pinnedAllDurableTimestamps.begin());
 }
 
 void WiredTigerKVEngine::unpinAllDurableTimestamp(uint64_t ts) {
-    stdx::lock_guard<stdx::mutex> lock(_allDurablePinMutex);
+    std::lock_guard<std::mutex> lock(_allDurablePinMutex);
     auto it = _pinnedAllDurableTimestamps.find(ts);
     invariant(it != _pinnedAllDurableTimestamps.end());
     _pinnedAllDurableTimestamps.erase(it);
@@ -2765,7 +2765,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::getOplogNeededForRollback() const {
     auto stableTimestamp = _stableTimestamp.load();
 
     // Only one thread can set or execute this callback.
-    stdx::lock_guard<stdx::mutex> lk(_oldestActiveTransactionTimestampCallbackMutex);
+    std::lock_guard<std::mutex> lk(_oldestActiveTransactionTimestampCallbackMutex);
     boost::optional<Timestamp> oldestActiveTransactionTimestamp;
     if (_oldestActiveTransactionTimestampCallback) {
         auto status = _oldestActiveTransactionTimestampCallback(Timestamp(stableTimestamp));
@@ -2800,7 +2800,7 @@ Timestamp WiredTigerKVEngine::getPinnedOplog() const {
     Timestamp pinned = Timestamp(_pinnedOplogTimestamp.load());
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
+        std::lock_guard<std::mutex> lock(_oplogPinnedByBackupMutex);
         if (!storageGlobalParams.allowOplogTruncation) {
             // If oplog truncation is not allowed, then return the min timestamp so that no
             // history is ever allowed to be deleted.
@@ -2833,7 +2833,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
     const std::string& requestingServiceName,
     Timestamp requestedTimestamp,
     bool roundUpIfTooOld) {
-    stdx::lock_guard<stdx::mutex> lock(_oldestTimestampPinRequestsMutex);
+    std::lock_guard<std::mutex> lock(_oldestTimestampPinRequestsMutex);
     Timestamp oldest = getOldestTimestamp();
     LOGV2(5380104,
           "Pin oldest timestamp request",
@@ -2862,7 +2862,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
             if (previousTimestamp.isNull()) {
                 unpinOldestTimestamp(svcName);
             } else {
-                stdx::lock_guard<stdx::mutex> lock(_oldestTimestampPinRequestsMutex);
+                std::lock_guard<std::mutex> lock(_oldestTimestampPinRequestsMutex);
                 // When a write is updating the value from an earlier pin to a later one, use
                 // rounding to make a best effort to repin the earlier value.
                 invariant(_pinOldestTimestamp(lock, svcName, previousTimestamp, true).getStatus());
@@ -2896,7 +2896,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::_pinOldestTimestamp(
 }
 
 void WiredTigerKVEngine::unpinOldestTimestamp(const std::string& requestingServiceName) {
-    stdx::lock_guard<stdx::mutex> lock(_oldestTimestampPinRequestsMutex);
+    std::lock_guard<std::mutex> lock(_oldestTimestampPinRequestsMutex);
     auto it = _oldestTimestampPinRequests.find(requestingServiceName);
     if (it == _oldestTimestampPinRequests.end()) {
         LOGV2_DEBUG(5380105,
@@ -2913,7 +2913,7 @@ void WiredTigerKVEngine::unpinOldestTimestamp(const std::string& requestingServi
 }
 
 std::map<std::string, Timestamp> WiredTigerKVEngine::getPinnedTimestampRequests() {
-    stdx::lock_guard<stdx::mutex> lock(_oldestTimestampPinRequestsMutex);
+    std::lock_guard<std::mutex> lock(_oldestTimestampPinRequestsMutex);
     return _oldestTimestampPinRequests;
 }
 
@@ -3048,7 +3048,7 @@ void WiredTigerKVEngine::waitUntilDurable(OperationContext* opCtx,
     uint32_t start = _lastSyncTime.load();
     // Do the remainder in a critical section that ensures only a single thread at a time
     // will attempt to synchronize.
-    stdx::unique_lock<stdx::mutex> lk(_lastSyncMutex);
+    std::unique_lock<std::mutex> lk(_lastSyncMutex);
     uint32_t current = _lastSyncTime.loadRelaxed();  // synchronized with writes through mutex
     if (current != start) {
         // Someone else synced already since we read lastSyncTime, so we're done!
@@ -3098,7 +3098,7 @@ WiredTigerKVEngine::_getJournalListenerWithToken(OperationContext* opCtx,
         // The JournalListener may not be set immediately, so we must check under a mutex so
         // as not to access the variable while setting a JournalListener. A JournalListener
         // is only allowed to be set once, so using the pointer outside of a mutex is safe.
-        stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
+        std::unique_lock<std::mutex> lk(_journalListenerMutex);
         return _journalListener;
     }();
     std::unique_ptr<JournalListener::Token> token;
@@ -3284,7 +3284,7 @@ void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
 
     bool needSyncSizeInfo = false;
     {
-        stdx::lock_guard<stdx::mutex> lock(_sizeStorerSyncTrackerMutex);
+        std::lock_guard<std::mutex> lock(_sizeStorerSyncTrackerMutex);
         needSyncSizeInfo = _sizeStorerSyncTracker.intervalHasElapsed();
     }
 
@@ -3429,7 +3429,7 @@ Status WiredTigerKVEngine::updateEvictionThreadsMax(const int32_t& threadsMax) {
 
         WiredTigerKVEngine* kvEngine =
             static_cast<WiredTigerKVEngine*>(serviceContext->getStorageEngine()->getEngine());
-        stdx::unique_lock lk(kvEngine->_configUpdateMutex);
+        std::unique_lock lk(kvEngine->_configUpdateMutex);
         kvEngine->_wtConfig.evictionThreadsMax = threadsMax;
 
         std::stringstream ss;
@@ -3446,7 +3446,7 @@ Status WiredTigerKVEngine::updateEvictionThreadsMin(const int32_t& threadsMin) {
 
         WiredTigerKVEngine* kvEngine =
             static_cast<WiredTigerKVEngine*>(serviceContext->getStorageEngine()->getEngine());
-        stdx::unique_lock lk(kvEngine->_configUpdateMutex);
+        std::unique_lock lk(kvEngine->_configUpdateMutex);
         kvEngine->_wtConfig.evictionThreadsMin = threadsMin;
 
         std::stringstream ss;

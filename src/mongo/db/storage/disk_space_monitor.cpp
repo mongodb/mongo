@@ -89,19 +89,19 @@ void DiskSpaceMonitor::_stop() {
 int64_t DiskSpaceMonitor::registerAction(
     std::function<int64_t()> getThresholdBytes,
     std::function<void(OperationContext*, int64_t, int64_t)> act) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     invariant(_actions.try_emplace(_actionId, Action{getThresholdBytes, act}).second);
     return _actionId++;
 }
 
 void DiskSpaceMonitor::deregisterAction(int64_t actionId) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     invariant(actionId >= 0 && actionId < _actionId);
     invariant(_actions.erase(actionId));
 }
 
 void DiskSpaceMonitor::runAction(OperationContext* opCtx, int64_t id) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     auto it = _actions.find(id);
     tassert(10624900,
             fmt::format("Provided disk space monitor action id {} not found", id),
@@ -110,7 +110,7 @@ void DiskSpaceMonitor::runAction(OperationContext* opCtx, int64_t id) {
 }
 
 void DiskSpaceMonitor::runAllActions(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     for (auto&& [_, action] : _actions) {
         _runAction(opCtx, action);
     }

@@ -30,7 +30,6 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
@@ -38,6 +37,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <thread>
 #include <vector>
@@ -84,7 +84,7 @@ public:
                 }
             });
         {
-            stdx::unique_lock<stdx::mutex> lock(_queueMutex);
+            std::unique_lock<std::mutex> lock(_queueMutex);
             // Don't allow new tasks once the pool is stopped
             invariant(!_stop.load());
             _tasks.emplace(SessionTask(std::move(task)));
@@ -119,11 +119,11 @@ private:
 
     std::vector<stdx::thread> _workers;   // Sessions threads (one per session is the default)
     std::queue<SessionTask> _tasks;       // The task queue
-    stdx::mutex _queueMutex;              // Synchronizes access to the task queue
+    std::mutex _queueMutex;               // Synchronizes access to the task queue
     stdx::condition_variable _condition;  // Used for thread synchronization
     AtomicWord<bool> _stop;               // Indicates whether the pool is stopping
 
-    stdx::mutex _errorMutex;                  // Synchronizes access to the error vector
+    std::mutex _errorMutex;                   // Synchronizes access to the error vector
     std::vector<std::exception_ptr> _errors;  // List of errors recorded during execution
     AtomicWord<bool> _hasRecordedErrors;  // Indicates whether the pool has recorded errors or not
 };

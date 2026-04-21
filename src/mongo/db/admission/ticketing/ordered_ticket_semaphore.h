@@ -32,12 +32,12 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticket_semaphore.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 
@@ -86,7 +86,7 @@ private:
 
     void _wakeUpWaiters(WithLock, int count);
     bool _tryAcquireWithoutQueuing(WithLock);
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     Atomic<int> _permits;
     Atomic<int> _maxWaiters;
     // Only used to prevent contention with observability threads. In other places to ensure

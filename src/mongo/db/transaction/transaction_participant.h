@@ -896,19 +896,19 @@ public:
         }
 
         void transitionToPreparedforTest(OperationContext* opCtx, repl::OpTime prepareOpTime) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).prepareOpTime = prepareOpTime;
             o(lk).txnState.transitionTo(TransactionState::kPrepared);
             shard_role_details::getLocker(opCtx)->unlockRSTLforPrepare();
         }
 
         void transitionToAbortedWithoutPrepareforTest(OperationContext* opCtx) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).txnState.transitionTo(TransactionState::kAbortedWithoutPrepare);
         }
 
         void transitionToAbortedWithPrepareforTest(OperationContext* opCtx) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).txnState.transitionTo(TransactionState::kAbortedWithPrepare);
         }
 
@@ -1165,7 +1165,7 @@ public:
         // Helper that resets the transactional state. This is used when aborting a transaction,
         // invalidating a transaction, or starting a new transaction. It releases the Client lock
         // before releasing this participant's locks and aborting its storage transaction.
-        void _resetTransactionStateAndUnlock(stdx::unique_lock<Client>* lk,
+        void _resetTransactionStateAndUnlock(std::unique_lock<Client>* lk,
                                              OperationContext* opCtx,
                                              TransactionState::StateFlag state);
 

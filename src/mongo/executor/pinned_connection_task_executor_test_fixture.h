@@ -37,7 +37,6 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
@@ -71,7 +70,7 @@ public:
     }
 
     Status sinkMessageCalled(Message message) {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         _hasWaitingSinkMessage = true;
         _readyRequestCV.notify_one();
         _readyResponseCV.wait(lk, [&] { return !!_sinkMessageExpectation || _isCanceled; });
@@ -88,14 +87,14 @@ public:
     }
 
     void expectSinkMessage(SinkMessageCbT handler) {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         invariant(!_sinkMessageExpectation);
         _sinkMessageExpectation = std::move(handler);
         _readyResponseCV.notify_one();
     }
 
     StatusWith<Message> sourceMessageCalled() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         _hasWaitingSourceMessage = true;
         _readyRequestCV.notify_one();
         _readyResponseCV.wait(lk, [&] { return !!_sourceMessageExpectation || _isCanceled; });
@@ -112,30 +111,30 @@ public:
     }
 
     void expectSourceMessage(SourceMessageCbT handler) {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         invariant(!_sourceMessageExpectation);
         _sourceMessageExpectation = std::move(handler);
         _readyResponseCV.notify_one();
     }
 
     void cancelAsyncOpsCalled() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         _isCanceled = true;
         _readyResponseCV.notify_one();
     }
 
     bool hasReadyRequests() {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         return _hasWaitingSinkMessage || _hasWaitingSourceMessage;
     }
 
     bool tryWaitUntilReadyRequests() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         if (_hasWaitingSinkMessage || _hasWaitingSourceMessage) {
             return true;
         }
 
-        return _readyRequestCV.wait_for(lk, stdx::chrono::seconds(10), [&] {
+        return _readyRequestCV.wait_for(lk, std::chrono::seconds(10), [&] {
             return _hasWaitingSinkMessage || _hasWaitingSourceMessage;
         });
     }
@@ -146,7 +145,7 @@ public:
 
 private:
     std::shared_ptr<transport::Session> _session;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     // We use two condition variables to handle the synchronous nature of this fixture:
     // _readyRequestCV is notified when a request is received, whereas _readyResponseCV is notified
     // when a response to a request (a request handler) is provided.

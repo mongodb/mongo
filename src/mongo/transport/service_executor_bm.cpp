@@ -64,17 +64,17 @@ const auto kMaxChainSize = 64;
 
 struct Notification {
     void set() {
-        stdx::unique_lock lk{mu};
+        std::unique_lock lk{mu};
         notified = true;
         cv.notify_all();
     }
 
     void get() {
-        stdx::unique_lock lk{mu};
+        std::unique_lock lk{mu};
         cv.wait(lk, [&] { return notified; });
     }
 
-    stdx::mutex mu;
+    std::mutex mu;
     stdx::condition_variable cv;
     bool notified = false;
 };
@@ -100,14 +100,14 @@ public:
     }
 
     void SetUp(benchmark::State& state) override {
-        stdx::lock_guard lk{mu};
+        std::lock_guard lk{mu};
         if (nThreads++)
             return;
         firstSetup();
     }
 
     void TearDown(benchmark::State& state) override {
-        stdx::lock_guard lk{mu};
+        std::lock_guard lk{mu};
         if (--nThreads)
             return;
         lastTearDown();
@@ -117,7 +117,7 @@ public:
         taskRunner->schedule(std::move(task));
     }
 
-    stdx::mutex mu;
+    std::mutex mu;
     int nThreads = 0;
     ServiceContext* sc;
 };

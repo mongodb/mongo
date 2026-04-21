@@ -72,11 +72,10 @@ void BM_xferDeletes(benchmark::State& state) {
         BSONArrayBuilder arrDel(builder.subarrayStart("deleted"));
         std::list<BSONObj> deleteList;
         createModListWithDuplicates(&deleteList, percentDup, docSizeInBytes);
-        auto start = mongo::stdx::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
         benchmark::DoNotOptimize(xferMods(&arrDel, &deleteList, 0, noopFn));
-        auto end = mongo::stdx::chrono::high_resolution_clock::now();
-        auto elapsed_seconds =
-            mongo::stdx::chrono::duration_cast<mongo::stdx::chrono::nanoseconds>(end - start);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
         state.SetIterationTime(elapsed_seconds.count());
         arrDel.done();
     }

@@ -71,13 +71,13 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -256,12 +256,12 @@ class PendingValue {
 public:
     PendingValue(int initialValue) : _value(initialValue) {}
     void set(int newValue) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _value = newValue;
         _condition.notify_all();
     }
     void await(int expectedValue) const {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         while (_value != expectedValue) {
             _condition.wait(lk);
         }
@@ -269,7 +269,7 @@ public:
 
 private:
     int _value;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     mutable stdx::condition_variable _condition;
 };
 

@@ -35,7 +35,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -44,6 +43,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <vector>
 
@@ -168,7 +168,7 @@ private:
         const NamespaceString& nss,
         const boost::optional<UUID>& collUuid);
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     int64_t _totalSampledReadsCount = 0;
     int64_t _totalSampledWritesCount = 0;

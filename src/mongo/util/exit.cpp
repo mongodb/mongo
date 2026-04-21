@@ -34,7 +34,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
@@ -52,7 +51,7 @@ namespace mongo {
 
 namespace {
 
-stdx::mutex shutdownMutex;
+std::mutex shutdownMutex;
 stdx::condition_variable shutdownTasksComplete;
 boost::optional<ExitCode> shutdownExitCode;
 bool shutdownTasksInProgress = false;
@@ -89,7 +88,7 @@ bool globalInShutdownDeprecated() {
 }
 
 ExitCode waitForShutdown() {
-    stdx::unique_lock<stdx::mutex> lk(shutdownMutex);
+    std::unique_lock<std::mutex> lk(shutdownMutex);
     shutdownTasksComplete.wait(lk, [] {
         const auto shutdownStarted = static_cast<bool>(shutdownExitCode);
         return shutdownStarted && !shutdownTasksInProgress;
@@ -99,7 +98,7 @@ ExitCode waitForShutdown() {
 }
 
 void registerShutdownTask(ShutdownTask task) {
-    stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
+    std::lock_guard<std::mutex> lock(shutdownMutex);
     invariant(!globalInShutdownDeprecated());
     shutdownTasks.emplace(std::move(task));
 }
@@ -108,7 +107,7 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
     decltype(shutdownTasks) localTasks;
 
     {
-        stdx::unique_lock<stdx::mutex> lock(shutdownMutex);
+        std::unique_lock<std::mutex> lock(shutdownMutex);
 
         if (shutdownTasksInProgress) {
             // Someone better have called shutdown in some form already.
@@ -143,7 +142,7 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
     runRegisteredShutdownTasks(std::move(localTasks), shutdownArgs);
 
     {
-        stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
+        std::lock_guard<std::mutex> lock(shutdownMutex);
         shutdownTasksInProgress = false;
 
         shutdownTasksComplete.notify_all();
@@ -156,7 +155,7 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
     decltype(shutdownTasks) localTasks;
 
     {
-        stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
+        std::lock_guard<std::mutex> lock(shutdownMutex);
 
         if (globalInShutdownDeprecated())
             return;
@@ -171,7 +170,7 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
     runRegisteredShutdownTasks(std::move(localTasks), shutdownArgs);
 
     {
-        stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
+        std::lock_guard<std::mutex> lock(shutdownMutex);
         shutdownTasksInProgress = false;
         shutdownExitCode.emplace(ExitCode::clean);
     }

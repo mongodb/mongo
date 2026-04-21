@@ -73,7 +73,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -82,6 +81,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -888,7 +888,7 @@ private:
     // (S) Self-synchronizing; access in any way from any context.
     //
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // True if startup() has been called.
     bool _started{false};  // (M)

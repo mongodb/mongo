@@ -134,7 +134,7 @@ private:
         void remove(int sizeBytes);
 
     private:
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         stdx::condition_variable _hasAvailableSpace;
 
         const int _maxSizeBytes;

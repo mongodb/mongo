@@ -1014,7 +1014,7 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
         // transaction as active here, since _abortTransactionOnSession() will assume we are
         // aborting an active transaction since there are no stashed resources.
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).transactionMetricsObserver.onUnstash(
                 ServerTransactionsMetrics::get(opCtx->getServiceContext()),
                 opCtx->getServiceContext()->getTickSource());
@@ -1049,7 +1049,7 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
     }
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         if (o(lk).transactionRuntimeContext.has_value() &&
             o(lk).transactionRuntimeContext->getPlacementConflictTime().has_value() &&
             transactionRuntimeContext.has_value()) {
@@ -1098,7 +1098,7 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
     }
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).txnState.transitionTo(TransactionState::kInProgress);
         // Start tracking various transactions metrics.
         //
@@ -1298,7 +1298,7 @@ void TransactionParticipant::Participant::beginOrContinueTransactionUnconditiona
     // We don't check or fetch any on-disk state, so treat the transaction as 'valid' for the
     // purposes of this method and continue the transaction unconditionally
     {
-        stdx::lock_guard<Client> lg(*opCtx->getClient());
+        std::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).isValid = true;
     }
 
@@ -1379,7 +1379,7 @@ void TransactionParticipant::Participant::_setReadSnapshot(
                               readTimestamp.toString(),
                               ruTs ? ruTs->toString() : "none"));
 
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);
     } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         // For transactions with read concern level specified as 'snapshot', we will use
@@ -1390,7 +1390,7 @@ void TransactionParticipant::Participant::_setReadSnapshot(
 
         const auto readTimestamp =
             repl::StorageInterface::get(opCtx)->getPointInTimeReadTimestamp(opCtx);
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);
     } else {
         // For transactions with read concern level specified as 'local' or 'majority', we will use
@@ -1690,7 +1690,7 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     auto tempTxnResourceStash = [&]() noexcept {
         using std::swap;
         boost::optional<TxnResources> trs;
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         swap(trs, o(lk).txnResourceStash);
         return trs;
     }();
@@ -1698,7 +1698,7 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     ScopeGuard releaseOnError([&] {
         // Restore the lock resources back to transaction participant.
         using std::swap;
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         swap(o(lk).txnResourceStash, tempTxnResourceStash);
     });
 
@@ -1817,7 +1817,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(
         }
 
         _releaseTransactionResourcesToOpCtx(opCtx, maxLockTimeout);
-        stdx::lock_guard<Client> lg(*opCtx->getClient());
+        std::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
         return;
@@ -1893,7 +1893,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(
     }
 
     {
-        stdx::lock_guard<Client> lg(*opCtx->getClient());
+        std::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
     }
@@ -1975,7 +1975,7 @@ TransactionParticipant::Participant::prepareTransaction(
     boost::optional<OplogSlotReserver> oplogSlotReserver;
     OplogSlot prepareOplogSlot;
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         // This check is necessary in order to avoid a race where a session with an active (but not
         // prepared) transaction is killed, but it still ends up in the prepared state
         opCtx->checkForInterrupt();
@@ -1990,7 +1990,7 @@ TransactionParticipant::Participant::prepareTransaction(
     if (prepareOptime) {
         // On secondary, we just prepare the transaction and discard the buffered ops.
         prepareOplogSlot = OplogSlot(*prepareOptime);
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).prepareOpTime = *prepareOptime;
         reservedSlots.push_back(prepareOplogSlot);
     } else {
@@ -2008,7 +2008,7 @@ TransactionParticipant::Participant::prepareTransaction(
                                 << o().prepareOpTime.toString());
 
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).prepareOpTime = prepareOplogSlot;
         }
 
@@ -2065,7 +2065,7 @@ TransactionParticipant::Participant::prepareTransaction(
 
     {
         const auto ticks = opCtx->getServiceContext()->getTickSource()->getTicks();
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onPrepare(ServerTransactionsMetrics::get(opCtx), ticks);
 
         // Ensure the lastWriteOpTime is set. This is needed so that we can correctly assign the
@@ -2110,7 +2110,7 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
     invariant(p().autoCommit == boost::optional<bool>(false));
 
     {
-        stdx::lock_guard<Client> lg(*opCtx->getClient());
+        std::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).txnState.transitionTo(TransactionState::kPrepared);
         o(lg).activeTxnNumberAndRetryCounter.setTxnNumber(txnRecord.getTxnNum());
         o(lg).activeTxnNumberAndRetryCounter.setTxnRetryCounter([&] {
@@ -2148,7 +2148,7 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
 
 void TransactionParticipant::Participant::setPrepareOpTimeForRecovery(OperationContext* opCtx,
                                                                       repl::OpTime prepareOpTime) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     o(lk).recoveryPrepareOpTime = prepareOpTime;
 }
 
@@ -2492,7 +2492,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
         repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
         const auto& session = sessInfos.session;
         {
-            auto lk = stdx::lock_guard(*splitOpCtx->getClient());
+            auto lk = std::lock_guard(*splitOpCtx->getClient());
             splitOpCtx->setLogicalSessionId(session.getSessionId());
             splitOpCtx->setTxnNumber(session.getTxnNumber());
             splitOpCtx->setInMultiDocumentTransaction();
@@ -2553,7 +2553,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
     Timestamp commitTimestamp) noexcept {
     {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).txnState.transitionTo(TransactionState::kCommitted);
         o(lk).commitTimestamp = commitTimestamp;
         // Features such as the "split prepared transaction" optimization will not attribute
@@ -2578,7 +2578,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
 }
 
 void TransactionParticipant::Participant::shutdown(OperationContext* opCtx) {
-    stdx::lock_guard<Client> lock(*opCtx->getClient());
+    std::lock_guard<Client> lock(*opCtx->getClient());
 
     p().inShutdown = true;
     // The stashed RecoveryUnit may hold a dangling pointer to an OperationContext. Make sure we
@@ -2603,7 +2603,7 @@ APIParameters TransactionParticipant::Participant::getAPIParameters(OperationCon
 
 void TransactionParticipant::Participant::setLastWriteOpTime(OperationContext* opCtx,
                                                              const repl::OpTime& lastWriteOpTime) {
-    stdx::lock_guard<Client> lg(*opCtx->getClient());
+    std::lock_guard<Client> lg(*opCtx->getClient());
     auto& curLastWriteOpTime = o(lg).lastWriteOpTime;
     invariant(lastWriteOpTime.isNull() || lastWriteOpTime > curLastWriteOpTime,
               str::stream() << "current lastWrite opTime: " << curLastWriteOpTime.toString()
@@ -2689,7 +2689,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
                                             o().activeTxnNumberAndRetryCounter.getTxnNumber());
 
     if (!o().txnState.isInRetryableWriteMode()) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
                                                                 curop->debug().getAdditiveMetrics(),
@@ -2784,7 +2784,7 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
 
         repl::UnreplicatedWritesBlock notReplicated(splitOpCtx.get());
         {
-            auto lk = stdx::lock_guard(*splitOpCtx->getClient());
+            auto lk = std::lock_guard(*splitOpCtx->getClient());
             splitOpCtx->setLogicalSessionId(sessionInfo.session.getSessionId());
             splitOpCtx->setTxnNumber(sessionInfo.session.getTxnNumber());
             splitOpCtx->setInMultiDocumentTransaction();
@@ -2856,7 +2856,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     const auto tickSource = opCtx->getServiceContext()->getTickSource();
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onAbort(
             opCtx, ServerTransactionsMetrics::get(opCtx->getServiceContext()), tickSource);
     }
@@ -2873,7 +2873,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     const auto nextState = o().txnState.isPrepared() ? TransactionState::kAbortedWithPrepare
                                                      : TransactionState::kAbortedWithoutPrepare;
 
-    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    std::unique_lock<Client> lk(*opCtx->getClient());
     if (o().txnResourceStash &&
         shard_role_details::getRecoveryUnit(opCtx)->getNoEvictionAfterCommitOrRollback()) {
         o(lk).txnResourceStash->setNoEvictionAfterCommitOrRollback();
@@ -3291,7 +3291,7 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
             opCtx, *clientTxnNumber);
     }
 
-    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    std::unique_lock<Client> lk(*opCtx->getClient());
     o(lk).activeTxnNumberAndRetryCounter = txnNumberAndRetryCounter;
     o(lk).lastWriteOpTime = repl::OpTime();
 
@@ -3478,7 +3478,7 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
     auto activeTxnHistory = fetchActiveTransactionHistory(opCtx, _sessionId(), fetchOplogEntries);
     const auto& lastTxnRecord = activeTxnHistory.lastTxnRecord;
     if (lastTxnRecord) {
-        stdx::lock_guard<Client> lg(*opCtx->getClient());
+        std::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).activeTxnNumberAndRetryCounter.setTxnNumber(lastTxnRecord->getTxnNum());
         o(lg).activeTxnNumberAndRetryCounter.setTxnRetryCounter([&] {
             if (lastTxnRecord->getState()) {
@@ -3533,7 +3533,7 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
     }
 
     {
-        stdx::lock_guard<Client> lg(*opCtx->getClient());
+        std::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).isValid = true;
     }
 }
@@ -3661,7 +3661,7 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
 
 void TransactionParticipant::Participant::addToAffectedNamespaces(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     o(lk).affectedNamespaces.emplace(nss);
 }
 
@@ -3699,7 +3699,7 @@ void TransactionParticipant::Participant::_resetRetryableWriteState(WithLock wl)
 }
 
 void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
-    stdx::unique_lock<Client>* lk, OperationContext* opCtx, TransactionState::StateFlag state) {
+    std::unique_lock<Client>* lk, OperationContext* opCtx, TransactionState::StateFlag state) {
     invariant(lk);
     invariant(lk->owns_lock());
 
@@ -3741,7 +3741,7 @@ void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
 }
 
 void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
-    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    std::unique_lock<Client> lk(*opCtx->getClient());
 
     uassert(ErrorCodes::PreparedTransactionInProgress,
             "Cannot invalidate prepared transaction",
@@ -3961,7 +3961,7 @@ void TransactionParticipant::Participant::addCommittedStmtIds(
     OperationContext* opCtx,
     const std::vector<StmtId>& stmtIdsCommitted,
     const repl::OpTime& writeOpTime) {
-    stdx::lock_guard<Client> lg(*opCtx->getClient());
+    std::lock_guard<Client> lg(*opCtx->getClient());
     for (auto stmtId : stmtIdsCommitted) {
         p().activeTxnCommittedStatements.getExpectAvailable().emplace(stmtId, writeOpTime);
     }
@@ -3979,7 +3979,7 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
         }
 
         invariant(opCtx->getTxnNumber());
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         _resetRetryableWriteState(lk);
     } else if (_isInternalSessionForRetryableWrite() &&
                // (Ignore FCV check): The feature flag is fully disabled.
@@ -4041,7 +4041,7 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
             RetryableWritesStats::get(opCtx->getServiceContext())
                 ->incrementTransactionsCollectionWriteCount();
 
-            stdx::lock_guard<Client> lg(*opCtx->getClient());
+            std::lock_guard<Client> lg(*opCtx->getClient());
 
             // The cache of the last written record must always be advanced after a write so that
             // subsequent writes have the correct point to start from.

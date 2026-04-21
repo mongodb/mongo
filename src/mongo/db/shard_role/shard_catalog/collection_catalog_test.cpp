@@ -76,7 +76,6 @@
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -84,6 +83,7 @@
 
 #include <algorithm>
 #include <map>
+#include <mutex>
 
 namespace mongo {
 namespace {

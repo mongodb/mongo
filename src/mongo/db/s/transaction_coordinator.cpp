@@ -219,7 +219,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             //         _participantsDurable (optional)
             //  Output: _participantsDurable = true
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 invariant(_participants);
 
                 _step = Step::kWritingParticipantList;
@@ -249,7 +249,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
         .thenRunOn(_scheduler->getExecutor())
         .then([this, self = shared_from_this(), apiParams] {
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 _participantsDurable = true;
             }
 
@@ -260,7 +260,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             //         _decision (optional)
             //  Output: _decision is set
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 invariant(_participantsDurable);
 
                 auto previousStep = _step;
@@ -285,7 +285,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                                     *_participants)
                 .then([this, self = shared_from_this()](PrepareVoteConsensus consensus) mutable {
                     {
-                        stdx::lock_guard<stdx::mutex> lg(_mutex);
+                        std::lock_guard<std::mutex> lg(_mutex);
                         _decision = consensus.decision();
                     }
 
@@ -316,7 +316,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                       "sessionId"_attr = _lsid,
                       "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
                       "status"_attr = redact(status));
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 _decision = txn::PrepareVote::kAbort;
                 _decision->setAbortStatus(Status(ErrorCodes::NoSuchTransaction, status.reason()));
             })
@@ -328,7 +328,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             //         _decisionDurable (optional)
             //  Output: _decisionDurable = true
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 invariant(_decision);
 
                 auto previousStep = _step;
@@ -365,7 +365,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
         })
         .then([this, self = shared_from_this(), apiParams] {
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 _decisionDurable = true;
             }
 
@@ -373,7 +373,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             //  Input: _decisionDurable
             //  Output: (none)
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 invariant(_decisionDurable);
 
                 auto previousStep = _step;
@@ -413,7 +413,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             setDecisionPromise(*_decision, _decisionAcknowledgedPromise);
 
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
 
                 auto previousStep = _step;
                 _step = Step::kWritingEndOfTransaction;
@@ -437,7 +437,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             // Do a best-effort attempt (i.e., writeConcern w:1) to delete the coordinator's durable
             // state.
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
 
                 auto previousStep = _step;
                 _step = Step::kDeletingCoordinatorDoc;
@@ -458,7 +458,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             // must be done strictly after all other logic except the shutdown phases which are
             // initiated later in this continuation.
             {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                std::lock_guard<std::mutex> lg(_mutex);
                 auto* tcs = TransactionCoordinatorService::get(_serviceContext);
                 tcs->notifyCoordinatorFinished(self);
             }
@@ -507,7 +507,7 @@ void TransactionCoordinator::runCommit(OperationContext* opCtx, std::vector<Shar
     invariant(opCtx->getClient() != nullptr);
     _updateAssociatedClient(opCtx->getClient());
 
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     _participants = std::move(participants);
     _kickOffCommitPromise.emplaceValue();
 }
@@ -516,7 +516,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
     if (!_reserveKickOffCommitPromise())
         return;
 
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     _transactionCoordinatorMetricsObserver->onRecoveryFromFailover();
 
     _participants = doc.getParticipants();
@@ -554,7 +554,7 @@ void TransactionCoordinator::cancelForStepDown() {
 }
 
 bool TransactionCoordinator::_reserveKickOffCommitPromise() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     if (_kickOffCommitPromiseSet)
         return false;
 
@@ -592,7 +592,7 @@ void TransactionCoordinator::_done(Status status) {
                 "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
                 "status"_attr = redact(status));
 
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    std::unique_lock<std::mutex> ul(_mutex);
 
     const auto tickSource = _serviceContext->getTickSource();
 
@@ -717,7 +717,7 @@ void TransactionCoordinator::_logSlowTwoPhaseCommit(
 }
 
 TransactionCoordinator::Step TransactionCoordinator::getStep() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _step;
 }
 
@@ -726,7 +726,7 @@ void TransactionCoordinator::reportState(OperationContext* opCtx, BSONObjBuilder
     TickSource* tickSource = _serviceContext->getTickSource();
     TickSource::Tick currentTick = tickSource->getTicks();
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     BSONObjBuilder lsidBuilder(doc.subobjStart("lsid"));
     _lsid.serialize(&lsidBuilder);
@@ -775,7 +775,7 @@ std::string TransactionCoordinator::toString(Step step) {
 }
 
 void TransactionCoordinator::_updateAssociatedClient(Client* client) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _transactionCoordinatorMetricsObserver->updateLastClientInfo(client);
 }
 

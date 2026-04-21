@@ -132,7 +132,7 @@ void TracerProviderService::initializeNoOp() {
 void TracerProviderService::shutdown() {
     if (_enabled && _tracerProvider) {
         auto tracer = _tracerProvider->GetTracer("mongodb");
-        tracer->Close(stdx::chrono::seconds{1});
+        tracer->Close(std::chrono::seconds{1});
         _tracerProvider = nullptr;
         _enabled = false;
     }

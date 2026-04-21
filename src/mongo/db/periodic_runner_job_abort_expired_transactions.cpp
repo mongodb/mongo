@@ -91,17 +91,17 @@ auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContex
 }
 
 auto PeriodicThreadToAbortExpiredTransactions::operator*() const noexcept -> PeriodicJobAnchor& {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return *_anchor;
 }
 
 auto PeriodicThreadToAbortExpiredTransactions::operator->() const noexcept -> PeriodicJobAnchor* {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _anchor.get();
 }
 
 void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceContext) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_anchor) {
         return;
     }

@@ -46,7 +46,7 @@ ExplainedCommand makeExplainedCommand(OperationContext* opCtx,
     // comment.
     auto commentField = explainedObj["comment"];
     if (!opCtx->getComment() && commentField) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->setComment(commentField.wrap());
     }
 

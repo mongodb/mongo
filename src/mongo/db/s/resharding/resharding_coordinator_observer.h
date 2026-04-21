@@ -32,13 +32,13 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -123,7 +123,7 @@ public:
      * Indicates that the ReshardingCoordinator::run method has been called.
      */
     void reshardingCoordinatorRunCalled() {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         _reshardingCoordinatorRunCalled = true;
     }
 
@@ -135,7 +135,7 @@ private:
     void _onAbortOrStepdown(WithLock, Status status);
 
     // Protects the state below
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     /**
      * Promises indicating that either all donors or all recipients have entered a specific state.

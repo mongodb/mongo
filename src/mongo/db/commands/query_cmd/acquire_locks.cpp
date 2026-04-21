@@ -75,7 +75,7 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
     // We place the cursor read concern onto the OperationContext so the lock acquisition
     // respects the cursor's read concern.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         repl::ReadConcernArgs::get(opCtx) = rcArgs;
     }
 }

@@ -32,9 +32,9 @@
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/shell/debugger/adapter.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 
 #include <map>
+#include <mutex>
 #include <set>
 
 #include <jsapi.h>

@@ -34,13 +34,13 @@
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -119,7 +119,7 @@ private:
     /**
      * Terminate the asynchronous initialization of this registry.
      */
-    void _terminate(stdx::unique_lock<stdx::mutex>& lock);
+    void _terminate(std::unique_lock<std::mutex>& lock);
 
     struct CollectionStats {
         // Number of orphan documents for this collection
@@ -136,11 +136,11 @@ private:
         kSecondary,
     };
 
-    mutable stdx::mutex _stateMutex;
+    mutable std::mutex _stateMutex;
     AtomicWord<State> _state{State::kSecondary};
     ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     // Map containing all the currently cached collection stats
     stdx::unordered_map<UUID, CollectionStats, UUID::Hash> _collStatsMap;
 

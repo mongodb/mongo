@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/histogram.h"
@@ -38,6 +37,7 @@
 #include "mongo/util/time_support.h"
 
 #include <deque>
+#include <mutex>
 
 namespace mongo {
 // Basic statistics from the RollingStats class.
@@ -114,7 +114,7 @@ private:
     // The bucket boundaries for recorded values.
     const std::vector<int64_t> _valuePartitions;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     // Histograms for each 1s time interval.
     std::deque<DataAtTime> _window;
     ClockSource* _clock;

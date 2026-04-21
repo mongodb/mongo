@@ -33,10 +33,10 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 
 namespace mongo::query_settings {
 
@@ -103,7 +103,7 @@ protected:
         CancellationSource cancellationSource = CancellationSource();
     };
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::unique_ptr<State> _state;
 
 private:

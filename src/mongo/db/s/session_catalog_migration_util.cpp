@@ -42,7 +42,7 @@ boost::optional<SharedSemiFuture<void>> runWithSessionCheckedOutIfStatementNotEx
     unique_function<void()> callable,
     bool ignoreIncompleteHistory) {
     {
-        auto lk = stdx::lock_guard(*opCtx->getClient());
+        auto lk = std::lock_guard(*opCtx->getClient());
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
     }

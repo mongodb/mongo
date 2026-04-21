@@ -33,11 +33,11 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <deque>
 #include <map>
+#include <mutex>
 
 namespace mongo {
 namespace mongotmock {
@@ -216,7 +216,7 @@ private:
     BSONObj _mockManageSearchIndexResponse;
 
     // Protects access to all members. Should be acquired using a MongotMockStateGuard.
-    stdx::mutex _lock;
+    std::mutex _lock;
 
     friend class MongotMockStateGuard;
     bool _doOrderChecks = true;
@@ -234,7 +234,7 @@ public:
     }
 
 private:
-    stdx::lock_guard<stdx::mutex> lk;
+    std::lock_guard<std::mutex> lk;
     MongotMockState* state;
 };
 

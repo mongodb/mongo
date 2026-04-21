@@ -277,7 +277,7 @@ void RemoveShardCommitCoordinator::checkIfOptionsConflict(const BSONObj& stateDo
         stateDoc, IDLParserContext("RemoveShardCommitCoordinatorDocument"));
 
     const auto optionsMatch = [&] {
-        stdx::lock_guard lk(_docMutex);
+        std::lock_guard lk(_docMutex);
         return _doc.getShardId() == otherDoc.getShardId();
     }();
 

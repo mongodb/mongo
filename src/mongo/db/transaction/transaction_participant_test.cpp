@@ -95,7 +95,6 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/future.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
@@ -115,6 +114,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <future>
 
 #include <boost/optional/optional.hpp>
 
@@ -1103,11 +1103,11 @@ TEST_F(TxnParticipantTest, StashedRollbackDoesntHoldClientLock) {
     shard_role_details::getRecoveryUnit(opCtx())->onRollback(
         [&](OperationContext*) { startedRollback.countDownAndWait(); });
 
-    auto future = stdx::async(stdx::launch::async, [&] {
+    auto future = std::async(std::launch::async, [&] {
         startedRollback.countDownAndWait();
 
         // Verify we can take the Client lock during the rollback of the stashed transaction.
-        stdx::lock_guard<Client> lk(*opCtx()->getClient());
+        std::lock_guard<Client> lk(*opCtx()->getClient());
 
         finishRollback.countDownAndWait();
     });
@@ -2119,7 +2119,7 @@ TEST_F(TxnParticipantTest, InterruptedSessionsCannotBePrepared) {
 
     unittest::Barrier barrier(2);
 
-    auto future = stdx::async(stdx::launch::async, [this, &barrier] {
+    auto future = std::async(std::launch::async, [this, &barrier] {
         ThreadClient tc(getServiceContext()->getService());
         auto sideOpCtx = tc->makeOperationContext();
         auto killToken = catalog()->killSession(_sessionId);
@@ -7978,7 +7978,7 @@ TEST_F(TxnParticipantAndTxnRouterTest, CannotEagerReapSessionWithYieldedTxnRoute
 
     unittest::Barrier startedYielding(2);
     unittest::Barrier finishYielding(2);
-    auto yieldedThreadFuture = stdx::async(stdx::launch::async, [&] {
+    auto yieldedThreadFuture = std::async(std::launch::async, [&] {
         runRouterTransactionAndYieldLeaveOpen(
             retryableChildLsid, 0, &startedYielding, &finishYielding);
     });

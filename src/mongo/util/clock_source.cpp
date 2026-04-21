@@ -60,7 +60,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     }
 
     struct AlarmInfo {
-        stdx::mutex mutex;
+        std::mutex mutex;
 
         stdx::condition_variable* cv;
         stdx::cv_status result = stdx::cv_status::no_timeout;
@@ -70,7 +70,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
 
     setAlarm(deadline, [alarmInfo] {
         // Set an alarm to hit our virtualized deadline
-        stdx::lock_guard infoLk(alarmInfo->mutex);
+        std::lock_guard infoLk(alarmInfo->mutex);
         auto cv = std::exchange(alarmInfo->cv, nullptr);
         if (!cv) {
             return;
@@ -80,7 +80,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
         cv->notify_all();
     });
 
-    if (stdx::lock_guard infoLk(alarmInfo->mutex); !alarmInfo->cv) {
+    if (std::lock_guard infoLk(alarmInfo->mutex); !alarmInfo->cv) {
         // If setAlarm() ran inline, then we've timed out
         return alarmInfo->result;
     }
@@ -97,7 +97,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
                          bla,
                          systemClockSource->now() + kMaxTimeoutForArtificialClocks);
 
-    stdx::lock_guard infoLk(alarmInfo->mutex);
+    std::lock_guard infoLk(alarmInfo->mutex);
     alarmInfo->cv = nullptr;
     return alarmInfo->result;
 }

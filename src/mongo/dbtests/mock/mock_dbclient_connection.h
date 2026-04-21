@@ -48,13 +48,13 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -184,12 +184,12 @@ public:
     mongo::ConnectionString::ConnectionType type() const override;
 
     Message getLastSentMessage() {
-        stdx::lock_guard lk(_netMutex);
+        std::lock_guard lk(_netMutex);
         return _lastSentMessage;
     }
 
     bool isBlockedOnNetwork() {
-        stdx::lock_guard lk(_netMutex);
+        std::lock_guard lk(_netMutex);
         return _blockedOnNetwork;
     }
 
@@ -216,7 +216,7 @@ private:
     uint64_t _sockCreationTime;
     boost::optional<OpMsgRequest> _lastCursorMessage;
 
-    stdx::mutex _netMutex;
+    std::mutex _netMutex;
 
     stdx::condition_variable _mockCallResponsesCV;
     Responses _mockCallResponses;

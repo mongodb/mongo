@@ -110,7 +110,7 @@ void TransactionCoordinatorService::createCoordinator(
     auto coordinator = std::make_shared<TransactionCoordinator>(
         opCtx, lsid, txnNumberAndRetryCounter, scheduler.makeChildScheduler(), commitDeadline);
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         _activeTransactionCoordinators.insert(coordinator);
     }
     coordinator->start(opCtx);
@@ -325,7 +325,7 @@ void TransactionCoordinatorService::_scheduleRecoveryTask(OperationContext* opCt
 void TransactionCoordinatorService::initializeIfNeeded(OperationContext* opCtx,
                                                        long long term,
                                                        Milliseconds recoveryDelay) {
-    stdx::unique_lock ul(_mutex);
+    std::unique_lock ul(_mutex);
     LOGV2(9307800,
           "Starting TransactionCoordinatorService initialization for specified term if needed.",
           "Current Initialized Term"_attr = _initTerm,
@@ -367,7 +367,7 @@ void TransactionCoordinatorService::interruptForStepDown() {
     std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
 
     {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (_catalogAndScheduler) {
             _catalogAndSchedulerToCleanup = std::move(_catalogAndScheduler);
         }
@@ -390,7 +390,7 @@ void TransactionCoordinatorService::interruptForStepDown() {
 
 void TransactionCoordinatorService::shutdown() {
     {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         _isShuttingDown = true;
     }
     interruptForStepDown();
@@ -399,7 +399,7 @@ void TransactionCoordinatorService::shutdown() {
 
 std::shared_ptr<TransactionCoordinatorService::CatalogAndScheduler>
 TransactionCoordinatorService::getCatalogAndScheduler(OperationContext* opCtx) {
-    stdx::unique_lock ul(_mutex);
+    std::unique_lock ul(_mutex);
     uassert(ErrorCodes::NotWritablePrimary,
             "Transaction coordinator is not a primary",
             _catalogAndScheduler);
@@ -410,7 +410,7 @@ TransactionCoordinatorService::getCatalogAndScheduler(OperationContext* opCtx) {
 void TransactionCoordinatorService::_joinAndCleanup() {
     std::shared_ptr<CatalogAndScheduler> schedulerToCleanup;
     {
-        stdx::lock_guard _lock(_mutex);
+        std::lock_guard _lock(_mutex);
         // checking this invariant requires holding _mutex
         invariant(!_catalogAndScheduler);
         if (!_catalogAndSchedulerToCleanup)

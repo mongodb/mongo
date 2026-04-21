@@ -731,7 +731,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
             }
         }
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             _progress.get(lk)->hit();
         }
         numKeys++;

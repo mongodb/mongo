@@ -34,12 +34,12 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/router_transactions_stats_gen.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <map>
+#include <mutex>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -158,7 +158,7 @@ private:
     CommitStats _recoverWithTokenCommitStats;
 
     // Mutual exclusion for _abortCauseMap
-    stdx::mutex _abortCauseMutex;
+    std::mutex _abortCauseMutex;
 
     // Map tracking the total number of each abort cause for any multi-statement transaction that
     // was aborted through this router.

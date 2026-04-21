@@ -41,10 +41,10 @@ namespace {
  * Executes a function and returns the duration of the execution time.
  */
 auto measureOperationTime(std::function<void()> operation) {
-    auto start = mongo::stdx::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     operation();
-    auto end = mongo::stdx::chrono::high_resolution_clock::now();
-    return mongo::stdx::chrono::duration_cast<mongo::stdx::chrono::duration<double>>(end - start);
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
 }
 
 /**
@@ -101,7 +101,7 @@ void BM_ReusingHalfSlots(benchmark::State& state) {
 
         iters.reserve(timestampsPerRound * round);
 
-        auto timeForHelpers = mongo::stdx::chrono::duration<double>(0);
+        auto timeForHelpers = std::chrono::duration<double>(0);
 
         for (int i = 0; i < round; i++) {
             timeForHelpers += measureOperationTime([&] {

@@ -283,7 +283,7 @@ Status prepareCommit(BucketCatalog& catalog,
     auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
-    stdx::lock_guard stripeLock{stripe.mutex};
+    std::lock_guard stripeLock{stripe.mutex};
 
     if (isWriteBatchFinished(*batch)) {
         // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
@@ -319,7 +319,7 @@ void finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
     finishWriteBatch(*batch);
 
     auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    std::lock_guard stripeLock{stripe.mutex};
 
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
@@ -390,7 +390,7 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
     }
 
     auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    std::lock_guard stripeLock{stripe.mutex};
 
     internal::abort(catalog, stripe, stripeLock, batch, status);
 }
@@ -498,7 +498,7 @@ std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOpt
 
 std::pair<UUID, tracking::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
     BucketCatalog& sideBucketCatalog) {
-    stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
+    std::lock_guard catalogLock{sideBucketCatalog.mutex};
     invariant(sideBucketCatalog.executionStats.size() == 1);
     return *sideBucketCatalog.executionStats.begin();
 }
@@ -770,7 +770,7 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
 Bucket& getEligibleBucket(OperationContext* opCtx,
                           BucketCatalog& catalog,
                           Stripe& stripe,
-                          stdx::unique_lock<stdx::mutex>& stripeLock,
+                          std::unique_lock<std::mutex>& stripeLock,
                           const Collection* bucketsColl,
                           const BSONObj& measurement,
                           const BucketKey& bucketKey,
@@ -889,7 +889,7 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
     Stripe& stripe,
-    stdx::unique_lock<stdx::mutex>& stripeLock,
+    std::unique_lock<std::mutex>& stripeLock,
     const Collection* bucketsColl,
     const BucketKey& bucketKey,
     const Date_t& time,
@@ -1157,7 +1157,7 @@ TimeseriesWriteBatches stageInsertBatch(
     const AllowQueryBasedReopening allowQueryBasedReopening,
     BatchedInsertContext& batch) {
     auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
-    stdx::unique_lock<stdx::mutex> stripeLock{stripe.mutex};
+    std::unique_lock<std::mutex> stripeLock{stripe.mutex};
     TimeseriesWriteBatches writeBatches;
     size_t currentPosition = 0;
     bool needsAnotherBucket = true;

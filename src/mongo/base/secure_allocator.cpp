@@ -126,7 +126,7 @@ void EnablePrivilege(const wchar_t* name) {
  * size, and then raising the working set. This is the same reason that "i++" has race conditions
  * across multiple threads.
  */
-stdx::mutex workingSizeMutex;
+std::mutex workingSizeMutex;
 
 /**
  * There is a minimum gap between the minimum working set size and maximum working set size.
@@ -141,7 +141,7 @@ void growWorkingSize(std::size_t bytes) {
     size_t minWorkingSetSize;
     size_t maxWorkingSetSize;
 
-    stdx::lock_guard<stdx::mutex> lock(workingSizeMutex);
+    std::lock_guard<std::mutex> lock(workingSizeMutex);
 
     if (!GetProcessWorkingSetSize(GetCurrentProcess(), &minWorkingSetSize, &maxWorkingSetSize)) {
         auto str = fmtError("Failed to GetProcessWorkingSetSize");
@@ -376,7 +376,7 @@ public:
     void deallocate(void* ptr, std::size_t bytes);
 
 private:
-    stdx::mutex allocatorMutex;
+    std::mutex allocatorMutex;
     stdx::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
     std::shared_ptr<Allocation> lastAllocation;
 };
@@ -390,7 +390,7 @@ MONGO_INITIALIZER_GENERAL(SecureAllocator, (), ())
 }
 
 void* GlobalSecureAllocator::allocate(std::size_t bytes, std::size_t alignOf) {
-    stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
+    std::lock_guard<std::mutex> lk(allocatorMutex);
     gSecureAllocCountInfo().updateSecureAllocByteCount(static_cast<int32_t>(bytes));
     if (lastAllocation) {
         auto out = lastAllocation->allocate(bytes, alignOf);
@@ -410,7 +410,7 @@ void* GlobalSecureAllocator::allocate(std::size_t bytes, std::size_t alignOf) {
 void GlobalSecureAllocator::deallocate(void* ptr, std::size_t bytes) {
     secureZeroMemory(ptr, bytes);
 
-    stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
+    std::lock_guard<std::mutex> lk(allocatorMutex);
     gSecureAllocCountInfo().updateSecureAllocByteCount(-static_cast<int32_t>(bytes));
 
     secureTable.erase(ptr);

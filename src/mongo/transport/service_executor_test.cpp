@@ -118,7 +118,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    stdx::chrono::system_clock::time_point systemTime() final {
+    std::chrono::system_clock::time_point systemTime() final {
         MONGO_UNREACHABLE;
     }
 

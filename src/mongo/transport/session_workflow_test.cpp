@@ -60,7 +60,6 @@
 #include "mongo/rpc/op_compressed.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -96,6 +95,7 @@
 #include <iosfwd>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -218,7 +218,7 @@ public:
 
     template <Event e>
     void push(unique_function<EventSigT<e>> cb) {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         invariant(!_cb);
         _cb = std::make_unique<Expectation<e>>(std::move(cb));
         _cv.notify_one();
@@ -226,7 +226,7 @@ public:
 
     template <Event e>
     unique_function<EventSigT<e>> pop() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         _cv.wait(lk, [&] { return !!_cb; });
         auto h = std::exchange(_cb, {});
         invariant(h->event() == e,
@@ -235,7 +235,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _cv;
     std::unique_ptr<BasicExpectation> _cb;
 };

@@ -58,7 +58,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -74,6 +73,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <type_traits>
 
@@ -121,13 +121,13 @@ auto& shardRequestsComplete = *MetricBuilder<Counter64>{"shardRequests.complete"
 class NetworkInterfaceTL::SynchronizedCounters {
 public:
     auto get() const {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _data;
     }
 
 
     void recordResult(const Status& status) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (status.isOK()) {
             // Increment the count of commands that received a valid response
             ++_data.succeeded;
@@ -151,12 +151,12 @@ public:
      * Increment the count of commands sent over the network
      */
     void recordSent() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         ++_data.sent;
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     Counters _data;
 };
 
@@ -181,7 +181,7 @@ NetworkInterfaceTL::~NetworkInterfaceTL() {
     shutdown();
 
     {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _stoppedCV.wait(lk, [&] { return _state == kStopped; });
     }
 
@@ -223,7 +223,7 @@ std::string NetworkInterfaceTL::getHostName() {
 }
 
 void NetworkInterfaceTL::startup() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(_state != kStarted, "NetworkInterface has already started");
 
     if (_state != kDefault) {
@@ -270,7 +270,7 @@ void NetworkInterfaceTL::_run() {
 void NetworkInterfaceTL::shutdown() {
     decltype(_inProgress) inProgress;
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         switch (_state) {
             case kDefault:
                 _state = kStopped;
@@ -295,7 +295,7 @@ void NetworkInterfaceTL::shutdown() {
     _shutdownAllAlarms();
 
     const ScopeGuard finallySetStopped = [&] {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _state = kStopped;
         invariant(_inProgress.size() == 0);
         _stoppedCV.notify_one();
@@ -318,7 +318,7 @@ void NetworkInterfaceTL::shutdown() {
     // stopping the reactor.
     {
         hangBeforeDrainingCommandStates.pauseWhileSet();
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         LOGV2_DEBUG(9213400,
                     2,
                     "Waiting for any pending network interface operations to complete",
@@ -333,7 +333,7 @@ void NetworkInterfaceTL::shutdown() {
 }
 
 bool NetworkInterfaceTL::inShutdown() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _inShutdown_inlock(lk);
 }
 
@@ -342,7 +342,7 @@ bool NetworkInterfaceTL::_inShutdown_inlock(WithLock lk) const {
 }
 
 Status NetworkInterfaceTL::_verifyRunning() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     switch (_state) {
         case kStopping:
         case kStopped:
@@ -382,7 +382,7 @@ Date_t NetworkInterfaceTL::now() {
 void NetworkInterfaceTL::_registerCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                           std::shared_ptr<CommandStateBase> cmdState) {
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
 
         if (_inShutdown_inlock(lk)) {
             uassertStatusOK({ErrorCodes::ShutdownInProgress, kShutdownInProgressMsg});
@@ -423,7 +423,7 @@ NetworkInterfaceTL::CommandStateBase::~CommandStateBase() {
 void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
     invariant(!status.isOK());
     {
-        stdx::lock_guard<stdx::mutex> lk(cancelMutex);
+        std::lock_guard<std::mutex> lk(cancelMutex);
         if (!cancelStatus.isOK()) {
             LOGV2_DEBUG(9257001,
                         2,
@@ -517,7 +517,7 @@ void NetworkInterfaceTL::CommandStateBase::releaseClientHandle(Status status) {
 }
 
 void NetworkInterfaceTL::_unregisterCommand(const TaskExecutor::CallbackHandle& cbHandle) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (!_inProgress.erase(cbHandle)) {
         // We never made it into the inProgress list.
         return;
@@ -641,7 +641,7 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
                                        const BatonHandle&) {
     std::shared_ptr<NetworkInterfaceTL::CommandStateBase> cmdStateToCancel;
     {
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
         auto it = _inProgress.find(cbHandle);
         if (it == _inProgress.end()) {
             return;
@@ -724,7 +724,7 @@ SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationTok
     auto alarmState = std::make_shared<AlarmState>(this, id, _reactor->makeTimer(), token);
 
     {
-        stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
 
         if (_inShutdown_inlock(lk)) {
             // Check that we've won any possible race with _shutdownAllAlarms();
@@ -765,7 +765,7 @@ SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationTok
 
 void NetworkInterfaceTL::_shutdownAllAlarms() {
     auto alarms = [&] {
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
         invariant(_state == kStopping);
         return _inProgressAlarms;
     }();
@@ -779,13 +779,13 @@ void NetworkInterfaceTL::_shutdownAllAlarms() {
     }
 
     {
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::unique_lock<ObservableMutex<std::mutex>> lk(_mutex);
         _stoppedCV.wait(lk, [&] { return _inProgressAlarms.empty(); });
     }
 }
 
 void NetworkInterfaceTL::_removeAlarm(std::uint64_t id) {
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
     auto it = _inProgressAlarms.find(id);
     invariant(it != _inProgressAlarms.end());
     _inProgressAlarms.erase(it);
@@ -940,7 +940,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
             [this, anchor = shared_from_this()](StatusWith<RemoteCommandResponse> swResp) {
                 auto status = swResp.isOK() ? swResp.getValue().status : swResp.getStatus();
                 if (swResp == ErrorCodes::CallbackCanceled) {
-                    stdx::lock_guard lock(cancelMutex);
+                    std::lock_guard lock(cancelMutex);
                     if (!cancelStatus.isOK()) {
                         status.addContext(
                             fmt::format("I/O interrupted due to {}", cancelStatus.codeString()));

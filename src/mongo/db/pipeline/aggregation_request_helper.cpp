@@ -282,7 +282,7 @@ void updateOpDescriptionForLog(OperationContext* opCtx,
                                const BSONArray& pipelineForLog) {
     auto modifiedCmd = buildModifiedAggregateCommandForLog(cmdObj, pipelineForLog);
     if (Client* client = opCtx->getClient()) {
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         CurOp::get(opCtx)->setOpDescription(lk, modifiedCmd);
     }
 }
@@ -298,7 +298,7 @@ void restoreExplainOpDescription(OperationContext* opCtx, const BSONObj& outerRe
                 builder.append(elem);
             }
         }
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         curOp->setOpDescription(lk, builder.obj());
     }
 }

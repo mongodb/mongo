@@ -348,7 +348,7 @@ InstrumentT& MetricsService::_createMetric(MetricName name,
 
     const std::string nameStr(name.getName());
 
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     // Check for duplicate.
     if (auto* duplicate = getDuplicateMetric<InstrumentT>(lock, nameStr, identifier)) {
@@ -564,7 +564,7 @@ Histogram<int64_t>& MetricsService::createInt64Histogram(MetricName name,
 }
 
 void MetricsService::clearForTests() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 #ifdef MONGO_CONFIG_OTEL
     _observableInstruments.clear();
 #endif

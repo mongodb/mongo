@@ -32,13 +32,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -116,11 +116,11 @@ private:
     const uint64_t _tableId;  // Not persisted
 
     // Serializes flushes to disk.
-    stdx::mutex _flushMutex;
+    std::mutex _flushMutex;
 
     using Buffer = StringMap<std::shared_ptr<SizeInfo>>;
 
-    mutable stdx::mutex _bufferMutex;  // Guards _buffer
+    mutable std::mutex _bufferMutex;  // Guards _buffer
     Buffer _buffer;
 };
 }  // namespace mongo

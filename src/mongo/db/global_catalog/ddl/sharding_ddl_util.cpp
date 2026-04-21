@@ -650,7 +650,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     }();
 
     if (osi.getSessionId()) {
-        auto lk = stdx::lock_guard(*newOpCtx->getClient());
+        auto lk = std::lock_guard(*newOpCtx->getClient());
         newOpCtx->setLogicalSessionId(*osi.getSessionId());
         newOpCtx->setTxnNumber(*osi.getTxnNumber());
     }

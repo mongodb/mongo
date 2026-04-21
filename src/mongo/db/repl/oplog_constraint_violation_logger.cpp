@@ -70,7 +70,7 @@ void OplogConstraintViolationLogger::logViolationIfReady(OplogConstraintViolatio
                                                          boost::optional<Status> status) {
     const auto index = static_cast<int>(type);
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     const auto lastLog = _lastLogTimes[index];
     const auto now = Date_t::now();
 

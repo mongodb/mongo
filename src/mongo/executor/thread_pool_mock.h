@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/modules.h"
@@ -77,14 +76,14 @@ public:
     void schedule(Task task) override;
 
 private:
-    void _consumeOneTask(stdx::unique_lock<stdx::mutex>& lk);
-    void _shutdown(stdx::unique_lock<stdx::mutex>& lk);
-    void _join(stdx::unique_lock<stdx::mutex>& lk);
+    void _consumeOneTask(std::unique_lock<std::mutex>& lk);
+    void _shutdown(std::unique_lock<std::mutex>& lk);
+    void _join(std::unique_lock<std::mutex>& lk);
 
     // These are the options with which the pool was configured at construction time.
     const Options _options;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::thread _worker;
     std::vector<Task> _tasks;
     PseudoRandom _prng;

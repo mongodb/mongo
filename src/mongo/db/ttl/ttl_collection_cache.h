@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <mutex>
 #include <string>
 #include <utility>
 #include <variant>
@@ -110,7 +110,7 @@ private:
      */
     void _deregisterTTLInfo(UUID uuid, const Info& info);
 
-    stdx::mutex _ttlInfosLock;
+    std::mutex _ttlInfosLock;
     InfoMap _ttlInfos;
 };
 }  // namespace MONGO_MOD_PUB mongo

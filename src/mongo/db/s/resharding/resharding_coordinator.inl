@@ -126,7 +126,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseBeforeTellingRecipientsToClone);
 #ifdef RESHARDING_COORDINATOR_PART_0
 
 void CoordinatorCancellationTokenHolder::abort(Status reason) {
-    stdx::unique_lock wLock(_abortMutex);
+    std::unique_lock wLock(_abortMutex);
     if (_abortReason) {
         if (_abortReason != reason) {
             LOGV2_WARNING(11400501,
@@ -731,7 +731,7 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::run", true);
 
     auto abortRequest = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_abortRequestMutex);
+        std::lock_guard<std::mutex> lk(_abortRequestMutex);
         _ctHolder = std::make_unique<CoordinatorCancellationTokenHolder>(stepdownToken);
         return _abortRequest;
     }();
@@ -846,7 +846,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
                 });
 
             {
-                auto lg = stdx::lock_guard(_fulfillmentMutex);
+                auto lg = std::lock_guard(_fulfillmentMutex);
                 // reportStatus is the status reported back to the caller, which may be
                 // different than the status if we interrupted the future chain because the
                 // resharding was already completed on a previous primary.
@@ -909,7 +909,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
 
             if (!status.isOK()) {
                 {
-                    auto lg = stdx::lock_guard(_fulfillmentMutex);
+                    auto lg = std::lock_guard(_fulfillmentMutex);
                     if (!_completionPromise.getFuture().isReady()) {
                         _completionPromise.setError(status);
                     }
@@ -1013,7 +1013,7 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
 
 void ReshardingCoordinator::abort(ReshardingCoordinator::AbortRequest abortRequest) {
     auto ctHolderInitialized = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_abortRequestMutex);
+        std::lock_guard<std::mutex> lk(_abortRequestMutex);
         _abortRequest.emplace(abortRequest);
         return !(_ctHolder == nullptr);
     }();
@@ -1040,7 +1040,7 @@ void ReshardingCoordinator::onOkayToEnterCritical() {
 }
 
 void ReshardingCoordinator::_fulfillOkayToEnterCritical(Status status) {
-    auto lg = stdx::lock_guard(_fulfillmentMutex);
+    auto lg = std::lock_guard(_fulfillmentMutex);
     if (_canEnterCritical.getFuture().isReady())
         return;
 

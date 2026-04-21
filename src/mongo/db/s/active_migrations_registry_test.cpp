@@ -37,7 +37,6 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
-#include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 
 #include <future>
@@ -185,7 +184,7 @@ TEST_F(MoveChunkRegistration,
     nolint_promise<void> inLock;
 
     // Registry thread.
-    auto result = stdx::async(stdx::launch::async, [&] {
+    auto result = std::async(std::launch::async, [&] {
         // 2. Lock the registry so that starting to receive will block.
         ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
         auto opCtxHolder = tc->makeOperationContext();
@@ -204,7 +203,7 @@ TEST_F(MoveChunkRegistration,
     });
 
     // Receive thread.
-    auto lockReleased = stdx::async(stdx::launch::async, [&] {
+    auto lockReleased = std::async(std::launch::async, [&] {
         ThreadClient tc("receive thread", getGlobalServiceContext()->getService());
         auto opCtx = tc->makeOperationContext();
 
@@ -253,7 +252,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
     nolint_promise<void> inLock;
 
     // Migration thread.
-    auto result = stdx::async(stdx::launch::async, [&] {
+    auto result = std::async(std::launch::async, [&] {
         // 2. Start a migration so that the registry lock will block when acquired.
         auto scopedDonateChunk = _registry.registerDonateChunk(
             operationContext(),
@@ -273,7 +272,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
     });
 
     // Registry locking thread.
-    auto lockReleased = stdx::async(stdx::launch::async, [&] {
+    auto lockReleased = std::async(std::launch::async, [&] {
         ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
         auto opCtxHolder = tc->makeOperationContext();
         opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -317,7 +316,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
     nolint_promise<void> inLock;
 
     // Migration thread.
-    auto result = stdx::async(stdx::launch::async, [&] {
+    auto result = std::async(std::launch::async, [&] {
         // 2. Start a migration so that the registry lock will block when acquired.
         auto scopedReceiveChunk = _registry.registerReceiveChunk(
             operationContext(),
@@ -337,7 +336,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
     });
 
     // Registry locking thread.
-    auto lockReleased = stdx::async(stdx::launch::async, [&] {
+    auto lockReleased = std::async(std::launch::async, [&] {
         ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
         auto opCtxHolder = tc->makeOperationContext();
         opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

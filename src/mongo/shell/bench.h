@@ -42,7 +42,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -56,6 +55,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -475,7 +475,7 @@ public:
     void onWorkerFinished();
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     stdx::condition_variable _stateChangeCondition;
 
@@ -626,7 +626,7 @@ public:
 
 private:
     // TODO: Same as for createWithConfig.
-    static stdx::mutex _staticMutex;
+    static std::mutex _staticMutex;
     static std::map<OID, BenchRunner*> _activeRuns;
 
     OID _oid;

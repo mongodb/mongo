@@ -52,7 +52,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/time_support.h"
@@ -75,7 +74,7 @@ namespace {
  */
 class MutexYielder : public ResourceYielder {
 public:
-    MutexYielder(stdx::mutex* mutex) : _lock(*mutex, stdx::defer_lock) {}
+    MutexYielder(std::mutex* mutex) : _lock(*mutex, std::defer_lock) {}
 
     void yield(OperationContext* opCtx) override {
         _lock.unlock();
@@ -85,12 +84,12 @@ public:
         _lock.lock();
     }
 
-    stdx::unique_lock<stdx::mutex>& getLock() {
+    std::unique_lock<std::mutex>& getLock() {
         return _lock;
     }
 
 private:
-    stdx::unique_lock<stdx::mutex> _lock;
+    std::unique_lock<std::mutex> _lock;
 };
 
 /**
@@ -619,7 +618,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
     // thread holds this while it calls getNext(). This is to simulate the case where a thread may
     // hold some "real" resources which need to be yielded while waiting, such as the Session, or
     // the locks held in a transaction.
-    stdx::mutex artificalGlobalMutex;
+    std::mutex artificalGlobalMutex;
 
     boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
         getOpCtx(), std::move(spec), Pipeline::create({source}, getExpCtx()));

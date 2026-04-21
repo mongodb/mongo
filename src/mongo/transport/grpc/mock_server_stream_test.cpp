@@ -31,7 +31,6 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/message.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_server_context.h"
@@ -50,6 +49,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>

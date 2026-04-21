@@ -99,7 +99,7 @@ private:
     struct State {
         State(size_t leftToDo) : leftToDo(leftToDo) {}
 
-        stdx::mutex mutex;
+        std::mutex mutex;
         stdx::condition_variable cv;
         size_t leftToDo;
         size_t running = 0;

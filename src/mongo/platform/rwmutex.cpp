@@ -31,7 +31,6 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/static_immortal.h"
@@ -41,6 +40,7 @@
 #include <forward_list>
 #include <functional>
 #include <memory>
+#include <mutex>
 
 #include <boost/optional.hpp>
 #include <fmt/format.h>
@@ -71,7 +71,7 @@ struct alignas(64) LockEntry {
 class LockEntryRegistry {
 public:
     LockEntry* checkout() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (MONGO_unlikely(_freeList.empty())) {
             _refill(lk);
         }
@@ -85,7 +85,7 @@ public:
     void release(LockEntry* lockEntry) {
         invariant(lockEntry->entry.load() == nullptr,
                   "Thread destroyed while holding on to a WriteRarelyRWMutex read lock");
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _freeList.push_front(lockEntry);
         --_checkedOut;
     }
@@ -100,7 +100,7 @@ public:
     }
 
     void reset_forTest() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         invariant(_checkedOut == 0, "Cannot reset a `LockEntryRegistry` with active leases!");
 
         _freeList.clear();
@@ -137,7 +137,7 @@ private:
         _blockHoldersHead.store(bh.release());
     }
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::forward_list<LockEntry*> _freeList;
 
     // Debug-only counter that tracks the number of checked-out instances of `LockEntry`.

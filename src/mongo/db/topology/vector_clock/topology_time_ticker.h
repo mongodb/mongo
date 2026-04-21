@@ -33,10 +33,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <map>
+#include <mutex>
 
 namespace mongo {
 
@@ -78,7 +78,7 @@ public:
     std::map<Timestamp, Timestamp> getTopologyTimeByLocalCommitTime_forTest() const;
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     /**
      * Container that stores time-related information about a topology change in a sharded cluster.

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -65,7 +64,7 @@ private:
     size_t _threadCount;
     size_t _threadsWaiting;
     uint64_t _generation;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _condition;
 };
 

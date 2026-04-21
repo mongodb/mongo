@@ -41,7 +41,6 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
@@ -237,12 +236,12 @@ public:
                                  const BSONObj& postImage);
 
     int getQueriesCountForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _queries.getCount();
     }
 
     std::vector<BSONObj> getQueriesForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _queries.getDocuments();
     }
 
@@ -251,12 +250,12 @@ public:
     }
 
     int getDiffsCountForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _diffs.getCount();
     }
 
     std::vector<BSONObj> getDiffsForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _diffs.getDocuments();
     }
 
@@ -307,7 +306,7 @@ private:
      *
      * Throws an error if the inserts fail with any other error.
      */
-    void _flush(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lk, Buffer* buffer);
+    void _flush(OperationContext* opCtx, std::unique_lock<std::mutex>& lk, Buffer* buffer);
 
     /**
      * Returns true if the total size of the buffered queries and diffs has exceeded the maximum
@@ -317,7 +316,7 @@ private:
 
     AtomicWord<bool> _isPrimary{false};
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     std::shared_ptr<PeriodicJobAnchor> _periodicQueryWriter;
     Buffer _queries{NamespaceString::kConfigSampledQueriesNamespace};

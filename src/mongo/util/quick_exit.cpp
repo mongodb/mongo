@@ -39,7 +39,7 @@
 #endif
 
 // NOTE: Header only dependencies are OK in this library.
-#include "mongo/stdx/mutex.h"  // IWYU pragma: keep
+#include <mutex>  // IWYU pragma: keep
 
 #if !defined(__has_include)
 #define __has_include(x) 0
@@ -85,7 +85,7 @@ extern "C" void __gcov_reset();
 namespace mongo {
 
 namespace {
-stdx::mutex* const quickExitMutex = new stdx::mutex;
+std::mutex* const quickExitMutex = new std::mutex;
 }  // namespace
 
 void quickExitWithoutLogging(ExitCode code) {

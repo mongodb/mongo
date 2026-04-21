@@ -31,9 +31,9 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_retry_server_parameters_gen.h"
-#include "mongo/stdx/mutex.h"
 
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 
 namespace mongo {
@@ -78,7 +78,7 @@ Status ShardSharedStateCache::updateRetryBudgetCapacity(std::int32_t capacity) {
 }
 
 void ShardSharedStateCache::forgetShardState(const ShardId& shardId) {
-    stdx::unique_lock _{_mutex};
+    std::unique_lock _{_mutex};
     _shardStateById.erase(shardId);
 }
 
@@ -90,7 +90,7 @@ auto ShardSharedStateCache::getShardState(const ShardId& shardId) -> std::shared
         }
     }
 
-    stdx::unique_lock _{_mutex};
+    std::unique_lock _{_mutex};
     const auto [it, inserted] = _shardStateById.try_emplace(
         shardId,
         std::make_shared<State>(gShardRetryTokenReturnRate.loadRelaxed(),

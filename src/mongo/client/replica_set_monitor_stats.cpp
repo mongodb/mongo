@@ -56,7 +56,7 @@ void ReplicaSetMonitorManagerStats::report(BSONObjBuilder* builder, bool forFTDC
         getHostStats.appendNumber("currentlyActive", _getHostAndRefreshCurrent.get());
         getHostStats.appendNumber("totalLatencyMicros", _getHostAndRefreshAggregateLatency.get());
 
-        stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
         getHostStats.appendNumber("maxLatencyMicros",
                                   durationCount<Microseconds>(_getHostAndRefreshMaxLatency));
     }
@@ -66,7 +66,7 @@ void ReplicaSetMonitorManagerStats::report(BSONObjBuilder* builder, bool forFTDC
         helloStats.appendNumber("currentlyActive", _helloCurrent.get());
         helloStats.appendNumber("totalLatencyMicros", _helloAggregateLatency.get());
 
-        stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+        std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
         helloStats.appendNumber("maxLatencyMicros", durationCount<Microseconds>(_helloMaxLatency));
     }
 }
@@ -97,7 +97,7 @@ void ReplicaSetMonitorManagerStats::leaveGetHostAndRefresh(Microseconds latency)
     _getHostAndRefreshCurrent.decrement(1);
     _getHostAndRefreshAggregateLatency.increment(latency.count());
 
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
     kProcessLatency(_getHostAndRefreshMaxLatency,
                     latency,
                     _lastTimeGetHostAndRefreshMaxLatencyUpdated,
@@ -113,7 +113,7 @@ void ReplicaSetMonitorManagerStats::leaveHello(Microseconds latency) {
     _helloCurrent.decrement(1);
     _helloAggregateLatency.increment(latency.count());
 
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
     kProcessLatency(_helloMaxLatency, latency, _lastTimeHelloMaxLatencyUpdated, _resetTimeout);
 }
 

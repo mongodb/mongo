@@ -57,7 +57,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -235,8 +234,8 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
     // Must name the return of value std::async.  The destructor of std::future joins the
     // asynchrounous task. (If it were left unnamed, the destructor would run inline, and the test
     // would hang forever.)
-    auto fut = stdx::async(stdx::launch::async,
-                           [&]() { onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj())); });
+    auto fut = std::async(std::launch::async,
+                          [&]() { onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj())); });
     fetcher->fetchAndScheduleInsertion();
 }
 
@@ -270,7 +269,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTestRetry) {
         nullptr,
         0 /* maxBytesPerThread */);
 
-    auto fut = stdx::async(stdx::launch::async, [&]() {
+    auto fut = std::async(std::launch::async, [&]() {
         onCommand(getOnMigrateCloneCommandCb(getErrorRetryable()));
         onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj()));
     });
@@ -306,7 +305,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
         nullptr,
         0 /* maxBytesPerThread */);
 
-    auto fut = stdx::async(stdx::launch::async, [&]() {
+    auto fut = std::async(std::launch::async, [&]() {
         for (int i = 0; i < 8; ++i) {
             onCommand(getOnMigrateCloneCommandCb(getBatchBsonObj()));
         }

@@ -31,7 +31,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/version/releases.h"
 
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 
@@ -94,7 +94,7 @@ private:
 
     std::unique_ptr<PeriodicJobAnchor> _job;
     multiversion::FeatureCompatibilityVersion _lastFcv;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     std::unique_ptr<SharedPromise<void>> _refreshPromise;
 };

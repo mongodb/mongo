@@ -48,7 +48,7 @@
 namespace mongo {
 
 void AuthorizationContract::enterCommandScope() {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
 
     // Only clear checks when its a top level command.
     if (_commandDepth == 0) {
@@ -58,13 +58,13 @@ void AuthorizationContract::enterCommandScope() {
 }
 
 void AuthorizationContract::exitCommandScope() {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
     invariant(_commandDepth > 0);
     _commandDepth--;
 }
 
 void AuthorizationContract::clear() {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
     clear(lck);
 }
 
@@ -82,7 +82,7 @@ void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
     if (_commandDepth > 1) {
         return;
     }
@@ -95,7 +95,7 @@ void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
 }
 
 bool AuthorizationContract::hasAccessCheck(AccessCheckEnum check) const {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
 
     return _checks.test(static_cast<size_t>(check));
 }
@@ -105,7 +105,7 @@ void AuthorizationContract::addPrivilege(const Privilege& p) {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
     if (_commandDepth > 1) {
         return;
     }
@@ -120,7 +120,7 @@ void AuthorizationContract::addPrivilege(const Privilege& p) {
 }
 
 bool AuthorizationContract::hasPrivileges(const Privilege& p) const {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
 
     auto matchType = p.getResourcePattern().matchType();
 
@@ -133,7 +133,7 @@ bool AuthorizationContract::contains(const AuthorizationContract& other) const {
         return true;  // this and other are same - so contains is necessarily true
     }
 
-    std::scoped_lock<stdx::mutex, stdx::mutex> lk(_mutex, other._mutex);
+    std::scoped_lock<std::mutex, std::mutex> lk(_mutex, other._mutex);
 
     if ((_checks | other._checks) != _checks) {
         if (kDebugBuild) {
@@ -179,7 +179,7 @@ bool AuthorizationContract::contains(const AuthorizationContract& other) const {
 }
 
 bool AuthorizationContract::isPermissionChecked() const {
-    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    std::lock_guard<std::mutex> lck(_mutex);
 
     return _isPermissionChecked;
 }

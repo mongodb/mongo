@@ -53,7 +53,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
@@ -155,7 +154,7 @@ public:
             })
             .then([=, this, f = std::move(f), p = std::move(p), dbName = dbName.toString_forTest()](
                       auto&& target) mutable {
-                stdx::lock_guard lg{_m};
+                std::lock_guard lg{_m};
                 _requests.emplace_back(cmdBSON, dbName, target, std::move(p));
                 _hasRequestsCV.notify_one();
                 return std::move(f).onCompletion([targetUsed = target](StatusWith<BSONObj> resp) {
@@ -177,7 +176,7 @@ public:
      * one arrives.
      */
     RequestInfo& getNextRequest() {
-        stdx::unique_lock lk(_m);
+        std::unique_lock lk(_m);
         auto pred = [this] {
             auto nextUnprocessedRequest =
                 std::find_if(_requests.begin(), _requests.end(), [](const RequestInfo& r) {
@@ -205,7 +204,7 @@ private:
     // All requests that have been scheduled on the mock.
     std::deque<RequestInfo> _requests;
     // Protects the above _requests queue.
-    stdx::mutex _m;
+    std::mutex _m;
     stdx::condition_variable _hasRequestsCV;
 };
 
@@ -263,7 +262,7 @@ public:
             .thenRunOn(exec)
             .then([this, p = std::move(p), cmdBSON, dbName = dbName.toString_forTest()](
                       auto&& target) {
-                stdx::lock_guard lg(_m);
+                std::lock_guard lg(_m);
                 Request req{dbName, cmdBSON, target};
                 auto expectation =
                     std::find_if(_expectations.begin(),
@@ -324,13 +323,13 @@ public:
                             StatusWith<BSONObj> response,
                             std::string name) {
         auto [p, f] = makePromiseFuture<void>();
-        stdx::lock_guard lg(_m);
+        std::lock_guard lg(_m);
         _expectations.emplace_back(matcher, response, std::move(p), std::move(name));
         return std::move(f).semi();
     }
 
     bool hasUnmetExpectations() {
-        stdx::lock_guard lg(_m);
+        std::lock_guard lg(_m);
         auto it = std::find_if(_expectations.begin(),
                                _expectations.end(),
                                [&](const Expectation& e) { return !e.met; });
@@ -340,7 +339,7 @@ public:
     // Return the name of the first expectation registered that isn't met. If all have been met,
     // return boost::none.
     boost::optional<std::string> getFirstUnmetExpectation() {
-        stdx::lock_guard lg(_m);
+        std::lock_guard lg(_m);
         auto it = std::find_if(_expectations.begin(),
                                _expectations.end(),
                                [&](const Expectation& e) { return !e.met; });
@@ -353,7 +352,7 @@ public:
     // Return the set of names of all unmet expectations.
     StringSet getUnmetExpectations() {
         StringSet set;
-        stdx::lock_guard lg(_m);
+        std::lock_guard lg(_m);
         for (auto&& expectation : _expectations) {
             if (!expectation.met) {
                 set.insert(expectation.name);
@@ -363,12 +362,12 @@ public:
     }
 
     bool hadUnexpectedRequests() {
-        stdx::lock_guard lg(_m);
+        std::lock_guard lg(_m);
         return !_unexpectedRequests.empty();
     }
 
     boost::optional<Request> getFirstUnexpectedRequest() {
-        stdx::lock_guard lg(_m);
+        std::lock_guard lg(_m);
         if (!_unexpectedRequests.empty()) {
             return _unexpectedRequests[0];
         }
@@ -376,7 +375,7 @@ public:
     }
 
     std::vector<Request> getUnexpectedRequests() {
-        stdx::lock_guard lg(_m);
+        std::lock_guard lg(_m);
         return _unexpectedRequests;
     }
 
@@ -384,7 +383,7 @@ private:
     std::vector<Expectation> _expectations;
     std::vector<Request> _unexpectedRequests;
     // Protects the above _expectations queue.
-    stdx::mutex _m;
+    std::mutex _m;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Request& o) {

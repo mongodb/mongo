@@ -34,12 +34,12 @@
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
 #include <map>
+#include <mutex>
 #include <vector>
 
 namespace mongo {
@@ -149,7 +149,7 @@ private:
 
         LockBucket();
 
-        ObservableMutex<stdx::mutex> mutex;
+        ObservableMutex<std::mutex> mutex;
         using Map = stdx::unordered_map<ResourceId, LockHead*>;
         Map data;
     };
@@ -163,7 +163,7 @@ private:
 
         Partition();
 
-        ObservableMutex<stdx::mutex> mutex;
+        ObservableMutex<std::mutex> mutex;
         using Map = stdx::unordered_map<ResourceId, PartitionedLockHead*>;
         Map data;
     };

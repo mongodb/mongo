@@ -120,17 +120,17 @@ public:
     }
 
     void createCollection(NamespaceString nss) {
-        stdx::lock_guard<stdx::mutex> lk(_collectionsLock);
+        std::lock_guard<std::mutex> lk(_collectionsLock);
         _collections[nss] = true;
     }
 
     bool collectionExists(NamespaceString nss) {
-        stdx::lock_guard<stdx::mutex> lk(_collectionsLock);
+        std::lock_guard<std::mutex> lk(_collectionsLock);
         return _collections.contains(nss);
     }
 
     void removeCollection(NamespaceString nss) {
-        stdx::lock_guard<stdx::mutex> lk(_collectionsLock);
+        std::lock_guard<std::mutex> lk(_collectionsLock);
         _collections.erase(nss);
     }
 
@@ -187,7 +187,7 @@ private:
     AtomicWord<bool> _sessionIsCheckedOut{false};
     AtomicWord<bool> _migrationsAreBlocked{false};
 
-    stdx::mutex _collectionsLock;
+    std::mutex _collectionsLock;
     std::map<NamespaceString, bool> _collections;
 };
 

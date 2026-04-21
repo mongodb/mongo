@@ -40,11 +40,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 
+#include <mutex>
 #include <utility>
 
 #include <fmt/format.h>
@@ -62,8 +62,8 @@ Status updateSettings(const std::string& op, Updater&& updater) {
     // Global mutex to serialize updates to any ticketing system settings via the server parameters.
     // This ensures that operations like changing the algorithm and changing the concurrent write
     // transactions value do not race with each other.
-    static stdx::mutex mutex;
-    stdx::lock_guard<stdx::mutex> lock(mutex);
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
 
     if (auto client = Client::getCurrent()) {
         auto ticketingSystem = TicketingSystem::get(client->getServiceContext());

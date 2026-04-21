@@ -36,11 +36,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/sessions_collection.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 #include <type_traits>
 
 namespace mongo {
@@ -112,7 +112,7 @@ private:
                                                            LocalCallback&& localCallback,
                                                            RemoteCallback&& remoteCallback);
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::unique_ptr<RemoteCommandTargeter> _targeter;
 };
 

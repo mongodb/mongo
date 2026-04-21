@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <list>
+#include <mutex>
 
 namespace mongo {
 struct CriticalSectionWaiterToken {
@@ -73,7 +73,7 @@ public:
         int64_t numWaiters;
 
         {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
 
             for (const auto& [_, timer] : _catchupModeCriticalSections) {
                 totalTimeActiveCatchup += timer.elapsed();
@@ -102,40 +102,40 @@ public:
     }
 
     void registerCatchupCriticalSection(const Key& keyNamespace) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _catchupModeCriticalSections.erase(keyNamespace);
         _commitModeCriticalSections.erase(keyNamespace);
         _catchupModeCriticalSections.emplace(keyNamespace, Timer{});
     }
 
     void registerCommitCriticalSection(const Key& keyNamespace) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _catchupModeCriticalSections.erase(keyNamespace);
         _commitModeCriticalSections.erase(keyNamespace);
         _commitModeCriticalSections.emplace(keyNamespace, Timer{});
     }
 
     void releaseCriticalSection(const Key& keyNamespace) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _catchupModeCriticalSections.erase(keyNamespace);
         _commitModeCriticalSections.erase(keyNamespace);
     }
 
     CriticalSectionWaiterToken startWaiter() {
         CriticalSectionWaiterToken token;
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _waitersList.emplace_back();
         token.pos = std::prev(_waitersList.end());
         return token;
     }
 
     void finishWaiter(CriticalSectionWaiterToken token) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _waitersList.erase(token.pos);
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::unordered_map<Key, Timer> _commitModeCriticalSections;
     stdx::unordered_map<Key, Timer> _catchupModeCriticalSections;
     std::list<Timer> _waitersList;

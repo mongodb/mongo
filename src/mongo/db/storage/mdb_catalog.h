@@ -195,7 +195,7 @@ private:
     RecordStore* _rs;  // not owned
 
     absl::flat_hash_map<RecordId, EntryIdentifier, RecordId::Hasher> _catalogIdToEntryMap;
-    mutable stdx::mutex _catalogIdToEntryMapLock;
+    mutable std::mutex _catalogIdToEntryMapLock;
 
     KVEngine* const _engine;
 };

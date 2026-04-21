@@ -49,7 +49,6 @@
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -61,6 +60,7 @@
 #include <cstddef>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <utility>
 #include <vector>
@@ -425,7 +425,7 @@ public:
      * Returns remote metrics aggregated in this ARM without reseting the local counts.
      */
     const query_stats::DataBearingNodeMetrics& peekMetrics_forTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _metrics;
     }
 
@@ -836,7 +836,7 @@ private:
     const TailableModeEnum _tailableMode;
 
     // Must be acquired before accessing any non-const data members.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Metrics aggregated from remote cursors.
     query_stats::DataBearingNodeMetrics _metrics;

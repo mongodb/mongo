@@ -57,7 +57,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -65,6 +64,8 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 
@@ -458,7 +459,7 @@ FaultManager::~FaultManager() {
 
     LOGV2(5936601, "Shutting down periodic health checks");
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         for (auto& pair : _healthCheckContexts) {
             auto cbHandle = pair.second.callbackHandle;
             if (cbHandle) {
@@ -500,7 +501,7 @@ FaultState FaultManager::getFaultState() const {
 
 FaultConstPtr FaultManager::currentFault() const {
     // This is called indirectly by a server status section, so we must lock.
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _fault;
 }
 
@@ -515,7 +516,7 @@ FaultPtr FaultManager::_createFault() {
 
 FaultPtr FaultManager::getOrCreateFault() {
     // This is used in unit tests only.
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (!_fault) {
         _fault = std::make_shared<Fault>(_svcCtx->getFastClockSource());
     }
@@ -526,7 +527,7 @@ void FaultManager::scheduleNextHealthCheck(HealthObserver* observer,
                                            CancellationToken token,
                                            bool immediately) {
     // This can be called indirectly from `healthMonitoringIntensitiesUpdated`, so lock.
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     // Check that context callbackHandle is not set and if future exists, it is ready.
     auto existingIt = _healthCheckContexts.find(observer->getType());
@@ -603,7 +604,7 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
     // Run asynchronous health check.  Send output to the state machine. Schedule next run.
     auto healthCheckFuture = observer->periodicCheck(_taskExecutor, token);
 
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     auto contextIt = _healthCheckContexts.find(observer->getType());
     if (contextIt == _healthCheckContexts.end()) {
         LOGV2_ERROR(6418204, "Unexpected failure during health check: context not found");
@@ -616,7 +617,7 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
         .getAsync([this, acceptNotOKStatus, observer, token](StatusWith<HealthCheckStatus> status) {
             ON_BLOCK_EXIT([this, observer, token]() {
                 {
-                    stdx::lock_guard lock(_mutex);
+                    std::lock_guard lock(_mutex);
                     // Rescheduling requires the previous handle to be cleaned.
                     auto contextIt = _healthCheckContexts.find(observer->getType());
                     if (contextIt != _healthCheckContexts.end()) {
@@ -664,7 +665,7 @@ void FaultManager::_init() {
     std::set<FaultFacetType> allTypes;
     // FTDC is already running when we are initializing, so lock here to prevent concurrent
     // read/write on `_observers`.
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx);
     for (const auto& observer : _observers) {

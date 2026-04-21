@@ -116,7 +116,7 @@ SampleCollectorCache::SampleCollectorCache(Milliseconds maxSampleWaitMS,
 }
 
 SampleCollectorCache::~SampleCollectorCache() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _shutdownPool_inlock(lk);
 }
 
@@ -151,7 +151,7 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
             auto [promise, future] = makePromiseFuture<BSONObj>();
             collector.updatedValue = std::move(future).semi();
 
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _pool->schedule([it, promise = std::move(promise)](Status) mutable {
                 BSONObjBuilder collectorBuilder;
                 auto& collector = it->second;

@@ -42,13 +42,13 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -159,7 +159,7 @@ private:
     stdx::thread _thread;
 
     // Protects _state and _errMsg.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     State _state = State::NotStarted;
     std::string _errMsg;  // valid only if _state == ErrorOccurred.
 

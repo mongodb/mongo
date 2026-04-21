@@ -75,7 +75,7 @@ BaseCloner::BaseCloner(StringData clonerName,
 
 Status BaseCloner::run() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _active = true;
     }
     try {
@@ -88,13 +88,13 @@ Status BaseCloner::run() {
         setSyncFailedStatus(e.toStatus());
     }
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _active = false;
         if (!_status.isOK()) {
             return _status;
         }
     }
-    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+    std::lock_guard<ReplSyncSharedData> lk(*_sharedData);
     if (!_sharedData->getStatus(lk).isOK()) {
         LOGV2_OPTIONS(21065,
                       {getLogComponent()},
@@ -214,7 +214,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
 std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEvent(
     TaskExecutor* executor) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         invariant(!_active);
         invariant(!_startedAsync);
         _startedAsync = true;
@@ -226,7 +226,7 @@ std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEven
     auto callback = [this](const TaskExecutor::CallbackArgs& args) mutable {
         if (!args.status.isOK()) {
             {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                std::lock_guard<std::mutex> lk(_mutex);
                 _startedAsync = false;
             }
             // The _promise can run the error callback on this thread, so we must not hold the lock
@@ -236,7 +236,7 @@ std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEven
         }
         _promise.setWith([this] {
             Status status = run();
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             _startedAsync = false;
             return status;
         });
@@ -266,7 +266,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStages() {
         return kSkipRemainingStages;
     for (auto* stage : getStages()) {
         {
-            stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+            std::lock_guard<ReplSyncSharedData> lk(*_sharedData);
             if (!_sharedData->getStatus(lk).isOK())
                 return kSkipRemainingStages;
         }
@@ -280,15 +280,15 @@ BaseCloner::AfterStageBehavior BaseCloner::runStages() {
 void BaseCloner::setSyncFailedStatus(Status status) {
     invariant(!status.isOK());
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _status = status;
     }
-    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+    std::lock_guard<ReplSyncSharedData> lk(*_sharedData);
     _sharedData->setStatusIfOK(lk, status);
 }
 
 bool BaseCloner::mustExit() {
-    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+    std::lock_guard<ReplSyncSharedData> lk(*_sharedData);
     return !_sharedData->getStatus(lk).isOK();
 }
 

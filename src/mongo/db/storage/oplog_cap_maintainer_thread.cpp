@@ -297,7 +297,7 @@ void OplogCapMaintainerThread::run() {
     boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
+        std::lock_guard<std::mutex> lk(_opCtxMutex);
 
         // Initialize the thread's opCtx.
         _uniqueCtx.emplace(tc->makeOperationContext());
@@ -312,7 +312,7 @@ void OplogCapMaintainerThread::run() {
         auto ts = _uniqueCtx->get()->getServiceContext()->getTickSource();
         auto killTime = _uniqueCtx->get()->getKillTime();
         {
-            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+            std::lock_guard<std::mutex> lk(_stateMutex);
             LOGV2(11211800,
                   "Time spent between an operation interrupting the cap maintainer thread and the "
                   "thread successfully shutting down.",
@@ -321,7 +321,7 @@ void OplogCapMaintainerThread::run() {
         }
 
         {
-            stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
+            std::lock_guard<std::mutex> lk(_opCtxMutex);
             admissionPriority.reset();
             _uniqueCtx.reset();
         }
@@ -332,7 +332,7 @@ void OplogCapMaintainerThread::run() {
     if (gOplogSamplingAsyncEnabled && provider.supportsOplogSampling()) {
         try {
             {
-                stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+                std::unique_lock<std::mutex> lk(_stateMutex);
                 if (_shuttingDown) {
                     return;
                 }
@@ -379,7 +379,7 @@ void OplogCapMaintainerThread::run() {
             LOGV2(11212201, "OplogCapMaintainerThread interrupted", "status"_attr = ex.toStatus());
             interruptCount.fetchAndAdd(1);
 
-            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+            std::lock_guard<std::mutex> lk(_stateMutex);
             _shutdownReason = ex.toStatus();
 
             return;
@@ -392,7 +392,7 @@ void OplogCapMaintainerThread::run() {
             LOGV2(11650901, "OplogCapMaintainerThread interrupted", "status"_attr = ex.toStatus());
             interruptCount.fetchAndAdd(1);
 
-            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+            std::lock_guard<std::mutex> lk(_stateMutex);
             _shutdownReason = err;
             return;
         }
@@ -402,7 +402,7 @@ void OplogCapMaintainerThread::run() {
         // We need this check since the first check to _shuttingDown is guarded by
         // gOplogSamplingAsyncEnabled and we will never check this value if async is disabled.
         {
-            stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+            std::unique_lock<std::mutex> lk(_stateMutex);
             if (_shuttingDown) {
                 return;
             }
@@ -424,7 +424,7 @@ void OplogCapMaintainerThread::run() {
             LOGV2(11212204, "OplogCapMaintainerThread interrupted", "status"_attr = ex.toStatus());
             interruptCount.fetchAndAdd(1);
 
-            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+            std::lock_guard<std::mutex> lk(_stateMutex);
             _shutdownReason = ex.toStatus();
 
             return;
@@ -452,14 +452,14 @@ void OplogCapMaintainerThread::run() {
 void OplogCapMaintainerThread::shutdown(const Status& reason) {
     LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread", "reason"_attr = reason);
     {
-        stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
+        std::lock_guard<std::mutex> lk(_opCtxMutex);
         if (_uniqueCtx) {
-            stdx::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
+            std::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
             _uniqueCtx->get()->markKilled(reason.code());
         }
     }
     {
-        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+        std::lock_guard<std::mutex> lk(_stateMutex);
         _shuttingDown = true;
         _shutdownReason = reason;
     }

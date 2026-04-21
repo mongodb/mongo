@@ -86,7 +86,7 @@ WriteRarelyRWMutex::WriteLock StorageEngineChangeContext::killOpsForStorageEngin
     invariant(this == StorageEngineChangeContext::get(service));
     // Prevent new operations from being created.
     auto storageChangeLk = service->getStorageChangeMutex().writeLock();
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     {
         ServiceContext::LockedClientsCursor clientCursor(service);
         // Interrupt all active operations with a real recovery unit.
@@ -129,7 +129,7 @@ void StorageEngineChangeContext::changeStorageEngine(ServiceContext* service,
 }
 
 void StorageEngineChangeContext::notifyOpCtxDestroyed() noexcept {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     invariant(--_numOpCtxtsToWaitFor >= 0);
     LOGV2_DEBUG(5781191,
                 1,

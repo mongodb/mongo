@@ -104,7 +104,6 @@
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"

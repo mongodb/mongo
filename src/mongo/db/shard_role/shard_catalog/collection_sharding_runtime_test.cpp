@@ -107,7 +107,7 @@ public:
 
         // Sleeping some time here to guarantee that any upcoming call to this function generates a
         // different timestamp
-        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(10));
+        stdx::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
         auto chunk = ChunkType(

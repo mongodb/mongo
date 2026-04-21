@@ -193,7 +193,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto&& explainer = exec->getPlanExplainer();
     // Store the plan summary string in CurOp.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         curop->setPlanSummary(lk, explainer.getPlanSummary());
         curop->debug().queryFramework = exec->getQueryFramework();
     }
@@ -237,7 +237,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         // internal command to create a temp collection, changing the curop namespace to the name of
         // this temp collection.
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setNS(lk, parsedMr.getNamespace());
         }
         uassertStatusOK(

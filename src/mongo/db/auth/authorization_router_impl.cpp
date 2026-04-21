@@ -61,13 +61,13 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
     // variable or with some novel Notifiable/Waitable-like type that synthesizes multiple
     // notifications.
     constexpr auto kCheckPeriod = Milliseconds{1};
-    stdx::mutex m;
+    std::mutex m;
     auto cv = stdx::condition_variable{};
     auto pred = [&] {
         return !fp.isStillEnabled() || !user.isValid();
     };
     auto waitOneCycle = [&] {
-        auto lk = stdx::unique_lock(m);
+        auto lk = std::unique_lock(m);
         return !opCtx->waitForConditionOrInterruptFor(cv, lk, kCheckPeriod, pred);
     };
 
@@ -291,7 +291,7 @@ void AuthorizationRouterImpl::notifyDDLOperation(OperationContext* opCtx,
 }
 
 OID AuthorizationRouterImpl::getCacheGeneration() {
-    stdx::lock_guard lg(_cacheGenerationMutex);
+    std::lock_guard lg(_cacheGenerationMutex);
     return _cacheGeneration;
 }
 
@@ -397,7 +397,7 @@ StatusWith<UserHandle> AuthorizationRouterImpl::reacquireUser(OperationContext* 
 }
 
 void AuthorizationRouterImpl::_updateCacheGeneration() {
-    stdx::lock_guard lg(_cacheGenerationMutex);
+    std::lock_guard lg(_cacheGenerationMutex);
     _cacheGeneration = OID::gen();
 }
 

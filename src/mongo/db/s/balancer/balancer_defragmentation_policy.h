@@ -39,7 +39,6 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -49,6 +48,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -187,7 +187,7 @@ private:
 
     const std::string kPolicyName{"BalancerDefragmentationPolicy"};
 
-    stdx::mutex _stateMutex;
+    std::mutex _stateMutex;
 
     ClusterStatistics* const _clusterStats;
 

@@ -32,7 +32,8 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
-#include "mongo/stdx/mutex.h"
+
+#include <mutex>
 
 namespace mongo {
 class StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor final
@@ -46,7 +47,7 @@ public:
 private:
     static inline const auto kLogLevel = 1;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     bool _isShutdown = false;
 };
 }  // namespace mongo

@@ -127,7 +127,7 @@ const TestCase testCases[]{
      BSON("$date" << BSON("$numberLong" << "-9223372036854775808")),
      BSON("$date" << BSON("$numberLong" << "-9223372036854775808")),
      JsonCompatible::no},
-    {Date_t::fromDurationSinceEpoch(stdx::chrono::years{50}),
+    {Date_t::fromDurationSinceEpoch(std::chrono::years{50}),
      BSON("$date" << BSON("$numberLong" << "1577847600000")),
      BSON("$date" << "2020-01-01T03:00:00.000Z"),
      JsonCompatible::no},

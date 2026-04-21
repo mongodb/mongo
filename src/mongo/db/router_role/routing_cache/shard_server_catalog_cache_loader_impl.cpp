@@ -484,7 +484,7 @@ void ShardServerCatalogCacheLoaderImpl::notifyOfCollectionRefreshEndMarkerSeen(
 }
 
 void ShardServerCatalogCacheLoaderImpl::initializeReplicaSetRole(bool isPrimary) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     invariant(_role == ReplicaSetRole::None);
 
     if (isPrimary) {
@@ -495,7 +495,7 @@ void ShardServerCatalogCacheLoaderImpl::initializeReplicaSetRole(bool isPrimary)
 }
 
 void ShardServerCatalogCacheLoaderImpl::onStepDown() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     invariant(_role != ReplicaSetRole::None);
     _contexts.interrupt(ErrorCodes::PrimarySteppedDown);
     ++_term;
@@ -503,7 +503,7 @@ void ShardServerCatalogCacheLoaderImpl::onStepDown() {
 }
 
 void ShardServerCatalogCacheLoaderImpl::onStepUp() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     invariant(_role != ReplicaSetRole::None);
     _contexts.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
     ++_term;
@@ -513,13 +513,13 @@ void ShardServerCatalogCacheLoaderImpl::onStepUp() {
 void ShardServerCatalogCacheLoaderImpl::onReplicationRollback() {
     // No need to increment the term since this interruption is only to prevent the secondary
     // refresh thread from getting stuck or waiting on an incorrect opTime.
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     _contexts.interrupt(ErrorCodes::Interrupted);
 }
 
 void ShardServerCatalogCacheLoaderImpl::shutDown() {
     {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        std::lock_guard<std::mutex> lg(_mutex);
         if (_inShutdown) {
             return;
         }
@@ -530,7 +530,7 @@ void ShardServerCatalogCacheLoaderImpl::shutDown() {
     // Prevent further scheduling, then interrupt ongoing tasks.
     _executor->shutdown();
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         _contexts.interrupt(ErrorCodes::InterruptedAtShutdown);
         ++_term;
     }
@@ -555,7 +555,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChu
     bool isPrimary;
     long long term;
     std::tie(isPrimary, term) = [&] {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         return std::make_tuple(_role == ReplicaSetRole::Primary, _term);
     }();
 
@@ -574,7 +574,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChu
                 // We may have missed an OperationContextGroup interrupt since this operation
                 // began but before the OperationContext was added to the group. So we'll check
                 // that we're still in the same _term.
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
                 uassert(ErrorCodes::InterruptedDueToReplStateChange,
                         "Unable to refresh routing table because replica set state changed or "
                         "the node is shutting down.",
@@ -597,7 +597,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
             !dbName.isAdminDB() && !dbName.isConfigDB());
 
     const auto [isPrimary, term] = [&] {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         return std::make_tuple(_role == ReplicaSetRole::Primary, _term);
     }();
 
@@ -618,7 +618,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
                 // We may have missed an OperationContextGroup interrupt since this operation began
                 // but before the OperationContext was added to the group. So we'll check that we're
                 // still in the same _term.
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
                 uassert(ErrorCodes::InterruptedDueToReplStateChange,
                         "Unable to refresh database because replica set state changed or the node "
                         "is shutting down.",
@@ -636,7 +636,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
 
 void ShardServerCatalogCacheLoaderImpl::waitForCollectionFlush(OperationContext* opCtx,
                                                                const NamespaceString& nss) {
-    stdx::unique_lock<stdx::mutex> lg(_mutex);
+    std::unique_lock<std::mutex> lg(_mutex);
     const auto initialTerm = _term;
 
     boost::optional<uint64_t> taskNumToWait;
@@ -703,7 +703,7 @@ void ShardServerCatalogCacheLoaderImpl::waitForCollectionFlush(OperationContext*
 void ShardServerCatalogCacheLoaderImpl::waitForDatabaseFlush(OperationContext* opCtx,
                                                              const DatabaseName& dbName) {
 
-    stdx::unique_lock<stdx::mutex> lg(_mutex);
+    std::unique_lock<std::mutex> lg(_mutex);
     const auto initialTerm = _term;
 
     boost::optional<uint64_t> taskNumToWait;
@@ -795,7 +795,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_runPr
     // Get the max version the loader has.
     const auto maxLoaderVersion = [&] {
         {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_mutex);
             auto taskListIt = _collAndChunkTaskLists.find(nss);
 
             if (taskListIt != _collAndChunkTaskLists.end() &&
@@ -885,7 +885,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_runPr
     }
 
     const auto termAfterRefresh = [&] {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         return _term;
     }();
 
@@ -1061,7 +1061,7 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     const long long term) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     auto taskListIt = _collAndChunkTaskLists.find(nss);
 
     if (taskListIt == _collAndChunkTaskLists.end()) {
@@ -1101,7 +1101,7 @@ void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleCollAnd
     performNoopMajorityWriteLocally(opCtx, "ensureMajorityPrimaryAndScheduleCollAndChunksTask");
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         auto& list = _collAndChunkTaskLists[nss];
         auto wasEmpty = list.empty();
@@ -1130,7 +1130,7 @@ void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleDbTask(
     // config server. This prevents using incorrect filtering information in split brain scenarios.
     performNoopMajorityWriteLocally(opCtx, "ensureMajorityPrimaryAndScheduleDbTask");
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         auto& list = _dbTaskLists[dbName];
         auto wasEmpty = list.empty();
@@ -1184,7 +1184,7 @@ void ShardServerCatalogCacheLoaderImpl::_runCollAndChunksTasks(const NamespaceSt
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         // If task completed successfully, remove it from work queue.
         if (taskFinished) {
@@ -1222,7 +1222,7 @@ void ShardServerCatalogCacheLoaderImpl::_runCollAndChunksTasks(const NamespaceSt
                   "error"_attr = redact(status));
 
             {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
                 _collAndChunkTaskLists.erase(nss);
             }
         } else {
@@ -1260,7 +1260,7 @@ void ShardServerCatalogCacheLoaderImpl::_runDbTasks(const DatabaseName& dbName) 
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         // If task completed successfully, remove it from work queue.
         if (taskFinished) {
@@ -1298,7 +1298,7 @@ void ShardServerCatalogCacheLoaderImpl::_runDbTasks(const DatabaseName& dbName) 
                   "error"_attr = redact(status));
 
             {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
                 _dbTaskLists.erase(dbName);
             }
         } else {
@@ -1309,7 +1309,7 @@ void ShardServerCatalogCacheLoaderImpl::_runDbTasks(const DatabaseName& dbName) 
 
 void ShardServerCatalogCacheLoaderImpl::_updatePersistedCollAndChunksMetadata(
     OperationContext* opCtx, const NamespaceString& nss) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
 
     const CollAndChunkTask& task = _collAndChunkTaskLists[nss].front();
     tassert(7032351,
@@ -1351,7 +1351,7 @@ void ShardServerCatalogCacheLoaderImpl::_updatePersistedCollAndChunksMetadata(
 
 void ShardServerCatalogCacheLoaderImpl::_updatePersistedDbMetadata(OperationContext* opCtx,
                                                                    const DatabaseName& dbName) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
 
     const DBTask& task = _dbTaskLists[dbName].front();
 

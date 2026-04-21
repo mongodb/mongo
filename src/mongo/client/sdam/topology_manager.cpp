@@ -86,7 +86,7 @@ TopologyManagerImpl::TopologyManagerImpl(SdamConfiguration config,
 }
 
 bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) {
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lock(_mutex);
 
     boost::optional<HelloRTT> lastRTT;
     boost::optional<TopologyVersion> lastTopologyVersion;
@@ -129,13 +129,13 @@ bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) 
 }
 
 TopologyDescriptionPtr TopologyManagerImpl::getTopologyDescription() const {
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lock(_mutex);
     return _getTopologyDescriptionWithLock(lock);
 }
 
 void TopologyManagerImpl::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {
     {
-        stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
+        std::lock_guard<ObservableMutex<std::mutex>> lock(_mutex);
 
         auto oldServerDescription = _topologyDescription->findServerByAddress(hostAndPort);
         if (oldServerDescription) {

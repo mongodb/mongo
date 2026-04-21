@@ -32,13 +32,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/stats/stats_cache_loader.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/read_through_cache.h"
 
 #include <memory>
+#include <mutex>
 
 #include <boost/smart_ptr.hpp>
 
@@ -79,7 +79,7 @@ private:
                               const StatsPathString& statsPath,
                               const ValueHandle& stats);
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     std::unique_ptr<StatsCacheLoader> _statsCacheLoader;
 };

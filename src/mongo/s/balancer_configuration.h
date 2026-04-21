@@ -36,10 +36,10 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/balancer_configuration_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <mutex>
 
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/move/utility_core.hpp>
@@ -291,7 +291,7 @@ public:
      * Modify the balancer settings directly. This is used for testing purposes only.
      */
     MONGO_MOD_PRIVATE void setBalancerSettingsForTest(const BalancerSettings& settings) {
-        stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+        std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
         _balancerSettings = settings;
     }
 
@@ -316,7 +316,7 @@ private:
     Status _refreshAutoMergeSettings(OperationContext* opCtx);
 
     // The latest read balancer settings and a mutex to protect its swaps
-    mutable stdx::mutex _balancerSettingsMutex;
+    mutable std::mutex _balancerSettingsMutex;
     BalancerSettings _balancerSettings;
 
     // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value

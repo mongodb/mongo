@@ -53,7 +53,7 @@ void AsyncTimerMockImpl::cancel() {
 
 void AsyncTimerMockImpl::asyncWait(AsyncTimerInterface::Handler handler) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         if (_timeLeft != kZeroMilliseconds) {
             _handlers.push_back(handler);
             return;
@@ -71,7 +71,7 @@ void AsyncTimerMockImpl::fastForward(Milliseconds time) {
     // While holding the lock, change the time and remove
     // handlers that have expired
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         if (time >= _timeLeft) {
             _timeLeft = kZeroMilliseconds;
             tmp.swap(_handlers);
@@ -87,7 +87,7 @@ void AsyncTimerMockImpl::fastForward(Milliseconds time) {
 }
 
 Milliseconds AsyncTimerMockImpl::timeLeft() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _timeLeft;
 }
 
@@ -96,7 +96,7 @@ void AsyncTimerMockImpl::expireAfter(Milliseconds expiration) {
 
     // While holding the lock, reset the time and remove all handlers
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _timeLeft = expiration;
         tmp.swap(_handlers);
     }
@@ -108,14 +108,14 @@ void AsyncTimerMockImpl::expireAfter(Milliseconds expiration) {
 }
 
 int AsyncTimerMockImpl::jobs() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _handlers.size();
 }
 
 void AsyncTimerMockImpl::_callAllHandlers(std::error_code ec) {
     std::vector<AsyncTimerInterface::Handler> tmp;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         tmp.swap(_handlers);
     }
 
@@ -139,13 +139,13 @@ void AsyncTimerMock::expireAfter(Milliseconds expiration) {
 }
 
 std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(Milliseconds expiration) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
+    std::lock_guard<std::recursive_mutex> lk(_timersMutex);
     auto elem = _timers.emplace(std::make_shared<AsyncTimerMockImpl>(expiration));
     return std::make_unique<AsyncTimerMock>(*elem.first);
 }
 
 void AsyncTimerFactoryMock::fastForward(Milliseconds time) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
+    std::lock_guard<std::recursive_mutex> lk(_timersMutex);
 
     _curTime += time;
 
@@ -157,14 +157,14 @@ void AsyncTimerFactoryMock::fastForward(Milliseconds time) {
 }
 
 Date_t AsyncTimerFactoryMock::now() {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
+    std::lock_guard<std::recursive_mutex> lk(_timersMutex);
     return Date_t::fromDurationSinceEpoch(_curTime);
 }
 
 int AsyncTimerFactoryMock::jobs() {
     int jobs = 1;
 
-    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
+    std::lock_guard<std::recursive_mutex> lk(_timersMutex);
     for (auto elem = _timers.begin(); elem != _timers.end(); elem++) {
         jobs += (*elem)->jobs();
     }

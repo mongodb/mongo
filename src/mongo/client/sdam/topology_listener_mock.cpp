@@ -38,7 +38,7 @@ namespace mongo::sdam {
 
 void TopologyListenerMock::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                            const BSONObj reply) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto it = _serverHelloReplies.find(hostAndPort);
     if (it != _serverHelloReplies.end()) {
         it->second.emplace_back(Status::OK());
@@ -51,7 +51,7 @@ void TopologyListenerMock::onServerHeartbeatSucceededEvent(const HostAndPort& ho
 void TopologyListenerMock::onServerHeartbeatFailureEvent(Status errorStatus,
                                                          const HostAndPort& hostAndPort,
                                                          const BSONObj reply) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // If the map already contains an element for hostAndPort, append to its already existing
     // vector. Otherwise, create a new vector.
     auto it = _serverHelloReplies.find(hostAndPort);
@@ -68,7 +68,7 @@ TopologyListenerMock::Counts TopologyListenerMock::serverHeartbeatCounts() const
 }
 
 bool TopologyListenerMock::hasHelloResponse(const HostAndPort& hostAndPort) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _hasHelloResponse(lock, hostAndPort);
 }
 
@@ -77,7 +77,7 @@ bool TopologyListenerMock::_hasHelloResponse(WithLock, const HostAndPort& hostAn
 }
 
 std::vector<Status> TopologyListenerMock::getHelloResponse(const HostAndPort& hostAndPort) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     invariant(_hasHelloResponse(lock, hostAndPort));
     auto it = _serverHelloReplies.find(hostAndPort);
     auto statusWithHelloResponse = it->second;
@@ -87,7 +87,7 @@ std::vector<Status> TopologyListenerMock::getHelloResponse(const HostAndPort& ho
 
 void TopologyListenerMock::onServerPingSucceededEvent(HelloRTT latency,
                                                       const HostAndPort& hostAndPort) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto it = _serverPingRTTs.find(hostAndPort);
     if (it != _serverPingRTTs.end()) {
         it->second.emplace_back(latency);
@@ -98,7 +98,7 @@ void TopologyListenerMock::onServerPingSucceededEvent(HelloRTT latency,
 
 void TopologyListenerMock::onServerPingFailedEvent(const HostAndPort& hostAndPort,
                                                    const Status& errorStatus) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // If the map already contains an element for hostAndPort, append to its already existing
     // vector. Otherwise, create a new vector.
     auto it = _serverPingRTTs.find(hostAndPort);
@@ -110,7 +110,7 @@ void TopologyListenerMock::onServerPingFailedEvent(const HostAndPort& hostAndPor
 }
 
 bool TopologyListenerMock::hasPingResponse(const HostAndPort& hostAndPort) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _hasPingResponse(lock, hostAndPort);
 }
 
@@ -120,7 +120,7 @@ bool TopologyListenerMock::_hasPingResponse(WithLock, const HostAndPort& hostAnd
 
 std::vector<StatusWith<HelloRTT>> TopologyListenerMock::getPingResponse(
     const HostAndPort& hostAndPort) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     invariant(_hasPingResponse(lock, hostAndPort));
     auto it = _serverPingRTTs.find(hostAndPort);
     auto statusWithRTT = it->second;

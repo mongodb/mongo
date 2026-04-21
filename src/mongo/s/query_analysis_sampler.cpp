@@ -150,7 +150,7 @@ void QueryAnalysisSampler::onStartup() {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    stdx::lock_guard<stdx::mutex> lk(_jobsMutex);
+    std::lock_guard<std::mutex> lk(_jobsMutex);
 
     // setting isKillableByStepdown to false as _freshQueryStats has no OperationContext.
     // Holds only _queryStatsMutex and no other resources, updates only in memory states and
@@ -197,7 +197,7 @@ void QueryAnalysisSampler::onStartup() {
 }
 
 void QueryAnalysisSampler::onShutdown() {
-    stdx::lock_guard<stdx::mutex> lk(_jobsMutex);
+    std::lock_guard<std::mutex> lk(_jobsMutex);
     if (_periodicQueryStatsRefresher.isValid()) {
         _periodicQueryStatsRefresher.stop();
     }
@@ -263,7 +263,7 @@ void QueryAnalysisSampler::_refreshQueryStats() {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
+    std::lock_guard<std::mutex> lk(_queryStatsMutex);
     _queryStats.refreshTotalCount();
 }
 
@@ -346,7 +346,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
 
     boost::optional<double> lastAvgCount;
     {
-        stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
+        std::lock_guard<std::mutex> lk(_queryStatsMutex);
         lastAvgCount = (MONGO_unlikely(overwriteQueryAnalysisSamplerAvgLastCountToZero.shouldFail())
                             ? 0
                             : _queryStats.getLastAvgCount());
@@ -374,7 +374,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
                 "numQueriesExecutedPerSecond"_attr = lastAvgCount,
                 "configurations"_attr = configurations);
 
-    stdx::lock_guard<stdx::mutex> lk(_sampleRateLimitersMutex);
+    std::lock_guard<std::mutex> lk(_sampleRateLimitersMutex);
 
     if (configurations.size() != _sampleRateLimiters.size()) {
         LOGV2(7362407,
@@ -488,7 +488,7 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
         return boost::none;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_sampleRateLimitersMutex);
+    std::lock_guard<std::mutex> lk(_sampleRateLimitersMutex);
     auto it = _sampleRateLimiters.find(nss);
 
     if (it == _sampleRateLimiters.end()) {

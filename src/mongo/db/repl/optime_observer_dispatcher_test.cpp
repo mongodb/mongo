@@ -31,12 +31,12 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -52,7 +52,7 @@ namespace {
 class MockObserver : public OpTimeObserver {
 public:
     void onOpTime(const Timestamp& ts) override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _received.push_back(ts);
         _cv.notify_all();
     }
@@ -62,23 +62,23 @@ public:
      * Returns true if the count was reached within the timeout.
      */
     bool waitForCount(size_t count, Milliseconds timeout = Milliseconds(5000)) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         return _cv.wait_for(
             lk, timeout.toSystemDuration(), [&] { return _received.size() >= count; });
     }
 
     std::vector<Timestamp> timestamps() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _received;
     }
 
     size_t count() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _received.size();
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
     std::vector<Timestamp> _received;
 };

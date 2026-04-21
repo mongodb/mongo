@@ -218,7 +218,7 @@ public:
      * of "curOp".
      */
     void push(CurOp* curOp) {
-        stdx::lock_guard<Client> lk(*opCtx()->getClient());
+        std::lock_guard<Client> lk(*opCtx()->getClient());
         _pushNoLock(curOp);
     }
 

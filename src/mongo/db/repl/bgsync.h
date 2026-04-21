@@ -46,7 +46,6 @@
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -55,6 +54,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 
@@ -249,7 +249,7 @@ private:
 
     // Protects member data of BackgroundSync.
     // Never hold the BackgroundSync mutex when trying to acquire the ReplicationCoordinator mutex.
-    mutable ObservableMutex<stdx::mutex> _mutex;  // (S)
+    mutable ObservableMutex<std::mutex> _mutex;  // (S)
 
     OpTime _lastOpTimeFetched;  // (M)
 

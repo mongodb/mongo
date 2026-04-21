@@ -41,7 +41,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/text.h"
 
@@ -49,6 +48,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -69,7 +69,7 @@ const size_t kPathBufferSize = 1024;
 // On Windows the symbol handler must be initialized at process startup and cleaned up at shutdown.
 // This class wraps up that logic and gives access to the process handle associated with the
 // symbol handler. Because access to the symbol handler API is not thread-safe, it also provides
-// a lock/unlock method so the whole symbol handler can be used with a stdx::lock_guard.
+// a lock/unlock method so the whole symbol handler can be used with a std::lock_guard.
 class SymbolHandler {
     SymbolHandler(const SymbolHandler&) = delete;
     SymbolHandler& operator=(const SymbolHandler&) = delete;
@@ -131,7 +131,7 @@ public:
 
 private:
     boost::optional<HANDLE> _processHandle;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     DWORD _origOptions;
 };
 
@@ -231,7 +231,7 @@ void appendTrace(BSONObjBuilder* bob, const std::vector<TraceItem>& traceList) {
 std::vector<TraceItem> makeTraceList(CONTEXT& context) {
     std::vector<TraceItem> traceList;
     auto& symbolHandler = SymbolHandler::instance();
-    stdx::lock_guard<SymbolHandler> lk(symbolHandler);
+    std::lock_guard<SymbolHandler> lk(symbolHandler);
 
     if (!symbolHandler) {
         LOGV2_ERROR(31444, "Stack trace failed, symbol handler returned an invalid handle");

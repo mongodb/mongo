@@ -61,7 +61,7 @@ class BucketCatalogServerStatus : public ServerStatusSection {
     BucketCounts _getBucketCounts(const BucketCatalog& catalog) const {
         BucketCounts sum;
         for (auto const& stripe : catalog.stripes) {
-            stdx::lock_guard stripeLock{stripe->mutex};
+            std::lock_guard stripeLock{stripe->mutex};
             sum += {stripe->openBucketsById.size(),
                     stripe->openBucketsByKey.size(),
                     stripe->idleBuckets.size()};
@@ -79,7 +79,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
         const auto& bucketCatalog = GlobalBucketCatalog::get(opCtx->getServiceContext());
         {
-            stdx::lock_guard catalogLock{bucketCatalog.mutex};
+            std::lock_guard catalogLock{bucketCatalog.mutex};
             if (bucketCatalog.executionStats.empty()) {
                 return {};
             }

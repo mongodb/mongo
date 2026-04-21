@@ -29,8 +29,9 @@
 
 #include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/intent_registry_test_fixture.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/thread.h"
+
+#include <chrono>
 
 
 namespace mongo {
@@ -171,7 +172,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepUp) {
     // Write Intent while the interruption is ongoing.
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::StepUp, opCtx.get(), timeout_sec);
-    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
     kill.get();
 
     // Assert no operations were killed and no intents were deregistered.
@@ -424,7 +425,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsShutdown) {
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::Shutdown, opCtx.get(), timeout_sec);
 
-    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Shutdown interruption should throw an
     // exception.
@@ -505,7 +506,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsSameOpCtxCanDeclareIntents) 
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::Shutdown, opCtx.get(), timeout_sec);
 
-    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Since we are using the same opCtx we should be able to register any intent.
     {
@@ -572,7 +573,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsRollback) {
     auto opCtx = client->makeOperationContext();
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::Rollback, opCtx.get(), timeout_sec);
-    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Rollback interruption should throw an
     // exception.
@@ -657,7 +658,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
     auto opCtx = client->makeOperationContext();
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::StepDown, opCtx.get(), timeout_sec);
-    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
     {
         auto clientWritePrepared =
             serviceContext->getService()->makeClient("testClientWritePrepared");

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
@@ -166,8 +165,8 @@ private:
     size_t _maxSizeBytes;
 
     // Guards all non-static data.
-    // stdx::recursive_mutex // NOLINT is intentional, stdx::mutex can not be used here
-    mutable ObservableMutex<stdx::recursive_mutex> _mutex;  // NOLINT
+    // std::recursive_mutex // NOLINT is intentional, std::mutex can not be used here
+    mutable ObservableMutex<std::recursive_mutex> _mutex;  // NOLINT
 
     // Array of lines
     std::vector<std::string> _lines;
@@ -226,7 +225,7 @@ private:
     const RamLog* _ramlog;
 
     // Holds RamLog's mutex
-    stdx::lock_guard<ObservableMutex<stdx::recursive_mutex>> _lock;
+    std::lock_guard<ObservableMutex<std::recursive_mutex>> _lock;
 
     size_t _nextLineIndex;
 };

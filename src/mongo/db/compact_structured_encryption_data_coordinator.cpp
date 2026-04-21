@@ -334,7 +334,7 @@ boost::optional<BSONObj> CompactStructuredEncryptionDataCoordinator::reportForCu
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
     auto bob = basicReportBuilder();
 
-    stdx::lock_guard lg{_docMutex};
+    std::lock_guard lg{_docMutex};
     bob.append(
         "escNss",
         NamespaceStringUtil::serialize(_doc.getEscNss(), SerializationContext::stateDefault()));
@@ -369,7 +369,7 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
                                      _skipCompact = doRenameOperation(
                                          opCtx, _doc, &_ecocRenameUuid, &_escDeleteSet, &_escStats);
 
-                                     stdx::lock_guard lg{_docMutex};
+                                     std::lock_guard lg{_docMutex};
                                      _doc.setSkipCompact(_skipCompact);
                                      _doc.setEcocRenameUuid(_ecocRenameUuid);
                                      _doc.setEscStats(_escStats);
@@ -384,7 +384,7 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
 
                 FLEStatusSection::get().updateCompactionStats(CompactStats(_ecocStats, _escStats));
 
-                stdx::lock_guard lg(_docMutex);
+                std::lock_guard lg(_docMutex);
                 _doc.setEscStats(_escStats);
                 _doc.setEcocStats(_ecocStats);
             }))

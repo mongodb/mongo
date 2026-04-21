@@ -39,7 +39,6 @@
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
@@ -85,7 +84,7 @@ public:
         auto opTimeBefore = _lastOpTimeWaited;
 
         do {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            std::unique_lock<std::mutex> lk(_mutex);
             _isTestReady = true;
             _isTestReadyCV.notify_one();
 
@@ -96,7 +95,7 @@ public:
     }
 
     Status waitForWriteConcernStub(OperationContext* opCtx, const repl::OpTime& opTime) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
 
         _waitForMajorityCallCount++;
         _callCountChangedCV.notify_one();
@@ -118,12 +117,12 @@ public:
     }
 
     const repl::OpTime& getLastOpTimeWaited() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _lastOpTimeWaited;
     }
 
     void waitForMajorityCallCountGreaterThan(int expectedCount) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _callCountChangedCV.wait(lk, [&] { return _waitForMajorityCallCount > expectedCount; });
     }
 
@@ -133,7 +132,7 @@ public:
 private:
     WaitForMajorityService _waitForMajorityService;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _isTestReadyCV;
     stdx::condition_variable _finishWaitingOneOpTimeCV;
     stdx::condition_variable _callCountChangedCV;

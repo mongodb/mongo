@@ -34,9 +34,10 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace mongo {
 
@@ -88,7 +89,7 @@ public:
 private:
     ChangeStreamOptions _changeStreamOptions;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 };
 
 }  // namespace mongo

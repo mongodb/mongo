@@ -152,7 +152,7 @@ BalancerConfiguration::BalancerConfiguration()
 BalancerConfiguration::~BalancerConfiguration() = default;
 
 BalancerModeEnum BalancerConfiguration::getBalancerMode() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
     return _balancerSettings.getMode();
 }
 
@@ -202,7 +202,7 @@ Status BalancerConfiguration::changeAutoMergeSettings(OperationContext* opCtx, b
 }
 
 bool BalancerConfiguration::shouldBalance(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
     if (_balancerSettings.getMode() != BalancerModeEnum::kFull) {
         return false;
     }
@@ -211,7 +211,7 @@ bool BalancerConfiguration::shouldBalance(OperationContext* opCtx) const {
 }
 
 bool BalancerConfiguration::shouldBalanceForAutoMerge(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
     if (_balancerSettings.getMode() == BalancerModeEnum::kOff || !shouldAutoMerge()) {
         return false;
     }
@@ -220,7 +220,7 @@ bool BalancerConfiguration::shouldBalanceForAutoMerge(OperationContext* opCtx) c
 }
 
 MigrationSecondaryThrottleOptions BalancerConfiguration::getSecondaryThrottle() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
     if (auto throttle = _balancerSettings.get_secondaryThrottle()) {
         return *throttle;
     }
@@ -228,12 +228,12 @@ MigrationSecondaryThrottleOptions BalancerConfiguration::getSecondaryThrottle() 
 }
 
 bool BalancerConfiguration::waitForDelete() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
     return _balancerSettings.get_waitForDelete();
 }
 
 bool BalancerConfiguration::attemptToBalanceJumboChunks() const {
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
     return _balancerSettings.getAttemptToBalanceJumboChunks();
 }
 
@@ -282,7 +282,7 @@ Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* opCtx) 
         return settingsObjStatus.getStatus();
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
     _balancerSettings = std::move(settings);
 
     return Status::OK();

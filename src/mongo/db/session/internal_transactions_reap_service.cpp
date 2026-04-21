@@ -95,7 +95,7 @@ void InternalTransactionsReapService::addEagerlyReapedSessions(
         return;
     }
 
-    stdx::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex);
     if (!_enabled) {
         return;
     }
@@ -135,7 +135,7 @@ void InternalTransactionsReapService::_reapInternalTransactions(ServiceContext* 
     std::vector<LogicalSessionId> lsidsToRemove;
     {
         using std::swap;
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         swap(lsidsToRemove, _lsidsToEagerlyReap);
     }
 

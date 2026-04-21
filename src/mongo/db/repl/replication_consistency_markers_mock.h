@@ -34,8 +34,9 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -88,10 +89,10 @@ public:
     BSONObj getInitialSyncId(OperationContext* opCtx) override;
 
 private:
-    mutable stdx::mutex _initialSyncFlagMutex;
+    mutable std::mutex _initialSyncFlagMutex;
     bool _initialSyncFlag = false;
 
-    mutable stdx::mutex _minValidBoundariesMutex;
+    mutable std::mutex _minValidBoundariesMutex;
     OpTime _appliedThrough;
     OpTime _minValid;
     Timestamp _oplogTruncateAfterPoint;

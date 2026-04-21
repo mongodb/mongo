@@ -343,7 +343,7 @@ private:
     };
 
     // Guards `_observableInstruments` and `_metrics`.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
 #ifdef MONGO_CONFIG_OTEL
     // Pointers to all observable instruments. These are not directly used, but must be kept alive

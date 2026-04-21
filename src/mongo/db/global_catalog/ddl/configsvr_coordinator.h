@@ -42,13 +42,13 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -109,7 +109,7 @@ protected:
         return cc().makeOperationContext();
     }
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     SharedPromise<void> _completionPromise;
 
 private:
@@ -141,7 +141,7 @@ protected:
                      defaultMajorityWriteConcern());
 
         {
-            stdx::lock_guard lk{_docMutex};
+            std::lock_guard lk{_docMutex};
             _doc = std::move(newDoc);
         }
     }
@@ -162,7 +162,7 @@ protected:
         if (newDoc.getPhase() != Phase::kUnset) {
             _updateStateDocument(opCtx, std::move(newDoc));
         } else {
-            stdx::lock_guard lk{_docMutex};
+            std::lock_guard lk{_docMutex};
             _doc = std::move(newDoc);
         }
     }
@@ -177,7 +177,7 @@ protected:
     auto _evalStateDocumentThreadSafe(Func&& evalF) const
     requires(std::is_invocable_v<Func, const StateDoc&>)
     {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         return evalF(_doc);
     }
 
@@ -271,7 +271,7 @@ protected:
         }
     }
 
-    mutable stdx::mutex _docMutex;
+    mutable std::mutex _docMutex;
     StateDoc _doc;
 
 private:

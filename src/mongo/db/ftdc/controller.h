@@ -38,7 +38,6 @@
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -46,6 +45,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <boost/filesystem/path.hpp>
@@ -266,7 +266,7 @@ private:
     boost::filesystem::path _path;
 
     // Mutex to protect the condvar, configuration changes, and most recent periodic document.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _condvar;
 
     // Indicates that a rotate should be triggered before the next FTDC log is collected and

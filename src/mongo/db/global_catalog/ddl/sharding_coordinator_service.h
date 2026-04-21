@@ -42,7 +42,6 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -53,6 +52,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 namespace mongo {
@@ -156,9 +156,9 @@ private:
 
     void _transitionToRecovered(WithLock lk, OperationContext* opCtx);
 
-    void _waitForRecovery(OperationContext* opCtx, std::unique_lock<stdx::mutex>& lock) const;
+    void _waitForRecovery(OperationContext* opCtx, std::unique_lock<std::mutex>& lock) const;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // When the node stepDown the state is set to kPaused and all the new DDL operation will be
     // blocked. On step-up we set _coordinatorsToWait to the numbers of coordinators that needs to

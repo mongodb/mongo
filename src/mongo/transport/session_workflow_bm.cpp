@@ -42,7 +42,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
@@ -65,6 +64,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -215,7 +215,7 @@ public:
     }
 
     void SetUp(benchmark::State& state) override {
-        stdx::lock_guard lk{_setupMutex};
+        std::lock_guard lk{_setupMutex};
         LOGV2_DEBUG(7015134, 3, "SetUp", "configuredThreads"_attr = _configuredThreads);
         if (_configuredThreads++)
             return;
@@ -263,7 +263,7 @@ public:
     }
 
     void TearDown(benchmark::State& state) override {
-        stdx::lock_guard lk{_setupMutex};
+        std::lock_guard lk{_setupMutex};
         LOGV2_DEBUG(7015137, 3, "TearDown", "configuredThreads"_attr = _configuredThreads);
         if (--_configuredThreads)
             return;
@@ -292,7 +292,7 @@ public:
     }
 
 private:
-    stdx::mutex _setupMutex;
+    std::mutex _setupMutex;
     int _configuredThreads = 0;
     boost::optional<ScopedValueOverride<size_t>> _savedDefaultReserved;
     std::unique_ptr<MockCoordinator> _coordinator;

@@ -96,7 +96,7 @@ public:
 private:
     // This alignment is a best effort approach to ensure that each partition falls on a
     // separate page/cache line in order to avoid false sharing.
-    struct alignas(stdx::hardware_destructive_interference_size) AlignedLockStats {
+    struct alignas(std::hardware_destructive_interference_size) AlignedLockStats {
         Locker::AtomicLockStats stats;
     };
 
@@ -196,16 +196,16 @@ namespace locker_internals {
 class LockOrderingsSet {
 public:
     void add(ResourceId from, ResourceId to) {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         _precomputedPaths[to].emplace(from);
     }
     bool hasPath(ResourceId from, ResourceId to) {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         return _precomputedPaths[to].contains(from);
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     // As the only question we have to answer is whether there exists a path that goes from a source
     // node to a target node we just store all nodes that can lead to the target node.
     stdx::unordered_map<ResourceId, stdx::unordered_set<ResourceId>> _precomputedPaths;

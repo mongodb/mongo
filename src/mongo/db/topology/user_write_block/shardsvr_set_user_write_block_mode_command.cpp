@@ -52,12 +52,12 @@
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -142,7 +142,7 @@ public:
                     case ShardsvrSetUserWriteBlockModePhaseEnum::kComplete: {
                         // The way we enable/disable user index build blocking is not
                         // concurrency-safe, so use a mutex to make this a critical section
-                        stdx::lock_guard lock(_mutex);
+                        std::lock_guard lock(_mutex);
                         auto writeBlockState = GlobalUserWriteBlockState::get(opCtx);
                         writeBlockState->enableUserIndexBuildBlocking(opCtx);
                         // Ensure that we eventually restore index build state.
@@ -200,7 +200,7 @@ public:
                             ActionType::internal));
         }
 
-        stdx::mutex _mutex;
+        std::mutex _mutex;
     };
 
     std::string help() const override {

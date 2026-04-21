@@ -37,8 +37,9 @@
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/stdx/future.h"
 #include "mongo/util/modules.h"
+
+#include <future>
 
 namespace mongo {
 
@@ -148,10 +149,10 @@ public:
         }
 
         std::shared_ptr<executor::TaskExecutor> getTransactionExecutor() {
-            static stdx::mutex mutex;
+            static std::mutex mutex;
             static std::shared_ptr<executor::ThreadPoolTaskExecutor> executor;
 
-            stdx::lock_guard<stdx::mutex> lg(mutex);
+            std::lock_guard<std::mutex> lg(mutex);
             if (!executor) {
                 ThreadPool::Options options;
                 options.poolName = "InternalTransaction";

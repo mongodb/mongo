@@ -85,7 +85,7 @@ public:
         ClockSource* clkSource,
         stdx::condition_variable& cv,
         LockT& lk,
-        const stdx::chrono::time_point<stdx::chrono::system_clock>& timeout_time) {
+        const std::chrono::time_point<std::chrono::system_clock>& timeout_time) {
         if (waitable) {
             auto rval = stdx::cv_status::no_timeout;
 
@@ -108,7 +108,7 @@ public:
                            ClockSource* clkSource,
                            stdx::condition_variable& cv,
                            LockT& lk,
-                           const stdx::chrono::time_point<stdx::chrono::system_clock>& timeout_time,
+                           const std::chrono::time_point<std::chrono::system_clock>& timeout_time,
                            PredicateT pred) {
         while (!pred()) {
             if (wait_until(waitable, clkSource, cv, lk, timeout_time) == stdx::cv_status::timeout) {

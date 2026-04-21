@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -61,12 +60,12 @@ TEST_F(TaskRunnerTest, GetDiagnosticString) {
 }
 
 TEST_F(TaskRunnerTest, CallbackValues) {
-    stdx::mutex mutex;
+    std::mutex mutex;
     bool called = false;
     OperationContext* opCtx = nullptr;
     Status status = getDetectableErrorStatus();
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         called = true;
         opCtx = theTxn;
         status = theStatus;
@@ -76,7 +75,7 @@ TEST_F(TaskRunnerTest, CallbackValues) {
     getThreadPool().waitForIdle();
     ASSERT_FALSE(getTaskRunner().isActive());
 
-    stdx::lock_guard<stdx::mutex> lk(mutex);
+    std::lock_guard<std::mutex> lk(mutex);
     ASSERT_TRUE(called);
     ASSERT(opCtx);
     ASSERT_OK(status);
@@ -87,11 +86,11 @@ using OpIdVector = std::vector<unsigned int>;
 OpIdVector _testRunTaskTwice(TaskRunnerTest& test, unique_function<void(Task task)> schedule) {
     auto nextAction = TaskRunner::NextAction::kDisposeOperationContext;
     unittest::Barrier barrier(2U);
-    stdx::mutex mutex;
+    std::mutex mutex;
     std::vector<OperationContext*> txns;
     OpIdVector txnIds;
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         if (txns.size() >= 2U) {
             return TaskRunner::NextAction::kInvalid;
         }
@@ -114,7 +113,7 @@ OpIdVector _testRunTaskTwice(TaskRunnerTest& test, unique_function<void(Task tas
     test.getThreadPool().waitForIdle();
     ASSERT_FALSE(test.getTaskRunner().isActive());
 
-    stdx::lock_guard<stdx::mutex> lk(mutex);
+    std::lock_guard<std::mutex> lk(mutex);
     ASSERT_EQUALS(2U, txns.size());
     ASSERT(txns[0]);
     ASSERT(txns[1]);
@@ -142,14 +141,14 @@ TEST_F(TaskRunnerTest, RunTaskTwiceDisposeOperationContextJoinThreadPoolBeforeSc
 }
 
 TEST_F(TaskRunnerTest, SkipSecondTask) {
-    stdx::mutex mutex;
+    std::mutex mutex;
     int i = 0;
     OperationContext* opCtx[2] = {nullptr, nullptr};
     Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
     stdx::condition_variable condition;
     bool schedulingDone = false;
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         int j = i++;
         if (j >= 2) {
             return TaskRunner::NextAction::kCancel;
@@ -168,14 +167,14 @@ TEST_F(TaskRunnerTest, SkipSecondTask) {
     ASSERT_TRUE(getTaskRunner().isActive());
     getTaskRunner().schedule(task);
     {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         schedulingDone = true;
         condition.notify_all();
     }
     getThreadPool().waitForIdle();
     ASSERT_FALSE(getTaskRunner().isActive());
 
-    stdx::lock_guard<stdx::mutex> lk(mutex);
+    std::lock_guard<std::mutex> lk(mutex);
     ASSERT_EQUALS(2, i);
     ASSERT(opCtx[0]);
     ASSERT_OK(status[0]);
@@ -184,14 +183,14 @@ TEST_F(TaskRunnerTest, SkipSecondTask) {
 }
 
 TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
-    stdx::mutex mutex;
+    std::mutex mutex;
     int i = 0;
     OperationContext* opCtx[2] = {nullptr, nullptr};
     Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
     stdx::condition_variable condition;
     bool schedulingDone = false;
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         int j = i++;
         if (j >= 2) {
             return TaskRunner::NextAction::kCancel;
@@ -217,14 +216,14 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
     ASSERT_TRUE(getTaskRunner().isActive());
     getTaskRunner().schedule(task);
     {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         schedulingDone = true;
         condition.notify_all();
     }
     getThreadPool().waitForIdle();
     ASSERT_FALSE(getTaskRunner().isActive());
 
-    stdx::lock_guard<stdx::mutex> lk(mutex);
+    std::lock_guard<std::mutex> lk(mutex);
     ASSERT_EQUALS(2, i);
     ASSERT(opCtx[0]);
     ASSERT_OK(status[0]);
@@ -233,7 +232,7 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
 }
 
 TEST_F(TaskRunnerTest, Cancel) {
-    stdx::mutex mutex;
+    std::mutex mutex;
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;
@@ -241,7 +240,7 @@ TEST_F(TaskRunnerTest, Cancel) {
     // Running this task causes the task runner to wait for another task that
     // is never scheduled.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         status = theStatus;
         taskRunning = true;
         condition.notify_all();
@@ -255,7 +254,7 @@ TEST_F(TaskRunnerTest, Cancel) {
     getTaskRunner().schedule(task);
     ASSERT_TRUE(getTaskRunner().isActive());
     {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         while (!taskRunning) {
             condition.wait(lk);
         }
@@ -270,19 +269,19 @@ TEST_F(TaskRunnerTest, Cancel) {
 
     // This status will not be OK if canceling the task runner
     // before scheduling the task results in the task being canceled.
-    stdx::lock_guard<stdx::mutex> lk(mutex);
+    std::lock_guard<std::mutex> lk(mutex);
     ASSERT_OK(status);
 }
 
 TEST_F(TaskRunnerTest, JoinShouldWaitForTasksToComplete) {
     unittest::Barrier barrier(2U);
-    stdx::mutex mutex;
+    std::mutex mutex;
     Status status1 = getDetectableErrorStatus();
     Status status2 = getDetectableErrorStatus();
 
     // "task1" should start running before we invoke join() the task runner.
     auto task1 = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         barrier.countDownAndWait();
         status1 = theStatus;
         return TaskRunner::NextAction::kDisposeOperationContext;
@@ -290,7 +289,7 @@ TEST_F(TaskRunnerTest, JoinShouldWaitForTasksToComplete) {
 
     // "task2" should start running after we invoke join() the task runner.
     auto task2 = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         status2 = theStatus;
         return TaskRunner::NextAction::kDisposeOperationContext;
     };
@@ -304,13 +303,13 @@ TEST_F(TaskRunnerTest, JoinShouldWaitForTasksToComplete) {
 
     // This status should be OK because we ensured that the task
     // was scheduled and invoked before we called cancel().
-    stdx::lock_guard<stdx::mutex> lk(mutex);
+    std::lock_guard<std::mutex> lk(mutex);
     ASSERT_OK(status1);
     ASSERT_OK(status2);
 }
 
 TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
-    stdx::mutex mutex;
+    std::mutex mutex;
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;
@@ -318,7 +317,7 @@ TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
     // Running this task causes the task runner to wait for another task that
     // is never scheduled.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         status = theStatus;
         taskRunning = true;
         condition.notify_all();
@@ -328,7 +327,7 @@ TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
     getTaskRunner().schedule(task);
     ASSERT_TRUE(getTaskRunner().isActive());
     {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         while (!taskRunning) {
             condition.wait(lk);
         }
@@ -340,7 +339,7 @@ TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
 
     // This status will not be OK if canceling the task runner
     // before scheduling the task results in the task being canceled.
-    stdx::lock_guard<stdx::mutex> lk(mutex);
+    std::lock_guard<std::mutex> lk(mutex);
     ASSERT_OK(status);
 }
 

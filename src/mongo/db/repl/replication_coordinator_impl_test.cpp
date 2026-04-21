@@ -70,7 +70,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/hello_metrics.h"
@@ -1483,11 +1482,11 @@ protected:
         ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     }
 
-    stdx::future<boost::optional<Status>> stepDown_nonBlocking(bool force,
-                                                               Milliseconds waitTime,
-                                                               Milliseconds stepDownTime) {
+    std::future<boost::optional<Status>> stepDown_nonBlocking(bool force,
+                                                              Milliseconds waitTime,
+                                                              Milliseconds stepDownTime) {
         auto task =
-            stdx::packaged_task<boost::optional<Status>()>([=, this]() -> boost::optional<Status> {
+            std::packaged_task<boost::optional<Status>()>([=, this]() -> boost::optional<Status> {
                 _stepDownClient = getServiceContext()->getService()->makeClient("StepDownThread");
                 _stepDownOpCtx = _stepDownClient->makeOperationContext();
                 // Temporarily attach the client to the current thread so that calls to cc()
@@ -1968,7 +1967,7 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 
     // Interrupt the ongoing stepdown command so that the stepdown attempt will fail.
     {
-        stdx::lock_guard<Client> lk(cc());
+        std::lock_guard<Client> lk(cc());
         getStepDownOpCtx()->markKilled(ErrorCodes::Interrupted);
     }
 
@@ -2851,7 +2850,7 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
 
     // Interrupt the ongoing stepdown command.
     {
-        stdx::lock_guard<Client> lk(cc());
+        std::lock_guard<Client> lk(cc());
         getStepDownOpCtx()->markKilled(ErrorCodes::Interrupted);
     }
 
@@ -2902,7 +2901,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
 
     // Interrupt the ongoing stepdown command.
     {
-        stdx::lock_guard<Client> lk(cc());
+        std::lock_guard<Client> lk(cc());
         getStepDownOpCtx()->markKilled(ErrorCodes::Interrupted);
     }
 
@@ -6438,7 +6437,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 1),
                                                         Date_t() + Seconds(100));
     OpTime committedOpTime(Timestamp(200, 1), 1);
-    auto pseudoLogOp = stdx::async(stdx::launch::async, [this, &committedOpTime]() {
+    auto pseudoLogOp = std::async(std::launch::async, [this, &committedOpTime]() {
         // Not guaranteed to be scheduled after waitUntil blocks...
         replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(committedOpTime,
                                                             Date_t() + Seconds(100));
@@ -6462,7 +6461,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
 
     OpTime opTimeToWait(Timestamp(100, 1), 1);
 
-    auto pseudoLogOp = stdx::async(stdx::launch::async, [this, &opTimeToWait]() {
+    auto pseudoLogOp = std::async(std::launch::async, [this, &opTimeToWait]() {
         // Not guaranteed to be scheduled after waitUntil blocks...
         getStorageInterface()->allDurableTimestamp = opTimeToWait.getTimestamp();
         replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(opTimeToWait, Date_t() + Seconds(100));

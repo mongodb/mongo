@@ -1028,7 +1028,7 @@ TransactionRouter::Participant TransactionRouter::Router::_createParticipant(
     auto isFirstParticipant = os.participants.empty();
     if (isFirstParticipant && !o().subRouter) {
         invariant(!os.coordinatorId);
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).coordinatorId = shard.toString();
     }
 
@@ -1039,7 +1039,7 @@ TransactionRouter::Participant TransactionRouter::Router::_createParticipant(
                                               os.placementConflictTimeForNonSnapshotReadConcern,
                                               isInternalSessionForRetryableWrite(_sessionId())};
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     auto resultPair = o(lk).participants.try_emplace(
         shard.toString(),
         TransactionRouter::Participant(isFirstParticipant && !o().subRouter,
@@ -1056,7 +1056,7 @@ void TransactionRouter::Router::_updateParticipant(
     const boost::optional<Participant::ReadOnly> readOnly,
     const boost::optional<bool> isSubRouter) {
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     const auto iter = o(lk).participants.find(shard.toString());
     invariant(iter != o().participants.end());
     const auto currentParticipant = iter->second;
@@ -1156,14 +1156,14 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
             p().recoveryShardId.reset();
         }
 
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         invariant(o(lk).participants.erase(participant));
     }
 
     // If there are no more participants, also clear the coordinator id because a new one must be
     // chosen by the retry.
     if (o().participants.empty()) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).coordinatorId.reset();
         return;
     }
@@ -1226,7 +1226,7 @@ void TransactionRouter::Router::onStaleShardOrDbError(OperationContext* opCtx,
     }
 
     // Reset the global snapshot timestamp so the retry will select a new one.
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     if (o(lk).atClusterTimeForSnapshotReadConcern) {
         o(lk).atClusterTimeForSnapshotReadConcern.emplace();
     } else {
@@ -1289,7 +1289,7 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
     invariant(!o().coordinatorId);
 
     // Reset the global snapshot timestamp so the retry will select a new one.
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     if (o(lk).atClusterTimeForSnapshotReadConcern) {
         o(lk).atClusterTimeForSnapshotReadConcern.emplace();
     } else {
@@ -1300,7 +1300,7 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
 void TransactionRouter::Router::setAtClusterTimeForStartOrContinue(OperationContext* opCtx) {
     if (o().atClusterTimeForSnapshotReadConcern) {
         if (*o().atClusterTimeForSnapshotReadConcern == LogicalTime::kUninitialized) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             auto candidateTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
             uassert(
                 8676400, "Missing atClusterTime in readConcernArgs", candidateTime != boost::none);
@@ -1313,7 +1313,7 @@ void TransactionRouter::Router::setAtClusterTimeForStartOrContinue(OperationCont
         }
     } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
         if (*o().placementConflictTimeForNonSnapshotReadConcern == LogicalTime::kUninitialized) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             auto candidateTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
             uassert(8676401,
                     "Missing afterClusterTime in readConcernArgs",
@@ -1333,7 +1333,7 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
 
     if (o().atClusterTimeForSnapshotReadConcern) {
         if (*o().atClusterTimeForSnapshotReadConcern == LogicalTime::kUninitialized) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             setAtClusterTime(_sessionId(),
                              o(lk).txnNumberAndRetryCounter,
                              p().latestStmtId,
@@ -1343,7 +1343,7 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
         }
     } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
         if (*o().placementConflictTimeForNonSnapshotReadConcern == LogicalTime::kUninitialized) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
 
             setAtClusterTime(_sessionId(),
                              o(lk).txnNumberAndRetryCounter,
@@ -1517,7 +1517,7 @@ void TransactionRouter::Router::stash(OperationContext* opCtx, StashReason reaso
         return;
     }
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
 
     if (reason == StashReason::kYield) {
         ++o(lk).activeYields;
@@ -1543,14 +1543,14 @@ void TransactionRouter::Router::unstash(OperationContext* opCtx) {
                   << ", operation: " << *opCtx->getTxnNumber());
 
     {
-        stdx::lock_guard<Client> lg(*opCtx->getClient());
+        std::lock_guard<Client> lg(*opCtx->getClient());
         --o(lg).activeYields;
         invariant(o(lg).activeYields >= 0,
                   str::stream() << "Invalid activeYields: " << o(lg).activeYields);
     }
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
 }
 
@@ -1638,7 +1638,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                 "Cannot recover the transaction decision without a recoveryToken",
                 recoveryToken);
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).commitType = CommitType::kRecoverWithToken;
             _onStartCommit(lk, opCtx);
         }
@@ -1654,7 +1654,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                 "Cannot commit without participants",
                 o().txnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).commitType = CommitType::kNoShards;
             _onStartCommit(lk, opCtx);
         }
@@ -1692,7 +1692,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                     "shardId"_attr = shardId);
 
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).commitType = CommitType::kSingleShard;
             _onStartCommit(lk, opCtx);
         }
@@ -1710,7 +1710,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                     "numReadOnlyShards"_attr = readOnlyShards.size(),
                     "writeShardId"_attr = writeShards.front());
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).commitType = CommitType::kSingleWriteShard;
             _onStartCommit(lk, opCtx);
         }
@@ -1754,7 +1754,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                     "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                     "numParticipantShards"_attr = readOnlyShards.size());
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).commitType = CommitType::kReadOnly;
             _onStartCommit(lk, opCtx);
         }
@@ -1763,7 +1763,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
     }
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).commitType = CommitType::kTwoPhaseCommit;
         _onStartCommit(lk, opCtx);
     }
@@ -1975,7 +1975,7 @@ void TransactionRouter::Router::appendRecoveryToken(BSONObjBuilder* builder) con
 void TransactionRouter::Router::_resetRouterState(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "Cannot start a new transaction while the previous is yielded",
@@ -2026,7 +2026,7 @@ void TransactionRouter::Router::_resetRouterStateForStartTransaction(
     _resetRouterState(opCtx, txnNumberAndRetryCounter);
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         auto& osw = o(lk);
 
         osw.apiParameters = APIParameters::get(opCtx);
@@ -2057,7 +2057,7 @@ void TransactionRouter::Router::_resetRouterStateForStartOrContinueTransaction(
     }
     _resetRouterStateForStartTransaction(opCtx, txnNumberAndRetryCounter);
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).subRouter = true;
     }
     setAtClusterTimeForStartOrContinue(opCtx);
@@ -2184,7 +2184,7 @@ void TransactionRouter::Router::_onImplicitAbort(OperationContext* opCtx, const 
     // Implicit abort may execute multiple times if a misbehaving client keeps sending statements
     // for a txnNumber after receiving an error, so only remember the first abort cause.
     if (o().abortCause.empty()) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).abortCause = status.codeString();
     }
 
@@ -2196,7 +2196,7 @@ void TransactionRouter::Router::_onExplicitAbort(OperationContext* opCtx) {
     // the transaction terminated as soon as explicit abort is observed.
     if (o().abortCause.empty()) {
         // Note this code means the abort was from a user abortTransaction command.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).abortCause = "abort";
     }
 
@@ -2220,7 +2220,7 @@ void TransactionRouter::Router::_onNonRetryableCommitError(OperationContext* opC
     // If the commit failed with a command error that can't be retried on, the transaction shouldn't
     // be able to eventually commit, so it can be considered over from the router's perspective.
     if (o().abortCause.empty()) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).abortCause = commitStatus.codeString();
     }
     _endTransactionTrackingIfNecessary(opCtx, TerminationCause::kAborted);
@@ -2229,7 +2229,7 @@ void TransactionRouter::Router::_onNonRetryableCommitError(OperationContext* opC
 void TransactionRouter::Router::_onContinue(OperationContext* opCtx) {
     auto tickSource = opCtx->getServiceContext()->getTickSource();
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
 }
 
@@ -2248,7 +2248,7 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
     auto curTicks = tickSource->getTicks();
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
 
         // In some error contexts, the transaction may not have been started yet, so try setting the
         // transaction's timing stats to active before ending it below. This is a no-op for already
@@ -2273,7 +2273,7 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
 }
 
 void TransactionRouter::Router::_updateLastClientInfo(Client* client) {
-    stdx::lock_guard<Client> lk(*client);
+    std::lock_guard<Client> lk(*client);
     o(lk).lastClientInfo.update(client);
 }
 

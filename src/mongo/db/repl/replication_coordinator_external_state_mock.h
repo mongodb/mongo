@@ -42,7 +42,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -53,6 +52,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -242,7 +242,7 @@ private:
     Status _storeLocalConfigDocumentStatus;
     Status _storeLocalLastVoteDocumentStatus;
     // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
-    stdx::mutex _shouldHangLastVoteMutex;
+    std::mutex _shouldHangLastVoteMutex;
     stdx::condition_variable _shouldHangLastVoteCondVar;
     bool _storeLocalLastVoteDocumentShouldHang;
     bool _connectionsClosed;

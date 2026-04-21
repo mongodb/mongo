@@ -349,7 +349,7 @@ void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
 void CommonAsioSession::end() {
     std::error_code ec;
     {
-        stdx::lock_guard lg(_sslSocketLock);
+        std::lock_guard lg(_sslSocketLock);
         (void)getSocket().shutdown(GenericSocket::shutdown_both, ec);
     }
     if ((ec) && (ec != asio::error::not_connected)) {
@@ -420,7 +420,7 @@ void CommonAsioSession::cancelAsyncOperations(const BatonHandle& baton) {
                 3,
                 "Canceling outstanding I/O operations on connection to remote",
                 "remote"_attr = _remote);
-    stdx::lock_guard lk(_asyncOpMutex);
+    std::lock_guard lk(_asyncOpMutex);
     _asyncOpState.cancel();
     if (baton && baton->networking() && baton->networking()->cancelSession(*this)) {
         // If we have a baton, it was for networking, and it owned our session, then we're done.
@@ -819,7 +819,7 @@ Future<void> CommonAsioSession::opportunisticRead(Stream& stream,
             asyncBuffers += size;
         }
 
-        stdx::lock_guard lk(_asyncOpMutex);
+        std::lock_guard lk(_asyncOpMutex);
         if (_asyncOpState.isCanceled())
             return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
@@ -885,7 +885,7 @@ Future<void> CommonAsioSession::opportunisticWrite(Stream& stream,
             return std::move(*more);
         }
 
-        stdx::lock_guard lk(_asyncOpMutex);
+        std::lock_guard lk(_asyncOpMutex);
         if (_asyncOpState.isCanceled())
             return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
@@ -972,7 +972,7 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
         }
 
         {
-            stdx::lock_guard lg(_sslSocketLock);
+            std::lock_guard lg(_sslSocketLock);
             _sslSocket.emplace(std::move(_socket), *_sslContext->ingress, "");
         }
 

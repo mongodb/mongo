@@ -37,7 +37,6 @@
 #include "mongo/logv2/log_capture_backend.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/uassert_sink.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/errno_util.h"
@@ -49,6 +48,7 @@
 #include <exception>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -362,7 +362,7 @@ private:
         public:
             explicit Listener(EnhancedReporter::Impl* reporter) : _reporter(reporter) {}
             void accept(const std::string& line) override {
-                stdx::lock_guard lk(_reporter->_mutex);
+                std::lock_guard lk(_reporter->_mutex);
                 fmt::print(_reporter->_buffer, "{}", line);
             }
 
@@ -483,7 +483,7 @@ private:
     }
 
     // Guards _buffer.
-    stdx::timed_mutex _mutex;  // NOLINT
+    std::timed_mutex _mutex;  // NOLINT
     std::unique_ptr<testing::TestEventListener> _defaultListener;
     Options _options;
     const testing::UnitTest* _env;
@@ -499,7 +499,7 @@ private:
 };
 
 void EnhancedReporter::Impl::OnTestProgramStart(const testing::UnitTest& unitTest) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto note = [&](StringData message) {
         fmt::println(_buffer, "{}{}", _style(kCyan, "NOTE: "), _style(kDim, message));
     };
@@ -519,7 +519,7 @@ void EnhancedReporter::Impl::OnTestProgramStart(const testing::UnitTest& unitTes
 
 void EnhancedReporter::Impl::OnTestIterationStart(const testing::UnitTest& unitTest,
                                                   int iteration) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     fmt::print(_buffer,
                _style(kCyan),
                "Running {} tests in {} suites [ {} of {} ]",
@@ -532,7 +532,7 @@ void EnhancedReporter::Impl::OnTestIterationStart(const testing::UnitTest& unitT
 }
 
 void EnhancedReporter::Impl::OnTestStart(const testing::TestInfo& testInfo) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 #if ENHANCED_REPORTER_BUFFERING_ENABLED
     if (!_options.showEachTest) {
         _startBuffering(lk);
@@ -577,7 +577,7 @@ void EnhancedReporter::Impl::OnTestStart(const testing::TestInfo& testInfo) {
 }
 
 void EnhancedReporter::Impl::OnTestPartResult(const testing::TestPartResult& res) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     // If this is a failure and we've been suppressing log output, dump out the buffer and direct
     // logs to stdout.
@@ -627,7 +627,7 @@ void EnhancedReporter::Impl::OnTestPartResult(const testing::TestPartResult& res
 }
 
 void EnhancedReporter::Impl::OnTestEnd(const testing::TestInfo& testInfo) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto res = testInfo.result();
     auto disposition = [&]() {
         if (res->Failed()) {
@@ -652,7 +652,7 @@ void EnhancedReporter::Impl::OnTestEnd(const testing::TestInfo& testInfo) {
 }
 
 void EnhancedReporter::Impl::OnTestIterationEnd(const testing::UnitTest& unitTest, int iteration) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     fmt::println(_buffer,
                  "{} / {} / {} / {} [ {} of {} ]",
                  fmt::format(_style(kCyan), "{} TOTAL", unitTest.total_test_count()),

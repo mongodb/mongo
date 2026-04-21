@@ -33,11 +33,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -89,7 +89,7 @@ public:
 
 private:
     // Protects the state below.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // The checkpoint thread idles on this condition variable for a particular time duration between
     // taking checkpoints. It can be triggered early to expedite either: immediate checkpointing if

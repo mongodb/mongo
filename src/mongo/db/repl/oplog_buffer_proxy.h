@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
@@ -38,6 +37,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -88,10 +88,10 @@ private:
     std::unique_ptr<OplogBuffer> _target;
 
     // If both mutexes have to be acquired, acquire _lastPushedMutex first.
-    mutable stdx::mutex _lastPushedMutex;
+    mutable std::mutex _lastPushedMutex;
     boost::optional<Value> _lastPushed;
 
-    mutable stdx::mutex _lastPeekedMutex;
+    mutable std::mutex _lastPeekedMutex;
     boost::optional<Value> _lastPeeked;
 };
 

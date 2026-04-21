@@ -38,7 +38,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
@@ -53,6 +52,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -119,7 +119,7 @@ private:
     std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
     std::string _instanceName;
 
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
     AtomicWord<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };
@@ -244,7 +244,7 @@ private:
 
     // Guards assignment of the _client pointer.
     // Do not need to acquire this in contexts where the pointer is known to be valid.
-    stdx::mutex _clientMutex;
+    std::mutex _clientMutex;
     std::shared_ptr<AsyncDBClient> _client;
     ConnectionMetrics _connMetrics;
 };

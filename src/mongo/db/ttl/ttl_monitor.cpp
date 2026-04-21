@@ -292,7 +292,7 @@ Status TTLMonitor::onUpdateTTLMonitorSleepSeconds(int newSleepSeconds) {
 
 void TTLMonitor::updateSleepSeconds(Seconds newSeconds) {
     {
-        stdx::lock_guard lk(_stateMutex);
+        std::lock_guard lk(_stateMutex);
         _ttlMonitorSleepSecs = newSeconds;
     }
     _notificationCV.notify_all();
@@ -307,7 +307,7 @@ void TTLMonitor::run() {
             auto startTime = Date_t::now();
             // Wait until either ttlMonitorSleepSecs passes, a shutdown is requested, or the
             // sleeping time has changed.
-            stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+            std::unique_lock<std::mutex> lk(_stateMutex);
             auto deadline = startTime + _ttlMonitorSleepSecs;
 
             MONGO_IDLE_THREAD_BLOCK;
@@ -362,7 +362,7 @@ void TTLMonitor::run() {
 void TTLMonitor::shutdown() {
     LOGV2(3684100, "Shutting down TTL collection monitor thread");
     {
-        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+        std::lock_guard<std::mutex> lk(_stateMutex);
         _shuttingDown = true;
         _notificationCV.notify_all();
     }
@@ -882,7 +882,7 @@ void TTLMonitor::_scheduleMetadataRecovery(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const Status& staleStatus) {
     {
-        stdx::lock_guard lk(_stateMutex);
+        std::lock_guard lk(_stateMutex);
         if (!_namespacesRequiringMetadataRefresh.insert(nss).second) {
             // This nss already has a refresh scheduled.
             return;
@@ -897,7 +897,7 @@ void TTLMonitor::_scheduleMetadataRecovery(OperationContext* opCtx,
             shard_role_loop::handleStaleError(opCtx, staleStatus, shardRoleRetryCtx);
         })
         .onCompletion([this, nss](const Status& s) {
-            stdx::lock_guard lk(_stateMutex);
+            std::lock_guard lk(_stateMutex);
             _namespacesRequiringMetadataRefresh.erase(nss);
         })
         .getAsync([](auto) {});

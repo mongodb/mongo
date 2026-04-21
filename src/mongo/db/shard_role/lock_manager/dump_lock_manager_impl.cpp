@@ -76,7 +76,7 @@ std::map<LockerId, BSONObj> getLockerIdToClientMap(ServiceContext* serviceContex
          Client* client = cursor.next();) {
         invariant(client);
 
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         const OperationContext* clientOpCtx = client->getOperationContext();
 
         // Operation context specific information

@@ -130,7 +130,7 @@ private:
      */
     enum class State { kNotInitialized, kSetUp, kStarted, kShutdown };
     State _state{State::kNotInitialized};
-    stdx::mutex _stateMutex;
+    std::mutex _stateMutex;
 
     std::vector<std::unique_ptr<TransportLayer>> _tls;
     TransportLayer* _defaultEgressLayer;

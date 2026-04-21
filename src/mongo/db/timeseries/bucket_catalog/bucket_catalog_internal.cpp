@@ -50,7 +50,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -64,6 +63,7 @@
 #include <climits>
 #include <limits>
 #include <list>
+#include <mutex>
 #include <string>
 #include <tuple>
 
@@ -84,7 +84,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
 MONGO_FAIL_POINT_DEFINE(hangTimeSeriesBatchPrepareWaitingForConflictingOperation);
 
-stdx::mutex _bucketIdGenLock;
+std::mutex _bucketIdGenLock;
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
 AtomicWord<uint64_t> _bucketIdGenCounter{static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64())};
 
@@ -384,7 +384,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     BucketId bucketId{key.collectionUUID, bucketIdElem.OID(), key.signature()};
     {
         auto& bucketStateRegistry = catalog.bucketStateRegistry;
-        stdx::lock_guard catalogLock{bucketStateRegistry.mutex};
+        std::lock_guard catalogLock{bucketStateRegistry.mutex};
 
         auto it = bucketStateRegistry.bucketStates.find(bucketId);
         if (it != bucketStateRegistry.bucketStates.end() && isBucketStateFrozen(it->second)) {
@@ -645,7 +645,7 @@ void waitToCommitBatch(BucketStateRegistry& registry,
     while (true) {
         boost::optional<InsertWaiter> waiter;
         {
-            stdx::lock_guard stripeLock{stripe.mutex};
+            std::lock_guard stripeLock{stripe.mutex};
             Bucket* bucket =
                 useBucket(registry, stripe, stripeLock, batch->bucketId, IgnoreBucketState::kNo);
             if (!bucket || isWriteBatchFinished(*batch)) {
@@ -1051,7 +1051,7 @@ std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOpt
 }
 
 void resetBucketOIDCounter() {
-    stdx::lock_guard lk{_bucketIdGenLock};
+    std::lock_guard lk{_bucketIdGenLock};
     _bucketIdGenCounter.store(static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64()));
 }
 
@@ -1246,7 +1246,7 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
 
 ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
                                                        const UUID& collectionUUID) {
-    stdx::lock_guard catalogLock{catalog.mutex};
+    std::lock_guard catalogLock{catalog.mutex};
     auto it = catalog.executionStats.find(collectionUUID);
     if (it != catalog.executionStats.end()) {
         return {it->second, catalog.globalExecutionStats};
@@ -1260,7 +1260,7 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
 }
 
 ExecutionStatsController getExecutionStats(BucketCatalog& catalog, const UUID& collectionUUID) {
-    stdx::lock_guard catalogLock{catalog.mutex};
+    std::lock_guard catalogLock{catalog.mutex};
 
     auto it = catalog.executionStats.find(collectionUUID);
     if (it != catalog.executionStats.end()) {
@@ -1274,7 +1274,7 @@ ExecutionStatsController getExecutionStats(BucketCatalog& catalog, const UUID& c
 
 tracking::shared_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCatalog& catalog,
                                                                  const UUID& collectionUUID) {
-    stdx::lock_guard catalogLock{catalog.mutex};
+    std::lock_guard catalogLock{catalog.mutex};
 
     auto it = catalog.executionStats.find(collectionUUID);
     if (it != catalog.executionStats.end()) {
@@ -1288,7 +1288,7 @@ std::vector<tracking::shared_ptr<ExecutionStats>> releaseExecutionStatsFromBucke
     std::vector<tracking::shared_ptr<ExecutionStats>> out;
     out.reserve(collectionUUIDs.size());
 
-    stdx::lock_guard catalogLock{catalog.mutex};
+    std::lock_guard catalogLock{catalog.mutex};
     for (auto&& uuid : collectionUUIDs) {
         auto it = catalog.executionStats.find(uuid);
         if (it != catalog.executionStats.end()) {

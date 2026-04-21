@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/dbmessage.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_session_impl.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
@@ -52,6 +51,7 @@
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
+#include <mutex>
 
 #include <boost/filesystem.hpp>
 
@@ -279,7 +279,7 @@ TEST_F(AsioGRPCTransportLayerManagerTest, EgressAsio) {
 TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
     runTest([&](auto&) {
         stdx::condition_variable cv;
-        stdx::mutex mutex;
+        std::mutex mutex;
         // When set to true, the client side thread will disconnect the gRPC session.
         bool killSession = false;
         bool serverCbComplete = false;
@@ -288,7 +288,7 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
             ON_BLOCK_EXIT([&] {
                 session.end();
                 {
-                    stdx::unique_lock lk(mutex);
+                    std::unique_lock lk(mutex);
                     serverCbComplete = true;
                 }
                 cv.notify_all();
@@ -312,7 +312,7 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
             auto clkSource = getServiceContext()->getFastClockSource();
             auto start = clkSource->now();
             {
-                stdx::lock_guard lk(mutex);
+                std::lock_guard lk(mutex);
                 killSession = true;
             }
             cv.notify_all();
@@ -337,7 +337,7 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
                                .get();
             ON_BLOCK_EXIT([&] { session->end(); });
             {
-                stdx::unique_lock lk(mutex);
+                std::unique_lock lk(mutex);
                 cv.wait(lk, [&]() { return killSession || serverCbComplete; });
                 ASSERT_FALSE(serverCbComplete) << "server callback terminated early";
             }
@@ -346,7 +346,7 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
             sleepFor(Milliseconds(100));
         }
 
-        stdx::unique_lock lk(mutex);
+        std::unique_lock lk(mutex);
         cv.wait(lk, [&]() { return serverCbComplete; });
     });
 }

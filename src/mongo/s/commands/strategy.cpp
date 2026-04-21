@@ -515,7 +515,7 @@ void ParseAndRunCommand::_parseCommand() {
 
     // If the command includes a 'comment' field, set it on the current OpCtx.
     if (auto& commentField = _invocation->getGenericArguments().getComment()) {
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField->getElement().wrap());
     }
 
@@ -531,7 +531,7 @@ void ParseAndRunCommand::_parseCommand() {
     {
         // We must obtain the client lock to set APIParameters on the operation context, as it may
         // be concurrently read by CurrentOp.
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         APIParameters::get(opCtx) = APIParameters::fromClient(std::move(apiParams));
     }
 
@@ -550,7 +550,7 @@ void ParseAndRunCommand::_parseCommand() {
 
     // Fill out all currentOp details.
     {
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         CurOp::get(opCtx)->setGenericOpRequestDetails(lk, nss, command, request.body, _opType);
     }
 
@@ -592,7 +592,7 @@ void ParseAndRunCommand::_parseCommand() {
     {
         // We must obtain the client lock to set ReadConcernArgs on the operation context, as it may
         // be concurrently read by CurrentOp.
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         if (auto& rc = _invocation->getGenericArguments().getReadConcern()) {
             readConcernArgs = *rc;
         }
@@ -812,7 +812,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         // We must obtain the client lock to set ReadConcernArgs, because it's an
         // in-place reference to the object on the operation context, which may be
         // concurrently used elsewhere (eg. read by currentOp).
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         LOGV2_DEBUG(22767,
                     2,
                     "Applying default readConcern on command",
@@ -862,7 +862,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     if (!provenance.hasSource()) {
         // We must obtain the client lock to set the provenance of the opCtx's ReadConcernArgs as it
         // may be concurrently read by CurrentOp.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         if (clientSuppliedReadConcern) {
             provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
         } else if (customDefaultReadConcernWasApplied) {

@@ -44,11 +44,11 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -225,7 +225,7 @@ private:
     // index builds that were resumed.
     const bool _skipNumAppliedCheck = false;
 
-    mutable stdx::mutex _multikeyPathMutex;
+    mutable std::mutex _multikeyPathMutex;
     boost::optional<MultikeyPaths> _multikeyPaths;
 };
 }  // namespace MONGO_MOD_PUBLIC mongo

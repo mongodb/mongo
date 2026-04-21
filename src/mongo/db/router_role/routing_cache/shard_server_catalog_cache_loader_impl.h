@@ -39,7 +39,6 @@
 #include "mongo/db/router_role/routing_cache/shard_server_catalog_cache_loader.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
@@ -49,6 +48,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -483,7 +483,7 @@ private:
     NamespaceMetadataChangeNotifications _namespaceNotifications;
 
     // Protects the class state below
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // True if shutDown was called.
     bool _inShutdown{false};

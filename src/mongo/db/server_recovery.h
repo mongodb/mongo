@@ -31,9 +31,10 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
+
+#include <mutex>
 
 namespace MONGO_MOD_PUBLIC mongo {
 /**
@@ -92,7 +93,7 @@ public:
     bool shouldRecordStoresAlwaysCheckSize() const;
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     StringSet _collectionsAlwaysNeedingSizeAdjustment;
     bool _recordStoresShouldAlwayCheckSize = false;
 };

@@ -254,7 +254,7 @@ template <typename T>
 class AsyncStack {
 public:
     T* tryPop() {
-        stdx::lock_guard lock{_spin};
+        std::lock_guard lock{_spin};
         T* node = _head;
         if (node) {
             node = std::exchange(_head, node->intrusiveNext);
@@ -264,7 +264,7 @@ public:
     }
 
     void push(T* node) {
-        stdx::lock_guard lock{_spin};
+        std::lock_guard lock{_spin};
         node->intrusiveNext = std::exchange(_head, node);
     }
 

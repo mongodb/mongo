@@ -31,13 +31,13 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/modules.h"
 
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -137,7 +137,7 @@ private:
 
     void _unregisterNotificationToken_inlock(WithLock, const NotificationToken& token);
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     // The timestamp represents the latest commitTime for a given namespace seen via notifyChange.
     std::map<NamespaceString, std::pair<Timestamp, NotificationsList>> _notificationsList;
 };

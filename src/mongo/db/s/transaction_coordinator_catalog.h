@@ -38,7 +38,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 #include <functional>
@@ -145,7 +144,7 @@ private:
      * Blocks in an interruptible wait until the catalog is not marked as having a stepup in
      * progress.
      */
-    void _waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
+    void _waitForStepUpToComplete(std::unique_lock<std::mutex>& lk, OperationContext* opCtx);
 
     /**
      * Removes the coordinator with the given session id and transaction number from the catalog, if
@@ -163,7 +162,7 @@ private:
     std::string _toString(WithLock wl) const;
 
     // Protects the state below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Contains TransactionCoordinator objects by session id and transaction number. May contain
     // more than one coordinator per session. All coordinators for a session that do not correspond

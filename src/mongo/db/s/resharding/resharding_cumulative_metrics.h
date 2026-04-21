@@ -184,7 +184,7 @@ private:
     void appendOldestDiagnosticMetrics(Role role, BSONObjBuilder* bob) const;
 
     const std::string _rootSectionName;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     std::vector<MetricsSet> _instanceMetricsForAllRoles;
 
     StateTracker _stateTracker;

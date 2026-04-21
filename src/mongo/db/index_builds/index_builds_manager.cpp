@@ -177,7 +177,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     const char* curopMessage = "Index Build: scanning collection";
     ProgressMeterHolder progressMeter;
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progressMeter.set(lk,
                           CurOp::get(opCtx)->setProgress(
                               lk, curopMessage, coll.getCollectionPtr()->numRecords(opCtx)),
@@ -210,7 +210,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                                   "error"_attr = redact(validStatus));
                     rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id);
                     {
-                        stdx::unique_lock<Client> lk(*opCtx->getClient());
+                        std::unique_lock<Client> lk(*opCtx->getClient());
                         // Must reduce the progress meter's expected total after deleting an invalid
                         // document from the collection.
                         progressMeter.get(lk)->setTotalWhileRunning(
@@ -238,7 +238,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                         return insertStatus;
                     }
                     {
-                        stdx::unique_lock<Client> lk(*opCtx->getClient());
+                        std::unique_lock<Client> lk(*opCtx->getClient());
                         progressMeter.get(lk)->hit();
                     }
                 }
@@ -266,7 +266,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     }
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progressMeter.get(lk)->finished();
     }
 
@@ -407,7 +407,7 @@ bool IndexBuildsManager::isBackgroundBuilding(const UUID& buildUUID) {
 }
 
 void IndexBuildsManager::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
@@ -423,14 +423,14 @@ void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
 }
 
 void IndexBuildsManager::_registerIndexBuild(UUID buildUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     auto mib = std::make_unique<MultiIndexBlock>();
     invariant(_builders.insert(std::make_pair(buildUUID, std::move(mib))).second);
 }
 
 void IndexBuildsManager::tearDownAndUnregisterIndexBuild(const UUID& buildUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
@@ -441,7 +441,7 @@ void IndexBuildsManager::tearDownAndUnregisterIndexBuild(const UUID& buildUUID) 
 }
 
 StatusWith<MultiIndexBlock*> IndexBuildsManager::_getBuilder(const UUID& buildUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};

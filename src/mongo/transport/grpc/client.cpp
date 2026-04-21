@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/channel_pool.h"
 #include "mongo/transport/grpc/client_stream.h"
 #include "mongo/transport/grpc/grpc_client_context.h"
@@ -48,6 +47,8 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <mutex>
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -86,7 +87,7 @@ Client::Client(TransportLayer* tl, ServiceContext* svcCtx, const BSONObj& client
 }
 
 void Client::start() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(std::exchange(_state, ClientState::kStarted) == ClientState::kUninitialized,
               "Cannot start a gRPC client more than once");
 }
@@ -95,7 +96,7 @@ void Client::shutdown() {
     decltype(_sessions) sessions;
     decltype(_remoteStates) remoteStates;
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         invariant(std::exchange(_state, ClientState::kShutdown) != ClientState::kShutdown,
                   "Cannot shut down a gRPC client more than once");
         sessions = _sessions;
@@ -120,7 +121,7 @@ void Client::shutdown() {
         }
     }
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     _shutdownCV.wait(lk, [&]() { return _isShutdownComplete_inlock(); });
 
     LOGV2_DEBUG(7401601,
@@ -268,7 +269,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                                                            _id,
                                                            _sharedState);
 
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             if (MONGO_unlikely(_state == ClientState::kShutdown)) {
                 auto status = makeShutdownTerminationStatus();
                 session->cancel(status);
@@ -286,7 +287,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                         _numFailedStreams.increment();
                     }
                     if (auto anchor = client.lock()) {
-                        stdx::lock_guard lk(_mutex);
+                        std::lock_guard lk(_mutex);
                         _sessions.erase(it);
                         _numActiveStreams.decrement();
 
@@ -301,7 +302,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
         .tapAll([this, streamState](const StatusWith<std::shared_ptr<EgressSession>>& swSession) {
             streamState->cancelTimer();
 
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _numPendingStreams--;
             streamState->unregisterFromClient(lk, streamState->getRemote(), *this);
             if (MONGO_unlikely(_isShutdownComplete_inlock())) {
@@ -345,7 +346,7 @@ void Client::PendingStreamState::cancel(Status reason) {
     invariant(!reason.isOK());
 
     {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (!_cancellationReason.isOK()) {
             // Already cancelled, can early return.
             return;
@@ -363,7 +364,7 @@ Status Client::PendingStreamState::getCancellationReason() {
         return Status::OK();
     }
 
-    stdx::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex);
     if (!_cancellationReason.isOK()) {
         return _cancellationReason;
     }
@@ -371,7 +372,7 @@ Status Client::PendingStreamState::getCancellationReason() {
 }
 
 size_t Client::getPendingStreamEstablishments(const HostAndPort& target) {
-    stdx::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex);
     if (auto it = _remoteStates.find(target); it != _remoteStates.end()) {
         return it->second.pendingStreamStates.size();
     }
@@ -864,7 +865,7 @@ void GRPCClient::dropConnections(const HostAndPort& target, const Status& status
 
 void GRPCClient::_dropPendingStreamEstablishments(
     std::function<bool(const HostAndPort&)> shouldDrop) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // Cancel all outstanding connect timers and stream establishment attempts.
     for (auto&& it : _remoteStates) {
         if (!it.second.keepOpen && shouldDrop(it.first)) {
@@ -876,7 +877,7 @@ void GRPCClient::_dropPendingStreamEstablishments(
 }
 
 void GRPCClient::setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _remoteStates[hostAndPort].keepOpen = keepOpen;
 
     static_cast<StubFactoryImpl&>(*_stubFactory)

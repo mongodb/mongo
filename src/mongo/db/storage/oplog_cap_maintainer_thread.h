@@ -84,12 +84,12 @@ private:
                                    RecordId mayTruncateUpTo);
 
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable stdx::mutex _opCtxMutex;
+    mutable std::mutex _opCtxMutex;
 
     // Saves a reference to the cap maintainer thread's operation context.
     boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
 
-    mutable stdx::mutex _stateMutex;
+    mutable std::mutex _stateMutex;
     bool _shuttingDown = false;
     Status _shutdownReason = Status::OK();
 

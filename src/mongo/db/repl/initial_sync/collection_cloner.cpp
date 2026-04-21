@@ -59,7 +59,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -69,6 +68,7 @@
 
 #include <cstdint>
 #include <list>
+#include <mutex>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
@@ -226,7 +226,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::collStatsStage() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     BSONObjBuilder b(BSON("collStats" << _sourceNss.coll()));
 
     BSONObj res;
@@ -481,7 +481,7 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
                               _sourceNss,
                               [&]() { return mustExit(); });
     {
-        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        std::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         if (!getSharedData()->getStatus(lk).isOK()) {
             static constexpr char message[] =
                 "Collection cloning cancelled due to initial sync failure";
@@ -506,7 +506,7 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     _firstBatchOfQueryRound = false;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _receivedBatches.fetchAndAddRelaxed(1);
         while (cursor.moreInCurrentBatch()) {
             _documentsToInsert.emplace_back(cursor.nextSafe());
@@ -541,7 +541,7 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
 void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd) {
     uassertStatusOK(cbd.status);
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         std::vector<BSONObj> docs;
         // Increment 'fetchedBatches' even if no documents were inserted to match the number of
         // 'receivedBatches'.

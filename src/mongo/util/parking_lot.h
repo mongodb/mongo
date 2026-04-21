@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/platform/atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <atomic>
 #include <list>
+#include <mutex>
 
 namespace mongo {
 
@@ -103,7 +103,7 @@ public:
      */
     bool unparkOne() noexcept {
         if (_notifiableCount.load()) {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
 
             return _notifyNextNotifiable(lk);
         }
@@ -113,7 +113,7 @@ public:
     /** Unpark everything currently parked. */
     void unparkAll() noexcept {
         if (_notifiableCount.load()) {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             while (_notifyNextNotifiable(lk)) {
             }
         }
@@ -146,7 +146,7 @@ public:
         // we can check upon wake-up if the _handleContainer was already re-populated (in case we
         // were unparked), or if we need to spliceBack ourselves, under the lock.
         auto iter = [&] {
-            stdx::lock_guard localMutex(_mutex);
+            std::lock_guard localMutex(_mutex);
             auto& notifiableHandleContainer = notifiable.getHandleContainer();
             _notifiableCount.addAndFetch(1);
             _notifiables.splice(
@@ -158,7 +158,7 @@ public:
         // as well as any other work the waiter would like to do while waiting.
         std::forward<Callback>(cb)();
 
-        stdx::lock_guard localMutex(_mutex);
+        std::lock_guard localMutex(_mutex);
         // If our list isn't empty, we were notified, and spliced back in _notifyNextNotifiable.
         // If it is empty, we need to stash our wait queue iterator ourselves.
         if (notifiable.getHandleContainer().empty()) {
@@ -201,7 +201,7 @@ private:
     }
 
     Atomic<uint64_t> _notifiableCount{0};
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::list<Notifiable*> _notifiables;
 };
 }  // namespace mongo

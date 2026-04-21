@@ -32,7 +32,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tracking/map.h"
 #include "mongo/util/tracking/unordered_map.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <variant>
 
@@ -118,7 +118,7 @@ using DirectWriteCounter = std::int32_t;
 struct BucketStateRegistry {
     using Era = std::uint64_t;
 
-    mutable stdx::mutex mutex;
+    mutable std::mutex mutex;
 
     // Global number tracking the current number of eras that have passed. Incremented each time
     // a bucket is cleared.

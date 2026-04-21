@@ -261,7 +261,7 @@ const AsyncResultsMergerParams& AsyncResultsMerger::params() const {
 }
 
 bool AsyncResultsMerger::remotesExhausted() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _remotesExhausted(lk);
 }
 
@@ -274,7 +274,7 @@ bool AsyncResultsMerger::_remotesExhausted(WithLock) const {
 }
 
 bool AsyncResultsMerger::isEOF() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return std::all_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
         return remote->exhausted() && !remote->hasNext() && !remote->invalidated;
     });
@@ -286,29 +286,29 @@ Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
                       "maxTimeMS can only be used with getMore for tailable, awaitData cursors");
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _awaitDataTimeout = awaitDataTimeout;
 
     return Status::OK();
 }
 
 boost::optional<Milliseconds> AsyncResultsMerger::getAwaitDataTimeout_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _awaitDataTimeout;
 }
 
 boost::optional<Milliseconds> AsyncResultsMerger::getEffectiveAwaitDataTimeout_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _calculateEffectiveAwaitDataTimeout(lk);
 }
 
 bool AsyncResultsMerger::ready() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _ready(lk);
 }
 
 void AsyncResultsMerger::detachFromOperationContext() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     if (_opCtx == nullptr) {
         // This early exit allows 'AsyncResultMerger' to be 'detached' twice without consequences
@@ -333,7 +333,7 @@ void AsyncResultsMerger::detachFromOperationContext() {
 }
 
 void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     if (_opCtx == opCtx) {
         // This early exit allows 'AsyncResultMerger' to be 're-attached' to the same 'opCtx' twice
@@ -354,7 +354,7 @@ bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyIncreasing(
 
 void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
                                             const ShardTag& tag) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     // Create a new remote cursor entry in the '_remotes' list for each new shard, and add the first
     // cursor batch to its buffer. This ensures the shard's initial high water mark is respected, if
@@ -379,7 +379,7 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
             "closeShardCursors() cannot be used for tailable cursors.",
             _tailableMode != TailableModeEnum::kTailable);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     ON_BLOCK_EXIT([this]() {
         // '_gettingRemote' contains an index into the '_remotes' vector. If the '_remotes' vector
@@ -443,23 +443,23 @@ void AsyncResultsMerger::setNextHighWaterMarkDeterminingStrategy(
             "expecting AsyncResultsMerger to be in tailable, awaitData mode",
             _tailableMode == TailableModeEnum::kTailableAndAwaitData);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _nextHighWaterMarkDeterminingStrategy = std::move(nextHighWaterMarkDeterminingStrategy);
 }
 
 void AsyncResultsMerger::enableUndoNextReadyMode() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _undoModeEnabled = true;
 }
 
 void AsyncResultsMerger::disableUndoNextReadyMode() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _undoModeEnabled = false;
     _stateForNextReadyCallUndo.reset();
 }
 
 void AsyncResultsMerger::undoNextReady() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     tassert(11057500,
             "expecting undo mode to be enabled when calling 'undoNextReady()'",
             _undoModeEnabled);
@@ -494,7 +494,7 @@ bool AsyncResultsMerger::getCompareWholeSortKey() const {
 }
 
 bool AsyncResultsMerger::partialResultsReturned() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return std::any_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
         return remote->partialResultsReturned;
     });
@@ -502,7 +502,7 @@ bool AsyncResultsMerger::partialResultsReturned() const {
 
 std::size_t AsyncResultsMerger::getNumRemotes() const {
     // Take the lock to guard against shard additions or disconnections.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     // If 'allowPartialResults' is false, the number of participating remotes is constant.
     if (!_params.getAllowPartialResults()) {
@@ -516,7 +516,7 @@ std::size_t AsyncResultsMerger::getNumRemotes() const {
 }
 
 std::size_t AsyncResultsMerger::getNumBufferedResponses_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return std::accumulate(
         _remotes.begin(), _remotes.end(), 0, [](std::size_t current, const auto& remote) {
             return current + remote->docBuffer.size();
@@ -526,19 +526,19 @@ std::size_t AsyncResultsMerger::getNumBufferedResponses_forTest() const {
 bool AsyncResultsMerger::hasCursorForShard_forTest(const ShardId& shardId,
                                                    const ShardTag& tag) const {
     // Take the lock to guard against shard additions or disconnections.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return std::any_of(_remotes.begin(), _remotes.end(), [&](const auto& remote) {
         return shardId == remote->shardId && tag == remote->tag;
     });
 }
 
 std::size_t AsyncResultsMerger::numberOfBufferedRemoteResponses_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _remoteResponses.size();
 }
 
 BSONObj AsyncResultsMerger::getHighWaterMark() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     // At this point, the high water mark may be the resume token of the last document we returned.
     // If no further results are eligible for return, we advance to the minimum promised sort key.
@@ -575,7 +575,7 @@ void AsyncResultsMerger::setHighWaterMark(const BSONObj& highWaterMark) {
     auto newHighWaterMark = BSON("" << highWaterMark);
     LOGV2_DEBUG(12163600, 5, "Setting high water mark", "highWaterMark"_attr = newHighWaterMark);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _highWaterMark = std::move(newHighWaterMark);
 }
 
@@ -750,7 +750,7 @@ bool AsyncResultsMerger::_readyUnsorted(WithLock) const {
 }
 
 StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     // Calling 'nextReady()' when the 'AsyncResultsMerger' is not ready is a contract violation, so
     // we check the readiness in debug mode to catch errors during testing. We do not do a readiness
@@ -960,7 +960,7 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock lk,
 }
 
 Status AsyncResultsMerger::scheduleGetMores() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _scheduleGetMores(lk);
 }
 
@@ -972,7 +972,7 @@ Status AsyncResultsMerger::releaseMemory() {
         AsyncRequestsSender::ShardHostMap shardHostMap;
         std::vector<AsyncRequestsSender::Request> requests;
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         requests.reserve(_remotes.size());
         for (const auto& remote : _remotes) {
@@ -1091,7 +1091,7 @@ Status AsyncResultsMerger::_sendRequestWithRetries(WithLock lk,
             }(cbData);
 
             // Handle the response and update the remote's status under the mutex.
-            stdx::lock_guard<stdx::mutex> lk(self->_mutex);
+            std::lock_guard<std::mutex> lk(self->_mutex);
             self->_handleBatchResponse(lk, cbData, parsedResponse, remote);
         },
         *_subBaton);
@@ -1159,7 +1159,7 @@ Status AsyncResultsMerger::_scheduleGetMoresForRemotes(
  * 3. Remotes that reached maximum retries will be in 'exhausted' state.
  */
 StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     if (_lifecycleState != kAlive) {
         // Can't schedule further network operations if the ARM is being killed.
@@ -1397,7 +1397,7 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                         return;
                     }
 
-                    stdx::lock_guard<stdx::mutex> lk(self->_mutex);
+                    std::lock_guard<std::mutex> lk(self->_mutex);
 
                     if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
                         remote->outstandingRequest = false;
@@ -1640,7 +1640,7 @@ bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& rem
 }
 
 SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     if (_killCompleteInfo) {
         tassert(11052315,
@@ -1698,7 +1698,7 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
 }
 
 query_stats::DataBearingNodeMetrics AsyncResultsMerger::takeMetrics() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     auto metrics = _metrics;
     _metrics = {};
     return metrics;

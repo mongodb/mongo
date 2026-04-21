@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -40,6 +39,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -113,7 +113,7 @@ private:
     std::function<size_t()> _minLoader;
     std::function<size_t()> _maxLoader;
     std::string _name;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 }  // namespace mongo::executor

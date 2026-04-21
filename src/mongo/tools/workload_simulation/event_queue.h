@@ -114,7 +114,7 @@ private:
     time_type _nextEventTime();
     std::pair<const storage_type*, queue_type*> _nextEventToProcess();
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     mutable stdx::condition_variable _cv;
 
     TickSourceMock<Nanoseconds>& _tickSource;

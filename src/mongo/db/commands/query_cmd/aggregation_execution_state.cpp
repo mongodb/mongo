@@ -605,7 +605,7 @@ void AggExState::adjustChangeStreamReadConcern() {
     {
         // We must obtain the client lock to set the ReadConcernArgs on the operation
         // context as it may be concurrently read by CurrentOp.
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
+        std::lock_guard<Client> lk(*_opCtx->getClient());
         readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
     }
 

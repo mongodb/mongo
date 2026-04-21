@@ -313,7 +313,7 @@ void MozJSProxyScope::runWithoutInterruptionExceptAtGlobalShutdown(Closure&& clo
 
 void MozJSProxyScope::runOnImplThread(unique_function<void()> f) {
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         _function = std::move(f);
 
         invariant(_state == State::Idle);
@@ -323,7 +323,7 @@ void MozJSProxyScope::runOnImplThread(unique_function<void()> f) {
 
     Status status = Status::OK();
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
 
         Interruptible* interruptible = _opCtx ? _opCtx : Interruptible::notInterruptible();
 
@@ -352,7 +352,7 @@ void MozJSProxyScope::runOnImplThread(unique_function<void()> f) {
 
 void MozJSProxyScope::shutdownThread() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         invariant(_state == State::Idle);
 
@@ -400,7 +400,7 @@ void MozJSProxyScope::implThread(MozJSProxyScope* proxy) {
 
     while (true) {
         {
-            stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
+            std::unique_lock<std::mutex> lk(proxy->_mutex);
             {
                 MONGO_IDLE_THREAD_BLOCK;
                 proxy->_implCondvar.wait(lk, [proxy] {
@@ -428,7 +428,7 @@ void MozJSProxyScope::implThread(MozJSProxyScope* proxy) {
         }
 
         {
-            stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
+            std::unique_lock<std::mutex> lk(proxy->_mutex);
 
             if (hadException) {
                 proxy->_status = std::move(capturedStatus);

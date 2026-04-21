@@ -52,7 +52,7 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
-using LockGuard = stdx::lock_guard<stdx::mutex>;
+using LockGuard = std::lock_guard<std::mutex>;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using EventHandle = executor::TaskExecutor::EventHandle;
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;

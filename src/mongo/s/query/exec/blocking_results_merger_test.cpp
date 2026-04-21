@@ -40,13 +40,14 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -245,15 +246,15 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
     future.default_timed_get();
 
     // Used for synchronizing the background thread with this thread.
-    stdx::mutex mutex;
-    stdx::unique_lock<stdx::mutex> lk(mutex);
+    std::mutex mutex;
+    std::unique_lock<std::mutex> lk(mutex);
 
     auto readyEvent = unittest::assertGet(blockingMerger.getNextEvent_forTest());
 
     // Issue a blocking wait for the next result asynchronously on a different thread.
     future = launchAsync([&]() {
         // Block until the main thread has responded to the getMore.
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
 
         ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
@@ -296,7 +297,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleDuringBlockingNext) {
 
     // Now mark the OperationContext as killed from this thread.
     {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        std::lock_guard<Client> lk(*operationContext()->getClient());
         operationContext()->markKilled(ErrorCodes::Interrupted);
     }
     // Wait for the merger to be interrupted.
@@ -328,7 +329,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleBeforeBlockingNext) {
 
     // Mark the OperationContext as killed from this thread.
     {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        std::lock_guard<Client> lk(*operationContext()->getClient());
         operationContext()->markKilled(ErrorCodes::Interrupted);
     }
 

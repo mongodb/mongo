@@ -960,7 +960,7 @@ ReshardingMetrics::OplogLatencyMetrics::OplogLatencyMetrics(ShardId donorShardId
     : _donorShardId(donorShardId) {}
 
 void ReshardingMetrics::OplogLatencyMetrics::updateAverageTimeToFetch(Milliseconds timeToFetch) {
-    stdx::lock_guard<stdx::mutex> lk(_timeToFetchMutex);
+    std::lock_guard<std::mutex> lk(_timeToFetchMutex);
 
     _avgTimeToFetch = [&]() -> Milliseconds {
         if (!_avgTimeToFetch) {
@@ -975,7 +975,7 @@ void ReshardingMetrics::OplogLatencyMetrics::updateAverageTimeToFetch(Millisecon
 }
 
 void ReshardingMetrics::OplogLatencyMetrics::updateAverageTimeToApply(Milliseconds timeToApply) {
-    stdx::lock_guard<stdx::mutex> lk(_timeToApplyMutex);
+    std::lock_guard<std::mutex> lk(_timeToApplyMutex);
 
     _avgTimeToApply = [&]() -> Milliseconds {
         if (!_avgTimeToApply) {
@@ -991,13 +991,13 @@ void ReshardingMetrics::OplogLatencyMetrics::updateAverageTimeToApply(Millisecon
 
 boost::optional<Milliseconds> ReshardingMetrics::OplogLatencyMetrics::getAverageTimeToFetch()
     const {
-    stdx::lock_guard<stdx::mutex> lk(_timeToFetchMutex);
+    std::lock_guard<std::mutex> lk(_timeToFetchMutex);
     return _avgTimeToFetch;
 }
 
 boost::optional<Milliseconds> ReshardingMetrics::OplogLatencyMetrics::getAverageTimeToApply()
     const {
-    stdx::lock_guard<stdx::mutex> lk(_timeToApplyMutex);
+    std::lock_guard<std::mutex> lk(_timeToApplyMutex);
     return _avgTimeToApply;
 }
 

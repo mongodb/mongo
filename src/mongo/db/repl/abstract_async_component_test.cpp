@@ -35,13 +35,13 @@
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <fmt/format.h>
@@ -51,7 +51,7 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
-using AbstractAsyncComponentType = AbstractAsyncComponent<stdx::mutex>;
+using AbstractAsyncComponentType = AbstractAsyncComponent<std::mutex>;
 
 /**
  * Mock implementation of AbstractAsyncComponent that supports returning errors from
@@ -105,10 +105,10 @@ private:
     void _doStartup(WithLock) override;
     void _doShutdown(WithLock) noexcept override;
     void _preJoin() noexcept override {}
-    stdx::mutex* _getMutex() noexcept override;
+    std::mutex* _getMutex() noexcept override;
 
     // Used by AbstractAsyncComponent to guard start changes.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
 public:
     // Asserted to be OK by _doStartup(). Override for testing.
@@ -123,13 +123,13 @@ MockAsyncComponent::MockAsyncComponent(executor::TaskExecutor* executor)
 
 Status MockAsyncComponent::checkForShutdownAndConvertStatus_forTest(
     const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     return this->_checkForShutdownAndConvertStatus(lock, callbackArgs, message);
 }
 
 Status MockAsyncComponent::checkForShutdownAndConvertStatus_forTest(const Status& status,
                                                                     const std::string& message) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     return this->_checkForShutdownAndConvertStatus(lock, status, message);
 }
 
@@ -137,7 +137,7 @@ Status MockAsyncComponent::scheduleWorkAndSaveHandle_forTest(
     executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     return this->_scheduleWorkAndSaveHandle(lock, std::move(work), handle, name);
 }
 
@@ -146,12 +146,12 @@ Status MockAsyncComponent::scheduleWorkAtAndSaveHandle_forTest(
     executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     return this->_scheduleWorkAtAndSaveHandle(lock, when, std::move(work), handle, name);
 }
 
 void MockAsyncComponent::cancelHandle_forTest(executor::TaskExecutor::CallbackHandle handle) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     this->_cancelHandle(lock, handle);
 }
 
@@ -172,7 +172,7 @@ void MockAsyncComponent::_doStartup(WithLock) {
 
 void MockAsyncComponent::_doShutdown(WithLock) noexcept {}
 
-stdx::mutex* MockAsyncComponent::_getMutex() noexcept {
+std::mutex* MockAsyncComponent::_getMutex() noexcept {
     return &_mutex;
 }
 

@@ -47,7 +47,6 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/transport/asio/asio_tcp_fast_open.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
@@ -66,6 +65,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/strong_weak_finish_line.h"
 
+#include <chrono>
 #include <type_traits>
 
 #include <asio/io_context.hpp>
@@ -277,7 +277,7 @@ public:
         return std::make_unique<AsioReactorTimer>(_ioContext);
     }
 
-    stdx::chrono::system_clock::time_point systemTime() override {
+    std::chrono::system_clock::time_point systemTime() override {
         return asio::system_timer::clock_type::now();
     }
 
@@ -344,7 +344,7 @@ void AsioTransportLayer::TimerService::start() {
     // ensures concurrent `start()` and `stop()` invocations are serialized. Holding the lock
     // guarantees that the following runs either before or after running `stop()`. Note that using
     // `compareAndSwap` while holding the lock is for simplicity and not necessary.
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     auto precondition = State::kInitialized;
     if (_state.compareAndSwap(&precondition, State::kStarted)) {
         _thread = _spawn([reactor = _reactor] {
@@ -365,7 +365,7 @@ void AsioTransportLayer::TimerService::stop() {
     // It's possible for `stop()` to be called without `start()` having been called (or for them to
     // be called concurrently), so we only proceed with stopping the reactor and joining the thread
     // if we've already transitioned to the `kStarted` state.
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     if (_state.swap(State::kStopped) != State::kStarted)
         return;
 
@@ -612,7 +612,7 @@ std::set<mongo::transport::WrappedEndpoint> getEndpoints(
     return endpoints;
 }
 
-AsioTransportLayer::ListenerInterface::ListenerInterface(stdx::mutex& sharedMutex,
+AsioTransportLayer::ListenerInterface::ListenerInterface(std::mutex& sharedMutex,
                                                          std::shared_ptr<AsioReactor> reactor,
                                                          AsioTransportLayer* asioTransportLayer)
     : _sharedMutex(sharedMutex),
@@ -755,8 +755,7 @@ AsioTransportLayer::ListenerInterface::_retrieveAllAcceptorRecords(
     return acceptorRecords;
 }
 
-void AsioTransportLayer::ListenerInterface::stopListenerWithLock(
-    stdx::unique_lock<stdx::mutex>& lk) {
+void AsioTransportLayer::ListenerInterface::stopListenerWithLock(std::unique_lock<std::mutex>& lk) {
     if (auto oldState = _listener.state; oldState != Listener::State::kShutdown) {
         _listener.state = Listener::State::kShuttingDown;
         if (oldState == Listener::State::kActive) {
@@ -773,7 +772,7 @@ void AsioTransportLayer::ListenerInterface::_runListener(std::string threadName)
     setThreadName(threadName);
 
     asioTransportLayerHangAtListenerStart.pauseWhileSet();
-    stdx::unique_lock lk(_sharedMutex);
+    std::unique_lock lk(_sharedMutex);
     ON_BLOCK_EXIT([&] {
         if (!lk.owns_lock()) {
             lk.lock();
@@ -817,7 +816,7 @@ void AsioTransportLayer::ListenerInterface::waitListenerThreadJoin() {
 }
 
 void AsioTransportLayer::ListenerInterface::waitUntilListenerStarted(
-    stdx::unique_lock<stdx::mutex>& lk) {
+    std::unique_lock<std::mutex>& lk) {
     _listener.cv.wait(lk, [this] { return _listener.state != Listener::State::kNew; });
 }
 
@@ -1127,7 +1126,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
         AtomicWord<bool> done{false};
         Promise<std::shared_ptr<Session>> promise;
 
-        stdx::mutex mutex;
+        std::mutex mutex;
         AsioSession::GenericSocket socket;
         AsioReactorTimer timeoutTimer;
         WrappedResolver resolver;
@@ -1160,7 +1159,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                                      connector->resolvedEndpoint));
 
                 std::error_code ec;
-                stdx::lock_guard<stdx::mutex> lk(connector->mutex);
+                std::lock_guard<std::mutex> lk(connector->mutex);
                 connector->resolver.cancel();
                 if (connector->session) {
                     connector->session->end();
@@ -1211,7 +1210,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                     networkCounter.incrementNumSlowDNSOperations();
                 }
 
-                stdx::lock_guard<stdx::mutex> lk(connector->mutex);
+                std::lock_guard<std::mutex> lk(connector->mutex);
 
                 connector->resolvedEndpoint = results.front();
                 connector->socket.open(connector->resolvedEndpoint->protocol());
@@ -1228,7 +1227,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
         .then([this, connector, sslMode, transientSSLContext, connectionMetrics]() -> Future<void> {
             connectionMetrics->onTCPConnectionEstablished();
 
-            stdx::unique_lock<stdx::mutex> lk(connector->mutex);
+            std::unique_lock<std::mutex> lk(connector->mutex);
             connector->session = [&] {
                 try {
                     return std::make_shared<AsyncAsioSession>(this,
@@ -1485,7 +1484,7 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
 void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder&) const {}
 
 Status AsioTransportLayer::start() {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     if (_isShutdown.load()) {
         LOGV2(6986801, "Cannot start an already shutdown TransportLayer");
         return ShutdownStatus;
@@ -1517,7 +1516,7 @@ Status AsioTransportLayer::start() {
 }
 
 void AsioTransportLayer::shutdown() {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     if (_isShutdown.swap(true)) {
         // We were already stopped
@@ -1536,7 +1535,7 @@ void AsioTransportLayer::shutdown() {
     }
 }
 
-void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::mutex> lk) {
+void AsioTransportLayer::stopAcceptingSessionsWithLock(std::unique_lock<std::mutex> lk) {
     if (!_listenerOptions.isIngress()) {
         // Egress only reactors never start a listener
         return;
@@ -1562,7 +1561,7 @@ void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::m
 }
 
 void AsioTransportLayer::stopAcceptingSessions() {
-    stopAcceptingSessionsWithLock(stdx::unique_lock(_mutex));
+    stopAcceptingSessionsWithLock(std::unique_lock(_mutex));
 }
 
 ReactorHandle AsioTransportLayer::getReactor(WhichReactor which) {
@@ -1598,13 +1597,13 @@ bool isTcp(Protocol&& p) {
 
 std::unique_ptr<AsioTransportLayer::TokenType>
 AsioTransportLayer::_makeParseProxyTokenIfPossible() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_numConnectionsPendingProxyHeader >= gProxyProtocolMaximumPendingConnections.load()) {
         return {};
     }
     ++_numConnectionsPendingProxyHeader;
     return std::make_unique<TokenType>([this] {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         --_numConnectionsPendingProxyHeader;
     });
 }

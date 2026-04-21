@@ -97,7 +97,7 @@ void writeToImageCollectionIfNeeded(OperationContext* opCtx, OpStateAccumulator*
     const auto existingNs = curOp->getNSS();
     UpdateResult res = Helpers::upsert(opCtx, collection, imageEntry.toBSON());
     {
-        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
         curOp->setNS(clientLock, existingNs);
     }
 

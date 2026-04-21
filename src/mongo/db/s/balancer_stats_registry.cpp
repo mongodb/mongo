@@ -102,7 +102,7 @@ void BalancerStatsRegistry::onStartup(OperationContext* opCtx) {
 
 void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
     // Different threads can trigger ReplicationCoordinator events concurrently.
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
 
     if (!_threadPool || _state.load() == State::kTerminating) {
         // The registry service has already been shut down.
@@ -123,7 +123,7 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
 
             OperationContext* opCtx;
             {
-                stdx::lock_guard lk{_stateMutex};
+                std::lock_guard lk{_stateMutex};
                 if (const auto currentState = _state.load(); currentState != State::kPrimaryIdle) {
                     LOGV2_DEBUG(6419631,
                                 2,
@@ -137,7 +137,7 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
             }
 
             ON_BLOCK_EXIT([this] {
-                stdx::lock_guard lk{_stateMutex};
+                std::lock_guard lk{_stateMutex};
                 _initOpCtxHolder.reset();
             });
 
@@ -197,12 +197,12 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
         .getAsync([](auto) {});
 }
 
-void BalancerStatsRegistry::_terminate(stdx::unique_lock<stdx::mutex>& lock) {
+void BalancerStatsRegistry::_terminate(std::unique_lock<std::mutex>& lock) {
     {
-        stdx::lock_guard lk{_stateMutex};
+        std::lock_guard lk{_stateMutex};
         _state.store(State::kTerminating);
         if (_initOpCtxHolder) {
-            stdx::lock_guard<Client> lk(*_initOpCtxHolder->getClient());
+            std::lock_guard<Client> lk(*_initOpCtxHolder->getClient());
             _initOpCtxHolder->markKilled(ErrorCodes::Interrupted);
         }
     }
@@ -222,7 +222,7 @@ void BalancerStatsRegistry::_terminate(stdx::unique_lock<stdx::mutex>& lock) {
 
 void BalancerStatsRegistry::onStepDown() {
     // Different threads can trigger ReplicationCoordinator events concurrently.
-    stdx::unique_lock lk{_mutex};
+    std::unique_lock lk{_mutex};
 
     if (!_threadPool || _state.load() == State::kTerminating) {
         // The registry service has already been shut down.
@@ -235,7 +235,7 @@ void BalancerStatsRegistry::onStepDown() {
 
 void BalancerStatsRegistry::onShutdown() {
     // Different threads can trigger ReplicationCoordinator events concurrently.
-    stdx::unique_lock lk{_mutex};
+    std::unique_lock lk{_mutex};
 
     if (!_threadPool || _state.load() == State::kTerminating) {
         // The registry service was never started (the startup event was not notified so the thread
@@ -254,7 +254,7 @@ long long BalancerStatsRegistry::getCollNumOrphanDocs(const UUID& collectionUUID
     if (!_isInitialized())
         uasserted(ErrorCodes::NotYetInitialized, "BalancerStatsRegistry is not initialized");
 
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     auto collStats = _collStatsMap.find(collectionUUID);
     if (collStats != _collStatsMap.end()) {
         return collStats->second.numOrphanDocs;
@@ -303,7 +303,7 @@ void BalancerStatsRegistry::onRangeDeletionTaskInsertion(const UUID& collectionU
     if (!_isInitialized())
         return;
 
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     auto& stats = _collStatsMap[collectionUUID];
     stats.numRangeDeletionTasks += 1;
     stats.numOrphanDocs += numOrphanDocs;
@@ -314,7 +314,7 @@ void BalancerStatsRegistry::onRangeDeletionTaskDeletion(const UUID& collectionUU
     if (!_isInitialized())
         return;
 
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     auto collStatsIt = _collStatsMap.find(collectionUUID);
     if (collStatsIt == _collStatsMap.end()) {
         LOGV2_DEBUG(6419612,
@@ -346,7 +346,7 @@ void BalancerStatsRegistry::updateOrphansCount(const UUID& collectionUUID, long 
     if (!_isInitialized() || delta == 0)
         return;
 
-    stdx::lock_guard lk{_mutex};
+    std::lock_guard lk{_mutex};
     if (delta > 0) {
         // Increase or create the stats if missing
         _collStatsMap[collectionUUID].numOrphanDocs += delta;
@@ -409,7 +409,7 @@ void BalancerStatsRegistry::_loadOrphansCount(OperationContext* opCtx) {
         &client, std::move(aggRequest), false /* secondaryOk */, true /* useExhaust */));
 
     {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         _collStatsMap.clear();
         while (cursor->more()) {
             auto collObj = cursor->next();

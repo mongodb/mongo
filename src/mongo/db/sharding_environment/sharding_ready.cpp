@@ -125,7 +125,7 @@ SharedSemiFuture<void> ShardingReady::isReadyFuture() const {
 }
 
 void ShardingReady::setIsReady() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (!_isReady.getFuture().isReady()) {
         _isReady.emplaceValue();
     }

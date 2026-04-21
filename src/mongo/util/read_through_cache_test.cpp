@@ -81,7 +81,7 @@ public:
     int countLookups{0};
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 class CausallyConsistentCache : public ReadThroughCache<std::string, CachedValue, Timestamp> {
@@ -106,11 +106,11 @@ public:
     int countLookups{0};
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 class CausallyConsistentCacheWithLookupArgs
-    : public ReadThroughCache<std::string, CachedValue, Timestamp, stdx::mutex, std::string, int> {
+    : public ReadThroughCache<std::string, CachedValue, Timestamp, std::mutex, std::string, int> {
 public:
     CausallyConsistentCacheWithLookupArgs(Service* service,
                                           ThreadPoolInterface& threadPool,
@@ -134,7 +134,7 @@ public:
     int countLookups{0};
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 /**

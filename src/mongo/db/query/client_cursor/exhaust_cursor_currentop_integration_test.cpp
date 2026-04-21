@@ -58,8 +58,6 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -84,7 +82,7 @@
 namespace mongo {
 namespace {
 // Specifies the amount of time we are willing to wait for a parallel operation to complete.
-const auto parallelWaitTimeoutMS = stdx::chrono::milliseconds(5 * 60 * 1000);
+const auto parallelWaitTimeoutMS = std::chrono::milliseconds(5 * 60 * 1000);
 
 // Obtain a pointer to the global system clock. Used to enforce timeouts in the parallel thread.
 auto* const clock = SystemClockSource::get();
@@ -193,11 +191,11 @@ auto startExhaustQuery(
     Milliseconds awaitDataTimeoutMS = Milliseconds(5000),
     const boost::optional<repl::OpTime>& lastKnownCommittedOpTime = boost::none) {
     boost::optional<CursorId> cursorId;
-    stdx::mutex cursorIdMutex;            // Protects the 'cursorId' variable.
+    std::mutex cursorIdMutex;             // Protects the 'cursorId' variable.
     stdx::condition_variable cursorIdCV;  // Synchronizes the threads on 'cursorId' initialization.
 
-    auto queryThread = stdx::async(
-        stdx::launch::async,
+    auto queryThread = std::async(
+        std::launch::async,
         [&cursorId,
          &cursorIdMutex,
          &cursorIdCV,
@@ -222,7 +220,7 @@ auto startExhaustQuery(
             auto queryCursor =
                 queryConnection->find(findCmd, ReadPreferenceSetting{}, ExhaustMode::kOn);
             {
-                stdx::lock_guard writeLock(cursorIdMutex);
+                std::lock_guard writeLock(cursorIdMutex);
                 cursorId = queryCursor->getCursorId();
             }
             cursorIdCV.notify_one();
@@ -250,7 +248,7 @@ auto startExhaustQuery(
 
     // Wait until the parallel operation initializes its cursor.
     {
-        stdx::unique_lock<stdx::mutex> lk(cursorIdMutex);
+        std::unique_lock<std::mutex> lk(cursorIdMutex);
         cursorIdCV.wait_for(lk, parallelWaitTimeoutMS, [&] { return cursorId.has_value(); });
     }
     ASSERT(cursorId);

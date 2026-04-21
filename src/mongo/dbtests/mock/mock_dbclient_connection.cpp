@@ -231,7 +231,7 @@ Message MockDBClientConnection::_call(Message& toSend, string* actualServer) {
 
     ScopeGuard killSessionOnDisconnect([this] { shutdown(); });
 
-    stdx::unique_lock lk(_netMutex);
+    std::unique_lock lk(_netMutex);
     ensureConnection();
     if (!isStillConnected() || !_remoteServer->isRunning()) {
         uasserted(ErrorCodes::SocketException, "Broken pipe in call");
@@ -257,7 +257,7 @@ Message MockDBClientConnection::_call(Message& toSend, string* actualServer) {
 Message MockDBClientConnection::recv(int lastRequestId) {
     ScopeGuard killSessionOnDisconnect([this] { shutdown(); });
 
-    stdx::unique_lock lk(_netMutex);
+    std::unique_lock lk(_netMutex);
     uassert(ErrorCodes::SocketException,
             "Broken pipe in recv",
             isStillConnected() && _remoteServer->isRunning());
@@ -279,21 +279,21 @@ Message MockDBClientConnection::recv(int lastRequestId) {
 }
 
 void MockDBClientConnection::shutdown() {
-    stdx::lock_guard lk(_netMutex);
+    std::lock_guard lk(_netMutex);
     DBClientConnection::shutdown();
     _mockCallResponsesCV.notify_all();
     _mockRecvResponsesCV.notify_all();
 }
 
 void MockDBClientConnection::shutdownAndDisallowReconnect() {
-    stdx::lock_guard lk(_netMutex);
+    std::lock_guard lk(_netMutex);
     DBClientConnection::shutdownAndDisallowReconnect();
     _mockCallResponsesCV.notify_all();
     _mockRecvResponsesCV.notify_all();
 }
 
 void MockDBClientConnection::setCallResponses(Responses responses) {
-    stdx::lock_guard lk(_netMutex);
+    std::lock_guard lk(_netMutex);
     _mockCallResponses = std::move(responses);
     _callIter = _mockCallResponses.begin();
     if (_blockedOnNetwork && !_mockCallResponses.empty()) {
@@ -303,7 +303,7 @@ void MockDBClientConnection::setCallResponses(Responses responses) {
 }
 
 void MockDBClientConnection::setRecvResponses(Responses responses) {
-    stdx::lock_guard lk(_netMutex);
+    std::lock_guard lk(_netMutex);
     _mockRecvResponses = std::move(responses);
     _recvIter = _mockRecvResponses.begin();
     if (_blockedOnNetwork && !_mockRecvResponses.empty()) {

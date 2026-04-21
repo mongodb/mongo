@@ -288,7 +288,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
         return AuthorizationManager::authenticationFailedStatus;
     }
 
-    stdx::lock_guard<Client> lk(*_client);
+    std::lock_guard<Client> lk(*_client);
 
     auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
     if (validatedTenancyScope && validatedTenancyScope->hasAuthenticatedUser()) {
@@ -343,7 +343,7 @@ boost::optional<UserHandle> AuthorizationSessionImpl::getAuthenticatedUser() {
 }
 
 void AuthorizationSessionImpl::logoutSecurityTokenUser() {
-    stdx::lock_guard<Client> lk(*_client);
+    std::lock_guard<Client> lk(*_client);
 
     uassert(6161503,
             "Attempted to deauth a security token user while using standard login",
@@ -365,7 +365,7 @@ void AuthorizationSessionImpl::logoutSecurityTokenUser() {
 }
 
 void AuthorizationSessionImpl::logoutAllDatabases(StringData reason) {
-    stdx::lock_guard<Client> lk(*_client);
+    std::lock_guard<Client> lk(*_client);
 
     uassert(6161504,
             "May not log out while using a security token based authentication",
@@ -420,7 +420,7 @@ RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
 }
 
 void AuthorizationSessionImpl::grantInternalAuthorization() {
-    stdx::lock_guard<Client> lk(*_client);
+    std::lock_guard<Client> lk(*_client);
     if (MONGO_unlikely(_authenticatedUser != boost::none)) {
         auto previousUser = _authenticatedUser.value()->getName();
         uassert(ErrorCodes::Unauthorized,
@@ -652,7 +652,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     const auto& name = currentUser->getName();
 
     const auto clearUser = [&] {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         _authenticatedUser = boost::none;
         _authenticationMode = AuthenticationMode::kNone;
         _expirationTime = boost::none;
@@ -660,7 +660,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     };
 
     const auto updateUser = [&](auto&& user) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         _authenticatedUser = std::move(user);
         LOGV2_DEBUG(
             20244, 1, "Updated session cache of user information for user", "user"_attr = name);

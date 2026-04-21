@@ -49,7 +49,6 @@
 #include "mongo/s/query/exec/cluster_client_cursor.h"
 #include "mongo/s/query/exec/cluster_client_cursor_guard.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -63,6 +62,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -297,7 +297,7 @@ public:
             }
 
             // Must hold the Client lock when calling isKillPending().
-            stdx::unique_lock<Client> lk(*_operationUsingCursor->getClient());
+            std::unique_lock<Client> lk(*_operationUsingCursor->getClient());
             return _operationUsingCursor->isKillPending();
         }
 
@@ -622,7 +622,7 @@ private:
     /**
      * Will detach a cursor, release the lock and then call kill() on it.
      */
-    void detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk,
+    void detachAndKillCursor(std::unique_lock<std::mutex> lk,
                              OperationContext* opCtx,
                              CursorId cursorId);
 
@@ -664,7 +664,7 @@ private:
     ClockSource* _clockSource;
 
     // Synchronizes access to all private state variables below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     bool _inShutdown{false};
 

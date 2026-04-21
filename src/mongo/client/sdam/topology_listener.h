@@ -31,11 +31,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -151,10 +151,10 @@ private:
     void _scheduleNextDelivery();
 
     // Lock acquisition order to avoid deadlock is _eventQueueMutex -> _mutex
-    stdx::mutex _eventQueueMutex;
+    std::mutex _eventQueueMutex;
     std::deque<EventPtr> _eventQueue;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     bool _isClosed = false;
     std::shared_ptr<executor::TaskExecutor> _executor;
     std::vector<TopologyListenerPtr> _listeners;

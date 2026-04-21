@@ -134,7 +134,7 @@ private:
 
     const MultiUpdateCoordinatorService* const _service;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     const MultiUpdateCoordinatorMetadata _metadata;
     MultiUpdateCoordinatorMutableFields _mutableFields;
     const MultiUpdateCoordinatorPhaseEnum _beganInPhase;

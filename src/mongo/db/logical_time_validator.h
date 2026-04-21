@@ -36,10 +36,10 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 
@@ -133,7 +133,7 @@ private:
 
     SignedLogicalTime _getProof(const KeysCollectionDocument& keyDoc, LogicalTime newTime);
 
-    stdx::mutex _mutex;  // protects _lastSeenValidTime
+    std::mutex _mutex;  // protects _lastSeenValidTime
     SignedLogicalTime _lastSeenValidTime;
     TimeProofService _timeProofService;
     std::shared_ptr<KeysCollectionManager> _keyManager;

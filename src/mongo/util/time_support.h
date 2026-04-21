@@ -32,7 +32,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -105,7 +104,7 @@ public:
     /**
      * Constructs a Date_t from a system clock time point.
      */
-    explicit Date_t(stdx::chrono::system_clock::time_point tp);
+    explicit Date_t(std::chrono::system_clock::time_point tp);
 
     /**
      * Returns a string representation of the date.
@@ -160,7 +159,7 @@ public:
      * Warning: careful when using with Date_t::max() as it can have a value that is bigger than
      * time_point can store.
      */
-    stdx::chrono::system_clock::time_point toSystemTimePoint() const;
+    std::chrono::system_clock::time_point toSystemTimePoint() const;
 
     /**
      * Returns true if this Date_t is in the range of Date_ts that can be formatted as calendar
@@ -176,7 +175,7 @@ public:
      * Warning: careful when using with Date_t::max() as it can have a value that is bigger than
      * time_point can store.
      */
-    operator stdx::chrono::system_clock::time_point() const {
+    operator std::chrono::system_clock::time_point() const {
         return toSystemTimePoint();
     }
 

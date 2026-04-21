@@ -36,10 +36,11 @@
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
+
+#include <mutex>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
@@ -121,13 +122,13 @@ public:
     EmuBinaryTracker makeEmuBinaryTracker();
 
     void updateCompactionStats(const CompactStats& stats) {
-        stdx::lock_guard<stdx::mutex> lock(_compactMutex);
+        std::lock_guard<std::mutex> lock(_compactMutex);
         FLEStatsUtil::accumulateStats(_compactStats.getEsc(), stats.getEsc());
         FLEStatsUtil::accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
     }
 
     void updateCleanupStats(const CleanupStats& stats) {
-        stdx::lock_guard<stdx::mutex> lock(_cleanupMutex);
+        std::lock_guard<std::mutex> lock(_cleanupMutex);
         FLEStatsUtil::accumulateStats(_cleanupStats.getEsc(), stats.getEsc());
         FLEStatsUtil::accumulateStats(_cleanupStats.getEcoc(), stats.getEcoc());
     }
@@ -145,15 +146,15 @@ private:
     AtomicWord<long long> emuBinarySuboperation;
     AtomicWord<long long> emuBinaryTotalMillis;
 
-    mutable stdx::mutex _compactMutex;
+    mutable std::mutex _compactMutex;
     CompactStats _compactStats;
 
-    mutable stdx::mutex _cleanupMutex;
+    mutable std::mutex _cleanupMutex;
     CleanupStats _cleanupStats;
 
     // Tracks and reports statistics about how many collections in the catalog use each of the
     // Queryable Encryption index types, and how many collections use unindexed encryption.
-    mutable stdx::mutex _indexTypeMutex;
+    mutable std::mutex _indexTypeMutex;
     FLEIndexTypeStats _indexTypeStats;
 };
 

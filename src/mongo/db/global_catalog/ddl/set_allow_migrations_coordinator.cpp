@@ -87,7 +87,7 @@ void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) c
     const auto otherDoc = SetAllowMigrationsCoordinatorDocument::parse(
         doc, IDLParserContext("SetAllowMigrationsCoordinatorDocument"));
 
-    stdx::lock_guard lk{_docMutex};
+    std::lock_guard lk{_docMutex};
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Another set allow migrations with different arguments is already running for the same "
             "namespace",
@@ -97,7 +97,7 @@ void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) c
 }
 
 void SetAllowMigrationsCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
-    stdx::lock_guard lk{_docMutex};
+    std::lock_guard lk{_docMutex};
     cmdInfoBuilder->appendElements(_doc.getSetAllowMigrationsRequest().toBSON());
 }
 

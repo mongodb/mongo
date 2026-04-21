@@ -34,10 +34,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transactions_stats_gen.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -142,7 +142,7 @@ private:
     AtomicWord<long long> _reclaimedPreparedTxnsAborted{0};
 
     // Protects member variables below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     boost::optional<LastCommittedTransaction> _lastCommittedTransaction;
 };

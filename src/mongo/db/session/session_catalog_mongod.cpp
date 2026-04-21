@@ -483,7 +483,7 @@ void abortInProgressTransactions(OperationContext* opCtx,
 
         // Synchronize with killOps to make this unkillable.
         {
-            auto lk = stdx::lock_guard(*opCtx->getClient());
+            auto lk = std::lock_guard(*opCtx->getClient());
             opCtx->setKillOpsExempt();
             opCtx->setLogicalSessionId(txnRecord.getSessionId());
             opCtx->setTxnNumber(txnRecord.getTxnNum());
@@ -603,7 +603,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
 
             // Synchronize with killOps to make this unkillable.
             {
-                auto lk = stdx::lock_guard(*newOpCtx->getClient());
+                auto lk = std::lock_guard(*newOpCtx->getClient());
                 newOpCtx->setKillOpsExempt();
                 newOpCtx->setLogicalSessionId(*sessionInfo.getSessionId());
                 newOpCtx->setTxnNumber(*sessionInfo.getTxnNumber());

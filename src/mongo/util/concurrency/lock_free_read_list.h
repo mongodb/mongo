@@ -32,7 +32,6 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/scoped_unlock.h"
@@ -40,6 +39,7 @@
 #include <limits>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <type_traits>
 
 namespace mongo {
@@ -162,7 +162,7 @@ public:
     }
 
     Entry* add(T data) {
-        stdx::lock_guard lk(_updateMutex);
+        std::lock_guard lk(_updateMutex);
         if (!_freeList.empty()) {
             // We are just recycling an entry from the free-list, so all we have to do is checking
             // it out and setting its data to the new value through `recycle()`.
@@ -181,7 +181,7 @@ public:
 
     void remove(Entry* e) {
         auto entry = static_cast<EntryImpl*>(e);
-        stdx::unique_lock lk(_updateMutex);
+        std::unique_lock lk(_updateMutex);
         entry->markDeletedAndAwaitReaders(lk);
         _freeList.push_back(entry);
     }
@@ -223,7 +223,7 @@ private:
 
         EntryImpl(EntryImpl* next, T data) : _readers(0), _data(data), _next(next) {}
 
-        void markDeletedAndAwaitReaders(stdx::unique_lock<stdx::mutex>& lk) {
+        void markDeletedAndAwaitReaders(std::unique_lock<std::mutex>& lk) {
             if (_readers.loadRelaxed() & kWriteIntentMask) {
                 // Another thread is removing this entry, or has already removed it.
                 return;
@@ -301,7 +301,7 @@ private:
         EntryImpl* const _next;
     };
 
-    stdx::mutex _updateMutex;
+    std::mutex _updateMutex;
     std::list<std::unique_ptr<EntryImpl>> _allocated;  // Maintains a list of all allocated entries.
     std::list<EntryImpl*> _freeList;
     Atomic<EntryImpl*> _head;

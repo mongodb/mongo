@@ -46,8 +46,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/future.h"  // IWYU pragma: keep
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -64,6 +62,7 @@
 #include "mongo/util/time_support.h"
 
 #include <functional>
+#include <future>  // IWYU pragma: keep
 #include <future>
 #include <initializer_list>
 #include <memory>
@@ -296,9 +295,9 @@ public:
     }
 
     void checkForInterruptForTimeout(OperationContext* opCtx) {
-        stdx::mutex m;
+        std::mutex m;
         stdx::condition_variable cv;
-        stdx::unique_lock<stdx::mutex> lk(m);
+        std::unique_lock<std::mutex> lk(m);
         opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; });
     }
 
@@ -438,9 +437,9 @@ TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesNanoseconds) {
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCV) {
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineByDate(mockClock->now(), ErrorCodes::ExceededTimeLimit);
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
+    std::unique_lock<std::mutex> lk(m);
     ASSERT_FALSE(opCtx->getCancellationToken().isCanceled());
     ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; }),
                        DBException,
@@ -451,9 +450,9 @@ TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCV) {
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineByDate(mockClock->now(), ErrorCodes::ExceededTimeLimit);
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
+    std::unique_lock<std::mutex> lk(m);
     ASSERT_FALSE(opCtx->getCancellationToken().isCanceled());
     ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterruptUntil(
                            cv, lk, mockClock->now() + Seconds{10}, [] { return false; }),
@@ -708,9 +707,9 @@ TEST_F(OperationDeadlineTests, DeadlineAfterRunWithoutInterruptDoesntSeeUnviolat
 TEST_F(OperationDeadlineTests, WaitForKilledOpCV) {
     auto opCtx = client->makeOperationContext();
     opCtx->markKilled();
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
+    std::unique_lock<std::mutex> lk(m);
     ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; }),
                        DBException,
                        ErrorCodes::Interrupted);
@@ -718,9 +717,9 @@ TEST_F(OperationDeadlineTests, WaitForKilledOpCV) {
 
 TEST_F(OperationDeadlineTests, WaitForUntilExpiredCV) {
     auto opCtx = client->makeOperationContext();
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
+    std::unique_lock<std::mutex> lk(m);
     ASSERT_FALSE(
         opCtx->waitForConditionOrInterruptUntil(cv, lk, mockClock->now(), [] { return false; }));
 }
@@ -728,18 +727,18 @@ TEST_F(OperationDeadlineTests, WaitForUntilExpiredCV) {
 TEST_F(OperationDeadlineTests, WaitForUntilExpiredCVWithMaxTimeSet) {
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineByDate(mockClock->now() + Seconds{10}, ErrorCodes::ExceededTimeLimit);
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
+    std::unique_lock<std::mutex> lk(m);
     ASSERT_FALSE(
         opCtx->waitForConditionOrInterruptUntil(cv, lk, mockClock->now(), [] { return false; }));
 }
 
 TEST_F(OperationDeadlineTests, WaitForDurationExpired) {
     auto opCtx = client->makeOperationContext();
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
+    std::unique_lock<std::mutex> lk(m);
     ASSERT_FALSE(opCtx->waitForConditionOrInterruptFor(
         cv, lk, Milliseconds(-1000), []() -> bool { return false; }));
 }
@@ -747,9 +746,9 @@ TEST_F(OperationDeadlineTests, WaitForDurationExpired) {
 TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpiration) {
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineByDate(mockClock->now(), ErrorCodes::ExceededTimeLimit);
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
+    std::unique_lock<std::mutex> lk(m);
     ASSERT_FALSE(opCtx->getCancellationToken().isCanceled());
     ASSERT_THROWS_CODE(
         opCtx->waitForConditionOrInterruptUntil(cv, lk, mockClock->now(), [] { return false; }),
@@ -780,24 +779,24 @@ class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
 public:
     using CvPred = std::function<bool()>;
     using WaitFn = std::function<bool(
-        OperationContext*, stdx::condition_variable&, stdx::unique_lock<stdx::mutex>&, CvPred)>;
+        OperationContext*, stdx::condition_variable&, std::unique_lock<std::mutex>&, CvPred)>;
 
     struct WaitTestState {
         void signal() {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
+            std::lock_guard<std::mutex> lk(mutex);
             invariant(!isSignaled);
             isSignaled = true;
             cv.notify_all();
         }
 
-        stdx::future<bool> start(OperationContext* opCtx,
-                                 boost::optional<Date_t> maxTime,
-                                 WaitFn waitFn) {
+        std::future<bool> start(OperationContext* opCtx,
+                                boost::optional<Date_t> maxTime,
+                                WaitFn waitFn) {
             auto barrier = std::make_shared<unittest::Barrier>(2);
             task = std::packaged_task<bool()>([=, this] {  // NOLINT
                 if (maxTime)
                     opCtx->setDeadlineByDate(*maxTime, ErrorCodes::ExceededTimeLimit);
-                stdx::unique_lock<stdx::mutex> lk(mutex);
+                std::unique_lock<std::mutex> lk(mutex);
                 barrier->countDownAndWait();
                 return waitFn(opCtx, cv, lk, [&] { return isSignaled; });
             });
@@ -807,7 +806,7 @@ public:
 
             // Now we know that the waiter task must own the mutex, because it does not signal the
             // barrier until it does.
-            stdx::lock_guard<stdx::mutex> lk(mutex);
+            std::lock_guard<std::mutex> lk(mutex);
 
             // Assuming that opCtx has not already been interrupted and that maxTime and until are
             // unexpired, we know that the waiter must be blocked in the condition variable, because
@@ -816,7 +815,7 @@ public:
             return result;
         }
 
-        stdx::mutex mutex;
+        std::mutex mutex;
         stdx::condition_variable cv;
         bool isSignaled = false;
         std::packaged_task<bool()> task;  // NOLINT
@@ -826,7 +825,7 @@ public:
     static WaitFn waitFn() {
         return [](OperationContext* opCtx,
                   stdx::condition_variable& cv,
-                  stdx::unique_lock<stdx::mutex>& lk,
+                  std::unique_lock<std::mutex>& lk,
                   CvPred predicate) {
             opCtx->waitForConditionOrInterrupt(cv, lk, predicate);
             return true;
@@ -836,7 +835,7 @@ public:
     static WaitFn waitUntilFn(Date_t until) {
         return [until](OperationContext* opCtx,
                        stdx::condition_variable& cv,
-                       stdx::unique_lock<stdx::mutex>& lk,
+                       std::unique_lock<std::mutex>& lk,
                        CvPred predicate) {
             return opCtx->waitForConditionOrInterruptUntil(cv, lk, until, predicate);
         };
@@ -846,7 +845,7 @@ public:
     static WaitFn waitDurationFn(Duration<Period> duration) {
         return [duration](OperationContext* opCtx,
                           stdx::condition_variable& cv,
-                          stdx::unique_lock<stdx::mutex>& lk,
+                          std::unique_lock<std::mutex>& lk,
                           CvPred predicate) {
             return opCtx->waitForConditionOrInterruptFor(cv, lk, duration, predicate);
         };
@@ -855,7 +854,7 @@ public:
     static WaitFn sleepUntilFn(Date_t sleepUntil) {
         return [sleepUntil](OperationContext* opCtx,
                             stdx::condition_variable& cv,
-                            stdx::unique_lock<stdx::mutex>& lk,
+                            std::unique_lock<std::mutex>& lk,
                             CvPred predicate) {
             lk.unlock();
             opCtx->sleepUntil(sleepUntil);
@@ -868,7 +867,7 @@ public:
     static WaitFn sleepForFn(Duration<Period> sleepFor) {
         return [sleepFor](OperationContext* opCtx,
                           stdx::condition_variable& cv,
-                          stdx::unique_lock<stdx::mutex>& lk,
+                          std::unique_lock<std::mutex>& lk,
                           CvPred predicate) {
             lk.unlock();
             opCtx->sleepFor(sleepFor);
@@ -878,8 +877,8 @@ public:
     }
 
     template <typename T>
-    static bool isReady(const stdx::future<T>& fut) {
-        return fut.wait_for((0_sec).toSystemDuration()) == stdx::future_status::ready;
+    static bool isReady(const std::future<T>& fut) {
+        return fut.wait_for((0_sec).toSystemDuration()) == std::future_status::ready;
     }
 };
 
@@ -890,7 +889,7 @@ TEST_F(ThreadedOperationDeadlineTests, KillArrivesWhileWaiting) {
     ASSERT_FALSE(isReady(fut));
     ASSERT_FALSE(opCtx->getCancellationToken().isCanceled());
     {
-        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
         opCtx->markKilled();
     }
     ASSERT_THROWS_CODE(fut.get(), DBException, ErrorCodes::Interrupted);
@@ -981,7 +980,7 @@ TEST_F(ThreadedOperationDeadlineTests, KillOneSignalAnother) {
     ASSERT_FALSE(isReady(fut1));
     ASSERT_FALSE(isReady(fut2));
     {
-        stdx::lock_guard<Client> clientLock(*txn1->getClient());
+        std::lock_guard<Client> clientLock(*txn1->getClient());
         txn1->markKilled();
     }
     ASSERT_THROWS_CODE(fut1.get(), DBException, ErrorCodes::Interrupted);
@@ -1063,9 +1062,9 @@ TEST_F(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(mutex);
+    std::unique_lock<std::mutex> lk(mutex);
 
     // Case (2). Expect a Status::OK with a cv_status::timeout.
     Date_t deadline = Date_t::now() + Milliseconds(500);
@@ -1105,9 +1104,9 @@ TEST_F(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
     unittest::Barrier barrier(2);
 
     stdx::thread worker([&] {
-        stdx::mutex mutex;
+        std::mutex mutex;
         stdx::condition_variable cv;
-        stdx::unique_lock<stdx::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         Date_t deadline = Date_t::now() + Milliseconds(300);
         optCtx->waitForConditionOrInterruptUntil(cv, lk, deadline, [&, i = 0]() mutable {
             if (i++ == 0) {
@@ -1137,7 +1136,7 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
         // of an `opCtx`. This is because `CurOp::reportCurrentOpForClient()` accepts an `opCtx`
         // as input and requires it to be present throughout its execution.
         stdx::thread thread([&]() mutable {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
 
             auto threadClient = getService()->makeClient("ThreadClient");
 
@@ -1385,7 +1384,7 @@ TEST_F(OverdueInterruptTestWithInterruptibleWait, KillDuringInterruptibleSleepNo
 
     // Start a thread which will be killed during an interruptible wait that is longer than the
     // interrupt period.
-    auto task = stdx::packaged_task<void()>(
+    auto task = std::packaged_task<void()>(
         [&] { WaitTestState{}.start(&*opCtx, {}, waitDurationFn(interval * 5)).get(); });
 
     auto result = task.get_future();
@@ -1396,7 +1395,7 @@ TEST_F(OverdueInterruptTestWithInterruptibleWait, KillDuringInterruptibleSleepNo
     mockTickSource()->advance(interval * 2);
 
     {
-        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
         opCtx->markKilled();
     }
     thread.join();

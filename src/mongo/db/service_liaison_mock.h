@@ -41,13 +41,13 @@
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <absl/container/node_hash_set.h>
@@ -102,7 +102,7 @@ private:
 
     boost::optional<SessionKiller::Matcher> _matcher;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     LogicalSessionIdSet _activeSessions;
     LogicalSessionIdSet _cursorSessions;
 };

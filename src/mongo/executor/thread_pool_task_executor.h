@@ -37,7 +37,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"
@@ -172,7 +171,7 @@ private:
     /**
      * Signals the given event.
      */
-    void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<stdx::mutex> lk);
+    void signalEvent_inlock(const EventHandle& event, std::unique_lock<std::mutex> lk);
 
     /**
      * Executes the callback specified by "cbState".
@@ -197,7 +196,7 @@ private:
     std::shared_ptr<ThreadPoolInterface> _pool;
 
     // Mutex guarding all remaining fields.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // List of all events that have yet to be signaled.
     EventList _unsignaledEvents;

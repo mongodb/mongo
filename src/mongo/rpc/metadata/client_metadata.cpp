@@ -437,7 +437,7 @@ StringData ClientMetadata::fieldName() {
 }
 
 bool ClientMetadata::tryFinalize(Client* client) {
-    auto lk = stdx::unique_lock(*client);
+    auto lk = std::unique_lock(*client);
     auto& state = getClientState(client);
     if (std::exchange(state.isFinalized, true)) {
         return false;
@@ -485,7 +485,7 @@ const ClientMetadata* ClientMetadata::get(Client* client) {
 void ClientMetadata::setAndFinalize(Client* client, boost::optional<ClientMetadata> meta) {
     invariant(TestingProctor::instance().isEnabled());
 
-    auto lk = stdx::lock_guard(*client);
+    auto lk = std::lock_guard(*client);
 
     auto& state = getClientState(client);
     state.isFinalized = true;
@@ -493,7 +493,7 @@ void ClientMetadata::setAndFinalize(Client* client, boost::optional<ClientMetada
 }
 
 void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, const BSONObj& obj) {
-    auto lk = stdx::lock_guard(*opCtx->getClient());
+    auto lk = std::lock_guard(*opCtx->getClient());
 
     auto& state = getOperationState(opCtx);
     uassert(ErrorCodes::ClientMetadataCannotBeMutated,
@@ -514,7 +514,7 @@ void ClientMetadata::setFromMetadata(Client* client,
 
     auto& state = getClientState(client);
     {
-        auto lk = stdx::lock_guard(*client);
+        auto lk = std::lock_guard(*client);
         uassert(ErrorCodes::ClientMetadataCannotBeMutated,
                 "The client metadata document may only be sent in the first hello",
                 !state.isFinalized);
@@ -537,7 +537,7 @@ void ClientMetadata::setFromMetadata(Client* client,
                                 VersionInfoInterface::instance().version());
     }
 
-    auto lk = stdx::lock_guard(*client);
+    auto lk = std::lock_guard(*client);
     state.meta = std::move(meta);
 }
 

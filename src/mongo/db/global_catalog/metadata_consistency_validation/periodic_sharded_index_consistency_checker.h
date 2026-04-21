@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 
@@ -106,7 +107,7 @@ private:
 
     // Protects the variables below. Uses acquisition level 1 because it will be held while starting
     // a periodic job, which resolves a future.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Periodic job for counting inconsistent indexes in the cluster.
     PeriodicJobAnchor _shardedIndexConsistencyChecker;

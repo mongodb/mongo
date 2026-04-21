@@ -2026,7 +2026,7 @@ TEST_F(AsyncResultsMergerTest, KillBeforeNext) {
 
     // Mark the OperationContext as killed from this thread.
     {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        std::lock_guard<Client> lk(*operationContext()->getClient());
         operationContext()->markKilled(ErrorCodes::Interrupted);
     }
 
@@ -2053,7 +2053,7 @@ TEST_F(AsyncResultsMergerTest, KillBeforeNextWithTwoRemotes) {
 
     // Mark the OperationContext as killed from this thread.
     {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        std::lock_guard<Client> lk(*operationContext()->getClient());
         operationContext()->markKilled(ErrorCodes::Interrupted);
     }
 

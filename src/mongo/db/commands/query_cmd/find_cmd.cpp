@@ -170,7 +170,7 @@ const auto kTermField = "term"_sd;
  */
 void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& queryObj) {
     auto curOp = CurOp::get(opCtx);
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     curOp->setOpDescription(lk, queryObj);
     curOp->setNS(lk, nss);
 }
@@ -894,7 +894,7 @@ public:
                                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO));
 
             {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
                 CurOp::get(opCtx)->debug().queryFramework = exec->getQueryFramework();
             }

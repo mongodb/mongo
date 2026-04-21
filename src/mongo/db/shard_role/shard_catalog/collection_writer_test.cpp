@@ -41,7 +41,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -242,13 +241,13 @@ TEST_F(CatalogTestFixture, ConcurrentCatalogWritesSerialized) {
     constexpr int32_t WritesPerThread = 1000;
 
     unittest::Barrier barrier(NumThreads);
-    stdx::mutex m;
+    std::mutex m;
     auto job = [&]() {
         barrier.countDownAndWait();
 
         for (int i = 0; i < WritesPerThread; ++i) {
             CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& writableCatalog) {
-                stdx::unique_lock lock(m, stdx::try_to_lock);
+                std::unique_lock lock(m, std::try_to_lock);
                 ASSERT(lock.owns_lock());
             });
         }

@@ -103,10 +103,10 @@ public:
     private:
         const ShardId _donorShardId;
 
-        mutable stdx::mutex _timeToFetchMutex;
+        mutable std::mutex _timeToFetchMutex;
         boost::optional<Milliseconds> _avgTimeToFetch;
 
-        mutable stdx::mutex _timeToApplyMutex;
+        mutable std::mutex _timeToApplyMutex;
         boost::optional<Milliseconds> _avgTimeToApply;
     };
 

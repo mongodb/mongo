@@ -33,12 +33,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <random>
 
 #include <benchmark/benchmark.h>
@@ -53,7 +53,7 @@ constexpr int kMaxWaiters = 4096;
 // section (~120 ns on Neoverse-N1).
 constexpr int64_t kHoldIters = 300;
 
-stdx::mutex mtx;
+std::mutex mtx;
 stdx::condition_variable cv;
 bool ready = false;
 int numRemaining = 0;
@@ -64,7 +64,7 @@ ServiceContext::UniqueServiceContext svcCtx;
  * Allows the initialization/destruction of the semaphore and the service context safely.
  */
 void barrierSetup(benchmark::State& state, std::unique_ptr<TicketSemaphore> s) {
-    stdx::unique_lock lk(mtx);
+    std::unique_lock lk(mtx);
     if (state.thread_index == 0) {
         numRemaining = state.threads;
         svcCtx = ServiceContext::make(std::make_unique<SystemClockSource>(),
@@ -90,7 +90,7 @@ void barrierTeardownWithServiceContext(benchmark::State& state,
                                        ServiceContext::UniqueOperationContext& opCtx,
                                        ServiceContext::UniqueClient& client) {
     {
-        stdx::unique_lock lk(mtx);
+        std::unique_lock lk(mtx);
         opCtx.reset();
         client.reset();
         numRemaining--;

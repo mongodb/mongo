@@ -71,7 +71,7 @@ void MigrationBatchFetcher<Inserter>::BufferSizeTracker::waitUntilSpaceAvailable
                           << sizeBytes,
             sizeBytes <= _maxSizeBytes);
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(_hasAvailableSpace, lk, [this, sizeBytes] {
         return (_currentSize + sizeBytes) <= _maxSizeBytes;
     });
@@ -84,7 +84,7 @@ void MigrationBatchFetcher<Inserter>::BufferSizeTracker::remove(int sizeBytes) {
         return;
     }
 
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     invariant(_currentSize >= sizeBytes);
 
     _currentSize -= sizeBytes;
@@ -178,7 +178,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
     auto opCtx = applicationOpCtx.get();
     auto assertNotAborted = [&]() {
         {
-            stdx::lock_guard<Client> lk(*_outerOpCtx->getClient());
+            std::lock_guard<Client> lk(*_outerOpCtx->getClient());
             _outerOpCtx->checkForInterrupt();
         }
         opCtx->checkForInterrupt();

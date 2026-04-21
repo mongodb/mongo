@@ -41,7 +41,6 @@
 #include <resolv.h>
 // clang-format on
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -52,6 +51,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -369,16 +369,16 @@ public:
     DNSQueryState() : _state() {
         // res_ninit may modify the global conf object creating a data race when multiple instances
         // of DNSQueryState are created concurrently.
-        stdx::lock_guard<stdx::mutex> lk(_staticMutex);
+        std::lock_guard<std::mutex> lk(_staticMutex);
         res_ninit(&_state);
     }
 
 private:
     struct __res_state _state;
-    static stdx::mutex _staticMutex;
+    static std::mutex _staticMutex;
 };
 
-inline stdx::mutex DNSQueryState::_staticMutex;
+inline std::mutex DNSQueryState::_staticMutex;
 
 }  // namespace dns
 }  // namespace mongo

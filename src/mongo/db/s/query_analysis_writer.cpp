@@ -452,7 +452,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     PeriodicRunner::PeriodicJob queryWriterJob(
         "QueryAnalysisQueryWriter",
@@ -594,7 +594,7 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
 
 void QueryAnalysisWriter::_flushQueries(OperationContext* opCtx) {
     try {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _flush(opCtx, lk, &_queries);
     } catch (DBException& ex) {
         LOGV2(7047300,
@@ -605,7 +605,7 @@ void QueryAnalysisWriter::_flushQueries(OperationContext* opCtx) {
 
 void QueryAnalysisWriter::_flushDiffs(OperationContext* opCtx) {
     try {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _flush(opCtx, lk, &_diffs);
     } catch (DBException& ex) {
         LOGV2(7075400,
@@ -615,7 +615,7 @@ void QueryAnalysisWriter::_flushDiffs(OperationContext* opCtx) {
 }
 
 void QueryAnalysisWriter::_flush(OperationContext* opCtx,
-                                 stdx::unique_lock<stdx::mutex>& lk,
+                                 std::unique_lock<std::mutex>& lk,
                                  Buffer* buffer) {
     invariant(lk.owns_lock());
     const auto nss = buffer->getNss();
@@ -681,7 +681,7 @@ void QueryAnalysisWriter::Buffer::truncate(size_t index, long long numBytes) {
 }
 
 bool QueryAnalysisWriter::_exceedsMaxSizeBytes() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _queries.getSize() + _diffs.getSize() >= gQueryAnalysisWriterMaxMemoryUsageBytes.load();
 }
 
@@ -750,7 +750,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
                                             expireAt}
                            .toBSON();
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             if (_queries.add(doc)) {
                 QueryAnalysisSampleTracker::get(opCtx).incrementReads(
                     opCtx, sampledReadCmd.nss, *collUuid, doc.objsize());
@@ -798,7 +798,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(SampledCommandNameEnum 
                                                 expireAt}
                                .toBSON();
 
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                std::lock_guard<std::mutex> lk(_mutex);
                 if (_queries.add(doc)) {
                     QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
                         opCtx, sampledUpdateCmd.nss, *collUuid, doc.objsize());
@@ -865,7 +865,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(SampledCommandNameEnum 
                                                 expireAt}
                                .toBSON();
 
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                std::lock_guard<std::mutex> lk(_mutex);
                 if (_queries.add(doc)) {
                     QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
                         opCtx, sampledDeleteCmd.nss, *collUuid, doc.objsize());
@@ -931,7 +931,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
                                             expireAt}
                            .toBSON();
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             if (_queries.add(doc)) {
                 QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
                     opCtx, sampledFindAndModifyCmd.nss, *collUuid, doc.objsize());
@@ -993,7 +993,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
             auto doc =
                 SampledQueryDiffDocument{sampleId, nss, collUuid, std::move(*diff), expireAt};
 
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             _diffs.add(doc.toBSON());
         })
         .then([this] {

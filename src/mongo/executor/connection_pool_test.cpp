@@ -3004,12 +3004,12 @@ TEST_F(ConnectionPoolTest, MultipleConsecutiveSetupFailuresDoNotBlockNewConnecti
 class NeverShutdownLimitController final : public ConnectionPool::ControllerInterface {
 public:
     void addHost(PoolId id, const HostAndPort& host) override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _poolData[id] = {host, 0};
     }
 
     HostGroupState updateHost(PoolId id, const PoolMetrics& stats) override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         auto& data = _poolData[id];
         auto opts = getPoolOptions();
 
@@ -3024,12 +3024,12 @@ public:
     }
 
     void removeHost(PoolId id) override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _poolData.erase(id);
     }
 
     ConnectionControls getControls(PoolId id) override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return {getPoolOptions().maxConnecting, _poolData[id].target};
     }
 
@@ -3058,7 +3058,7 @@ private:
         HostAndPort host;
         size_t target = 0;
     };
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 

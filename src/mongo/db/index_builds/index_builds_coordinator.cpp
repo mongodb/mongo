@@ -487,7 +487,7 @@ void forEachIndexBuild(
 void updateCurOpForCommitOrAbort(OperationContext* opCtx, StringData fieldName, UUID buildUUID) {
     BSONObjBuilder builder;
     buildUUID.appendToBuilder(&builder, fieldName);
-    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    std::unique_lock<Client> lk(*opCtx->getClient());
     auto curOp = CurOp::get(opCtx);
     builder.appendElementsUnique(curOp->opDescription());
     auto opDescObj = builder.obj();
@@ -2613,7 +2613,7 @@ void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
         builder.append(kIndexesFieldName, indexesBuilder.arr());
     }
 
-    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    std::unique_lock<Client> lk(*opCtx->getClient());
     auto curOp = CurOp::get(opCtx);
     builder.appendElementsUnique(curOpDesc ? curOpDesc.value() : curOp->opDescription());
     auto opDescObj = builder.obj();
@@ -3565,14 +3565,14 @@ void IndexBuildsCoordinator::_buildPrimaryDrivenIndex(
                 const char* curopMessage = "Index Build: waiting on failpoint";
                 ProgressMeterHolder progress;
                 {
-                    stdx::unique_lock<Client> lk(*opCtx->getClient());
+                    std::unique_lock<Client> lk(*opCtx->getClient());
                     progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, 0), opCtx);
                 }
 
                 fp->pauseWhileSet(opCtx);
 
                 {
-                    stdx::unique_lock<Client> lk(*opCtx->getClient());
+                    std::unique_lock<Client> lk(*opCtx->getClient());
                     progress.get(lk)->finished();
                 }
             }

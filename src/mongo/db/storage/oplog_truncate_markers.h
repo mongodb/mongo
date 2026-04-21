@@ -34,10 +34,10 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <deque>
+#include <mutex>
 
 #include <boost/optional.hpp>
 
@@ -130,7 +130,7 @@ private:
         _reclaimCv.notify_all();
     }
 
-    stdx::mutex _reclaimMutex;
+    std::mutex _reclaimMutex;
     stdx::condition_variable _reclaimCv;
 
     // True if '_rs' has been destroyed, e.g. due to repairDatabase being called on the collection's

@@ -34,10 +34,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <map>
+#include <mutex>
 #include <set>
 #include <string>
 
@@ -90,7 +90,7 @@ public:
 
 private:
     std::map<std::string, std::set<std::string>> _connectionUris;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 };
 
 extern ConnectionRegistry connectionRegistry;

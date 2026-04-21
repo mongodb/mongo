@@ -210,7 +210,7 @@ std::shared_ptr<ShardingCoordinatorService::Instance> ShardingCoordinatorService
     auto coord = constructShardingCoordinatorInstance(this, std::move(initialState));
 
     {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         const auto coordTypeAndOfcv =
             std::make_pair(coord->operationType(), coord->getOperationFCV());
         const auto coordPerTypeAndOfcvIt =
@@ -229,7 +229,7 @@ std::shared_ptr<ShardingCoordinatorService::Instance> ShardingCoordinatorService
         .getAsync([this](auto status) {
             AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
             auto opCtx = cc().makeOperationContext();
-            stdx::lock_guard lg(_mutex);
+            std::lock_guard lg(_mutex);
             if (_state != State::kRecovering) {
                 return;
             }
@@ -244,7 +244,7 @@ std::shared_ptr<ShardingCoordinatorService::Instance> ShardingCoordinatorService
         .getAsync([this,
                    coordTypeAndOfcv = std::make_pair(coord->operationType(),
                                                      coord->getOperationFCV())](auto status) {
-            stdx::lock_guard lg(_mutex);
+            std::lock_guard lg(_mutex);
             if (_state == State::kPaused) {
                 return;
             }
@@ -268,7 +268,7 @@ std::shared_ptr<ShardingCoordinatorExternalState> ShardingCoordinatorService::cr
 
 void ShardingCoordinatorService::waitForCoordinatorsOfGivenOfcvToComplete(
     OperationContext* opCtx, std::function<bool(boost::optional<FCV>)> pred) const {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lk, [this, pred]() {
         uassert(ErrorCodes::NotWritablePrimary,
                 "Should not wait on DDL Coordinators in kPaused state",
@@ -281,7 +281,7 @@ void ShardingCoordinatorService::waitForCoordinatorsOfGivenOfcvToComplete(
 
 void ShardingCoordinatorService::waitForCoordinatorsOfGivenTypeToComplete(
     OperationContext* opCtx, CoordinatorTypeEnum coordType) const {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lk, [this, coordType]() {
         const auto numActiveCoords = _countActiveCoordinators(
             [coordType](CoordinatorTypeEnum activeCoordType, boost::optional<FCV>) {
@@ -309,7 +309,7 @@ void ShardingCoordinatorService::waitForOngoingCoordinatorsToFinish(
 }
 
 void ShardingCoordinatorService::_onServiceInitialization() {
-    stdx::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex);
     invariant(_state == State::kPaused);
     invariant(_numCoordinatorsToWait == 0);
     invariant(_numActiveCoordinatorsPerTypeAndOfcv.empty());
@@ -317,7 +317,7 @@ void ShardingCoordinatorService::_onServiceInitialization() {
 }
 
 void ShardingCoordinatorService::_onServiceTermination() {
-    stdx::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex);
     _state = State::kPaused;
     _numCoordinatorsToWait = 0;
     _numActiveCoordinatorsPerTypeAndOfcv.clear();
@@ -336,7 +336,7 @@ size_t ShardingCoordinatorService::_countActiveCoordinators(
 }
 
 void ShardingCoordinatorService::_waitForRecovery(OperationContext* opCtx,
-                                                  std::unique_lock<stdx::mutex>& lock) const {
+                                                  std::unique_lock<std::mutex>& lock) const {
     opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lock, [this]() {
         return _state != State::kRecovering;
     });
@@ -347,7 +347,7 @@ void ShardingCoordinatorService::_waitForRecovery(OperationContext* opCtx,
 }
 
 void ShardingCoordinatorService::waitForRecovery(OperationContext* opCtx) const {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     _waitForRecovery(opCtx, lk);
 }
 
@@ -384,7 +384,7 @@ ExecutorFuture<void> ShardingCoordinatorService::_rebuildService(
             pauseShardingCoordinatorServiceOnRecovery.pauseWhileSet();
 
             {
-                stdx::lock_guard lg(_mutex);
+                std::lock_guard lg(_mutex);
                 // Since this is an asyncronous task,
                 // It could happen that it gets executed after the node stepped down and changed
                 // the state to kPaused.

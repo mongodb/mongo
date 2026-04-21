@@ -35,13 +35,13 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
+#include <mutex>
 #include <set>
 #include <vector>
 
@@ -119,7 +119,7 @@ private:
     StatusWith<std::vector<HostAndPort>> _findHostReturnValue;
 
     // Protects _hostsMarkedDown.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // HostAndPorts marked not primary or unreachable. Meant to verify a code path updates the
     // RemoteCommandTargeterMock.

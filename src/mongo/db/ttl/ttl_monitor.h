@@ -36,13 +36,13 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace MONGO_MOD_PRIVATE mongo {
@@ -201,7 +201,7 @@ private:
                                    const Status& staleStatus);
 
     // Protects the state below.
-    mutable stdx::mutex _stateMutex;
+    mutable std::mutex _stateMutex;
 
     // Signaled to wake up the thread, if the thread is waiting. This condition variable is used to
     // notify the thread of either:

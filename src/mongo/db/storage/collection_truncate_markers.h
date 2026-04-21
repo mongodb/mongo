@@ -35,7 +35,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/system_tick_source.h"
@@ -46,6 +45,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <type_traits>
 #include <utility>
 
@@ -293,7 +293,7 @@ public:
     }
 
     size_t numMarkers() const {
-        stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+        std::lock_guard<std::mutex> lk(_markersMutex);
         return _markers.size();
     }
 
@@ -338,7 +338,7 @@ private:
 
     // Protects against concurrent access to the deque of collection markers and the
     // _initialSamplingFinished variable.
-    mutable stdx::mutex _markersMutex;
+    mutable std::mutex _markersMutex;
     std::deque<Marker> _markers;  // front = oldest, back = newest.
 
     // Whether or not the initial set of markers has finished being sampled.
@@ -354,7 +354,7 @@ protected:
     auto modifyMarkersWith(F&& f) {
         static_assert(std::is_invocable_v<F, std::deque<Marker>&>,
                       "Function must be of type T(std::deque<Marker>&)");
-        stdx::lock_guard lk(_markersMutex);
+        std::lock_guard lk(_markersMutex);
         return f(_markers);
     }
 
@@ -362,7 +362,7 @@ protected:
     auto checkMarkersWith(F&& f) const {
         static_assert(std::is_invocable_v<F, const std::deque<Marker>&>,
                       "Function must be of type T(const std::deque<Marker>&)");
-        stdx::lock_guard lk(_markersMutex);
+        std::lock_guard lk(_markersMutex);
         return f(_markers);
     }
 
@@ -376,7 +376,7 @@ protected:
      * markers will be created.
      */
     bool isEmpty() const {
-        stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+        std::lock_guard<std::mutex> lk(_markersMutex);
         return _markers.size() == 0 && _currentBytes.load() == 0 && _currentRecords.load() == 0;
     }
 
@@ -456,7 +456,7 @@ public:
 private:
     // Highest marker seen during the lifetime of the class. Modifications must happen
     // while holding '_highestRecordMutex'.
-    mutable stdx::mutex _highestRecordMutex;
+    mutable std::mutex _highestRecordMutex;
     RecordId _highestRecordId;
     Date_t _highestWallTime;
 
@@ -475,7 +475,7 @@ protected:
     auto checkPartialMarkerWith(F&& fn) const {
         static_assert(std::is_invocable_v<F, const RecordId&, const Date_t&>,
                       "fn must be a callable of type T(const RecordId&, const Date_t&)");
-        stdx::unique_lock lk(_highestRecordMutex);
+        std::unique_lock lk(_highestRecordMutex);
         return fn(_highestRecordId, _highestWallTime);
     }
 

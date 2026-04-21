@@ -981,7 +981,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
@@ -1121,7 +1121,7 @@ long long performDelete(OperationContext* opCtx,
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
@@ -1327,7 +1327,7 @@ WriteResult performInserts(
 
     // Timeseries inserts already did as part of performTimeseriesWrites.
     if (source != OperationSource::kTimeseriesInsert) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS(lk, actualNs);
         curOp.setLogicalOp(lk, LogicalOp::opInsert);
         curOp.ensureStarted();
@@ -1472,7 +1472,7 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
@@ -1722,7 +1722,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     if (source != OperationSource::kTimeseriesInsert) {
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
             opCtx->getWriteConcern());
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS(
             lk,
             (source == OperationSource::kTimeseriesUpdate && ns.isTimeseriesBucketsCollection())
@@ -2104,7 +2104,7 @@ static SingleWriteResult performSingleDeleteOp(
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS(lk,
                     (preConditions.isLegacyTimeseriesCollection() &&
                              source == OperationSource::kTimeseriesDelete
@@ -2193,7 +2193,7 @@ static SingleWriteResult performSingleDeleteOp(
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 

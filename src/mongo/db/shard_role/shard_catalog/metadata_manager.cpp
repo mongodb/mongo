@@ -80,7 +80,7 @@ public:
     }
 
     ~RangePreserver() override {
-        stdx::lock_guard<stdx::mutex> managerLock(_metadataManager->_managerLock);
+        std::lock_guard<std::mutex> managerLock(_metadataManager->_managerLock);
 
         invariant(_metadataTracker->usageCounter != 0);
         if (--_metadataTracker->usageCounter == 0) {
@@ -105,7 +105,7 @@ public:
     // This determines whether the metadata currently held by the _metadataTracker is still
     // considered valid.
     bool isMetadataStillValid() const override {
-        stdx::lock_guard<stdx::mutex> managerLock(_metadataManager->_managerLock);
+        std::lock_guard<std::mutex> managerLock(_metadataManager->_managerLock);
         return _metadataTracker->valid;
     }
 
@@ -123,7 +123,7 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
 
 std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMetadata(
     const boost::optional<LogicalTime>& atClusterTime, bool preserveRange) {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    std::lock_guard<std::mutex> lg(_managerLock);
 
     auto activeMetadataTracker = _metadata.back();
     const auto& activeMetadata = activeMetadataTracker->metadata;
@@ -158,7 +158,7 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
 }
 
 boost::optional<UUID> MetadataManager::getCollectionUuid() const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    std::lock_guard<std::mutex> lg(_managerLock);
     return _getCollectionUuidWithLock(lg);
 }
 
@@ -176,13 +176,13 @@ boost::optional<UUID> MetadataManager::_getCollectionUuidWithLock(WithLock wl) c
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    std::lock_guard<std::mutex> lg(_managerLock);
     invariant(!_metadata.empty());
     return _metadata.size() - 1;
 }
 
 int MetadataManager::numberOfEmptyMetadataSnapshots() const {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    std::lock_guard<std::mutex> lg(_managerLock);
 
     int emptyMetadataSnapshots = 0;
     for (const auto& collMetadataTracker : _metadata) {
@@ -194,7 +194,7 @@ int MetadataManager::numberOfEmptyMetadataSnapshots() const {
 }
 
 void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    std::lock_guard<std::mutex> lg(_managerLock);
     invariant(!_metadata.empty());
     // The active metadata should always be available (not boost::none)
     invariant(_metadata.back()->metadata);
@@ -261,7 +261,7 @@ void MetadataManager::_retireExpiredMetadata(WithLock) {
 }
 
 SharedSemiFuture<void> MetadataManager::getOngoingQueriesCompletionFuture(ChunkRange const& range) {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    std::lock_guard<std::mutex> lg(_managerLock);
 
     auto* const overlapMetadata = _findNewestOverlappingMetadata(lg, range);
     if (!overlapMetadata) {
@@ -275,7 +275,7 @@ void MetadataManager::invalidateRangePreserversOlderThanShardVersion(
     if (shardVersion == ChunkVersion::IGNORED()) {
         return;
     }
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    std::lock_guard<std::mutex> lg(_managerLock);
 
     // Invalidate all metadata trackers when shardPlacementVersion is lower than or equal
     // to the given version.

@@ -63,7 +63,7 @@ public:
     std::shared_ptr<MultiPlanTicketHolder> get(ServiceContext* serviceContext,
                                                const std::string& key,
                                                size_t numCandidatePlans) {
-        stdx::lock_guard guard{_mutex};
+        std::lock_guard guard{_mutex};
         auto [pos, _] = _table.try_emplace(key);
         if (auto holder = pos->second.lock()) {
             return holder;
@@ -80,7 +80,7 @@ public:
     }
 
     void removeQueryShape(const std::string& key) {
-        stdx::lock_guard guard{_mutex};
+        std::lock_guard guard{_mutex};
         auto pos = _table.find(key);
         if (pos != _table.end()) {
             if (auto holder = pos->second.lock()) {
@@ -97,7 +97,7 @@ private:
     // is particular useful in situations when a single query of a particular shape is sent just
     // once, and an active cache entry for it is never created.
     stdx::unordered_map<std::string, std::weak_ptr<MultiPlanTicketHolder>> _table;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 /**

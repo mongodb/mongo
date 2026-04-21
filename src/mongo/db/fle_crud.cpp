@@ -493,7 +493,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     const write_ops::InsertCommandRequest& insertRequest,
     GetTxnCallback getTxns) {
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
@@ -593,7 +593,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         auto deletes = deleteRequest.getDeletes();
         uassert(6371302, "Only single document deletes are permitted", deletes.size() == 1);
 
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
@@ -711,7 +711,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                     updateOpEntry.getU().type() ==
                         write_ops::UpdateModification::Type::kReplacement);
 
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
@@ -1049,7 +1049,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     ErrorWithWriteConcernErrorCallback wceCallback) {
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
@@ -1361,7 +1361,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                const BatchedCommandRequest& request,
                                BatchedCommandResponse* response) {
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
@@ -1437,7 +1437,7 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
     };
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
@@ -1485,7 +1485,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
     {
-        stdx::lock_guard<Client> lk(*expCtx->getOperationContext()->getClient());
+        std::lock_guard<Client> lk(*expCtx->getOperationContext()->getClient());
         CurOp::get(expCtx->getOperationContext())->setShouldOmitDiagnosticInformation(lk, true);
     }
 
@@ -1673,7 +1673,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
     }
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 

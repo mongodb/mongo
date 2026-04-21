@@ -32,9 +32,9 @@
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/future.h"
 #include "mongo/util/timer.h"
 
+#include <future>
 #include <random>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -304,10 +304,11 @@ void testPermutation(key_string::Version version,
     // Since key_string::Builders are compared using memcmp we can assume it provides a total
     // ordering such that there won't be cases where (a < b && b < c && !(a < c)). This test still
     // needs to ensure that it provides the *correct* total ordering.
-    std::vector<stdx::future<void>> futures;
+    std::vector<std::future<void>> futures;
     for (size_t k = 0; k < orderings.size(); k++) {
         futures.push_back(
-            stdx::async(stdx::launch::async, [k, version, elementsOrig, orderings, debug] {
+            //  NOLINTNEXTLINE
+            std::async(std::launch::async, [k, version, elementsOrig, orderings, debug] {
                 BSONObj orderObj = orderings[k];
                 Ordering ordering = Ordering::make(orderObj);
                 if (debug)

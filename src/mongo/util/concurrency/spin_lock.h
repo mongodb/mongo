@@ -37,7 +37,6 @@
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <mutex>
@@ -97,7 +96,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 #else
@@ -139,6 +138,6 @@ private:
 
 #endif
 
-using scoped_spinlock = stdx::lock_guard<SpinLock>;
+using scoped_spinlock = std::lock_guard<SpinLock>;
 
 }  // namespace MONGO_MOD_PUB mongo

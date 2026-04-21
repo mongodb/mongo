@@ -51,7 +51,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/exception.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/active_exception_witness.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debugger.h"
@@ -61,6 +60,8 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -152,7 +153,7 @@ public:
      * the default handler for the given signum. In that case, it's important that we kill
      * the process in a timely manner so the user has a chance to detect that and restart it.
      */
-    explicit MallocFreeOStreamGuard(int signum) : _lk(_streamMutex, stdx::defer_lock) {
+    explicit MallocFreeOStreamGuard(int signum) : _lk(_streamMutex, std::defer_lock) {
         if (terminateDepth++) {
             if (_onDeadlock)
                 _onDeadlock(signum);
@@ -166,11 +167,11 @@ public:
     }
 
 private:
-    static inline stdx::mutex _streamMutex;
+    static inline std::mutex _streamMutex;
     static inline thread_local int terminateDepth = 0;
     static inline std::function<void(int)> _onDeadlock;
 
-    stdx::unique_lock<stdx::mutex> _lk;
+    std::unique_lock<std::mutex> _lk;
 };
 
 void logNoRecursion(StringData message) {

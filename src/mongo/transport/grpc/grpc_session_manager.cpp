@@ -70,7 +70,7 @@ void GRPCSessionManager::configureServiceExecutorContext(mongo::Client* client,
                                                          bool isPrivilegedSession) const {
     auto seCtx = std::make_unique<ServiceExecutorContext>();
     seCtx->setThreadModel(seCtx->kInline);
-    stdx::lock_guard lk(*client);
+    std::lock_guard lk(*client);
     ServiceExecutorContext::set(client, std::move(seCtx));
 }
 

@@ -37,12 +37,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
 #include <iosfwd>
+#include <mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -143,7 +143,7 @@ private:
     CallbackFn _onCompletion;
 
     // Protects member data of this MultiApplier.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     stdx::condition_variable _condition;
 

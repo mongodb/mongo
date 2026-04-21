@@ -266,7 +266,7 @@ CommandService::CommandService(TransportLayer* tl,
         _tl, &serverCtx, &stream, clientId, authToken, base64EncodedClientMetadata);
     std::list<InSessionPtr>::iterator it;
     {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
 
         if (_shutdown || !_acceptNewRequests) {
             session->setTerminationStatus(makeShutdownTerminationStatus());
@@ -275,7 +275,7 @@ CommandService::CommandService(TransportLayer* tl,
         it = _sessions.insert(_sessions.begin(), session);
     }
     ON_BLOCK_EXIT([&]() {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         _sessions.erase(it);
         if (_sessions.empty()) {
             _shutdownCV.notify_one();
@@ -307,7 +307,7 @@ CommandService::CommandService(TransportLayer* tl,
 }
 
 void CommandService::shutdown() {
-    stdx::unique_lock lk{_mutex};
+    std::unique_lock lk{_mutex};
 
     invariant(!_shutdown,
               fmt::format("Cannot shut down {} gRPC service once it's stopped", name()));
@@ -327,7 +327,7 @@ void CommandService::shutdown() {
 }
 
 void CommandService::stopAcceptingRequests() {
-    stdx::unique_lock lk{_mutex};
+    std::unique_lock lk{_mutex};
     _acceptNewRequests = false;
 }
 

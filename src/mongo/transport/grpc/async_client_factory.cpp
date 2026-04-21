@@ -35,7 +35,6 @@
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
@@ -44,6 +43,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/version.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -61,7 +62,7 @@ void GRPCAsyncClientFactory::startup(ServiceContext* svcCtx,
                                      transport::ReactorHandle reactor) {
     invariant(tl->getTransportProtocol() == getTransportProtocol());
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     if (_state == State::kShutdown) {
         return;
@@ -104,7 +105,7 @@ GRPCAsyncClientFactory::lease(const HostAndPort& target,
 }
 
 void GRPCAsyncClientFactory::shutdown() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     if (auto state = std::exchange(_state, State::kShutdown);
         state == State::kShutdown || state == State::kNew) {
         return;
@@ -144,7 +145,7 @@ GRPCConnectionStats GRPCAsyncClientFactory::getStats() const {
 }
 
 void GRPCAsyncClientFactory::dropConnections(const Status& status) {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
     if (_state == State::kShutdown || _state == State::kNew) {
         return;
     }
@@ -153,7 +154,7 @@ void GRPCAsyncClientFactory::dropConnections(const Status& status) {
 }
 
 void GRPCAsyncClientFactory::dropConnections(const HostAndPort& target, const Status& status) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_state == State::kShutdown || _state == State::kNew) {
         return;
     }
@@ -169,7 +170,7 @@ void GRPCAsyncClientFactory::dropConnections(const HostAndPort& target, const St
 }
 
 void GRPCAsyncClientFactory::setKeepOpen(const HostAndPort& target, bool keepOpen) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_state == State::kShutdown || _state == State::kNew) {
         return;
     }
@@ -191,7 +192,7 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
     const CancellationToken& token) {
 
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (_state == State::kShutdown) {
             return Status(ErrorCodes::ShutdownInProgress,
                           "Cannot create new gRPC clients, factory was shut down");
@@ -237,7 +238,7 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 size_t activeCalls;
                 {
-                    stdx::lock_guard lk(_mutex);
+                    std::lock_guard lk(_mutex);
                     activeCalls = _endpoints[target].handles.size();
                 }
 
@@ -264,7 +265,7 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                         "duration"_attr = connMetrics->total());
             auto handle = std::make_shared<Handle>(this, _svcCtx, std::move(client), lease);
 
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             auto& handlesList = _endpoints[target].handles;
             handlesList.push_front({&handle->getClient()});
             handle->_it = handlesList.begin();
@@ -287,7 +288,7 @@ void GRPCAsyncClientFactory::_destroyHandle(Handle& handle) {
 
     FinishingClientState* cs;
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         auto remote = handle.getRemote();
 
         // Preserve the AsyncDBClient until the call to asyncFinish() is complete.
@@ -316,7 +317,7 @@ void GRPCAsyncClientFactory::_destroyHandle(Handle& handle) {
                         "Completed call to finish() on gRPC stream",
                         "status"_attr = s);
 
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             // Remove the client from the actively destructing list and stop holding onto the client
             // object.
             invariant(cs->it);

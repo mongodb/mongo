@@ -52,7 +52,7 @@ public:
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept override {}
     void rollback(OperationContext* opCtx) noexcept override {
-        stdx::lock_guard<stdx::mutex> lk(_catalog->_catalogIdToEntryMapLock);
+        std::lock_guard<std::mutex> lk(_catalog->_catalogIdToEntryMapLock);
         _catalog->_catalogIdToEntryMap.erase(_catalogId);
     }
 
@@ -111,7 +111,7 @@ std::vector<MDBCatalog::EntryIdentifier> MDBCatalog::getAllCatalogEntries(
 }
 
 MDBCatalog::EntryIdentifier MDBCatalog::getEntry(const RecordId& catalogId) const {
-    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+    std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
     auto it = _catalogIdToEntryMap.find(catalogId);
     invariant(it != _catalogIdToEntryMap.end());
     return it->second;
@@ -119,7 +119,7 @@ MDBCatalog::EntryIdentifier MDBCatalog::getEntry(const RecordId& catalogId) cons
 
 boost::optional<MDBCatalog::EntryIdentifier> MDBCatalog::getEntry_forTest(
     const RecordId& catalogId) const {
-    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+    std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
     auto it = _catalogIdToEntryMap.find(catalogId);
     if (it != _catalogIdToEntryMap.end()) {
         return it->second;
@@ -245,7 +245,7 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::addEntry(OperationContext* o
         return res.getStatus();
     invariant(res.getValue() == catalogId);
 
-    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+    std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = EntryIdentifier(res.getValue(), ident, nss);
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
@@ -308,7 +308,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> MDBCatalog::import
 
 
 Status MDBCatalog::removeEntry(OperationContext* opCtx, const RecordId& catalogId) {
-    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+    std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
     const auto it = _catalogIdToEntryMap.find(catalogId);
     if (it == _catalogIdToEntryMap.end()) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found");
@@ -316,7 +316,7 @@ Status MDBCatalog::removeEntry(OperationContext* opCtx, const RecordId& catalogI
 
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, catalogId, entry = it->second](OperationContext*) {
-            stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+            std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
             _catalogIdToEntryMap[catalogId] = entry;
         });
 
@@ -342,7 +342,7 @@ Status MDBCatalog::putRenamedEntry(OperationContext* opCtx,
                                       renamedEntry.objsize());
     fassert(28522, status);
 
-    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+    std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
     const auto it = _catalogIdToEntryMap.find(catalogId);
     invariant(it != _catalogIdToEntryMap.end());
 
@@ -350,7 +350,7 @@ Status MDBCatalog::putRenamedEntry(OperationContext* opCtx,
     it->second.nss = toNss;
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, catalogId, fromName](OperationContext*) {
-            stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+            std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
             const auto it = _catalogIdToEntryMap.find(catalogId);
             invariant(it != _catalogIdToEntryMap.end());
             it->second.nss = fromName;
@@ -362,7 +362,7 @@ Status MDBCatalog::putRenamedEntry(OperationContext* opCtx,
 NamespaceString MDBCatalog::getNSSFromCatalog(OperationContext* opCtx,
                                               const RecordId& catalogId) const {
     {
-        stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+        std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
         auto it = _catalogIdToEntryMap.find(catalogId);
         if (it != _catalogIdToEntryMap.end()) {
             return it->second.nss;
@@ -513,7 +513,7 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::_importEntry(OperationContex
     if (!res.isOK())
         return res.getStatus();
 
-    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
+    std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(

@@ -43,7 +43,6 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
@@ -54,6 +53,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <utility>
@@ -281,7 +281,7 @@ private:
     mutable stdx::condition_variable _notifier;
 
     // Mutex used with '_notifier'. Protects access to '_version'.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // A counter, incremented on insertion of new data into the capped collection.
     //

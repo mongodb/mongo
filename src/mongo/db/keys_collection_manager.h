@@ -39,7 +39,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
@@ -47,6 +46,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -224,7 +224,7 @@ private:
         AtomicWord<bool> _hasSeenKeys{false};
 
         // protects all the member variables below.
-        mutable stdx::mutex _mutex;
+        mutable std::mutex _mutex;
         std::shared_ptr<Notification<void>> _refreshRequest;
         stdx::condition_variable _refreshNeededCV;
 

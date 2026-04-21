@@ -34,10 +34,10 @@
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -110,7 +110,7 @@ private:
     const std::string _purpose;
     KeysCollectionClient* const _client;
 
-    stdx::mutex _cacheMutex;
+    std::mutex _cacheMutex;
 
     // Stores keys for signing and validating cluster times created by the cluster that this node
     // is in.

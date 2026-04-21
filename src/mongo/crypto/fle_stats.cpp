@@ -64,7 +64,7 @@ BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
     {
         CompactStats temp;
         {
-            stdx::lock_guard<stdx::mutex> lock(_compactMutex);
+            std::lock_guard<std::mutex> lock(_compactMutex);
             temp = _compactStats;
         }
         auto sub = BSONObjBuilder(builder.subobjStart("compactStats"));
@@ -73,7 +73,7 @@ BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
     {
         CleanupStats temp;
         {
-            stdx::lock_guard<stdx::mutex> lock(_cleanupMutex);
+            std::lock_guard<std::mutex> lock(_cleanupMutex);
             temp = _cleanupStats;
         }
         auto sub = BSONObjBuilder(builder.subobjStart("cleanupStats"));
@@ -91,7 +91,7 @@ BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
     {
         FLEIndexTypeStats temp;
         {
-            stdx::lock_guard<stdx::mutex> lock(_indexTypeMutex);
+            std::lock_guard<std::mutex> lock(_indexTypeMutex);
             temp = _indexTypeStats;
         }
         auto sub = BSONObjBuilder(builder.subobjStart("indexTypeStats"));
@@ -147,7 +147,7 @@ void FLEStatusSection::updateIndexTypeStats(const EncryptedFieldConfig& efc, boo
             return false;
         });
 
-    stdx::lock_guard<stdx::mutex> lock(_indexTypeMutex);
+    std::lock_guard<std::mutex> lock(_indexTypeMutex);
     FLEStatsUtil::accumulateStats(_indexTypeStats, deltas);
 }
 
@@ -160,7 +160,7 @@ void FLEStatusSection::updateIndexTypeStatsOnDeregisterCollection(const Encrypte
 }
 
 void FLEStatusSection::clearIndexTypeStats() {
-    stdx::lock_guard<stdx::mutex> lock(_indexTypeMutex);
+    std::lock_guard<std::mutex> lock(_indexTypeMutex);
     _indexTypeStats = {};
 }
 

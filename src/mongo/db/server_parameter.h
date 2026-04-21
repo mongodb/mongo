@@ -49,7 +49,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"

@@ -32,7 +32,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
-#include "mongo/stdx/chrono.h"
+
+#include <chrono>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

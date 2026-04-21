@@ -65,7 +65,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/decorable.h"
@@ -78,6 +77,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <tuple>
@@ -115,7 +115,7 @@ public:
      */
     std::tuple<bool, std::shared_ptr<Notification<Status>>> getOrCreateWriteRequest(
         LogicalTime clusterTime) {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         auto lastEl = _writeRequests.rbegin();
         if (lastEl != _writeRequests.rend() && lastEl->first >= clusterTime.asTimestamp()) {
             return std::make_tuple(false, lastEl->second);
@@ -130,7 +130,7 @@ public:
      * Erases writeRequest that happened at clusterTime
      */
     void deleteWriteRequest(LogicalTime clusterTime) {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(_mutex);
         auto el = _writeRequests.find(clusterTime.asTimestamp());
         invariant(el != _writeRequests.end());
         invariant(el->second);
@@ -139,7 +139,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::map<Timestamp, std::shared_ptr<Notification<Status>>> _writeRequests;
 };
 

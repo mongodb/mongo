@@ -82,7 +82,7 @@ bool ShardingState::inMaintenanceMode() const {
 void ShardingState::setRecoveryCompleted(RecoveredClusterRole role) {
     LOGV2(
         22081, "Sharding status of the node recovered successfully", "role"_attr = role.toString());
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    std::unique_lock<std::mutex> ul(_mutex);
     invariant(!_future.isReady());
 
     _promise.emplaceValue(std::move(role));
@@ -92,7 +92,7 @@ void ShardingState::setRecoveryFailed(Status failedStatus) {
     invariant(!failedStatus.isOK());
     LOGV2(22082, "Sharding status of the node failed to recover", "error"_attr = failedStatus);
 
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    std::unique_lock<std::mutex> ul(_mutex);
     invariant(!_future.isReady());
 
     _promise.setError(

@@ -147,7 +147,7 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
     OperationContext* opCtx,
     boost::optional<TopologyVersion> clientTopologyVersion,
     boost::optional<Date_t> deadline) const {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     // Fail all new hello requests with ShutdownInProgress if we've transitioned to Quiesce
     // Mode.
@@ -218,7 +218,7 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
         // only decrement non-zero counters. This is safe so long as:
         // 1) Increment + decrement calls always occur at a 1:1 ratio and in that order.
         // 2) All callers to increment/decrement/reset take locks.
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (status != ErrorCodes::SplitHorizonChange &&
             HelloMetrics::get(opCtx)->getNumAwaitingTopologyChanges() > 0) {
             HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
@@ -231,7 +231,7 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
         // Return a MongosHelloResponse with the current topology version on timeout when
         // waiting for a topology change.
         if (status == ErrorCodes::ExceededTimeLimit) {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             return _makeHelloResponse(lk);
         }
     }
@@ -245,7 +245,7 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
 void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
                                                         Milliseconds quiesceTime) {
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _inQuiesceMode = true;
         _quiesceDeadline = getGlobalServiceContext()->getPreciseClockSource()->now() + quiesceTime;
 

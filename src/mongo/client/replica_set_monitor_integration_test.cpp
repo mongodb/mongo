@@ -51,7 +51,6 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -200,12 +199,12 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     auto sets = ReplicaSetMonitorManager::get()->getAllSetNames();
     ASSERT_TRUE(std::find(sets.begin(), sets.end(), setName) == sets.end());
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     stdx::condition_variable cv;
     bool cleanupInvoked = false;
     auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri,
                                                                    [&cleanupInvoked, &mutex, &cv] {
-                                                                       stdx::unique_lock lk(mutex);
+                                                                       std::unique_lock lk(mutex);
                                                                        cleanupInvoked = true;
                                                                        cv.notify_one();
                                                                    });
@@ -216,7 +215,7 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     shutdownExecutor();
     rsm.reset();
 
-    stdx::unique_lock lk(mutex);
+    std::unique_lock lk(mutex);
     cv.wait(lk, [&cleanupInvoked] { return cleanupInvoked; });
     ASSERT_TRUE(cleanupInvoked);
 }
@@ -232,8 +231,8 @@ TEST_F(ReplicaSetMonitorFixture, LockOrderingAndGC) {
         ReplicaSetMonitorManager::get()->getGarbageCollectedMonitorsCount();
 
     {
-        stdx::mutex lvl2mutex;
-        stdx::unique_lock lk(lvl2mutex);
+        std::mutex lvl2mutex;
+        std::unique_lock lk(lvl2mutex);
         // This invokes delayed GC that locks only lvl 1 mutex.
         monitor.reset();
         // Tests that GC was not run yet.

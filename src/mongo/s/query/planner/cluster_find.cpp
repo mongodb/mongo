@@ -427,7 +427,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                 // Reveal the MaxTimeMSExpired error.
                 opCtx->checkForInterrupt();
             }
-            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
+            stdx::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 
@@ -558,7 +558,7 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.
     auto comment = cursor->getOriginatingCommand()["comment"];
     if (!opCtx->getComment() && comment) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->setComment(comment.wrap());
     }
 
@@ -1070,7 +1070,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     {
         CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue()->getNumRemotes();
         CurOp::get(opCtx)->debug().cursorid = cursorId;
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(
             lk, pinnedCursor.getValue()->shouldOmitDiagnosticInformation());
         CurOp::get(opCtx)->setOriginatingCommand(lk,

@@ -50,7 +50,6 @@
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
@@ -60,6 +59,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -164,7 +164,7 @@ private:
     /**
      * Stops data replication and returns with 'lock' locked.
      */
-    void _stopDataReplication(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock);
+    void _stopDataReplication(OperationContext* opCtx, std::unique_lock<std::mutex>& lock);
 
     /**
      * Drops all temporary collections on all databases except "local".
@@ -196,7 +196,7 @@ private:
     ServiceContext* _service;
 
     // Guards starting threads and setting _startedThreads
-    stdx::mutex _threadMutex;
+    std::mutex _threadMutex;
 
     // Flag for guarding against concurrent data replication stopping.
     bool _stoppingDataReplication = false;

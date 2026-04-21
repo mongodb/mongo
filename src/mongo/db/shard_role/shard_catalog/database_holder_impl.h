@@ -33,10 +33,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -97,7 +97,7 @@ public:
 private:
     boost::optional<DatabaseName> _getNameWithConflictingCasing_inlock(const DatabaseName& dbName);
 
-    mutable stdx::mutex _m;
+    mutable std::mutex _m;
 
     DatabaseHolderImpl::DBsIndex _dbs;
 };

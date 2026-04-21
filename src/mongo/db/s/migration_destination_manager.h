@@ -57,7 +57,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -69,6 +68,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -329,7 +329,7 @@ private:
     AtomicWord<long long> _sessionOplogEntriesMigrated{0};
 
     // Mutex to guard all fields below
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Migration session ID uniquely identifies the migration and indicates whether the prepare
     // method has been called.

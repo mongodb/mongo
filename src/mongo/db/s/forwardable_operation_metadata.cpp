@@ -101,7 +101,7 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
 void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     Client* client = opCtx->getClient();
     if (const auto& comment = getComment()) {
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         opCtx->setComment(comment.value());
     }
 

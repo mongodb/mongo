@@ -97,14 +97,14 @@ ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
 }
 
 void ReadyRangeDeletionsProcessor::beginProcessing() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     if (!_beginProcessingSignal.getFuture().isReady()) {
         _beginProcessingSignal.emplaceValue();
     }
 }
 
 void ReadyRangeDeletionsProcessor::shutdown() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     if (_state == kStopped)
         return;
     _transitionState(lock, kStopped);
@@ -115,13 +115,13 @@ void ReadyRangeDeletionsProcessor::shutdown() {
     }
 
     if (_threadOpCtxHolder) {
-        stdx::lock_guard<Client> scopedClientLock(*_threadOpCtxHolder->getClient());
+        std::lock_guard<Client> scopedClientLock(*_threadOpCtxHolder->getClient());
         _threadOpCtxHolder->markKilled(ErrorCodes::Interrupted);
     }
 }
 
 bool ReadyRangeDeletionsProcessor::_stopRequested() const {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     return _state == kStopped;
 }
 
@@ -163,7 +163,7 @@ bool ReadyRangeDeletionsProcessor::_isStateTransitionValid(State oldState, State
 }
 
 void ReadyRangeDeletionsProcessor::emplaceRangeDeletion(const RangeDeletionTask& rdt) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     if (_state == kStopped) {
         return;
     }
@@ -172,7 +172,7 @@ void ReadyRangeDeletionsProcessor::emplaceRangeDeletion(const RangeDeletionTask&
 }
 
 void ReadyRangeDeletionsProcessor::_completedRangeDeletion() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     tassert(ErrorCodes::InternalError,
             "Queue cannot be empty while popping queue element",
             !_queue.empty());
@@ -180,7 +180,7 @@ void ReadyRangeDeletionsProcessor::_completedRangeDeletion() {
 }
 
 RangeDeletionTask ReadyRangeDeletionsProcessor::_peekFront() const {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     tassert(ErrorCodes::InternalError,
             "Queue cannot be empty while peeking at front element",
             !_queue.empty());
@@ -226,7 +226,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
     ThreadClient threadClient(kRangeDeletionThreadName, _service->getService());
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         if (_state != kInitializing) {
             return;
         }
@@ -237,7 +237,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
     auto opCtx = _threadOpCtxHolder.get();
 
     ON_BLOCK_EXIT([this]() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         _threadOpCtxHolder.reset();
     });
 
@@ -246,7 +246,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 
     while (!_stopRequested()) {
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            std::unique_lock<std::mutex> lock(_mutex);
             try {
                 opCtx->waitForConditionOrInterrupt(_condVar, lock, [&] { return !_queue.empty(); });
             } catch (const DBException& ex) {

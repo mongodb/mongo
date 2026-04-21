@@ -311,7 +311,7 @@ protected:
      * TODO (SERVER-83933) Remove this mutex after SSL handshake logic is moved to occur before
      * concurrent accesses can occur.
      */
-    stdx::mutex _sslSocketLock{};
+    std::mutex _sslSocketLock{};
 
     AsioTransportLayer* const _tl;
     bool _isIngressSession;
@@ -356,7 +356,7 @@ protected:
      * Opportunistic read and write are implemented as recursive future continuations, so we may
      * recursively acquire the mutex when the future is readied inline.
      */
-    stdx::recursive_mutex _asyncOpMutex;  // NOLINT
+    std::recursive_mutex _asyncOpMutex;  // NOLINT
 };
 
 /**

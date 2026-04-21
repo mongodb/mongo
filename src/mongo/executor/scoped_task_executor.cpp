@@ -37,7 +37,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -91,7 +90,7 @@ public:
 
     void shutdown() override {
         auto handles = [&] {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             if (!_inShutdown && _cbHandles.empty()) {
                 // We are guaranteed that no more callbacks can be added to _cbHandles after
                 // _inShutdown is set to true. If there aren't any callbacks outstanding, then it is
@@ -124,7 +123,7 @@ public:
     }
 
     bool isShuttingDown() const override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _inShutdown;
     }
 
@@ -137,7 +136,7 @@ public:
     }
 
     StatusWith<EventHandle> makeEvent() override {
-        if (stdx::lock_guard lk(_mutex); _inShutdown) {
+        if (std::lock_guard lk(_mutex); _inShutdown) {
             return _shutdownStatus;
         }
 
@@ -277,7 +276,7 @@ private:
         size_t id;
 
         // State 1 - No Data
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
 
         // No clean up needed because we never ran or recorded anything
         if (_inShutdown) {
@@ -306,7 +305,7 @@ private:
         struct MoveState {
             MoveState(std::unique_ptr<CallbackFn> mem,
                       CallbackFn&& from,
-                      stdx::unique_lock<stdx::mutex>& _lk)
+                      std::unique_lock<std::mutex>& _lk)
                 : work(std::move(mem)), moveFrom(std::move(from)), lk(_lk) {}
 
             // Dummy copy constructor so the variant has a copy constructor
@@ -325,7 +324,7 @@ private:
 
             std::unique_ptr<CallbackFn> work;
             CallbackFn&& moveFrom;
-            stdx::unique_lock<stdx::mutex>& lk;
+            std::unique_lock<std::mutex>& lk;
             std::thread::id tid{stdx::this_thread::get_id()};
         };
         std::variant<RemoteCommandCallbackFn, MoveState> state;
@@ -348,8 +347,8 @@ private:
             [id, state = std::move(state), self = shared_self()](const auto& cargs) {
                 using ArgsT = std::decay_t<decltype(cargs)>;
 
-                stdx::unique_lock<stdx::mutex> lk(self->_mutex, stdx::defer_lock);
-                std::unique_lock<stdx::mutex>* useLock = nullptr;
+                std::unique_lock<std::mutex> lk(self->_mutex, std::defer_lock);
+                std::unique_lock<std::mutex>* useLock = nullptr;
 
                 if constexpr (std::is_same_v<Work, CallbackFn>) {
                     // check for inline execution, tid check must be first
@@ -456,7 +455,7 @@ private:
         }
     }
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     bool _inShutdown = false;
     std::shared_ptr<TaskExecutor> _executor;
     Status _shutdownStatus;

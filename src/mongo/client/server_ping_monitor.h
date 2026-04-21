@@ -34,13 +34,13 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 
@@ -123,7 +123,7 @@ private:
     /**
      * Must be held to access any of the member variables below.
      */
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     /**
      * Enables a scheduled or outgoing ping to be cancelled upon drop().
@@ -191,7 +191,7 @@ private:
 
     static constexpr auto kLogLevel = 0;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     /**
      * Maps each server to a SingleServerPingMonitor.

@@ -43,12 +43,12 @@ ReadThroughCacheBase::ReadThroughCacheBase(Service* service, ThreadPoolInterface
 ReadThroughCacheBase::~ReadThroughCacheBase() = default;
 
 struct ReadThroughCacheBase::CancelToken::TaskInfo {
-    TaskInfo(Service* service, stdx::mutex& cancelTokenMutex)
+    TaskInfo(Service* service, std::mutex& cancelTokenMutex)
         : service(service), cancelTokenMutex(cancelTokenMutex) {}
 
     Service* const service;
 
-    stdx::mutex& cancelTokenMutex;
+    std::mutex& cancelTokenMutex;
     Status cancelStatus{Status::OK()};
     OperationContext* opCtxToCancel{nullptr};
 };
@@ -62,7 +62,7 @@ ReadThroughCacheBase::CancelToken::~CancelToken() = default;
 
 void ReadThroughCacheBase::CancelToken::tryCancel() {
     // Taking mutex in order to be mutually exclusive with _asyncWork's _threadPool.schedule lambda
-    stdx::lock_guard lg(_info->cancelTokenMutex);
+    std::lock_guard lg(_info->cancelTokenMutex);
     _info->cancelStatus =
         Status(ErrorCodes::ReadThroughCacheLookupCanceled, "Internal only: task canceled");
     if (_info->opCtxToCancel) {
@@ -90,7 +90,7 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
             cancelStatusAtTaskBegin = [&] {
                 // Taking mutex in order to be mutually exclusive with
                 // any callers of `::tryCancel()`
-                stdx::lock_guard lg(taskInfo->cancelTokenMutex);
+                std::lock_guard lg(taskInfo->cancelTokenMutex);
                 taskInfo->opCtxToCancel = opCtxHolder.get();
                 return taskInfo->cancelStatus;
             }();
@@ -98,7 +98,7 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
             ON_BLOCK_EXIT([&] {
                 // Taking mutex in order to be mutually exclusive with
                 // any callers of `::tryCancel()`
-                stdx::lock_guard lg(taskInfo->cancelTokenMutex);
+                std::lock_guard lg(taskInfo->cancelTokenMutex);
                 taskInfo->opCtxToCancel = nullptr;
             });
 

@@ -182,7 +182,7 @@ SharedSemiFuture<BSONObj> MultiUpdateCoordinatorInstance::getCompletionFuture() 
 
 void MultiUpdateCoordinatorInstance::abort(Status reason) {
     invariant(!reason.isOK());
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (_abortReason) {
         return;
     }
@@ -306,7 +306,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_sendUpdateRequest() {
     return _retry->untilAbortOrSuccess("_sendUpdateRequest", [this](const auto& factory) {
         auto opCtx = factory->makeOperationContext(&cc());
         {
-            auto lk = stdx::lock_guard(*opCtx->getClient());
+            auto lk = std::lock_guard(*opCtx->getClient());
             opCtx->setLogicalSessionId(_getSessionId());
         }
         auto futureResponse = _externalState->sendClusterUpdateCommandToShards(
@@ -370,7 +370,7 @@ const MultiUpdateCoordinatorMetadata& MultiUpdateCoordinatorInstance::getMetadat
 }
 
 const boost::optional<Status>& MultiUpdateCoordinatorInstance::_getAbortReason() const {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _abortReason;
 }
 
@@ -384,7 +384,7 @@ StatusWith<BSONObj> MultiUpdateCoordinatorInstance::_getResult() const {
 }
 
 MultiUpdateCoordinatorMutableFields MultiUpdateCoordinatorInstance::_getMutableFields() const {
-    stdx::unique_lock lock(_mutex);
+    std::unique_lock lock(_mutex);
     return _mutableFields;
 }
 
@@ -401,18 +401,18 @@ MultiUpdateCoordinatorDocument MultiUpdateCoordinatorInstance::_buildCurrentStat
 
 void MultiUpdateCoordinatorInstance::_acquireSession() {
     auto session = _externalState->acquireSession();
-    stdx::unique_lock lock(_mutex);
+    std::unique_lock lock(_mutex);
     _mutableFields.setLsid(session.getSessionId());
     _mutableFields.setTxnNumber(session.getTxnNumber());
 }
 
 void MultiUpdateCoordinatorInstance::_releaseSession() {
-    stdx::unique_lock lock(_mutex);
+    std::unique_lock lock(_mutex);
     _externalState->releaseSession({*_mutableFields.getLsid(), *_mutableFields.getTxnNumber()});
 }
 
 const LogicalSessionId& MultiUpdateCoordinatorInstance::_getSessionId() const {
-    stdx::unique_lock lock(_mutex);
+    std::unique_lock lock(_mutex);
     return *_mutableFields.getLsid();
 }
 
@@ -477,7 +477,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
             if (newPhase == Phase::kSuccess) {
                 newDocument.getMutableFields().setResult(_cmdResponse);
             } else if (newPhase == Phase::kFailure) {
-                stdx::lock_guard lock(_mutex);
+                std::lock_guard lock(_mutex);
                 if (_abortReason) {
                     newDocument.getMutableFields().setAbortReason(
                         sharding_ddl_util::possiblyTruncateErrorStatus(*_abortReason));
@@ -524,7 +524,7 @@ void MultiUpdateCoordinatorInstance::_updateOnDiskState(
 
 void MultiUpdateCoordinatorInstance::_updateInMemoryState(
     const MultiUpdateCoordinatorDocument& newPhaseDocument) {
-    stdx::unique_lock lock(_mutex);
+    std::unique_lock lock(_mutex);
     _mutableFields = newPhaseDocument.getMutableFields();
 }
 

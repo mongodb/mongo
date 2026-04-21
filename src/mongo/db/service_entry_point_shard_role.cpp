@@ -142,7 +142,6 @@
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -156,6 +155,7 @@
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -582,7 +582,7 @@ private:
         _startOperationTime = getClientOperationTime(opCtx);
         Client* client = opCtx->getClient();
         {
-            stdx::lock_guard<Client> lk(*client);
+            std::lock_guard<Client> lk(*client);
             // We construct a legacy $cmd namespace so we can fill in curOp using
             // the existing logic that existed for OP_QUERY commands
             CurOp::get(opCtx)->setGenericOpRequestDetails(
@@ -1627,7 +1627,7 @@ void ExecCommandDatabase::_initiateCommand() {
         _sessionOptions, command, _invocation->allNamespaces(), allowTransactionsOnConfigDatabase);
 
     if (auto& commentField = genericArgs.getComment()) {
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField->getElement().wrap());
     }
 
@@ -1905,7 +1905,7 @@ void ExecCommandDatabase::_initiateCommand() {
         {
             // We must obtain the client lock to set the ReadConcernArgs on the operation context as
             // it may be concurrently read by CurrentOp.
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             readConcernArgs = std::move(newReadConcernArgs);
         }
 
@@ -2166,7 +2166,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
         if (readConcernArgsStatus.isOK()) {
             // We must obtain the client lock to set the ReadConcernArgs on the operation context as
             // it may be concurrently read by CurrentOp.
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             readConcernArgs = readConcernArgsStatus.getValue();
         }
     }

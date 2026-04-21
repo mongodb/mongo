@@ -30,12 +30,12 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
+#include <mutex>
 
 #include <boost/optional.hpp>
 
@@ -86,9 +86,9 @@ public:
      * Requires either a unique_lock or lock_guard to be passed in to ensure that we call
      * _CancelRemainingWork()) while we have a lock on the callers's mutex.
      */
-    void setResultAndCancelRemainingWork(const stdx::lock_guard<stdx::mutex>& lock,
+    void setResultAndCancelRemainingWork(const std::lock_guard<std::mutex>& lock,
                                          const Result& result);
-    void setResultAndCancelRemainingWork(const stdx::unique_lock<stdx::mutex>& lock,
+    void setResultAndCancelRemainingWork(const std::unique_lock<std::mutex>& lock,
                                          const Result& result);
 
 private:
@@ -127,13 +127,13 @@ CallbackCompletionGuard<Result>::~CallbackCompletionGuard() {
 template <typename Result>
 
 void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork(
-    const stdx::lock_guard<stdx::mutex>& lock, const Result& result) {
+    const std::lock_guard<std::mutex>& lock, const Result& result) {
     _setResultAndCancelRemainingWork(lock, result);
 }
 
 template <typename Result>
 void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork(
-    const stdx::unique_lock<stdx::mutex>& lock, const Result& result) {
+    const std::unique_lock<std::mutex>& lock, const Result& result) {
     _setResultAndCancelRemainingWork(lock, result);
 }
 

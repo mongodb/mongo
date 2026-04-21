@@ -38,7 +38,6 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
@@ -137,22 +136,22 @@ public:
 
 
     CollectionQueryAnalyzerConfigurationMap getConfigurationsForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _configurations;
     }
 
     void clearConfigurationsForTest() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _configurations.clear();
     }
 
     StringMap<Sampler> getSamplersForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _samplers;
     }
 
     void clearSamplersForTest() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _samplers.clear();
     }
 
@@ -189,7 +188,7 @@ private:
     Date_t _getMinLastPingTime();
     Date_t _getMinLastPingTime(Date_t now);
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     CollectionQueryAnalyzerConfigurationMap _configurations;
     StringMap<Sampler> _samplers;

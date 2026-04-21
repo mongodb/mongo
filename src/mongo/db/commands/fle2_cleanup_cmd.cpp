@@ -149,7 +149,7 @@ void dropQEStateCollection(OperationContext* opCtx, const NamespaceString& nss) 
 CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
                                         const CleanupStructuredEncryptionData& request) {
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 

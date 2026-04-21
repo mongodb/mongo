@@ -38,7 +38,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -309,9 +308,9 @@ TEST_F(OperationCPUTimerTest, TimerPausesOnBlockingSleep) {
         timer->stop();
 
         stdx::condition_variable cv;
-        stdx::mutex mutex;
+        std::mutex mutex;
         timer->start();
-        stdx::unique_lock lk(mutex);
+        std::unique_lock lk(mutex);
         cv.wait_for(lk, kSomeDelay.toSystemDuration(), [] { return false; });
         if (!checkTimer())
             failures++;

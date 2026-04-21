@@ -34,13 +34,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <mutex>
 
 namespace mongo {
 
@@ -134,7 +134,7 @@ private:
         std::uint64_t majorityJFalseOverriddenCount = 0;
     };
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     WriteConcernMetricsForOperationType _insertMetrics;
     WriteConcernMetricsForOperationType _updateMetrics;
     WriteConcernMetricsForOperationType _deleteMetrics;

@@ -41,7 +41,6 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store_base.h"
 #include "mongo/db/storage/stub_container.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -51,6 +50,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <variant>
 #include <vector>
@@ -154,13 +154,13 @@ public:
     }
 
     void updateStatsAfterRepair(long long numRecords, long long dataSize) override {
-        stdx::lock_guard<stdx::recursive_mutex> lock(_data->mutex);
+        std::lock_guard<std::recursive_mutex> lock(_data->mutex);
         invariant(_data->records.size() == size_t(numRecords));
         _data->dataSize = dataSize;
     }
 
     RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const final {
-        stdx::lock_guard<stdx::recursive_mutex> lock(_data->mutex);
+        std::lock_guard<std::recursive_mutex> lock(_data->mutex);
         return RecordId(_data->nextId - 1);
     }
 
@@ -228,7 +228,7 @@ private:
         explicit Data(bool isOplog) : mutex(), dataSize(0), nextId(1), isOplog(isOplog) {}
 
         // Protects 'dataSize' and 'records'.
-        stdx::recursive_mutex mutex;
+        std::recursive_mutex mutex;  //  NOLINT
         int64_t dataSize;
         Records records;
 

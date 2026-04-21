@@ -56,13 +56,13 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -78,7 +78,7 @@ MONGO_FAIL_POINT_DEFINE(validateCmdCollectionNotValid);
 namespace {
 
 // Protects the state below.
-stdx::mutex _validationMutex;
+std::mutex _validationMutex;
 
 // Holds the set of full `databaseName.collectionName` namespace strings in progress. Validation
 // commands register themselves in this data structure so that subsequent commands on the same
@@ -266,7 +266,7 @@ public:
 
         // Only one validation per collection can be in progress, the rest wait.
         {
-            stdx::unique_lock<stdx::mutex> lock(_validationMutex);
+            std::unique_lock<std::mutex> lock(_validationMutex);
             try {
                 opCtx->waitForConditionOrInterrupt(_validationNotifier, lock, [&] {
                     return _validationsInProgress.find(nss) == _validationsInProgress.end();
@@ -283,7 +283,7 @@ public:
         }
 
         ON_BLOCK_EXIT([&] {
-            stdx::lock_guard<stdx::mutex> lock(_validationMutex);
+            std::lock_guard<std::mutex> lock(_validationMutex);
             _validationsInProgress.erase(nss);
             _validationNotifier.notify_all();
         });

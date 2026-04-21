@@ -154,11 +154,11 @@ public:
 
 private:
     StringMap<size_t> _atoms;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 size_t CommandNameAtomRegistry::lookup(StringData s) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     auto itr = _atoms.find(s);
     if (itr != _atoms.end()) {
@@ -197,7 +197,7 @@ bool prepareForFLERewrite(OperationContext* opCtx,
     // Make OperationContext forget about diagnostics, so it won't leak sensitive field
     // information into them.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
     // Prevent duplicate rewriting.

@@ -31,11 +31,11 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
+#include <mutex>
 #include <string>
 
 #include <boost/optional.hpp>
@@ -91,7 +91,7 @@ public:
      */
     scram::Secrets<HashBlock> getCachedSecrets(
         const HostAndPort& target, const scram::Presecrets<HashBlock>& presecrets) const {
-        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
+        const std::lock_guard<std::mutex> lock(_hostToSecretsMutex);
 
         // Search the cache for a record associated with the host we're trying to connect to.
         auto foundSecret = _hostToSecrets.find(target);
@@ -123,7 +123,7 @@ public:
     void setCachedSecrets(HostAndPort target,
                           scram::Presecrets<HashBlock> presecrets,
                           scram::Secrets<HashBlock> secrets) {
-        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
+        const std::lock_guard<std::mutex> lock(_hostToSecretsMutex);
 
         typename HostToSecretsMap::iterator it;
         bool insertionSuccessful;
@@ -144,7 +144,7 @@ public:
      * Return metrics about the cache
      */
     Stats getStats() const {
-        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
+        const std::lock_guard<std::mutex> lock(_hostToSecretsMutex);
         Stats stats = _stats;
         stats.count = _hostToSecrets.size();
         return stats;
@@ -162,7 +162,7 @@ private:
                     "misses"_attr = _stats.misses);
     }
 
-    mutable stdx::mutex _hostToSecretsMutex;
+    mutable std::mutex _hostToSecretsMutex;
     HostToSecretsMap _hostToSecrets;
     mutable Stats _stats;
 };

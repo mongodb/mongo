@@ -36,7 +36,6 @@
 #include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
@@ -231,7 +230,7 @@ public:
     void onShutdown();
 
     void gotCommand(StringData cmdName) {
-        stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
+        std::lock_guard<std::mutex> lk(_queryStatsMutex);
         _queryStats.gotCommand(cmdName);
     }
 
@@ -260,12 +259,12 @@ public:
      * opportunity to pass arguments. A post-construction setter is the least-bad alternative.
      */
     void setOpCountersForTest(OpCounters& opCounters) {
-        stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
+        std::lock_guard<std::mutex> lk(_queryStatsMutex);
         _queryStats.setOpCountersForTest(opCounters);
     }
 
     QueryStats getQueryStatsForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
+        std::lock_guard<std::mutex> lk(_queryStatsMutex);
         return _queryStats;
     }
 
@@ -274,7 +273,7 @@ public:
     }
 
     std::map<NamespaceString, SampleRateLimiter> getRateLimitersForTest() const {
-        stdx::lock_guard<stdx::mutex> lk(_sampleRateLimitersMutex);
+        std::lock_guard<std::mutex> lk(_sampleRateLimitersMutex);
         return _sampleRateLimiters;
     }
 
@@ -294,9 +293,9 @@ private:
                             const NamespaceString& nss,
                             SampledCommandNameEnum cmdName);
 
-    mutable stdx::mutex _sampleRateLimitersMutex;
-    mutable stdx::mutex _queryStatsMutex;
-    mutable stdx::mutex _jobsMutex;
+    mutable std::mutex _sampleRateLimitersMutex;
+    mutable std::mutex _queryStatsMutex;
+    mutable std::mutex _jobsMutex;
 
     PeriodicJobAnchor _periodicQueryStatsRefresher;
     QueryStats _queryStats;

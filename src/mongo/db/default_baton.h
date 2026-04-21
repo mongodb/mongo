@@ -31,7 +31,6 @@
 
 #include "mongo/db/baton.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
 
+#include <mutex>
 #include <vector>
 
 namespace mongo {
@@ -72,7 +72,7 @@ private:
     };
     void detachImpl() override;
 
-    using Job = unique_function<void(stdx::unique_lock<stdx::mutex>)>;
+    using Job = unique_function<void(std::unique_lock<std::mutex>)>;
 
     /**
      * Invokes a job with exclusive access to the baton's internals.
@@ -87,11 +87,11 @@ private:
      * Also note that the job may not run inline, and may get scheduled to run by the baton, so it
      * should never throw.
      */
-    void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job);
+    void _safeExecute(std::unique_lock<std::mutex> lk, Job job);
 
-    void _notify(stdx::unique_lock<stdx::mutex>) noexcept;
+    void _notify(std::unique_lock<std::mutex>) noexcept;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
     bool _notified = false;
     bool _sleeping = false;

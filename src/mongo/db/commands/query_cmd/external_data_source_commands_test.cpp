@@ -57,7 +57,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/unittest/unittest.h"
@@ -78,19 +77,19 @@ class PipeWaiter {
 public:
     void notify() {
         {
-            stdx::unique_lock lk(m);
+            std::unique_lock lk(m);
             pipeCreated = true;
         }
         cv.notify_one();
     }
 
     void wait() {
-        stdx::unique_lock lk(m);
+        std::unique_lock lk(m);
         cv.wait(lk, [&] { return pipeCreated; });
     }
 
 private:
-    stdx::mutex m;
+    std::mutex m;
     stdx::condition_variable cv;
     bool pipeCreated = false;
 };

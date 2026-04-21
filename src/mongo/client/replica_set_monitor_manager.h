@@ -45,7 +45,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -59,6 +58,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -205,7 +205,7 @@ private:
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors and several fields.
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     // Fields guarded by _mutex:
 
@@ -233,7 +233,7 @@ private:
     // It is necessary to avoid deadlock while invoking the 'registerForGarbageCollection()' while
     // already holding any lvl 2-6 mutex up the stack. The 'registerForGarbageCollection()' method
     // is not locking the lvl 6 _mutex above.
-    mutable stdx::mutex _gcMutex;
+    mutable std::mutex _gcMutex;
 
     // Fields guarded by _gcMutex.
 

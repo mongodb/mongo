@@ -31,12 +31,12 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
+#include <mutex>
 #include <stack>
 #include <vector>
 
@@ -99,7 +99,7 @@ public:
         CRYPTO_set_locking_callback(&SSLThreadInfo::lockingCallback);
 
         while ((int)mutexes().size() < CRYPTO_num_locks()) {
-            mutexes().emplace_back(std::make_unique<stdx::recursive_mutex>());
+            mutexes().emplace_back(std::make_unique<std::recursive_mutex>());
         }
     }
 
@@ -109,17 +109,17 @@ private:
     // Note: see SERVER-8734 for why we are using a recursive mutex here.
     // Once the deadlock fix in OpenSSL is incorporated into most distros of
     // Linux, this can be changed back to a nonrecursive mutex.
-    static std::vector<std::unique_ptr<stdx::recursive_mutex>>& mutexes() {
+    static std::vector<std::unique_ptr<std::recursive_mutex>>& mutexes() {
         // Keep the static as a pointer to avoid it ever to be destroyed. It is referenced in the
         // CallErrRemoveState thread local above.
-        static auto m = new std::vector<std::unique_ptr<stdx::recursive_mutex>>();
+        static auto m = new std::vector<std::unique_ptr<std::recursive_mutex>>();
         return *m;
     }
 
     class ThreadIDManager {
     public:
         unsigned long reserveID() {
-            stdx::unique_lock<stdx::mutex> lock(_idMutex);
+            std::unique_lock<std::mutex> lock(_idMutex);
             if (!_idLast.empty()) {
                 unsigned long ret = _idLast.top();
                 _idLast.pop();
@@ -129,13 +129,13 @@ private:
         }
 
         void releaseID(unsigned long id) {
-            stdx::unique_lock<stdx::mutex> lock(_idMutex);
+            std::unique_lock<std::mutex> lock(_idMutex);
             _idLast.push(id);
         }
 
     private:
         // Machinery for producing IDs that are unique for the life of a thread.
-        stdx::mutex _idMutex;       // Protects _idNext and _idLast.
+        std::mutex _idMutex;        // Protects _idNext and _idLast.
         unsigned long _idNext = 0;  // Stores the next thread ID to use, if none already allocated.
         std::stack<unsigned long, std::vector<unsigned long>>
             _idLast;  // Stores old thread IDs, for reuse.

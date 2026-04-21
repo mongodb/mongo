@@ -132,7 +132,7 @@ protected:
         // The explain printer checks the CurOp's Command to see if it is allowed to print it.
         Command* cmd = CommandHelpers::findCommand(operationContext(), "find");
         {
-            stdx::lock_guard<Client> clientLock(*operationContext()->getClient());
+            std::lock_guard<Client> clientLock(*operationContext()->getClient());
             CurOp::get(operationContext())
                 ->setGenericOpRequestDetails(clientLock, kNss, cmd, BSONObj(), NetworkOp::dbQuery);
         }
@@ -166,7 +166,7 @@ protected:
             auto request = AggregateCommandRequest(kNss, stages);
             Command* cmd = CommandHelpers::findCommand(operationContext(), "aggregate");
             {
-                stdx::lock_guard<Client> clientLock(*operationContext()->getClient());
+                std::lock_guard<Client> clientLock(*operationContext()->getClient());
                 CurOp::get(operationContext())
                     ->setGenericOpRequestDetails(
                         clientLock, kNss, cmd, BSONObj(), NetworkOp::dbQuery);

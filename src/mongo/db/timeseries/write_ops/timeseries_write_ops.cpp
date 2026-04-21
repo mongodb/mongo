@@ -59,7 +59,7 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
     });
 
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         auto requestNs = internal::ns(request);
         // TODO SERVER-101784: Remove the following translation once 9.0 is LTS and viewful
         // time-series collections no longe rexist.

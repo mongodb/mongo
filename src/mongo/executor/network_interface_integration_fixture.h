@@ -43,7 +43,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
@@ -152,7 +151,7 @@ public:
                           Milliseconds timeoutMillis = Minutes(5));
 
     size_t getInProgress() {
-        auto lk = stdx::unique_lock(_mutex);
+        auto lk = std::unique_lock(_mutex);
         return _workInProgress;
     }
 
@@ -194,7 +193,7 @@ private:
 
     size_t _workInProgress = 0;
     stdx::condition_variable _fixtureIsIdle;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     boost::optional<ConnectionPool::Options> _opts;
 };

@@ -199,7 +199,7 @@ void RemoteCommandRetrySchedulerTest::processNetworkResponse(const ResponseStatu
         while (!net->hasReadyRequests() && totalDelay < maxWaitTimeout) {
             net->advanceTime(net->now() + minExpectedDelay);
             totalDelay += minExpectedDelay;
-            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
+            stdx::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         // Request should not become ready too quickly - verify delay is working.
         ASSERT_GTE(totalDelay, minExpectedDelay);

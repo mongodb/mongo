@@ -119,7 +119,7 @@ Status userCacheInvalidationIntervalSecsNotify(const int& value) {
 }
 
 void UserCacheInvalidator::setPeriod(Milliseconds period) {
-    stdx::lock_guard lg(_jobMutex);
+    std::lock_guard lg(_jobMutex);
     if (_job) {
         _job.setPeriod(period);
     }
@@ -158,7 +158,7 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
         loadInterval(),
         true /*isKillableByStepdown*/);
 
-    stdx::lock_guard lg(invalidator._jobMutex);
+    std::lock_guard lg(invalidator._jobMutex);
     // UserCacheInvalidator job must not already be present
     invariant(!invalidator._job);
     invalidator._job = periodicRunner->makeJob(std::move(job));
@@ -169,7 +169,7 @@ void UserCacheInvalidator::stop(ServiceContext* serviceCtx) {
     auto& invalidator = getUserCacheInvalidator(serviceCtx);
 
     // Guard changes to _job with a mutex because this can run concurrently with start()
-    stdx::lock_guard lg(invalidator._jobMutex);
+    std::lock_guard lg(invalidator._jobMutex);
     if (invalidator._job) {
         invalidator._job.stop();
         invalidator._job.detach();

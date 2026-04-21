@@ -35,11 +35,11 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/service_liaison.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -87,7 +87,7 @@ protected:
      */
     ServiceContext* _context() override;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::vector<PeriodicJobAnchor> _jobs;
 
 private:

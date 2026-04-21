@@ -75,7 +75,7 @@ protected:
 
 
 protected:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     boost::optional<T> _delayableTimeoutCallback;
     executor::NetworkInterfaceMock* _net;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -230,7 +230,7 @@ TEST_F(DelayableTimeoutCallbackWithJitterTest, ScheduleAtWithZeroJitter) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     ASSERT_OK(
         _delayableTimeoutCallback->scheduleAtWithJitter(lk, _net->now() + Seconds(10), Seconds(0)));
     ASSERT_TRUE(_delayableTimeoutCallback->isActive());
@@ -247,7 +247,7 @@ TEST_F(DelayableTimeoutCallbackWithJitterTest, ScheduleAtWithJitterMovesCallback
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
         lk, _net->now() + Seconds(3), Milliseconds(100)));
 
@@ -275,7 +275,7 @@ TEST_F(DelayableTimeoutCallbackWithJitterTest, ScheduleAtWithJitter) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
         lk, _net->now() + Seconds(10), Milliseconds(100)));
 

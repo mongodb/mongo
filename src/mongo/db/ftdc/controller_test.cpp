@@ -63,7 +63,7 @@ namespace {
 class Checkpoint {
 public:
     void arrive() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         if (_released)
             return;
 
@@ -73,25 +73,25 @@ public:
     }
 
     void wait() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         _cv.wait(lk, [&] { return _progress == _limit; });
     }
 
     void advance() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         ++_limit;
         _cv.notify_all();
     }
 
     void release() {
-        stdx::unique_lock lk{_mutex};
+        std::unique_lock lk{_mutex};
         _released = true;
         _progress = 0;
         _cv.notify_all();
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
     bool _released = false;
     uint64_t _progress = 0;

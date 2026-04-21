@@ -350,7 +350,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         // builds before waiting for throttling.
         uassertStatusOK(writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss));
 
-        stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
+        std::unique_lock<std::mutex> lk(_throttlingMutex);
         bool messageLogged = false;
         opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
             const int maxActiveBuilds = maxNumActiveUserIndexBuilds.load();
@@ -379,12 +379,12 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         });
     } else {
         // System index builds have no limit and never wait, but do consume a slot.
-        stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
+        std::unique_lock<std::mutex> lk(_throttlingMutex);
         _numActiveIndexBuilds++;
     }
 
     ScopeGuard onScopeExitGuard([&] {
-        stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
+        std::unique_lock<std::mutex> lk(_throttlingMutex);
         _numActiveIndexBuilds--;
         _indexBuildFinished.notify_one();
     });
@@ -458,7 +458,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // still want to transfer whatever extra information there is available from the caller.
     BSONObj opDesc;
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         auto curOp = CurOp::get(opCtx);
         opDesc = curOp->opDescription().getOwned();
     }
@@ -496,7 +496,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                    resumeInfo,
                    forwardableOpMetadata = std::move(forwardableOpMetadata)](auto status) mutable {
         ScopeGuard onScopeExitGuard([&] {
-            stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
+            std::unique_lock<std::mutex> lk(_throttlingMutex);
             _numActiveIndexBuilds--;
             _indexBuildFinished.notify_one();
         });

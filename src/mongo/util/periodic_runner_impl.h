@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -40,6 +39,7 @@
 #include "mongo/util/periodic_runner.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -89,7 +89,7 @@ private:
         stdx::thread _thread;
         SharedPromise<void> _stopPromise;
 
-        mutable stdx::mutex _mutex;
+        mutable std::mutex _mutex;
         stdx::condition_variable _condvar;
         /**
          * The current execution status of the job.

@@ -58,7 +58,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
-#include "mongo/stdx/future.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1501,7 +1500,7 @@ TEST_F(QueryAnalysisWriterTestAfterWriteError, AddQueriesBackAfterWriteError) {
     auto hangFp = globalFailPointRegistry().find("hangAfterCollectionInserts");
     auto hangTimesEntered = hangFp->setMode(FailPoint::alwaysOn, 0);
 
-    auto future = stdx::async(stdx::launch::async, [&] {
+    auto future = std::async(std::launch::async, [&] {
         ThreadClient tc(getServiceContext()->getService());
         auto opCtx = makeOperationContext();
         writer.flushQueriesForTest(opCtx.get());
@@ -1596,7 +1595,7 @@ TEST_F(QueryAnalysisWriterTestAfterWriteError, RemoveDuplicatesFromBufferAfterWr
     auto hangFp = globalFailPointRegistry().find("hangAfterCollectionInserts");
     auto hangTimesEntered = hangFp->setMode(FailPoint::alwaysOn, 0);
 
-    auto future = stdx::async(stdx::launch::async, [&] {
+    auto future = std::async(std::launch::async, [&] {
         ThreadClient tc(getServiceContext()->getService());
         auto opCtx = makeOperationContext();
         writer.flushQueriesForTest(opCtx.get());

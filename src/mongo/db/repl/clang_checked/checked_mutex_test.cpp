@@ -31,9 +31,10 @@
 
 #include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/clang_checked/thread_safety_annotations.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/observable_mutex.h"
+
+#include <mutex>
 
 namespace mongo {
 namespace {
@@ -62,14 +63,14 @@ private:
 };
 
 TEST(CheckedMutexTest, CheckedMutexShouldWorkWithStdxMutex) {
-    auto f = Foo<stdx::mutex>(0);
+    auto f = Foo<std::mutex>(0);
     ASSERT_EQ(f.getI(), 0);
     f.incI();
     ASSERT_EQ(f.getI(), 1);
 }
 
 TEST(CheckedMutexTest, CheckedMutexShouldWorkWithObservableMutexStdxMutex) {
-    auto f = Foo<ObservableMutex<mongo::stdx::mutex>>(0);
+    auto f = Foo<ObservableMutex<std::mutex>>(0);
     ASSERT_EQ(f.getI(), 0);
     f.incI();
     ASSERT_EQ(f.getI(), 1);

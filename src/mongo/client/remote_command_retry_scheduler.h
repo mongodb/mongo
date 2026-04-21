@@ -35,7 +35,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -43,6 +42,7 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <type_traits>
 
@@ -140,7 +140,7 @@ private:
     std::size_t _currentAttempt{0};
 
     // Protects member data of this scheduler declared after mutex.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     mutable stdx::condition_variable _condition;
 

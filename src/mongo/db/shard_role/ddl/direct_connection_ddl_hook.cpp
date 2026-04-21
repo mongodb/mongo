@@ -54,7 +54,7 @@ void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx,
 
     const auto& opId = opCtx->getOpID();
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // If this op was already registered for a prior acquisition, skip it now.
     auto ongoingOpIt = _ongoingOps.find(opId);
     if (ongoingOpIt != _ongoingOps.end()) {
@@ -89,7 +89,7 @@ void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx,
 void DirectConnectionDDLHook::onEndDDL(OperationContext* opCtx,
                                        const std::vector<NamespaceString>& namespaces) {
     const auto& opId = opCtx->getOpID();
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto ongoingOpIt = _ongoingOps.find(opId);
     if (ongoingOpIt == _ongoingOps.end()) {
         return;
@@ -108,7 +108,7 @@ void DirectConnectionDDLHook::onEndDDL(OperationContext* opCtx,
 }
 
 SharedSemiFuture<void> DirectConnectionDDLHook::getWaitForDrainedFuture(OperationContext* opCtx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     // If there are no ongoing ops, then return immediately a ready future.
     if (_ongoingOps.empty()) {
@@ -123,7 +123,7 @@ SharedSemiFuture<void> DirectConnectionDDLHook::getWaitForDrainedFuture(Operatio
 }
 
 stdx::unordered_map<OperationId, int> DirectConnectionDDLHook::getOngoingOperations() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     return _ongoingOps;
 }

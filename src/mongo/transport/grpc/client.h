@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/grpc/channel_pool.h"
 #include "mongo/transport/grpc/client_stream.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <mutex>
 
 #include <boost/optional.hpp>
 
@@ -208,7 +208,7 @@ protected:
         ConnectSSLMode _sslMode;
         std::shared_ptr<ConnectionMetrics> _connectionMetrics;
 
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         Status _cancellationReason = Status::OK();
         CancellationSource _cancelSource;
 
@@ -220,7 +220,7 @@ protected:
     Counter64 _numFailedStreams;
 
     // The below members are protected so that dropConnections() can access them.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     struct RemoteState {
         std::list<std::shared_ptr<PendingStreamState>> pendingStreamStates;

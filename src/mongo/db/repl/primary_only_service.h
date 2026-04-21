@@ -44,7 +44,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -58,6 +57,7 @@
 #include "mongo/util/string_map.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -530,7 +530,7 @@ private:
     // (S)  Self-synchronizing; access according to class's own rules.
     // (M)  Reads and writes guarded by _mutex.
     // (W)  Synchronization required only for writes.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Condvar to receive notifications when _state changes.
     stdx::condition_variable _stateChangeCV;  // (S)

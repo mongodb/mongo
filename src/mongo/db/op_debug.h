@@ -367,7 +367,7 @@ public:
         OperationContext* opCtx, Fn&& queryShapeHashFn) {
         // QueryShapeHash may be accessed by other thread running $currentOp and therefore needs to
         // be synchronized.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         if (_didComputeQueryShapeHash) {
             return _queryShapeHash;
         }

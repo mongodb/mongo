@@ -369,7 +369,7 @@ void logSSLInfo(const SSLInformationToLog& info,
 }
 
 void SSLManagerCoordinator::rotate() {
-    stdx::lock_guard lockGuard(_lock);
+    std::lock_guard lockGuard(_lock);
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(sslGlobalParams, isSSLServer);

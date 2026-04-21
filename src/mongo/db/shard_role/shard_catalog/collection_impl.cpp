@@ -1720,7 +1720,7 @@ bool CollectionImpl::isIndexMultikey(OperationContext* opCtx,
         // after checking. This is fine we know that the reader in that case opened its snapshot
         // before the writer and we do not need to observe its result.
         if (index.concurrentWriters.load() == 0) {
-            stdx::lock_guard lock(index.multikeyMutex);
+            std::lock_guard lock(index.multikeyMutex);
             if (multikeyPaths && !index.multikeyPaths.empty()) {
                 *multikeyPaths = index.multikeyPaths;
             }
@@ -1772,7 +1772,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     auto setMultikey = [offset,
                         multikeyPaths](const durable_catalog::CatalogEntryMetaData& metadata) {
         auto* index = &metadata.indexes[offset];
-        stdx::lock_guard lock(index->multikeyMutex);
+        std::lock_guard lock(index->multikeyMutex);
 
         auto tracksPathLevelMultikeyInfo = !index->multikeyPaths.empty();
         if (!tracksPathLevelMultikeyInfo) {
@@ -1937,7 +1937,7 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
                                 << getCatalogId() << " : " << metadata.toBSON());
 
         const auto& index = metadata.indexes[offset];
-        stdx::lock_guard lock(index.multikeyMutex);
+        std::lock_guard lock(index.multikeyMutex);
         index.multikey = isMultikey;
         if (indexTypeSupportsPathLevelMultikeyTracking(accessMethod)) {
             if (isMultikey) {

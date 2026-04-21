@@ -215,7 +215,7 @@ ClusterCursorManager::~ClusterCursorManager() {
 
 void ClusterCursorManager::shutdown(OperationContext* opCtx) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _inShutdown = true;
     }
     killAllCursors(opCtx);
@@ -231,7 +231,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     if (_inShutdown) {
         lk.unlock();
@@ -274,7 +274,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     AuthCheck checkSessionAuth,
     StringData commandName) {
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     if (_inShutdown) {
         return Status(ErrorCodes::ShutdownInProgress,
@@ -332,7 +332,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursorNoAuthCheck(
     CursorId cursorId, OperationContext* opCtx, StringData commandName) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     if (_inShutdown) {
         return Status(ErrorCodes::ShutdownInProgress,
@@ -372,7 +372,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
         cursor->setLastUseDate(now);
     }
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     CursorEntry* entry = _getEntry(lk, cursorId);
     invariant(entry);
@@ -408,7 +408,7 @@ template <typename T>
 Status ClusterCursorManager::checkAuthCursor(OperationContext* opCtx,
                                              CursorId cursorId,
                                              std::function<Status(T)> authChecker) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     auto entry = _getEntry(lk, cursorId);
 
     if (!entry) {
@@ -452,7 +452,7 @@ Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
                                          AuthzCheckFn authChecker) {
     invariant(opCtx);
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     CursorEntry* entry = _getEntry(lk, cursorId);
     if (!entry) {
@@ -485,7 +485,7 @@ Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
     return Status::OK();
 }
 
-void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk,
+void ClusterCursorManager::detachAndKillCursor(std::unique_lock<std::mutex> lk,
                                                OperationContext* opCtx,
                                                CursorId cursorId) {
     LOGV2_DEBUG(8928411, 2, "Detaching and killing cursor", "cursorId"_attr = cursorId);
@@ -522,7 +522,7 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
             return res;
         });
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _cursorsTimedOut += cursorsKilled;
 
     return cursorsKilled;
@@ -535,7 +535,7 @@ void ClusterCursorManager::killAllCursors(OperationContext* opCtx) {
 std::size_t ClusterCursorManager::killCursorsSatisfying(
     OperationContext* opCtx, const std::function<bool(CursorId, const CursorEntry&)>& pred) {
     invariant(opCtx);
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     std::size_t nKilled = 0;
 
     std::vector<ClusterClientCursorGuard> cursorsToDestroy;
@@ -579,13 +579,13 @@ std::size_t ClusterCursorManager::killCursorsSatisfying(
 }
 
 size_t ClusterCursorManager::cursorsTimedOut() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _cursorsTimedOut;
 }
 
 auto ClusterCursorManager::getOpenCursorStats() const -> OpenCursorStats {
     OpenCursorStats stats{};
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     for (auto&& [cursorId, entry] : _cursorEntryMap) {
         if (entry.isKillPending())
             continue;
@@ -607,7 +607,7 @@ auto ClusterCursorManager::getOpenCursorStats() const -> OpenCursorStats {
 }
 
 void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     for (auto&& [cursorId, entry] : _cursorEntryMap) {
         if (entry.isKillPending()) {
@@ -633,7 +633,7 @@ std::vector<GenericCursor> ClusterCursorManager::getIdleCursors(
     const OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const {
     std::vector<GenericCursor> cursors;
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
@@ -672,7 +672,7 @@ std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
 
 stdx::unordered_set<CursorId> ClusterCursorManager::getCursorsForSession(
     LogicalSessionId lsid) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     stdx::unordered_set<CursorId> cursorIds;
 

@@ -78,7 +78,6 @@
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -86,6 +85,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 
 #ifdef __linux__
 #include <unistd.h>
@@ -146,7 +146,7 @@ const StringData kExtraAttrFieldName = "extraAttr";
  * Runtime's can race on first creation (on some function statics), so we just
  * serialize the initial Runtime creation.
  */
-stdx::mutex gRuntimeCreationMutex;
+std::mutex gRuntimeCreationMutex;
 bool gFirstRuntimeCreated = false;
 
 bool closeToMaxMemory() {
@@ -304,7 +304,7 @@ void MozJSImplScope::unregisterOperation() {
 
 void MozJSImplScope::kill() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         // If we are on the right thread, in the middle of an operation, and we have a
         // registered opCtx, then we should check the opCtx for interrupts.
@@ -326,7 +326,7 @@ void MozJSImplScope::interrupt() {
 }
 
 bool MozJSImplScope::isKillPending() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return !_killStatus.isOK();
 }
 
@@ -353,7 +353,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
 
     // Check our initial kill status (which might be fine).
     auto status = [&scope]() -> Status {
-        stdx::lock_guard<stdx::mutex> lk(scope->_mutex);
+        std::lock_guard<std::mutex> lk(scope->_mutex);
 
         return scope->_killStatus;
     }();
@@ -429,12 +429,12 @@ void MozJSImplScope::ASANHandles::addPointer(void* ptr) {
      * This allows us to keep the pointer address in the map for as long as it is required by ASAN
      * in the above case.
      */
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _handles.addPointer(ptr);
 }
 
 void MozJSImplScope::ASANHandles::removePointer(void* ptr) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _handles.removePointer(ptr);
 }
 #else
@@ -472,7 +472,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
     mongo::sm::reset(mallocMemoryLimit, !useLegacyMemoryTracking);
 
     {
-        stdx::unique_lock<stdx::mutex> lk(gRuntimeCreationMutex);
+        std::unique_lock<std::mutex> lk(gRuntimeCreationMutex);
 
         if (gFirstRuntimeCreated) {
             // If we've already made a runtime, just proceed
@@ -1190,7 +1190,7 @@ void MozJSImplScope::gc() {
 }
 
 void MozJSImplScope::sleep(Milliseconds ms) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     uassert(ErrorCodes::JSUncatchableError,
             "sleep was interrupted by kill",
@@ -1266,7 +1266,7 @@ void MozJSImplScope::setStatus(Status status) {
 
 bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool assertOnError) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         if (!_killStatus.isOK()) {
             success = false;
             setStatus(_killStatus);

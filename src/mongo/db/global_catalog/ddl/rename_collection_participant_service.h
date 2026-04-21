@@ -41,7 +41,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -139,7 +138,7 @@ public:
      * after releasing the critical section on source and target collection.
      */
     boost::optional<SharedSemiFuture<void>> getUnblockCrudFutureFor(const UUID& sourceUUID) {
-        stdx::lock_guard<stdx::mutex> lg(_stateMutex);
+        std::lock_guard<std::mutex> lg(_stateMutex);
         if (sourceUUID != _doc.getSourceUUID()) {
             return boost::none;
         }
@@ -217,7 +216,7 @@ private:
     bool _isInCriticalSection(Phase phase) const;
 
     // Protects the state of the service object (the recovery doc and the promise fields).
-    stdx::mutex _stateMutex;
+    std::mutex _stateMutex;
 
     // Ready when step 1 (drop target && rename source) has been completed: once set, a successful
     // response to `ShardsvrRenameCollectionParticipantCommand` can be returned to the coordinator.

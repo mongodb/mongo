@@ -43,7 +43,6 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
@@ -53,6 +52,7 @@
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -235,7 +235,7 @@ private:
     AtomicWord<bool> _oplogApplicationStarted{false};
 
     // The mutex that protects all the members below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     ReshardingDonorOplogId _startAt;
     boost::optional<Date_t> _lastUpdatedProgressMarkAt;

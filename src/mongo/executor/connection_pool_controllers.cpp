@@ -52,7 +52,7 @@ void DynamicLimitController::init(executor::ConnectionPool* parent) {
 }
 
 void DynamicLimitController::addHost(PoolId id, const HostAndPort& host) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto ret = _poolData.insert({id, {host}});
     invariant(ret.second,
               fmt::format("ConnectionPool controller {} received a request to track host {} that "
@@ -63,7 +63,7 @@ void DynamicLimitController::addHost(PoolId id, const HostAndPort& host) {
 
 DynamicLimitController::HostGroupState DynamicLimitController::updateHost(
     PoolId id, const PoolMetrics& stats) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto& data = getOrInvariant(_poolData, id);
     data.target =
         std::clamp(stats.requests + stats.active + stats.leased, _minLoader(), _maxLoader());
@@ -71,12 +71,12 @@ DynamicLimitController::HostGroupState DynamicLimitController::updateHost(
 }
 
 void DynamicLimitController::removeHost(PoolId id) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(_poolData.erase(id));
 }
 
 ConnectionPool::ConnectionControls DynamicLimitController::getControls(PoolId id) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return {getPoolOptions().maxConnecting, getOrInvariant(_poolData, id).target};
 }
 

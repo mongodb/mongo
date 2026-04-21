@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -97,7 +97,7 @@ public:
      */
     template <typename... Args>
     std::shared_ptr<Value> getOrEmplace(const Key& key, Args&&... args) {
-        stdx::lock_guard lk(_mapModificationMutex);
+        std::lock_guard lk(_mapModificationMutex);
         auto currentMap = atomic_load(&_map);
         // Check in case it already exists.
         if (auto it = currentMap->find(key); it != currentMap->end()) {
@@ -117,7 +117,7 @@ public:
      * This is a blocking operation as all writes are serialized.
      */
     void erase(const Key& key) {
-        stdx::lock_guard lk(_mapModificationMutex);
+        std::lock_guard lk(_mapModificationMutex);
         auto currentMap = atomic_load(&_map);
         auto mapCopy = std::make_shared<Map>(*currentMap);
         mapCopy->erase(key);
@@ -131,7 +131,7 @@ public:
      * This is a blocking operation as all writes are serialized.
      */
     void clear() {
-        stdx::lock_guard lk(_mapModificationMutex);
+        std::lock_guard lk(_mapModificationMutex);
         auto emptyMap = std::make_shared<Map>();
         atomic_store(&_map, std::move(emptyMap));
     }
@@ -149,7 +149,7 @@ public:
     void updateWith(F&& updateFunc) {
         static_assert(std::is_invocable_r_v<Map, F, const Map&>,
                       "Function must be of type Map(const Map&)");
-        stdx::lock_guard lk(_mapModificationMutex);
+        std::lock_guard lk(_mapModificationMutex);
         auto currentMap = atomic_load(&_map);
         auto newMap = std::make_shared<Map>(std::forward<F>(updateFunc)(*currentMap));
         atomic_store(&_map, std::move(newMap));
@@ -170,6 +170,6 @@ private:
     // shared_ptr in order to allow lock-free reads of the values.
     std::shared_ptr<Map> _map;
     // Locked in order to modify the map by either inserting or removing an element.
-    stdx::mutex _mapModificationMutex;
+    std::mutex _mapModificationMutex;
 };
 }  // namespace mongo

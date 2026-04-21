@@ -238,7 +238,6 @@
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
@@ -1742,7 +1741,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             }
         }
         {
-            stdx::lock_guard lg(*client);
+            std::lock_guard lg(*client);
             opCtx->setIsExecutingShutdown();
         }
 

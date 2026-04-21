@@ -61,7 +61,7 @@ InitialSyncSharedData* InitialSyncClonerTestFixture::getSharedData() {
 }
 
 void InitialSyncClonerTestFixture::setInitialSyncId() {
-    stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+    std::lock_guard<InitialSyncSharedData> lk(*getSharedData());
     getSharedData()->setInitialSyncSourceId(lk, _initialSyncId);
 }
 

@@ -30,7 +30,7 @@
 
 #include "mongo/transport/transport_layer_manager_impl.h"
 
-#include "mongo/stdx/mutex.h"
+#include <mutex>
 
 #ifdef __linux__
 #include <fstream>
@@ -79,7 +79,7 @@ TransportLayerManagerImpl::TransportLayerManagerImpl(std::unique_ptr<TransportLa
 // TODO Right now this and setup() leave TLs started if there's an error. In practice the server
 // exits with an error and this isn't an issue, but we should make this more robust.
 Status TransportLayerManagerImpl::start() {
-    stdx::lock_guard lk(_stateMutex);
+    std::lock_guard lk(_stateMutex);
     if (_state == State::kShutdown) {
         return Status(ErrorCodes::ShutdownInProgress,
                       "Cannot start TransportLayerManager, shutdown already in progress");
@@ -103,7 +103,7 @@ void TransportLayerManagerImpl::stopAcceptingSessions() {
 }
 
 void TransportLayerManagerImpl::shutdown() {
-    stdx::lock_guard lk(_stateMutex);
+    std::lock_guard lk(_stateMutex);
     invariant(std::exchange(_state, State::kShutdown) != State::kShutdown);
     for (auto&& tl : _tls) {
         tl->shutdown();
@@ -111,7 +111,7 @@ void TransportLayerManagerImpl::shutdown() {
 }
 
 Status TransportLayerManagerImpl::setup() {
-    stdx::lock_guard lk(_stateMutex);
+    std::lock_guard lk(_stateMutex);
     if (_state == State::kShutdown) {
         return Status(ErrorCodes::ShutdownInProgress,
                       "Cannot setup TransportLayerManager, shutdown already in progress");

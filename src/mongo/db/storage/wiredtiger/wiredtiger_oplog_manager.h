@@ -33,11 +33,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <mutex>
 
 namespace mongo {
 
@@ -128,7 +128,7 @@ private:
         Updated,
         Stopped,
     };
-    VisibilityUpdateResult _updateVisibility(stdx::unique_lock<stdx::mutex>&,
+    VisibilityUpdateResult _updateVisibility(std::unique_lock<std::mutex>&,
                                              const KVEngine&,
                                              const RecordStore::Capped& oplog);
 
@@ -147,7 +147,7 @@ private:
     mutable stdx::condition_variable _oplogEntriesBecameVisibleCV;
 
     // Protects the state below.
-    mutable stdx::mutex _oplogVisibilityStateMutex;
+    mutable std::mutex _oplogVisibilityStateMutex;
 
     // The record store which the thread is currently running for. May be null while the thread is
     // running if the thread is in the process of shutting down.

@@ -415,11 +415,11 @@ void runBMTest(TestServiceContext& testSvcCtx, Fixture& fixture, benchmark::Stat
         auto opCtx = opCtxRaii.get();
         repl::createOplog(opCtx);
         auto batches = fixture.getOplogBatches(state.range(3), state.range(4));
-        auto start = mongo::stdx::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
         fixture.writeOplog(opCtx, batches);
-        auto end = mongo::stdx::chrono::high_resolution_clock::now();
+        auto end = std::chrono::high_resolution_clock::now();
         auto elapsed_seconds =
-            mongo::stdx::chrono::duration_cast<mongo::stdx::chrono::duration<double>>(end - start);
+            std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
         state.SetIterationTime(elapsed_seconds.count());
     }
 }

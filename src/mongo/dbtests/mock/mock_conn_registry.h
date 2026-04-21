@@ -35,11 +35,11 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -130,7 +130,7 @@ private:
     MockConnHook _mockConnStrHook;
 
     // protects _registry
-    mutable stdx::mutex _registryMutex;
+    mutable std::mutex _registryMutex;
     stdx::unordered_map<std::string, MockRemoteDBServer*> _registry;
 };
 }  // namespace mongo

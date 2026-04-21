@@ -53,7 +53,7 @@ const int kMaxPerfThreads = 16;  // max number of threads to use for lock perf
 class DConcurrencyTest : public benchmark::Fixture {
 protected:
     void SetUp(benchmark::State& state) override {
-        stdx::unique_lock ul(_mutex);
+        std::unique_lock ul(_mutex);
         if (state.thread_index == 0) {
             _serviceContextHolder = ServiceContext::make();
             makeKClientsWithLockers(state.threads);
@@ -64,7 +64,7 @@ protected:
     }
 
     void TearDown(benchmark::State& state) override {
-        stdx::unique_lock ul(_mutex);
+        std::unique_lock ul(_mutex);
         if (state.thread_index == 0) {
             clients.clear();
             _serviceContextHolder = nullptr;
@@ -89,7 +89,7 @@ protected:
         return _serviceContextHolder.get();
     }
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
 
     ServiceContext::UniqueServiceContext _serviceContextHolder;

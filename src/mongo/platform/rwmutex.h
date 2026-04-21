@@ -31,9 +31,10 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace MONGO_MOD_PUB mongo {
 
@@ -122,7 +123,7 @@ private:
     }
 
     // Synchronizes writers, only allowing a single writer to acquire the mutex at any time.
-    stdx::mutex _writeMutex;
+    std::mutex _writeMutex;
 
     /**
      * Bits [0 .. 29] represent the number of readers, allowing up to 2 ^ 30 - 1 concurrent reads.
@@ -202,7 +203,7 @@ private:
         return hasWaiters_forTest(mutex._writeFlag);
     }
 
-    stdx::mutex _writeMutex;
+    std::mutex _writeMutex;
 
     // Will be non-zero when a writer is either waiting for or is holding the lock. May only be
     // modified while holding `_writeMutex`.

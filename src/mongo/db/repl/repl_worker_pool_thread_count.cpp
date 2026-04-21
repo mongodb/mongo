@@ -62,9 +62,9 @@ namespace {
  * 2. param is set.
  * 3. onUpdateXXX() is called after setting the param value. We unlock the mutex.
  */
-stdx::mutex threadCountParamsMutex;
+std::mutex threadCountParamsMutex;
 // We are using a boost::optional in order to hold the unique_lock between step 1 and 3.
-boost::optional<stdx::unique_lock<stdx::mutex>> threadCountParamsLocker;
+boost::optional<std::unique_lock<std::mutex>> threadCountParamsLocker;
 }  // namespace
 
 Status validateUpdateReplWriterThreadCount(const int count, const boost::optional<TenantId>&) {
@@ -81,7 +81,7 @@ Status validateUpdateReplWriterThreadCount(const int count, const boost::optiona
                                        "must be less than or equal to 256");
     }
 
-    stdx::unique_lock<stdx::mutex> lk(threadCountParamsMutex);
+    std::unique_lock<std::mutex> lk(threadCountParamsMutex);
 
     if (count < replWriterMinThreadCount) {
         return Status(ErrorCodes::BadValue,
@@ -122,7 +122,7 @@ Status validateUpdateReplWriterMinThreadCount(const int count, const boost::opti
                                        "must be less than or equal to 256");
     }
 
-    stdx::unique_lock<stdx::mutex> lk(threadCountParamsMutex);
+    std::unique_lock<std::mutex> lk(threadCountParamsMutex);
 
     size_t newCount = static_cast<size_t>(count);
     // May be replWriterThreadCount, or may be capped by the number of CPUs
@@ -145,7 +145,7 @@ Status onUpdateReplWriterThreadCount(const int) {
 
     // Here we adopt the ownership of the locker without locking the underlying mutex as it was
     // previously locked by validateUpdateReplWriterThreadCount().
-    stdx::unique_lock<stdx::mutex> lk(std::move(threadCountParamsLocker.get()));
+    std::unique_lock<std::mutex> lk(std::move(threadCountParamsLocker.get()));
     threadCountParamsLocker.reset();
 
     if (hasGlobalServiceContext()) {
@@ -164,7 +164,7 @@ Status onUpdateReplWriterThreadCount(const int) {
 Status onUpdateReplWriterMinThreadCount(const int) {
     // Here we adopt the ownership of the locker without locking the underlying mutex as it was
     // previously locked by validateUpdateReplWriterMinThreadCount().
-    stdx::unique_lock<stdx::mutex> lk(std::move(threadCountParamsLocker.get()));
+    std::unique_lock<std::mutex> lk(std::move(threadCountParamsLocker.get()));
     threadCountParamsLocker.reset();
 
     if (hasGlobalServiceContext()) {

@@ -33,12 +33,12 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -96,12 +96,12 @@ private:
     void onShutdown() final;
 
     void onStepUpComplete(OperationContext* opCtx, long long term) final {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         _enabled = true;
     }
 
     void onStepDown() final {
-        stdx::lock_guard lg(_mutex);
+        std::lock_guard lg(_mutex);
         _enabled = false;
         _lsidsToEagerlyReap.clear();
     }
@@ -119,7 +119,7 @@ private:
     std::shared_ptr<ThreadPool> _threadPool;
 
     // Protects the state below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     bool _enabled{false};
     boost::optional<ExecutorFuture<void>> _drainedSessionsFuture;

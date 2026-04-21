@@ -30,9 +30,10 @@
 #include "mongo/util/interruptible.h"
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -44,9 +45,9 @@ class InterruptibleTest : public unittest::Test {};
 TEST_F(InterruptibleTest, NotInterruptibleWaitForConditionFailsWithOverflowError) {
     auto notInterruptible = Interruptible::notInterruptible();
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(mutex);
+    std::unique_lock<std::mutex> lk(mutex);
 
     auto overflowDeadline = Date_t::max() - Milliseconds(1);
 

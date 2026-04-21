@@ -239,18 +239,18 @@ ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
 }
 
 void ReplIndexBuildState::onThreadScheduled(OperationContext* opCtx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _opId = opCtx->getOpID();
 }
 
 void ReplIndexBuildState::completeSetup() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _indexBuildState.setState(IndexBuildState::kPostSetup, false /* skipCheck */);
     _cleanUpRequired = true;
 }
 
 void ReplIndexBuildState::setInProgress(OperationContext* opCtx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // The index build might have been aborted/interrupted before reaching this point. Trying to
     // transtion to kInProgress would be an error.
     opCtx->checkForInterrupt();
@@ -258,7 +258,7 @@ void ReplIndexBuildState::setInProgress(OperationContext* opCtx) {
 }
 
 void ReplIndexBuildState::setPostFailureState(const Status& status) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_indexBuildState.isFailureCleanUp() || _indexBuildState.isExternalAbort() ||
         _indexBuildState.isAborted()) {
         LOGV2_DEBUG(7693500,
@@ -284,14 +284,14 @@ void ReplIndexBuildState::setPostFailureState(const Status& status) {
 }
 
 void ReplIndexBuildState::setVotedForCommitReadiness(OperationContext* opCtx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(!_votedForCommitReadiness);
     opCtx->checkForInterrupt();
     _votedForCommitReadiness = true;
 }
 
 bool ReplIndexBuildState::canVoteForAbort() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return !_votedForCommitReadiness;
 }
 
@@ -299,24 +299,24 @@ void ReplIndexBuildState::commit(OperationContext* opCtx) {
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this, skipCheck](OperationContext*, boost::optional<Timestamp>) {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             _indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
         });
 }
 
 void ReplIndexBuildState::requestAbortFromPrimary() {
     invariant(mustReplicateCompletion(protocol));
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _indexBuildState.setState(IndexBuildState::kAwaitPrimaryAbort, false /* skipCheck */);
 }
 
 Timestamp ReplIndexBuildState::getCommitTimestamp() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.getTimestamp().value_or(Timestamp());
 }
 
 void ReplIndexBuildState::onOplogCommit(bool isPrimary) const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(!isPrimary && _indexBuildState.isApplyingCommitOplogEntry(),
               str::stream() << "Index build: " << buildUUID
                             << ",  index build state: " << _indexBuildState.toString());
@@ -324,13 +324,13 @@ void ReplIndexBuildState::onOplogCommit(bool isPrimary) const {
 
 void ReplIndexBuildState::completeAbort(OperationContext* opCtx) {
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _indexBuildState.setState(IndexBuildState::kAborted, skipCheck);
 }
 
 void ReplIndexBuildState::abortForShutdown(OperationContext* opCtx) {
     // Promise should be set at least once before it's getting destroyed.
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (!_waitForNextAction->getFuture().isReady()) {
         _waitForNextAction->emplaceValue(IndexBuildAction::kNoAction);
     }
@@ -345,7 +345,7 @@ void ReplIndexBuildState::onOplogAbort(OperationContext* opCtx, const NamespaceS
         !storageGlobalParams.magicRestore;
     invariant(!isPrimary, str::stream() << "Index build: " << buildUUID);
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(_indexBuildState.isExternalAbort(),
               str::stream() << "Index build: " << buildUUID
                             << ",  index build state: " << _indexBuildState.toString());
@@ -360,48 +360,48 @@ void ReplIndexBuildState::onOplogAbort(OperationContext* opCtx, const NamespaceS
 }
 
 bool ReplIndexBuildState::isAbortCleanUpRequired() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // Cleanup is required for external aborts if setup stage completed at some point in the past.
     return _cleanUpRequired;
 }
 
 bool ReplIndexBuildState::isAborted() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.isAborted();
 }
 
 bool ReplIndexBuildState::isAborting() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.isAborting();
 }
 
 bool ReplIndexBuildState::isCommitted() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.isCommitted();
 }
 
 bool ReplIndexBuildState::isSettingUp() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.isSettingUp();
 }
 
 bool ReplIndexBuildState::isExternalAbort() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.isExternalAbort();
 }
 
 bool ReplIndexBuildState::isFailureCleanUp() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.isFailureCleanUp();
 }
 
 bool ReplIndexBuildState::isAwaitingPrimaryAbort() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.isAwaitingPrimaryAbort();
 }
 
 std::string ReplIndexBuildState::getAbortReason() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(_indexBuildState.isAborted() || _indexBuildState.isAborting(),
               str::stream() << "Index build: " << buildUUID
                             << ",  index build state: " << _indexBuildState.toString());
@@ -411,12 +411,12 @@ std::string ReplIndexBuildState::getAbortReason() const {
 }
 
 Status ReplIndexBuildState::getAbortStatus() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _indexBuildState.getAbortStatus();
 }
 
 void ReplIndexBuildState::setCommitQuorumSatisfied(OperationContext* opCtx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (!_waitForNextAction->getFuture().isReady()) {
         _setSignalAndCancelVoteRequestCbkIfActive(
             lk, opCtx, IndexBuildAction::kCommitQuorumSatisfied);
@@ -437,7 +437,7 @@ void ReplIndexBuildState::setCommitQuorumSatisfied(OperationContext* opCtx) {
 }
 
 void ReplIndexBuildState::setSinglePhaseCommit(OperationContext* opCtx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_waitForNextAction->getFuture().isReady()) {
         // If the signal action has been set, it should only be because a concurrent operation
         // already aborted the index build.
@@ -454,7 +454,7 @@ void ReplIndexBuildState::setSinglePhaseCommit(OperationContext* opCtx) {
 }
 
 bool ReplIndexBuildState::tryCommit(OperationContext* opCtx) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_indexBuildState.isSettingUp() || _indexBuildState.isPostSetup()) {
         // It's possible that the index build thread has not reached the point where it can be
         // committed yet.
@@ -495,7 +495,7 @@ bool ReplIndexBuildState::tryCommit(OperationContext* opCtx) {
 ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationContext* opCtx,
                                                                   IndexBuildAction signalAction,
                                                                   Status abortStatus) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // It is not possible for the index build to be in kExternalAbort state, as the collection
     // MODE_X lock is held and there cannot be concurrent external aborters.
     auto nssOptional = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, collectionUUID);
@@ -591,7 +591,7 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
 }
 
 bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& error) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_indexBuildState.isSettingUp() || _indexBuildState.isAborted() ||
         _indexBuildState.isCommitted() || _indexBuildState.isAborting() ||
         _indexBuildState.isApplyingCommitOplogEntry() || _votedForCommitReadiness) {
@@ -627,7 +627,7 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
 
 void ReplIndexBuildState::onVoteRequestScheduled(OperationContext* opCtx,
                                                  executor::TaskExecutor::CallbackHandle handle) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_waitForNextAction->getFuture().isReady()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         replCoord->cancelCbkHandle(handle);
@@ -642,7 +642,7 @@ void ReplIndexBuildState::_clearVoteRequestCbk(WithLock) {
 }
 
 void ReplIndexBuildState::clearVoteRequestCbk() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _clearVoteRequestCbk(lk);
 }
 
@@ -655,18 +655,18 @@ void ReplIndexBuildState::_cancelAndClearVoteRequestCbk(WithLock lk, OperationCo
 }
 
 void ReplIndexBuildState::resetNextActionPromise() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _waitForNextAction = std::make_unique<SharedPromise<IndexBuildAction>>();
 }
 
 SharedSemiFuture<IndexBuildAction> ReplIndexBuildState::getNextActionFuture() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     invariant(_waitForNextAction, str::stream() << buildUUID);
     return _waitForNextAction->getFuture();
 }
 
 boost::optional<IndexBuildAction> ReplIndexBuildState::getNextActionNoWait() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto future = _waitForNextAction->getFuture();
     if (!future.isReady()) {
         return boost::none;
@@ -686,7 +686,7 @@ Status ReplIndexBuildState::onConflictWithNewIndexBuild(const ReplIndexBuildStat
     IndexBuildState existingIndexBuildState;
     {
         // We have to lock the mutex in order to read the committed/aborted state.
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         existingIndexBuildState = _indexBuildState;
     }
     ss << " index build state: " << existingIndexBuildState.toString();
@@ -714,29 +714,29 @@ Status ReplIndexBuildState::onConflictWithNewIndexBuild(const ReplIndexBuildStat
 }
 
 bool ReplIndexBuildState::isResumable() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     // It's implied that the IndexBuildProtocol is resumable if _lastOpTimeBeforeInterceptors is
     // set.
     return !_lastOpTimeBeforeInterceptors.isNull();
 }
 
 repl::OpTime ReplIndexBuildState::getLastOpTimeBeforeInterceptors() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _lastOpTimeBeforeInterceptors;
 }
 
 void ReplIndexBuildState::setLastOpTimeBeforeInterceptors(repl::OpTime opTime) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _lastOpTimeBeforeInterceptors = std::move(opTime);
 }
 
 void ReplIndexBuildState::clearLastOpTimeBeforeInterceptors() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _lastOpTimeBeforeInterceptors = {};
 }
 
 void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     // This allows listIndexes callers to identify how to kill the index build.
     // Previously, users have to locate the index build in the currentOp command output
@@ -751,17 +751,17 @@ void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
 }
 
 IndexBuildMetrics ReplIndexBuildState::getIndexBuildMetrics() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _metrics;
 }
 
 void ReplIndexBuildState::setVotedToCommitTime(const Date_t& time) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _metrics.voteCommitTime = time;
 }
 
 void ReplIndexBuildState::setReceivedCommitIndexBuildEntryTime(const Date_t& time) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _metrics.commitIndexOplogEntryTime = time;
 }
 

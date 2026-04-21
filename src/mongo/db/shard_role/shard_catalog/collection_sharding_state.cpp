@@ -34,10 +34,11 @@
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <mutex>
 
 #include <boost/none.hpp>
 
@@ -70,7 +71,7 @@ public:
             return &it->second;
         }
         readLock.unlock();
-        stdx::lock_guard writeLock(_mutex);
+        std::lock_guard writeLock(_mutex);
         auto [it, _] = _collections.emplace(nss, _factory->make(nss));
         return &it->second;
     }

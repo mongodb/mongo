@@ -35,7 +35,7 @@
 namespace mongo {
 
 bool OrderedTicketSemaphore::tryAcquire() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     return _tryAcquireWithoutQueuing(lock);
 }
 
@@ -43,7 +43,7 @@ bool OrderedTicketSemaphore::acquire(OperationContext* opCtx,
                                      AdmissionContext* admCtx,
                                      Date_t until,
                                      bool interruptible) {
-    stdx::unique_lock lk(_mutex);
+    std::unique_lock lk(_mutex);
 
     if (_tryAcquireWithoutQueuing(lk)) {
         return true;
@@ -96,7 +96,7 @@ bool OrderedTicketSemaphore::acquire(OperationContext* opCtx,
 }
 
 void OrderedTicketSemaphore::release() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     int available = _permits.addAndFetch(1);
 
@@ -106,7 +106,7 @@ void OrderedTicketSemaphore::release() {
 }
 
 void OrderedTicketSemaphore::resize(int delta) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     int available = _permits.addAndFetch(delta);
 

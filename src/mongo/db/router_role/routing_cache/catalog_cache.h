@@ -43,7 +43,6 @@
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/modules.h"
@@ -51,6 +50,7 @@
 #include "mongo/util/read_through_cache.h"
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -66,7 +66,7 @@ class ComparableDatabaseVersion;
 using DatabaseTypeCache MONGO_MOD_PRIVATE = ReadThroughCache<DatabaseName,
                                                              DatabaseType,
                                                              ComparableDatabaseVersion,
-                                                             ObservableMutex<stdx::mutex>>;
+                                                             ObservableMutex<std::mutex>>;
 using DatabaseTypeValueHandle MONGO_MOD_USE_REPLACEMENT(CachedDatabaseInfo) =
     DatabaseTypeCache::ValueHandle;
 using CachedDatabaseInfo MONGO_MOD_PUBLIC = DatabaseTypeValueHandle;
@@ -499,7 +499,7 @@ private:
                                      const ComparableDatabaseVersion& previousDbVersion);
 
         std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
-        ObservableMutex<stdx::mutex> _mutex;
+        ObservableMutex<std::mutex> _mutex;
     };
 
     class CollectionCache : public RoutingTableHistoryCache {
@@ -521,7 +521,7 @@ private:
                                        const ComparableChunkVersion& previousChunkVersion);
 
         std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
-        ObservableMutex<stdx::mutex> _mutex;
+        ObservableMutex<std::mutex> _mutex;
 
         struct Stats {
             // Tracks how many incremental refreshes are waiting to complete currently

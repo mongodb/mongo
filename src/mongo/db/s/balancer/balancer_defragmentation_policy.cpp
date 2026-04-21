@@ -1263,7 +1263,7 @@ private:
 }  // namespace
 
 void BalancerDefragmentationPolicy::startCollectionDefragmentations(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+    std::lock_guard<std::mutex> lk(_stateMutex);
 
     // Fetch all collections with `defragmentCollection` flag enabled
     static const auto query =
@@ -1293,7 +1293,7 @@ void BalancerDefragmentationPolicy::startCollectionDefragmentations(OperationCon
 
 void BalancerDefragmentationPolicy::abortCollectionDefragmentation(OperationContext* opCtx,
                                                                    const NamespaceString& nss) {
-    stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+    std::lock_guard<std::mutex> lk(_stateMutex);
     auto coll =
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, nss, {});
     if (coll.getDefragmentCollection()) {
@@ -1307,17 +1307,17 @@ void BalancerDefragmentationPolicy::abortCollectionDefragmentation(OperationCont
 }
 
 void BalancerDefragmentationPolicy::interruptAllDefragmentations() {
-    stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+    std::lock_guard<std::mutex> lk(_stateMutex);
     _defragmentationStates.clear();
 }
 
 bool BalancerDefragmentationPolicy::isDefragmentingCollection(const UUID& uuid) {
-    stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+    std::lock_guard<std::mutex> lk(_stateMutex);
     return _defragmentationStates.contains(uuid);
 }
 
 BSONObj BalancerDefragmentationPolicy::reportProgressOn(const UUID& uuid) {
-    stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+    std::lock_guard<std::mutex> lk(_stateMutex);
     auto match = _defragmentationStates.find(uuid);
     if (match == _defragmentationStates.end() || !match->second) {
         return BSON(kCurrentPhase << kNoPhase);
@@ -1332,7 +1332,7 @@ MigrateInfoVector BalancerDefragmentationPolicy::selectChunksToMove(
 
     MigrateInfoVector chunksToMove;
     {
-        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+        std::lock_guard<std::mutex> lk(_stateMutex);
 
         std::vector<UUID> collectionUUIDs;
         collectionUUIDs.reserve(_defragmentationStates.size());
@@ -1412,7 +1412,7 @@ StringData BalancerDefragmentationPolicy::getName() const {
 
 boost::optional<BalancerStreamAction> BalancerDefragmentationPolicy::getNextStreamingAction(
     OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+    std::lock_guard<std::mutex> lk(_stateMutex);
     // Visit the defrag state in round robin fashion starting from a random one
     auto stateIt = [&] {
         auto it = _defragmentationStates.begin();
@@ -1481,7 +1481,7 @@ void BalancerDefragmentationPolicy::applyActionResult(
     const BalancerStreamAction& action,
     const BalancerStreamActionResponse& response) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+        std::lock_guard<std::mutex> lk(_stateMutex);
         DefragmentationPhase* targetState = nullptr;
         visit(OverloadedVisitor{[&](const MergeInfo& act) {
                                     if (_defragmentationStates.contains(act.uuid)) {

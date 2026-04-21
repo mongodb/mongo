@@ -313,7 +313,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     invariant(_externalState);
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         if (_donorCtx.getState() >= DonorStateEnum::kDonatingOplogEntries) {
             ensureFulfilledPromise(lk, _inDonatingOplogEntries);
         }
@@ -322,7 +322,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     if (_changeStreamsMonitorCtx) {
         invariant(_metadata.getPerformVerification());
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(lk,
                                _changeStreamMonitorStartTimeSelected,
                                _changeStreamsMonitorCtx->getStartAtOperationTime());
@@ -339,7 +339,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
 CancelableOperationContext ReshardingDonorService::DonorStateMachine::_makeOperationContext(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
     auto state = [this] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _donorCtx.getState();
     }();
     return resharding::makeReshardingOperationContext(
@@ -419,7 +419,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                   "error"_attr = status);
 
             {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                std::lock_guard<std::mutex> lk(_mutex);
                 ensureFulfilledPromise(lk, _inDonatingOplogEntries, status);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorStarted, status);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
@@ -460,7 +460,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
             {
                 // The donor is done with all local transitions until the coordinator makes its
                 // decision.
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                std::lock_guard<std::mutex> lk(_mutex);
                 invariant(_donorCtx.getState() >= DonorStateEnum::kError);
                 ensureFulfilledPromise(lk, _inBlockingWritesOrError);
             }
@@ -472,7 +472,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_donorCtx.getState() == DonorStateEnum::kDone) {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             ensureFulfilledPromise(lk, _critSecWasPromoted);
         }
         return ExecutorFuture(**executor);
@@ -495,7 +495,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
         })
         .runOn(**executor, _cancelState->getAbortOrStepdownToken())
         .then([this] {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
                                                  _cancelState->getAbortOrStepdownToken());
         });
@@ -516,7 +516,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
             } else if (_donorCtx.getState() != DonorStateEnum::kDone) {
                 {
                     // Unblock the RecoverRefreshThread as quickly as possible when aborting.
-                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+                    std::lock_guard<std::mutex> lk(_mutex);
                     ensureFulfilledPromise(
                         lk, _critSecWasAcquired, {ErrorCodes::ReshardCollectionAborted, "aborted"});
                     ensureFulfilledPromise(
@@ -621,7 +621,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runMandatoryCle
                              "set stepdown"}
                     : status;
 
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                std::lock_guard<std::mutex> lk(_mutex);
 
                 ensureFulfilledPromise(lk, _inDonatingOplogEntries, statusForPromise);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorStarted, statusForPromise);
@@ -721,7 +721,7 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
 
     const CoordinatorStateEnum coordinatorState = reshardingFields.getState();
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         if (coordinatorState >= CoordinatorStateEnum::kApplying) {
             ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
         }
@@ -745,7 +745,7 @@ void ReshardingDonorService::DonorStateMachine::onReadDuringCriticalSection() {
 }
 
 void ReshardingDonorService::DonorStateMachine::notifyAllRecipientsDoneCloning() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
 }
 
@@ -894,7 +894,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
         .thenRunOn(**executor)
         .then([this, factory]() {
             _transitionState(DonorStateEnum::kDonatingOplogEntries, factory);
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             ensureFulfilledPromise(lk, _inDonatingOplogEntries);
         })
         .onCompletion([=, this](Status status) {
@@ -927,7 +927,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
 
     SharedSemiFuture<void> allRecipientsDoneApplyingFuture;
     {
-        stdx::lock_guard<std::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         allRecipientsDoneApplyingFuture = _allRecipientsDoneApplying.getFuture();
     }
 
@@ -943,7 +943,7 @@ void ReshardingDonorService::DonorStateMachine::
     _writeTransactionOplogEntryThenTransitionToBlockingWrites(
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_donorCtx.getState() > DonorStateEnum::kPreparingToBlockWrites) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasAcquired);
         return;
     }
@@ -964,7 +964,7 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasAcquired);
     }
 
@@ -1042,7 +1042,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_donorCtx.getState() > DonorStateEnum::kBlockingWrites) {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             ensureFulfilledPromise(lk, _critSecWasPromoted);
         }
         return;
@@ -1059,7 +1059,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasPromoted);
     }
 
@@ -1091,7 +1091,7 @@ ReshardingDonorService::DonorStateMachine::createAndStartChangeStreamsMonitor(
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         auto startAtOperationTime = cloneTimestamp + 1;
         ensureFulfilledPromise(lk, _changeStreamMonitorStartTimeSelected, startAtOperationTime);
     }
@@ -1128,7 +1128,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
 
     SharedSemiFuture<Timestamp> changeStreamMonitorStartTimeSelectedFuture;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         changeStreamMonitorStartTimeSelectedFuture =
             _changeStreamMonitorStartTimeSelected.getFuture();
     }
@@ -1237,7 +1237,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStre
                                          _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .onCompletion([this](Status status) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             if (status.isOK()) {
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
                                     resharding::getCurrentTime());
@@ -1439,7 +1439,7 @@ void ReshardingDonorService::DonorStateMachine::insertStateDocument(
 }
 
 void ReshardingDonorService::DonorStateMachine::commit() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     tassert(
         ErrorCodes::ReshardCollectionInProgress,
         fmt::format("Attempted to commit the resharding operation in an incorrect donor state: {}",
@@ -1485,7 +1485,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     _updateDonorDocument(opCtx.get(),
                          BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName
                                              << newDonorCtx.toBSON())));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _donorCtx = newDonorCtx;
 }
 
@@ -1494,7 +1494,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     _updateDonorDocument(opCtx,
                          BSON("$set" << BSON(ReshardingDonorDocument::kChangeStreamsMonitorFieldName
                                              << newChangeStreamsMonitorCtx.toBSON())));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _changeStreamsMonitorCtx = newChangeStreamsMonitorCtx;
 }
 
@@ -1520,7 +1520,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 
         shard_role_details::getRecoveryUnit(opCtx.get())
             ->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                std::lock_guard<std::mutex> lk(_mutex);
                 _completionPromise.emplaceValue();
             });
 
@@ -1537,7 +1537,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 void ReshardingDonorService::DonorStateMachine::_initCancelState(
     const CancellationToken& stepdownToken) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _cancelState = std::make_unique<primary_only_service_helpers::CancelState>(stepdownToken);
     }
 
@@ -1569,7 +1569,7 @@ otel::traces::Span ReshardingDonorService::DonorStateMachine::_startSpan(
 
 void ReshardingDonorService::DonorStateMachine::abort(bool isUserCancelled) {
     auto cancelStateInitialized = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _cancelState != nullptr;
     }();
 
@@ -1578,7 +1578,7 @@ void ReshardingDonorService::DonorStateMachine::abort(bool isUserCancelled) {
     }
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(
             lk, _coordinatorHasDecisionPersisted, resharding::kCoordinatorAbortedError);
     }

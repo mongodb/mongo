@@ -38,7 +38,6 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/modules.h"
@@ -49,6 +48,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <string>
 
@@ -213,7 +213,7 @@ protected:
 
         stdx::thread _thread;
 
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         mongo::Atomic<bool> _started{false};
         bool _inShutdown = false;
         TrafficRecorderStats _trafficStats;

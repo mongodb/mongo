@@ -30,12 +30,12 @@
 
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_manager.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 namespace mongo::sdam {

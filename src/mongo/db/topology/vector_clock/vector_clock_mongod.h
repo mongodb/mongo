@@ -36,8 +36,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace mongo {
 
@@ -121,7 +122,7 @@ private:
     ExecutorFuture<void> _createPersisterTask();
 
     // Protects the shared state below
-    stdx::mutex _durableTimeMutex;
+    std::mutex _durableTimeMutex;
 
     // If boost::none, means the durable time needs to be recovered from disk, otherwise contains
     // the latest-known durable time

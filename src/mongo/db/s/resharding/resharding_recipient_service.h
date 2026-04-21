@@ -56,7 +56,6 @@
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -68,6 +67,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -487,7 +487,7 @@ private:
     SharedSemiFuture<void> _changeStreamsMonitorQuiesced;
 
     // Protects the state below
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Manages abort state and provides cancellation tokens for async operations. Initialized in
     // _initCancelState().

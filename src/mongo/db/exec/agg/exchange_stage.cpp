@@ -74,13 +74,13 @@ namespace {
 class MutexAndResourceLock {
     OperationContext* _opCtx;
     ResourceYielder* _resourceYielder;
-    stdx::unique_lock<stdx::mutex> _lock;
+    std::unique_lock<std::mutex> _lock;
 
 public:
     // Must be constructed with the mutex held. 'yielder' may be null if there are no resources
     // which need to be yielded while waiting.
     MutexAndResourceLock(OperationContext* opCtx,
-                         stdx::unique_lock<stdx::mutex> m,
+                         std::unique_lock<std::mutex> m,
                          ResourceYielder* yielder)
         : _opCtx(opCtx), _resourceYielder(yielder), _lock(std::move(m)) {
         invariant(_lock.owns_lock());
@@ -104,7 +104,7 @@ public:
      * Releases ownership of the lock to the caller. May only be called when the mutex is held
      * (after a call to unlock(), for example).
      */
-    stdx::unique_lock<stdx::mutex> releaseLockOwnership() {
+    std::unique_lock<std::mutex> releaseLockOwnership() {
         invariant(_lock.owns_lock());
         return std::move(_lock);
     }
@@ -296,7 +296,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                                                 size_t consumerId,
                                                 ResourceYielder* resourceYielder) {
     // Grab a lock.
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     for (;;) {
         // Guard against some of the trickiness we do with moving the lock to/from the
@@ -482,7 +482,7 @@ void Exchange::updateMemoryTrackingForDispose(OperationContext* opCtx) {
 }
 
 void Exchange::dispose(OperationContext* opCtx, size_t consumerId) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
 
     invariant(_disposeRunDown < getConsumers());
 

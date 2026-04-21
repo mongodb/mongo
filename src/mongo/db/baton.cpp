@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
@@ -62,13 +61,13 @@ public:
     explicit SubBaton(BatonHandle baton) : _baton(std::move(baton)) {}
 
     ~SubBaton() override {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         invariant(_isDead);
     }
 
     void schedule(Task func) override {
         {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
 
             if (_isDead) {
                 lk.unlock();
@@ -85,7 +84,7 @@ public:
         }
 
         _baton->schedule([this, anchor = shared_from_this()](Status status) {
-            _runJobs(stdx::unique_lock<stdx::mutex>(_mutex), status);
+            _runJobs(std::unique_lock<std::mutex>(_mutex), status);
         });
     }
 
@@ -95,7 +94,7 @@ public:
 
     void run(ClockSource* clkSource) noexcept override {
         {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             invariant(!_isDead);
         }
 
@@ -104,7 +103,7 @@ public:
 
     TimeoutState run_until(ClockSource* clkSource, Date_t deadline) noexcept override {
         {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             invariant(!_isDead);
         }
 
@@ -112,7 +111,7 @@ public:
     }
 
     void notify() noexcept override {
-        if (stdx::lock_guard lk(_mutex); _isDead) {
+        if (std::lock_guard lk(_mutex); _isDead) {
             return;
         }
 
@@ -120,14 +119,14 @@ public:
     }
 
     void detachImpl() noexcept override {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         _isDead = true;
 
         _runJobs(std::move(lk), kDetached);
     }
 
     Future<void> waitUntil(Date_t expiration, const CancellationToken& token) noexcept override {
-        if (stdx::lock_guard lk(_mutex); _isDead) {
+        if (std::lock_guard lk(_mutex); _isDead) {
             return kDetached;
         }
 
@@ -135,7 +134,7 @@ public:
     }
 
 private:
-    void _runJobs(stdx::unique_lock<stdx::mutex> lk, Status status) {
+    void _runJobs(std::unique_lock<std::mutex> lk, Status status) {
         if (status.isOK() && _isDead) {
             status = kDetached;
         }
@@ -154,7 +153,7 @@ private:
 
     BatonHandle _baton;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     bool _isDead = false;
     std::vector<Task> _scheduled;
 };

@@ -39,33 +39,33 @@
 namespace mongo {
 
 void CappedInsertNotifier::notifyAll() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     ++_version;
     _notifier.notify_all();
 }
 
 uint64_t CappedInsertNotifier::getVersion() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _version;
 }
 
 void CappedInsertNotifier::waitUntil(OperationContext* opCtx,
                                      uint64_t prevVersion,
                                      Date_t deadline) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     opCtx->waitForConditionOrInterruptUntil(_notifier, lk, deadline, [this, prevVersion]() {
         return _dead || prevVersion != _version;
     });
 }
 
 void CappedInsertNotifier::kill() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _dead = true;
     _notifier.notify_all();
 }
 
 bool CappedInsertNotifier::isDead() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _dead;
 }
 

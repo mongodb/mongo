@@ -60,8 +60,8 @@ void OplogBufferProxy::startup(OperationContext* opCtx) {
 
 void OplogBufferProxy::shutdown(OperationContext* opCtx) {
     {
-        stdx::lock_guard<stdx::mutex> backLock(_lastPushedMutex);
-        stdx::lock_guard<stdx::mutex> frontLock(_lastPeekedMutex);
+        std::lock_guard<std::mutex> backLock(_lastPushedMutex);
+        std::lock_guard<std::mutex> frontLock(_lastPeekedMutex);
         _lastPushed.reset();
         _lastPeeked.reset();
     }
@@ -75,7 +75,7 @@ void OplogBufferProxy::push(OperationContext* opCtx,
     if (begin == end) {
         return;
     }
-    stdx::lock_guard<stdx::mutex> lk(_lastPushedMutex);
+    std::lock_guard<std::mutex> lk(_lastPushedMutex);
     _lastPushed = *(end - 1);
     _target->push(opCtx, begin, end, cost);
 }
@@ -97,16 +97,16 @@ std::size_t OplogBufferProxy::getCount() const {
 }
 
 void OplogBufferProxy::clear(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> backLock(_lastPushedMutex);
-    stdx::lock_guard<stdx::mutex> frontLock(_lastPeekedMutex);
+    std::lock_guard<std::mutex> backLock(_lastPushedMutex);
+    std::lock_guard<std::mutex> frontLock(_lastPeekedMutex);
     _lastPushed.reset();
     _lastPeeked.reset();
     _target->clear(opCtx);
 }
 
 bool OplogBufferProxy::tryPop(OperationContext* opCtx, Value* value) {
-    stdx::lock_guard<stdx::mutex> backLock(_lastPushedMutex);
-    stdx::lock_guard<stdx::mutex> frontLock(_lastPeekedMutex);
+    std::lock_guard<std::mutex> backLock(_lastPushedMutex);
+    std::lock_guard<std::mutex> frontLock(_lastPeekedMutex);
     if (!_target->tryPop(opCtx, value)) {
         return false;
     }
@@ -120,7 +120,7 @@ bool OplogBufferProxy::tryPop(OperationContext* opCtx, Value* value) {
 
 bool OplogBufferProxy::waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) {
     {
-        stdx::unique_lock<stdx::mutex> lk(_lastPushedMutex);
+        std::unique_lock<std::mutex> lk(_lastPushedMutex);
         if (_lastPushed) {
             return true;
         }
@@ -130,7 +130,7 @@ bool OplogBufferProxy::waitForDataFor(Milliseconds waitDuration, Interruptible* 
 
 bool OplogBufferProxy::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
     {
-        stdx::unique_lock<stdx::mutex> lk(_lastPushedMutex);
+        std::unique_lock<std::mutex> lk(_lastPushedMutex);
         if (_lastPushed) {
             return true;
         }
@@ -139,7 +139,7 @@ bool OplogBufferProxy::waitForDataUntil(Date_t deadline, Interruptible* interrup
 }
 
 bool OplogBufferProxy::peek(OperationContext* opCtx, Value* value) {
-    stdx::lock_guard<stdx::mutex> lk(_lastPeekedMutex);
+    std::lock_guard<std::mutex> lk(_lastPeekedMutex);
     if (_lastPeeked) {
         *value = *_lastPeeked;
         return true;
@@ -153,7 +153,7 @@ bool OplogBufferProxy::peek(OperationContext* opCtx, Value* value) {
 
 boost::optional<OplogBuffer::Value> OplogBufferProxy::lastObjectPushed(
     OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lk(_lastPushedMutex);
+    std::lock_guard<std::mutex> lk(_lastPushedMutex);
     if (!_lastPushed) {
         return boost::none;
     }
@@ -161,7 +161,7 @@ boost::optional<OplogBuffer::Value> OplogBufferProxy::lastObjectPushed(
 }
 
 boost::optional<OplogBuffer::Value> OplogBufferProxy::getLastPeeked_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_lastPeekedMutex);
+    std::lock_guard<std::mutex> lk(_lastPeekedMutex);
     return _lastPeeked;
 }
 

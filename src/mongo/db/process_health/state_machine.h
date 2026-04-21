@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -37,6 +36,7 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -171,7 +171,7 @@ namespace process_health {
  *
  * Concurrency
  * -----------
- * `StateMachine` owns a `stdx::recursive_mutex` that it holds a lock on throughout
+ * `StateMachine` owns a `std::recursive_mutex` that it holds a lock on throughout
  * `accept(...)` and `state()`. This has implications for multi-threaded use of `StateMachine`.
  * See the comment above the definition of `accept(...)`.
  *
@@ -233,7 +233,7 @@ public:
     // Transitions the state machine into the initial state.
     // Can only be called once.
     void start() {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        std::lock_guard<std::recursive_mutex> lk(_mutex);
         tassertNotStarted();
         _started = true;
 
@@ -248,7 +248,7 @@ public:
     // Must be called prior to starting the state machine.
     void validTransition(State from, State to) {
         try {
-            stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+            std::lock_guard<std::recursive_mutex> lk(_mutex);
             tassertNotStarted();
             auto& context = _states[from];
             context.validTransitions.insert(to);
@@ -278,7 +278,7 @@ public:
     //	2. For any hooks run as a result of accepting this message, no blocking calls are made
     // involving shared resources with another thread that may call this function.
     State accept(const OptionalMessageType& m) {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        std::lock_guard<std::recursive_mutex> lk(_mutex);
         tassertStarted();
 
         auto& handler = _current->stateHandler;
@@ -292,7 +292,7 @@ public:
 
     // Return the current state.
     State state() const {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        std::lock_guard<std::recursive_mutex> lk(_mutex);
         tassertStarted();
         invariant(_current);
         return _current->state();
@@ -379,7 +379,7 @@ public:
     };
 
     StateEventRegistryPtr registerHandler(StateHandlerPtr handler) {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        std::lock_guard<std::recursive_mutex> lk(_mutex);
         tassertNotStarted();
         auto& context = _states[handler->state()];
         context.stateHandler = std::move(handler);
@@ -387,7 +387,7 @@ public:
     }
 
     StateEventRegistryPtr registerHandler(State s, MessageHandler&& handler, bool isTransient) {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        std::lock_guard<std::recursive_mutex> lk(_mutex);
         tassertNotStarted();
 
         auto& context = _states[s];
@@ -415,7 +415,7 @@ protected:
     using StateContexts = stdx::unordered_map<State, StateContext>;
 
     void setState(State s, const OptionalMessageType& message) {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        std::lock_guard<std::recursive_mutex> lk(_mutex);
         tassertStarted();
 
         invariant(_current);
@@ -463,7 +463,7 @@ protected:
         return getHandlerOrFatal(s);
     }
 
-    mutable stdx::recursive_mutex _mutex;
+    mutable std::recursive_mutex _mutex;  //  NOLINT
     bool _started;
     State _initial;
     StateContext* _current = nullptr;

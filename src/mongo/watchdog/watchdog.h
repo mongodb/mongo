@@ -33,7 +33,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -41,6 +40,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -211,7 +211,7 @@ private:
     stdx::thread _thread;
 
     // Lock to protect _state and control _thread
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _condvar;
 };
 
@@ -431,7 +431,7 @@ private:
     };
 
     // Lock to protect _state and control _thread
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // State of watchdog
     State _state{State::kNotStarted};

@@ -117,7 +117,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
 
     boost::optional<bool> cachedIsAuthorizedForInternalClusterAction;
     if (osi.getSessionId()) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
 
         auto lsc = LogicalSessionCache::get(opCtx->getServiceContext());
         if (!lsc) {
@@ -154,7 +154,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
 
     if (osi.getTxnNumber()) {
         invariant(osi.getSessionId());
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
 
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on a replica set member or mongos",
@@ -186,7 +186,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
 
     if (osi.getAutocommit()) {
         invariant(osi.getTxnNumber());
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         uassert(ErrorCodes::InvalidOptions,
                 "Specifying autocommit=true is not allowed.",
                 !osi.getAutocommit().value());

@@ -621,7 +621,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     const auto numRecords = collection->getCollectionPtr()->numRecords(opCtx);
     ProgressMeterHolder progress;
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, numRecords), opCtx);
     }
 
@@ -752,7 +752,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         tassert(7683103, "Expected CollectionAcquisition to be initialized", collection);
         restartCollectionScan = false;
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             progress.get(lk)->reset(collection->getCollectionPtr()->numRecords(opCtx));
         }
         timer.reset();
@@ -845,7 +845,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     }
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.get(lk)->finished();
     }
 
@@ -913,7 +913,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         bulkDocsScannedCounter.add(1);
 
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             progress->get(lk)->setTotalWhileRunning(
                 collection.getCollectionPtr()->numRecords(opCtx));
         }
@@ -948,7 +948,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
             .ignore();
 
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             // Go to the next document.
             progress->get(lk)->hit();
         }

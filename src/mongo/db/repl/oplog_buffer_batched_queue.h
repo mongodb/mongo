@@ -31,8 +31,9 @@
 
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace MONGO_MOD_PUB mongo {
 namespace repl {
@@ -82,10 +83,10 @@ public:
     void exitDrainMode() final;
 
 private:
-    void _waitForSpace(stdx::unique_lock<stdx::mutex>& lk, std::size_t size);
+    void _waitForSpace(std::unique_lock<std::mutex>& lk, std::size_t size);
     void _clear(WithLock lk);
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _notEmptyCV;
     stdx::condition_variable _notFullCV;
     const std::size_t _maxSize;

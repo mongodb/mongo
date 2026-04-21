@@ -33,11 +33,11 @@
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_check_status.h"
 #include "mongo/db/process_health/health_observer.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
+#include <mutex>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -70,7 +70,7 @@ private:
 
     const Date_t _startTime = _clockSource->now();
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     Severity _severity = Severity::kOk;
     std::string _description;
 };

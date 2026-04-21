@@ -37,13 +37,13 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
 #include <functional>
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 
@@ -222,7 +222,7 @@ private:
     AtomicWord<bool> _shardingInitialized{false};
     AtomicWord<bool> _isGridInitialized{false};
 
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
 };

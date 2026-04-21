@@ -79,7 +79,7 @@ public:
         newNode.push_back({.tag = std::string(tag),
                            .registrationTime = _clockSource->now(),
                            .token = mutex.token()});
-        stdx::lock_guard lk(_registrationMutex);
+        std::lock_guard lk(_registrationMutex);
         _newMutexEntries.splice(_newMutexEntries.end(), newNode);
 #endif
     }
@@ -156,10 +156,10 @@ private:
 
     ClockSource* _clockSource;
 
-    mutable ObservableMutex<stdx::mutex> _registrationMutex;
+    mutable ObservableMutex<std::mutex> _registrationMutex;
     std::list<NewMutexEntry> _newMutexEntries;
 
-    mutable ObservableMutex<stdx::mutex> _collectionMutex;
+    mutable ObservableMutex<std::mutex> _collectionMutex;
     int64_t _nextMutexId{0};
     StringMap<std::list<MutexEntry>> _mutexEntries;
     // Maps a Mutex tag to the sum of all its invalidated token stats.

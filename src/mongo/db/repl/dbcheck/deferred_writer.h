@@ -38,12 +38,12 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -176,7 +176,7 @@ private:
     /**
      * Guards all non-const, non-thread-safe members.
      */
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     /**
      * The number of bytes currently in the in-memory buffer.
@@ -194,7 +194,7 @@ private:
      *
      * Ensures we don't flood the log with such entries.
      */
-    using TimePoint = stdx::chrono::time_point<stdx::chrono::system_clock>;
+    using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
     TimePoint _lastLogged;
     TimePoint _lastLoggedDrop;
 

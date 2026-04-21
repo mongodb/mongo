@@ -30,7 +30,6 @@
 #include "mongo/platform/rwmutex.h"
 
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -39,6 +38,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
 
+#include <mutex>
 #include <shared_mutex>
 #include <vector>
 
@@ -232,7 +232,7 @@ TEST_F(WriteRarelyRWMutexTest, MultiWriter) {
 
 TEST(RWMutex, OneWriterAtAnyTime) {
     RWMutex mutex;
-    stdx::unique_lock lk(mutex);
+    std::unique_lock lk(mutex);
     Atomic<bool> isLockedByMainThread{true};
     ASSERT_FALSE(hasWaiters_forTest(mutex));
     ASSERT_TRUE(isWriteIntentSet_forTest(mutex));
@@ -278,7 +278,7 @@ TEST(RWMutex, WriterWaitsForReader) {
 
 TEST(RWMutex, NewReaderWaitsForWriter) {
     RWMutex mutex;
-    stdx::unique_lock lk(mutex);
+    std::unique_lock lk(mutex);
     ASSERT_FALSE(hasWaiters_forTest(mutex));
 
     unittest::ThreadAssertionMonitor monitor;
@@ -345,7 +345,7 @@ TEST(RWMutex, MultipleReadersAndWriters) {
                     return;
 
                 if (iteration % 1'000 == 0) {
-                    stdx::lock_guard writeLk(mutex);
+                    std::lock_guard writeLk(mutex);
                     ASSERT_EQ(readers.loadRelaxed(), 0);
                     writers.fetchAndAddRelaxed(1);
                     ON_BLOCK_EXIT([&] { writers.fetchAndSubtractRelaxed(1); });

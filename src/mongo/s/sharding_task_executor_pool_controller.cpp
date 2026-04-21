@@ -186,7 +186,7 @@ public:
     }
 
     void onConfirmedSet(const State& state) override {
-        stdx::lock_guard lk(_controller->_mutex);
+        std::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, state.connStr.getSetName());
         _controller->_addGroup(lk, state);
@@ -197,7 +197,7 @@ public:
     }
 
     void onDroppedSet(const Key& key) override {
-        stdx::lock_guard lk(_controller->_mutex);
+        std::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, key);
     }
@@ -212,7 +212,7 @@ void ShardingTaskExecutorPoolController::init(ConnectionPool* parent) {
 }
 
 void ShardingTaskExecutorPoolController::addHost(PoolId id, const HostAndPort& host) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     PoolData poolData;
     poolData.host = host;
@@ -236,7 +236,7 @@ void ShardingTaskExecutorPoolController::addHost(PoolId id, const HostAndPort& h
 }
 auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const PoolMetrics& stats)
     -> HostGroupState {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     auto& poolData = getOrInvariant(_poolDatas, id);
 
@@ -311,7 +311,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const PoolMetrics
 }
 
 void ShardingTaskExecutorPoolController::removeHost(PoolId id) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto it = _poolDatas.find(id);
     if (it == _poolDatas.end()) {
         // It's possible that a host immediately needs to go before it updates even once
@@ -331,7 +331,7 @@ void ShardingTaskExecutorPoolController::removeHost(PoolId id) {
 }
 
 auto ShardingTaskExecutorPoolController::getControls(PoolId id) -> ConnectionControls {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto& poolData = getOrInvariant(_poolDatas, id);
 
     const size_t maxPending = gParameters.maxConnecting.load();

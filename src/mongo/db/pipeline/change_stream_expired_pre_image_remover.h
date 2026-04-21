@@ -33,12 +33,12 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -158,7 +158,7 @@ private:
     /**
      * Protects '_periodicJob', '_nextJobId' and '_isPrimary'.
      */
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     /**
      * State of the currently running periodic job, if active. Otherwise empty.

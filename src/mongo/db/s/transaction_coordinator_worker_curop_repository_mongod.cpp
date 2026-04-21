@@ -86,7 +86,7 @@ public:
              const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
              const CoordinatorAction action) override {
         auto startTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         getTransactionCoordinatorWorkerCurOpInfo(opCtx).emplace(
             TransactionCoordinatorWorkerCurOpInfo(
                 lsid, txnNumberAndRetryCounter, startTime, action));

@@ -35,7 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/latency_distribution.h"
 #include "mongo/util/system_clock_source.h"
@@ -45,6 +44,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 namespace {
@@ -66,7 +66,7 @@ public:
 };
 
 
-static stdx::mutex isReadyMutex;
+static std::mutex isReadyMutex;
 static stdx::condition_variable isReadyCv;
 static bool isReady = false;
 
@@ -77,7 +77,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
     static LatencyPercentileDistribution resultingDistribution(resolution);
     static int numRemainingToMerge;
     {
-        stdx::unique_lock lk(isReadyMutex);
+        std::unique_lock lk(isReadyMutex);
         if (state.thread_index == 0) {
             resultingDistribution = LatencyPercentileDistribution{resolution};
             numRemainingToMerge = state.threads;
@@ -127,7 +127,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
         benchmark::Counter(acquired, benchmark::Counter::kAvgThreadsRate);
     // Merge all latency distributions in order to get the full view of all threads.
     {
-        stdx::unique_lock lk(isReadyMutex);
+        std::unique_lock lk(isReadyMutex);
         opCtx.reset();
         client.reset();
         resultingDistribution = resultingDistribution.mergeWith(localDistribution);

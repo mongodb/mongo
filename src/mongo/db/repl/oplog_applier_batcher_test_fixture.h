@@ -39,7 +39,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
@@ -48,6 +47,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -84,7 +84,7 @@ public:
                            SeekStrategy exact = SeekStrategy::kExact) final;
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _notEmptyCv;
     bool _hasShutDown = false;
     bool _hasStartedUp = false;

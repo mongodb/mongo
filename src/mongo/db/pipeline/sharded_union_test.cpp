@@ -569,7 +569,7 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
 
     auto readConcernArgs = repl::ReadConcernArgs{repl::ReadConcernLevel::kMajorityReadConcern};
     {
-        stdx::lock_guard<Client> lk(*expCtx()->getOperationContext()->getClient());
+        std::lock_guard<Client> lk(*expCtx()->getOperationContext()->getClient());
         repl::ReadConcernArgs::get(expCtx()->getOperationContext()) = readConcernArgs;
     }
     auto future = launchAsync([&] {

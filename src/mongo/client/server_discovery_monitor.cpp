@@ -133,13 +133,13 @@ SingleServerDiscoveryMonitor::SingleServerDiscoveryMonitor(
 }
 
 void SingleServerDiscoveryMonitor::init() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _isShutdown = false;
     _scheduleNextHello(lock, Milliseconds(0));
 }
 
 void SingleServerDiscoveryMonitor::requestImmediateCheck() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
 
@@ -248,7 +248,7 @@ void SingleServerDiscoveryMonitor::_scheduleNextHello(WithLock, Milliseconds del
 }
 
 void SingleServerDiscoveryMonitor::_doRemoteCommand() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
 
@@ -299,7 +299,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
             const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             Milliseconds nextRefreshPeriod;
             {
-                stdx::lock_guard lk(self->_mutex);
+                std::lock_guard lk(self->_mutex);
 
                 if (self->_isShutdown) {
                     self->_helloOutstanding = false;
@@ -349,7 +349,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
             const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             Milliseconds nextRefreshPeriod;
             {
-                stdx::lock_guard lk(self->_mutex);
+                std::lock_guard lk(self->_mutex);
                 self->_helloOutstanding = false;
 
                 if (self->_isShutdown) {
@@ -389,7 +389,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
 }
 
 void SingleServerDiscoveryMonitor::shutdown() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (std::exchange(_isShutdown, true)) {
         return;
     }
@@ -503,7 +503,7 @@ Milliseconds SingleServerDiscoveryMonitor::_currentRefreshPeriod(WithLock,
 }
 
 void SingleServerDiscoveryMonitor::disableExpeditedChecking() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _isExpedited = false;
 }
 
@@ -530,7 +530,7 @@ ServerDiscoveryMonitor::ServerDiscoveryMonitor(
 }
 
 void ServerDiscoveryMonitor::shutdown() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
 
@@ -542,7 +542,7 @@ void ServerDiscoveryMonitor::shutdown() {
 
 void ServerDiscoveryMonitor::onTopologyDescriptionChangedEvent(
     sdam::TopologyDescriptionPtr previousDescription, sdam::TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
 
@@ -617,7 +617,7 @@ std::shared_ptr<executor::TaskExecutor> ServerDiscoveryMonitor::_setupExecutor(
 }
 
 void ServerDiscoveryMonitor::requestImmediateCheck() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
 
@@ -627,7 +627,7 @@ void ServerDiscoveryMonitor::requestImmediateCheck() {
 }
 
 void ServerDiscoveryMonitor::disableExpeditedChecking() {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _disableExpeditedChecking(lock);
 }
 

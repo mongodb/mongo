@@ -995,7 +995,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
     ON_BLOCK_EXIT([&]() {
         results->setNumRecords(_numRecords);
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             _progress.get(lk)->finished();
         }
     });
@@ -1006,7 +1006,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
     const char* curopMessage = "Validate: scanning documents for 'collHash' drill-down";
     const auto totalRecords = coll->getRecordStore()->numRecords();
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
 
@@ -1044,7 +1044,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
          record;
          record = traverseRecordStoreCursor->next(opCtx)) {
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             _progress.get(lk)->hit();
         }
         ++_numRecords;
@@ -1091,7 +1091,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         results->setNumNonCompliantDocuments(nNonCompliantDocuments);
         results->setNumRecords(_numRecords);
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             _progress.get(lk)->finished();
         }
     });
@@ -1100,7 +1100,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
     // In case validation occurs twice and the progress meter persists after index traversal
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         if (_progress.get(lk) && _progress.get(lk)->isActive()) {
             _progress.get(lk)->finished();
         }
@@ -1113,7 +1113,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     const auto totalRecords = coll->getRecordStore()->numRecords();
     const auto rs = coll->getRecordStore();
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
 
@@ -1148,7 +1148,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
          record;
          record = traverseRecordStoreCursor->next(opCtx)) {
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             _progress.get(lk)->hit();
         }
         ++_numRecords;
@@ -1481,7 +1481,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     // The progress meter will be inactive after traversing the record store to allow the
     // message and the total to be set to different values.
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         if (!_progress.get(lk)->isActive()) {
             const char* curopMessage = "Validate: scanning index entries";
             _progress.set(lk,

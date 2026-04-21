@@ -33,7 +33,6 @@
 #include "mongo/db/process_health/fault_facet.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
@@ -42,6 +41,7 @@
 
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -120,7 +120,7 @@ private:
     ClockSource* const _clockSource;
     const Date_t _startTime;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     // We don't need a map by type because we expect to have only few facets.
     // Linear search is much faster, we want to avoid any lock contention here.
     std::deque<FaultFacetPtr> _facets;

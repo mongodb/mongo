@@ -87,7 +87,7 @@ void SingleServerPingMonitor::init() {
 }
 
 void SingleServerPingMonitor::drop() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (std::exchange(_isDropped, true)) {
         return;
     }
@@ -108,7 +108,7 @@ auto SingleServerPingMonitor::_scheduleWorkAt(Date_t when, Callback&& cb) const 
             return;
         }
 
-        stdx::lock_guard lk(anchor->_mutex);
+        std::lock_guard lk(anchor->_mutex);
         if (anchor->_isDropped) {
             LOGV2(7926102,
                   "ServerPingMonitor stopping pings to host because the component was shutdown",
@@ -126,7 +126,7 @@ void SingleServerPingMonitor::_scheduleServerPing() {
             anchor->_doServerPing();
         });
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_isDropped) {
         return;
     }
@@ -171,7 +171,7 @@ void SingleServerPingMonitor::_doServerPing() {
         [anchor = shared_from_this(),
          timer = Timer()](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             {
-                stdx::lock_guard lk(anchor->_mutex);
+                std::lock_guard lk(anchor->_mutex);
                 if (anchor->_isDropped) {
                     LOGV2(7926104,
                           "ServerPingMonitor stopping pings to host because the component was "
@@ -250,7 +250,7 @@ void ServerPingMonitor::shutdown() {
     decltype(_serverPingMonitorMap) serverPingMonitorMap;
     decltype(_executor) executor;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         if (std::exchange(_isShutdown, true)) {
             return;
         }
@@ -269,7 +269,7 @@ void ServerPingMonitor::shutdown() {
 void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                                        const HostAndPort& address,
                                                        const BSONObj reply) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_isShutdown) {
         return;
     }
@@ -295,7 +295,7 @@ void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs
 
 void ServerPingMonitor::onTopologyDescriptionChangedEvent(
     sdam::TopologyDescriptionPtr previousDescription, sdam::TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_isShutdown) {
         return;
     }

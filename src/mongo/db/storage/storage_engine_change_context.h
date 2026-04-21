@@ -34,10 +34,10 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 
 namespace mongo {
 
@@ -68,7 +68,7 @@ public:
     void notifyOpCtxDestroyed() noexcept;
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // Keeps track of opCtxs associated with a storage engine that is being replaced.
     // Protected by _mutex

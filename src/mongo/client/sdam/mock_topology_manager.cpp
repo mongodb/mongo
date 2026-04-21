@@ -50,14 +50,14 @@ bool MockTopologyManager::onServerDescription(const HelloOutcome& helloOutcome) 
 }
 
 std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lock(_mutex);
     return _getTopologyDescriptionWithLock(lock);
 }
 
 void MockTopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {}
 
 void MockTopologyManager::setTopologyDescription(TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lock(_mutex);
     _topologyDescription = newDescription;
 }
 

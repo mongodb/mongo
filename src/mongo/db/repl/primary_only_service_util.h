@@ -38,7 +38,6 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/scoped_task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -46,6 +45,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 
@@ -151,7 +151,7 @@ private:
     virtual void _removeStateDocument(OperationContext* opCtx) = 0;
 
     // Guards the access of the '_completionPromise'.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // Tracks the completion state of the instance.
     SharedPromise<void> _completionPromise;

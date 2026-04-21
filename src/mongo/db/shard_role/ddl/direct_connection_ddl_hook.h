@@ -33,11 +33,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <string>
 
 namespace mongo {
@@ -82,7 +82,7 @@ public:
     stdx::unordered_map<OperationId, int> getOngoingOperations() const;
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     // Tracks the operation ID plus a counter of how many times register has been called for this
     // operation. This allows us to handle multiple calls to onBegin and onEnd for the same op.
     stdx::unordered_map<OperationId, int> _ongoingOps;

@@ -35,7 +35,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -124,9 +123,9 @@ public:
         }
 
         template <class Rep, class Period>
-        T timed_get(const stdx::chrono::duration<Rep, Period>& timeout_duration) {
+        T timed_get(const std::chrono::duration<Rep, Period>& timeout_duration) {
             auto status = _future.wait_for(timeout_duration);
-            ASSERT(status == stdx::future_status::ready);
+            ASSERT(status == std::future_status::ready);
 
             return _future.get();
         }
@@ -156,7 +155,8 @@ public:
      */
     template <typename Lambda>
     FutureHandle<typename std::invoke_result<Lambda>::type> launchAsync(Lambda&& func) const {
-        auto future = async(stdx::launch::async, std::forward<Lambda>(func));
+        //  NOLINTNEXTLINE
+        auto future = async(std::launch::async, std::forward<Lambda>(func));
         return NetworkTestEnv::FutureHandle<typename std::invoke_result<Lambda>::type>{
             std::move(future), _executor, _mockNetwork};
     }

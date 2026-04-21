@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/global_catalog/ddl/sessions_collection_sharded.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 namespace mongo {
 
@@ -60,7 +61,7 @@ private:
 
     // Serialises concurrent calls to setupSessionsCollection so that only one thread performs the
     // sharded operations
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 }  // namespace mongo

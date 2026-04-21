@@ -116,7 +116,7 @@ value::TagValueMaybeOwned ByteCode::genericNewKeyString(ArityType arity,
                 break;
             case value::TypeTags::Date: {
                 auto milliseconds = value::bitcastTo<int64_t>(tagValView.value);
-                auto duration = stdx::chrono::duration<int64_t, std::milli>(milliseconds);
+                auto duration = std::chrono::duration<int64_t, std::milli>(milliseconds);
                 auto date = Date_t::fromDurationSinceEpoch(duration);
                 kb.appendDate(date);
                 break;

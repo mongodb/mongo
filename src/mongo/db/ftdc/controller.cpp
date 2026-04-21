@@ -42,7 +42,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -73,7 +72,7 @@ long long FTDCController::getNumAsyncPeriodicCollectors() {
 }
 
 Status FTDCController::setEnabled(bool enabled) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     if (_path.empty()) {
         return Status(ErrorCodes::FTDCPathNotSet,
@@ -88,18 +87,18 @@ Status FTDCController::setEnabled(bool enabled) {
 }
 
 void FTDCController::setMetadataCaptureFrequency(std::uint64_t freq) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _configTemp.metadataCaptureFrequency = freq;
     _condvar.notify_one();
 }
 
 Milliseconds FTDCController::getPeriod() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     return _configTemp.period;
 }
 
 void FTDCController::setPeriod(Milliseconds millis) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _configTemp.period = millis;
     _condvar.notify_one();
 }
@@ -112,7 +111,7 @@ Status FTDCController::setSampleTimeout(Milliseconds newValue) {
             "featureFlagGaplessFTDC disabled.");
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _configTemp.sampleTimeout = newValue;
     _asyncPeriodicCollectors->updateSampleTimeout(newValue);
     _condvar.notify_one();
@@ -126,7 +125,7 @@ Status FTDCController::setMinThreads(size_t newValue) {
                       "featureFlagGaplessFTDC disabled.");
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     if (newValue > _configTemp.maxThreads) {
         return Status(
             ErrorCodes::BadValue,
@@ -149,7 +148,7 @@ Status FTDCController::setMaxThreads(size_t newValue) {
                       "featureFlagGaplessFTDC disabled.");
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     if (newValue < _configTemp.minThreads) {
         return Status(
             ErrorCodes::BadValue,
@@ -166,31 +165,31 @@ Status FTDCController::setMaxThreads(size_t newValue) {
 }
 
 void FTDCController::setMaxDirectorySizeBytes(std::uint64_t size) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _configTemp.maxDirectorySizeBytes = size;
     _condvar.notify_one();
 }
 
 void FTDCController::setMaxFileSizeBytes(std::uint64_t size) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _configTemp.maxFileSizeBytes = size;
     _condvar.notify_one();
 }
 
 void FTDCController::setMaxSamplesPerArchiveMetricChunk(size_t size) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _configTemp.maxSamplesPerArchiveMetricChunk = size;
     _condvar.notify_one();
 }
 
 void FTDCController::setMaxSamplesPerInterimMetricChunk(size_t size) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     _configTemp.maxSamplesPerInterimMetricChunk = size;
     _condvar.notify_one();
 }
 
 Status FTDCController::setDirectory(const boost::filesystem::path& path) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     if (!_path.empty()) {
         return Status(ErrorCodes::FTDCPathAlreadySet,
@@ -207,14 +206,14 @@ Status FTDCController::setDirectory(const boost::filesystem::path& path) {
 
 void FTDCController::addPeriodicMetadataCollector(
     std::unique_ptr<FTDCCollectorInterface> collector) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     invariant(_state == State::kNotStarted);
 
     _periodicMetadataCollectors.add(std::move(collector));
 }
 
 void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     invariant(_state == State::kNotStarted);
 
     if (feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
@@ -227,7 +226,7 @@ void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface
 }
 
 void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     invariant(_state == State::kNotStarted);
 
     _rotateCollectors.add(std::move(collector));
@@ -235,7 +234,7 @@ void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface
 
 BSONObj FTDCController::getMostRecentPeriodicDocument() {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         return _mostRecentPeriodicDocument.getOwned();
     }
 }
@@ -247,7 +246,7 @@ void FTDCController::triggerRotate() {
 void FTDCController::start(Service* service) {
     const auto initPath = [&] {
         // FTDC is initialized after `TransportLayer`, so avoid a read-after-write on `_path`.
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _path.generic_string();
     }();
     LOGV2(20625, "Initializing full-time diagnostic data capture", "dataDirectory"_attr = initPath);
@@ -256,7 +255,7 @@ void FTDCController::start(Service* service) {
     _thread = stdx::thread([this, service] { doLoop(service); });
 
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
 
         invariant(_state == State::kNotStarted);
         _state = State::kStarted;
@@ -267,7 +266,7 @@ void FTDCController::stop() {
     LOGV2(20626, "Shutting down full-time diagnostic data capture");
 
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
 
         bool started = (_state == State::kStarted);
 
@@ -288,7 +287,7 @@ void FTDCController::stop() {
     _thread.join();
 
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         _state = State::kDone;
     }
 
@@ -312,7 +311,7 @@ void FTDCController::doLoop(Service* service) try {
 
     // Update config
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         _config = _configTemp;
     }
 
@@ -334,7 +333,7 @@ void FTDCController::doLoop(Service* service) try {
 
         // Wait for the next run or signal to shutdown
         {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            std::unique_lock<std::mutex> lock(_mutex);
             MONGO_IDLE_THREAD_BLOCK;
 
             // We ignore spurious wakeups by just doing an iteration of the loop
@@ -369,7 +368,7 @@ void FTDCController::doLoop(Service* service) try {
         // FTDC
         if (!_mgr) {
             const auto path = [&] {
-                stdx::lock_guard lk(_mutex);
+                std::lock_guard lk(_mutex);
                 return _path;
             }();
             auto swMgr = FTDCFileManager::create(&_config, path, &_rotateCollectors, client);
@@ -400,7 +399,7 @@ void FTDCController::doLoop(Service* service) try {
 
             // Store a reference to the most recent document from the periodic collectors
             {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
                 _mostRecentPeriodicDocument = std::get<0>(collectSample);
             }
         } catch (const DBException& e) {

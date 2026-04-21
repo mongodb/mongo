@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex_registry.h"
 
+#include <mutex>
 #include <tuple>
 
 #include <boost/log/detail/fake_mutex.hpp>
@@ -59,10 +59,10 @@ private:
             boost::log::sinks::has_requirement<typename backend_t::frontend_requirements,
                                                boost::log::sinks::concurrent_feeding>::value,
             boost::log::aux::fake_mutex,
-            ObservableMutex<stdx::mutex>>;
+            ObservableMutex<std::mutex>>;
 
         BackendTraits(boost::shared_ptr<backend_t> backend) : _backend(std::move(backend)) {
-            if constexpr (std::is_same_v<decltype(_mutex), ObservableMutex<stdx::mutex>>) {
+            if constexpr (std::is_same_v<decltype(_mutex), ObservableMutex<std::mutex>>) {
                 ObservableMutexRegistry::get().add("logv2::CompositeBackend::BackendTraits::_mutex",
                                                    _mutex);
             }
@@ -125,7 +125,7 @@ private:
     void flushBackend(mutex_t& mutex, backend_t& backend) {
         if constexpr (boost::log::sinks::has_requirement<typename backend_t::frontend_requirements,
                                                          boost::log::sinks::flushing>::value) {
-            stdx::lock_guard lock(mutex);
+            std::lock_guard lock(mutex);
 
             backend.flush();
         }
@@ -149,7 +149,7 @@ private:
     void consumeAt(boost::log::record_view const& rec, string_type const& formatted_string) {
         auto& trait = getTrait<I>();
         if (!trait._filter || trait._filter(rec.attribute_values())) {
-            stdx::lock_guard lock(trait._mutex);
+            std::lock_guard lock(trait._mutex);
 
             trait._backend->consume(rec, formatted_string);
         }

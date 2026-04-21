@@ -142,7 +142,7 @@ AutoStatsTracker::AutoStatsTracker(
         return;
     }
 
-    stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
+    std::lock_guard<Client> clientLock(*_opCtx->getClient());
     CurOp::get(_opCtx)->enter(clientLock, nss, dbProfilingLevel);
 }
 

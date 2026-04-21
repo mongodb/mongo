@@ -35,12 +35,12 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 
@@ -249,10 +249,10 @@ private:
      * _dropMutex. This is used so that markIdentInUse() can avoid returning an ident which is being
      * dropped without having to acquire _dropMutex.
      */
-    mutable stdx::mutex _dropMutex;
+    mutable std::mutex _dropMutex;
 
     // Guards access to member variables below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Untimestamped drop-pending idents. Ordered by drop order.
     std::vector<IdentInfo*> _untimestampedDrops;

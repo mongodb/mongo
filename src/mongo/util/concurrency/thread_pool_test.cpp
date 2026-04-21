@@ -35,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/barrier.h"
@@ -74,36 +73,36 @@ protected:
         }
 
         void block() {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             _workBlocked = true;
             _cv.notify_all();
         }
 
         void unblock() {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             _workBlocked = false;
             _cv.notify_all();
         }
 
         void onWorkStart() {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             ++_workStarted;
             _cv.notify_all();
         }
 
         void pauseWhileBlocked() {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             _cv.wait(lk, [&] { return !_workBlocked; });
         }
 
         int pauseUntilWorkStartedCountAtLeast(int count) {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             _cv.wait(lk, [&] { return _workStarted >= count; });
             return _workStarted;
         }
 
     private:
-        mutable stdx::mutex _mutex;
+        mutable std::mutex _mutex;
         stdx::condition_variable _cv;
         int _workStarted = 0;
         int _workBlocked = true;
@@ -262,7 +261,7 @@ DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
                    "Attempted to join pool.*more than once.*DoubleJoinPool") {
     // This test ensures that the ThreadPool destructor runs while some thread is blocked
     // running ThreadPool::join, to see that double-join is fatal in the pool destructor.
-    stdx::mutex mutex;
+    std::mutex mutex;
     ThreadPool::Options options;
     options.minThreads = 1;
     options.maxThreads = 1;
@@ -271,16 +270,16 @@ DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
     pool.startup();
     ASSERT_EQ(pool.getStats().numThreads, 1);
 
-    stdx::unique_lock lk(mutex);
+    std::unique_lock lk(mutex);
     // Schedule 2 tasks to ensure that independent thread join() is blocked draining the tasks and
     // causing the ThreadPool destructor join to fail due to double-join.
     pool.schedule([&mutex](auto status) {
         ASSERT_OK(status);
-        stdx::lock_guard lk(mutex);
+        std::lock_guard lk(mutex);
     });
     pool.schedule([&mutex](auto status) {
         ASSERT_OK(status);
-        stdx::lock_guard lk(mutex);
+        std::lock_guard lk(mutex);
     });
 
     stdx::thread t{[&] {

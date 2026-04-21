@@ -84,7 +84,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -670,7 +669,7 @@ public:
         ~WriteConcernTagChangesImpl() override = default;
 
         bool reserveDefaultWriteConcernChange() override {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             if (_configWriteConcernTagChanges > 0) {
                 return false;
             }
@@ -679,13 +678,13 @@ public:
         }
 
         void releaseDefaultWriteConcernChange() override {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             invariant(_defaultWriteConcernChanges > 0);
             _defaultWriteConcernChanges--;
         }
 
         bool reserveConfigWriteConcernTagChange() override {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             if (_defaultWriteConcernChanges > 0) {
                 return false;
             }
@@ -694,7 +693,7 @@ public:
         }
 
         void releaseConfigWriteConcernTagChange() override {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             invariant(_configWriteConcernTagChanges > 0);
             _configWriteConcernTagChanges--;
         }
@@ -718,7 +717,7 @@ public:
         size_t _defaultWriteConcernChanges{0};  // (M)
 
         // Used to synchronize access to the above variables.
-        stdx::mutex _mutex;  // (S)
+        std::mutex _mutex;  // (S)
     };
 
     /**
@@ -1215,7 +1214,7 @@ private:
      * When prioritized is set to true, the reporter will try to schedule an updatePosition request
      * even there is already one in flight.
      */
-    void _reportUpstream(stdx::unique_lock<ObservableMutex<stdx::mutex>> lock, bool prioritized);
+    void _reportUpstream(std::unique_lock<ObservableMutex<std::mutex>> lock, bool prioritized);
 
     /**
      * Helpers to set the last written, applied and durable OpTime.
@@ -1530,10 +1529,10 @@ private:
      *
      * Requires "lock" to own _mutex, and returns the same unique_lock.
      */
-    stdx::unique_lock<ObservableMutex<stdx::mutex>> _handleHeartbeatResponseAction(
+    std::unique_lock<ObservableMutex<std::mutex>> _handleHeartbeatResponseAction(
         const HeartbeatResponseAction& action,
         const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> lock);
+        std::unique_lock<ObservableMutex<std::mutex>> lock);
 
     /**
      * Updates the last committed OpTime to be 'committedOpTime' if it is more recent than the
@@ -1820,7 +1819,7 @@ private:
     // (I)  Independently synchronized, see member variable comment.
 
     // Protects member data of this ReplicationCoordinator.
-    mutable ObservableMutex<stdx::mutex> _mutex;  // (S)
+    mutable ObservableMutex<std::mutex> _mutex;  // (S)
 
     // Handles to actively queued heartbeats.
     size_t _maxSeenHeartbeatQSize = 0;

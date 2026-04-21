@@ -848,7 +848,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                                                std::move(pipeline));
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 

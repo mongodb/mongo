@@ -33,10 +33,11 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
+
+#include <mutex>
 
 #include <benchmark/benchmark.h>
 #include <fmt/format.h>
@@ -175,7 +176,7 @@ private:
         return sp;
     }
 
-    static inline stdx::mutex _mu;
+    static inline std::mutex _mu;
     static inline std::weak_ptr<TestEnv> _fixtureWeak;
 
     benchmark::State& _state;

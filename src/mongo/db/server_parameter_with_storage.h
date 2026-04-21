@@ -48,7 +48,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
@@ -197,12 +196,12 @@ struct storage_wrapper<TenantIdMap<U>> {
     storage_wrapper(TenantIdMap<U>& storage) : _storage(storage) {}
 
     void store(const U& value, const boost::optional<TenantId>& id) {
-        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
+        std::lock_guard<std::mutex> lg(_storageMutex);
         _storage[id] = value;
     }
 
     U load(const boost::optional<TenantId>& id) const {
-        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
+        std::lock_guard<std::mutex> lg(_storageMutex);
         auto it = _storage.find(id);
         if (it != _storage.end()) {
             return it->second;
@@ -212,7 +211,7 @@ struct storage_wrapper<TenantIdMap<U>> {
     }
 
     void reset(const boost::optional<TenantId>& id) {
-        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
+        std::lock_guard<std::mutex> lg(_storageMutex);
         _storage.erase(id);
     }
 
@@ -223,7 +222,7 @@ struct storage_wrapper<TenantIdMap<U>> {
     }
 
 private:
-    mutable stdx::mutex _storageMutex;
+    mutable std::mutex _storageMutex;
     TenantIdMap<U>& _storage;
 
     // Copy of original value to be read from during resets.
@@ -240,19 +239,19 @@ struct storage_wrapper {
 
     void store(const U& value, const boost::optional<TenantId>& id) {
         invariant(!id.is_initialized());
-        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
+        std::lock_guard<std::mutex> lg(_storageMutex);
         _storage = value;
     }
 
     U load(const boost::optional<TenantId>& id) const {
         invariant(!id.is_initialized());
-        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
+        std::lock_guard<std::mutex> lg(_storageMutex);
         return _storage;
     }
 
     void reset(const boost::optional<TenantId>& id) {
         invariant(!id.is_initialized());
-        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
+        std::lock_guard<std::mutex> lg(_storageMutex);
         _storage = _defaultValue;
     }
 
@@ -263,7 +262,7 @@ struct storage_wrapper {
     }
 
 private:
-    mutable stdx::mutex _storageMutex;
+    mutable std::mutex _storageMutex;
     U& _storage;
 
     // Copy of original value to be read from during resets.

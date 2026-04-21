@@ -145,7 +145,7 @@ void MozJSScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
 void MozJSScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
     ServiceContext::LockedClientsCursor cursor(&*svcCtxLock);
     while (auto client = cursor.next()) {
-        stdx::lock_guard lk(*client);
+        std::lock_guard lk(*client);
         if (auto opCtx = client->getOperationContext();
             opCtx && (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration]) {
             (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration]->kill();
@@ -196,7 +196,7 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
                 "scope"_attr = reinterpret_cast<uint64_t>(scope),
                 "opId"_attr = opCtx->getOpID());
 
-    stdx::lock_guard lk(*opCtx->getClient());
+    std::lock_guard lk(*opCtx->getClient());
     (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration] = scope;
 
     if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
@@ -211,7 +211,7 @@ void MozJSScriptEngine::unregisterOperation(OperationContext* opCtx) {
                 "scope"_attr = reinterpret_cast<uint64_t>(this),
                 "opId"_attr = opCtx->getOpID());
 
-    stdx::lock_guard lk(*opCtx->getClient());
+    std::lock_guard lk(*opCtx->getClient());
     (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration] = nullptr;
 }
 

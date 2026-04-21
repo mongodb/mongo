@@ -119,7 +119,7 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
     // If the collection doesn't already exist, create it.
     _createCollection(opCtx);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     // If we are starting from an existing collection, we must populate the in memory state of the
     // buffer.
     _size = uassertStatusOK(_storageInterface->getCollectionSize(opCtx, _nss));
@@ -152,7 +152,7 @@ void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock lk
 
 void OplogBufferCollection::shutdown(OperationContext* opCtx) {
     if (_options.dropCollectionAtShutdown) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _dropCollection(opCtx);
         _size = 0;
         _count = 0;
@@ -169,7 +169,7 @@ void OplogBufferCollection::push(OperationContext* opCtx,
     if (begin == end) {
         return;
     }
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     // Make sure timestamp order is correct.
     auto ts = _lastPushedTimestamp;
     std::for_each(begin, end, [&ts](const Value& value) {
@@ -193,11 +193,11 @@ void OplogBufferCollection::preload(OperationContext* opCtx,
     }
 
     ScopeGuard failToPreloadGuard([this] {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         _lastPushedTimestamp = kInvalidLastPushedTimestamp;
     });
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     invariant(_lastPoppedKey.isEmpty());
     _push(lk, opCtx, begin, end);
     _updateLastPushedTimestampFromCollection(lk, opCtx);
@@ -251,23 +251,23 @@ void OplogBufferCollection::_push(WithLock,
 void OplogBufferCollection::waitForSpace(OperationContext* opCtx, const Cost& cost) {}
 
 bool OplogBufferCollection::isEmpty() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _count == 0;
 }
 
 std::size_t OplogBufferCollection::getSize() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     uassert(4940100, "getSize() called on OplogBufferCollection after seek", _sizeIsValid);
     return _size;
 }
 
 std::size_t OplogBufferCollection::getCount() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _count;
 }
 
 void OplogBufferCollection::clear(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     // We acquire the appropriate locks for the temporary oplog buffer collection here,
     // so that we perform the drop and create under the same locks.
     AutoGetCollection autoColl(opCtx, NamespaceString::kDefaultOplogCollectionNamespace, MODE_X);
@@ -282,7 +282,7 @@ void OplogBufferCollection::clear(OperationContext* opCtx) {
 }
 
 bool OplogBufferCollection::tryPop(OperationContext* opCtx, Value* value) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (_count == 0) {
         return false;
     }
@@ -291,7 +291,7 @@ bool OplogBufferCollection::tryPop(OperationContext* opCtx, Value* value) {
 
 bool OplogBufferCollection::waitForDataFor(Milliseconds waitDuration,
                                            Interruptible* interruptible) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     if (!interruptible->waitForConditionOrInterruptFor(
             _cvNoLongerEmpty, lk, waitDuration, [&]() { return _count != 0; })) {
         return false;
@@ -300,7 +300,7 @@ bool OplogBufferCollection::waitForDataFor(Milliseconds waitDuration,
 }
 
 bool OplogBufferCollection::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
     if (!interruptible->waitForConditionOrInterruptUntil(
             _cvNoLongerEmpty, lk, deadline, [&]() { return _count != 0; })) {
         return false;
@@ -309,7 +309,7 @@ bool OplogBufferCollection::waitForDataUntil(Date_t deadline, Interruptible* int
 }
 
 bool OplogBufferCollection::peek(OperationContext* opCtx, Value* value) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     if (_count == 0) {
         return false;
     }
@@ -319,7 +319,7 @@ bool OplogBufferCollection::peek(OperationContext* opCtx, Value* value) {
 
 boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
     OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     auto lastDocumentPushed = _lastDocumentPushed(lk, opCtx);
     if (lastDocumentPushed) {
         BSONObj entryObj = extractEmbeddedOplogDocument(*lastDocumentPushed);
@@ -351,7 +351,7 @@ StatusWith<OplogBuffer::Value> OplogBufferCollection::findByTimestamp(OperationC
 Status OplogBufferCollection::seekToTimestamp(OperationContext* opCtx,
                                               const Timestamp& ts,
                                               SeekStrategy exact) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     BSONObj docWithTimestamp;
     auto docWithStatus = _getDocumentWithTimestamp(opCtx, ts);
     if (docWithStatus.isOK()) {
@@ -482,13 +482,13 @@ void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
 }
 
 Timestamp OplogBufferCollection::getLastPoppedTimestamp_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _lastPoppedKey.isEmpty() ? Timestamp()
                                     : _lastPoppedKey[""].Obj()[kTimestampFieldName].timestamp();
 }
 
 std::queue<BSONObj> OplogBufferCollection::getPeekCache_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _peekCache;
 }
 

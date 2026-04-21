@@ -44,10 +44,10 @@
 #include "mongo/db/topology/user_write_block/block_replica_set_writes_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <mutex>
 #include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -82,7 +82,7 @@ public:
                     repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
 
             // Only one attempt to change whether writes are blocked may make progress at once
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             {
                 if (MONGO_unlikely(hangInBlockReplicaSetWritesCommand.shouldFail())) {
                     LOGV2(12096400, "hangInBlockReplicaSetWritesCommand failpoint enabled");
@@ -131,7 +131,7 @@ public:
                             ActionType::blockReplicaSetWrites}));
         }
 
-        stdx::mutex _mutex;
+        std::mutex _mutex;
     };
 };
 MONGO_REGISTER_COMMAND(BlockReplicaSetWritesCommand)

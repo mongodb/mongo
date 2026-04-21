@@ -56,7 +56,7 @@ LogicalSessionIdSet ServiceLiaisonImpl::getActiveOpSessions() const {
     for (ServiceContext::LockedClientsCursor cursor(getGlobalServiceContext());
          Client* client = cursor.next();) {
 
-        stdx::lock_guard<Client> lk(*client);
+        std::lock_guard<Client> lk(*client);
         auto clientOpCtx = client->getOperationContext();
 
         // Ignore clients without currently-running operations
@@ -82,14 +82,14 @@ void ServiceLiaisonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
     jobAnchor.start();
 
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _jobs.push_back(std::move(jobAnchor));
     }
 }
 
 void ServiceLiaisonImpl::join() {
     auto jobs = [&] {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return std::exchange(_jobs, {});
     }();
 }

@@ -31,10 +31,10 @@
 
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 
 MONGO_MOD_PUBLIC;
 
@@ -62,7 +62,7 @@ public:
 
 private:
     // protects _maxOperationTime
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     LogicalTime _maxOperationTime;
 };
 

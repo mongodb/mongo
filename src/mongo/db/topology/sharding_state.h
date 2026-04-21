@@ -36,9 +36,9 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -156,7 +156,7 @@ private:
 
     // Mutex which only protects the setting of the cluster recovery promise below. This happens at
     // most once for the lifetime of a process, so this mutex is never contended.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Promise/future pair which will be set when the recovery of the shard role completes
     SharedPromise<RecoveredClusterRole> _awaitClusterRoleRecoveryPromise;

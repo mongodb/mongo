@@ -123,24 +123,24 @@ BucketStateRegistry::BucketStateRegistry(tracking::Context& trackingContext)
       clearedSets(tracking::make_map<Era, tracking::vector<UUID>>(trackingContext)) {}
 
 BucketStateRegistry::Era getCurrentEra(const BucketStateRegistry& registry) {
-    stdx::lock_guard lk{registry.mutex};
+    std::lock_guard lk{registry.mutex};
     return registry.currentEra;
 }
 
 BucketStateRegistry::Era getCurrentEraAndIncrementBucketCount(BucketStateRegistry& registry) {
-    stdx::lock_guard lk{registry.mutex};
+    std::lock_guard lk{registry.mutex};
     incrementEraCountHelper(registry, registry.currentEra);
     return registry.currentEra;
 }
 
 void decrementBucketCountForEra(BucketStateRegistry& registry, BucketStateRegistry::Era value) {
-    stdx::lock_guard lk{registry.mutex};
+    std::lock_guard lk{registry.mutex};
     decrementEraCountHelper(registry, value);
 }
 
 BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
                                               const BucketStateRegistry::Era value) {
-    stdx::lock_guard lk{registry.mutex};
+    std::lock_guard lk{registry.mutex};
     auto it = registry.bucketsPerEra.find(value);
     if (it == registry.bucketsPerEra.end()) {
         return 0;
@@ -151,18 +151,18 @@ BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
 
 void clearSetOfBuckets(BucketStateRegistry& registry,
                        tracking::vector<UUID> clearedCollectionUUIDs) {
-    stdx::lock_guard lk{registry.mutex};
+    std::lock_guard lk{registry.mutex};
     registry.clearedSets[++registry.currentEra] = std::move(clearedCollectionUUIDs);
 }
 
 std::uint64_t getClearedSetsCount(const BucketStateRegistry& registry) {
-    stdx::lock_guard lk{registry.mutex};
+    std::lock_guard lk{registry.mutex};
     return registry.clearedSets.size();
 }
 
 boost::optional<std::variant<BucketState, DirectWriteCounter>> materializeAndGetBucketState(
     BucketStateRegistry& registry, Bucket* bucket) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     // If the bucket has been cleared, we will set the bucket state accordingly to reflect that.
     if (isMemberOfClearedSet(registry, catalogLock, bucket)) {
@@ -179,7 +179,7 @@ boost::optional<std::variant<BucketState, DirectWriteCounter>> materializeAndGet
 
 boost::optional<std::variant<BucketState, DirectWriteCounter>> getBucketState(
     BucketStateRegistry& registry, const BucketId& bucketId) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     auto it = registry.bucketStates.find(bucketId);
     if (it == registry.bucketStates.end()) {
@@ -227,7 +227,7 @@ Status initializeBucketState(BucketStateRegistry& registry,
                              const BucketId& bucketId,
                              const boost::optional<BucketStateRegistry::Era>& targetEra,
                              Bucket* bucket) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     // Returns a WriteConflict error if the target Era is older than the registry Era or if the
     // 'bucket' is cleared.
@@ -262,7 +262,7 @@ Status initializeBucketState(BucketStateRegistry& registry,
 StateChangeSuccessful prepareBucketState(BucketStateRegistry& registry,
                                          const BucketId& bucketId,
                                          Bucket* bucket) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     if (bucket && isMemberOfClearedSet(registry, catalogLock, bucket)) {
         markIndividualBucketCleared(registry, catalogLock, bucketId);
@@ -287,7 +287,7 @@ StateChangeSuccessful prepareBucketState(BucketStateRegistry& registry,
 StateChangeSuccessful unprepareBucketState(BucketStateRegistry& registry,
                                            const BucketId& bucketId,
                                            Bucket* bucket) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     if (bucket && isMemberOfClearedSet(registry, catalogLock, bucket)) {
         markIndividualBucketCleared(registry, catalogLock, bucketId);
@@ -316,7 +316,7 @@ std::variant<BucketState, DirectWriteCounter> addDirectWrite(
     BucketStateRegistry& registry,
     const BucketId& bucketId,
     const ContinueTrackingBucket continueTrackingBucket) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     auto it = registry.bucketStates.find(bucketId);
     DirectWriteCounter newDirectWriteCount = 1;
@@ -354,7 +354,7 @@ std::variant<BucketState, DirectWriteCounter> addDirectWrite(
 }
 
 void removeDirectWrite(BucketStateRegistry& registry, const BucketId& bucketId) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     auto it = registry.bucketStates.find(bucketId);
     invariant(it != registry.bucketStates.end());
@@ -384,12 +384,12 @@ void removeDirectWrite(BucketStateRegistry& registry, const BucketId& bucketId) 
 }
 
 void clearBucketState(BucketStateRegistry& registry, const BucketId& bucketId) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
     markIndividualBucketCleared(registry, catalogLock, bucketId);
 }
 
 void stopTrackingBucketState(BucketStateRegistry& registry, const BucketId& bucketId) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
     auto it = registry.bucketStates.find(bucketId);
     if (it == registry.bucketStates.end()) {
         return;
@@ -412,7 +412,7 @@ void stopTrackingBucketState(BucketStateRegistry& registry, const BucketId& buck
 }
 
 void freezeBucket(BucketStateRegistry& registry, const BucketId& bucketId) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     auto it = registry.bucketStates.find(bucketId);
     if (it == registry.bucketStates.end()) {
@@ -424,7 +424,7 @@ void freezeBucket(BucketStateRegistry& registry, const BucketId& bucketId) {
 }
 
 void appendStats(const BucketStateRegistry& registry, BSONObjBuilder& base) {
-    stdx::lock_guard catalogLock{registry.mutex};
+    std::lock_guard catalogLock{registry.mutex};
 
     BSONObjBuilder builder{base.subobjStart("stateManagement")};
 

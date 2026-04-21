@@ -42,7 +42,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -50,6 +49,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -215,7 +215,7 @@ private:
     std::unique_ptr<txn::AsyncWorkScheduler> _sendPrepareScheduler;
 
     // Protects the state below
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Tracks which step of the 2PC coordination is currently (or was most recently) executing
     Step _step{Step::kInactive};

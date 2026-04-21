@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
-
 #include <cstddef>
 #include <deque>
 #include <memory>
@@ -105,7 +103,7 @@ public:
      * @returns  The index of the new pointer element
      */
     size_t add(ElementType ptr) {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
 
         _data.emplace_back(std::move(ptr));
         return _data.size() - 1;
@@ -115,7 +113,7 @@ public:
      * Returns an element at the given index within the list
      */
     ElementType at(size_t index) const {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
 
         if (index >= _data.size()) {
             // If index is past our synchronized end on the deque, then indexing it will be UB.
@@ -129,7 +127,7 @@ public:
      * Return the total number of elements in this list
      */
     size_t size() const {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
 
         return _data.size();
     }
@@ -138,7 +136,7 @@ public:
      * Return a copy of the underlying data structure
      */
     DataType data() const {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
 
         return _data;
     }
@@ -154,7 +152,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _m;
+    mutable std::mutex _m;
     DataType _data;
 };
 

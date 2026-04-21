@@ -42,7 +42,6 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -50,6 +49,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -304,7 +304,7 @@ private:
      * entry corresponds to a write against the chunk range being migrated, adds the oplog entry or
      * its inner oplog entries (for applyOps) to '_unprocessedNewWriteOplogBuffer'.
      */
-    void _tryFetchNextNewWriteOplog(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
+    void _tryFetchNextNewWriteOplog(std::unique_lock<std::mutex>& lk, OperationContext* opCtx);
 
     /**
      * If there is no stashed '_lastFetchedOplog', looks for the next opTime in
@@ -341,7 +341,7 @@ private:
 
     // Protects _sessionOplogIterators, _currentOplogIterator, _lastFetchedOplog,
     // _lastFetchedOplogImage and _unprocessedOplogBuffer.
-    stdx::mutex _sessionCloneMutex;
+    std::mutex _sessionCloneMutex;
 
     // List of remaining session records that needs to be cloned.
     std::vector<std::unique_ptr<SessionOplogIterator>> _sessionOplogIterators;
@@ -363,7 +363,7 @@ private:
 
     // Protects _newWriteOpTimeList, _lastFetchedNewWriteOplog, _lastFetchedNewWriteOplogImage,
     // _unprocessedNewWriteOplogBuffer, _state, _newOplogNotification.
-    stdx::mutex _newOplogMutex;
+    std::mutex _newOplogMutex;
 
     // The average size of documents in config.transactions.
     uint64_t _averageSessionDocSize{0};

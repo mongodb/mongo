@@ -1224,7 +1224,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
 
     ProgressMeterHolder pm;
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         pm.set(lk,
                CurOp::get(opCtx)->setProgress(
                    lk, _progressMessage, _keysInserted, 3 /* secondsBetween */),
@@ -1345,7 +1345,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         }
 
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             // If we're here either it's a dup and we're cool with it or the addKey went
             // just fine.
             pm.get(lk)->hit();
@@ -1353,7 +1353,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
     }
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         pm.get(lk)->finished();
     }
 

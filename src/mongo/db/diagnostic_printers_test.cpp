@@ -91,12 +91,12 @@ public:
     }
 
     void setMockCmdOnCurOp() {
-        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        std::lock_guard<Client> clientLock(*opCtx()->getClient());
         curOp()->setGenericOpRequestDetails(clientLock, _nss, &_cmd, _cmdBson, NetworkOp::dbQuery);
     }
 
     void setCmdOnCurOp(Command* cmdObj, const BSONObj& cmdBson) {
-        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        std::lock_guard<Client> clientLock(*opCtx()->getClient());
         curOp()->setGenericOpRequestDetails(clientLock, _nss, cmdObj, cmdBson, NetworkOp::dbQuery);
     }
 
@@ -119,7 +119,7 @@ TEST_F(DiagnosticPrinterTest, IsIneligibleForPrintingWhenOpCtxIsNull) {
 TEST_F(DiagnosticPrinterTest, IsIneligibleForPrintingWhenCurOpIsIneligible) {
     setMockCmdOnCurOp();
     {
-        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        std::lock_guard<Client> clientLock(*opCtx()->getClient());
         curOp()->setShouldOmitDiagnosticInformation(clientLock, true);
     }
     ASSERT_EQ(diagnostic_printers::kOmitUnsupportedCurOpMsg,
@@ -171,7 +171,7 @@ TEST_F(DiagnosticPrinterTest, PrinterOmitsAllFieldsWhenRequested) {
     // fields.
     setMockCmdOnCurOp();
     {
-        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        std::lock_guard<Client> clientLock(*opCtx()->getClient());
         curOp()->setShouldOmitDiagnosticInformation(clientLock, true);
     }
     ASSERT_EQ(diagnostic_printers::kOmitUnsupportedCurOpMsg, printCurOpDiagnostics());

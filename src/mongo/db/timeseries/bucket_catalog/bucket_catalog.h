@@ -44,7 +44,6 @@
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tracking/btree_map.h"
 #include "mongo/util/tracking/flat_hash_set.h"
@@ -58,6 +57,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
@@ -110,7 +110,7 @@ using InsertWaiter = std::variant<std::shared_ptr<WriteBatch>, std::shared_ptr<R
  */
 struct Stripe {
     // All access to a stripe should happen while 'mutex' is locked.
-    mutable stdx::mutex mutex;
+    mutable std::mutex mutex;
 
     // All buckets currently open in the catalog, including buckets which are full or pending
     // closure but not yet committed, indexed by BucketId. Owning pointers.
@@ -176,7 +176,7 @@ public:
     // Per-namespace execution stats. This map is protected by 'mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the
     // lock. The object itself is thread-safe (using atomics).
-    mutable stdx::mutex mutex;
+    mutable std::mutex mutex;
     tracking::unordered_map<UUID, tracking::shared_ptr<ExecutionStats>> executionStats;
 
     // Global execution stats used to report aggregated metrics in server status.
@@ -430,7 +430,7 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
     Stripe& stripe,
-    stdx::unique_lock<stdx::mutex>& stripeLock,
+    std::unique_lock<std::mutex>& stripeLock,
     const Collection* bucketsColl,
     const BucketKey& bucketKey,
     const Date_t& time,
@@ -455,7 +455,7 @@ StatusWith<Bucket*> potentiallyReopenBucket(
 Bucket& getEligibleBucket(OperationContext* opCtx,
                           BucketCatalog& catalog,
                           Stripe& stripe,
-                          stdx::unique_lock<stdx::mutex>& stripeLock,
+                          std::unique_lock<std::mutex>& stripeLock,
                           const Collection* bucketsColl,
                           const BSONObj& measurement,
                           const BucketKey& bucketKey,

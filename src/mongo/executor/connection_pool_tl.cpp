@@ -132,7 +132,7 @@ void TLTypeFactory::shutdown() {
     // Stop any attempt to schedule timers in the future
     _inShutdown.store(true);
 
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
 
     stdx::unordered_map<std::string, int> counts;
     for (const Type* collar : _collars) {
@@ -149,12 +149,12 @@ void TLTypeFactory::shutdown() {
 }
 
 void TLTypeFactory::fasten(Type* type) {
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
     _collars.insert(type);
 }
 
 void TLTypeFactory::release(Type* type) {
-    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
+    std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
     _collars.erase(type);
 
     type->_wasReleased = true;
@@ -446,7 +446,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
         .then([this, helloHook, instanceName = std::move(instanceName)](
                   std::shared_ptr<AsyncDBClient> client) {
             {
-                stdx::lock_guard lk(_clientMutex);
+                std::lock_guard lk(_clientMutex);
                 _client = std::move(client);
             }
             return _client->initWireVersion(instanceName, helloHook.get());
@@ -566,7 +566,7 @@ Date_t TLConnection::now() {
 
 void TLConnection::cancel(bool endClient) {
     auto client = [&] {
-        stdx::lock_guard lk(_clientMutex);
+        std::lock_guard lk(_clientMutex);
         return _client;
     }();
 

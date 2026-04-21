@@ -107,7 +107,7 @@ const auto getClientState = Client::declareDecoration<ClientState>();
 
 OperationId OperationIdManager::issueForClient(Client* client) {
     auto getLease = [this, client](Lease* oldLease) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         auto lease = _pool->lease(lk);
         VERIFY_LEASE_START(lease.start, _leaseStartBitMask);
 
@@ -150,7 +150,7 @@ void OperationIdManager::eraseClientFromMap(Client* client) {
 }
 
 ClientLock OperationIdManager::findAndLockClient(OperationId id) const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto it = _clientByOperationId.find(id & _leaseStartBitMask);
     if (it == _clientByOperationId.end()) {
         return {};

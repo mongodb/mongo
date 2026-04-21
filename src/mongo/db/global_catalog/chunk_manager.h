@@ -700,7 +700,7 @@ using RoutingTableHistoryCache MONGO_MOD_UNFORTUNATELY_OPEN =
     ReadThroughCache<NamespaceString,
                      OptionalRoutingTableHistory,
                      ComparableChunkVersion,
-                     ObservableMutex<stdx::mutex>>;
+                     ObservableMutex<std::mutex>>;
 using RoutingTableHistoryValueHandle MONGO_MOD_NEEDS_REPLACEMENT =
     RoutingTableHistoryCache::ValueHandle;
 

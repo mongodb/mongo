@@ -293,7 +293,7 @@ void RangeDeleterService::_stopService() {
     _activeTerm.reset();
 
     if (_initOpCtxHolder) {
-        stdx::lock_guard<Client> lk(*_initOpCtxHolder->getClient());
+        std::lock_guard<Client> lk(*_initOpCtxHolder->getClient());
         _initOpCtxHolder->markKilled(ErrorCodes::Interrupted);
     }
 

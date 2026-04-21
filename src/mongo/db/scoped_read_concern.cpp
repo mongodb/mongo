@@ -45,12 +45,12 @@ ScopedReadConcern::ScopedReadConcern(OperationContext* opCtx,
         _originalReadTimestamp =
             shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
 
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    std::lock_guard<Client> lk(*_opCtx->getClient());
     repl::ReadConcernArgs::get(opCtx) = requestReadConcernArgs;
 }
 
 ScopedReadConcern::~ScopedReadConcern() {
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    std::lock_guard<Client> lk(*_opCtx->getClient());
     repl::ReadConcernArgs::get(_opCtx) = _originalRCA;
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
         shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(_originalReadSource,

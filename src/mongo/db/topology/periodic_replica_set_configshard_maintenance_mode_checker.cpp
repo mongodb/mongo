@@ -50,12 +50,12 @@ auto PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(ServiceContext* se
 }
 
 auto PeriodicReplicaSetConfigShardMaintenanceModeChecker::operator*() const -> PeriodicJobAnchor& {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return *_anchor;
 }
 
 auto PeriodicReplicaSetConfigShardMaintenanceModeChecker::operator->() const -> PeriodicJobAnchor* {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _anchor.get();
 }
 
@@ -64,7 +64,7 @@ PeriodicReplicaSetConfigShardMaintenanceModeChecker::operator bool() const {
 }
 
 void PeriodicReplicaSetConfigShardMaintenanceModeChecker::_init(ServiceContext* serviceContext) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (_anchor) {
         return;
     }

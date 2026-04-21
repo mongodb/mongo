@@ -58,7 +58,7 @@ RangeDeletionRecoveryTracker::RangeDeletionRecoveryTracker() {
 }
 
 void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {
-    stdx::lock_guard guard(_mutex);
+    std::lock_guard guard(_mutex);
     auto state = getStateForTerm(guard, term);
     if (!state) {
         return;
@@ -71,7 +71,7 @@ void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {
 }
 
 void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term) {
-    stdx::lock_guard guard(_mutex);
+    std::lock_guard guard(_mutex);
     auto state = getStateForTerm(guard, term);
     if (!state) {
         return;
@@ -87,7 +87,7 @@ void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term) {
 }
 
 void RangeDeletionRecoveryTracker::notifyEndOfTerm(Term term) {
-    stdx::lock_guard guard(_mutex);
+    std::lock_guard guard(_mutex);
     if (_highestEndedTerm.has_value()) {
         _highestEndedTerm = std::max(*_highestEndedTerm, term);
     } else {
@@ -97,7 +97,7 @@ void RangeDeletionRecoveryTracker::notifyEndOfTerm(Term term) {
 }
 
 SharedSemiFuture<Outcome> RangeDeletionRecoveryTracker::getRecoveryFuture(Term term) {
-    stdx::lock_guard guard(_mutex);
+    std::lock_guard guard(_mutex);
     auto state = getStateForTerm(guard, term);
     if (!state) {
         return {Outcome::kUnknown};
@@ -106,7 +106,7 @@ SharedSemiFuture<Outcome> RangeDeletionRecoveryTracker::getRecoveryFuture(Term t
 }
 
 size_t RangeDeletionRecoveryTracker::getTrackedTermsCount() const {
-    stdx::lock_guard guard(_mutex);
+    std::lock_guard guard(_mutex);
     return _termStates.size();
 }
 

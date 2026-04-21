@@ -46,7 +46,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -99,21 +98,21 @@ private:
     ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
     /* Acquire mutex only if service is up (for "user" operation) */
-    [[nodiscard]] stdx::unique_lock<stdx::mutex> _acquireMutexFailIfServiceNotUp() {
-        stdx::unique_lock<stdx::mutex> lg(_mutex_DO_NOT_USE_DIRECTLY);
+    [[nodiscard]] std::unique_lock<std::mutex> _acquireMutexFailIfServiceNotUp() {
+        std::unique_lock<std::mutex> lg(_mutex_DO_NOT_USE_DIRECTLY);
         uassert(ErrorCodes::NotYetInitialized, "Range deleter service not up", _state == kUp);
         return lg;
     }
 
     /* Unconditionally acquire mutex (for internal operations) */
-    [[nodiscard]] stdx::unique_lock<stdx::mutex> _acquireMutexUnconditionally() {
-        stdx::unique_lock<stdx::mutex> lg(_mutex_DO_NOT_USE_DIRECTLY);
+    [[nodiscard]] std::unique_lock<std::mutex> _acquireMutexUnconditionally() {
+        std::unique_lock<std::mutex> lg(_mutex_DO_NOT_USE_DIRECTLY);
         return lg;
     }
 
     // Protecting the access to all class members (DO NOT USE DIRECTLY: rely on
     // `_acquireMutexUnconditionally` and `_acquireMutexFailIfServiceNotUp`)
-    stdx::mutex _mutex_DO_NOT_USE_DIRECTLY;
+    std::mutex _mutex_DO_NOT_USE_DIRECTLY;
 
 public:
     void registerRecoveryJob(long long term);

@@ -30,7 +30,6 @@
 #include "mongo/util/concurrency/lock_free_read_list.h"
 
 #include "mongo/platform/atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/system_tick_source.h"
@@ -39,6 +38,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <mutex>
 
 #include <benchmark/benchmark.h>
 
@@ -58,24 +58,24 @@ public:
     using Iterator = typename ListType::iterator;
 
     Iterator add(T data) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _list.insert(_list.begin(), data);
     }
 
     void remove(Iterator iterator) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _list.erase(iterator);
     }
 
     void forEach(std::function<void(T)> callback) const {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         for (auto it = _list.begin(); it != _list.end(); ++it) {
             callback(*it);
         }
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     ListType _list;
 };
 
@@ -109,7 +109,7 @@ public:
     static constexpr size_t kListLength = 2048;
 
     void setUp() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (_threads++ == 0) {
             // Make sure the list is not empty when we start running the benchmark. These are
             // basically immutable entries that are never removed while the benchmark is running.
@@ -123,7 +123,7 @@ public:
     }
 
     void finalize(benchmark::State& state) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (--_threads == 0) {
             const auto stoppedAt = _tickSource->getTicks();
             const auto microseconds = durationCount<Microseconds>(
@@ -194,7 +194,7 @@ private:
     Atomic<size_t> _totalObserved;
     Atomic<size_t> _totalUpdated;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     size_t _threads;
     TickSource::Tick _startedAt;
 };

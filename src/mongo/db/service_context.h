@@ -38,7 +38,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
@@ -145,7 +144,7 @@ private:
 
 template <typename T>
 auto makeLockHandleForObjectLock(T* object) {
-    return stdx::unique_lock(*object);
+    return std::unique_lock(*object);
 }
 
 /**
@@ -176,7 +175,7 @@ public:
     }
 
 private:
-    stdx::unique_lock<MutexType> _lk;
+    std::unique_lock<MutexType> _lk;
     T* _object{};
 };
 }  // namespace service_context_detail
@@ -192,7 +191,7 @@ public:
  * block normal server operations.
  */
 using ServiceContextLock =
-    service_context_detail::ObjectLock<ServiceContext, ObservableMutex<stdx::mutex>>;
+    service_context_detail::ObjectLock<ServiceContext, ObservableMutex<std::mutex>>;
 
 /**
  * Classes that implement this interface can receive notification on killOp.
@@ -785,7 +784,7 @@ public:
      * `ServiceContext` as it will block normal server operations.
      */
     friend auto makeLockHandleForObjectLock(ServiceContext* svcCtx) {
-        return stdx::unique_lock(svcCtx->_mutex);
+        return std::unique_lock(svcCtx->_mutex);
     }
 
 private:
@@ -820,7 +819,7 @@ private:
      */
     void _delistOperation(OperationContext* opCtx);
 
-    ObservableMutex<stdx::mutex> _mutex;
+    ObservableMutex<std::mutex> _mutex;
 
     /**
      * The periodic runner.

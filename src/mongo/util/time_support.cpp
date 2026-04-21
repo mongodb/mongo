@@ -98,11 +98,11 @@ Date_t Date_t::now() {
     return fromMillisSinceEpoch(curTime);
 }
 
-Date_t::Date_t(stdx::chrono::system_clock::time_point tp)
-    : millis(durationCount<Milliseconds>(tp - stdx::chrono::system_clock::from_time_t(0))) {}
+Date_t::Date_t(std::chrono::system_clock::time_point tp)
+    : millis(durationCount<Milliseconds>(tp - std::chrono::system_clock::from_time_t(0))) {}
 
-stdx::chrono::system_clock::time_point Date_t::toSystemTimePoint() const {
-    return stdx::chrono::system_clock::from_time_t(0) + toDurationSinceEpoch().toSystemDuration();
+std::chrono::system_clock::time_point Date_t::toSystemTimePoint() const {
+    return std::chrono::system_clock::from_time_t(0) + toDurationSinceEpoch().toSystemDuration();
 }
 
 bool Date_t::isFormattable() const {
@@ -578,7 +578,7 @@ int Backoff::getNextSleepMillis(long long lastSleepMillis,
 
 #ifdef _WIN32  // no gettimeofday on windows
 unsigned long long curTimeMillis64() {
-    using stdx::chrono::system_clock;
+    using std::chrono::system_clock;
     return static_cast<unsigned long long>(
         durationCount<Milliseconds>(system_clock::now() - system_clock::from_time_t(0)));
 }

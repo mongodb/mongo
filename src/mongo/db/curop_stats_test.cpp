@@ -37,9 +37,10 @@
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <mutex>
 namespace mongo {
 
 namespace {
@@ -489,7 +490,7 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
         tickSource()->advance(waitForExecutionTicket);
         executionTime += waitForExecutionTicket;
 
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         curop->reportState(&builder, sc);
     }
     auto bsonObj = builder.done();

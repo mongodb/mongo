@@ -101,7 +101,7 @@ private:
 private:
     // Serves as a source for the return value of getCacheGeneration(). Refer to this method for
     // more details.
-    stdx::mutex _cacheGenerationMutex;
+    std::mutex _cacheGenerationMutex;
     OID _cacheGeneration{OID::gen()};
 
     /**
@@ -124,7 +124,7 @@ private:
                              const UserRequest& userReq,
                              const SharedUserAcquisitionStats& userAcquisitionStats);
 
-        stdx::mutex _mutex;
+        std::mutex _mutex;
 
         AuthorizationRouter* _authzRouter;
     } _userCache;

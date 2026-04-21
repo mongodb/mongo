@@ -101,7 +101,6 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/transport_layer.h"
@@ -125,6 +124,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version/releases.h"
+
+#include <mutex>
 
 #include <boost/thread/exceptions.hpp>
 
@@ -188,7 +189,7 @@ public:
     void consume(boost::log::record_view const& rec, string_type const& formatted_message) {
         using boost::log::extract;
 
-        auto lk = stdx::lock_guard(mx);
+        auto lk = std::lock_guard(mx);
         if (!loggingEnabled &&
             !extract<logv2::LogTag>(logv2::attributes::tags(), rec)
                  .get()
@@ -210,20 +211,20 @@ public:
 
 private:
     static void enableLogging() {
-        auto lk = stdx::lock_guard(mx);
+        auto lk = std::lock_guard(mx);
         invariant(!loggingEnabled);
         loggingEnabled = true;
     }
 
     static void disableLogging() {
-        auto lk = stdx::lock_guard(mx);
+        auto lk = std::lock_guard(mx);
         invariant(loggingEnabled);
         loggingEnabled = false;
     }
 
     // This needs to use a mutex rather than an atomic bool because we need to ensure that no more
     // logging will happen once we return from disable().
-    static inline stdx::mutex mx;
+    static inline std::mutex mx;
     static inline bool loggingEnabled = true;
 };
 

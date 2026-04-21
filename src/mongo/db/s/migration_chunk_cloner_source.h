@@ -55,7 +55,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -539,7 +538,7 @@ private:
          */
         void _finishedOneInProgressRead();
 
-        mutable stdx::mutex _mutex;
+        mutable std::mutex _mutex;
 
         RecordIdSet _recordIds;
 
@@ -667,7 +666,7 @@ private:
      * function. Should only be used in the cleanup for this class. Should use a lock wrapped
      * around this class's mutex.
      */
-    void _drainAllOutstandingOperationTrackRequests(stdx::unique_lock<stdx::mutex>& lk);
+    void _drainAllOutstandingOperationTrackRequests(std::unique_lock<std::mutex>& lk);
 
     /**
      * Sends _recvChunkStatus to the recipient shard until it receives 'steady' from the recipient,
@@ -713,7 +712,7 @@ private:
     std::unique_ptr<SessionCatalogMigrationSource> _sessionCatalogSource;
 
     // Protects the entries below
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // The current state of the cloner
     State _state{kNew};

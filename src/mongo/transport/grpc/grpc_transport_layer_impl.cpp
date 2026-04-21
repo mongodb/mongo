@@ -32,7 +32,6 @@
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_session_manager.h"
 #include "mongo/transport/grpc/service.h"
@@ -42,6 +41,8 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -135,7 +136,7 @@ std::unique_ptr<GRPCTransportLayerImpl> GRPCTransportLayerImpl::createWithConfig
 
 Status GRPCTransportLayerImpl::registerService(std::unique_ptr<Service> svc) {
     try {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         invariant(
             !_server,
             "Cannot register gRPC services after GRPCTransportLayer::setup() has been invoked");
@@ -151,7 +152,7 @@ Status GRPCTransportLayerImpl::registerService(std::unique_ptr<Service> svc) {
 
 Status GRPCTransportLayerImpl::setup() {
     try {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         iassert(TransportLayer::ShutdownStatus.code(),
                 "Cannot set up GRPCTransportLayer after it has been shut down",
                 !_isShutdown);
@@ -227,7 +228,7 @@ Status GRPCTransportLayerImpl::setup() {
 
 Status GRPCTransportLayerImpl::start() {
     try {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         iassert(TransportLayer::ShutdownStatus.code(),
                 "Cannot start GRPCTransportLayer after it has been shut down",
                 !_isShutdown);
@@ -357,7 +358,7 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerImpl::asyncConnect(
 }
 
 void GRPCTransportLayerImpl::shutdown() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     if (std::exchange(_isShutdown, true)) {
         return;
     }

@@ -35,11 +35,11 @@
 #include "mongo/db/repl/oplog_visibility_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_truncate_markers.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <cstddef>
+#include <mutex>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -162,11 +162,11 @@ private:
     // the server is read-only.
     std::shared_ptr<OplogTruncateMarkers> _truncateMarkers;
     // Mutex for concurrent access to above fields
-    mutable stdx::mutex _rsMutex;
+    mutable std::mutex _rsMutex;
 
     // Synchronizes the section where a new Timestamp is generated and when it is registered in the
     // storage engine.
-    mutable stdx::mutex _newOpMutex;
+    mutable std::mutex _newOpMutex;
 
     // Tracks timestamp reservations and controls oplog visibility.
     // This will be default-constructed and will not be properly re-initialized if

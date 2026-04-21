@@ -39,7 +39,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/functional.h"
@@ -47,6 +46,7 @@
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/time_support.h"
 
+#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -223,7 +223,7 @@ private:
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx);
 
     private:
-        stdx::mutex _mutex;
+        std::mutex _mutex;
 
         FetchDefaultsFn _fetchDefaultsFn;
     };

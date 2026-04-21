@@ -32,11 +32,11 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
+#include <mutex>
 
 namespace mongo {
 namespace repl {
@@ -123,7 +123,7 @@ private:
     executor::TaskExecutor* const _executor;
 
     // Protects member data of this RollbackChecker.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // The sync source to check for rollbacks against.
     HostAndPort _syncSource;

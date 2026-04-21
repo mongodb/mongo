@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <mutex>
 
 namespace mongo {
 /**
@@ -48,7 +49,7 @@ class MONGO_MOD_USE_REPLACEMENT(other OutOfLineExecutors) InlineQueuedCountingEx
 public:
     void schedule(Task task) override {
         {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             // Add the task to our queue
             _taskQueue.emplace_back(std::move(task));
             // Make sure that we are not invoking a Task while invoking a Task. Some
@@ -64,7 +65,7 @@ public:
         while (true) {
             Task task_to_run;
             {
-                stdx::lock_guard lock(_mutex);
+                std::lock_guard lock(_mutex);
                 if (_taskQueue.empty()) {
                     _inSchedule = false;
                     break;
@@ -88,7 +89,7 @@ public:
 
     std::atomic<uint32_t> tasksRun{0};  // NOLINT
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     // Whether or not a task is currently being run.
     bool _inSchedule = false;
     std::deque<Task> _taskQueue;

@@ -70,7 +70,7 @@ void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeI
         return;
 
     // Ordering is important: as the entry may be flushed concurrently, set the dirty flag last.
-    stdx::lock_guard<stdx::mutex> lk(_bufferMutex);
+    std::lock_guard<std::mutex> lk(_bufferMutex);
     auto& entry = _buffer[uri];
     // During rollback it is possible to get a new SizeInfo. In that case clear the dirty flag,
     // so the SizeInfo can be destructed without triggering the dirty check invariant.
@@ -91,7 +91,7 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(
     WiredTigerSession& session, StringData uri) const {
     {
         // Check if we can satisfy the read from the buffer.
-        stdx::lock_guard<stdx::mutex> bufferLock(_bufferMutex);
+        std::lock_guard<std::mutex> bufferLock(_bufferMutex);
         Buffer::const_iterator it = _buffer.find(uri);
         if (it != _buffer.end())
             return it->second ? it->second : std::make_shared<SizeInfo>();
@@ -120,7 +120,7 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(
 }
 
 void WiredTigerSizeStorer::remove(StringData uri) {
-    stdx::lock_guard<stdx::mutex> bufferLock{_bufferMutex};
+    std::lock_guard<std::mutex> bufferLock{_bufferMutex};
 
     // Insert a new nullptr entry into the buffer, or set the existing one to nullptr if there
     // already is one.
@@ -133,7 +133,7 @@ void WiredTigerSizeStorer::remove(StringData uri) {
 void WiredTigerSizeStorer::flush(bool syncToDisk) {
     Buffer buffer;
     {
-        stdx::lock_guard<stdx::mutex> bufferLock(_bufferMutex);
+        std::lock_guard<std::mutex> bufferLock(_bufferMutex);
         _buffer.swap(buffer);
     }
 
@@ -144,7 +144,7 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
 
     // We serialize flushing to disk to avoid running into write conflicts from having multiple
     // threads try to flush at the same time.
-    stdx::lock_guard<stdx::mutex> flushLock(_flushMutex);
+    std::lock_guard<std::mutex> flushLock(_flushMutex);
 
     // When the session is destructed, it closes any cursors that remain open. Set the config to a
     // magic number that indicates to WT that this session should not take part in optional
@@ -158,7 +158,7 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
         // On failure, place entries back into the map, unless a newer value already exists.
         ON_BLOCK_EXIT([this, &buffer]() {
             if (!buffer.empty()) {
-                stdx::lock_guard<stdx::mutex> bufferLock(this->_bufferMutex);
+                std::lock_guard<std::mutex> bufferLock(this->_bufferMutex);
                 for (auto& it : buffer)
                     this->_buffer.try_emplace(it.first, it.second);
             }

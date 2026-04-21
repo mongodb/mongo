@@ -31,7 +31,6 @@
 
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 
@@ -39,6 +38,7 @@
 #include <ctime>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 
 #include <boost/optional.hpp>
@@ -125,7 +125,7 @@ public:
      * Updates _lastKnownStats using _callback and marks the token as invalid.
      */
     void invalidate() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (!_isValid) {
             return;
         }
@@ -134,7 +134,7 @@ public:
     }
 
     bool isValid() const {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _isValid;
     }
 
@@ -143,7 +143,7 @@ public:
     }
 
     MutexStats getStats() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (_isValid) {
             _callback(_lastKnownStats);
         }
@@ -152,7 +152,7 @@ public:
 
 private:
     AppendStatsCallback _callback;
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     MutexStats _lastKnownStats;
     bool _isValid = true;
 };
@@ -263,7 +263,7 @@ template <typename MutexType>
 using ObservableMutex = MutexType;
 #endif
 
-using ObservableExclusiveMutex = ObservableMutex<stdx::mutex>;
+using ObservableExclusiveMutex = ObservableMutex<std::mutex>;
 using ObservableSharedMutex = ObservableMutex<std::shared_mutex>;  // NOLINT
 
 }  // namespace MONGO_MOD_PUBLIC mongo

@@ -109,7 +109,7 @@ void RollingStats::_purgeOldEntries(WithLock, Date_t now) {
 
 void RollingStats::record(int64_t value) {
     Date_t now = _clock->now();
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _purgeOldEntries(lock, now);
 
     if (_window.empty() || now - _window.back().date > _windowIncrement) {
@@ -125,7 +125,7 @@ RollingStats::WindowData RollingStats::_readWindowData() const {
     WindowData data{.histogram = Histogram<int64_t>(_valuePartitions)};
     Date_t now = _clock->now();
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         // For each entry in _window, we need to iterate over all the counts present and add them to
         // the aggregate WindowData.
         for (auto windowIt = _window.begin(); windowIt != _window.end(); ++windowIt) {

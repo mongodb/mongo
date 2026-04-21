@@ -32,7 +32,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 
 #include <future>
@@ -50,7 +49,7 @@ void waitForCondition(stdx::condition_variable_any& cv, BasicLockableAdapter loc
 }
 
 void callUnderLock(BasicLockableAdapter adaptedLock) {
-    stdx::lock_guard lock(adaptedLock);
+    std::lock_guard lock(adaptedLock);
     ASSERT_TRUE(true);  // got here
 }
 
@@ -72,7 +71,7 @@ public:
     int unlockCalls{0};
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 }  // namespace
@@ -80,16 +79,16 @@ private:
 TEST(BasicLockableAdapter, TestWithConditionVariable) {
     bool ready = false;
     stdx::condition_variable_any cv;
-    stdx::mutex mut;
+    std::mutex mut;
 
-    auto result = stdx::async(stdx::launch::async, [&ready, &mut, &cv] {
-        stdx::lock_guard lock(mut);
+    auto result = std::async(std::launch::async, [&ready, &mut, &cv] {
+        std::lock_guard lock(mut);
         ASSERT_FALSE(ready);
         ready = true;
         cv.notify_all();
     });
 
-    stdx::unique_lock lock(mut);
+    std::unique_lock lock(mut);
     waitForCondition(cv, lock, [&ready] { return ready; });
     ASSERT_TRUE(ready);
 }
@@ -97,7 +96,7 @@ TEST(BasicLockableAdapter, TestWithConditionVariable) {
 TEST(BasicLockableAdapter, TestWithMutexTypes) {
 
     {
-        stdx::mutex mut;
+        std::mutex mut;
         callUnderLock(mut);
     }
 
@@ -119,15 +118,15 @@ TEST(BasicLockableAdapter, TestWithCustomLockableType) {
     stdx::condition_variable_any cv;
     TestLockable mut;
 
-    auto result = stdx::async(stdx::launch::async, [&ready, &mut, &cv] {
-        stdx::lock_guard lock(mut);
+    auto result = std::async(std::launch::async, [&ready, &mut, &cv] {
+        std::lock_guard lock(mut);
         ASSERT_FALSE(ready);
         ready = true;
         cv.notify_all();
     });
 
     {
-        stdx::unique_lock lock(mut);
+        std::unique_lock lock(mut);
         waitForCondition(cv, lock, [&ready] { return ready; });
     }
 

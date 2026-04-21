@@ -34,7 +34,6 @@
 #include "mongo/db/admission/ticketing/ticket_semaphore.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -278,7 +278,7 @@ private:
 
     // Serializes updates to _outof to ensure only 1 thread can change the size of the ticket pool
     // at a time. Reading _outof does not require holding the lock.
-    stdx::mutex _resizeMutex;
+    std::mutex _resizeMutex;
     Atomic<int> _outof;
     Atomic<int> _peakUsed;
     bool _enabledDelinquent{false};

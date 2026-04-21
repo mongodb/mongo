@@ -788,7 +788,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
 
     {
         auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
-        stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
+        std::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
         CurOp::get(aggExState.getOpCtx())->setPlanSummary(lk, std::move(planSummary));
         CurOp::get(aggExState.getOpCtx())->debug().queryFramework = execs[0]->getQueryFramework();
     }
@@ -1361,7 +1361,7 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
     // Set the namespace of the curop back to the view namespace so ctx records stats on this view
     // namespace on destruction.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setNS(lk, originalNss);
     }
 
@@ -1538,7 +1538,7 @@ Status runAggregate(
             // executes an internal command to create a temp collection, changing the curop
             // namespace to the name of this temp collection.
             {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setNS(lk, request.getNamespace());
             }
             return status;

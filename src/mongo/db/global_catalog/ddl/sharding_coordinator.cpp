@@ -208,7 +208,7 @@ void ShardingCoordinator::interrupt(Status status) {
                 logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
     // Resolve any unresolved promises to avoid hanging.
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    std::lock_guard<std::mutex> lg(_mutex);
     if (!_constructionCompletionPromise.getFuture().isReady()) {
         _constructionCompletionPromise.setError(status);
     }
@@ -259,7 +259,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
             return _translateTimeseriesNss(executor, token);
         })
         .then([this, anchor = shared_from_this()] {
-            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            std::lock_guard<std::mutex> lg(_mutex);
             if (!_constructionCompletionPromise.getFuture().isReady()) {
                 _constructionCompletionPromise.emplaceValue();
             }
@@ -286,7 +286,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
                 errorMsg,
                 logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
-            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            std::lock_guard<std::mutex> lg(_mutex);
             if (!_constructionCompletionPromise.getFuture().isReady()) {
                 _constructionCompletionPromise.setError(status);
             }
@@ -425,7 +425,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
 
             _releaseLocks(opCtx);
 
-            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            std::lock_guard<std::mutex> lg(_mutex);
             if (!_completionPromise.getFuture().isReady()) {
                 _completionPromise.setFrom(completionStatus);
             }
@@ -463,7 +463,7 @@ BSONObjBuilder ShardingCoordinator::basicReportBuilder() const noexcept {
 
     // Append dynamic fields from the state doc
     {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         if (const auto& bucketNss = getDoc().getShardingCoordinatorMetadata().getBucketNss()) {
             // Bucket namespace is only present in case the collection is a sharded timeseries
             bob.append("bucketNamespace",
@@ -475,7 +475,7 @@ BSONObjBuilder ShardingCoordinator::basicReportBuilder() const noexcept {
     // Create command description
     BSONObjBuilder cmdInfoBuilder;
     {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         if (const auto& optComment = getForwardableOpMetadata().getComment()) {
             cmdInfoBuilder.append(optComment.get().firstElement());
         }
@@ -498,7 +498,7 @@ std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
     std::function<void(OperationContext*)>&& handlerFn) {
     return [=, this] {
         const auto currPhase = [this] {
-            stdx::lock_guard lk{_docMutex};
+            std::lock_guard lk{_docMutex};
             return getDoc().getGenericPhase();
         }();
 
@@ -556,7 +556,7 @@ BSONObjBuilder RecoverableShardingCoordinator::basicReportBuilder() const noexce
     auto baseReportBuilder = ShardingCoordinator::basicReportBuilder();
 
     const auto currPhase = [this] {
-        stdx::lock_guard l{_docMutex};
+        std::lock_guard l{_docMutex};
         return getDoc().getGenericPhase();
     }();
 
@@ -586,7 +586,7 @@ void RecoverableShardingCoordinator::_insertStateDocumentGeneric(
     }
 
     {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         getDoc().replace(std::move(newDoc));
     }
 }
@@ -605,7 +605,7 @@ void RecoverableShardingCoordinator::_updateStateDocumentGeneric(
                  defaultMajorityWriteConcern());
 
     {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         getDoc().replace(std::move(newDoc));
     }
 }
@@ -642,7 +642,7 @@ void RecoverableShardingCoordinator::_onCleanup(OperationContext* opCtx) {
 boost::optional<OperationSessionInfo> RecoverableShardingCoordinator::readSession(
     OperationContext* opCtx) const {
     auto optSession = [&] {
-        stdx::lock_guard lk{_docMutex};
+        std::lock_guard lk{_docMutex};
         return getDoc().getShardingCoordinatorMetadata().getSession();
     }();
     if (!optSession) {

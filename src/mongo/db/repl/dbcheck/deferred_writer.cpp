@@ -59,13 +59,13 @@
 namespace mongo {
 
 namespace {
-auto kLogInterval = stdx::chrono::minutes(1);
+auto kLogInterval = std::chrono::minutes(1);
 }
 
 void DeferredWriter::_logFailure(const Status& status) {
     if (TimePoint::clock::now() - _lastLogged > kLogInterval) {
         LOGV2(20516, "Unable to write to collection", logAttrs(_nss), "error"_attr = status);
-        _lastLogged = stdx::chrono::system_clock::now();
+        _lastLogged = std::chrono::system_clock::now();
     }
 }
 
@@ -77,7 +77,7 @@ void DeferredWriter::_logDroppedEntry() {
               "dropped.",
               logAttrs(_nss),
               "droppedEntries"_attr = _droppedEntries);
-        _lastLoggedDrop = stdx::chrono::system_clock::now();
+        _lastLoggedDrop = std::chrono::system_clock::now();
         _droppedEntries = 0;
     }
 }
@@ -139,7 +139,7 @@ Status DeferredWriter::_worker(BSONObj doc) noexcept try {
         return Status::OK();
     });
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     _numBytes -= doc.objsize();
     return status;
@@ -191,7 +191,7 @@ bool DeferredWriter::insertDocument(BSONObj obj) {
     // We can't insert documents if we haven't been started up.
     invariant(_pool);
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     // Check if we're allowed to insert this object.
     if (_numBytes + obj.objsize() >= _maxNumBytes) {

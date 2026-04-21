@@ -97,7 +97,7 @@ KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(e
 void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime& dropTime,
                                                    std::shared_ptr<Ident> ident,
                                                    StorageEngine::DropIdentCallback&& onDrop) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     invariant(!_dropPendingIdents.contains(ident->getIdent()), ident->getIdent());
     if (auto ts = getTimestamp(dropTime)) {
         invariant(!ts->isNull(), ident->getIdent());
@@ -121,7 +121,7 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
 
 void KVDropPendingIdentReaper::dropUnknownIdent(const Timestamp& stableTimestamp,
                                                 StringData ident) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
 
     // There may already be drop-pending idents when we reload the catalog and drop all idents not
     // present at the stable timestamp. If the existing drop is untimestamped or before the stable
@@ -156,7 +156,7 @@ void KVDropPendingIdentReaper::dropUnknownIdent(const Timestamp& stableTimestamp
 }
 
 std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(StringData ident) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     auto it = _dropPendingIdents.find(ident);
     if (it == _dropPendingIdents.end()) {
         return nullptr;
@@ -181,7 +181,7 @@ std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(StringData ident
 }
 
 boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     boost::optional<Timestamp> earliestDropTs;
     if (!_oldestTimestampDrops.empty()) {
         earliestDropTs =
@@ -198,7 +198,7 @@ boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() 
 }
 
 std::set<std::string> KVDropPendingIdentReaper::getAllIdentNames() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     std::set<std::string> identNames;
     for (const auto& [identName, _] : _dropPendingIdents) {
         identNames.insert(identName);
@@ -207,7 +207,7 @@ std::set<std::string> KVDropPendingIdentReaper::getAllIdentNames() const {
 }
 
 size_t KVDropPendingIdentReaper::getNumIdents() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     return _dropPendingIdents.size();
 };
 
@@ -245,9 +245,9 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
     };
     std::vector<ToDropEntry> toDrop;
 
-    stdx::lock_guard lock(_dropMutex);
+    std::lock_guard lock(_dropMutex);
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         for (auto& info : _untimestampedDrops) {
             if (info->isExpired(_engine, Timestamp())) {
                 info->dropInProgress = true;
@@ -300,7 +300,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
         // Dropping tables can be expensive since it involves disk operations. If the table also
         // needs a checkpoint, that adds even more overhead.
         if (auto interruptStatus = opCtx->checkForInterruptNoAssert(); !interruptStatus.isOK()) {
-            stdx::lock_guard lock(_mutex);
+            std::lock_guard lock(_mutex);
             for (; i < toDrop.size(); ++i) {
                 toDrop[i].identInfo->dropInProgress = false;
             }
@@ -331,8 +331,8 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
 }
 
 void KVDropPendingIdentReaper::rollbackDropsAfterStableTimestamp(Timestamp stableTimestamp) {
-    stdx::lock_guard dropLock(_dropMutex);
-    stdx::lock_guard stateLock(_mutex);
+    std::lock_guard dropLock(_dropMutex);
+    std::lock_guard stateLock(_mutex);
     _oldestTimestampDrops.erase(
         _oldestTimestampDrops.upper_bound(StorageEngine::OldestTimestamp{stableTimestamp}),
         _oldestTimestampDrops.end());
@@ -355,7 +355,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
     // Acquiring _dropMutex is potentially expensive (it may involve waiting on IO being done on
     // another thread), so first check if the ident is known to the reaper without acquiring it.
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         auto it = _dropPendingIdents.find(ident);
         if (it == _dropPendingIdents.end())
             return Status::OK();
@@ -391,7 +391,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
                                                                            StringData ident,
                                                                            Timestamp timestamp) {
     {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         auto it = _dropPendingIdents.find(ident);
         if (it == _dropPendingIdents.end()) {
             LOGV2_WARNING(12079400,
@@ -422,9 +422,9 @@ Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(
     OperationContext* opCtx,
     StringData ident,
     boost::optional<Timestamp> replicatedIdentDropTimestamp) {
-    stdx::lock_guard dropLock(_dropMutex);
+    std::lock_guard dropLock(_dropMutex);
     auto info = [&]() -> IdentInfo* {
-        stdx::lock_guard stateLock(_mutex);
+        std::lock_guard stateLock(_mutex);
         auto it = _dropPendingIdents.find(ident);
         if (it == _dropPendingIdents.end()) {
             return nullptr;
@@ -505,7 +505,7 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
         dropExecution);
 
     if (!status.isOK()) {
-        stdx::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
         identInfo.dropInProgress = false;
         return status;
     }
@@ -526,7 +526,7 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
         return false;
     };
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
     bool found = visit(OverloadedVisitor{
                            [&](StorageEngine::OldestTimestamp dropTs) {
                                return removeTimestamped(_oldestTimestampDrops, dropTs);

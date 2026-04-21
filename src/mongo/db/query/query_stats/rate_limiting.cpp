@@ -29,9 +29,10 @@
 
 #include "mongo/db/query/query_stats/rate_limiting.h"
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/overloaded_visitor.h"
+
+#include <mutex>
 namespace mongo {
 
 Date_t RateLimiter::WindowBasedPolicy::tickWindow() {
@@ -56,7 +57,7 @@ bool RateLimiter::WindowBasedPolicy::handle() {
         return false;
     }
 
-    stdx::unique_lock windowLock{_windowMutex};
+    std::unique_lock windowLock{_windowMutex};
 
     Date_t currentTime = tickWindow();
     auto windowStart = _windowStart;

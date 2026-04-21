@@ -32,12 +32,12 @@
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
 #include <list>
+#include <mutex>
 #include <string>
 
 namespace MONGO_MOD_PARENT_PRIVATE mongo {
@@ -140,7 +140,7 @@ private:
     ThreadPool* _threadPool;
 
     // Protects member data of this TaskRunner.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     stdx::condition_variable _condition;
 

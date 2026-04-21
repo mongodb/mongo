@@ -99,7 +99,7 @@ TEST(RegistryList, ConcurrentAdd) {
 
 
     struct State {
-        stdx::mutex m;
+        std::mutex m;
         size_t workersDone = 0;
     } state;
 
@@ -113,7 +113,7 @@ TEST(RegistryList, ConcurrentAdd) {
             list.add(i);
         }
 
-        stdx::lock_guard lk(state.m);
+        std::lock_guard lk(state.m);
         ++state.workersDone;
     };
 
@@ -122,7 +122,7 @@ TEST(RegistryList, ConcurrentAdd) {
         barrier.countDownAndWait();
 
         while ([&] {
-            stdx::lock_guard lk(state.m);
+            std::lock_guard lk(state.m);
             return state.workersDone != kThreads;
         }()) {
             // The list never shrinks over the course of iteration and probably grows, this proves

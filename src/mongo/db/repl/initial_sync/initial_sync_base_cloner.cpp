@@ -99,7 +99,7 @@ int InitialSyncBaseCloner::getRetryableOperationCount_forTest() {
         return 0;
     }
 
-    stdx::lock_guard<InitialSyncSharedData> lk(*_retryableOp->getSharedData());
+    std::lock_guard<InitialSyncSharedData> lk(*_retryableOp->getSharedData());
     return _retryableOp->getSharedData()->getRetryingOperationsCount(lk);
 }
 
@@ -109,14 +109,14 @@ void InitialSyncBaseCloner::handleStageAttemptFailed(BaseClonerStage* stage, Sta
     };
 
     bool shouldRetry = [&] {
-        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        std::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         return getSharedData()->shouldRetryOperation(lk, &_retryableOp);
     }();
     if (!shouldRetry) {
         auto status = lastError.withContext(
             str::stream() << ": Exceeded initialSyncTransientErrorRetryPeriodSeconds "
                           << getSharedData()->getAllowedOutageDuration(
-                                 stdx::lock_guard<InitialSyncSharedData>(*getSharedData())));
+                                 std::lock_guard<InitialSyncSharedData>(*getSharedData())));
         setSyncFailedStatus(status);
         uassertStatusOK(status);
     }
@@ -172,7 +172,7 @@ Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
     InitialSyncIdDocument initialSyncIdDoc =
         InitialSyncIdDocument::parse(initialSyncId, IDLParserContext("initialSyncId"));
 
-    stdx::lock_guard<ReplSyncSharedData> lk(*getSharedData());
+    std::lock_guard<ReplSyncSharedData> lk(*getSharedData());
     uassert(ErrorCodes::InitialSyncFailure,
             "Sync source has been resynced since we started syncing from it",
             getSharedData()->getInitialSyncSourceId(lk) == initialSyncIdDoc.get_id());

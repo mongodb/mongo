@@ -59,7 +59,6 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -72,6 +71,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -134,13 +134,13 @@ struct WiredTigerBackup {
 
     // 'wtBackupCursorMutex' provides concurrency control between beginNonBlockingBackup(),
     // endNonBlockingBackup(), and getNextBatch() because we stream the output of the backup cursor.
-    stdx::mutex wtBackupCursorMutex;
+    std::mutex wtBackupCursorMutex;
 
     // 'wtBackupDupCursorMutex' provides concurrency control between getNextBatch() and
     // extendBackupCursor() because WiredTiger only allows one duplicate cursor to be open at a
     // time. extendBackupCursor() blocks on condition variable 'wtBackupDupCursorCV' if a duplicate
     // cursor is already open.
-    stdx::mutex wtBackupDupCursorMutex;
+    std::mutex wtBackupDupCursorMutex;
     stdx::condition_variable wtBackupDupCursorCV;
 
     // This file flags there was an ongoing backup when an unclean shutdown happened.
@@ -387,7 +387,7 @@ protected:
     //
     // TODO(SERVER-118642): Remove this mutex once runtime-settable configs are removed from the
     // _wtConfig.
-    stdx::mutex _configUpdateMutex;
+    std::mutex _configUpdateMutex;
 
     std::string _canonicalName;
     std::string _path;
@@ -402,7 +402,7 @@ protected:
 
     // Maintains a stable mapping from ident to cursor cache table ID. Entries are cleaned up
     // automatically when the ident is dropped.
-    stdx::mutex _identTableIdMutex;
+    std::mutex _identTableIdMutex;
     StringMap<uint64_t> _identTableIds;
 };
 
@@ -852,7 +852,7 @@ private:
     // Guarantees that the necessary directories exist in case the ident lives in a subdirectory of
     // the database (i.e. because of --directoryPerDb). The caller should hold the lock until
     // whatever they were doing with the ident has been persisted to disk.
-    [[nodiscard]] stdx::unique_lock<stdx::mutex> _ensureIdentPath(StringData ident);
+    [[nodiscard]] std::unique_lock<std::mutex> _ensureIdentPath(StringData ident);
 
     /**
      * Recreates a WiredTiger ident from the provided URI by dropping and recreating the ident.
@@ -905,7 +905,7 @@ private:
     // Wrapped method call to WT_SESSION::drop that handles sub-level error codes if applicable.
     Status _drop(WiredTigerSession& session, const char* uri, const char* config);
 
-    mutable stdx::mutex _oldestActiveTransactionTimestampCallbackMutex;
+    mutable std::mutex _oldestActiveTransactionTimestampCallbackMutex;
     StorageEngine::OldestActiveTransactionTimestampCallback
         _oldestActiveTransactionTimestampCallback;
 
@@ -918,7 +918,7 @@ private:
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
 
     mutable ElapsedTracker _sizeStorerSyncTracker;
-    mutable stdx::mutex _sizeStorerSyncTrackerMutex;
+    mutable std::mutex _sizeStorerSyncTrackerMutex;
 
     const bool _inRepairMode;
 
@@ -931,7 +931,7 @@ private:
     std::unique_ptr<WiredTigerSession> _backupSession;
     WiredTigerBackup _wtBackup;
 
-    mutable stdx::mutex _oplogPinnedByBackupMutex;
+    mutable std::mutex _oplogPinnedByBackupMutex;
     boost::optional<Timestamp> _oplogPinnedByBackup;
     Timestamp _recoveryTimestamp;
 
@@ -945,14 +945,14 @@ private:
 
     AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
 
-    mutable stdx::mutex _oldestTimestampPinRequestsMutex;
+    mutable std::mutex _oldestTimestampPinRequestsMutex;
     std::map<std::string, Timestamp> _oldestTimestampPinRequests;
 
     // Pins the oplog so that OplogTruncateMarkers will not truncate oplog history equal or newer to
     // this timestamp.
     AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
 
-    stdx::mutex _checkpointMutex;
+    std::mutex _checkpointMutex;
 
     // Counters used for computing whether a checkpointIteration has lapsed or not.
     //
@@ -966,7 +966,7 @@ private:
     AtomicWord<std::uint64_t> _finishedCheckpointIteration{0};
 
     // Protects getting and setting the _journalListener below.
-    stdx::mutex _journalListenerMutex;
+    std::mutex _journalListenerMutex;
 
     // Notified when we commit to the journal.
     //
@@ -978,7 +978,7 @@ private:
 
     // Counter and critical section mutex for waitUntilDurable
     AtomicWord<unsigned> _lastSyncTime;
-    stdx::mutex _lastSyncMutex;
+    std::mutex _lastSyncMutex;
 
     // A long-lived session for ensuring data is periodically flushed to disk.
     std::unique_ptr<WiredTigerSession> _waitUntilDurableSession = nullptr;
@@ -988,7 +988,7 @@ private:
 
     // Prevents a database's directory from being deleted concurrently with creation (necessary for
     // --directoryPerDb).
-    stdx::mutex _directoryModificationMutex;
+    std::mutex _directoryModificationMutex;
 
     // Replication settings, passed in from constructor to avoid dependency on repl
     bool _isReplSet;
@@ -1001,7 +1001,7 @@ private:
     // Protects _pinnedAllDurableTimestamps. Only acquired by pin/unpin writers.
     // Readers use _minPinnedTimestamp instead, which writers publish atomically
     // after updating the multiset, keeping getAllDurableTimestamp() lock-free.
-    stdx::mutex _allDurablePinMutex;
+    std::mutex _allDurablePinMutex;
     std::multiset<uint64_t> _pinnedAllDurableTimestamps;
     // Lock-free snapshot of the minimum pinned timestamp. Set to max uint64 when no pins
     // exist. Writers update this under _allDurablePinMutex; readers load it without locking.

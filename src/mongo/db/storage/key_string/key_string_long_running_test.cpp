@@ -29,8 +29,8 @@
 
 #include "mongo/db/storage/key_string/key_string_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/future.h"
 
+#include <future>
 #include <random>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -208,10 +208,10 @@ TEST_P(KeyStringBuilderTest, AllPerm2Compare) {
 }
 
 TEST_P(KeyStringBuilderTest, LotsOfNumbers3) {
-    std::vector<stdx::future<void>> futures;
+    std::vector<std::future<void>> futures;
 
     for (double k = 0; k < 8; k++) {
-        futures.push_back(stdx::async(stdx::launch::async, [k, this] {
+        futures.push_back(std::async(std::launch::async, [k, this] {
             for (double i = -1100; i < 1100; i++) {
                 for (double j = 0; j < 52; j++) {
                     const auto V1 = key_string::Version::V1;

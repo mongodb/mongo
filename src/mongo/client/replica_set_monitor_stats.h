@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/counter.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/scopeguard.h"
@@ -65,7 +64,7 @@ public:
 private:
     const Microseconds _resetTimeout;
 
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     // Stats for the outer loop of getHostAndRefresh().
 

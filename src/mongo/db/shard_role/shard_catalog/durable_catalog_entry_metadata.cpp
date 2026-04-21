@@ -185,7 +185,7 @@ BSONObj CatalogEntryMetaData::toBSON(bool hasExclusiveAccess) const {
             sub.append("spec", indexes[i].spec);
             sub.appendBool("ready", indexes[i].ready);
             {
-                stdx::unique_lock lock(indexes[i].multikeyMutex, stdx::defer_lock_t{});
+                std::unique_lock lock(indexes[i].multikeyMutex, std::defer_lock_t{});
                 if (!hasExclusiveAccess) {
                     lock.lock();
                 }

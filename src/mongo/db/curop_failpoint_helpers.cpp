@@ -51,7 +51,7 @@ namespace mongo {
 
 std::string CurOpFailpointHelpers::updateCurOpFailPointMsg(OperationContext* opCtx,
                                                            const std::string& newMsg) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     auto oldMsg = CurOp::get(opCtx)->getFailPointMessage();
     CurOp::get(opCtx)->setFailPointMessage(lk, newMsg.c_str());
     return oldMsg;

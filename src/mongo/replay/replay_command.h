@@ -33,7 +33,6 @@
 #include "mongo/db/traffic_reader.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 

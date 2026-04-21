@@ -225,7 +225,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             // read from all cursors simultaneously, it is possible (though unlikely) for one to be
             // starved for an arbitrary period of time.
             {
-                auto lk = stdx::lock_guard(*opCtx->getClient());
+                auto lk = std::lock_guard(*opCtx->getClient());
                 opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
             }
 

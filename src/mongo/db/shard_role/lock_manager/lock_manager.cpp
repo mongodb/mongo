@@ -37,7 +37,6 @@
 #include "mongo/db/shard_role/lock_manager/lock_request_list.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -45,6 +44,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -378,7 +378,7 @@ void LockHead::migratePartitionedLockHeads() {
     // Migration time: lock each partition in turn and transfer its requests, if any
     while (partitioned()) {
         LockManager::Partition* partition = partitions.back();
-        stdx::lock_guard scopedLock(partition->mutex);
+        std::lock_guard scopedLock(partition->mutex);
 
         LockManager::Partition::Map::iterator it = partition->data.find(resourceId);
         if (it != partition->data.end()) {
@@ -442,7 +442,7 @@ LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mo
     // For intent modes, try the PartitionedLockHead
     if (request->partitioned) {
         Partition* partition = _getPartition(request);
-        stdx::lock_guard scopedLock(partition->mutex);
+        std::lock_guard scopedLock(partition->mutex);
         invariant(request->status == LockRequest::STATUS_NEW);
 
         // Fast path for intent locks
@@ -459,7 +459,7 @@ LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mo
 
     // Use regular LockHead, maybe start partitioning
     LockBucket* bucket = _getBucket(resId);
-    stdx::lock_guard scopedLock(bucket->mutex);
+    std::lock_guard scopedLock(bucket->mutex);
     invariant(request->status == LockRequest::STATUS_NEW);
 
     LockHead* lock = bucket->findOrInsert(resId);
@@ -467,7 +467,7 @@ LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mo
     // Start a partitioned lock if possible
     if (request->partitioned && !(lock->grantedModes & (~intentModes)) && !lock->conflictModes) {
         Partition* partition = _getPartition(request);
-        stdx::lock_guard scopedLock(partition->mutex);
+        std::lock_guard scopedLock(partition->mutex);
         PartitionedLockHead* partitionedLock = partition->findOrInsert(resId);
         invariant(partitionedLock);
         lock->partitions.push_back(partition);
@@ -493,7 +493,7 @@ bool LockManager::unlock(LockRequest* request) {
         // moved to the lock head, but there is no safe way to find out without synchronizing
         // thorough the partition mutex. Migrations are expected to be rare.
         Partition* partition = _getPartition(request);
-        stdx::lock_guard scopedLock(partition->mutex);
+        std::lock_guard scopedLock(partition->mutex);
         invariant(request->status == LockRequest::STATUS_GRANTED);
 
         if (request->status == LockRequest::STATUS_GRANTED && request->recursiveCount > 0)
@@ -511,7 +511,7 @@ bool LockManager::unlock(LockRequest* request) {
 
     LockHead* lock = request->lock;
     LockBucket* bucket = _getBucket(lock->resourceId);
-    stdx::lock_guard scopedLock(bucket->mutex);
+    std::lock_guard scopedLock(bucket->mutex);
 
     if (request->status == LockRequest::STATUS_GRANTED) {
         if (request->recursiveCount > 0)
@@ -551,7 +551,7 @@ bool LockManager::unlock(LockRequest* request) {
 void LockManager::cleanupUnusedLocks() {
     for (unsigned i = 0; i < _numLockBuckets; i++) {
         LockBucket* bucket = &_lockBuckets[i];
-        stdx::lock_guard scopedLock(bucket->mutex);
+        std::lock_guard scopedLock(bucket->mutex);
         _cleanupUnusedLocksInBucket(bucket);
     }
 }
@@ -659,7 +659,7 @@ LockManager::Partition* LockManager::_getPartition(LockRequest* request) const {
 }
 
 bool LockManager::hasConflictingRequests(ResourceId resId, const LockRequest* request) const {
-    stdx::lock_guard lk(_getBucket(resId)->mutex);
+    std::lock_guard lk(_getBucket(resId)->mutex);
     return request->lock ? !request->lock->conflictList.empty() : false;
 }
 
@@ -667,7 +667,7 @@ std::vector<LockDebugInfo> LockManager::getLockInfoFromResourceHolders(ResourceI
     std::vector<LockDebugInfo> locksInfo;
     for (size_t i = 0; i < _numLockBuckets; ++i) {
         LockBucket& bucket = _lockBuckets[i];
-        stdx::lock_guard scopedLock{bucket.mutex};
+        std::lock_guard scopedLock{bucket.mutex};
         const auto it = bucket.data.find(resId);
         if (it == bucket.data.end()) {
             continue;
@@ -686,7 +686,7 @@ void LockManager::getLockInfoArray(const std::map<LockerId, BSONObj>& lockToClie
                                    BSONArrayBuilder* locks) const {
     for (size_t i = 0; i < _numLockBuckets; ++i) {
         LockBucket& bucket = _lockBuckets[i];
-        stdx::lock_guard scopedLock(bucket.mutex);
+        std::lock_guard scopedLock(bucket.mutex);
         // LockInfo cleans the unused locks as it goes, but dump doesn't.
         if (mutableThis) {
             invariant(mutableThis == this);

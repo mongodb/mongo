@@ -428,7 +428,7 @@ public:
 
             // Store the plan summary string in CurOp.
             {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 curOp->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
             }
             long long countResult = 0;

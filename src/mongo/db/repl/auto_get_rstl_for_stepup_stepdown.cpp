@@ -143,7 +143,7 @@ void AutoGetRstlForStepUpStepDown::_killOpThreadFn(Date_t deadline) {
         // X mode for the first time. This ensures that no writing operations will continue
         // after the node's term change.
         {
-            stdx::unique_lock lock(_mutex);
+            std::unique_lock lock(_mutex);
             if (_stopKillingOps.wait_for(
                     lock, Milliseconds(10).toSystemDuration(), [this] { return _killSignaled; })) {
                 LOGV2(21344, "Stopped killing user operations");
@@ -161,7 +161,7 @@ void AutoGetRstlForStepUpStepDown::_stopAndWaitForKillOpThread() {
         return;
 
     {
-        stdx::unique_lock lock(_mutex);
+        std::unique_lock lock(_mutex);
         _killSignaled = true;
         _stopKillingOps.notify_all();
     }

@@ -160,18 +160,18 @@ ProgramRunner ProgramRegistry::createProgramRunner(BSONObj args,
 }
 
 bool ProgramRegistry::isPortRegistered(int port) const {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     return _portToPidMap.count(port) == 1;
 }
 
 ProcessId ProgramRegistry::pidForPort(int port) const {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     invariant(isPortRegistered(port));
     return _portToPidMap.find(port)->second;
 }
 
 int ProgramRegistry::portForPid(ProcessId pid) const {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     for (const auto& portPid : _portToPidMap) {
         if (portPid.second == pid)
             return portPid.first;
@@ -180,7 +180,7 @@ int ProgramRegistry::portForPid(ProcessId pid) const {
 }
 
 void ProgramRegistry::registerProgram(ProcessId pid, int port) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     uassert(7095701,
             str::stream() << "Program cannot be reigstered because pid " << pid.toString()
                           << " is already in use",
@@ -193,7 +193,7 @@ void ProgramRegistry::registerProgram(ProcessId pid, int port) {
 }
 
 void ProgramRegistry::unregisterProgram(ProcessId pid) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     if (isPidRegistered(pid)) {
         // Some instances of ProgramRunner are constructed to read output synchronously. These
         // instances never created a separate stdx::thread and never called registerReaderThread().
@@ -209,21 +209,21 @@ void ProgramRegistry::unregisterProgram(ProcessId pid) {
 }
 
 void ProgramRegistry::registerReaderThread(ProcessId pid, stdx::thread reader) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     invariant(isPidRegistered(pid));
     invariant(_outputReaderThreads.count(pid) == 0);
     _outputReaderThreads.emplace(pid, std::move(reader));
 }
 
 void ProgramRegistry::updatePidExitCode(ProcessId pid, int exitCode) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     _pidToExitCode[pid] = exitCode;
 }
 
 bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* const exit_code) {
     {
         // Be careful not to hold the lock while waiting for the pid to finish
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        std::lock_guard<std::recursive_mutex> lk(_mutex);
 
         // unregistered pids are dead
         if (!this->isPidRegistered(pid)) {
@@ -318,32 +318,32 @@ bool ProgramRegistry::isPidDead(const ProcessId pid, int* const exit_code) {
 }
 
 void ProgramRegistry::getRegisteredPorts(vector<int>& ports) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     for (const auto& portPid : _portToPidMap) {
         ports.push_back(portPid.first);
     }
 }
 
 bool ProgramRegistry::isPidRegistered(ProcessId pid) const {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     return _registeredPids.count(pid) == 1;
 }
 
 void ProgramRegistry::getRegisteredPids(vector<ProcessId>& pids) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     for (const auto& pid : _registeredPids) {
         pids.emplace_back(pid);
     }
 }
 
 std::vector<ProcessId> ProgramRegistry::getRegisteredPidsHistory() {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
     return _registeredPidsHistory;
 }
 
 #ifdef _WIN32
 HANDLE ProgramRegistry::getHandleForPid(ProcessId pid) const {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
 
     auto iter = _handles.find(pid);
     uassert(ErrorCodes::BadValue,
@@ -353,13 +353,13 @@ HANDLE ProgramRegistry::getHandleForPid(ProcessId pid) const {
 }
 
 void ProgramRegistry::eraseHandleForPid(ProcessId pid) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
 
     _handles.erase(pid);
 }
 
 void ProgramRegistry::insertHandleForPid(ProcessId pid, HANDLE handle) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    std::lock_guard<std::recursive_mutex> lk(_mutex);
 
     _handles.insert(make_pair(pid, handle));
 }
@@ -368,7 +368,7 @@ void ProgramRegistry::insertHandleForPid(ProcessId pid, HANDLE handle) {
 
 void ProgramOutputMultiplexer::appendLine(
     int port, ProcessId pid, const std::string& name, const std::string& line, bool shouldLog) {
-    stdx::lock_guard<stdx::mutex> lk(_mongoProgramOutputMutex);
+    std::lock_guard<std::mutex> lk(_mongoProgramOutputMutex);
     auto sinkProgramOutput = [&](auto& sink) {
         if (port > 0) {
             sink << name << port << "| " << line << endl;
@@ -392,12 +392,12 @@ void ProgramOutputMultiplexer::appendLine(
 }
 
 string ProgramOutputMultiplexer::str() const {
-    stdx::lock_guard<stdx::mutex> lk(_mongoProgramOutputMutex);
+    std::lock_guard<std::mutex> lk(_mongoProgramOutputMutex);
     return _buffer.str();
 }
 
 void ProgramOutputMultiplexer::clear() {
-    stdx::lock_guard<stdx::mutex> lk(_mongoProgramOutputMutex);
+    std::lock_guard<std::mutex> lk(_mongoProgramOutputMutex);
     _buffer.str("");
 }
 
@@ -479,7 +479,7 @@ void ProgramRunner::start(bool shouldLogArgs) {
         //
         // Holding the lock for the duration of those events prevents the leaks and thus the
         // associated deadlocks.
-        stdx::lock_guard<stdx::mutex> lk(_parentRegistry->_createProcessMtx);
+        std::lock_guard<std::mutex> lk(_parentRegistry->_createProcessMtx);
         if (pipe(pipeEnds)) {
             auto ec = lastPosixError();
             LOGV2_ERROR(22830, "Failed to create pipe", "error"_attr = errorMessage(ec));

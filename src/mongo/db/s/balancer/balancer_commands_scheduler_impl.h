@@ -63,7 +63,6 @@
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -77,6 +76,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -503,7 +503,7 @@ private:
 
     // Protects the in-memory state of the Scheduler
     // (_state, _requests, _unsubmittedRequestIds, _recentlyCompletedRequests).
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     SchedulerState _state{SchedulerState::Stopped};
 

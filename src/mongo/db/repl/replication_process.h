@@ -33,10 +33,10 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_recovery.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 
 namespace MONGO_MOD_PUB mongo {
 
@@ -101,7 +101,7 @@ private:
     // (M)  Reads and writes guarded by _mutex.
 
     // Guards access to member variables.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Used to access the storage layer.
     StorageInterface* const _storageInterface;  // (R)

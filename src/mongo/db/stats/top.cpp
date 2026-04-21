@@ -185,7 +185,7 @@ void Top::record(OperationContext* opCtx,
 
     auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
     auto microsCount = durationCount<Microseconds>(micros);
-    stdx::lock_guard lk(_lockUsage);
+    std::lock_guard lk(_lockUsage);
     CollectionData& coll = _usage[hashedNs];
     updateCollectionData(lk, opCtx, coll, logicalOp, lockType, microsCount, readWriteType);
 }
@@ -208,7 +208,7 @@ void Top::record(OperationContext* opCtx,
     }
 
     auto microsCount = durationCount<Microseconds>(micros);
-    stdx::lock_guard lk(_lockUsage);
+    std::lock_guard lk(_lockUsage);
     for (const auto& hashedNs : hashedSet) {
         CollectionData& coll = _usage[hashedNs];
         updateCollectionData(lk, opCtx, coll, logicalOp, lockType, microsCount, readWriteType);
@@ -217,7 +217,7 @@ void Top::record(OperationContext* opCtx,
 
 void Top::collectionDropped(const NamespaceString& nss) {
     const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
-    stdx::lock_guard lk(_lockUsage);
+    std::lock_guard lk(_lockUsage);
     _usage.erase(nssStr);
 }
 
@@ -243,7 +243,7 @@ void Top::appendUsageStatsForCollection(BSONObjBuilder& result, const Collection
 }
 
 void Top::append(BSONObjBuilder& topStatsBuilder) {
-    stdx::lock_guard lk(_lockUsage);
+    std::lock_guard lk(_lockUsage);
 
     // Pull all the names into a vector so we can sort them for the user.
     std::vector<std::string> names;
@@ -271,7 +271,7 @@ void Top::appendLatencyStats(const NamespaceString& nss,
                              BSONObjBuilder* builder) {
     const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
-    stdx::lock_guard lk(_lockUsage);
+    std::lock_guard lk(_lockUsage);
     BSONObjBuilder latencyStatsBuilder;
     _usage[hashedNs].opLatencyHistogram.append(includeHistograms, false, &latencyStatsBuilder);
     builder->append("ns", nssStr);
@@ -281,7 +281,7 @@ void Top::appendLatencyStats(const NamespaceString& nss,
 void Top::appendOperationStats(const NamespaceString& nss, BSONObjBuilder* builder) {
     const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
-    stdx::lock_guard lk(_lockUsage);
+    std::lock_guard lk(_lockUsage);
     BSONObjBuilder opStatsBuilder;
 
     // Appends usage statistics to operationStats object.

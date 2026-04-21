@@ -92,7 +92,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -111,6 +110,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <ratio>
 #include <utility>
@@ -156,9 +156,9 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-using LockGuard = stdx::lock_guard<stdx::mutex>;
+using LockGuard = std::lock_guard<std::mutex>;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using UniqueLock = std::unique_lock<std::mutex>;
 
 const BSONObj kListDatabasesFailPointData = BSON("cloner" << "AllDatabaseCloner"
                                                           << "stage"
@@ -320,7 +320,7 @@ protected:
     };
 
     // protects _storageInterfaceWorkDone.
-    stdx::mutex _storageInterfaceWorkDoneMutex;
+    std::mutex _storageInterfaceWorkDoneMutex;
     StorageInterfaceResults _storageInterfaceWorkDone;
 
     void setUp() override {

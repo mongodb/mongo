@@ -41,7 +41,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
 
 #include <mutex>
@@ -59,7 +58,7 @@ repl::ReplSettings globalReplSettings;
 const auto getClusterNetworkRestrictionManager =
     ServiceContext::declareDecoration<std::unique_ptr<ClusterNetworkRestrictionManager>>();
 
-stdx::mutex mtxSetAllowListedCluster;
+std::mutex mtxSetAllowListedCluster;
 
 }  // namespace
 
@@ -113,7 +112,7 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
     const auto service = Client::getCurrent()->getServiceContext();
     const auto updater = getClusterNetworkRestrictionManager(service).get();
     if (updater) {
-        stdx::lock_guard<stdx::mutex> guard(mtxSetAllowListedCluster);
+        std::lock_guard<std::mutex> guard(mtxSetAllowListedCluster);
         std::atomic_store(&mongodGlobalParams.allowlistedClusterNetwork,
                           std::move(allowlistedClusterNetwork));
         updater->updateClusterNetworkRestrictions();

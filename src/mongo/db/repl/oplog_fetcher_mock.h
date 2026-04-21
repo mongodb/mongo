@@ -37,13 +37,13 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -99,18 +99,18 @@ private:
 
     void _preJoin() noexcept override {}
 
-    ObservableMutex<stdx::mutex>* _getMutex() noexcept override;
+    ObservableMutex<std::mutex>* _getMutex() noexcept override;
 
     // ============= End AbstractAsyncComponent overrides ==============
     class TestCodeBlock {
     public:
         TestCodeBlock(OplogFetcherMock* mock) : _mock(mock) {
-            stdx::lock_guard lk(_mock->_mutex);
+            std::lock_guard lk(_mock->_mutex);
             _mock->_inTestCodeSemaphore++;
         }
 
         ~TestCodeBlock() {
-            stdx::lock_guard lk(_mock->_mutex);
+            std::lock_guard lk(_mock->_mutex);
             _mock->_inTestCodeSemaphore--;
             _mock->_inTestCodeCV.notify_one();
         }
@@ -123,7 +123,7 @@ private:
 
     void _finishCallback(Status status);
 
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     std::unique_ptr<OplogFetcherRestartDecision> _oplogFetcherRestartDecision;
 
@@ -139,7 +139,7 @@ private:
 
     // Mutex to ensure we call join() on the _waitForFinishThread only once.  This mutex should
     // never be held when _mutex is held.
-    mutable stdx::mutex _joinFinishThreadMutex;
+    mutable std::mutex _joinFinishThreadMutex;
 
     // Thread to wait for _finishPromise and call _onShutdownCallbackFn with the given status only
     // once before the OplogFetcher finishes.

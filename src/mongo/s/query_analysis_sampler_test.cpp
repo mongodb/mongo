@@ -49,7 +49,6 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
-#include "mongo/stdx/future.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
@@ -509,7 +508,7 @@ protected:
 
         // Force the sampler to refresh its configurations. This should cause the sampler to send a
         // _refreshQueryAnalyzerConfiguration command to get sent and update its configurations.
-        auto future = stdx::async(stdx::launch::async, [&] {
+        auto future = std::async(std::launch::async, [&] {
             expectConfigurationRefreshReturnSuccess(*queryStats.getLastAvgCount(), configurations);
         });
         sampler->refreshConfigurationsForTest(operationContext());
@@ -888,7 +887,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
         CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1, startTime});
     refreshedConfigurations1.push_back(
         CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 0.5, startTime});
-    auto future1 = stdx::async(stdx::launch::async, [&] {
+    auto future1 = std::async(std::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats1.getLastAvgCount(),
                                                 refreshedConfigurations1);
     });
@@ -926,7 +925,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     std::vector<CollectionQueryAnalyzerConfiguration> refreshedConfigurations2;
     refreshedConfigurations2.push_back(
         CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 1.5, startTime});
-    auto future2 = stdx::async(stdx::launch::async, [&] {
+    auto future2 = std::async(std::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats2.getLastAvgCount(),
                                                 refreshedConfigurations2);
     });
@@ -959,7 +958,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
 
     // Force the sampler to refresh its configurations. This should cause the sampler to send a
     // _refreshQueryAnalyzerConfiguration command to get sent and update its configurations.
-    auto future3 = stdx::async(stdx::launch::async, [&] {
+    auto future3 = std::async(std::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats3.getLastAvgCount(), {});
     });
     sampler.refreshConfigurationsForTest(operationContext());
@@ -1094,7 +1093,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     std::vector<CollectionQueryAnalyzerConfiguration> newConfigurations;
     newConfigurations.push_back(
         CollectionQueryAnalyzerConfiguration{nss0, UUID::gen(), 1.5, startTime});
-    auto future = stdx::async(stdx::launch::async, [&] {
+    auto future = std::async(std::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats.getLastAvgCount(), newConfigurations);
     });
     sampler.refreshConfigurationsForTest(opCtx);

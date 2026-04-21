@@ -32,10 +32,10 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 
 MONGO_MOD_PUBLIC;
@@ -46,12 +46,12 @@ namespace versioned_value_detail {
  * The default policy that works for the most commonly used mutex types that we have anticipated.
  */
 struct DefaultLockPolicy {
-    auto makeSharedLock(stdx::mutex& m) const {
-        return stdx::lock_guard(m);
+    auto makeSharedLock(std::mutex& m) const {
+        return std::lock_guard(m);
     }
 
-    auto makeExclusiveLock(stdx::mutex& m) const {
-        return stdx::lock_guard(m);
+    auto makeExclusiveLock(std::mutex& m) const {
+        return std::lock_guard(m);
     }
 
     auto makeSharedLock(RWMutex& m) const {
@@ -59,7 +59,7 @@ struct DefaultLockPolicy {
     }
 
     auto makeExclusiveLock(RWMutex& m) const {
-        return stdx::lock_guard(m);
+        return std::lock_guard(m);
     }
 
     auto makeSharedLock(WriteRarelyRWMutex& m) const {
@@ -89,7 +89,7 @@ struct DefaultLockPolicy {
  * `VersionedValue<...>::Snapshot` values must be synchronized by users of `VersionedValue`.
  */
 template <typename ValueType,
-          typename MutexType = stdx::mutex,
+          typename MutexType = std::mutex,
           typename LockPolicy = versioned_value_detail::DefaultLockPolicy>
 class VersionedValue {
 public:

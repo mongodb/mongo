@@ -36,7 +36,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <mutex>
 #include <queue>
 #include <tuple>
 
@@ -218,7 +218,7 @@ private:
     stdx::condition_variable _cvNoLongerEmpty;
 
     // Protects member data below and synchronizes it with the underlying collection.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Number of documents in buffer.
     std::size_t _count = 0;

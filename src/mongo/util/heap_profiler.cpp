@@ -473,7 +473,7 @@ private:
         Hash stackHash = tempStack.hash();
 
         // Now acquire lock.
-        stdx::lock_guard<stdx::mutex> lk(hashtable_mutex);
+        std::lock_guard<std::mutex> lk(hashtable_mutex);
 
         // Look up stack in stackHashTable.
         StackInfo* stackInfo = stackHashTable.find(stackHash, tempStack);
@@ -519,7 +519,7 @@ private:
             return;
 
         // Now acquire lock.
-        stdx::lock_guard<stdx::mutex> lk(hashtable_mutex);
+        std::lock_guard<std::mutex> lk(hashtable_mutex);
 
         // Remove the object from the hash bucket if present.
         ObjInfo* objInfo = objHashTable.find(objHash, obj);
@@ -604,7 +604,7 @@ private:
         statsBuilder.doneFast();
 
         // Guard against races updating the StackInfo bson representation.
-        stdx::lock_guard<stdx::mutex> lk(stackinfo_mutex);
+        std::lock_guard<std::mutex> lk(stackinfo_mutex);
 
         // Traverse stackHashTable accumulating potential stacks to emit.
         // We do this traversal without locking hashtable_mutex because we need to use the heap.
@@ -679,9 +679,9 @@ private:
     std::atomic_size_t sampleIntervalBytes;  // NOLINT
 
     // guards updates to both object and stack hash tables
-    stdx::mutex hashtable_mutex;
+    std::mutex hashtable_mutex;
     // guards against races updating the StackInfo bson representation
-    stdx::mutex stackinfo_mutex;
+    std::mutex stackinfo_mutex;
 
     // cumulative bytes allocated - determines when samples are taken
     std::atomic_size_t bytesAllocated{0};  // NOLINT
@@ -793,7 +793,7 @@ private:
                   "maximumSampledObjects"_attr = _maxSampledObjects.load());
         }
 
-        stdx::lock_guard lk(heapProfiler->_mutex);
+        std::lock_guard lk(heapProfiler->_mutex);
 
         // Get a live snapshot profile of the current heap usage
         int64_t totalActiveBytes = 0;
@@ -884,7 +884,7 @@ private:
         }
     }
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     size_t _sampleBytesAllocated = 0;
     stdx::unordered_map<uint32_t, std::unique_ptr<StackInfo>> _stackInfoMap;
     Atomic<bool> _logGeneralStats = true;

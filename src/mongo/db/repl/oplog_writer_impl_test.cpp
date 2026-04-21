@@ -73,18 +73,18 @@ public:
     }
 
     void onDurable(const JournalListener::Token& t) override {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         auto& token = dynamic_cast<const Token&>(t);
         _onDurableToken = token.opTimeAndWallTime;
     }
 
     OpTimeAndWallTime getOnDurableToken() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_mutex);
         return _onDurableToken;
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     OpTimeAndWallTime _onDurableToken;
 };
 

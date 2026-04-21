@@ -157,9 +157,9 @@ TEST(DurationCast, DurationCastConstexpr) {
         ASSERT_EQ(2, secs.count());
     }
 
-    // Converting from stdx::chrono::duration to Duration is constexpr.
+    // Converting from std::chrono::duration to Duration is constexpr.
     {
-        constexpr auto ms = duration_cast<Milliseconds>(stdx::chrono::seconds(2));
+        constexpr auto ms = duration_cast<Milliseconds>(std::chrono::seconds(2));
         ASSERT_EQ(2000, ms.count());
     }
 
@@ -268,19 +268,19 @@ auto validateDeduce(In in, Equivalent equivalent) {
 }
 
 TEST(DeduceChronoDuration, DefaultPeriod) {
-    validateDeduce(3600, stdx::chrono::duration<int>(3600));
-    validateDeduce(3600, stdx::chrono::duration<int>(3600));
-    validateDeduce((short)3600, stdx::chrono::duration<short>(3600));
-    validateDeduce(3600u, stdx::chrono::duration<unsigned>(3600));
-    validateDeduce(3600., stdx::chrono::duration<double>(3600));
-    validateDeduce(3600.5, stdx::chrono::duration<double>(3600.5));
-    validateDeduce(-3600.5, stdx::chrono::duration<double>(-3600.5));
+    validateDeduce(3600, std::chrono::duration<int>(3600));
+    validateDeduce(3600, std::chrono::duration<int>(3600));
+    validateDeduce((short)3600, std::chrono::duration<short>(3600));
+    validateDeduce(3600u, std::chrono::duration<unsigned>(3600));
+    validateDeduce(3600., std::chrono::duration<double>(3600));
+    validateDeduce(3600.5, std::chrono::duration<double>(3600.5));
+    validateDeduce(-3600.5, std::chrono::duration<double>(-3600.5));
 }
 
 TEST(DeduceChronoDuration, ExplicitPeriod) {
-    validateDeduce<std::milli>(123, stdx::chrono::duration<int, std::milli>(123));
-    validateDeduce<std::nano>(123, stdx::chrono::duration<int, std::nano>(123));
-    validateDeduce<std::ratio<45, 123>>(50, stdx::chrono::duration<int, std::ratio<45, 123>>(50));
+    validateDeduce<std::milli>(123, std::chrono::duration<int, std::milli>(123));
+    validateDeduce<std::nano>(123, std::chrono::duration<int, std::nano>(123));
+    validateDeduce<std::ratio<45, 123>>(50, std::chrono::duration<int, std::ratio<45, 123>>(50));
 }
 
 }  // namespace

@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/future.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <functional>
+#include <future>
 
 #include <link.h>
 
@@ -93,7 +93,7 @@ public:
     void wait() {
         return _paused.wait();
     }
-    bool waitFor(stdx::chrono::milliseconds dur) const {
+    bool waitFor(std::chrono::milliseconds dur) const {
         return _paused.waitFor(dur);
     }
 

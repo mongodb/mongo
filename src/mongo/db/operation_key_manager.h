@@ -33,11 +33,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -85,7 +85,7 @@ public:
     size_t size() const;
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     stdx::unordered_map<OperationKey, OperationId, OperationKey::Hash> _idByOperationKey;
 };

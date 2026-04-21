@@ -39,11 +39,11 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <barrier>  // NOLINT
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <benchmark/benchmark.h>
@@ -162,7 +162,7 @@ public:
      * to call this as well, so there's an implicit arrival.
      */
     void startThreadRun(size_t threads) {
-        if (stdx::unique_lock lk{_mu}; !std::exchange(_active, true))
+        if (std::unique_lock lk{_mu}; !std::exchange(_active, true))
             _b.emplace(threads);
         _b->arrive_and_wait();
     }
@@ -176,7 +176,7 @@ public:
      */
     void endThreadRun() {
         _b->arrive_and_wait();
-        if (stdx::unique_lock lk{_mu}; std::exchange(_active, false))
+        if (std::unique_lock lk{_mu}; std::exchange(_active, false))
             _b.reset();
     }
 
@@ -194,7 +194,7 @@ private:
     };
     using NopBarrier = std::barrier<Nop>;  // NOLINT
 
-    mutable stdx::mutex _mu;
+    mutable std::mutex _mu;
     bool _active = false;
     boost::optional<NopBarrier> _b;
 };

@@ -1468,7 +1468,7 @@ boost::optional<query_shape::QueryShapeHash> OpDebug::getQueryShapeHash() const 
 
 void OpDebug::setQueryShapeHash(OperationContext* opCtx,
                                 const boost::optional<query_shape::QueryShapeHash>& hash) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    std::lock_guard<Client> lk(*opCtx->getClient());
     _queryShapeHash = hash;
     _didComputeQueryShapeHash = true;
 }

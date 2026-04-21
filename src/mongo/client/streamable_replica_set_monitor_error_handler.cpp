@@ -154,7 +154,7 @@ bool SdamErrorHandler::_isNotMaster(const Status& status) const {
 }
 
 int SdamErrorHandler::_getConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host) const {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     if (auto it = _consecutiveErrorsWithoutHelloOutcome.find(host);
         it != _consecutiveErrorsWithoutHelloOutcome.end()) {
         return it->second;
@@ -163,7 +163,7 @@ int SdamErrorHandler::_getConsecutiveErrorsWithoutHelloOutcome(const HostAndPort
 }
 
 void SdamErrorHandler::_incrementConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     auto [iter, wasEmplaced] = _consecutiveErrorsWithoutHelloOutcome.emplace(host, 1);
     if (!wasEmplaced) {
         ++(iter->second);
@@ -171,7 +171,7 @@ void SdamErrorHandler::_incrementConsecutiveErrorsWithoutHelloOutcome(const Host
 }
 
 void SdamErrorHandler::_clearConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host) {
-    stdx::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex);
     _consecutiveErrorsWithoutHelloOutcome.erase(host);
 }
 }  // namespace mongo

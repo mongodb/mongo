@@ -33,7 +33,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -42,6 +41,7 @@
 #include "mongo/util/time_support.h"
 
 #include <array>
+#include <mutex>
 #include <ostream>
 #include <thread>
 #include <tuple>
@@ -680,7 +680,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(popManyUpToPopWithBlockingWithSpecialCost,
 PRODUCER_CONSUMER_QUEUE_TEST(singleProducerMultiConsumer, runPermutations<false, true>) {
     typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     size_t successes = 0;
     size_t failures = 0;
 
@@ -690,10 +690,10 @@ PRODUCER_CONSUMER_QUEUE_TEST(singleProducerMultiConsumer, runPermutations<false,
             {
                 try {
                     pcq.pop(opCtx);
-                    stdx::lock_guard<stdx::mutex> lk(mutex);
+                    std::lock_guard<std::mutex> lk(mutex);
                     successes++;
                 } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
-                    stdx::lock_guard<stdx::mutex> lk(mutex);
+                    std::lock_guard<std::mutex> lk(mutex);
                     failures++;
                 }
             }
@@ -723,7 +723,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerSingleConsumer, runPermutations<true, 
 
     pcq.push(MoveOnly(1));
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     size_t success = 0;
     size_t failure = 0;
 
@@ -733,10 +733,10 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerSingleConsumer, runPermutations<true, 
             {
                 try {
                     pcq.push(MoveOnly(1), opCtx);
-                    stdx::lock_guard<stdx::mutex> lk(mutex);
+                    std::lock_guard<std::mutex> lk(mutex);
                     success++;
                 } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueEndClosed>&) {
-                    stdx::lock_guard<stdx::mutex> lk(mutex);
+                    std::lock_guard<std::mutex> lk(mutex);
                     failure++;
                 }
             }
@@ -746,7 +746,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerSingleConsumer, runPermutations<true, 
     pcq.pop();
 
     while (true) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         if (success == 1)
             break;
         stdx::this_thread::yield();
@@ -802,7 +802,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
 
     pcq.push(MoveOnly(1));
 
-    stdx::mutex mutex;
+    std::mutex mutex;
     bool failed = false;
     OperationContext* threadBopCtx = nullptr;
 
@@ -815,7 +815,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
 
     auto threadB = helper.runThread("ProducerB", [&](OperationContext* opCtx) {
         {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
+            std::lock_guard<std::mutex> lk(mutex);
             threadBopCtx = opCtx;
         }
 
@@ -831,7 +831,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
     };
 
     {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
+        std::lock_guard<std::mutex> lk(mutex);
         ASSERT(threadBopCtx != nullptr);
     }
 
@@ -843,7 +843,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
     };
 
     {
-        stdx::lock_guard<Client> clientLock(*threadBopCtx->getClient());
+        std::lock_guard<Client> clientLock(*threadBopCtx->getClient());
         threadBopCtx->markKilled(ErrorCodes::Interrupted);
     }
 

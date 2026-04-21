@@ -41,7 +41,6 @@
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/topology_version_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -49,6 +48,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -129,7 +129,7 @@ private:
     const HostAndPort _host;
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -182,7 +182,7 @@ private:
 
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     SdamConfiguration _sdamConfiguration;
     TopologyEventsPublisherPtr _eventPublisher;
     std::shared_ptr<executor::TaskExecutor> _executor;

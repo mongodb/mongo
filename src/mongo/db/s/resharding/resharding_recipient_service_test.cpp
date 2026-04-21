@@ -365,17 +365,17 @@ public:
     }
 
     void notifyNewInstanceStarted() {
-        stdx::lock_guard guard(_instanceStateMutex);
+        std::lock_guard guard(_instanceStateMutex);
         _instanceSpecificState = std::make_unique<InstanceSpecificState>();
     }
 
     bool setDataReplicationStarted() {
-        stdx::lock_guard guard(_instanceStateMutex);
+        std::lock_guard guard(_instanceStateMutex);
         return _instanceSpecificState->dataReplicationRunning = true;
     }
 
     bool isDataReplicationRunning() {
-        stdx::lock_guard guard(_instanceStateMutex);
+        std::lock_guard guard(_instanceStateMutex);
         return _instanceSpecificState->dataReplicationRunning;
     }
 
@@ -399,7 +399,7 @@ private:
     boost::optional<std::tuple<RecipientStateEnum, ExternalFunction>> _errorFunction = boost::none;
     boost::optional<bool> _shouldSkipCloning = boost::none;
 
-    stdx::mutex _instanceStateMutex;
+    std::mutex _instanceStateMutex;
     std::unique_ptr<InstanceSpecificState> _instanceSpecificState =
         std::make_unique<InstanceSpecificState>();
 

@@ -45,7 +45,7 @@ DelayableTimeoutCallback::~DelayableTimeoutCallback() {
 }
 
 void DelayableTimeoutCallback::cancel() {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _cancel(lk);
 }
 
@@ -59,7 +59,7 @@ void DelayableTimeoutCallback::_cancel(WithLock) {
 }
 
 Date_t DelayableTimeoutCallback::getNextCall() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _nextCall;
 }
 
@@ -68,7 +68,7 @@ bool DelayableTimeoutCallback::isActive() const {
 }
 
 Status DelayableTimeoutCallback::scheduleAt(Date_t when) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _scheduleAt(lk, when);
 }
 
@@ -105,7 +105,7 @@ Status DelayableTimeoutCallback::_delayUntil(WithLock lk, Date_t when) {
 
 void DelayableTimeoutCallback::_handleTimeout(const executor::TaskExecutor::CallbackArgs& args) {
     {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (args.myHandle != _cbHandle) {
             // This is normal when scheduleAt() or cancel() is used.
             LOGV2_DEBUG(6602302,
@@ -187,12 +187,12 @@ Status DelayableTimeoutCallbackWithJitter::scheduleAtWithJitter(WithLock,
                                                                 Date_t when,
                                                                 Milliseconds jitterUpperBound) {
     if (jitterUpperBound == Milliseconds::zero()) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _resetRandomization(lk);
         return _scheduleAt(lk, when);
     }
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     _updateJitter(lk, jitterUpperBound);
     return _scheduleAt(lk, when + _currentJitter);
 }

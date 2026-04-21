@@ -59,7 +59,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/topology_version_gen.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -73,6 +72,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -518,7 +518,7 @@ private:
     RunCmdOnPrimaryAndAwaitResponseFunction _runCmdOnPrimaryAndAwaitResponseFn;
 
     // Guards all the variables below
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     MemberState _memberState;
     ReplSetConfig _getConfigReturnValue;

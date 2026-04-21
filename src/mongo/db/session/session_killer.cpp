@@ -60,7 +60,7 @@ SessionKiller::SessionKiller(Service* service, KillFunc killer)
         // TODO(SERVER-111754): Please revisit if this thread could be made killable.
         ThreadClient tc("SessionKiller", service, ClientOperationKillableByStepdown{false});
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
 
         // While we're not in shutdown
         while (!_inShutdown) {
@@ -94,7 +94,7 @@ SessionKiller::SessionKiller(Service* service, KillFunc killer)
 SessionKiller::~SessionKiller() {
     try {
         {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             _inShutdown = true;
         }
         _killerCV.notify_one();
@@ -167,7 +167,7 @@ SessionKiller* SessionKiller::get(OperationContext* ctx) {
 
 std::shared_ptr<SessionKiller::Result> SessionKiller::kill(
     OperationContext* opCtx, const KillAllSessionsByPatternSet& toKill) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     // Save a shared_ptr to the current reapResults (I.e. the next thing to get killed).
     auto reapResults = _reapResults;
@@ -193,7 +193,7 @@ std::shared_ptr<SessionKiller::Result> SessionKiller::kill(
     return {reapResults.result, reapResults.result->get_ptr()};
 }
 
-void SessionKiller::_periodicKill(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lk) {
+void SessionKiller::_periodicKill(OperationContext* opCtx, std::unique_lock<std::mutex>& lk) {
     // Pull our current workload onto the stack.  Swap it for empties.
     decltype(_nextToReap) nextToReap;
     decltype(_reapResults) reapResults;

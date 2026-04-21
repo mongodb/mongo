@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
@@ -84,11 +83,11 @@ public:
     }
 
     void setName(StringData name) {
-        stdx::lock_guard lk(_nameMutex);
+        std::lock_guard lk(_nameMutex);
         _name = std::string{name};
     }
     std::string getName() const {
-        stdx::lock_guard lk(_nameMutex);
+        std::lock_guard lk(_nameMutex);
         return _name;
     }
 
@@ -132,7 +131,7 @@ private:
 
     std::string _units;
 
-    mutable stdx::mutex _nameMutex;
+    mutable std::mutex _nameMutex;
     std::string _name;  // guarded by _nameMutex
 };
 
@@ -155,7 +154,7 @@ public:
     ~ProgressMeterHolder() {
         if (_pm) {
             {
-                stdx::unique_lock<Client> lk(*_opCtx->getClient());
+                std::unique_lock<Client> lk(*_opCtx->getClient());
                 _pm->finished();
             }
         }

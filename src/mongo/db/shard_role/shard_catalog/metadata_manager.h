@@ -42,7 +42,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
@@ -89,7 +88,7 @@ public:
      * Returns the placement version of the active metadata object.
      */
     ChunkVersion getActivePlacementVersion() {
-        stdx::lock_guard<stdx::mutex> lg(_managerLock);
+        std::lock_guard<std::mutex> lg(_managerLock);
         invariant(!_metadata.empty());
         return _metadata.back()->metadata->getShardPlacementVersion();
     }
@@ -201,7 +200,7 @@ private:
     const NamespaceString _nss;
 
     // Mutex to protect the state below
-    mutable stdx::mutex _managerLock;
+    mutable std::mutex _managerLock;
 
     // Contains a list of collection metadata for the same collection uuid, ordered in
     // chronological order based on the refreshes that occurred. The entry at _metadata.back() is

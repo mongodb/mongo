@@ -64,7 +64,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
@@ -1504,14 +1503,14 @@ public:
     };
 
     virtual HelloData waitForHello() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         _helloCondVar.wait(lk, [this] { return _helloResult != boost::none; });
 
         return std::move(*_helloResult);
     }
 
     bool hasHelloResult() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         return _helloResult != boost::none;
     }
 
@@ -1523,7 +1522,7 @@ private:
         Status validateHost(const HostAndPort& host,
                             const BSONObj& request,
                             const RemoteCommandResponse& helloReply) override {
-            stdx::lock_guard<stdx::mutex> lk(_parent->_mutex);
+            std::lock_guard<std::mutex> lk(_parent->_mutex);
             _parent->_helloResult = HelloData{request, helloReply};
             _parent->_helloCondVar.notify_all();
             return Status::OK();
@@ -1542,7 +1541,7 @@ private:
     };
 
 protected:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _helloCondVar;
     boost::optional<HelloData> _helloResult;
 };

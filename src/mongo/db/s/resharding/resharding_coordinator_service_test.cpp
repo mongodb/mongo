@@ -234,7 +234,7 @@ public:
         }
 
         if (_options.blockInGetDocumentsDelta) {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             opCtx->waitForConditionOrInterrupt(_blockInGetDocumentsDeltaCV, lk, [this] {
                 return !_doKeepBlockingInGetDocumentsDelta;
             });
@@ -292,7 +292,7 @@ public:
     }
 
     void unblockGetDocumentsDelta() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _doKeepBlockingInGetDocumentsDelta = false;
         _blockInGetDocumentsDeltaCV.notify_all();
     }
@@ -303,7 +303,7 @@ private:
     boost::optional<std::tuple<CoordinatorStateEnum, ExternalFunction>> _errorFunction =
         boost::none;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _blockInGetDocumentsDeltaCV;
     bool _doKeepBlockingInGetDocumentsDelta = true;
 

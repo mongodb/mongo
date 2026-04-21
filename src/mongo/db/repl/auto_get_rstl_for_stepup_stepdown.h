@@ -33,11 +33,11 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/storage/execution_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
+#include <mutex>
 #include <vector>
 
 namespace mongo {
@@ -145,7 +145,7 @@ private:
     // Thread that will run killOpThreadFn().
     std::unique_ptr<stdx::thread> _killOpThread;
     // Protects killSignaled and stopKillingOps cond. variable.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     // Signals thread about the change of killSignaled value.
     stdx::condition_variable _stopKillingOps;
     // Once this is set to true, the killOpThreadFn method will terminate.

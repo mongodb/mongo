@@ -100,7 +100,7 @@ auto runWithoutSession(OperationContext* opCtx, Callable callable) {
 
     // The below code can throw, so it cannot run in a scope guard.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->checkForInterrupt();
     }
     checkOutSessionAndVerifyTxnState(opCtx);
@@ -119,7 +119,7 @@ void runWithoutSession(OperationContext* opCtx, Callable callable) {
 
     // The below code can throw, so it cannot run in a scope guard.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->checkForInterrupt();
     }
     checkOutSessionAndVerifyTxnState(opCtx);
@@ -157,11 +157,11 @@ void MigrationBatchInserter::run(Status status) const try {
 
     auto assertNotAborted = [&]() {
         {
-            stdx::lock_guard<Client> lk(*_outerOpCtx->getClient());
+            std::lock_guard<Client> lk(*_outerOpCtx->getClient());
             _outerOpCtx->checkForInterrupt();
         }
         {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            std::lock_guard<Client> lk(*opCtx->getClient());
             opCtx->checkForInterrupt();
         }
     };

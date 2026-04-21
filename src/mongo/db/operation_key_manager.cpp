@@ -68,7 +68,7 @@ void OperationKeyManager::add(const OperationKey& key, OperationId id) {
                 "operationKey"_attr = key.toString(),
                 "operationId"_attr = id);
 
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto result = _idByOperationKey.emplace(key, id).second;
 
     uassert(ErrorCodes::BadValue,
@@ -77,12 +77,12 @@ void OperationKeyManager::add(const OperationKey& key, OperationId id) {
 }
 
 bool OperationKeyManager::remove(const OperationKey& key) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _idByOperationKey.erase(key);
 }
 
 boost::optional<OperationId> OperationKeyManager::at(const OperationKey& key) const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     auto it = _idByOperationKey.find(key);
     if (it == _idByOperationKey.end()) {
         return boost::none;
@@ -92,7 +92,7 @@ boost::optional<OperationId> OperationKeyManager::at(const OperationKey& key) co
 }
 
 size_t OperationKeyManager::size() const {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
     return _idByOperationKey.size();
 }
 

@@ -33,12 +33,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -140,14 +140,14 @@ private:
     void _triggerJournalFlush(WithLock lk);
 
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable stdx::mutex _opCtxMutex;
+    mutable std::mutex _opCtxMutex;
 
     // Saves a reference to the flusher thread's operation context so it can be interrupted if the
     // flusher is active.
     boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
 
     // Protects the state below.
-    mutable stdx::mutex _stateMutex;
+    mutable std::mutex _stateMutex;
 
     // Signaled to wake up the thread, if the thread is waiting or paused. The thread will check
     // whether _flushJournalNow, _needToPause, or _shuttingDown is set and flush, pause, or stop

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -106,7 +105,7 @@ struct Partitioner {
 
 namespace partitioned_detail {
 
-using CacheExclusiveMutex = CacheExclusive<stdx::mutex>;
+using CacheExclusiveMutex = CacheExclusive<std::mutex>;
 
 template <typename Key, typename Value>
 Key getKey(const std::pair<Key, Value>& pair) {
@@ -119,11 +118,11 @@ Key getKey(const Key& key) {
 }
 
 template <typename T>
-inline std::vector<stdx::unique_lock<stdx::mutex>> lockAllPartitions(T& mutexes) {
-    std::vector<stdx::unique_lock<stdx::mutex>> result;
+inline std::vector<std::unique_lock<std::mutex>> lockAllPartitions(T& mutexes) {
+    std::vector<std::unique_lock<std::mutex>> result;
     result.reserve(mutexes.size());
     std::transform(mutexes.begin(), mutexes.end(), std::back_inserter(result), [](auto&& mutex) {
-        return stdx::unique_lock<stdx::mutex>{*mutex};
+        return std::unique_lock<std::mutex>{*mutex};
     });
     return result;
 }
@@ -250,7 +249,7 @@ public:
     private:
         friend class Partitioned;
 
-        std::vector<stdx::unique_lock<stdx::mutex>> _lockGuards;
+        std::vector<std::unique_lock<std::mutex>> _lockGuards;
         Partitioned* _partitionedContainer;
     };
 
@@ -288,7 +287,7 @@ public:
               _partitioned(&partitioned),
               _id(partitionId) {}
 
-        stdx::unique_lock<stdx::mutex> _partitionLock;
+        std::unique_lock<std::mutex> _partitionLock;
         Partitioned* _partitioned;
         PartitionId _id;
     };

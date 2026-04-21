@@ -115,7 +115,7 @@ void MoveTimingHelper::done(int step) {
     CurOp* op = CurOp::get(_opCtx);
 
     {
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
+        std::lock_guard<Client> lk(*_opCtx->getClient());
         op->setMessage(lk, s.c_str());
     }
 

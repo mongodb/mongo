@@ -49,7 +49,6 @@
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
@@ -110,7 +109,7 @@ private:
 
     std::unique_ptr<stdx::thread> _quorumCheckThread;
     Status _quorumCheckStatus;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     bool _isQuorumCheckDone;
 };
 
@@ -131,13 +130,13 @@ Status CheckQuorumTest::waitForQuorumCheck() {
 }
 
 bool CheckQuorumTest::isQuorumCheckDone() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     return _isQuorumCheckDone;
 }
 
 void CheckQuorumTest::_runQuorumCheck(const ReplSetConfig& config, int myIndex) {
     _quorumCheckStatus = _runQuorumCheckImpl(config, myIndex);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::lock_guard<std::mutex> lk(_mutex);
     _isQuorumCheckDone = true;
 }
 

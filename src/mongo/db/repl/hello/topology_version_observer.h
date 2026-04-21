@@ -36,13 +36,13 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -138,7 +138,7 @@ private:
      * consumers are readers of `_cache` and the producer is the observer thread. The assumption
      * is that the contention on this lock is insignificant.
      */
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _cv;
 
     /**

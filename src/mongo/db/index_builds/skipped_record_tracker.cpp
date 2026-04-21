@@ -172,7 +172,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     static const char* curopMessage = "Index Build: retrying skipped records";
     ProgressMeterHolder progress;
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(
             lk,
             CurOp::get(opCtx)->setProgress(lk, curopMessage, _skippedRecordCounter.load(), 1),
@@ -183,7 +183,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     const auto onResolved = [&]() {
         resolved++;
 
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.get(lk)->hit();
     };
 
@@ -283,7 +283,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     }
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.get(lk)->finished();
     }
 

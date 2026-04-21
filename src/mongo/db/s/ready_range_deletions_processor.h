@@ -100,7 +100,7 @@ private:
 
     ServiceContext* const _service;
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     State _state{kInitializing};
 

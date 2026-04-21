@@ -37,7 +37,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
@@ -46,6 +45,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -64,12 +64,12 @@ public:
     AsyncConditionVariable() : _current(boost::in_place()) {}
 
     SemiFuture<void> onNotify() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         return _current->getFuture().semi();
     }
 
     void notifyAllAndReset() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (_inShutdown) {
             return;
         }
@@ -78,7 +78,7 @@ public:
     }
 
     void notifyAllAndClose() {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         if (_inShutdown) {
             return;
         }
@@ -87,7 +87,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     boost::optional<SharedPromise<void>> _current;
     bool _inShutdown{false};
 };
@@ -144,7 +144,7 @@ private:
     ClientStrandPtr _waitForMajorityCancellationClient;
 
     // This mutex synchronizes access to the members declared below.
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // Contains an ordered list of opTimes to wait to be majority comitted.
     OpTimeWaitingMap _queuedOpTimes;

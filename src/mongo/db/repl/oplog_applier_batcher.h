@@ -37,7 +37,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -46,6 +45,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -169,7 +169,7 @@ private:
     OplogApplier* _oplogApplier;
     OplogBuffer* const _oplogBuffer;
 
-    ObservableMutex<stdx::mutex> _mutex;
+    ObservableMutex<std::mutex> _mutex;
     stdx::condition_variable _cv;
 
     /**

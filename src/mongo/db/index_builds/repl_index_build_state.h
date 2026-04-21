@@ -42,7 +42,6 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
@@ -52,6 +51,7 @@
 #include "mongo/util/uuid.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -675,7 +675,7 @@ public:
      * entry in "config.system.indexBuilds" collection should take this lock in exclusive mode.
      *
      * Resource mutex will be initialized only for 2 phase index protocol.
-     * stdx::mutex lock order:
+     * std::mutex lock order:
      * commitQuorumLock -> mutex.
      */
     boost::optional<ResourceMutex> commitQuorumLock;
@@ -724,7 +724,7 @@ private:
     const std::vector<IndexBuildInfo> _indexes;
 
     // Protects the state below.
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
     // Primary and secondaries gets their commit or abort signal via this promise future pair.
     std::unique_ptr<SharedPromise<IndexBuildAction>> _waitForNextAction;

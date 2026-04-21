@@ -46,7 +46,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/mongo_path_util.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/decorable.h"
@@ -303,7 +302,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
              *  where the js misses the interrupt and throw an exception instead of
              *  being interrupted
              */
-            stdx::this_thread::sleep_for(stdx::chrono::seconds(1));
+            stdx::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
         try {
@@ -434,7 +433,7 @@ class ScopeCache {
 public:
     using PoolName = std::tuple<DatabaseName, string>;
     void release(const PoolName& poolName, const std::shared_ptr<Scope>& scope) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         if (scope->hasOutOfMemoryException()) {
             // make some room
@@ -462,7 +461,7 @@ public:
     }
 
     std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const PoolName& poolName) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
             if (it->poolName == poolName) {
@@ -478,7 +477,7 @@ public:
     }
 
     void clear() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         _pools.clear();
     }
@@ -495,7 +494,7 @@ private:
 
     typedef std::deque<ScopeAndPool> Pools;  // More-recently used Scopes are kept at the front.
     Pools _pools;                            // protected by _mutex
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 };
 
 ScopeCache scopeCache;

@@ -37,7 +37,8 @@
 #include "mongo/otel/metrics/metrics_prometheus_file_exporter.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
-#include "mongo/stdx/chrono.h"
+
+#include <chrono>
 
 #include <absl/algorithm/container.h>
 #include <google/protobuf/message.h>
@@ -96,8 +97,8 @@ Status initializeHttp(const std::string& endpoint, const std::string& compressio
 
     // Initialize and set the global MeterProvider
     metrics_sdk::PeriodicExportingMetricReaderOptions pemOpts;
-    pemOpts.export_interval_millis = stdx::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
-    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
+    pemOpts.export_interval_millis = std::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
+    pemOpts.export_timeout_millis = std::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
 
     auto reader =
         metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(exporter), pemOpts);
@@ -140,8 +141,8 @@ Status initializeFile(const std::string& directory) {
 
     // Initialize and set the global MeterProvider
     metrics_sdk::PeriodicExportingMetricReaderOptions pemOpts;
-    pemOpts.export_interval_millis = stdx::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
-    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
+    pemOpts.export_interval_millis = std::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
+    pemOpts.export_timeout_millis = std::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
     // We do a empty file write immediately here because there's some one-time static initialization
     // that needs to be done in the file exporter, which is currently not done in a thread-safe way,
     // so if there are multiple file exporters (e.g. for metrics and for traces) it can lead to a
@@ -174,8 +175,8 @@ Status initializePrometheusFileExporter(const std::string& path, const int maxCo
     }
 
     metrics_sdk::PeriodicExportingMetricReaderOptions pemOpts;
-    pemOpts.export_interval_millis = stdx::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
-    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
+    pemOpts.export_interval_millis = std::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
+    pemOpts.export_timeout_millis = std::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
     auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(
         std::move(prometheusFileExporter.getValue()), pemOpts);
 

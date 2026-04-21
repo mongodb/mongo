@@ -58,7 +58,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/log_test.h"
@@ -182,7 +181,7 @@ public:
     }
 
     RequestHandlerUtil::responseOutcomeCount getCountersWhenReady() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        std::unique_lock<std::mutex> lk(_mutex);
         _cv.wait(_mutex, [&] { return _replyUpdated; });
         _replyUpdated = false;
         return _responseOutcomeCount;
@@ -196,7 +195,7 @@ private:
     // counter of how many successful and failed responses were received.
     responseOutcomeCount _responseOutcomeCount;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     stdx::condition_variable _cv;
 
     // called when a server sends a new isMaster exhaust response. Updates _responseOutcomeCount
@@ -204,7 +203,7 @@ private:
     std::function<void(const executor::TaskExecutor::RemoteCommandCallbackArgs&)> _callbackFn =
         [&](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) {
             {
-                stdx::unique_lock<stdx::mutex> lk(_mutex);
+                std::unique_lock<std::mutex> lk(_mutex);
                 if (result.response.isOK()) {
                     _responseOutcomeCount._success++;
                 } else {

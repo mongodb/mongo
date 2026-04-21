@@ -395,7 +395,7 @@ protected:
     const bool _isColdCollection;
 
     // Protects initialization of the _nextIdNum.
-    mutable stdx::mutex _initNextIdMutex;
+    mutable std::mutex _initNextIdMutex;
     AtomicWord<long long> _nextIdNum{0};
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL

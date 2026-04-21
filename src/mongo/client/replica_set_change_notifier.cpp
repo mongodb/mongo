@@ -43,7 +43,7 @@
 namespace mongo {
 
 void ReplicaSetChangeNotifier::_addListener(std::shared_ptr<Listener> listener) {
-    stdx::lock_guard lk(_mutex);
+    std::lock_guard lk(_mutex);
 
     listener->init(this);
     _listeners.push_back(std::move(listener));
@@ -52,7 +52,7 @@ void ReplicaSetChangeNotifier::_addListener(std::shared_ptr<Listener> listener) 
 void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) {
     LOGV2_DEBUG(20158, 2, "Signaling found set", "replicaSet"_attr = name);
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     _replicaSetStates.emplace(name, State{});
 
@@ -71,7 +71,7 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
 
     const auto& name = connectionString.getSetName();
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     auto state = [&] {
         auto& state = _replicaSetStates[name];
@@ -103,7 +103,7 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
                 "primary"_attr = primary);
 
     const auto& name = connectionString.getSetName();
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     auto state = [&] {
         auto& state = _replicaSetStates[name];
@@ -129,7 +129,7 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
 void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) {
     LOGV2_DEBUG(20161, 2, "Signaling dropped set", "replicaSet"_attr = name);
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
     // If we never singaled the initial possible set, we should not on dropped set
     auto it = _replicaSetStates.find(name);
@@ -152,7 +152,7 @@ void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) {
 auto ReplicaSetChangeNotifier::Listener::getCurrentState(const Key& key) -> State {
     invariant(_notifier);
 
-    stdx::lock_guard lk(_notifier->_mutex);
+    std::lock_guard lk(_notifier->_mutex);
 
     return _notifier->_replicaSetStates.at(key);
 }

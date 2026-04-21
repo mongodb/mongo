@@ -45,13 +45,13 @@
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -483,7 +483,7 @@ private:
     void _checkForAllIdIndexes(OperationContext* opCtx);
 
     // Guards access to member variables.
-    mutable stdx::mutex _mutex;  // (S)
+    mutable std::mutex _mutex;  // (S)
 
     // Set to true when RollbackImpl should shut down.
     bool _inShutdown = false;  // (M)

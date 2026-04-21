@@ -136,7 +136,7 @@ TEST_F(CancelableOperationContextTest, SafeWhenCancellationSourceIsCanceledUnder
     {
         // Holding the Client mutex while canceling the CancellationSource won't lead to
         // self-deadlock.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         cancelSource.cancel();
     }
     waitForAllEarlierTasksToComplete();
@@ -200,7 +200,7 @@ TEST_F(CancelableOperationContextTest, SafeWhenOperationContextOwnCancellationTo
     {
         // Acquiring the Client mutex is technically unnecessary here but we do it specifically to
         // demonstrate that holding it won't lead to self-deadlock.
-        stdx::lock_guard<Client> lk(*cancelableOpCtx->getClient());
+        std::lock_guard<Client> lk(*cancelableOpCtx->getClient());
         cancelableOpCtx->markKilled(expectedErrorCode);
     }
     ASSERT_EQ(cancelableOpCtx->checkForInterruptNoAssert(), expectedErrorCode);
@@ -220,7 +220,7 @@ TEST_F(CancelableOperationContextTest, SafeWhenOperationContextKilledManually) {
     {
         // Acquiring the Client mutex is technically unnecessary here but we do it specifically to
         // demonstrate that holding it won't lead to self-deadlock.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->markKilled(expectedErrorCode);
     }
     ASSERT_EQ(opCtx->checkForInterruptNoAssert(), expectedErrorCode);

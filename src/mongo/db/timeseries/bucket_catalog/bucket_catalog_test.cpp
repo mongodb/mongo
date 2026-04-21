@@ -468,7 +468,7 @@ BSONObj BucketCatalogTest::_getCompressedBucketDoc(const BSONObj& bucketDoc) {
 
 BSONObj BucketCatalogTest::_getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {
     auto const& stripe = *catalog.stripes[internal::getStripeNumber(catalog, bucketId)];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    std::lock_guard stripeLock{stripe.mutex};
 
     const Bucket* bucket =
         internal::findBucket(catalog.bucketStateRegistry, stripe, stripeLock, bucketId);
@@ -561,7 +561,7 @@ Status BucketCatalogTest::_reopenBucket(
 
     // Register the reopened bucket with the catalog.
     auto& stripe = *_bucketCatalog->stripes[stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    std::lock_guard stripeLock{stripe.mutex};
 
     era = loadBucketIntoCatalogEra.value_or(getCurrentEra(_bucketCatalog->bucketStateRegistry));
     return internal::loadBucketIntoCatalog(
@@ -1049,7 +1049,7 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     for (size_t i = 0; i < numMeasurementsInWriteBatch.size(); i++) {
         auto& curBatch = batchedInsertContexts[curBatchedInsertContextsIndex[i]];
         auto& stripe = *_bucketCatalog->stripes[curBatch.stripeNumber];
-        stdx::lock_guard stripeLock{stripe.mutex};
+        std::lock_guard stripeLock{stripe.mutex};
 
         // We are looking at a new batchedInsertContext, so we should reset curPosition
         if (i != 0 && (curBatchedInsertContextsIndex[i] != curBatchedInsertContextsIndex[i - 1])) {
@@ -2433,7 +2433,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     stripe.openBucketsByKey[dummyBucketKey].emplace(dummyBucket.get());
     stripe.idleBuckets.push_front(dummyBucket.get());
     dummyBucket->idleListEntry = stripe.idleBuckets.begin();
-    stdx::lock_guard stripeLock{stripe.mutex};
+    std::lock_guard stripeLock{stripe.mutex};
 
     // Create execution stats controller.
     auto collectionStats = std::make_shared<ExecutionStats>();
@@ -3431,7 +3431,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
     ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.empty());
 
     {
-        stdx::unique_lock<stdx::mutex> stripeLock(
+        std::unique_lock<std::mutex> stripeLock(
             _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->mutex);
         bool bucketOpenedDueToMetadata = true;
         auto& bucket = getEligibleBucket(_opCtx,
@@ -3492,7 +3492,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
     ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
 
     {
-        stdx::unique_lock<stdx::mutex> stripeLock(
+        std::unique_lock<std::mutex> stripeLock(
             _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->mutex);
         bool bucketOpenedDueToMetadata = true;
         auto& bucketFound =

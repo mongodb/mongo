@@ -50,12 +50,12 @@
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -65,34 +65,34 @@ namespace mongo {
 // The purpose of this type is to allow inserters to communicate
 // their progress to the outside world.
 class MigrationCloningProgressSharedState {
-    mutable stdx::mutex _m;
+    mutable std::mutex _m;
     repl::OpTime _maxOptime;
     long long _numCloned = 0;
     long long _numBytes = 0;
 
 public:
     void updateMaxOptime(const repl::OpTime& _newOptime) {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
         _maxOptime = std::max(_maxOptime, _newOptime);
     }
     repl::OpTime getMaxOptime() const {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
         return _maxOptime;
     }
     void incNumCloned(int num) {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
         _numCloned += num;
     }
     void incNumBytes(int num) {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
         _numBytes += num;
     }
     long long getNumCloned() const {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
         return _numCloned;
     }
     long long getNumBytes() const {
-        stdx::lock_guard lk(_m);
+        std::lock_guard lk(_m);
         return _numBytes;
     }
 };

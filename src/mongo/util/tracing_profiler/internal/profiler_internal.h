@@ -148,7 +148,7 @@ public:
         TagIdHash,
         std::equal_to<TagId>,
         boost::alignment::aligned_allocator<std::pair<TagId, NodeId>,
-                                            stdx::hardware_destructive_interference_size>>
+                                            std::hardware_destructive_interference_size>>
         ChildrenHashMap;
 
     /**
@@ -186,7 +186,7 @@ public:
 
     typedef std::vector<
         Node,
-        boost::alignment::aligned_allocator<Node, stdx::hardware_destructive_interference_size>>
+        boost::alignment::aligned_allocator<Node, std::hardware_destructive_interference_size>>
         Nodes;
 
 public:

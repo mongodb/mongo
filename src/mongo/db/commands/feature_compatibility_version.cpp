@@ -71,7 +71,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -81,6 +80,7 @@
 #include <algorithm>
 #include <initializer_list>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -317,7 +317,7 @@ ResourceMutex fcvDocumentLock("featureCompatibilityVersionDocumentLock");
 // lastFCVUpdateTimestamp contains the latest oplog entry timestamp which updated the FCV.
 // It is reset on rollback.
 Timestamp lastFCVUpdateTimestamp;
-stdx::mutex lastFCVUpdateTimestampMutex;
+std::mutex lastFCVUpdateTimestampMutex;
 
 /**
  * Build update command for featureCompatibilityVersion document updates.
@@ -817,14 +817,14 @@ Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationC
 }
 
 void FeatureCompatibilityVersion::advanceLastFCVUpdateTimestamp(Timestamp fcvUpdateTimestamp) {
-    stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
+    std::lock_guard lk(lastFCVUpdateTimestampMutex);
     if (fcvUpdateTimestamp > lastFCVUpdateTimestamp) {
         lastFCVUpdateTimestamp = fcvUpdateTimestamp;
     }
 }
 
 void FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp() {
-    stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
+    std::lock_guard lk(lastFCVUpdateTimestampMutex);
     lastFCVUpdateTimestamp = Timestamp();
 }
 
@@ -853,7 +853,7 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
         const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet = replCoordinator && replCoordinator->getSettings().isReplSet();
         auto neededMajorityTimestamp = [] {
-            stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
+            std::lock_guard lk(lastFCVUpdateTimestampMutex);
             return lastFCVUpdateTimestamp;
         }();
         if (isReplSet && !neededMajorityTimestamp.isNull()) {

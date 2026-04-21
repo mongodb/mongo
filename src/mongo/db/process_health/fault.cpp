@@ -54,13 +54,13 @@ Milliseconds Fault::getDuration() const {
 }
 
 std::vector<FaultFacetPtr> Fault::getFacets() const {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     std::vector<FaultFacetPtr> result(_facets.begin(), _facets.end());
     return result;
 }
 
 FaultFacetPtr Fault::getFaultFacet(FaultFacetType type) {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     auto it = std::find_if(_facets.begin(), _facets.end(), [type](const FaultFacetPtr& facet) {
         return facet->getType() == type;
     });
@@ -71,7 +71,7 @@ FaultFacetPtr Fault::getFaultFacet(FaultFacetType type) {
 }
 
 void Fault::removeFacet(FaultFacetType type) {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     _facets.erase(
         std::remove_if(_facets.begin(),
                        _facets.end(),
@@ -82,7 +82,7 @@ void Fault::removeFacet(FaultFacetType type) {
 void Fault::upsertFacet(FaultFacetPtr facet) {
     invariant(facet);
     auto type = facet->getType();
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     for (auto& existing : _facets) {
         invariant(existing);
         if (existing->getType() == type) {
@@ -95,7 +95,7 @@ void Fault::upsertFacet(FaultFacetPtr facet) {
 }
 
 void Fault::garbageCollectResolvedFacets() {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     _facets.erase(std::remove_if(_facets.begin(),
                                  _facets.end(),
                                  [this](const FaultFacetPtr& facet) {
@@ -110,7 +110,7 @@ void Fault::appendDescription(BSONObjBuilder* builder) const {
     builder->append("id", getId().toBSON());
     builder->append("duration", getDuration().toBSON());
     BSONObjBuilder facetsBuilder;
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     for (auto& facet : _facets) {
         facetsBuilder.append(FaultFacetType_serializer(facet->getType()), facet->toBSON());
     }

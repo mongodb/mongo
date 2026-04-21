@@ -127,14 +127,14 @@ public:
     ErrorLabelBuilderTest() : _opCtx(makeOperationContext()) {}
 
     void setCommand(BSONObj cmdObj) const {
-        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        std::lock_guard<Client> clientLock(*opCtx()->getClient());
         CurOp::get(opCtx())->setGenericOpRequestDetails(
             clientLock, _testNss, nullptr, cmdObj, NetworkOp::dbMsg);
     }
 
     void setGetMore(BSONObj originatingCommand) const {
         setCommand(BSON("getMore" << 1000000ll << "collection" << _testNss.coll()));
-        stdx::lock_guard<Client> lk(*opCtx()->getClient());
+        std::lock_guard<Client> lk(*opCtx()->getClient());
         CurOp::get(opCtx())->setOriginatingCommand(lk, originatingCommand);
     }
 

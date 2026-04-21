@@ -115,7 +115,7 @@ void WasmtimeScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
 void WasmtimeScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
     ServiceContext::LockedClientsCursor cursor(&*svcCtxLock);
     while (auto client = cursor.next()) {
-        stdx::lock_guard lk(*client);
+        std::lock_guard lk(*client);
         if (auto opCtx = client->getOperationContext();
             opCtx && (*opCtx)[operationWasmtimeScopeDecoration]) {
             (*opCtx)[operationWasmtimeScopeDecoration]->kill();

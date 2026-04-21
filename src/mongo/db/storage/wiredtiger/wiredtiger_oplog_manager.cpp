@@ -37,12 +37,12 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 
 #include <limits>
 #include <memory>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -87,7 +87,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
 
     _oplogIdent = std::string{oplog.getIdent()};
 
-    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    std::lock_guard<std::mutex> lk(_oplogVisibilityStateMutex);
     invariant(!_oplog);
     _oplog = &oplog;
     LOGV2(12035900, "Oplog visibility thread is starting");
@@ -95,7 +95,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         stdx::thread([this, service = opCtx->getServiceContext()->getService(), &engine] {
             Client::initThread("OplogVisibilityThread", service);
 
-            stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
+            std::unique_lock<std::mutex> lk(_oplogVisibilityStateMutex);
             while (_oplog) {
                 switch (_updateVisibility(lk, engine, *_oplog->capped())) {
                     case VisibilityUpdateResult::NotUpdated:
@@ -144,7 +144,7 @@ void WiredTigerOplogManager::stop(const RecordStore* oplog) {
 }
 
 void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
-    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    std::lock_guard<std::mutex> lk(_oplogVisibilityStateMutex);
     if (!_triggerOplogVisibilityUpdate) {
         _triggerOplogVisibilityUpdate = true;
         _oplogVisibilityThreadCV.notify_one();
@@ -175,7 +175,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     // Close transaction before we wait.
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-    stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    std::unique_lock<std::mutex> lk(_oplogVisibilityStateMutex);
 
     // Prevent any scheduled oplog visibility updates from being delayed for batching and blocking
     // this wait excessively.
@@ -216,7 +216,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
 }
 
 WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVisibility(
-    stdx::unique_lock<stdx::mutex>& lk, const KVEngine& engine, const RecordStore::Capped& oplog) {
+    std::unique_lock<std::mutex>& lk, const KVEngine& engine, const RecordStore::Capped& oplog) {
     {
         MONGO_IDLE_THREAD_BLOCK;
         _oplogVisibilityThreadCV.wait(lk,
@@ -264,7 +264,7 @@ std::uint64_t WiredTigerOplogManager::getOplogReadTimestamp() const {
 }
 
 void WiredTigerOplogManager::setOplogReadTimestamp(Timestamp ts) {
-    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    std::lock_guard<std::mutex> lk(_oplogVisibilityStateMutex);
     _setOplogReadTimestamp(lk, ts.asULL());
 }
 

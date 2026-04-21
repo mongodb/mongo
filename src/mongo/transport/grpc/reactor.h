@@ -33,16 +33,16 @@
 #include "mongo/db/baton.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/executor_stats.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
 
+#include <chrono>
 #include <list>
 #include <memory>
+#include <mutex>
 
 #include <grpc/support/time.h>
 #include <grpcpp/alarm.h>
@@ -142,7 +142,7 @@ public:
         return std::make_unique<GRPCReactorTimer>(shared_from_this());
     }
 
-    stdx::chrono::system_clock::time_point systemTime() override {
+    std::chrono::system_clock::time_point systemTime() override {
         return ::grpc::Timespec2Timepoint(gpr_now(::gpr_clock_type::GPR_CLOCK_REALTIME));
     }
 
@@ -176,7 +176,7 @@ private:
     ::grpc::CompletionQueue _cq;
     bool _inShutdownFlag = false;
 
-    stdx::mutex _taskMutex;
+    std::mutex _taskMutex;
     std::list<std::unique_ptr<CompletionQueueEntry>> _cqTaskStash;
 };
 }  // namespace mongo::transport::grpc

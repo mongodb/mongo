@@ -281,7 +281,7 @@ TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
 
     // Now interrupt the opCtx which the cursor is running under.
     {
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
+        std::lock_guard<Client> lk(*_opCtx->getClient());
         _opCtx->markKilled(ErrorCodes::CursorKilled);
     }
 

@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <vector>
 
 MONGO_MOD_PUBLIC;
@@ -54,12 +54,12 @@ public:
     using Argument = T;
 
     void addObserver(unique_function<void(const T&)> observer) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         _registry.emplace_back(std::move(observer));
     }
 
     Status operator()(const T& t) {
-        stdx::lock_guard lk(_mutex);
+        std::lock_guard lk(_mutex);
         for (const auto& observer : _registry) {
             observer(t);
         }
@@ -68,7 +68,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     std::vector<unique_function<void(const T&)>> _registry;
 };
 

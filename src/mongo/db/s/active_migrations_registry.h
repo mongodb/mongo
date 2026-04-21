@@ -42,13 +42,13 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -225,7 +225,7 @@ private:
     void _clearSplitMergeChunk(const NamespaceString& nss);
 
     // Protects the state below
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // Condition variable which will be signaled whenever any of the states below become false,
     // boost::none or a specific namespace removed from the map.

@@ -52,7 +52,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -67,6 +66,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <utility>
@@ -343,7 +343,7 @@ private:
 
     AtomicWord<bool> _isDropped{true};
 
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
     std::list<HostQueryPtr> _outstandingQueries;
     boost::optional<ChangeNotifierState> _confirmedNotifierState;
     std::shared_ptr<ReplicaSetMonitorStats> _stats;

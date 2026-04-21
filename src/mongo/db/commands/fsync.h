@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
+
+#include <mutex>
 
 MONGO_MOD_PUBLIC;
 
@@ -48,10 +49,10 @@ void shutdownFsyncLockThread();
 /**
  * This is used to block oplogWriter and should never be acquired by others.
  */
-extern stdx::mutex oplogWriterLockedFsync;
+extern std::mutex oplogWriterLockedFsync;
 
 /**
  * This is used to block oplogApplier and should never be acquired by others.
  */
-extern stdx::mutex oplogApplierLockedFsync;
+extern std::mutex oplogApplierLockedFsync;
 }  // namespace mongo

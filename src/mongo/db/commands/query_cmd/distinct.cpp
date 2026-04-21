@@ -626,7 +626,7 @@ public:
                 opCtx, std::move(canonicalQuery), collectionOrView->getCollection());
 
             {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setPlanSummary(lk,
                                                   executor->getPlanExplainer().getPlanSummary());
                 CurOp::get(opCtx)->debug().queryFramework = executor->getQueryFramework();

@@ -65,7 +65,7 @@ public:
         for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
              Client* client = cursor.next();) {
             invariant(client);
-            stdx::unique_lock<Client> uniqueLock(*client);
+            std::unique_lock<Client> uniqueLock(*client);
 
             const OperationContext* clientOpCtx = client->getOperationContext();
             auto state = clientOpCtx ? shard_role_details::getLocker(clientOpCtx)->getClientState()

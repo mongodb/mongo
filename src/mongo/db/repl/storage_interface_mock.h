@@ -47,13 +47,13 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdlib>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <utility>
@@ -486,7 +486,7 @@ public:
     Timestamp earliestOplogTimestamp = Timestamp::min();
 
 private:
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     int _rbid;
     bool _rbidInitialized = false;
     Timestamp _stableTimestamp = Timestamp::min();

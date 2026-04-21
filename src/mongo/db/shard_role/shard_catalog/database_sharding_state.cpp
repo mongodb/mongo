@@ -31,10 +31,11 @@
 
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <mutex>
 
 namespace mongo {
 namespace {
@@ -63,7 +64,7 @@ public:
             return &it->second;
         }
         readLock.unlock();
-        stdx::lock_guard writeLock(_mutex);
+        std::lock_guard writeLock(_mutex);
         auto [it, _] = _databases.emplace(dbName, _factory->make(dbName));
         return &it->second;
     }

@@ -48,7 +48,7 @@ requires(std::equality_comparable<Key>)
 class WaiterList {
 public:
     SharedSemiFuture<void> waitFor(const Key& key) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         if (key == _currentKeyValue) {
             return SemiFuture<void>::makeReady().share();
         }
@@ -60,7 +60,7 @@ public:
     }
 
     void notifyWaiters(const Key& key) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         if (auto nh = _waiters.extract(key)) {
             nh.mapped().emplaceValue();
         }
@@ -77,7 +77,7 @@ public:
     template <typename F>
     requires(std::predicate<F, const Key&>)
     void notifyWaitersBasedOnPredicate(F&& pred) {
-        stdx::unique_lock lk(_mutex);
+        std::unique_lock lk(_mutex);
         auto it = _waiters.begin();
         auto end = _waiters.end();
         while (it != end) {
@@ -91,7 +91,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     boost::optional<Key> _currentKeyValue;
     stdx::unordered_map<Key, SharedPromise<void>, absl::Hash<Key>> _waiters;
 };

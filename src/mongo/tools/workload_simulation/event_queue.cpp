@@ -29,7 +29,7 @@
 
 #include "mongo/tools/workload_simulation/event_queue.h"
 
-#include "mongo/stdx/chrono.h"
+#include <chrono>
 
 namespace mongo::workload_simulation {
 
@@ -76,7 +76,7 @@ bool EventQueue::wait_for(Duration d, WaitType t) {
     auto promise = std::make_unique<promise_type>();
     auto notifier = promise->getFuture();
     {
-        stdx::lock_guard lk{_mutex};
+        std::lock_guard lk{_mutex};
         auto currentTime = _tickSource.getTicks();
         invariant(currentTime > 0);
         auto wakeTime = currentTime + duration_cast<Nanoseconds>(d).count();
@@ -101,10 +101,10 @@ template bool EventQueue::wait_for<Milliseconds>(Milliseconds, WaitType);
 template bool EventQueue::wait_for<Seconds>(Seconds, WaitType);
 
 void EventQueue::_processQueues() {
-    stdx::unique_lock lk{_mutex};
+    std::unique_lock lk{_mutex};
     if (!_haveEventToProcess()) {
         if (!_cv.wait_for(
-                lk, stdx::chrono::milliseconds(1), [this]() { return _haveEventToProcess(); })) {
+                lk, std::chrono::milliseconds(1), [this]() { return _haveEventToProcess(); })) {
             return;
         }
     }

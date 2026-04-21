@@ -145,7 +145,7 @@ public:
                 token.onCancel()
                     .thenRunOn(_service->getInstanceCleanupExecutor())
                     .then([this, self = shared_from_this()] {
-                        stdx::lock_guard lk(_mutex);
+                        std::lock_guard lk(_mutex);
 
                         if (_completionPromise.getFuture().isReady()) {
                             // We already completed
@@ -183,7 +183,7 @@ public:
                         }
                     })
                     .onCompletion([self = shared_from_this()](Status status) {
-                        stdx::lock_guard lk(self->_mutex);
+                        std::lock_guard lk(self->_mutex);
                         if (self->_completionPromise.getFuture().isReady()) {
                             // We were already interrupted
                             return;
@@ -215,7 +215,7 @@ public:
         boost::optional<BSONObj> reportForCurrentOp(
             MongoProcessInterface::CurrentOpConnectionsMode connMode,
             MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
 
             if (_stateDoc.getBoolField("reportOp")) {
                 return BSON("instanceID" << _id << "state" << _state);
@@ -225,17 +225,17 @@ public:
         }
 
         int getID() {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             return _id["_id"].Int();
         }
 
         State getState() {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             return _state;
         }
 
         State getInitialState() {
-            stdx::lock_guard lk(_mutex);
+            std::lock_guard lk(_mutex);
             return _initialState;
         }
 
@@ -249,7 +249,7 @@ public:
 
     private:
         void _runOnce(State sourceState, State targetState) {
-            stdx::unique_lock lk(_mutex);
+            std::unique_lock lk(_mutex);
             if (_state > sourceState) {
                 invariant(_state != State::kDone);
                 return;
@@ -306,7 +306,7 @@ public:
         SharedPromise<void> _completionPromise;
         // set only if doing a write to the state document throws an exception.
         SharedPromise<void> _documentWriteException;
-        stdx::mutex _mutex;
+        std::mutex _mutex;
         const TestService* const _service;
     };
 

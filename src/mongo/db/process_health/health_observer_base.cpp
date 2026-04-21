@@ -62,7 +62,7 @@ SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
         LOGV2_DEBUG(6007902, 2, "Start periodic health check", "observerType"_attr = getType());
         const auto now = _svcCtx->getPreciseClockSource()->now();
 
-        auto lk = stdx::lock_guard(_mutex);
+        auto lk = std::lock_guard(_mutex);
         _lastTimeTheCheckWasRun = now;
         _currentlyRunningHealthCheck = true;
     }
@@ -87,7 +87,7 @@ SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
         std::move(healthCheckResult).onCompletion([this](StatusWith<HealthCheckStatus> status) {
             const auto now = _svcCtx->getPreciseClockSource()->now();
 
-            auto lk = stdx::lock_guard(_mutex);
+            auto lk = std::lock_guard(_mutex);
             ++_completedChecksCount;
             invariant(_currentlyRunningHealthCheck);
             _currentlyRunningHealthCheck = false;
@@ -134,7 +134,7 @@ HealthCheckStatus HealthObserverBase::makeSimpleFailedStatusWithType(
 }
 
 HealthObserverLivenessStats HealthObserverBase::getStats() const {
-    auto lk = stdx::lock_guard(_mutex);
+    auto lk = std::lock_guard(_mutex);
     return getStatsLocked(lk);
 }
 

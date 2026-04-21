@@ -62,7 +62,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
@@ -1834,7 +1833,7 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
     BSONObjBuilder result;
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    auto reconfigResult = stdx::async(stdx::launch::async, [&] {
+    auto reconfigResult = std::async(std::launch::async, [&] {
         status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
     });
 
@@ -1857,7 +1856,7 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
 
     // Respond to quorum check to resume the reconfig. We keep responding until the reconfig thread
     // finishes.
-    while (stdx::future_status::ready !=
+    while (std::future_status::ready !=
            reconfigResult.wait_for(Milliseconds::zero().toSystemDuration())) {
         respondToAllHeartbeats();
     }

@@ -118,7 +118,7 @@ private:
     Commands _commands;
     ReplayTestServer _server;
     std::string _jsonStr;
-    stdx::mutex _m;
+    std::mutex _m;
     std::vector<std::exception_ptr> _errors;
 };
 

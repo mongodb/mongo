@@ -32,13 +32,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -87,11 +87,11 @@ public:
     void exitDrainMode() final;
 
 private:
-    void _waitForSpace(stdx::unique_lock<stdx::mutex>& lk, const Cost& cost);
+    void _waitForSpace(std::unique_lock<std::mutex>& lk, const Cost& cost);
     void _clear(WithLock lk);
     void _push(Batch::const_iterator begin, Batch::const_iterator end, const Cost& cost);
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
     stdx::condition_variable _notEmptyCV;
     stdx::condition_variable _notFullCV;
     const std::size_t _maxSize;

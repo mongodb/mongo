@@ -45,7 +45,6 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/session.h"
@@ -55,6 +54,8 @@
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/processinfo.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -264,7 +265,7 @@ public:
         }
 
         Sessions* _src;
-        stdx::unique_lock<ObservableMutex<stdx::mutex>> _lk;
+        std::unique_lock<ObservableMutex<std::mutex>> _lk;
     };
 
     /** Returns a proxy object providing synchronized mutable access to the Sessions object. */
@@ -288,7 +289,7 @@ public:
         return _rejected.load();
     }
 
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
     stdx::condition_variable _cv;      ///< notified on `_byClient` changes.
     Atomic<std::size_t> _size{0};      ///< Kept in sync with `_byClient.size()`
     Atomic<std::size_t> _created{0};   ///< Increases with each `insert` call.
@@ -465,7 +466,7 @@ void SessionManagerCommon::endSessionByClient(Client* client) {
     }
 
     {
-        stdx::lock_guard lk(*client);
+        std::lock_guard lk(*client);
         ServiceExecutorContext::reset(client);
     }
     auto sync = _sessions->sync();

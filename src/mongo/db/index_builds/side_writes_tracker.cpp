@@ -246,12 +246,12 @@ Status SideWritesTracker::drainWritesIntoIndex(
     static const char* curopMessage = "Index Build: draining writes received during build";
     ProgressMeterHolder progress;
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage), opCtx);
     }
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         // Force the progress meter to log at the end of every batch. By default, the progress
         // meter only logs after a large number of calls to hit(), but since we use such large
         // batch sizes, progress would rarely be displayed.
@@ -386,7 +386,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         wuow.commit();
 
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             progress.get(lk)->hit(batchSize);
         }
         _numApplied += batchSize;
@@ -408,7 +408,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         }
 
         {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            std::unique_lock<Client> lk(*opCtx->getClient());
             // Account for more writes coming in during a batch.
             progress.get(lk)->setTotalWhileRunning(_counter->loadRelaxed() - appliedAtStart);
         }
@@ -428,7 +428,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
     }
 
     {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        std::unique_lock<Client> lk(*opCtx->getClient());
         progress.get(lk)->finished();
     }
 

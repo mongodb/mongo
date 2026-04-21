@@ -117,7 +117,7 @@ public:
                                        const TxnNumber& txnNumber,
                                        boost::optional<TxnRetryCounter> txnRetryCounter)
         : _opCtx(opCtx) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        std::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->setLogicalSessionId(lsid);
         opCtx->setTxnNumber(txnNumber);
         if (txnRetryCounter.has_value()) {
@@ -128,7 +128,7 @@ public:
 
     // The opCtx may be used to apply later operations in a batch, clean up before reusing.
     ~ScopedSetTxnInfoOnOperationContext() {
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
+        std::lock_guard<Client> lk(*_opCtx->getClient());
         _opCtx->resetMultiDocumentTransactionState();
     }
 

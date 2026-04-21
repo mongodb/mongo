@@ -407,7 +407,7 @@ boost::optional<BSONObj> CleanupStructuredEncryptionDataCoordinator::reportForCu
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
     auto bob = basicReportBuilder();
 
-    stdx::lock_guard lg{_docMutex};
+    std::lock_guard lg{_docMutex};
     bob.append(
         "escNss",
         NamespaceStringUtil::serialize(_doc.getEscNss(), SerializationContext::stateDefault()));
@@ -429,7 +429,7 @@ void CleanupStructuredEncryptionDataCoordinator::updateCleanupStats(const ECOCSt
     FLEStatusSection::get().updateCleanupStats(CleanupStats(phaseEcocStats, phaseEscStats));
 
     // update stats in state document
-    stdx::lock_guard lg(_docMutex);
+    std::lock_guard lg(_docMutex);
     auto docEscStats = _doc.getEscStats().value_or(ECStats{});
     auto docEcocStats = _doc.getEcocStats().value_or(ECOCStats{});
     FLEStatsUtil::accumulateStats(docEscStats, phaseEscStats);
@@ -462,7 +462,7 @@ ExecutorFuture<void> CleanupStructuredEncryptionDataCoordinator::_runImpl(
 
                 updateCleanupStats(ECOCStats{}, phaseEscStats);
 
-                stdx::lock_guard lg(_docMutex);
+                std::lock_guard lg(_docMutex);
                 _doc.setSkipCleanup(skipCleanup);
                 _doc.setEcocRenameUuid(ecocRenameUuid);
             }))

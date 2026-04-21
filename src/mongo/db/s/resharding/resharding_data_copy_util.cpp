@@ -328,7 +328,7 @@ int insertBatchTransactionally(OperationContext* opCtx,
         try {
             ++txnNumber;
             {
-                stdx::lock_guard<Client> lg(*opCtx->getClient());
+                std::lock_guard<Client> lg(*opCtx->getClient());
                 opCtx->setTxnNumber(txnNumber);
             }
             runWithTransactionFromOpCtx(opCtx, nss, [&](OperationContext* opCtx) {
@@ -458,7 +458,7 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
     AuthorizationSession::get(client)->grantInternalAuthorization();
     TxnNumber txnNumber = *opCtx->getTxnNumber();
     {
-        stdx::lock_guard<Client> lg(*client);
+        std::lock_guard<Client> lg(*client);
         opCtx->setInMultiDocumentTransaction();
     }
 

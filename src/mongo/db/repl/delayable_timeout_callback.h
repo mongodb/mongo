@@ -30,7 +30,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -38,6 +37,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -97,7 +97,7 @@ protected:
         return _executor;
     }
 
-    mutable stdx::mutex _mutex;
+    mutable std::mutex _mutex;
 
 private:
     void _handleTimeout(const executor::TaskExecutor::CallbackArgs& cbData);

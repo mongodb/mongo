@@ -32,7 +32,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/intrusive_counter.h"
@@ -212,7 +211,7 @@ private:
 
     Client* const _clientPtr;
 
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     // Once we have stdx::atomic::wait(), we can get rid of the mutex in favor of this variable.
     AtomicWord<bool> _isBound{false};

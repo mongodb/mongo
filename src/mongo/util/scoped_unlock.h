@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -50,7 +49,7 @@ public:
      * Unique_locks passed into this constructor must be locked, or an invariant failure will be
      * thrown.
      */
-    explicit ScopedUnlock(stdx::unique_lock<T>& lock) : _lock(lock) {
+    explicit ScopedUnlock(std::unique_lock<T>& lock) : _lock(lock) {
         invariant(_lock.owns_lock(), "Locks in ScopedUnlock must be locked on initialization.");
         _lock.unlock();
     }
@@ -72,7 +71,7 @@ public:
     }
 
 private:
-    stdx::unique_lock<T>& _lock;
+    std::unique_lock<T>& _lock;
     bool _dismissed = false;
 };
 

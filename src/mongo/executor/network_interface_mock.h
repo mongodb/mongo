@@ -41,7 +41,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/transport_layer.h"
@@ -427,44 +426,44 @@ private:
     /**
      * Implementation of startup behavior.
      */
-    void _startup_inlock(stdx::unique_lock<stdx::mutex>& lk);
+    void _startup_inlock(std::unique_lock<std::mutex>& lk);
 
     /**
      * Returns the current virtualized time.
      */
-    Date_t _now_inlock(stdx::unique_lock<stdx::mutex>& lk) const {
+    Date_t _now_inlock(std::unique_lock<std::mutex>& lk) const {
         return _clkSource->now();
     }
 
     /**
      * Implementation of waitForWork*.
      */
-    void _waitForWork_inlock(stdx::unique_lock<stdx::mutex>& lk);
+    void _waitForWork_inlock(std::unique_lock<std::mutex>& lk);
 
     /**
      * Returns the current number of ready requests.
      */
-    size_t _getNumReadyRequests_inlock(stdx::unique_lock<stdx::mutex>& lk);
+    size_t _getNumReadyRequests_inlock(std::unique_lock<std::mutex>& lk);
 
     /**
      * Returns true if the network thread could run right now.
      */
-    bool _isNetworkThreadRunnable_inlock(stdx::unique_lock<stdx::mutex>& lk);
+    bool _isNetworkThreadRunnable_inlock(std::unique_lock<std::mutex>& lk);
 
     /**
      * Returns true if the executor thread could run right now.
      */
-    bool _isExecutorThreadRunnable_inlock(stdx::unique_lock<stdx::mutex>& lk);
+    bool _isExecutorThreadRunnable_inlock(std::unique_lock<std::mutex>& lk);
 
     /**
      * Enqueues a network operation to run in order of 'consideration date'.
      */
-    void _enqueueOperation_inlock(stdx::unique_lock<stdx::mutex>& lk, NetworkOperation&& op);
+    void _enqueueOperation_inlock(std::unique_lock<std::mutex>& lk, NetworkOperation&& op);
 
     /**
      * "Connects" to a remote host, and then enqueues the provided operation.
      */
-    void _connectThenEnqueueOperation_inlock(stdx::unique_lock<stdx::mutex>& lk,
+    void _connectThenEnqueueOperation_inlock(std::unique_lock<std::mutex>& lk,
                                              const HostAndPort& target,
                                              NetworkOperation&& op);
 
@@ -473,7 +472,7 @@ private:
      *
      * Note that interruption and timeout also invoke this function.
      */
-    void _scheduleResponse_inlock(stdx::unique_lock<stdx::mutex>& lk,
+    void _scheduleResponse_inlock(std::unique_lock<std::mutex>& lk,
                                   NetworkOperationIterator noi,
                                   Date_t when,
                                   const TaskExecutor::ResponseStatus& response);
@@ -483,7 +482,7 @@ private:
      * This represents interrupting the regular flow with, for example, a NetworkTimeout or
      * CallbackCanceled error.
      */
-    void _interruptWithResponse_inlock(stdx::unique_lock<stdx::mutex>& lk,
+    void _interruptWithResponse_inlock(std::unique_lock<std::mutex>& lk,
                                        const TaskExecutor::CallbackHandle& cbHandle,
                                        const TaskExecutor::ResponseStatus& response);
 
@@ -492,7 +491,7 @@ private:
      * reaquire "lk" several times, but will not return until the executor has blocked
      * in waitFor*.
      */
-    void _runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>& lk);
+    void _runReadyNetworkOperations_inlock(std::unique_lock<std::mutex>& lk);
 
     /**
      * Returns true if there are operations that have not yet been marked as isFinished().
@@ -516,7 +515,7 @@ private:
     // Mutex that synchronizes access to mutable data in this class and its subclasses.
     // Fields guarded by the mutex are labled (M), below, and those that are read-only
     // in multi-threaded execution, and so unsynchronized, are labeled (R).
-    stdx::mutex _mutex;
+    std::mutex _mutex;
 
     std::function<void()> _onCancelAction;
 
@@ -619,7 +618,7 @@ public:
     /**
      * Fulfills a response to an ongoing operation.
      */
-    bool fulfillResponse_inlock(stdx::unique_lock<stdx::mutex>& lk, NetworkResponse response);
+    bool fulfillResponse_inlock(std::unique_lock<std::mutex>& lk, NetworkResponse response);
 
     /**
      * Predicate that returns true if cbHandle equals the executor's handle for this network

@@ -103,7 +103,7 @@ public:
      */
     LogSeverity operator()(const key_type& k) {
         auto now = Date_t::now();
-        auto lg = stdx::lock_guard(_mutex);
+        auto lg = std::lock_guard(_mutex);
         auto& queue = _suppressions.template get<0>();    // view as a queue
         auto& hashset = _suppressions.template get<1>();  // view as a hashset
         for (; !queue.empty() && queue.front().expire <= now;)
@@ -117,7 +117,7 @@ private:
     Milliseconds _period;
     LogSeverity _normal;
     LogSeverity _quiet;
-    stdx::mutex _mutex;
+    std::mutex _mutex;
     Suppressions _suppressions;
 };
 
