@@ -4,6 +4,11 @@
  *
  * NOTE: This test is similar to mixed_mode_sharded_transition_part_1/2.js in the ssl_x509
  * test suite. This suite does not use ssl so it cannot test modes with ssl.
+ *
+ * @tags: [
+ *   # TODO(SERVER-124153): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 
 // Test setup randomly have auth/no auth setting on shards, which make hooks targetting shard

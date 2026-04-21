@@ -2,6 +2,11 @@
  * This test checks if different mixtures of ssl modes
  * in a sharded clutster can or cannot function. This test is split in 2 parts since it was hitting
  * timeouts in slow variants.
+ *
+ * @tags: [
+ *   # TODO(SERVER-124153): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 
 import {disabled, mixedShardTest, preferTLS} from "jstests/ssl/libs/ssl_helpers.js";

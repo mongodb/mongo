@@ -8,6 +8,8 @@
 //   directly_against_shardsvrs_incompatible,
 //   # Time series collections cannot be used as a source for `viewOn` or have view-like limitations in this context.
 //   exclude_from_timeseries_crud_passthrough,
+//   # TODO(SERVER-124153): Remove.
+//   featureFlagReplicatedFastCount_incompatible,
 // ]
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getAggPlanStages, getPlanStages} from "jstests/libs/query/analyze_plan.js";

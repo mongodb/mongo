@@ -10,6 +10,8 @@
  *   does_not_support_stepdowns,
  *   # moveCollection can't run during FCV transitions
  *   cannot_run_during_upgrade_downgrade,
+ *   # TODO(SERVER-124153): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

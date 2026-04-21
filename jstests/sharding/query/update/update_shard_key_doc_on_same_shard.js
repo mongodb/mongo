@@ -4,6 +4,8 @@
  * @tags: [
  *   uses_multi_shard_transaction,
  *   uses_transactions,
+ *   # TODO(SERVER-124153): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

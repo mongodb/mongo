@@ -7,6 +7,8 @@
  *   # This test requires strict control over the tracking state of un/sharded collections.
  *   assumes_unsharded_collection,
  *   requires_fcv_70,
+ *   # TODO(SERVER-124153): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {

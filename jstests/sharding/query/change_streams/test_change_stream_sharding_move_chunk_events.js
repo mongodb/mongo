@@ -12,6 +12,8 @@
  *   featureFlagChangeStreamPreciseShardTargeting,
  *   requires_sharding,
  *   uses_change_streams,
+ *   # TODO(SERVER-124153): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {

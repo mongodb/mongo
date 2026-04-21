@@ -6,6 +6,8 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   requires_fcv_70,
+ *   # TODO(SERVER-124153): Remove.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {numMostCommonValues} from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
