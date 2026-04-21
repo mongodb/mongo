@@ -97,10 +97,9 @@ public:
     void ignoreUniqueConstraint();
 
     /**
-     * Sets an index build UUID associated with the indexes for this builder. This call is required
-     * for two-phase index builds.
+     * Sets an index build UUID associated with the indexes for this builder.
      */
-    void setTwoPhaseBuildUUID(UUID indexBuildUUID) {
+    void setBuildUUID(UUID indexBuildUUID) {
         _buildUUID = indexBuildUUID;
     }
 

@@ -2680,7 +2680,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
 
     // Provide a build UUID, indicating that this is a two-phase index build.
     const auto buildUUID = UUID::gen();
-    indexer.setTwoPhaseBuildUUID(buildUUID);
+    indexer.setBuildUUID(buildUUID);
 
     const LogicalTime indexInit = _clock->tickClusterTime(3);
 

@@ -290,7 +290,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
 TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
-    indexer->setTwoPhaseBuildUUID(buildUUID);
+    indexer->setBuildUUID(buildUUID);
 
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
@@ -323,7 +323,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
 TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
-    indexer->setTwoPhaseBuildUUID(buildUUID);
+    indexer->setBuildUUID(buildUUID);
 
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
@@ -366,7 +366,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
 TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
-    indexer->setTwoPhaseBuildUUID(buildUUID);
+    indexer->setBuildUUID(buildUUID);
 
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
@@ -670,7 +670,7 @@ TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
 TEST_F(MultiIndexBlockTest, CommitDropsTemporaryTables) {
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
-    indexer->setTwoPhaseBuildUUID(buildUUID);
+    indexer->setBuildUUID(buildUUID);
 
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);
@@ -751,7 +751,7 @@ TEST_F(MultiIndexBlockTest, AbortDropsTemporaryTables) {
 TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
-    indexer->setTwoPhaseBuildUUID(buildUUID);
+    indexer->setBuildUUID(buildUUID);
 
     AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
     CollectionWriter coll(operationContext(), autoColl);

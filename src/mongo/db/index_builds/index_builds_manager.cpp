@@ -116,7 +116,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     auto builder = invariant(_getBuilder(buildUUID));
     if (options.protocol == IndexBuildProtocol::kTwoPhase ||
         options.protocol == IndexBuildProtocol::kPrimaryDriven) {
-        builder->setTwoPhaseBuildUUID(buildUUID);
+        builder->setBuildUUID(buildUUID);
     }
 
     // Ignore uniqueness constraint violations when relaxed, for single-phase builds on
