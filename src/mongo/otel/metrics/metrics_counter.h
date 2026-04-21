@@ -46,15 +46,42 @@
 
 namespace mongo::otel::metrics {
 
+/** A counter with typed attributes. */
 template <typename T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC Counter : public Metric {
+class MONGO_MOD_PUBLIC Counter {
 public:
     using Attributes = std::tuple<AttributeTs...>;
 
-    ~Counter() override = default;
+    virtual ~Counter() = default;
 
     /** T must be nonnegative. */
     virtual void add(T value, const Attributes& attributes) = 0;
+};
+
+/**
+ * Specialization when there are no attributes so we don't need to add an empty tuple to add. See
+ * the non-specialized version for documentation.
+ */
+template <typename T>
+class MONGO_MOD_PUBLIC Counter<T> {
+public:
+    using Attributes = std::tuple<>;
+    virtual ~Counter() = default;
+    virtual void add(T value, const std::tuple<>& attributes) = 0;
+    void add(T value) {
+        add(value, {});
+    }
+};
+
+/**
+ * Base interface for counter observation. Provides the read/observe side of a counter (value
+ * reporting and resetting) without exposing any particular add() signature. MetricsService uses
+ * this as its storage type so it doesn't need to template on the attribute types.
+ */
+template <typename T>
+class ObservableCounter : public Metric {
+public:
+    ~ObservableCounter() override = default;
 
     /**
      * For each combination of attributes for which the counter has been incremented, returns the
@@ -65,26 +92,10 @@ public:
 };
 
 /**
- * Specialization when there are no attributes so we don't need to add an empty tuple to add. See
- * the non-specialized version for documentation.
- */
-template <typename T>
-class MONGO_MOD_PUBLIC Counter<T> : public Metric {
-public:
-    using Attributes = std::tuple<>;
-    ~Counter() override = default;
-    virtual void add(T value, const std::tuple<>& attributes) = 0;
-    void add(T value) {
-        add(value, {});
-    }
-    virtual AttributesAndValues<T> values() const = 0;
-};
-
-/**
  * A lock free (non-decreasing) counter with attribute support.
  */
 template <typename T, typename... AttributeTs>
-class CounterImpl : public Counter<T, AttributeTs...> {
+class CounterImpl : public Counter<T, AttributeTs...>, public ObservableCounter<T> {
 public:
     using Attributes = Counter<T, AttributeTs...>::Attributes;
 

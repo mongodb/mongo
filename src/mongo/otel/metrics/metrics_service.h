@@ -38,17 +38,21 @@
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/otel/metrics/metrics_updown_counter.h"
+#include "mongo/otel/metrics/otel_metric_name_validation.h"
+#include "mongo/otel/metrics/server_status_metric_name_validation.h"
 #include "mongo/otel/metrics/server_status_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
-#include <functional>
 #include <memory>
+#include <typeindex>
 #include <vector>
 
 #include <absl/container/btree_map.h>
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/meter.h>
@@ -104,30 +108,40 @@ public:
     }
 
     /**
-     * Creates a counter with the provided parameters. The function will throw an exception if the
-     * counter would collide with an existing metric (i.e., same name but different type or other
-     * parameters). Metrics should be stashed once they are created to avoid taking a lock on the
-     * global list of metrics in performance-sensitive codepaths.
+     * Creates an int64_t counter with the provided parameters. The function will throw an exception
+     * if the counter would collide with an existing metric (i.e., same name but different type or
+     * other parameters). Metrics should be stashed once they are created to avoid taking a lock on
+     * the global list of metrics in performance-sensitive codepaths. Note that this will take
+     * storage proportional to all possible attribute combinations, and will throw an exception if
+     * there are too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    Counter<int64_t>& createInt64Counter(MetricName name,
-                                         std::string description,
-                                         MetricUnit unit,
-                                         const CounterOptions& = {});
+    template <AttributeType... AttributeTs>
+    Counter<int64_t, AttributeTs...>& createInt64Counter(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const CounterOptions& = {});
 
     /**
-     * Creates a counter with the provided parameters. The function will throw an exception if the
-     * counter would collide with an existing metric (i.e., same name but different type or other
-     * parameters). Metrics should be stashed once they are created to avoid taking a lock on the
-     * global list of metrics in performance-sensitive codepaths.
+     * Creates a double counter with the provided parameters. The function will throw an exception
+     * if the counter would collide with an existing metric (i.e., same name but different type or
+     * other parameters). Metrics should be stashed once they are created to avoid taking a lock on
+     * the global list of metrics in performance-sensitive codepaths. Note that this will take
+     * storage proportional to all possible attribute combinations, and will throw an exception if
+     * there are too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    Counter<double>& createDoubleCounter(MetricName name,
-                                         std::string description,
-                                         MetricUnit unit,
-                                         const CounterOptions& = {});
+    template <AttributeType... AttributeTs>
+    Counter<double, AttributeTs...>& createDoubleCounter(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const CounterOptions& = {});
 
     /**
      * Creates an int64_t up-down counter with the provided parameters. The function will throw an
@@ -228,7 +242,8 @@ private:
     struct MetricIdentifier {
         std::string description;
         MetricUnit unit;
-        // If this is none, the metric will not be exported to serverStatus.
+        /** The type index of the implementation class, which includes the attribute types. */
+        std::type_index typeIndex = typeid(void);
         boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
         boost::optional<std::vector<double>> histogramBucketBoundaries = boost::none;
 
@@ -253,14 +268,19 @@ private:
      * If a metric with the same name and different identifier or type T exists, an exception is
      * thrown.
      */
-    template <typename T>
-    T* getDuplicateMetric(WithLock, const std::string& name, MetricIdentifier identifier);
+    template <typename ImplT, typename OwnedMetricT>
+    ImplT* _getDuplicateMetric(WithLock, const std::string& name, MetricIdentifier identifier);
 
-    template <typename T>
-    Counter<T>& createCounter(MetricName name,
-                              std::string description,
-                              MetricUnit unit,
-                              const CounterOptions& options);
+    /**
+     * Creates a counter with attributes of type AttributeTs and records values of type T. This
+     * includes adding it to the appropriate internal data structures.
+     */
+    template <typename T, AttributeType... AttributeTs>
+    Counter<T, AttributeTs...>& _createCounter(MetricName name,
+                                               std::string description,
+                                               MetricUnit unit,
+                                               const AttributeDefinition<AttributeTs>&... defs,
+                                               const CounterOptions& options);
 
     template <typename T>
     UpDownCounter<T>& createUpDownCounter(MetricName name,
@@ -294,17 +314,31 @@ private:
     /**
      * Validates the given options. Then, either returns an existing matching metric or creates
      * one with `makeInstrument` and stores it. Then, registers the serverStatus tree if requested
-     * and optionally runs `addObservable` if OTEL is enabled.
+     * and optionally runs `addObservable` if OTEL is enabled. ImplT is the implementation class and
+     * OwnedMetricT is the type used for storage in _metrics and observation (where applicable).
      */
-    template <typename InstrumentT, typename Options>
-    InstrumentT& _createMetric(MetricName name,
-                               const Options& options,
-                               MetricIdentifier identifier,
-                               MakeInstrumentRef<InstrumentT> makeInstrument,
-                               AddObservableRef<InstrumentT> addObservable);
+    template <typename ImplT, typename OwnedMetricT, typename Options>
+    ImplT& _createMetric(MetricName name,
+                         const Options& options,
+                         MetricIdentifier identifier,
+                         MakeInstrumentRef<ImplT> makeInstrument,
+                         AddObservableRef<ImplT> addObservable);
 
-    using OwnedMetric = std::variant<std::unique_ptr<Counter<int64_t>>,
-                                     std::unique_ptr<Counter<double>>,
+#ifdef MONGO_CONFIG_OTEL
+    /**
+     * Registers an observable counter instrument with the OTEL provider and stores the resulting
+     * handle in `_observableInstruments`.
+     */
+    template <template <typename> class MetricT, typename T>
+    void _addObservable(WithLock,
+                        const std::string& nameStr,
+                        MetricT<T>* metricPtr,
+                        std::string description,
+                        MetricUnit unit);
+#endif  // MONGO_CONFIG_OTEL
+
+    using OwnedMetric = std::variant<std::unique_ptr<ObservableCounter<int64_t>>,
+                                     std::unique_ptr<ObservableCounter<double>>,
                                      std::unique_ptr<UpDownCounter<int64_t>>,
                                      std::unique_ptr<UpDownCounter<double>>,
                                      std::unique_ptr<Gauge<int64_t>>,
@@ -326,8 +360,8 @@ private:
         std::vector<std::shared_ptr<opentelemetry::metrics::ObservableInstrument>>&
             newObservableInstruments;
 
-        void operator()(std::unique_ptr<Counter<int64_t>>& counter);
-        void operator()(std::unique_ptr<Counter<double>>& counter);
+        void operator()(std::unique_ptr<ObservableCounter<int64_t>>& counter);
+        void operator()(std::unique_ptr<ObservableCounter<double>>& counter);
         void operator()(std::unique_ptr<UpDownCounter<int64_t>>& upDownCounter);
         void operator()(std::unique_ptr<UpDownCounter<double>>& upDownCounter);
         void operator()(std::unique_ptr<Gauge<int64_t>>& gauge);
@@ -355,4 +389,126 @@ private:
     // Map from metric name to its definition and implementation. Guarded by `_mutex`.
     absl::btree_map<std::string, IdentifierAndMetric> _metrics;
 };
+
+///////////////////////////////////////////////////////////////////////////////
+// Implementation details
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename ImplT, typename OwnedMetricT>
+ImplT* MetricsService::_getDuplicateMetric(WithLock,
+                                           const std::string& name,
+                                           MetricIdentifier identifier) {
+    // TODO: take into account attribute defs here.
+    if (auto it = _metrics.find(name); it != _metrics.end()) {
+        massert(ErrorCodes::ObjectAlreadyExists,
+                fmt::format("Tried to create a metric with the name: {} but different definition "
+                            "already exists.",
+                            name),
+                it->second.identifier == identifier);
+        massert(ErrorCodes::ObjectAlreadyExists,
+                "Tried to create a new metric, but a metric with a different type parameter "
+                "already exists.",
+                std::holds_alternative<std::unique_ptr<OwnedMetricT>>(it->second.metric));
+
+        return static_cast<ImplT*>(
+            std::get<std::unique_ptr<OwnedMetricT>>(it->second.metric).get());
+    }
+    return nullptr;
+}
+
+template <typename ImplT, typename OwnedMetricT, typename Options>
+ImplT& MetricsService::_createMetric(MetricName name,
+                                     const Options& options,
+                                     MetricIdentifier identifier,
+                                     MakeInstrumentRef<ImplT> makeInstrument,
+                                     AddObservableRef<ImplT> addObservable) {
+    // Validate otel and serverStatus metric names.
+    uassertStatusOK(validateOtelMetricName(name.getName()));
+    if (options.serverStatusOptions) {
+        uassertStatusOK(validateServerStatusMetricPath(options.serverStatusOptions->dottedPath));
+    }
+
+    const std::string nameStr(name.getName());
+
+    std::lock_guard lock(_mutex);
+
+    // Check for duplicate.
+    if (auto* duplicate = _getDuplicateMetric<ImplT, OwnedMetricT>(lock, nameStr, identifier)) {
+        return *duplicate;
+    }
+
+    // Register.
+    auto impl = makeInstrument(lock, nameStr);
+    ImplT* const ptr = impl.get();
+
+    auto owned = OwnedMetric{std::unique_ptr<ImplT>(std::move(impl))};
+    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(owned)};
+    _registerServerStatusTree(lock, static_cast<Metric*>(ptr), options.serverStatusOptions);
+#ifdef MONGO_CONFIG_OTEL
+    addObservable(lock, nameStr, ptr);
+#endif  // MONGO_CONFIG_OTEL
+    return *ptr;
+}
+
+template <typename T, AttributeType... AttributeTs>
+Counter<T, AttributeTs...>& MetricsService::_createCounter(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const CounterOptions& options) {
+    MetricIdentifier identifier{.description = description,
+                                .unit = unit,
+                                .serverStatusOptions = options.serverStatusOptions,
+                                .histogramBucketBoundaries = boost::none};
+    CounterImpl<T, AttributeTs...>& base =
+        _createMetric<CounterImpl<T, AttributeTs...>, ObservableCounter<T>, CounterOptions>(
+            name,
+            options,
+            std::move(identifier),
+            /* makeInstrument= */
+            [&](WithLock, const std::string&) {
+                return std::make_unique<CounterImpl<T, AttributeTs...>>(defs...);
+            },
+#ifdef MONGO_CONFIG_OTEL
+            /* addObservable= */
+            [this, desc = std::move(description), unit](
+                WithLock lock,
+                const std::string& nameStr,
+                CounterImpl<T, AttributeTs...>* counterPtr) mutable {
+                _addObservable(lock,
+                               nameStr,
+                               static_cast<ObservableCounter<T>*>(counterPtr),
+                               std::move(desc),
+                               unit);
+            }
+#else
+            /* addObservable= */
+            [](WithLock, const std::string&, CounterImpl<T, AttributeTs...>*) {}
+#endif  // MONGO_CONFIG_OTEL
+        );
+    return base;
+}
+
+template <AttributeType... AttributeTs>
+Counter<int64_t, AttributeTs...>& MetricsService::createInt64Counter(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const CounterOptions& options) {
+    return _createCounter<int64_t, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
+
+template <AttributeType... AttributeTs>
+Counter<double, AttributeTs...>& MetricsService::createDoubleCounter(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const CounterOptions& options) {
+    return _createCounter<double, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
 }  // namespace mongo::otel::metrics

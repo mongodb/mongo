@@ -245,6 +245,8 @@ using MetricTypes = testing::Types<Counter<int64_t>,
                                    Histogram<double>>;
 TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
 
+// TODO SERVER-124302: Add tests for metrics with attributes once OtelMetricsCapturer is updated.
+
 TYPED_TEST(MetricCreationTest, CreateRejectsInvalidOtelMetricName) {
     ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
                                                         MetricNames::kTestInvalid,
