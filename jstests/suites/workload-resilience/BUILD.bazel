@@ -50,6 +50,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
+        "incompatible_with_bazel_remote_test",  # This test is frequently hitting the bazel test timeout running remove_adjacent_index_keys.js. Disable until resolved. TODO(SERVER-124515)
         "jscore",
         "sharding",
     ],
