@@ -201,6 +201,16 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         );
     };
 
+    /**
+     * Returns true if 'res' contains an acceptable error for the find command used by
+     * verifyDocuments. The find can fail with a QueryPlanKilled error after a collection
+     * rename (done by resharding) or other catalog changes that invalidate an in-flight
+     * plan executor.
+     */
+    $config.data.isAcceptableFindCmdError = function isAcceptableFindCmdError(res) {
+        return res && interruptedQueryErrors.includes(res.code);
+    };
+
     $config.data.getRandomDocument = function getRandomDocument(db, collName) {
         const aggregateCmdObj = {
             aggregate: collName,
@@ -679,7 +689,20 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
                 findCmdObj.readConcern.level = "majority";
             }
         }
-        const docs = assert.commandWorked(sessionDb.runCommand(findCmdObj)).cursor.firstBatch;
+        let findRes;
+        assert.soon(() => {
+            try {
+                findRes = sessionDb.runCommand(findCmdObj);
+                assert.commandWorked(findRes);
+                return true;
+            } catch (e) {
+                if (this.isAcceptableFindCmdError(findRes)) {
+                    return false;
+                }
+                throw e;
+            }
+        });
+        const docs = findRes.cursor.firstBatch;
         print(
             "verifyDocuments " +
                 tojsononeline({findCmdObj, numDocsFound: docs.length, numDocsExpected: numDocsExpected}),
