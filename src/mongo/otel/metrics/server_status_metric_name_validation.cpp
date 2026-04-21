@@ -92,6 +92,11 @@ Status validateServerStatusMetricPath(StringData dottedPath) {
         return {ErrorCodes::InvalidOptions,
                 "serverStatus metric path cannot start or end with a dot"};
     }
+    if (dottedPath == "metrics" || dottedPath.starts_with("metrics.")) {
+        return {ErrorCodes::InvalidOptions,
+                "serverStatus metric path must not include the \"metrics\" prefix since "
+                "the prefix is added automatically"};
+    }
 
     size_t segStart = 0;
     for (size_t i = 0; i < dottedPath.size(); ++i) {

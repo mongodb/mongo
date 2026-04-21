@@ -47,6 +47,7 @@ namespace mongo::otel::metrics {
  * - no empty segments
  * - each segment starts with `a–z`. Remaining characters may be `a–z`, `A–Z`, or `0–9`. No `_` or
  *   `-`.
+ * - must not equal "metrics" or start with "metrics" since the prefix is added automatically.
  */
 Status validateServerStatusMetricPath(StringData dottedPath);
 

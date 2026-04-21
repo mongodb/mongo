@@ -97,6 +97,14 @@ TEST(ServerStatusMetricNameValidation, RejectsNonAscii) {
                                        "Connections"));
 }
 
+TEST(ServerStatusMetricNameValidation, RejectsMetricsPrefix) {
+    ASSERT_NOT_OK(validateServerStatusMetricPath("metrics"));
+    ASSERT_NOT_OK(validateServerStatusMetricPath("metrics.openConnections"));
+    ASSERT_NOT_OK(validateServerStatusMetricPath("metrics.network.openConnections"));
+    ASSERT_OK(validateServerStatusMetricPath("metricsNetwork"));
+    ASSERT_OK(validateServerStatusMetricPath("myMetrics.openConnections"));
+}
+
 TEST(ServerStatusMetricNameValidation, AcceptsLongSingleSegment) {
     std::string s = "a";
     s.append(10000, 'b');
