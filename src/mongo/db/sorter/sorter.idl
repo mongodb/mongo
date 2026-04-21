@@ -21,6 +21,10 @@ structs:
                 description: "Tracks where in the file we started writing this data range."
                 type: long
                 cpp_name: start
+            current:
+                description: "The current position of the iterator on this range."
+                type: long
+                optional: true
             endOffset:
                 description: "Tracks where in the file we finished writing this data range."
                 type: long
