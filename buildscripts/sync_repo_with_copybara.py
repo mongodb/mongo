@@ -34,6 +34,7 @@ EXCLUDED_PATTERNS = [
     "AGENTS.md",
     ".github/CODEOWNERS",
     "monguard/",
+    "etc/evergreen_yml_components/",
 ]
 ACCEPTABLE_ERROR_MESSAGES = [
     # Indicates the two repositories are identical.
