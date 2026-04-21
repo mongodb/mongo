@@ -1382,6 +1382,16 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"upgradeDowngradeViewlessTimeseries",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
+          // Do not apply this oplog entry in initial sync mode, where it may be applied on
+          // a state where system.views and _mdb_catalog were cloned at different points in time.
+          // (Initial sync is incompatible with FCV changes, so we don't need to support this case.)
+          if (mode == OplogApplication::Mode::kInitialSync) {
+              return Status(ErrorCodes::OplogOperationUnsupported,
+                            str::stream() << "Applying viewless timeseries upgrade/downgrade not "
+                                             "supported in initial sync: "
+                                          << redact(op->toBSONForLogging()));
+          }
+
           const auto& entry = *op;
           auto cmd = UpgradeDowngradeViewlessTimeseriesOplogEntry::parse(entry.getObject());
 

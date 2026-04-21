@@ -4891,6 +4891,16 @@ TEST_F(OplogApplierImplTest, FailOnInsertFCVDocument) {
     ASSERT_EQUALS(runOpInitialSync(op), ErrorCodes::OplogOperationUnsupported);
 }
 
+TEST_F(OplogApplierImplTest, FailOnUpgradeDowngradeViewlessTimeseriesInInitialSync) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto cmd = BSON("upgradeDowngradeViewlessTimeseries" << nss.coll() << "isUpgrade" << true);
+    auto op = makeCommandOplogEntry(nextOpTime(), nss, cmd);
+    ASSERT_EQUALS(runOpInitialSync(op), ErrorCodes::OplogOperationUnsupported);
+}
+
 TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
     auto fcvNS(NamespaceString::kServerConfigurationNamespace);
     ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
