@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -68,7 +69,7 @@ TEST_F(SBECoerceToStringTest, BasicCoerceToString) {
     value::OwnedValueAccessor coerceToStringAccessor;
     auto coerceToStringSlot = bindAccessor(&coerceToStringAccessor);
     auto coerceToStringExpr = sbe::makeE<sbe::EFunction>(
-        "coerceToString", sbe::makeEs(makeE<EVariable>(coerceToStringSlot)));
+        EFn::kCoerceToString, sbe::makeEs(makeE<EVariable>(coerceToStringSlot)));
     auto compiledExpr = compileExpression(*coerceToStringExpr);
 
     // Int32_t test.

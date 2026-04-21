@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -68,7 +69,7 @@ protected:
         auto stepExpr = makeE<EConstant>(stepCopy.first, stepCopy.second);
 
         auto getElementExpr =
-            makeE<EFunction>("newArrayFromRange",
+            makeE<EFunction>(EFn::kNewArrayFromRange,
                              makeEs(std::move(startExpr), std::move(endExpr), std::move(stepExpr)));
         auto compiledExpr = compileExpression(*getElementExpr);
 

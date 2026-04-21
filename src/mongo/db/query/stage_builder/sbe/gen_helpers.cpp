@@ -35,6 +35,7 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/preallocated_container_pool.h"
@@ -70,6 +71,7 @@
 
 namespace mongo::stage_builder {
 
+
 SbExpr makeShardKeyForPersistedDocuments(StageBuilderState& state,
                                          const std::vector<sbe::MatchPath>& shardKeyPaths,
                                          const std::vector<bool>& shardKeyHashed,
@@ -89,21 +91,22 @@ SbExpr makeShardKeyForPersistedDocuments(StageBuilderState& state,
             SbExpr{slots.get(std::make_pair(PlanStageSlots::kField, fieldRef.getPart(0)))};
         if (fieldRef.numParts() > 1) {
             for (size_t level = 1; level < fieldRef.numParts(); ++level) {
-                shardKeyBinding = b.makeFunction(
-                    "getField", std::move(shardKeyBinding), b.makeStrConstant(fieldRef[level]));
+                shardKeyBinding = b.makeFunction(sbe::EFn::kGetField,
+                                                 std::move(shardKeyBinding),
+                                                 b.makeStrConstant(fieldRef[level]));
             }
         }
         shardKeyBinding = b.makeFillEmptyNull(std::move(shardKeyBinding));
         // If this is a hashed shard key then compute the hash value.
         if (shardKeyHashed[i]) {
-            shardKeyBinding = b.makeFunction("shardHash"_sd, std::move(shardKeyBinding));
+            shardKeyBinding = b.makeFunction(sbe::EFn::kShardHash, std::move(shardKeyBinding));
         }
 
         newBsonObjArgs.emplace_back(b.makeStrConstant(fieldRef.dottedField()));
         newBsonObjArgs.emplace_back(std::move(shardKeyBinding));
     }
 
-    return b.makeFunction("newBsonObj"_sd, std::move(newBsonObjArgs));
+    return b.makeFunction(sbe::EFn::kNewBsonObj, std::move(newBsonObjArgs));
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONObj& bo) {
@@ -373,7 +376,7 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
         std::move(elseStage), fields, elseResultSlot, planNodeId, state.slotIdGenerator, state);
     elseStage = std::move(projectStage);
 
-    auto conditionExpr = b.makeNot(b.makeFunction("exists", *prefetchedResultSlot));
+    auto conditionExpr = b.makeNot(b.makeFunction(sbe::EFn::kExists, *prefetchedResultSlot));
 
     auto thenOutputSlots = SbExpr::makeSV(thenResultSlot, thenRecordIdSlot);
     thenOutputSlots.insert(thenOutputSlots.end(), thenFieldSlots.begin(), thenFieldSlots.end());
@@ -433,18 +436,18 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
     SbExprBuilder b(state);
     auto resultExpr = [&] {
         auto fieldExpr = fieldSlot ? SbExpr{*fieldSlot}
-                                   : b.makeFunction("getField"_sd,
+                                   : b.makeFunction(sbe::EFn::kGetField,
                                                     std::move(inputExpr),
                                                     b.makeStrConstant(fp.getFieldName(level)));
         if (level == fp.getPathLength() - 1u) {
-            return b.makeFunction("isArray"_sd, std::move(fieldExpr));
+            return b.makeFunction(sbe::EFn::kIsArray, std::move(fieldExpr));
         }
         sbe::FrameId frameId = frameIdGenerator->generate();
         return b.makeLet(
             frameId,
             SbExpr::makeSeq(std::move(fieldExpr)),
             b.makeBooleanOpTree(abt::Operations::Or,
-                                b.makeFunction("isArray"_sd, SbVar{frameId, 0}),
+                                b.makeFunction(sbe::EFn::kIsArray, SbVar{frameId, 0}),
                                 generateArrayCheckForSort(
                                     state, SbVar{frameId, 0}, fp, level + 1, frameIdGenerator)));
     }();
@@ -480,7 +483,7 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
 
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldExpr = fieldSlot ? SbExpr{*fieldSlot}
-                               : b.makeFunction("getField"_sd,
+                               : b.makeFunction(sbe::EFn::kGetField,
                                                 std::move(inputVar),
                                                 b.makeStrConstant(fp.getFieldName(level)));
 
@@ -496,7 +499,7 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
             helperArgs.emplace_back(SbExpr{SbVar{*collatorSlot}});
         }
 
-        StringData helperFn = isAscending ? "getSortKeyAsc"_sd : "getSortKeyDesc"_sd;
+        sbe::EFn helperFn = isAscending ? sbe::EFn::kGetSortKeyAsc : sbe::EFn::kGetSortKeyDesc;
 
         auto resultExpr = b.makeFunction(helperFn, std::move(helperArgs));
 
@@ -524,8 +527,10 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
     if (!fieldSlot) {
         binds.emplace_back(std::move(fieldExpr));
     }
-    binds.emplace_back(b.makeFunction(
-        "traverseP", var.clone(), std::move(lambdaExpr), b.makeInt32Constant(1) /* maxDepth */));
+    binds.emplace_back(b.makeFunction(sbe::EFn::kTraverseP,
+                                      var.clone(),
+                                      std::move(lambdaExpr),
+                                      b.makeInt32Constant(1) /* maxDepth */));
 
     auto helperArgs = SbExpr::makeSeq(resultVar.clone());
     if (collatorSlot) {
@@ -534,13 +539,15 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
 
     // According to MQL's sorting semantics, when a non-leaf field is an empty array or does not
     // exist we should use Null as the sort key.
-    StringData helperFn = isAscending ? "getNonLeafSortKeyAsc"_sd : "getNonLeafSortKeyDesc"_sd;
+    sbe::EFn helperFn =
+        isAscending ? sbe::EFn::kGetNonLeafSortKeyAsc : sbe::EFn::kGetNonLeafSortKeyDesc;
 
-    return b.makeLet(frameId,
-                     std::move(binds),
-                     b.makeIf(b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, std::move(var))),
-                              b.makeFunction(helperFn, std::move(helperArgs)),
-                              b.makeFillEmptyNull(std::move(resultVar))));
+    return b.makeLet(
+        frameId,
+        std::move(binds),
+        b.makeIf(b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsArray, std::move(var))),
+                 b.makeFunction(helperFn, std::move(helperArgs)),
+                 b.makeFillEmptyNull(std::move(resultVar))));
 }
 }  // namespace
 
@@ -651,8 +658,9 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
 
             // Apply the transformation required by the collation, if specified.
             if (collatorSlot) {
-                sortKeyExpr = b.makeFunction(
-                    "collComparisonKey"_sd, std::move(sortKeyExpr), SbExpr{SbVar{*collatorSlot}});
+                sortKeyExpr = b.makeFunction(sbe::EFn::kCollComparisonKey,
+                                             std::move(sortKeyExpr),
+                                             SbExpr{SbVar{*collatorSlot}});
             }
 
             sortKeysExprs.keyExprs.emplace_back(std::move(sortKeyExpr));
@@ -663,9 +671,9 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
         // so we don't need to generate our own sort key traversal logic in the SBE plan.
         const SbSlot childResultSlotId = outputs.getResultObj();
 
-        StringData generateSortKeyFnName = plan.type == BuildSortKeysPlan::kCallGenSortKey
-            ? "generateSortKey"
-            : "generateCheapSortKey";
+        sbe::EFn generateSortKeyFnName = plan.type == BuildSortKeysPlan::kCallGenSortKey
+            ? sbe::EFn::kGenerateSortKey
+            : sbe::EFn::kGenerateCheapSortKey;
 
         if (!sortSpecExpr) {
             auto sortSpec = makeSortSpecFromSortPattern(sortPattern);
@@ -887,7 +895,7 @@ SbExpr buildNewObjExpr(StageBuilderState& state, const SlotTreeNode* kpTree) {
         }
     }
 
-    return b.makeFunction("newObj", std::move(args));
+    return b.makeFunction(sbe::EFn::kNewObj, std::move(args));
 }
 
 /**
@@ -1016,7 +1024,7 @@ std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
                         resultSlot.has_value());
 
                 auto getFieldExpr = b.makeFunction(
-                    "getField"_sd, SbExpr{*resultSlot}, b.makeStrConstant(fields[i]));
+                    sbe::EFn::kGetField, SbExpr{*resultSlot}, b.makeStrConstant(fields[i]));
                 projects.emplace_back(std::move(getFieldExpr), boost::none);
             }
         }
@@ -1095,7 +1103,7 @@ std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
                         !parent->value.expr.isNull());
 
                 auto getFieldExpr = b.makeFunction(
-                    "getField"_sd, parent->value.expr.clone(), b.makeStrConstant(node->name));
+                    sbe::EFn::kGetField, parent->value.expr.clone(), b.makeStrConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;

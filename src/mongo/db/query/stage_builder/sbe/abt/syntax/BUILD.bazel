@@ -16,6 +16,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",  # needed to register extended type destruction for MakeObjSpec :(
+        "//src/mongo/db/exec/sbe:sbe_fn_names",
         "//src/mongo/stdx",
     ],
 )

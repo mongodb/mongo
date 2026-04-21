@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/decimal128.h"
@@ -50,7 +51,7 @@ protected:
                                 std::pair<value::TypeTags, value::Value> inArray,
                                 bool expectedRes) {
         auto isMemberExpr = makeE<EFunction>(
-            "isMember",
+            EFn::kIsMember,
             makeEs(makeE<EVariable>(inputSlot), makeE<EConstant>(inArray.first, inArray.second)));
         auto compiledExpr = compileExpression(*isMemberExpr);
         auto actualRes = runCompiledExpressionPredicate(compiledExpr.get());

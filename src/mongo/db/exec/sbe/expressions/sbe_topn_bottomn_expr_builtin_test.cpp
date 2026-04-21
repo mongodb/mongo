@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -67,7 +68,7 @@ protected:
         auto sortByExpr = makeE<EVariable>(sortBySlot);
 
         auto topNExpr = makeE<EFunction>(
-            "topN", makeEs(std::move(nExpr), std::move(arrayExpr), std::move(sortByExpr)));
+            EFn::kTopN, makeEs(std::move(nExpr), std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*topNExpr);
 
         auto actual = runCompiledExpression(compiledExpr.get());
@@ -229,7 +230,7 @@ protected:
         auto sortByExpr = makeE<EVariable>(sortBySlot);
 
         auto bottomNExpr = makeE<EFunction>(
-            "bottomN", makeEs(std::move(nExpr), std::move(arrayExpr), std::move(sortByExpr)));
+            EFn::kBottomN, makeEs(std::move(nExpr), std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*bottomNExpr);
 
         auto actual = runCompiledExpression(compiledExpr.get());
@@ -377,7 +378,8 @@ protected:
         sortBySlotAccessor.reset(sortBy.first, sortBy.second);
         auto sortByExpr = makeE<EVariable>(sortBySlot);
 
-        auto topExpr = makeE<EFunction>("top", makeEs(std::move(arrayExpr), std::move(sortByExpr)));
+        auto topExpr =
+            makeE<EFunction>(EFn::kTop, makeEs(std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*topExpr);
 
         auto actual = runCompiledExpression(compiledExpr.get());
@@ -481,7 +483,7 @@ protected:
         auto sortByExpr = makeE<EVariable>(sortBySlot);
 
         auto bottomExpr =
-            makeE<EFunction>("bottom", makeEs(std::move(arrayExpr), std::move(sortByExpr)));
+            makeE<EFunction>(EFn::kBottom, makeEs(std::move(arrayExpr), std::move(sortByExpr)));
         auto compiledExpr = compileExpression(*bottomExpr);
 
         auto actual = runCompiledExpression(compiledExpr.get());

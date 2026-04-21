@@ -30,6 +30,7 @@
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -55,16 +56,16 @@ public:
         auto aggSlot = bindAccessor(&aggAccessor);
 
         auto aggRemovablePushAdd = sbe::makeE<sbe::EFunction>(
-            "aggRemovablePushAdd", sbe::makeEs(makeE<EVariable>(inputSlot)));
+            EFn::kAggRemovablePushAdd, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovablePushAdd = compileAggExpression(*aggRemovablePushAdd, &aggAccessor);
 
         auto aggRemovablePushRemove = sbe::makeE<sbe::EFunction>(
-            "aggRemovablePushRemove", sbe::makeEs(makeE<EVariable>(inputSlot)));
+            EFn::kAggRemovablePushRemove, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovablePushRemove =
             compileAggExpression(*aggRemovablePushRemove, &aggAccessor);
 
         auto aggRemovablePushFinalize = sbe::makeE<sbe::EFunction>(
-            "aggRemovablePushFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggRemovablePushFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledRemovablePushFinalize = compileExpression(*aggRemovablePushFinalize);
 
         // call RemovablePushOp (Add/Remove) on the inputs and call finalize() method after each op

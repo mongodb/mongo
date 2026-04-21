@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -76,7 +77,7 @@ TEST_F(SBEDateFromStringTest, BasicDateFromString) {
 
     // Construct an invocation of "DateFromString" function.
     auto DateFromStringExpression =
-        sbe::makeE<sbe::EFunction>("dateFromString",
+        sbe::makeE<sbe::EFunction>(EFn::kDateFromString,
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(dateStringSlot),
                                                makeE<EVariable>(timezoneSlot),
@@ -152,7 +153,7 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoFormat) {
 
     // Construct an invocation of "DateFromString" that doesn't pass in a format.
     auto DateFromStringExpression =
-        sbe::makeE<sbe::EFunction>("dateFromString",
+        sbe::makeE<sbe::EFunction>(EFn::kDateFromString,
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(dateStringSlot),
                                                makeE<EVariable>(timezoneSlot)));
@@ -227,7 +228,7 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoThrow) {
 
     // Construct an invocation of "DateFromStringNoThrow" function.
     auto DateFromStringNoThrowExpression =
-        sbe::makeE<sbe::EFunction>("dateFromStringNoThrow",
+        sbe::makeE<sbe::EFunction>(EFn::kDateFromStringNoThrow,
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(dateStringSlot),
                                                makeE<EVariable>(timezoneSlot),
@@ -313,7 +314,7 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoThrowNoFormat) {
 
     // Construct an invocation of "DateFromStringNoThrow" that doesn't pass in a format.
     auto DateFromStringNoThrowExpression =
-        sbe::makeE<sbe::EFunction>("dateFromStringNoThrow",
+        sbe::makeE<sbe::EFunction>(EFn::kDateFromStringNoThrow,
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(dateStringSlot),
                                                makeE<EVariable>(timezoneSlot)));

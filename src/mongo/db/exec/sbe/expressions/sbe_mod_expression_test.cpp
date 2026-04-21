@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -93,7 +94,7 @@ TEST_F(SBEModExprTest, ComputesMod) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto modExpr = sbe::makeE<sbe::EFunction>(
-        "mod", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kMod, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*modExpr);
 
     const int32_t i32Val = 16;
@@ -129,7 +130,7 @@ TEST_F(SBEModExprTest, ComputesModDifferentWidths) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto modExpr = sbe::makeE<sbe::EFunction>(
-        "mod", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kMod, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*modExpr);
 
     const int32_t i32Val = 16;
@@ -151,7 +152,7 @@ TEST_F(SBEModExprTest, ComputesNothingIfNotNumeric) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto modExpr = sbe::makeE<sbe::EFunction>(
-        "mod", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kMod, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*modExpr);
 
     const int32_t i32Val = 16;
@@ -177,7 +178,7 @@ TEST_F(SBEModExprTest, ComputesNothingIfNullOrMissing) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto modExpr = sbe::makeE<sbe::EFunction>(
-        "mod", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kMod, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*modExpr);
 
     const int32_t i32Val = 16;
@@ -221,7 +222,7 @@ TEST_F(SBEModExprTest, ErrorIfModRHSIsZero) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto modExpr = sbe::makeE<sbe::EFunction>(
-        "mod", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kMod, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*modExpr);
 
     const int32_t i32Val = 16;

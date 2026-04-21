@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -71,7 +72,7 @@ TEST_F(SBEConcatTest, ComputesEmptyStringsConcat) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto concatExpr = sbe::makeE<sbe::EFunction>(
-        "concat", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kConcat, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*concatExpr);
 
     auto [tag1, val1] = value::makeNewString("");
@@ -84,7 +85,8 @@ TEST_F(SBEConcatTest, ComputesEmptyStringsConcat) {
 TEST_F(SBEConcatTest, ComputesSingleStringConcat) {
     value::OwnedValueAccessor slotAccessor1;
     auto argSlot1 = bindAccessor(&slotAccessor1);
-    auto concatExpr = sbe::makeE<sbe::EFunction>("concat", sbe::makeEs(makeE<EVariable>(argSlot1)));
+    auto concatExpr =
+        sbe::makeE<sbe::EFunction>(EFn::kConcat, sbe::makeEs(makeE<EVariable>(argSlot1)));
     auto compiledExpr = compileExpression(*concatExpr);
 
     auto [tag1, val1] = value::makeNewString("Test");
@@ -98,7 +100,7 @@ TEST_F(SBEConcatTest, ComputesStringConcat) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto concatExpr = sbe::makeE<sbe::EFunction>(
-        "concat", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kConcat, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*concatExpr);
 
     auto [tag1, val1] = value::makeNewString("F");
@@ -133,7 +135,7 @@ TEST_F(SBEConcatTest, ComputesManyStringsConcat) {
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto argSlot3 = bindAccessor(&slotAccessor3);
     auto argSlot4 = bindAccessor(&slotAccessor4);
-    auto concatExpr = sbe::makeE<sbe::EFunction>("concat",
+    auto concatExpr = sbe::makeE<sbe::EFunction>(EFn::kConcat,
                                                  sbe::makeEs(makeE<EVariable>(argSlot1),
                                                              makeE<EVariable>(argSlot2),
                                                              makeE<EVariable>(argSlot3),
@@ -166,7 +168,7 @@ TEST_F(SBEConcatTest, ComputesManyMoreStringsConcat) {
             args.push_back(makeE<EConstant>("x"));
         }
 
-        auto concatExpr = makeE<EFunction>("concat", std::move(args));
+        auto concatExpr = makeE<EFunction>(EFn::kConcat, std::move(args));
         auto compiledExpr = compileExpression(*concatExpr);
         runAndAssertExpression(compiledExpr.get(), std::string(arity, 'x'));
     }
@@ -178,7 +180,7 @@ TEST_F(SBEConcatTest, ReturnsNothingForNonStringsConcat) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto concatExpr = sbe::makeE<sbe::EFunction>(
-        "concat", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kConcat, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*concatExpr);
 
     auto [tag1, val1] = value::makeNewString("abc");

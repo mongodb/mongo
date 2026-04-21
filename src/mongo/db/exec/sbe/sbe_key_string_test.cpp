@@ -41,6 +41,7 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -175,7 +176,7 @@ TEST_F(SBEKeyStringTest, Basic) {
     auto comparisonExpr = makeE<EPrimBinary>(
         EPrimBinary::eq,
         makeE<EVariable>(keyStringComponentSlot),
-        makeE<EFunction>("getField",
+        makeE<EFunction>(EFn::kGetField,
                          makeEs(makeE<EVariable>(bsonObjSlot), makeE<EVariable>(fieldNameSlot))));
     auto compiledExpr = compileExpression(*comparisonExpr);
 

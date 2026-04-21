@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -40,7 +41,7 @@ namespace mongo::sbe {
 using SBECurrentDateTest = EExpressionTestFixture;
 
 TEST_F(SBECurrentDateTest, BaseCurrentDate) {
-    auto expr = sbe::makeE<sbe::EFunction>("currentDate", sbe::makeEs());
+    auto expr = sbe::makeE<sbe::EFunction>(EFn::kCurrentDate, sbe::makeEs());
     auto compiledExpr = compileExpression(*expr);
 
     auto run = [&]() {

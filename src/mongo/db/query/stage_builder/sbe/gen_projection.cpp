@@ -30,6 +30,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -50,6 +51,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
+
+
 ProjectActionType ProjectAction::type() const {
     return visit(OverloadedVisitor{[](const Keep&) { return ProjectActionType::kKeep; },
                                    [](const Drop&) { return ProjectActionType::kDrop; },
@@ -356,7 +359,7 @@ SbExpr generateObjectExpr(StageBuilderState& state,
     auto specExpr = b.makeConstant(sbe::value::TypeTags::makeObjSpec,
                                    sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release()));
 
-    const StringData makeObjFn = shouldProduceBson ? "makeBsonObj"_sd : "makeObj"_sd;
+    const sbe::EFn makeObjFn = shouldProduceBson ? sbe::EFn::kMakeBsonObj : sbe::EFn::kMakeObj;
     auto funcArgs = SbExpr::makeSeq(std::move(specExpr), std::move(expr));
 
     std::move(args.begin(), args.end(), std::back_inserter(funcArgs));
@@ -371,7 +374,7 @@ SbExpr generateSingleFieldExpr(StageBuilderState& state,
                                bool shouldProduceBson) {
     SbExprBuilder b(state);
 
-    const StringData makeObjFn = shouldProduceBson ? "makeBsonObj"_sd : "makeObj"_sd;
+    const sbe::EFn makeObjFn = shouldProduceBson ? sbe::EFn::kMakeBsonObj : sbe::EFn::kMakeObj;
     const auto defActionType = pa.fieldsScope == FieldListScope::kClosed ? ProjectActionType::kDrop
                                                                          : ProjectActionType::kKeep;
 
@@ -515,9 +518,10 @@ ProjectActions evaluateSliceOps(StageBuilderState& state,
                 args.emplace_back(b.makeInt32Constant(*skip));
             }
 
-            auto extractSubArrayExpr = b.makeIf(b.makeFunction("isArray"_sd, var),
-                                                b.makeFunction("extractSubArray", std::move(args)),
-                                                var);
+            auto extractSubArrayExpr =
+                b.makeIf(b.makeFunction(sbe::EFn::kIsArray, var),
+                         b.makeFunction(sbe::EFn::kExtractSubArray, std::move(args)),
+                         var);
 
             context.pushLambdaArg(std::move(extractSubArrayExpr), frameId);
         }

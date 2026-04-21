@@ -39,7 +39,6 @@
 #include <vector>
 
 namespace mongo::stage_builder {
-using namespace std::string_literals;
 
 TypeChecker::TypeChecker() {
     // Define an initial binding level, so that the caller can define variable bindings before
@@ -416,7 +415,7 @@ TypeSignature TypeChecker::evaluateTypeTest(abt::ABT& n,
 
 TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool saveInference) {
     size_t arity = op.nodes().size();
-    if (arity == 3 && (op.name() == "traverseF"s || op.name() == "traverseP"s) &&
+    if (arity == 3 && (op.fn() == sbe::EFn::kTraverseF || op.fn() == sbe::EFn::kTraverseP) &&
         op.nodes()[1].is<abt::LambdaAbstraction>()) {
         // Always process the last argument for completeness, but ignore its computed type.
         op.nodes()[2].visit(*this, false);
@@ -481,10 +480,10 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool s
     for (auto& node : op.nodes()) {
         argTypes.emplace_back(node.visit(*this, false));
     }
-    if (arity == 2) {
-        if (op.name() == "typeMatch"s) {
+    switch (op.fn()) {
+        case sbe::EFn::kTypeMatch: {
             auto argSignature = argTypes[0];
-            if (op.nodes()[1].is<abt::Constant>()) {
+            if (arity == 2 && op.nodes()[1].is<abt::Constant>()) {
                 auto [tagMask, valMask] = op.nodes()[1].cast<abt::Constant>()->get();
                 if (tagMask == sbe::value::TypeTags::NumberInt32) {
                     auto bsonMask = static_cast<uint32_t>(sbe::value::bitcastTo<int32_t>(valMask));
@@ -511,10 +510,9 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool s
             return TypeSignature::kBooleanType.include(
                 argSignature.intersect(TypeSignature::kNothingType));
         }
-
-        if (op.name() == "convert"s) {
+        case sbe::EFn::kConvert: {
             auto argSignature = argTypes[0];
-            if (op.nodes()[1].is<abt::Constant>()) {
+            if (arity == 2 && op.nodes()[1].is<abt::Constant>()) {
                 auto [tagMask, valMask] = op.nodes()[1].cast<abt::Constant>()->get();
                 if (tagMask == sbe::value::TypeTags::NumberInt32) {
                     sbe::value::TypeTags targetTypeTag =
@@ -533,78 +531,94 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool s
             return TypeSignature::kNumericType.include(
                 argSignature.intersect(TypeSignature::kNothingType));
         }
-    } else if (arity == 1) {
-        if (op.name() == "exists"s) {
-            // If the argument is already guaranteed not to be a Nothing or if it is a constant, we
-            // can evaluate it now.
-            if (!TypeSignature::kNothingType.isSubset(argTypes[0])) {
-                swapAndUpdate(n, abt::Constant::boolean(true));
-            } else if (saveInference && op.nodes()[0].cast<abt::Variable>()) {
-                // If this 'exists' is testing a variable and is part of an And, add a mask
-                // excluding Nothing from the type information of the variable.
-                auto& varName = op.nodes()[0].cast<abt::Variable>()->name();
-                auto varType = getInferredType(varName).value_or(TypeSignature::kAnyScalarType);
-
-                bind(varName, varType.exclude(TypeSignature::kNothingType));
+        case sbe::EFn::kExists:
+            if (arity == 1) {
+                // If the argument is already guaranteed not to be a Nothing or if it is a
+                // constant, we can evaluate it now.
+                if (!TypeSignature::kNothingType.isSubset(argTypes[0])) {
+                    swapAndUpdate(n, abt::Constant::boolean(true));
+                } else if (saveInference && op.nodes()[0].cast<abt::Variable>()) {
+                    // If this 'exists' is testing a variable and is part of an And, add a mask
+                    // excluding Nothing from the type information of the variable.
+                    auto& varName = op.nodes()[0].cast<abt::Variable>()->name();
+                    auto varType = getInferredType(varName).value_or(TypeSignature::kAnyScalarType);
+                    bind(varName, varType.exclude(TypeSignature::kNothingType));
+                }
+                return TypeSignature::kBooleanType;
             }
-            return TypeSignature::kBooleanType;
-        }
-
-        if (op.name() == "coerceToBool"s) {
-            auto argSignature = argTypes[0];
-            // If the argument is already guaranteed to be a boolean or a Nothing, the coerceToBool
-            // is unnecessary.
-            if (argSignature.isSubset(
-                    TypeSignature::kBooleanType.include(TypeSignature::kNothingType))) {
-                swapAndUpdate(n, std::exchange(op.nodes()[0], abt::make<abt::Blackhole>()));
+            break;
+        case sbe::EFn::kCoerceToBool: {
+            if (arity == 1) {
+                auto argSignature = argTypes[0];
+                // If the argument is already guaranteed to be a boolean or a Nothing, the
+                // coerceToBool is unnecessary.
+                if (argSignature.isSubset(
+                        TypeSignature::kBooleanType.include(TypeSignature::kNothingType))) {
+                    swapAndUpdate(n, std::exchange(op.nodes()[0], abt::make<abt::Blackhole>()));
+                }
+                return TypeSignature::kBooleanType.include(
+                    argSignature.intersect(TypeSignature::kNothingType));
             }
-            return TypeSignature::kBooleanType.include(
-                argSignature.intersect(TypeSignature::kNothingType));
+            break;
         }
-
-        if (op.name() == "isArray"s) {
-            return evaluateTypeTest(n, argTypes[0], TypeSignature::kArrayType);
-        }
-
-        if (op.name() == "isDate"s) {
-            return evaluateTypeTest(n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Date));
-        }
-
-        if (op.name() == "isNull"s) {
-            return evaluateTypeTest(n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Null));
-        }
-
-        if (op.name() == "isNumber"s) {
-            return evaluateTypeTest(n, argTypes[0], TypeSignature::kNumericType);
-        }
-
-        if (op.name() == "isObject"s) {
-            return evaluateTypeTest(n, argTypes[0], TypeSignature::kObjectType);
-        }
-
-        if (op.name() == "isString"s) {
-            return evaluateTypeTest(n, argTypes[0], TypeSignature::kStringType);
-        }
-
-        if (op.name() == "isTimestamp"s) {
-            return evaluateTypeTest(
-                n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Timestamp));
-        }
-    }
-
-    if ((arity == 6 && op.name() == "dateTrunc"s) || (arity == 5 && op.name() == "dateAdd"s)) {
-        // Always mark Nothing as a possible return type, as it can be reported due to invalid
-        // arguments.
-        return getTypeSignature(sbe::value::TypeTags::Date).include(TypeSignature::kNothingType);
-    }
-
-    if ((arity == 5 || arity == 6) && op.name() == "dateDiff"s) {
-        return getTypeSignature(sbe::value::TypeTags::NumberInt64)
-            .include(TypeSignature::kNothingType);
-    }
-
-    if (arity == 0 && op.name() == "currentDate"s) {
-        return getTypeSignature(sbe::value::TypeTags::Date);
+        case sbe::EFn::kIsArray:
+            if (arity == 1)
+                return evaluateTypeTest(n, argTypes[0], TypeSignature::kArrayType);
+            break;
+        case sbe::EFn::kIsDate:
+            if (arity == 1)
+                return evaluateTypeTest(
+                    n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Date));
+            break;
+        case sbe::EFn::kIsNull:
+            if (arity == 1)
+                return evaluateTypeTest(
+                    n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Null));
+            break;
+        case sbe::EFn::kIsNumber:
+            if (arity == 1)
+                return evaluateTypeTest(n, argTypes[0], TypeSignature::kNumericType);
+            break;
+        case sbe::EFn::kIsObject:
+            if (arity == 1)
+                return evaluateTypeTest(n, argTypes[0], TypeSignature::kObjectType);
+            break;
+        case sbe::EFn::kIsString:
+            if (arity == 1)
+                return evaluateTypeTest(n, argTypes[0], TypeSignature::kStringType);
+            break;
+        case sbe::EFn::kIsTimestamp:
+            if (arity == 1)
+                return evaluateTypeTest(
+                    n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Timestamp));
+            break;
+        case sbe::EFn::kDateTrunc:
+            // Always mark Nothing as a possible return type, as it can be reported due to invalid
+            // arguments.
+            if (arity == 6) {
+                return getTypeSignature(sbe::value::TypeTags::Date)
+                    .include(TypeSignature::kNothingType);
+            }
+            break;
+        case sbe::EFn::kDateAdd:
+            if (arity == 5) {
+                return getTypeSignature(sbe::value::TypeTags::Date)
+                    .include(TypeSignature::kNothingType);
+            }
+            break;
+        case sbe::EFn::kDateDiff:
+            if (arity == 5 || arity == 6) {
+                return getTypeSignature(sbe::value::TypeTags::NumberInt64)
+                    .include(TypeSignature::kNothingType);
+            }
+            break;
+        case sbe::EFn::kCurrentDate:
+            if (arity == 0) {
+                return getTypeSignature(sbe::value::TypeTags::Date);
+            }
+            break;
+        default:
+            break;
     }
 
     return TypeSignature::kAnyScalarType;

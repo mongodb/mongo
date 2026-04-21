@@ -33,6 +33,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -147,6 +148,7 @@ AccumInputsPtr CombineAggsTopBottomNInputs::clone() const {
 }
 
 namespace {
+
 template <typename ReturnT, typename InputsT, typename... Args>
 using BuildFnType =
     std::function<ReturnT(const AccumOp&, std::unique_ptr<InputsT>, StageBuilderState&, Args...)>;
@@ -299,7 +301,7 @@ SbExpr nullMissingUndefinedToNothing(SbExpr arg, StageBuilderState& state) {
     SbExprBuilder b(state);
 
     return b.makeFunction(
-        "fillType",
+        sbe::EFn::kFillType,
         std::move(arg),
         b.makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined)),
         b.makeNothingConstant());
@@ -342,9 +344,9 @@ SbExpr::Vector buildAccumAggsMin(const AccumOp& acc,
 
     if (collatorSlot) {
         return SbExpr::makeSeq(
-            b.makeFunction("collMin"_sd, SbVar{*collatorSlot}, std::move(inputs->inputExpr)));
+            b.makeFunction(sbe::EFn::kCollMin, SbVar{*collatorSlot}, std::move(inputs->inputExpr)));
     } else {
-        return SbExpr::makeSeq(b.makeFunction("min"_sd, std::move(inputs->inputExpr)));
+        return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kMin, std::move(inputs->inputExpr)));
     }
 }
 
@@ -362,9 +364,10 @@ SbExpr::Vector buildCombineAggsMin(const AccumOp& acc,
     boost::optional<sbe::value::SlotId> collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction("collMin"_sd, SbVar{*collatorSlot}, std::move(arg)));
+        return SbExpr::makeSeq(
+            b.makeFunction(sbe::EFn::kCollMin, SbVar{*collatorSlot}, std::move(arg)));
     } else {
-        return SbExpr::makeSeq(b.makeFunction("min"_sd, std::move(arg)));
+        return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kMin, std::move(arg)));
     }
 }
 
@@ -392,9 +395,9 @@ SbExpr::Vector buildAccumAggsMax(const AccumOp& acc,
 
     if (collatorSlot) {
         return SbExpr::makeSeq(
-            b.makeFunction("collMax"_sd, SbVar{*collatorSlot}, std::move(inputs->inputExpr)));
+            b.makeFunction(sbe::EFn::kCollMax, SbVar{*collatorSlot}, std::move(inputs->inputExpr)));
     } else {
-        return SbExpr::makeSeq(b.makeFunction("max"_sd, std::move(inputs->inputExpr)));
+        return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kMax, std::move(inputs->inputExpr)));
     }
 }
 
@@ -412,9 +415,10 @@ SbExpr::Vector buildCombineAggsMax(const AccumOp& acc,
     boost::optional<sbe::value::SlotId> collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction("collMax"_sd, SbVar{*collatorSlot}, std::move(arg)));
+        return SbExpr::makeSeq(
+            b.makeFunction(sbe::EFn::kCollMax, SbVar{*collatorSlot}, std::move(arg)));
     } else {
-        return SbExpr::makeSeq(b.makeFunction("max"_sd, std::move(arg)));
+        return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kMax, std::move(arg)));
     }
 }
 
@@ -443,7 +447,7 @@ SbExpr::Vector buildAccumAggsFirst(const AccumOp& acc,
                                    std::unique_ptr<AddSingleInput> inputs,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("first", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kFirst, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildCombineAggsFirst(const AccumOp& acc,
@@ -456,14 +460,14 @@ SbExpr::Vector buildCombineAggsFirst(const AccumOp& acc,
     SbExprBuilder b(state);
 
     auto arg = b.makeFillEmptyNull(SbExpr{inputSlots[0]});
-    return SbExpr::makeSeq(b.makeFunction("first", std::move(arg)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kFirst, std::move(arg)));
 }
 
 SbExpr::Vector buildAccumAggsLast(const AccumOp& acc,
                                   std::unique_ptr<AddSingleInput> inputs,
                                   StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("last", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kLast, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildCombineAggsLast(const AccumOp& acc,
@@ -476,7 +480,7 @@ SbExpr::Vector buildCombineAggsLast(const AccumOp& acc,
     SbExprBuilder b(state);
 
     auto arg = b.makeFillEmptyNull(SbExpr{inputSlots[0]});
-    return SbExpr::makeSeq(b.makeFunction("last", std::move(arg)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kLast, std::move(arg)));
 }
 
 AccumInputsPtr buildAccumExprsAvg(const AccumOp& acc,
@@ -549,8 +553,8 @@ SbExpr::Vector buildAccumAggsAvg(const AccumOp& acc,
     SbExprBuilder b(state);
 
     SbExpr::Vector aggs;
-    aggs.push_back(b.makeFunction("aggDoubleDoubleSum", std::move(inputs->inputExpr)));
-    aggs.push_back(b.makeFunction("sum", std::move(inputs->count)));
+    aggs.push_back(b.makeFunction(sbe::EFn::kAggDoubleDoubleSum, std::move(inputs->inputExpr)));
+    aggs.push_back(b.makeFunction(sbe::EFn::kSum, std::move(inputs->count)));
 
     return aggs;
 }  // buildAccumAggsAvg
@@ -563,12 +567,12 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsAvg(
     SbExprBuilder b(state);
 
     auto inputBlockAgg = b.makeFunction(
-        "valueBlockAggDoubleDoubleSum"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
-    auto inputRowAgg = b.makeFunction("aggDoubleDoubleSum"_sd, std::move(inputs->inputExpr));
+        sbe::EFn::kValueBlockAggDoubleDoubleSum, bitmapInternalSlot, inputs->inputExpr.clone());
+    auto inputRowAgg = b.makeFunction(sbe::EFn::kAggDoubleDoubleSum, std::move(inputs->inputExpr));
 
     auto countBlockAgg =
-        b.makeFunction("valueBlockAggSum"_sd, bitmapInternalSlot, inputs->count.clone());
-    auto countRowAgg = b.makeFunction("sum"_sd, std::move(inputs->count));
+        b.makeFunction(sbe::EFn::kValueBlockAggSum, bitmapInternalSlot, inputs->count.clone());
+    auto countRowAgg = b.makeFunction(sbe::EFn::kSum, std::move(inputs->count));
 
     boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
     pairs.emplace();
@@ -587,8 +591,8 @@ SbExpr::Vector buildCombineAggsAvg(const AccumOp& acc,
             "partial agg combiner for $avg should have exactly two input slots",
             inputSlots.size() == 2);
 
-    return SbExpr::makeSeq(b.makeFunction("aggMergeDoubleDoubleSums", inputSlots[0]),
-                           b.makeFunction("sum", inputSlots[1]));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggMergeDoubleDoubleSums, inputSlots[0]),
+                           b.makeFunction(sbe::EFn::kSum, inputSlots[1]));
 }
 
 SbExpr buildFinalizeAvg(const AccumOp& acc,
@@ -608,10 +612,10 @@ SbExpr buildFinalizeAvg(const AccumOp& acc,
         // avg in the form of {count: val, ps: array_val}.
         auto sumResult = aggSlots[0];
         auto countResult = aggSlots[1];
-        auto partialSumExpr = b.makeFunction("doubleDoublePartialSumFinalize", sumResult);
+        auto partialSumExpr = b.makeFunction(sbe::EFn::kDoubleDoublePartialSumFinalize, sumResult);
 
         // Returns {count: val, ps: array_val}.
-        auto partialAvgFinalize = b.makeFunction("newObj"_sd,
+        auto partialAvgFinalize = b.makeFunction(sbe::EFn::kNewObj,
                                                  b.makeStrConstant(countName),
                                                  countResult,
                                                  b.makeStrConstant(partialSumName),
@@ -625,7 +629,7 @@ SbExpr buildFinalizeAvg(const AccumOp& acc,
             b.makeIf(b.makeBinaryOp(abt::Operations::Eq, aggSlots[1], b.makeInt64Constant(0)),
                      b.makeNullConstant(),
                      b.makeBinaryOp(abt::Operations::Div,
-                                    b.makeFunction("doubleDoubleSumFinalize", aggSlots[0]),
+                                    b.makeFunction(sbe::EFn::kDoubleDoubleSumFinalize, aggSlots[0]),
                                     aggSlots[1]));
 
         return finalizingExpression;
@@ -636,7 +640,8 @@ SbExpr::Vector buildAccumAggsSum(const AccumOp& acc,
                                  std::unique_ptr<AddSingleInput> inputs,
                                  StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggDoubleDoubleSum", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggDoubleDoubleSum, std::move(inputs->inputExpr)));
 }
 
 boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsSum(
@@ -647,8 +652,8 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsSum(
     SbExprBuilder b(state);
 
     SbExpr blockAgg = b.makeFunction(
-        "valueBlockAggDoubleDoubleSum"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
-    SbExpr rowAgg = b.makeFunction("aggDoubleDoubleSum"_sd, std::move(inputs->inputExpr));
+        sbe::EFn::kValueBlockAggDoubleDoubleSum, bitmapInternalSlot, inputs->inputExpr.clone());
+    SbExpr rowAgg = b.makeFunction(sbe::EFn::kAggDoubleDoubleSum, std::move(inputs->inputExpr));
 
     boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
     pairs.emplace();
@@ -667,7 +672,7 @@ SbExpr::Vector buildCombineAggsSum(const AccumOp& acc,
             inputSlots.size() == 1);
     auto arg = inputSlots[0];
 
-    return SbExpr::makeSeq(b.makeFunction("aggMergeDoubleDoubleSums", std::move(arg)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggMergeDoubleDoubleSums, std::move(arg)));
 }
 
 SbExpr buildFinalizeSum(const AccumOp& acc,
@@ -688,15 +693,15 @@ SbExpr buildFinalizeSum(const AccumOp& acc,
         //   {nonDecimalTag: val, nonDecimalTotal: val, nonDecimalAddend: val}
         //     -OR-
         //   {nonDecimalTag: val, nonDecimalTotal: val, nonDecimalAddend: val, decimalTotal: val}
-        return b.makeFunction("doubleDoublePartialSumFinalize", sumSlots[0]);
+        return b.makeFunction(sbe::EFn::kDoubleDoublePartialSumFinalize, sumSlots[0]);
     } else {
-        return b.makeFunction("doubleDoubleSumFinalize", sumSlots[0]);
+        return b.makeFunction(sbe::EFn::kDoubleDoubleSumFinalize, sumSlots[0]);
     }
 }
 
 SbExpr::Vector buildAccumAggsCount(const AccumOp& acc, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("count"));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kCount));
 }
 
 SbExpr::Vector buildCombineAggsCount(const AccumOp& acc,
@@ -710,7 +715,7 @@ SbExpr::Vector buildCombineAggsCount(const AccumOp& acc,
 
     auto arg = inputSlots[0];
 
-    return SbExpr::makeSeq(b.makeFunction("sum", std::move(arg)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, std::move(arg)));
 }
 
 SbExpr buildFinalizeCount(const AccumOp& acc,
@@ -737,22 +742,22 @@ SbExpr buildFinalizeCount(const AccumOp& acc,
         //   {nonDecimalTag: val, nonDecimalTotal: val, nonDecimalAddend: val}
         //     -OR-
         //   {nonDecimalTag: val, nonDecimalTotal: val, nonDecimalAddend: val, decimalTotal: val}
-        return b.makeFunction(
-            "doubleDoublePartialSumFinalize",
-            b.makeFunction("convertSimpleSumToDoubleDoubleSum", std::move(finalResultExpr)));
+        return b.makeFunction(sbe::EFn::kDoubleDoublePartialSumFinalize,
+                              b.makeFunction(sbe::EFn::kConvertSimpleSumToDoubleDoubleSum,
+                                             std::move(finalResultExpr)));
     } else {
         return finalResultExpr;
     }
 }
 
 SbExpr::Vector buildAccumAggsConcatArraysHelper(SbExpr arg,
-                                                StringData funcName,
+                                                sbe::EFn funcName,
                                                 StageBuilderState& state) {
     SbExprBuilder b(state);
 
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
-    auto expr = b.makeIf(b.makeFunction("isArray", argValue),
+    auto expr = b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
                          argValue,
                          b.makeFail(ErrorCodes::TypeMismatch,
                                     "Expected new value for $concatArrays to be an array"_sd));
@@ -769,7 +774,7 @@ SbExpr::Vector buildAccumAggsConcatArrays(const AccumOp& acc,
                                           std::unique_ptr<AddSingleInput> inputs,
                                           StageBuilderState& state) {
     return buildAccumAggsConcatArraysHelper(
-        std::move(inputs->inputExpr), "concatArraysCapped"_sd, state);
+        std::move(inputs->inputExpr), sbe::EFn::kConcatArraysCapped, state);
 }
 
 SbExpr::Vector buildCombineAggsConcatArrays(const AccumOp& acc,
@@ -779,19 +784,20 @@ SbExpr::Vector buildCombineAggsConcatArrays(const AccumOp& acc,
             "partial agg combiner for $concatArrays should have exactly one input slot",
             inputSlots.size() == 1);
     auto arg = inputSlots[0];
-    return buildAccumAggsConcatArraysHelper(std::move(arg), "aggConcatArraysCapped"_sd, state);
+    return buildAccumAggsConcatArraysHelper(
+        std::move(arg), sbe::EFn::kAggConcatArraysCapped, state);
 }
 
 SbExpr::Vector buildAccumAggsSetUnionHelper(SbExpr arg,
-                                            StringData funcName,
-                                            StringData funcNameWithCollator,
+                                            sbe::EFn funcName,
+                                            sbe::EFn funcNameWithCollator,
                                             StageBuilderState& state) {
     SbExprBuilder b(state);
 
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
     auto expr = b.makeIf(
-        b.makeFunction("isArray", argValue),
+        b.makeFunction(sbe::EFn::kIsArray, argValue),
         argValue,
         b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
 
@@ -815,8 +821,10 @@ SbExpr::Vector buildAccumAggsSetUnionHelper(SbExpr arg,
 SbExpr::Vector buildAccumAggsSetUnion(const AccumOp& acc,
                                       std::unique_ptr<AddSingleInput> inputs,
                                       StageBuilderState& state) {
-    return buildAccumAggsSetUnionHelper(
-        std::move(inputs->inputExpr), "setUnionCapped"_sd, "collSetUnionCapped"_sd, state);
+    return buildAccumAggsSetUnionHelper(std::move(inputs->inputExpr),
+                                        sbe::EFn::kSetUnionCapped,
+                                        sbe::EFn::kCollSetUnionCapped,
+                                        state);
 }
 
 SbExpr::Vector buildCombineAggsSetUnion(const AccumOp& acc,
@@ -827,12 +835,12 @@ SbExpr::Vector buildCombineAggsSetUnion(const AccumOp& acc,
             inputSlots.size() == 1);
     auto arg = inputSlots[0];
     return buildAccumAggsSetUnionHelper(
-        std::move(arg), "aggSetUnionCapped"_sd, "aggCollSetUnionCapped"_sd, state);
+        std::move(arg), sbe::EFn::kAggSetUnionCapped, sbe::EFn::kAggCollSetUnionCapped, state);
 }
 
 SbExpr::Vector buildAccumAggsAddToSetHelper(SbExpr arg,
-                                            StringData funcName,
-                                            StringData funcNameWithCollator,
+                                            sbe::EFn funcName,
+                                            sbe::EFn funcNameWithCollator,
                                             StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -851,8 +859,10 @@ SbExpr::Vector buildAccumAggsAddToSetHelper(SbExpr arg,
 SbExpr::Vector buildAccumAggsAddToSet(const AccumOp& acc,
                                       std::unique_ptr<AddSingleInput> inputs,
                                       StageBuilderState& state) {
-    return buildAccumAggsAddToSetHelper(
-        std::move(inputs->inputExpr), "addToSetCapped"_sd, "collAddToSetCapped"_sd, state);
+    return buildAccumAggsAddToSetHelper(std::move(inputs->inputExpr),
+                                        sbe::EFn::kAddToSetCapped,
+                                        sbe::EFn::kCollAddToSetCapped,
+                                        state);
 }
 
 SbExpr::Vector buildCombineAggsAddToSet(const AccumOp& acc,
@@ -863,7 +873,7 @@ SbExpr::Vector buildCombineAggsAddToSet(const AccumOp& acc,
             inputSlots.size() == 1);
     auto arg = inputSlots[0];
     return buildAccumAggsAddToSetHelper(
-        std::move(arg), "aggSetUnionCapped"_sd, "aggCollSetUnionCapped"_sd, state);
+        std::move(arg), sbe::EFn::kAggSetUnionCapped, sbe::EFn::kAggCollSetUnionCapped, state);
 }
 
 SbExpr buildFinalizeCappedAccumulator(const AccumOp& acc,
@@ -880,7 +890,7 @@ SbExpr buildFinalizeCappedAccumulator(const AccumOp& acc,
     // values and the back element is their cumulative size in bytes. We just ignore the size
     // because if it exceeded the size cap, we should have thrown an error during accumulation.
     auto pushFinalize =
-        b.makeFunction("getElement",
+        b.makeFunction(sbe::EFn::kGetElement,
                        accSlots[0],
                        b.makeInt32Constant(static_cast<int>(sbe::vm::AggArrayWithSize::kValues)));
 
@@ -888,7 +898,7 @@ SbExpr buildFinalizeCappedAccumulator(const AccumOp& acc,
 }
 
 SbExpr::Vector buildAccumAggsPushHelper(SbExpr arg,
-                                        StringData aggFuncName,
+                                        sbe::EFn aggFuncName,
                                         StageBuilderState& state) {
     SbExprBuilder b(state);
 
@@ -899,7 +909,8 @@ SbExpr::Vector buildAccumAggsPushHelper(SbExpr arg,
 SbExpr::Vector buildAccumAggsPush(const AccumOp& acc,
                                   std::unique_ptr<AddSingleInput> inputs,
                                   StageBuilderState& state) {
-    return buildAccumAggsPushHelper(std::move(inputs->inputExpr), "addToArrayCapped"_sd, state);
+    return buildAccumAggsPushHelper(
+        std::move(inputs->inputExpr), sbe::EFn::kAddToArrayCapped, state);
 }
 
 SbExpr::Vector buildCombineAggsPush(const AccumOp& acc,
@@ -910,14 +921,14 @@ SbExpr::Vector buildCombineAggsPush(const AccumOp& acc,
             inputSlots.size() == 1);
 
     auto arg = inputSlots[0];
-    return buildAccumAggsPushHelper(std::move(arg), "aggConcatArraysCapped"_sd, state);
+    return buildAccumAggsPushHelper(std::move(arg), sbe::EFn::kAggConcatArraysCapped, state);
 }
 
 SbExpr::Vector buildAccumAggsStdDev(const AccumOp& acc,
                                     std::unique_ptr<AddSingleInput> inputs,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggStdDev", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggStdDev, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildCombineAggsStdDev(const AccumOp& acc,
@@ -929,7 +940,7 @@ SbExpr::Vector buildCombineAggsStdDev(const AccumOp& acc,
             "partial agg combiner for stddev should have exactly one input slot",
             inputSlots.size() == 1);
     auto arg = inputSlots[0];
-    return SbExpr::makeSeq(b.makeFunction("aggMergeStdDevs", arg));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggMergeStdDevs, arg));
 }
 
 SbExpr buildFinalizePartialStdDevHelper(SbSlot stdDevSlot, StageBuilderState& state) {
@@ -942,21 +953,21 @@ SbExpr buildFinalizePartialStdDevHelper(SbSlot stdDevSlot, StageBuilderState& st
     auto stdDevResult = stdDevSlot;
 
     auto m2Field = b.makeFunction(
-        "getElement",
+        sbe::EFn::kGetElement,
         stdDevResult,
         b.makeInt32Constant(static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningM2)));
 
     auto meanField = b.makeFunction(
-        "getElement",
+        sbe::EFn::kGetElement,
         stdDevResult,
         b.makeInt32Constant(static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningMean)));
 
     auto countField =
-        b.makeFunction("getElement",
+        b.makeFunction(sbe::EFn::kGetElement,
                        stdDevResult,
                        b.makeInt32Constant(static_cast<int>(sbe::vm::AggStdDevValueElems::kCount)));
 
-    return b.makeFunction("newObj"_sd,
+    return b.makeFunction(sbe::EFn::kNewObj,
                           b.makeStrConstant("m2"_sd),
                           std::move(m2Field),
                           b.makeStrConstant("mean"_sd),
@@ -978,7 +989,7 @@ SbExpr buildFinalizeStdDevPop(const AccumOp& acc,
     if (state.needsMerge) {
         return buildFinalizePartialStdDevHelper(stdDevSlots[0], state);
     } else {
-        auto stdDevPopFinalize = b.makeFunction("stdDevPopFinalize", stdDevSlots[0]);
+        auto stdDevPopFinalize = b.makeFunction(sbe::EFn::kStdDevPopFinalize, stdDevSlots[0]);
         return stdDevPopFinalize;
     }
 }
@@ -996,7 +1007,7 @@ SbExpr buildFinalizeStdDevSamp(const AccumOp& acc,
     if (state.needsMerge) {
         return buildFinalizePartialStdDevHelper(stdDevSlots[0], state);
     } else {
-        return b.makeFunction("stdDevSampFinalize", stdDevSlots[0]);
+        return b.makeFunction(sbe::EFn::kStdDevSampFinalize, stdDevSlots[0]);
     }
 }
 
@@ -1010,7 +1021,7 @@ SbExpr wrapMergeObjectsArg(SbExpr arg, StageBuilderState& state) {
     auto expr =
         b.makeIf(b.makeBooleanOpTree(abt::Operations::Or,
                                      b.generateNullMissingOrUndefined(var),
-                                     b.makeFunction("isObject", var)),
+                                     b.makeFunction(sbe::EFn::kIsObject, var)),
                  SbExpr{var},
                  b.makeFail(ErrorCodes::Error{5911200}, "$mergeObjects only supports objects"));
 
@@ -1029,7 +1040,7 @@ SbExpr::Vector buildAccumAggsMergeObjects(const AccumOp& acc,
                                           StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    return SbExpr::makeSeq(b.makeFunction("mergeObjects", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kMergeObjects, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildCombineAggsMergeObjects(const AccumOp& acc,
@@ -1042,7 +1053,7 @@ SbExpr::Vector buildCombineAggsMergeObjects(const AccumOp& acc,
     SbExprBuilder b(state);
 
     return SbExpr::makeSeq(
-        b.makeFunction("mergeObjects", wrapMergeObjectsArg(SbExpr{inputSlots[0]}, state)));
+        b.makeFunction(sbe::EFn::kMergeObjects, wrapMergeObjectsArg(SbExpr{inputSlots[0]}, state)));
 }
 
 SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
@@ -1064,8 +1075,8 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
                 "parameter 'n' must be coercible to a positive 64-bit integer",
                 convertTag != sbe::value::TypeTags::Nothing &&
                     static_cast<int64_t>(convertVal) > 0);
-        return SbExpr::makeSeq(b.makeFunction("newArray",
-                                              b.makeFunction("newArray"),
+        return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray,
+                                              b.makeFunction(sbe::EFn::kNewArray),
                                               b.makeInt64Constant(0),
                                               b.makeConstant(convertTag, convertVal),
                                               b.makeInt32Constant(0),
@@ -1079,10 +1090,10 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
 
         auto e = b.makeIf(
             b.makeBooleanOpTree(abt::Operations::And,
-                                b.makeFunction("exists", var),
+                                b.makeFunction(sbe::EFn::kExists, var),
                                 b.makeBinaryOp(abt::Operations::Gt, var, b.makeInt64Constant(0))),
-            b.makeFunction("newArray",
-                           b.makeFunction("newArray"),
+            b.makeFunction(sbe::EFn::kNewArray,
+                           b.makeFunction(sbe::EFn::kNewArray),
                            b.makeInt64Constant(0),
                            var,
                            b.makeInt32Constant(0),
@@ -1103,10 +1114,10 @@ SbExpr::Vector buildAccumAggsFirstN(const AccumOp& acc,
     SbExprBuilder b(state);
 
     auto frameId = state.frameIdGenerator->generate();
-    auto binds = SbExpr::makeSeq(b.makeFunction("aggState"));
+    auto binds = SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggState));
 
-    auto e = b.makeIf(b.makeFunction("aggFirstNNeedsMoreInput", SbLocalVar{frameId, 0}),
-                      b.makeFunction("aggFirstN",
+    auto e = b.makeIf(b.makeFunction(sbe::EFn::kAggFirstNNeedsMoreInput, SbLocalVar{frameId, 0}),
+                      b.makeFunction(sbe::EFn::kAggFirstN,
                                      SbLocalVar{frameId, 0},
                                      b.makeFillEmptyNull(std::move(inputs->inputExpr))),
                       SbLocalVar{frameId, 0});
@@ -1124,7 +1135,7 @@ SbExpr::Vector buildCombineAggsFirstN(const AccumOp& acc,
                           << inputSlots.size(),
             inputSlots.size() == 1);
 
-    return SbExpr::makeSeq(b.makeFunction("aggFirstNMerge", inputSlots[0]));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggFirstNMerge, inputSlots[0]));
 }
 
 SbExpr buildFinalizeFirstN(const AccumOp& acc,
@@ -1136,7 +1147,7 @@ SbExpr buildFinalizeFirstN(const AccumOp& acc,
             str::stream() << "Expected one input slot for finalization of $firstN, got: "
                           << inputSlots.size(),
             inputSlots.size() == 1);
-    return b.makeFunction("aggFirstNFinalize", inputSlots[0]);
+    return b.makeFunction(sbe::EFn::kAggFirstNFinalize, inputSlots[0]);
 }
 
 AccumInputsPtr buildAccumExprsLastN(const AccumOp& acc,
@@ -1152,7 +1163,7 @@ SbExpr::Vector buildAccumAggsLastN(const AccumOp& acc,
                                    std::unique_ptr<AddSingleInput> inputs,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggLastN", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggLastN, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildCombineAggsLastN(const AccumOp& acc,
@@ -1165,7 +1176,7 @@ SbExpr::Vector buildCombineAggsLastN(const AccumOp& acc,
                           << inputSlots.size(),
             inputSlots.size() == 1);
 
-    return SbExpr::makeSeq(b.makeFunction("aggLastNMerge", inputSlots[0]));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggLastNMerge, inputSlots[0]));
 }
 
 SbExpr buildFinalizeLastN(const AccumOp& acc,
@@ -1177,7 +1188,7 @@ SbExpr buildFinalizeLastN(const AccumOp& acc,
             str::stream() << "Expected one input slot for finalization of $lastN, got: "
                           << inputSlots.size(),
             inputSlots.size() == 1);
-    return b.makeFunction("aggLastNFinalize", inputSlots[0]);
+    return b.makeFunction(sbe::EFn::kAggLastNFinalize, inputSlots[0]);
 }
 
 bool isAccumulatorTopN(const AccumOp& acc) {
@@ -1194,11 +1205,12 @@ SbExpr::Vector buildAccumAggsTopBottomN(const AccumOp& acc,
     auto key = std::move(inputs->sortBy);
     auto sortSpec = std::move(inputs->sortSpec);
 
-    return SbExpr::makeSeq(b.makeFunction(isAccumulatorTopN(acc) ? "aggTopN" : "aggBottomN",
-                                          std::move(sortSpec),
-                                          b.makeNullConstant(),
-                                          std::move(key),
-                                          std::move(value)));
+    return SbExpr::makeSeq(
+        b.makeFunction(isAccumulatorTopN(acc) ? sbe::EFn::kAggTopN : sbe::EFn::kAggBottomN,
+                       std::move(sortSpec),
+                       b.makeNullConstant(),
+                       std::move(key),
+                       std::move(value)));
 }
 
 SbExpr::Vector buildCombineAggsTopBottomN(const AccumOp& acc,
@@ -1214,10 +1226,10 @@ SbExpr::Vector buildCombineAggsTopBottomN(const AccumOp& acc,
 
     auto sortSpec = std::move(inputs->sortSpec);
 
-    return SbExpr::makeSeq(
-        b.makeFunction(isAccumulatorTopN(acc) ? "aggTopNMerge" : "aggBottomNMerge",
-                       inputSlots[0],
-                       std::move(sortSpec)));
+    return SbExpr::makeSeq(b.makeFunction(isAccumulatorTopN(acc) ? sbe::EFn::kAggTopNMerge
+                                                                 : sbe::EFn::kAggBottomNMerge,
+                                          inputSlots[0],
+                                          std::move(sortSpec)));
 }
 
 SbExpr buildFinalizeTopBottomNImpl(const AccumOp& acc,
@@ -1239,30 +1251,32 @@ SbExpr buildFinalizeTopBottomNImpl(const AccumOp& acc,
         // When the data will be merged, the heap itself doesn't need to be sorted since the merging
         // code will handle the sorting.
         auto heapExpr = b.makeFunction(
-            "getElement",
+            sbe::EFn::kGetElement,
             inputVar,
             b.makeInt32Constant(static_cast<int>(sbe::vm::AggMultiElems::kInternalArr)));
         auto lambdaFrameId = state.frameIdGenerator->generate();
         auto pairVar = SbVar{lambdaFrameId, 0};
         auto lambdaExpr = b.makeLocalLambda(
             lambdaFrameId,
-            b.makeFunction("newObj"_sd,
+            b.makeFunction(sbe::EFn::kNewObj,
                            b.makeStrConstant(AccumulatorN::kFieldNameGeneratedSortKey),
-                           b.makeFunction("getElement", pairVar, b.makeInt32Constant(0)),
+                           b.makeFunction(sbe::EFn::kGetElement, pairVar, b.makeInt32Constant(0)),
                            b.makeStrConstant(AccumulatorN::kFieldNameOutput),
-                           b.makeFunction("getElement", pairVar, b.makeInt32Constant(1))));
+                           b.makeFunction(sbe::EFn::kGetElement, pairVar, b.makeInt32Constant(1))));
         // Convert the array pair representation [key, output] to an object format that the merging
         // code expects.
-        return b.makeFunction(
-            "traverseP", std::move(heapExpr), std::move(lambdaExpr), b.makeInt32Constant(1));
+        return b.makeFunction(sbe::EFn::kTraverseP,
+                              std::move(heapExpr),
+                              std::move(lambdaExpr),
+                              b.makeInt32Constant(1));
     } else {
-        auto finalExpr =
-            b.makeFunction(isAccumulatorTopN(acc) ? "aggTopNFinalize" : "aggBottomNFinalize",
-                           inputVar,
-                           std::move(sortSpec));
+        auto finalExpr = b.makeFunction(isAccumulatorTopN(acc) ? sbe::EFn::kAggTopNFinalize
+                                                               : sbe::EFn::kAggBottomNFinalize,
+                                        inputVar,
+                                        std::move(sortSpec));
         if (single) {
-            finalExpr = b.makeFillEmptyNull(
-                b.makeFunction("getElement", std::move(finalExpr), b.makeInt32Constant(0)));
+            finalExpr = b.makeFillEmptyNull(b.makeFunction(
+                sbe::EFn::kGetElement, std::move(finalExpr), b.makeInt32Constant(0)));
         }
         return finalExpr;
     }
@@ -1287,7 +1301,7 @@ AccumInputsPtr buildAccumExprsMinMaxN(const AccumOp& acc,
                                       StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    inputs->inputExpr = b.makeFunction("setToArray", std::move(inputs->inputExpr));
+    inputs->inputExpr = b.makeFunction(sbe::EFn::kSetToArray, std::move(inputs->inputExpr));
     return inputs;
 }
 
@@ -1296,16 +1310,16 @@ SbExpr::Vector buildAccumAggsMinMaxN(const AccumOp& acc,
                                      StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    auto aggExprName = acc.getOpName() == AccumulatorMaxN::kName ? "aggMaxN" : "aggMinN";
+    auto aggExprName =
+        acc.getOpName() == AccumulatorMaxN::kName ? sbe::EFn::kAggMaxN : sbe::EFn::kAggMinN;
 
     auto collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction(
-            std::move(aggExprName), std::move(inputs->inputExpr), SbVar{*collatorSlot}));
-    } else {
         return SbExpr::makeSeq(
-            b.makeFunction(std::move(aggExprName), std::move(inputs->inputExpr)));
+            b.makeFunction(aggExprName, std::move(inputs->inputExpr), SbVar{*collatorSlot}));
+    } else {
+        return SbExpr::makeSeq(b.makeFunction(aggExprName, std::move(inputs->inputExpr)));
     }
 }
 
@@ -1318,15 +1332,15 @@ SbExpr::Vector buildCombineAggsMinMaxN(const AccumOp& acc,
             str::stream() << "Expected one input slot for merging, got: " << inputSlots.size(),
             inputSlots.size() == 1);
 
-    auto aggExprName = acc.getOpName() == AccumulatorMaxN::kName ? "aggMaxNMerge" : "aggMinNMerge";
+    auto aggExprName = acc.getOpName() == AccumulatorMaxN::kName ? sbe::EFn::kAggMaxNMerge
+                                                                 : sbe::EFn::kAggMinNMerge;
 
     auto collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
-        return SbExpr::makeSeq(
-            b.makeFunction(std::move(aggExprName), inputSlots[0], SbVar{*collatorSlot}));
+        return SbExpr::makeSeq(b.makeFunction(aggExprName, inputSlots[0], SbVar{*collatorSlot}));
     } else {
-        return SbExpr::makeSeq(b.makeFunction(std::move(aggExprName), inputSlots[0]));
+        return SbExpr::makeSeq(b.makeFunction(aggExprName, inputSlots[0]));
     }
 }
 
@@ -1338,15 +1352,15 @@ SbExpr buildFinalizeMinMaxN(const AccumOp& acc,
     uassert(7548809,
             str::stream() << "Expected one input slot for finalization, got: " << inputSlots.size(),
             inputSlots.size() == 1);
-    auto aggExprName =
-        acc.getOpName() == AccumulatorMaxN::kName ? "aggMaxNFinalize" : "aggMinNFinalize";
+    auto aggExprName = acc.getOpName() == AccumulatorMaxN::kName ? sbe::EFn::kAggMaxNFinalize
+                                                                 : sbe::EFn::kAggMinNFinalize;
 
     auto collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
-        return b.makeFunction(std::move(aggExprName), inputSlots[0], SbVar{*collatorSlot});
+        return b.makeFunction(aggExprName, inputSlots[0], SbVar{*collatorSlot});
     } else {
-        return b.makeFunction(std::move(aggExprName), inputSlots[0]);
+        return b.makeFunction(aggExprName, inputSlots[0]);
     }
 }
 
@@ -1358,7 +1372,8 @@ SbExpr::Vector buildAccumAggsCovariance(const AccumOp& acc,
 
     SbExprBuilder b(state);
 
-    return SbExpr::makeSeq(b.makeFunction("aggCovarianceAdd", std::move(argX), std::move(argY)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggCovarianceAdd, std::move(argX), std::move(argY)));
 }
 
 SbExpr buildFinalizeCovarianceSamp(const AccumOp& acc,
@@ -1371,7 +1386,7 @@ SbExpr buildFinalizeCovarianceSamp(const AccumOp& acc,
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggCovarianceSampFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggCovarianceSampFinalize, std::move(exprs));
 }
 
 SbExpr buildFinalizeCovariancePop(const AccumOp& acc,
@@ -1384,7 +1399,7 @@ SbExpr buildFinalizeCovariancePop(const AccumOp& acc,
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggCovariancePopFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggCovariancePopFinalize, std::move(exprs));
 }
 
 SbExpr::Vector buildInitializeExpMovingAvg(const AccumOp& acc,
@@ -1394,15 +1409,18 @@ SbExpr::Vector buildInitializeExpMovingAvg(const AccumOp& acc,
 
     auto alphaExpr = std::move(inputs->inputExpr);
 
-    return SbExpr::makeSeq(b.makeFunction(
-        "newArray", b.makeNullConstant(), std::move(alphaExpr), b.makeBoolConstant(false)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray,
+                                          b.makeNullConstant(),
+                                          std::move(alphaExpr),
+                                          b.makeBoolConstant(false)));
 }
 
 SbExpr::Vector buildAccumAggsExpMovingAvg(const AccumOp& acc,
                                           std::unique_ptr<AddSingleInput> inputs,
                                           StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggExpMovingAvg", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggExpMovingAvg, std::move(inputs->inputExpr)));
 }
 
 SbExpr buildFinalizeExpMovingAvg(const AccumOp& acc,
@@ -1410,7 +1428,7 @@ SbExpr buildFinalizeExpMovingAvg(const AccumOp& acc,
                                  const SbSlotVector& slots) {
     SbExprBuilder b(state);
     tassert(7996802, "Incorrect number of arguments", slots.size() == 1);
-    return b.makeFunction("aggExpMovingAvgFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggExpMovingAvgFinalize, slots[0]);
 }
 
 SbExpr::Vector buildAccumAggsLocf(const AccumOp& acc,
@@ -1422,7 +1440,8 @@ SbExpr::Vector buildAccumAggsLocf(const AccumOp& acc,
     auto binds = SbExpr::makeSeq(std::move(inputs->inputExpr));
     auto var = SbVar{frameId, 0};
 
-    auto e = b.makeIf(b.generateNullMissingOrUndefined(var), b.makeFunction("aggState"), var);
+    auto e =
+        b.makeIf(b.generateNullMissingOrUndefined(var), b.makeFunction(sbe::EFn::kAggState), var);
 
     auto localBind = b.makeLet(frameId, std::move(binds), std::move(e));
 
@@ -1433,11 +1452,11 @@ SbExpr::Vector buildAccumAggsDocumentNumber(const AccumOp& acc,
                                             std::unique_ptr<AddSingleInput> inputs,
                                             StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(1)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(1)));
 }
 
-SbExpr::Vector buildAccumAggsRankImpl(const StringData rankFuncName,
-                                      const StringData collRankFuncName,
+SbExpr::Vector buildAccumAggsRankImpl(const sbe::EFn rankFuncName,
+                                      const sbe::EFn collRankFuncName,
                                       const AccumOp& acc,
                                       SbExpr input,
                                       SbExpr sortOrder,
@@ -1461,15 +1480,19 @@ SbExpr::Vector buildAccumAggsRank(const AccumOp& acc,
     auto input = std::move(inputs->inputExpr);
     auto sortOrder = std::move(inputs->isAscending);
 
-    return buildAccumAggsRankImpl(
-        "aggRank", "aggRankColl", acc, std::move(input), std::move(sortOrder), state);
+    return buildAccumAggsRankImpl(sbe::EFn::kAggRank,
+                                  sbe::EFn::kAggRankColl,
+                                  acc,
+                                  std::move(input),
+                                  std::move(sortOrder),
+                                  state);
 }
 
 SbExpr buildFinalizeRank(const AccumOp& acc, StageBuilderState& state, const SbSlotVector& slots) {
     SbExprBuilder b(state);
 
     tassert(7996805, "Incorrect number of arguments", slots.size() == 1);
-    return b.makeFunction("aggRankFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggRankFinalize, slots[0]);
 }
 
 SbExpr::Vector buildAccumAggsDenseRank(const AccumOp& acc,
@@ -1478,8 +1501,12 @@ SbExpr::Vector buildAccumAggsDenseRank(const AccumOp& acc,
     auto input = std::move(inputs->inputExpr);
     auto sortOrder = std::move(inputs->isAscending);
 
-    return buildAccumAggsRankImpl(
-        "aggDenseRank", "aggDenseRankColl", acc, std::move(input), std::move(sortOrder), state);
+    return buildAccumAggsRankImpl(sbe::EFn::kAggDenseRank,
+                                  sbe::EFn::kAggDenseRankColl,
+                                  acc,
+                                  std::move(input),
+                                  std::move(sortOrder),
+                                  state);
 }
 
 SbExpr::Vector buildInitializeIntegral(const AccumOp& acc,
@@ -1490,7 +1517,7 @@ SbExpr::Vector buildInitializeIntegral(const AccumOp& acc,
     auto unitExpr = std::move(inputs->inputExpr);
 
     return SbExpr::makeSeq(
-        b.makeFunction("aggIntegralInit", std::move(unitExpr), b.makeBoolConstant(true)));
+        b.makeFunction(sbe::EFn::kAggIntegralInit, std::move(unitExpr), b.makeBoolConstant(true)));
 }
 
 SbExpr::Vector buildAccumAggsIntegral(const AccumOp& acc,
@@ -1501,7 +1528,8 @@ SbExpr::Vector buildAccumAggsIntegral(const AccumOp& acc,
 
     SbExprBuilder b(state);
 
-    return SbExpr::makeSeq(b.makeFunction("aggIntegralAdd", std::move(input), std::move(sortBy)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggIntegralAdd, std::move(input), std::move(sortBy)));
 }
 
 SbExpr buildFinalizeIntegral(const AccumOp& acc,
@@ -1510,12 +1538,12 @@ SbExpr buildFinalizeIntegral(const AccumOp& acc,
     SbExprBuilder b(state);
 
     tassert(7996809, "Incorrect number of arguments", slots.size() == 1);
-    return b.makeFunction("aggIntegralFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggIntegralFinalize, slots[0]);
 }
 
 SbExpr::Vector buildAccumAggsDerivative(const AccumOp& acc, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(1)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(1)));
 }
 
 SbExpr buildFinalizeDerivative(const AccumOp& acc,
@@ -1534,9 +1562,9 @@ SbExpr buildFinalizeDerivative(const AccumOp& acc,
 
     return b.makeIf(
         b.makeBooleanOpTree(abt::Operations::And,
-                            b.makeFunction("exists", slots[0]),
+                            b.makeFunction(sbe::EFn::kExists, slots[0]),
                             b.makeBinaryOp(abt::Operations::Gt, slots[0], b.makeInt64Constant(0))),
-        b.makeFunction("aggDerivativeFinalize",
+        b.makeFunction(sbe::EFn::kAggDerivativeFinalize,
                        std::move(unit),
                        std::move(inputFirst),
                        std::move(sortByFirst),
@@ -1547,7 +1575,7 @@ SbExpr buildFinalizeDerivative(const AccumOp& acc,
 
 SbExpr::Vector buildInitializeLinearFill(const AccumOp& acc, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("newArray",
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray,
                                           b.makeNullConstant(),
                                           b.makeNullConstant(),
                                           b.makeNullConstant(),
@@ -1573,7 +1601,8 @@ SbExpr::Vector buildAccumAggsLinearFill(const AccumOp& acc,
 
     SbExprBuilder b(state);
 
-    return SbExpr::makeSeq(b.makeFunction("aggLinearFillAdd", std::move(input), std::move(sortBy)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggLinearFillAdd, std::move(input), std::move(sortBy)));
 }
 
 SbExpr buildFinalizeLinearFill(const AccumOp& acc,
@@ -1590,7 +1619,7 @@ SbExpr buildFinalizeLinearFill(const AccumOp& acc,
 
     auto sortBy = std::move(inputs->sortBy);
 
-    return b.makeFunction("aggLinearFillFinalize", std::move(inputVar), std::move(sortBy));
+    return b.makeFunction(sbe::EFn::kAggLinearFillFinalize, std::move(inputVar), std::move(sortBy));
 }
 
 boost::optional<AddBlockExprs> buildAccumBlockExprsSingleInput(
@@ -1642,9 +1671,9 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMin(
     SbExprBuilder b(state);
 
     auto blockAgg =
-        b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+        b.makeFunction(sbe::EFn::kValueBlockAggMin, bitmapInternalSlot, inputs->inputExpr.clone());
 
-    auto rowAgg = b.makeFunction("min"_sd, std::move(inputs->inputExpr));
+    auto rowAgg = b.makeFunction(sbe::EFn::kMin, std::move(inputs->inputExpr));
 
     boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
     pairs.emplace();
@@ -1661,9 +1690,9 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMax(
     SbExprBuilder b(state);
 
     auto blockAgg =
-        b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+        b.makeFunction(sbe::EFn::kValueBlockAggMax, bitmapInternalSlot, inputs->inputExpr.clone());
 
-    auto rowAgg = b.makeFunction("max"_sd, std::move(inputs->inputExpr));
+    auto rowAgg = b.makeFunction(sbe::EFn::kMax, std::move(inputs->inputExpr));
 
     boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
     pairs.emplace();
@@ -1676,8 +1705,8 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsCount(
     const AccumOp& acc, StageBuilderState& state, SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
 
-    auto blockAgg = b.makeFunction("valueBlockAggCount", bitmapInternalSlot);
-    auto rowAgg = b.makeFunction("count");
+    auto blockAgg = b.makeFunction(sbe::EFn::kValueBlockAggCount, bitmapInternalSlot);
+    auto rowAgg = b.makeFunction(sbe::EFn::kCount);
 
     boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
     pairs.emplace();
@@ -1762,10 +1791,11 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsTopBottomN(
 
     bool isTopN = isAccumulatorTopN(acc);
     auto [fnName, blockFnName] = inputs->valueIsArray
-        ? std::pair(isTopN ? "aggTopNArray"_sd : "aggBottomNArray"_sd,
-                    isTopN ? "valueBlockAggTopNArray"_sd : "valueBlockAggBottomNArray"_sd)
-        : std::pair(isTopN ? "aggTopN"_sd : "aggBottomN"_sd,
-                    isTopN ? "valueBlockAggTopN"_sd : "valueBlockAggBottomN"_sd);
+        ? std::pair(isTopN ? sbe::EFn::kAggTopNArray : sbe::EFn::kAggBottomNArray,
+                    isTopN ? sbe::EFn::kValueBlockAggTopNArray
+                           : sbe::EFn::kValueBlockAggBottomNArray)
+        : std::pair(isTopN ? sbe::EFn::kAggTopN : sbe::EFn::kAggBottomN,
+                    isTopN ? sbe::EFn::kValueBlockAggTopN : sbe::EFn::kValueBlockAggBottomN);
 
     auto blockArgs = SbExpr::makeSeq(bitmapInternalSlot, inputs->sortSpec.clone());
     auto args = SbExpr::makeSeq(std::move(inputs->sortSpec));

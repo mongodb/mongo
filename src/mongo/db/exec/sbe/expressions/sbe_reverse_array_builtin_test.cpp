@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -58,7 +59,7 @@ protected:
         arraySlotAccessor.reset(array.first, array.second);
         auto arrayExpr = makeE<EVariable>(arraySlot);
 
-        auto reverseArrayExpr = makeE<EFunction>("reverseArray", makeEs(std::move(arrayExpr)));
+        auto reverseArrayExpr = makeE<EFunction>(EFn::kReverseArray, makeEs(std::move(arrayExpr)));
         auto compiledExpr = compileExpression(*reverseArrayExpr);
 
         auto actual = runCompiledExpression(compiledExpr.get());

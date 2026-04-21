@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -123,7 +124,7 @@ protected:
             arguments.push_back(makeE<EConstant>(skipCopy.first, skipCopy.second));
         }
 
-        auto extractSubArrayExpr = makeE<EFunction>("extractSubArray", std::move(arguments));
+        auto extractSubArrayExpr = makeE<EFunction>(EFn::kExtractSubArray, std::move(arguments));
         auto compiledExpr = compileExpression(*extractSubArrayExpr);
 
         return runCompiledExpression(compiledExpr.get());
@@ -229,8 +230,8 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
         // Use 'extractSubArray' to create a stack owned array and extract object from it, then test
         // if 'getElement' can return the value with correct memory management.
         auto extractFromSubArrayExpr = makeE<EFunction>(
-            "getElement",
-            makeEs(makeE<EFunction>("extractSubArray",
+            EFn::kGetElement,
+            makeEs(makeE<EFunction>(EFn::kExtractSubArray,
                                     makeEs(makeC(array),
                                            makeC(value::TypeTags::NumberInt32, 1),
                                            makeC(value::TypeTags::NumberInt32, 2))),
@@ -257,10 +258,10 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
         // Use 'extractSubArray' to create a stack owned array and extract object from it, then test
         // if 'getField' can return the value with correct memory management.
         auto extractFromSubArrayExpr = makeE<EFunction>(
-            "getField",
+            EFn::kGetField,
             makeEs(makeE<EFunction>(
-                       "getElement",
-                       makeEs(makeE<EFunction>("extractSubArray",
+                       EFn::kGetElement,
+                       makeEs(makeE<EFunction>(EFn::kExtractSubArray,
                                                makeEs(makeC(arrTag, arrVal),
                                                       makeC(value::TypeTags::NumberInt32, 1))),
                               makeC(value::TypeTags::NumberInt32, 0))),

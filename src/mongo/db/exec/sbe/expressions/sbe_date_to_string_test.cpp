@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -76,7 +77,7 @@ TEST_F(SBEDateToStringTest, BasicDateToString) {
 
     // Construct an invocation of "DateToString" function.
     auto DateToStringExpression =
-        sbe::makeE<sbe::EFunction>("dateToString",
+        sbe::makeE<sbe::EFunction>(EFn::kDateToString,
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(dateSlot),
                                                makeE<EVariable>(formatSlot),

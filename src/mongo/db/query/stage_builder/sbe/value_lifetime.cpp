@@ -30,7 +30,6 @@
 #include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
 
 namespace mongo::stage_builder {
-using namespace std::string_literals;
 
 void ValueLifetime::validate(abt::ABT& node) {
     node.visit(*this);
@@ -134,7 +133,7 @@ ValueLifetime::ValueType ValueLifetime::operator()(abt::ABT& n, abt::NaryOp& op)
 
 ValueLifetime::ValueType ValueLifetime::operator()(abt::ABT& n, abt::FunctionCall& op) {
     size_t arity = op.nodes().size();
-    if (arity == 3 && (op.name() == "traverseP"s || op.name() == "traverseF"s)) {
+    if (arity == 3 && (op.fn() == sbe::EFn::kTraverseP || op.fn() == sbe::EFn::kTraverseF)) {
         ValueType argType = op.nodes()[0].visit(*this);
 
         auto lambda = op.nodes()[1].cast<abt::LambdaAbstraction>();
@@ -163,14 +162,14 @@ ValueLifetime::ValueType ValueLifetime::operator()(abt::ABT& n, abt::FunctionCal
         argTypes.emplace_back(node.visit(*this));
     }
     if (arity == 2 &&
-        (op.name() == "getField"s || op.name() == "getElement"s ||
-         op.name() == "getFieldOrElement"s)) {
-        // These methods return a local value if the input is a local value, otherwise it returns a
-        // reference; when the input is a global value, a reference to a global value can be treated
-        // as a global value itself, so we can just propagate the type of the input.
+        (op.fn() == sbe::EFn::kGetField || op.fn() == sbe::EFn::kGetElement ||
+         op.fn() == sbe::EFn::kGetFieldOrElement)) {
+        // These methods return a local value if the input is a local value, otherwise it returns
+        // a reference; when the input is a global value, a reference to a global value can be
+        // treated as a global value itself, so we can just propagate the type of the input.
         return argTypes[0];
     }
-    if (arity == 3 && op.name() == "fillType"s) {
+    if (arity == 3 && op.fn() == sbe::EFn::kFillType) {
         // fillType propagates either the input argument or the fallback value, promote references
         // to be local values.
         if (argTypes[0] == argTypes[2]) {
@@ -231,7 +230,7 @@ ValueLifetime::ValueType ValueLifetime::operator()(abt::ABT& n, abt::Switch& op)
 void ValueLifetime::wrapNode(abt::ABT& node) {
     abt::ABTVector arguments;
     arguments.push_back(std::exchange(node, abt::make<abt::Blackhole>()));
-    swapAndUpdate(node, abt::make<abt::FunctionCall>("makeOwn", std::move(arguments)));
+    swapAndUpdate(node, abt::make<abt::FunctionCall>(sbe::EFn::kMakeOwn, std::move(arguments)));
 }
 
 void ValueLifetime::swapAndUpdate(abt::ABT& n, abt::ABT newN) {

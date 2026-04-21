@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -76,6 +77,8 @@
 
 namespace mongo::stage_builder {
 namespace {
+
+
 /**
  * Returns 'true' if the index bounds in 'intervalLists' can be represented as a number of intervals
  * between low and high keys, which can be statically generated. Inclusivity of each bound is
@@ -375,8 +378,8 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
     // bind the keys to the 'lowKeySlot' and 'highKeySlot'.
     auto [project, outSlots] =
         b.makeProject(std::move(unwind),
-                      b.makeFunction("getField"_sd, unwindSlot, b.makeStrConstant("l"_sd)),
-                      b.makeFunction("getField"_sd, unwindSlot, b.makeStrConstant("h"_sd)));
+                      b.makeFunction(sbe::EFn::kGetField, unwindSlot, b.makeStrConstant("l"_sd)),
+                      b.makeFunction(sbe::EFn::kGetField, unwindSlot, b.makeStrConstant("h"_sd)));
 
     auto lowKeySlot = outSlots[0];
     auto highKeySlot = outSlots[1];
@@ -648,11 +651,11 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
     // return EOF. This does not apply when the interval is a point interval, since the interval
     // should always exist in that case.
     if (shouldRegisterLowHighKeyInRuntimeEnv && !isPointInterval) {
-        stage =
-            b.makeConstFilter(std::move(stage),
-                              b.makeBooleanOpTree(abt::Operations::And,
-                                                  b.makeFunction("exists", lowKeyExpr.clone()),
-                                                  b.makeFunction("exists", highKeyExpr.clone())));
+        stage = b.makeConstFilter(
+            std::move(stage),
+            b.makeBooleanOpTree(abt::Operations::And,
+                                b.makeFunction(sbe::EFn::kExists, lowKeyExpr.clone()),
+                                b.makeFunction(sbe::EFn::kExists, highKeyExpr.clone())));
     }
 
     return {std::move(stage),
@@ -791,7 +794,7 @@ std::pair<SbStage, PlanStageSlots> setResultAndAdditionalFieldSlots(SbStage stag
         }
 
         auto [outStage, outSlots] =
-            b.makeProject(std::move(stage), b.makeFunction("newObj"_sd, std::move(args)));
+            b.makeProject(std::move(stage), b.makeFunction(sbe::EFn::kNewObj, std::move(args)));
         stage = std::move(outStage);
 
         outputs.set(PlanStageSlots::kReturnKey, outSlots[0]);

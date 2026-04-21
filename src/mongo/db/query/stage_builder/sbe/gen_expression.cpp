@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -73,6 +74,8 @@
 
 namespace mongo::stage_builder {
 namespace {
+
+
 size_t kArgumentCountForBinaryTree = 100;
 
 struct ExpressionVisitorContext {
@@ -163,7 +166,7 @@ SbExpr generateTraverseHelper(SbExpr inputExpr,
     auto fieldName = b.makeStrConstant(fp.getFieldName(level));
     auto fieldExpr = topLevelFieldSlot
         ? b.makeVariable(*topLevelFieldSlot)
-        : b.makeFunction("getField"_sd, std::move(inputExpr), std::move(fieldName));
+        : b.makeFunction(sbe::EFn::kGetField, std::move(inputExpr), std::move(fieldName));
 
     if (level == fp.getPathLength() - 1) {
         // For the last level, we can just return the field slot without the need for a
@@ -181,7 +184,7 @@ SbExpr generateTraverseHelper(SbExpr inputExpr,
 
     // Generate the traverse stage for the current nested level.
     return b.makeFunction(
-        "traverseP"_sd, std::move(fieldExpr), std::move(lambdaExpr), b.makeInt32Constant(1));
+        sbe::EFn::kTraverseP, std::move(fieldExpr), std::move(lambdaExpr), b.makeInt32Constant(1));
 }
 
 SbExpr generateTraverse(SbExpr inputExpr,
@@ -207,8 +210,10 @@ SbExpr generateTraverse(SbExpr inputExpr,
 
         auto lambdaExpr = b.makeLocalLambda(lambdaFrameId, std::move(resultExpr));
 
-        return b.makeFunction(
-            "traverseP"_sd, std::move(inputExpr), std::move(lambdaExpr), b.makeInt32Constant(1));
+        return b.makeFunction(sbe::EFn::kTraverseP,
+                              std::move(inputExpr),
+                              std::move(lambdaExpr),
+                              b.makeInt32Constant(1));
     }
 }
 
@@ -216,7 +221,7 @@ SbExpr generateTraverse(SbExpr inputExpr,
  * Generates an EExpression that converts the input to upper or lower case.
  */
 void generateStringCaseConversionExpression(ExpressionVisitorContext* context,
-                                            const std::string& caseConversionFunction) {
+                                            sbe::EFn caseConversionFunction) {
     SbExprBuilder b(context->state);
 
     uint32_t typeMask = (getBSONTypeMask(sbe::value::TypeTags::StringSmall) |
@@ -237,11 +242,11 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* context,
     auto totalCaseConversionExpr = b.buildMultiBranchConditionalFromCaseValuePairs(
         SbExpr::makeExprPairVector(
             SbExprPair{b.generateNullMissingOrUndefined(var), b.makeStrConstant(""_sd)},
-            SbExprPair{
-                b.makeFunction("typeMatch"_sd, var, b.makeInt32Constant(typeMask)),
-                b.makeFunction(caseConversionFunction, b.makeFunction("coerceToString"_sd, var))}),
+            SbExprPair{b.makeFunction(sbe::EFn::kTypeMatch, var, b.makeInt32Constant(typeMask)),
+                       b.makeFunction(caseConversionFunction,
+                                      b.makeFunction(sbe::EFn::kCoerceToString, var))}),
         b.makeFail(ErrorCodes::Error{7158200},
-                   str::stream() << "$" << caseConversionFunction
+                   str::stream() << "$" << sbe::toString(caseConversionFunction)
                                  << " input type is not supported"));
 
     context->pushExpr(b.makeLet(frameId, std::move(binds), std::move(totalCaseConversionExpr)));
@@ -679,7 +684,7 @@ public:
                 SbExprPair{
                     _b.generateLongLongMinCheck(input),
                     _b.makeFail(ErrorCodes::Error{7157701}, "can't take $abs of long long min")}),
-            _b.makeFunction("abs", input));
+            _b.makeFunction(sbe::EFn::kAbs, input));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(absExpr)));
     }
@@ -705,8 +710,8 @@ public:
 
             auto checkedLeaf = _b.buildMultiBranchConditional(
                 SbExprPair{_b.makeBinaryOp(abt::Operations::Or,
-                                           _b.makeFunction("isNumber", var),
-                                           _b.makeFunction("isDate", var)),
+                                           _b.makeFunction(sbe::EFn::kIsNumber, var),
+                                           _b.makeFunction(sbe::EFn::kIsDate, var)),
                            var},
                 _b.makeFail(ErrorCodes::Error{7315401},
                             "only numbers and dates are allowed in an $add expression"));
@@ -730,8 +735,8 @@ public:
                                                _b.generateNullMissingOrUndefined(varRight)),
                                _b.makeNullConstant()},
                     SbExprPair{_b.makeBinaryOp(abt::Operations::And,
-                                               _b.makeFunction("isDate", varLeft),
-                                               _b.makeFunction("isDate", varRight)),
+                                               _b.makeFunction(sbe::EFn::kIsDate, varLeft),
+                                               _b.makeFunction(sbe::EFn::kIsDate, varRight)),
                                _b.makeFail(ErrorCodes::Error{7315402},
                                            "only one date allowed in an $add expression")}),
                 _b.makeBinaryOp(abt::Operations::Add, varLeft, varRight));
@@ -777,9 +782,10 @@ public:
                 // Count the number of dates among children of this $add while verifying the types
                 // so that we can later check that we have at most one date.
                 checkArgHasValidType.emplace_back(_b.buildMultiBranchConditionalFromCaseValuePairs(
-                    SbExpr::makeExprPairVector(
-                        SbExprPair{_b.makeFunction("isNumber", var), _b.makeInt32Constant(0)},
-                        SbExprPair{_b.makeFunction("isDate", var), _b.makeInt32Constant(1)}),
+                    SbExpr::makeExprPairVector(SbExprPair{_b.makeFunction(sbe::EFn::kIsNumber, var),
+                                                          _b.makeInt32Constant(0)},
+                                               SbExprPair{_b.makeFunction(sbe::EFn::kIsDate, var),
+                                                          _b.makeInt32Constant(1)}),
                     _b.makeFail(ErrorCodes::Error{7157723},
                                 "only numbers and dates are allowed in an $add expression")));
 
@@ -829,12 +835,14 @@ public:
 
         auto lambdaFrameId = _context->state.frameId();
         SbVar lambdaVar{lambdaFrameId, 0};
-        auto lambdaBody = _b.makeFillEmptyFalse(_b.makeFunction("coerceToBool", lambdaVar));
+        auto lambdaBody =
+            _b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kCoerceToBool, lambdaVar));
         auto lambdaExpr = _b.makeLocalLambda(lambdaFrameId, std::move(lambdaBody));
 
         auto resultExpr = _b.makeIf(
-            _b.makeFillEmptyFalse(_b.makeFunction("isArray", var)),
-            _b.makeFunction("traverseF", var, std::move(lambdaExpr), _b.makeBoolConstant(false)),
+            _b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kIsArray, var)),
+            _b.makeFunction(
+                sbe::EFn::kTraverseF, var, std::move(lambdaExpr), _b.makeBoolConstant(false)),
             _b.makeFail(ErrorCodes::Error{7158300}, "$anyElementTrue's argument must be an array"));
 
         pushExpr(_b.makeLet(frameId, std::move(binds), std::move(resultExpr)));
@@ -855,7 +863,7 @@ public:
             args.emplace_back(_b.makeFillEmptyNull(popExpr()));
         }
         std::reverse(std::begin(args), std::end(args));
-        pushExpr(_b.makeFunction("newArray", std::move(args)));
+        pushExpr(_b.makeFunction(sbe::EFn::kNewArray, std::move(args)));
     }
     void visit(const ExpressionArrayElemAt* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -884,13 +892,13 @@ public:
         SbVar arg{frameId, 0};
 
         // Create an expression to invoke the built-in function.
-        binds.emplace_back(_b.makeFunction("objectToArray"_sd, arg));
+        binds.emplace_back(_b.makeFunction(sbe::EFn::kObjectToArray, arg));
         SbVar func{frameId, 1};
 
         // Create validation checks when builtin returns nothing
         auto validationExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
-                SbExprPair{_b.makeFunction("exists"_sd, func), func},
+                SbExprPair{_b.makeFunction(sbe::EFn::kExists, func), func},
                 SbExprPair{_b.generateNullMissingOrUndefined(arg), _b.makeNullConstant()},
                 SbExprPair{_b.generateNonObjectCheck(arg),
                            _b.makeFail(ErrorCodes::Error{5153215},
@@ -905,13 +913,13 @@ public:
         SbVar arg{frameId, 0};
 
         // Create an expression to invoke the built-in function.
-        binds.emplace_back(_b.makeFunction("arrayToObject"_sd, arg));
+        binds.emplace_back(_b.makeFunction(sbe::EFn::kArrayToObject, arg));
         SbVar func{frameId, 1};
 
         // Create validation checks when builtin returns nothing
         auto validationExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
-                SbExprPair{_b.makeFunction("exists"_sd, func), func},
+                SbExprPair{_b.makeFunction(sbe::EFn::kExists, func), func},
                 SbExprPair{_b.generateNullMissingOrUndefined(arg), _b.makeNullConstant()},
                 SbExprPair{_b.generateNonArrayCheck(arg),
                            _b.makeFail(ErrorCodes::Error{5153200},
@@ -936,7 +944,7 @@ public:
                 SbExprPair{_b.generateNonObjectCheck(arg),
                            _b.makeFail(ErrorCodes::Error{7158301},
                                        "$bsonSize requires a document input")}),
-            _b.makeFunction("bsonSize", arg));
+            _b.makeFunction(sbe::EFn::kBsonSize, arg));
 
         pushExpr(_b.makeLet(frameId, std::move(binds), std::move(bsonSizeExpr)));
     }
@@ -951,7 +959,7 @@ public:
                 SbExprPair{
                     _b.generateNonNumericCheck(input),
                     _b.makeFail(ErrorCodes::Error{7157702}, "$ceil only supports numeric types")}),
-            _b.makeFunction("ceil", input));
+            _b.makeFunction(sbe::EFn::kCeil, input));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(ceilExpr)));
     }
@@ -992,7 +1000,7 @@ public:
             SbVar var{frameId, numLocalVars++};
 
             checkNullArg.push_back(_b.generateNullMissingOrUndefined(var));
-            checkStringArg.push_back(_b.makeFunction("isString"_sd, var));
+            checkStringArg.push_back(_b.makeFunction(sbe::EFn::kIsString, var));
             args.emplace_back(SbExpr{var});
         }
 
@@ -1006,7 +1014,7 @@ public:
             SbExpr::makeExprPairVector(
                 SbExprPair{std::move(checkNullAnyArgument), _b.makeNullConstant()},
                 SbExprPair{std::move(checkStringAllArguments),
-                           _b.makeFunction("concat", std::move(args))}),
+                           _b.makeFunction(sbe::EFn::kConcat, std::move(args))}),
             _b.makeFail(ErrorCodes::Error{7158201}, "$concat supports only strings"));
 
         pushExpr(_b.makeLet(frameId, std::move(binds), std::move(concatExpr)));
@@ -1046,7 +1054,7 @@ public:
             argIsNullOrMissing.emplace_back(_b.generateNullMissingOrUndefined(var));
         }
 
-        binds.emplace_back(_b.makeFunction("concatArrays", std::move(args)));
+        binds.emplace_back(_b.makeFunction(sbe::EFn::kConcatArrays, std::move(args)));
         SbVar result{frameId, numLocalVars++};
 
         pushExpr(_b.makeLet(
@@ -1054,7 +1062,7 @@ public:
             std::move(binds),
             _b.buildMultiBranchConditionalFromCaseValuePairs(
                 SbExpr::makeExprPairVector(
-                    SbExprPair{_b.makeFunction("exists"_sd, result), result},
+                    SbExprPair{_b.makeFunction(sbe::EFn::kExists, result), result},
                     SbExprPair{
                         _b.makeBooleanOpTree(abt::Operations::Or, std::move(argIsNullOrMissing)),
                         _b.makeNullConstant()}),
@@ -1134,7 +1142,7 @@ public:
         }
 
         // Create an expression to invoke built-in "dateDiff" function.
-        auto dateDiffFunctionCall = _b.makeFunction("dateDiff", std::move(arguments));
+        auto dateDiffFunctionCall = _b.makeFunction(sbe::EFn::kDateDiff, std::move(arguments));
 
         // Create expressions to check that each argument to "dateDiff" function exists, is not
         // null, and is of the correct type.
@@ -1160,7 +1168,7 @@ public:
             _b.makeFail(ErrorCodes::Error{7157919},
                         "$dateDiff parameter 'timezone' must be a string"));
         inputValidationCases.emplace_back(
-            _b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, timezoneVar)),
+            _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimezone, timeZoneDBVar, timezoneVar)),
             _b.makeFail(ErrorCodes::Error{7157920},
                         "$dateDiff parameter 'timezone' must be a valid timezone"));
 
@@ -1177,7 +1185,7 @@ public:
             _b.generateNonStringCheck(unitVar),
             _b.makeFail(ErrorCodes::Error{7157923}, "$dateDiff parameter 'unit' must be a string"));
         inputValidationCases.emplace_back(
-            _b.makeNot(_b.makeFunction("isTimeUnit", unitVar)),
+            _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimeUnit, unitVar)),
             _b.makeFail(ErrorCodes::Error{7157924},
                         "$dateDiff parameter 'unit' must be a valid time unit"));
 
@@ -1191,9 +1199,10 @@ public:
                 _b.makeFail(ErrorCodes::Error{7157925},
                             "$dateDiff parameter 'startOfWeek' must be a string"));
             inputValidationCases.emplace_back(
-                _b.makeBinaryOp(abt::Operations::And,
-                                *unitIsWeekVar,
-                                _b.makeNot(_b.makeFunction("isDayOfWeek", *startOfWeekVar))),
+                _b.makeBinaryOp(
+                    abt::Operations::And,
+                    *unitIsWeekVar,
+                    _b.makeNot(_b.makeFunction(sbe::EFn::kIsDayOfWeek, *startOfWeekVar))),
                 _b.makeFail(ErrorCodes::Error{7157926},
                             "$dateDiff parameter 'startOfWeek' must be a valid day of the week"));
         }
@@ -1263,8 +1272,8 @@ public:
         }
 
         // Create an expression to invoke built-in "dateFromString" function.
-        std::string functionName =
-            expr->isOnErrorSpecified() ? "dateFromStringNoThrow" : "dateFromString";
+        sbe::EFn functionName = expr->isOnErrorSpecified() ? sbe::EFn::kDateFromStringNoThrow
+                                                           : sbe::EFn::kDateFromString;
         auto dateFromStringFunctionCall = _b.makeFunction(functionName, std::move(arguments));
 
         // Create expressions to check that each argument to "dateFromString" function exists, is
@@ -1320,7 +1329,7 @@ public:
                                 "$dateFromString requires that 'format' be a string"));
 
                 inputValidationCases.emplace_back(
-                    _b.makeNot(_b.makeFunction("validateFromStringFormat", *formatVar)),
+                    _b.makeNot(_b.makeFunction(sbe::EFn::kValidateFromStringFormat, *formatVar)),
                     // This should be unreachable. The validation function above will uassert on an
                     // invalid format string and then return true. It returns false on non-string
                     // input, but we already check for non-string format above.
@@ -1353,7 +1362,7 @@ public:
                 _b.makeFail(ErrorCodes::Error{4997807},
                             "$dateFromString parameter 'timezone' must be a string"));
             inputValidationCases.emplace_back(
-                _b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, *timezoneVar)),
+                _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimezone, timeZoneDBVar, *timezoneVar)),
                 _b.makeFail(ErrorCodes::Error{4997808},
                             "$dateFromString parameter 'timezone' must be a valid timezone"));
         }
@@ -1409,7 +1418,7 @@ public:
         SbVar millisecVar{frameId, 6};
         SbVar timeZoneVar{frameId, 7};
 
-        std::string functionName = eIsoWeekYear ? "datePartsWeekYear" : "dateParts";
+        sbe::EFn functionName = eIsoWeekYear ? sbe::EFn::kDatePartsWeekYear : sbe::EFn::kDateParts;
 
         // Build a chain of nested bounds checks for each date part that is provided in the
         // expression. We elide the checks in the case that default values are used. These bound
@@ -1457,16 +1466,16 @@ public:
                 SbExpr::makeSeq(std::move(expr)),
                 _b.makeIf(
                     _b.makeBinaryOp(abt::Operations::Or,
-                                    _b.makeNot(_b.makeFunction("exists", outerVar)),
-                                    _b.makeFunction("isNull", outerVar)),
+                                    _b.makeNot(_b.makeFunction(sbe::EFn::kExists, outerVar)),
+                                    _b.makeFunction(sbe::EFn::kIsNull, outerVar)),
                     _b.makeNullConstant(),
                     _b.makeLet(
                         innerFrameId,
-                        SbExpr::makeSeq(_b.makeFunction("convert",
+                        SbExpr::makeSeq(_b.makeFunction(sbe::EFn::kConvert,
                                                         outerVar,
                                                         _b.makeInt32Constant(static_cast<int32_t>(
                                                             sbe::value::TypeTags::NumberInt64)))),
-                        _b.makeIf(_b.makeFunction("exists", convertedFieldVar),
+                        _b.makeIf(_b.makeFunction(sbe::EFn::kExists, convertedFieldVar),
                                   convertedFieldVar,
                                   _b.makeFail(ErrorCodes::Error{7157917},
                                               str::stream() << "'" << varName << "'"
@@ -1569,7 +1578,7 @@ public:
             operands.push_back(_b.makeLet(
                 innerFrameId,
                 SbExpr::makeSeq(std::move(eTimezone)),
-                _b.makeIf(_b.makeFunction("isString", timeZoneVar),
+                _b.makeIf(_b.makeFunction(sbe::EFn::kIsString, timeZoneVar),
                           timeZoneVar,
                           _b.makeFail(ErrorCodes::Error{7157918},
                                       str::stream() << "'timezone' must evaluate to a string"))));
@@ -1627,28 +1636,32 @@ public:
         auto totalDateToPartsFunc = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullMissingOrUndefined(timezoneVar), _b.makeNullConstant()},
-                SbExprPair{_b.makeNot(_b.makeFunction("isString", timezoneVar)),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kIsString, timezoneVar)),
                            _b.makeFail(ErrorCodes::Error{7157912},
                                        "$dateToParts timezone must be a string")},
-                SbExprPair{_b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, timezoneVar)),
-                           _b.makeFail(ErrorCodes::Error{7157913},
-                                       "$dateToParts timezone must be a valid timezone")},
+                SbExprPair{
+                    _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimezone, timeZoneDBVar, timezoneVar)),
+                    _b.makeFail(ErrorCodes::Error{7157913},
+                                "$dateToParts timezone must be a valid timezone")},
                 SbExprPair{_b.generateNullMissingOrUndefined(isoflagVar), _b.makeNullConstant()},
-                SbExprPair{_b.makeNot(_b.makeFunction(
-                               "typeMatch", isoflagVar, _b.makeInt32Constant(isoTypeMask))),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kTypeMatch,
+                                                      isoflagVar,
+                                                      _b.makeInt32Constant(isoTypeMask))),
                            _b.makeFail(ErrorCodes::Error{7157914},
                                        "$dateToParts iso8601 must be a boolean")},
                 SbExprPair{_b.generateNullMissingOrUndefined(dateVar), _b.makeNullConstant()},
-                SbExprPair{_b.makeNot(_b.makeFunction(
-                               "typeMatch", dateVar, _b.makeInt32Constant(dateTypeMask()))),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kTypeMatch,
+                                                      dateVar,
+                                                      _b.makeInt32Constant(dateTypeMask()))),
                            _b.makeFail(ErrorCodes::Error{7157915},
                                        "$dateToParts date must have the format of a date")},
                 // Determine whether to call dateToParts or isoDateToParts.
                 SbExprPair{
                     _b.makeBinaryOp(abt::Operations::Eq, isoflagVar, _b.makeBoolConstant(false)),
                     _b.makeFunction(
-                        "dateToParts", timeZoneDBVar, dateVar, timezoneVar, isoflagVar)}),
-            _b.makeFunction("isoDateToParts", timeZoneDBVar, dateVar, timezoneVar, isoflagVar));
+                        sbe::EFn::kDateToParts, timeZoneDBVar, dateVar, timezoneVar, isoflagVar)}),
+            _b.makeFunction(
+                sbe::EFn::kIsoDateToParts, timeZoneDBVar, dateVar, timezoneVar, isoflagVar));
 
         pushExpr(
             _b.makeLet(frameId,
@@ -1698,7 +1711,7 @@ public:
         // null, and is of the correct type.
         std::vector<SbExprPair> inputValidationCases;
         // Return the evaluation of the function, if the result is correct.
-        inputValidationCases.emplace_back(_b.makeFunction("exists"_sd, dateToStringVar),
+        inputValidationCases.emplace_back(_b.makeFunction(sbe::EFn::kExists, dateToStringVar),
                                           dateToStringVar);
         // Return onNull if date is null or missing.
         inputValidationCases.emplace_back(_b.generateNullMissingOrUndefined(dateVar),
@@ -1736,7 +1749,7 @@ public:
                 _b.makeFail(ErrorCodes::Error{4997907},
                             "$dateToString parameter 'timezone' must be a string"));
             inputValidationCases.emplace_back(
-                _b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, timezoneVar)),
+                _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimezone, timeZoneDBVar, timezoneVar)),
                 _b.makeFail(ErrorCodes::Error{4997908},
                             "$dateToString parameter 'timezone' must be a valid timezone"));
         }
@@ -1757,7 +1770,7 @@ public:
                 _b.makeFail(ErrorCodes::Error{4997903},
                             "$dateToString parameter 'format' must be a string"));
             inputValidationCases.emplace_back(
-                _b.makeNot(_b.makeFunction("isValidToStringFormat", formatVar)),
+                _b.makeNot(_b.makeFunction(sbe::EFn::kIsValidToStringFormat, formatVar)),
                 _b.makeFail(ErrorCodes::Error{4997904},
                             "$dateToString parameter 'format' must be a valid format"));
         }
@@ -1770,7 +1783,8 @@ public:
         arguments.push_back(timezoneVar);
 
         // Create an expression to invoke built-in "dateToString" function.
-        auto dateToStringFunctionCall = _b.makeFunction("dateToString", std::move(arguments));
+        auto dateToStringFunctionCall =
+            _b.makeFunction(sbe::EFn::kDateToString, std::move(arguments));
 
         pushExpr(_b.makeLet(frameId,
                             SbExpr::makeSeq(std::move(dateExpression),
@@ -1826,7 +1840,7 @@ public:
         arguments.push_back(startOfWeekVar);
 
         // Create an expression to invoke built-in "dateTrunc" function.
-        auto dateTruncFunctionCall = _b.makeFunction("dateTrunc", std::move(arguments));
+        auto dateTruncFunctionCall = _b.makeFunction(sbe::EFn::kDateTrunc, std::move(arguments));
 
         // Local bind to hold the unitIsWeek common subexpression
         auto innerFrameId = _context->state.frameId();
@@ -1863,7 +1877,7 @@ public:
                 _b.makeFail(ErrorCodes::Error{7157930},
                             "$dateTrunc parameter 'timezone' must be a string"));
             inputValidationCases.emplace_back(
-                _b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, timezoneVar)),
+                _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimezone, timeZoneDBVar, timezoneVar)),
                 _b.makeFail(ErrorCodes::Error{7157931},
                             "$dateTrunc parameter 'timezone' must be a valid timezone"));
         }
@@ -1888,7 +1902,7 @@ public:
                 _b.makeFail(ErrorCodes::Error{7157935},
                             "$dateTrunc parameter 'unit' must be a string"));
             inputValidationCases.emplace_back(
-                _b.makeNot(_b.makeFunction("isTimeUnit", unitVar)),
+                _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimeUnit, unitVar)),
                 _b.makeFail(ErrorCodes::Error{7157936},
                             "$dateTrunc parameter 'unit' must be a valid time unit"));
         }
@@ -1919,10 +1933,10 @@ public:
                         abt::Operations::And,
                         _b.makeBinaryOp(
                             abt::Operations::And,
-                            _b.makeFunction("isNumber", binSizeVar),
+                            _b.makeFunction(sbe::EFn::kIsNumber, binSizeVar),
                             _b.makeFunction(
-                                "exists",
-                                _b.makeFunction("convert",
+                                sbe::EFn::kExists,
+                                _b.makeFunction(sbe::EFn::kConvert,
                                                 binSizeVar,
                                                 _b.makeInt32Constant(static_cast<int32_t>(
                                                     sbe::value::TypeTags::NumberInt64))))),
@@ -1954,9 +1968,10 @@ public:
                     _b.makeFail(ErrorCodes::Error{7157943},
                                 "$dateTrunc parameter 'startOfWeek' must be a string"));
                 inputValidationCases.emplace_back(
-                    _b.makeBinaryOp(abt::Operations::And,
-                                    unitIsWeekVar,
-                                    _b.makeNot(_b.makeFunction("isDayOfWeek", startOfWeekVar))),
+                    _b.makeBinaryOp(
+                        abt::Operations::And,
+                        unitIsWeekVar,
+                        _b.makeNot(_b.makeFunction(sbe::EFn::kIsDayOfWeek, startOfWeekVar))),
                     _b.makeFail(
                         ErrorCodes::Error{7157944},
                         "$dateTrunc parameter 'startOfWeek' must be a valid day of the week"));
@@ -1971,7 +1986,7 @@ public:
                             std::move(timezoneExpression),
                             std::move(startOfWeekExpression),
                             std::move(dateTruncFunctionCall)),
-            _b.makeIf(_b.makeFunction("exists", dateTruncVar),
+            _b.makeIf(_b.makeFunction(sbe::EFn::kExists, dateTruncVar),
                       dateTruncVar,
                       _b.makeLet(innerFrameId,
                                  SbExpr::makeSeq(std::move(unitIsWeekExpression)),
@@ -1988,8 +2003,8 @@ public:
         SbVar rhsVar{frameId, 1};
 
         auto checkIsNumber = _b.makeBinaryOp(abt::Operations::And,
-                                             _b.makeFunction("isNumber", lhsVar),
-                                             _b.makeFunction("isNumber", rhsVar));
+                                             _b.makeFunction(sbe::EFn::kIsNumber, lhsVar),
+                                             _b.makeFunction(sbe::EFn::kIsNumber, rhsVar));
 
         auto checkIsNullOrMissing = _b.makeBinaryOp(abt::Operations::Or,
                                                     _b.generateNullMissingOrUndefined(lhsVar),
@@ -2015,7 +2030,7 @@ public:
                 SbExprPair{
                     _b.generateNonNumericCheck(inputVar),
                     _b.makeFail(ErrorCodes::Error{7157704}, "$exp only supports numeric types")}),
-            _b.makeFunction("exp", inputVar));
+            _b.makeFunction(sbe::EFn::kExp, inputVar));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(expExpr)));
     }
@@ -2041,7 +2056,7 @@ public:
                 SbExprPair{
                     _b.generateNonNumericCheck(inputVar),
                     _b.makeFail(ErrorCodes::Error{7157703}, "$floor only supports numeric types")}),
-            _b.makeFunction("floor", inputVar));
+            _b.makeFunction(sbe::EFn::kFloor, inputVar));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(floorExpr)));
     }
@@ -2078,9 +2093,9 @@ public:
 
         auto inExpr = _b.makeIf(
             // Check that the arr argument is an array and is not missing.
-            _b.makeFillEmptyFalse(_b.makeFunction("isArray", arrLocalVar)),
-            (collatorSlot ? _b.makeFunction("collIsMember", std::move(functionArgs))
-                          : _b.makeFunction("isMember", std::move(functionArgs))),
+            _b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kIsArray, arrLocalVar)),
+            (collatorSlot ? _b.makeFunction(sbe::EFn::kCollIsMember, std::move(functionArgs))
+                          : _b.makeFunction(sbe::EFn::kIsMember, std::move(functionArgs))),
             _b.makeFail(ErrorCodes::Error{5153700}, "$in requires an array as a second argument"));
 
         pushExpr(_b.makeLet(
@@ -2091,19 +2106,19 @@ public:
     }
 
     void visit(const ExpressionIndexOfBytes* expr) final {
-        visitIndexOfFunction(expr, _context, "indexOfBytes");
+        visitIndexOfFunction(expr, _context, sbe::EFn::kIndexOfBytes);
     }
 
     void visit(const ExpressionIndexOfCP* expr) final {
-        visitIndexOfFunction(expr, _context, "indexOfCP");
+        visitIndexOfFunction(expr, _context, sbe::EFn::kIndexOfCP);
     }
     void visit(const ExpressionIsNumber* expr) final {
         auto arg = popExpr();
         auto frameId = _context->state.frameId();
         SbVar var{frameId, 0};
 
-        auto exprIsNum = _b.makeIf(_b.makeFunction("exists", var),
-                                   _b.makeFunction("isNumber", var),
+        auto exprIsNum = _b.makeIf(_b.makeFunction(sbe::EFn::kExists, var),
+                                   _b.makeFunction(sbe::EFn::kIsNumber, var),
                                    _b.makeBoolConstant(false));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(exprIsNum)));
@@ -2150,14 +2165,14 @@ public:
                 // Note: In MQL, $ln on a NumberDecimal NaN historically evaluates to a NumberDouble
                 // NaN.
                 SbExprPair{_b.generateNaNCheck(inputVar),
-                           _b.makeFunction("convert",
+                           _b.makeFunction(sbe::EFn::kConvert,
                                            inputVar,
                                            _b.makeInt32Constant(static_cast<int32_t>(
                                                sbe::value::TypeTags::NumberDouble)))},
                 SbExprPair{_b.generateNonPositiveCheck(inputVar),
                            _b.makeFail(ErrorCodes::Error{7157706},
                                        "$ln's argument must be a positive number")}),
-            _b.makeFunction("ln", inputVar));
+            _b.makeFunction(sbe::EFn::kLn, inputVar));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(lnExpr)));
     }
@@ -2177,14 +2192,14 @@ public:
                 // Note: In MQL, $log10 on a NumberDecimal NaN historically evaluates to a
                 // NumberDouble NaN.
                 SbExprPair{_b.generateNaNCheck(inputVar),
-                           _b.makeFunction("convert",
+                           _b.makeFunction(sbe::EFn::kConvert,
                                            inputVar,
                                            _b.makeInt32Constant(static_cast<int32_t>(
                                                sbe::value::TypeTags::NumberDouble)))},
                 SbExprPair{_b.generateNonPositiveCheck(inputVar),
                            _b.makeFail(ErrorCodes::Error{7157708},
                                        "$log10's argument must be a positive number")}),
-            _b.makeFunction("log10", inputVar));
+            _b.makeFunction(sbe::EFn::kLog10, inputVar));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(log10Expr)));
     }
@@ -2216,11 +2231,11 @@ public:
     void visit(const ExpressionMeta* expr) final {
         auto pushMetadataExpr = [&](boost::optional<sbe::value::SlotId> slot, uint32_t typeMask) {
             if (slot) {
-                pushExpr(
-                    _b.makeIf(_b.makeFillEmptyTrue(_b.makeFunction(
-                                  "typeMatch"_sd, SbVar{*slot}, _b.makeInt32Constant(typeMask))),
-                              SbVar{*slot},
-                              _b.makeFail(ErrorCodes::Error{8107800}, "Unexpected metadata type")));
+                pushExpr(_b.makeIf(
+                    _b.makeFillEmptyTrue(_b.makeFunction(
+                        sbe::EFn::kTypeMatch, SbVar{*slot}, _b.makeInt32Constant(typeMask))),
+                    SbVar{*slot},
+                    _b.makeFail(ErrorCodes::Error{8107800}, "Unexpected metadata type")));
             } else {
                 pushExpr(_b.makeNothingConstant());
             }
@@ -2266,7 +2281,7 @@ public:
                                     _b.generateNonNumericCheck(lhsVar),
                                     _b.generateNonNumericCheck(rhsVar)),
                     _b.makeFail(ErrorCodes::Error{7157718}, "$mod only supports numeric types")}),
-            _b.makeFunction("mod", lhsVar, rhsVar));
+            _b.makeFunction(sbe::EFn::kMod, lhsVar, rhsVar));
 
         pushExpr(_b.makeLet(
             frameId, SbExpr::makeSeq(std::move(lhs), std::move(rhs)), std::move(modExpr)));
@@ -2285,7 +2300,7 @@ public:
             auto frameId = _context->state.frameId();
             SbVar var{frameId, 0};
             auto checkedLeaf = _b.buildMultiBranchConditional(
-                SbExprPair{_b.makeFunction("isNumber", var), var},
+                SbExprPair{_b.makeFunction(sbe::EFn::kIsNumber, var), var},
                 _b.makeFail(ErrorCodes::Error{7315403},
                             "only numbers are allowed in an $multiply expression"));
             return _b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(checkedLeaf));
@@ -2344,7 +2359,7 @@ public:
             SbVar currentVar{frameId, numLocalVars++};
 
             checkExprsNull.push_back(_b.generateNullMissingOrUndefined(currentVar));
-            checkExprsNumber.push_back(_b.makeFunction("isNumber", currentVar));
+            checkExprsNumber.push_back(_b.makeFunction(sbe::EFn::kIsNumber, currentVar));
             variables.push_back(currentVar);
         }
 
@@ -2371,7 +2386,8 @@ public:
         pushExpr(std::move(multiplyExpr));
     }
     void visit(const ExpressionNot* expr) final {
-        pushExpr(_b.makeNot(_b.makeFillEmptyFalse(_b.makeFunction("coerceToBool", popExpr()))));
+        pushExpr(
+            _b.makeNot(_b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kCoerceToBool, popExpr()))));
     }
     void visit(const ExpressionObject* expr) final {
         const auto& childExprs = expr->getChildExpressions();
@@ -2394,7 +2410,7 @@ public:
         // Lastly we need to reverse it to get the correct order of arguments.
         std::reverse(exprs.begin(), exprs.end());
 
-        pushExpr(_b.makeFunction("newObj", std::move(exprs)));
+        pushExpr(_b.makeFunction(sbe::EFn::kNewObj, std::move(exprs)));
     }
 
     void visit(const ExpressionOr* expr) final {
@@ -2426,7 +2442,7 @@ public:
                                                     _b.generateNullMissingOrUndefined(rhsVar));
 
         // Create an expression to invoke built-in "pow" function
-        auto powFunctionCall = _b.makeFunction("pow", lhsVar, rhsVar);
+        auto powFunctionCall = _b.makeFunction(sbe::EFn::kPow, lhsVar, rhsVar);
 
         // Return the result or check for issues if result is empty (Nothing)
         auto checkPowRes = _b.makeBinaryOp(
@@ -2479,38 +2495,41 @@ public:
                                            "$range only supports numeric types for step")}),
                 _b.makeLet(
                     innerFrameId,
-                    SbExpr::makeSeq(_b.makeFunction("convert",
+                    SbExpr::makeSeq(_b.makeFunction(sbe::EFn::kConvert,
                                                     startVar,
                                                     _b.makeInt32Constant(static_cast<int32_t>(
                                                         sbe::value::TypeTags::NumberInt32))),
-                                    _b.makeFunction("convert",
+                                    _b.makeFunction(sbe::EFn::kConvert,
                                                     endVar,
                                                     _b.makeInt32Constant(static_cast<int32_t>(
                                                         sbe::value::TypeTags::NumberInt32))),
-                                    _b.makeFunction("convert",
+                                    _b.makeFunction(sbe::EFn::kConvert,
                                                     stepVar,
                                                     _b.makeInt32Constant(static_cast<int32_t>(
                                                         sbe::value::TypeTags::NumberInt32)))),
                     _b.buildMultiBranchConditionalFromCaseValuePairs(
                         SbExpr::makeExprPairVector(
-                            SbExprPair{_b.makeNot(_b.makeFunction("exists", convertedStartVar)),
-                                       _b.makeFail(ErrorCodes::Error{7157714},
-                                                   "$range start argument cannot be "
-                                                   "represented as a 32-bit integer")},
-                            SbExprPair{_b.makeNot(_b.makeFunction("exists", convertedEndVar)),
-                                       _b.makeFail(ErrorCodes::Error{7157715},
-                                                   "$range end argument cannot be represented "
-                                                   "as a 32-bit integer")},
-                            SbExprPair{_b.makeNot(_b.makeFunction("exists", convertedStepVar)),
-                                       _b.makeFail(ErrorCodes::Error{7157716},
-                                                   "$range step argument cannot be "
-                                                   "represented as a 32-bit integer")},
+                            SbExprPair{
+                                _b.makeNot(_b.makeFunction(sbe::EFn::kExists, convertedStartVar)),
+                                _b.makeFail(ErrorCodes::Error{7157714},
+                                            "$range start argument cannot be "
+                                            "represented as a 32-bit integer")},
+                            SbExprPair{
+                                _b.makeNot(_b.makeFunction(sbe::EFn::kExists, convertedEndVar)),
+                                _b.makeFail(ErrorCodes::Error{7157715},
+                                            "$range end argument cannot be represented "
+                                            "as a 32-bit integer")},
+                            SbExprPair{
+                                _b.makeNot(_b.makeFunction(sbe::EFn::kExists, convertedStepVar)),
+                                _b.makeFail(ErrorCodes::Error{7157716},
+                                            "$range step argument cannot be "
+                                            "represented as a 32-bit integer")},
                             SbExprPair{_b.makeBinaryOp(abt::Operations::Eq,
                                                        convertedStepVar,
                                                        _b.makeInt32Constant(0)),
                                        _b.makeFail(ErrorCodes::Error{7157717},
                                                    "$range requires a non-zero step value")}),
-                        _b.makeFunction("newArrayFromRange",
+                        _b.makeFunction(sbe::EFn::kNewArrayFromRange,
                                         convertedStartVar,
                                         convertedEndVar,
                                         convertedStepVar)))));
@@ -2549,16 +2568,16 @@ public:
         auto isEmptyFindStr =
             _b.makeBinaryOp(abt::Operations::Eq, findArgVar, _b.makeStrConstant(""_sd));
 
-        auto generateTypeCheckCaseValuePair = [&](SbVar paramVar,
-                                                  SbVar paramIsNullVar,
-                                                  StringData param) {
-            return SbExprPair{_b.makeNot(_b.makeBinaryOp(abt::Operations::Or,
-                                                         paramIsNullVar,
-                                                         _b.makeFunction("isString", paramVar))),
-                              _b.makeFail(ErrorCodes::Error{7158302},
-                                          str::stream() << "$replaceOne requires that '" << param
-                                                        << "' be a string")};
-        };
+        auto generateTypeCheckCaseValuePair =
+            [&](SbVar paramVar, SbVar paramIsNullVar, StringData param) {
+                return SbExprPair{
+                    _b.makeNot(_b.makeBinaryOp(abt::Operations::Or,
+                                               paramIsNullVar,
+                                               _b.makeFunction(sbe::EFn::kIsString, paramVar))),
+                    _b.makeFail(ErrorCodes::Error{7158302},
+                                str::stream()
+                                    << "$replaceOne requires that '" << param << "' be a string")};
+            };
 
         // Order here is important because we want to preserve the precedence of failures in MQL.
         auto replaceOneExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
@@ -2569,8 +2588,9 @@ public:
                     replacementArgVar, replacementArgNullVar, "replacement"),
                 SbExprPair{std::move(checkNull), _b.makeNullConstant()}),
             _b.makeIf(std::move(isEmptyFindStr),
-                      _b.makeFunction("concat", replacementArgVar, inputArgVar),
-                      _b.makeFunction("replaceOne", inputArgVar, findArgVar, replacementArgVar)));
+                      _b.makeFunction(sbe::EFn::kConcat, replacementArgVar, inputArgVar),
+                      _b.makeFunction(
+                          sbe::EFn::kReplaceOne, inputArgVar, findArgVar, replacementArgVar)));
 
         pushExpr(_b.makeLet(frameId,
                             SbExpr::makeSeq(std::move(replacementArg),
@@ -2645,7 +2665,7 @@ public:
         auto frameId = _context->state.frameId();
         SbVar var{frameId, 0};
 
-        auto argumentIsNotArray = _b.makeNot(_b.makeFunction("isArray", var));
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, var));
 
         auto exprReverseArr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
@@ -2653,7 +2673,7 @@ public:
                 SbExprPair{std::move(argumentIsNotArray),
                            _b.makeFail(ErrorCodes::Error{7158002},
                                        "$reverseArray argument must be an array")}),
-            _b.makeFunction("reverseArray", var));
+            _b.makeFunction(sbe::EFn::kReverseArray, var));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(exprReverseArr)));
     }
@@ -2666,7 +2686,7 @@ public:
         auto [specTag, specVal] = makeValue(expr->getSortPattern());
         auto specConstant = _b.makeConstant(specTag, specVal);
 
-        auto argumentIsNotArray = _b.makeNot(_b.makeFunction("isArray", var));
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, var));
 
         auto functionArgs = SbExpr::makeSeq(var, std::move(specConstant));
 
@@ -2681,32 +2701,32 @@ public:
                 SbExprPair{std::move(argumentIsNotArray),
                            _b.makeFail(ErrorCodes::Error{7158001},
                                        "$sortArray input argument must be an array")}),
-            _b.makeFunction("sortArray", std::move(functionArgs)));
+            _b.makeFunction(sbe::EFn::kSortArray, std::move(functionArgs)));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(exprSortArr)));
     }
 
     void visit(const ExpressionTopN* expr) final {
-        visitTopNOrBottomN(expr, "topN"_sd);
+        visitTopNOrBottomN(expr, sbe::EFn::kTopN);
     }
 
     void visit(const ExpressionTop* expr) final {
-        visitTopOrBottom(expr, "top"_sd);
+        visitTopOrBottom(expr, sbe::EFn::kTop);
     }
 
     void visit(const ExpressionBottomN* expr) final {
-        visitTopNOrBottomN(expr, "bottomN"_sd);
+        visitTopNOrBottomN(expr, sbe::EFn::kBottomN);
     }
 
     void visit(const ExpressionBottom* expr) final {
-        visitTopOrBottom(expr, "bottom"_sd);
+        visitTopOrBottom(expr, sbe::EFn::kBottom);
     }
 
     void visit(const ExpressionSlice* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionIsArray* expr) final {
-        pushExpr(_b.makeFillEmptyFalse(_b.makeFunction("isArray", popExpr())));
+        pushExpr(_b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kIsArray, popExpr())));
     }
     void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -2747,11 +2767,11 @@ public:
                                            _b.generateNullMissingOrUndefined(varString),
                                            _b.generateNullMissingOrUndefined(varDelimiter)),
                            _b.makeNullConstant()},
-                SbExprPair{_b.makeNot(_b.makeFunction("isString"_sd, varString)),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kIsString, varString)),
                            _b.makeFail(ErrorCodes::Error{7158202},
                                        "$split string expression must be a string")},
                 SbExprPair{
-                    _b.makeNot(_b.makeFunction("isString"_sd, varDelimiter)),
+                    _b.makeNot(_b.makeFunction(sbe::EFn::kIsString, varDelimiter)),
                     _b.makeFail(ErrorCodes::Error{7158203}, "$split delimiter must be a string")},
                 SbExprPair{
                     _b.makeBinaryOp(abt::Operations::Eq, varDelimiter, _b.makeStrConstant(""_sd)),
@@ -2760,7 +2780,7 @@ public:
                 SbExprPair{
                     _b.makeBinaryOp(abt::Operations::Eq, varString, _b.makeStrConstant(""_sd)),
                     std::move(emptyResult)}),
-            _b.makeFunction("split"_sd, varString, varDelimiter));
+            _b.makeFunction(sbe::EFn::kSplit, varString, varDelimiter));
 
         pushExpr(_b.makeLet(frameId,
                             SbExpr::makeSeq(std::move(stringExpression), std::move(delimiter)),
@@ -2779,7 +2799,7 @@ public:
                 SbExprPair{_b.generateNegativeCheck(inputVar),
                            _b.makeFail(ErrorCodes::Error{7157710},
                                        "$sqrt's argument must be greater than or equal to 0")}),
-            _b.makeFunction("sqrt", inputVar));
+            _b.makeFunction(sbe::EFn::kSqrt, inputVar));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(sqrtExpr)));
     }
@@ -2789,9 +2809,9 @@ public:
                 expr->getChildren().size() == 2);
         _context->ensureArity(2);
 
-        generateStringCaseConversionExpression(_context, "toUpper");
+        generateStringCaseConversionExpression(_context, sbe::EFn::kToUpper);
         SbExpr rhs = popExpr();
-        generateStringCaseConversionExpression(_context, "toUpper");
+        generateStringCaseConversionExpression(_context, sbe::EFn::kToUpper);
         SbExpr lhs = popExpr();
 
         pushExpr(_b.makeBinaryOp(abt::Operations::Cmp3w, std::move(lhs), std::move(rhs)));
@@ -2818,11 +2838,11 @@ public:
                 SbExprPair{_b.generateNullMissingOrUndefined(stringExprVar),
                            _b.makeStrConstant(""_sd)},
                 SbExprPair{
-                    _b.makeFillEmptyTrue(_b.makeFunction("coerceToString", stringExprVar)),
+                    _b.makeFillEmptyTrue(_b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar)),
                     _b.makeFail(
                         ErrorCodes::Error(5155608),
                         "$substrBytes: string expression could not be resolved to a string")}),
-            _b.makeFunction("coerceToString", stringExprVar));
+            _b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar));
         functionArgs.push_back(std::move(validStringExpr));
 
         SbExpr validStartIndexExpr = _b.makeIf(
@@ -2836,7 +2856,7 @@ public:
             _b.makeFail(ErrorCodes::Error{5155603},
                         "Starting index must be non-negative numeric type"),
             _b.makeFunction(
-                "convert",
+                sbe::EFn::kConvert,
                 startIndexVar,
                 _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
         functionArgs.push_back(std::move(validStartIndexExpr));
@@ -2847,7 +2867,7 @@ public:
                             _b.generateNonNumericCheck(byteCountVar)),
             _b.makeFail(ErrorCodes::Error{5155602}, "Length must be a numeric type"),
             _b.makeFunction(
-                "convert",
+                sbe::EFn::kConvert,
                 byteCountVar,
                 _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
         functionArgs.push_back(std::move(validLengthExpr));
@@ -2855,7 +2875,7 @@ public:
         pushExpr(_b.makeLet(
             frameId,
             SbExpr::makeSeq(std::move(byteCount), std::move(startIndex), std::move(stringExpr)),
-            _b.makeFunction("substrBytes", std::move(functionArgs))));
+            _b.makeFunction(sbe::EFn::kSubstrBytes, std::move(functionArgs))));
     }
     void visit(const ExpressionSubstrCP* expr) final {
         tassert(11051813,
@@ -2878,11 +2898,12 @@ public:
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullMissingOrUndefined(stringExprVar),
                            _b.makeStrConstant(""_sd)},
-                SbExprPair{_b.makeFillEmptyTrue(_b.makeFunction("coerceToString", stringExprVar)),
-                           _b.makeFail(ErrorCodes::Error(5155708),
-                                       "$substrCP: string expression could not be resolved to a "
-                                       "string")}),
-            _b.makeFunction("coerceToString", stringExprVar));
+                SbExprPair{
+                    _b.makeFillEmptyTrue(_b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar)),
+                    _b.makeFail(ErrorCodes::Error(5155708),
+                                "$substrCP: string expression could not be resolved to a "
+                                "string")}),
+            _b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar));
         functionArgs.push_back(std::move(validStringExpr));
 
         SbExpr validStartIndexExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
@@ -2897,7 +2918,7 @@ public:
                     _b.makeFail(ErrorCodes::Error{5155701},
                                 "$substrCP: starting index must be a non-negative integer")}),
             _b.makeFunction(
-                "convert",
+                sbe::EFn::kConvert,
                 startIndexVar,
                 _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
         functionArgs.push_back(std::move(validStartIndexExpr));
@@ -2912,7 +2933,7 @@ public:
                            _b.makeFail(ErrorCodes::Error{5155703},
                                        "$substrCP: length must be a non-negative integer")}),
             _b.makeFunction(
-                "convert",
+                sbe::EFn::kConvert,
                 lenVar,
                 _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
         functionArgs.push_back(std::move(validLengthExpr));
@@ -2920,7 +2941,7 @@ public:
         pushExpr(_b.makeLet(
             frameId,
             SbExpr::makeSeq(std::move(len), std::move(startIndex), std::move(stringExpr)),
-            _b.makeFunction("substrCP", std::move(functionArgs))));
+            _b.makeFunction(sbe::EFn::kSubstrCP, std::move(functionArgs))));
     }
     void visit(const ExpressionStrLenBytes* expr) final {
         tassert(5155802, "expected 'expr' to have 1 child", expr->getChildren().size() == 1);
@@ -2932,8 +2953,8 @@ public:
         SbExpr strExpression = popExpr();
 
         auto strLenBytesExpr = _b.makeIf(
-            _b.makeFillEmptyFalse(_b.makeFunction("isString", strVar)),
-            _b.makeFunction("strLenBytes", strVar),
+            _b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kIsString, strVar)),
+            _b.makeFunction(sbe::EFn::kStrLenBytes, strVar),
             _b.makeFail(ErrorCodes::Error{5155800}, "$strLenBytes requires a string argument"));
 
         pushExpr(_b.makeLet(
@@ -2951,8 +2972,8 @@ public:
         SbExpr strExpression = popExpr();
 
         auto strLenCPExpr = _b.makeIf(
-            _b.makeFillEmptyFalse(_b.makeFunction("isString", strVar)),
-            _b.makeFunction("strLenCP", strVar),
+            _b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kIsString, strVar)),
+            _b.makeFunction(sbe::EFn::kStrLenCP, strVar),
             _b.makeFail(ErrorCodes::Error{5155900}, "$strLenCP requires a string argument"));
 
         pushExpr(_b.makeLet(
@@ -2975,14 +2996,14 @@ public:
                                                   _b.generateNullMissingOrUndefined(lhsVar),
                                                   _b.generateNullMissingOrUndefined(rhsVar));
 
-        auto checkArgumentTypes = _b.makeNot(
-            _b.makeIf(_b.makeFunction("isNumber", lhsVar),
-                      _b.makeFunction("isNumber", rhsVar),
-                      _b.makeBinaryOp(abt::Operations::And,
-                                      _b.makeFunction("isDate", lhsVar),
-                                      _b.makeBinaryOp(abt::Operations::Or,
-                                                      _b.makeFunction("isNumber", rhsVar),
-                                                      _b.makeFunction("isDate", rhsVar)))));
+        auto checkArgumentTypes = _b.makeNot(_b.makeIf(
+            _b.makeFunction(sbe::EFn::kIsNumber, lhsVar),
+            _b.makeFunction(sbe::EFn::kIsNumber, rhsVar),
+            _b.makeBinaryOp(abt::Operations::And,
+                            _b.makeFunction(sbe::EFn::kIsDate, lhsVar),
+                            _b.makeBinaryOp(abt::Operations::Or,
+                                            _b.makeFunction(sbe::EFn::kIsNumber, rhsVar),
+                                            _b.makeFunction(sbe::EFn::kIsDate, rhsVar)))));
 
         auto subtractOp = _b.makeBinaryOp(abt::Operations::Sub, lhsVar, rhsVar);
         auto subtractExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
@@ -3012,10 +3033,10 @@ public:
         pushExpr(_b.makeInt32Constant(1));
     }
     void visit(const ExpressionToLower* expr) final {
-        generateStringCaseConversionExpression(_context, "toLower");
+        generateStringCaseConversionExpression(_context, sbe::EFn::kToLower);
     }
     void visit(const ExpressionToUpper* expr) final {
-        generateStringCaseConversionExpression(_context, "toUpper");
+        generateStringCaseConversionExpression(_context, sbe::EFn::kToUpper);
     }
     void visit(const ExpressionTrim* expr) final {
         tassert(5156301,
@@ -3038,13 +3059,13 @@ public:
 
         auto charsString = isCharsProvided ? popExpr() : _b.makeNullConstant();
         auto inputString = popExpr();
-        auto trimBuiltinName = expr->getTrimTypeString();
+        auto trimBuiltinName = sbe::fromString(expr->getTrimTypeString());
 
         auto checkCharsNullish = isCharsProvided ? _b.generateNullMissingOrUndefined(charsVar)
                                                  : _b.makeBoolConstant(false);
 
         auto checkCharsNotString = isCharsProvided
-            ? _b.makeNot(_b.makeFunction("isString"_sd, charsVar))
+            ? _b.makeNot(_b.makeFunction(sbe::EFn::kIsString, charsVar))
             : _b.makeBoolConstant(false);
 
         /*
@@ -3071,14 +3092,14 @@ public:
         auto trimFunc = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullMissingOrUndefined(inputVar), _b.makeNullConstant()},
-                SbExprPair{
-                    _b.makeNot(_b.makeFunction("isString"_sd, inputVar)),
-                    _b.makeFail(ErrorCodes::Error{5156302},
-                                "$" + trimBuiltinName + " input expression must be a string")},
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kIsString, inputVar)),
+                           _b.makeFail(ErrorCodes::Error{5156302},
+                                       "$" + std::string{sbe::toString(trimBuiltinName)} +
+                                           " input expression must be a string")},
                 SbExprPair{std::move(checkCharsNullish), _b.makeNullConstant()},
                 SbExprPair{std::move(checkCharsNotString),
                            _b.makeFail(ErrorCodes::Error{5156303},
-                                       "$" + trimBuiltinName +
+                                       "$" + std::string{sbe::toString(trimBuiltinName)} +
                                            " chars expression must be a string if provided")}),
             _b.makeFunction(trimBuiltinName, inputVar, charsVar));
 
@@ -3140,7 +3161,7 @@ public:
                            _b.makeFail(ErrorCodes::Error{5156500},
                                        str::stream() << "All operands of $zip"
                                                      << " must be array expressions.")}),
-            _b.makeFunction("zipArrays", std::move(variables)));
+            _b.makeFunction(sbe::EFn::kZipArrays, std::move(variables)));
 
         pushExpr(_b.makeLet(frameId, std::move(binds), std::move(zip)));
     }
@@ -3148,104 +3169,104 @@ public:
         unsupportedExpression("$convert");
     }
     void visit(const ExpressionRegexFind* expr) final {
-        generateRegexExpression(expr, "regexFind");
+        generateRegexExpression(expr, sbe::EFn::kRegexFind);
     }
     void visit(const ExpressionRegexFindAll* expr) final {
-        generateRegexExpression(expr, "regexFindAll");
+        generateRegexExpression(expr, sbe::EFn::kRegexFindAll);
     }
     void visit(const ExpressionRegexMatch* expr) final {
-        generateRegexExpression(expr, "regexMatch");
+        generateRegexExpression(expr, sbe::EFn::kRegexMatch);
     }
     void visit(const ExpressionCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "cos", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
+            sbe::EFn::kCos, DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
     void visit(const ExpressionSine* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "sin", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
+            sbe::EFn::kSin, DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
     void visit(const ExpressionTangent* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "tan", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
+            sbe::EFn::kTan, DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
     void visit(const ExpressionArcCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "acos", DoubleBound(-1.0, true), DoubleBound(1.0, true));
+            sbe::EFn::kAcos, DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
     void visit(const ExpressionArcSine* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "asin", DoubleBound(-1.0, true), DoubleBound(1.0, true));
+            sbe::EFn::kAsin, DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
     void visit(const ExpressionArcTangent* expr) final {
-        generateTrigonometricExpression("atan");
+        generateTrigonometricExpression(sbe::EFn::kAtan);
     }
     void visit(const ExpressionArcTangent2* expr) final {
-        generateTrigonometricExpressionBinary("atan2");
+        generateTrigonometricExpressionBinary(sbe::EFn::kAtan2);
     }
     void visit(const ExpressionHyperbolicArcTangent* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "atanh", DoubleBound(-1.0, true), DoubleBound(1.0, true));
+            sbe::EFn::kAtanh, DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
     void visit(const ExpressionHyperbolicArcCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
-            "acosh", DoubleBound(1.0, true), DoubleBound::plusInfinityInclusive());
+            sbe::EFn::kAcosh, DoubleBound(1.0, true), DoubleBound::plusInfinityInclusive());
     }
     void visit(const ExpressionHyperbolicArcSine* expr) final {
-        generateTrigonometricExpression("asinh");
+        generateTrigonometricExpression(sbe::EFn::kAsinh);
     }
     void visit(const ExpressionHyperbolicCosine* expr) final {
-        generateTrigonometricExpression("cosh");
+        generateTrigonometricExpression(sbe::EFn::kCosh);
     }
     void visit(const ExpressionHyperbolicSine* expr) final {
-        generateTrigonometricExpression("sinh");
+        generateTrigonometricExpression(sbe::EFn::kSinh);
     }
     void visit(const ExpressionHyperbolicTangent* expr) final {
-        generateTrigonometricExpression("tanh");
+        generateTrigonometricExpression(sbe::EFn::kTanh);
     }
     void visit(const ExpressionDegreesToRadians* expr) final {
-        generateTrigonometricExpression("degreesToRadians");
+        generateTrigonometricExpression(sbe::EFn::kDegreesToRadians);
     }
     void visit(const ExpressionRadiansToDegrees* expr) final {
-        generateTrigonometricExpression("radiansToDegrees");
+        generateTrigonometricExpression(sbe::EFn::kRadiansToDegrees);
     }
     void visit(const ExpressionDayOfMonth* expr) final {
-        generateDateExpressionAcceptingTimeZone("dayOfMonth", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kDayOfMonth, expr);
     }
     void visit(const ExpressionDayOfWeek* expr) final {
-        generateDateExpressionAcceptingTimeZone("dayOfWeek", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kDayOfWeek, expr);
     }
     void visit(const ExpressionDayOfYear* expr) final {
-        generateDateExpressionAcceptingTimeZone("dayOfYear", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kDayOfYear, expr);
     }
     void visit(const ExpressionHour* expr) final {
-        generateDateExpressionAcceptingTimeZone("hour", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kHour, expr);
     }
     void visit(const ExpressionMillisecond* expr) final {
-        generateDateExpressionAcceptingTimeZone("millisecond", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kMillisecond, expr);
     }
     void visit(const ExpressionMinute* expr) final {
-        generateDateExpressionAcceptingTimeZone("minute", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kMinute, expr);
     }
     void visit(const ExpressionMonth* expr) final {
-        generateDateExpressionAcceptingTimeZone("month", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kMonth, expr);
     }
     void visit(const ExpressionSecond* expr) final {
-        generateDateExpressionAcceptingTimeZone("second", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kSecond, expr);
     }
     void visit(const ExpressionWeek* expr) final {
-        generateDateExpressionAcceptingTimeZone("week", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kWeek, expr);
     }
     void visit(const ExpressionIsoWeekYear* expr) final {
-        generateDateExpressionAcceptingTimeZone("isoWeekYear", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kIsoWeekYear, expr);
     }
     void visit(const ExpressionIsoDayOfWeek* expr) final {
-        generateDateExpressionAcceptingTimeZone("isoDayOfWeek", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kIsoDayOfWeek, expr);
     }
     void visit(const ExpressionIsoWeek* expr) final {
-        generateDateExpressionAcceptingTimeZone("isoWeek", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kIsoWeek, expr);
     }
     void visit(const ExpressionYear* expr) final {
-        generateDateExpressionAcceptingTimeZone("year", expr);
+        generateDateExpressionAcceptingTimeZone(sbe::EFn::kYear, expr);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
         size_t arity = expr->getChildren().size();
@@ -3261,15 +3282,17 @@ public:
                 SbExpr::makeExprPairVector(
                     SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
                                _b.makeNullConstant()},
-                    SbExprPair{_b.makeFunction("isArray", singleInputVar),
-                               _b.makeFillEmptyNull(_b.makeFunction("avgOfArray", singleInputVar))},
-                    SbExprPair{_b.makeFunction("isNumber", singleInputVar), singleInputVar}),
+                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
+                               _b.makeFillEmptyNull(
+                                   _b.makeFunction(sbe::EFn::kAvgOfArray, singleInputVar))},
+                    SbExprPair{_b.makeFunction(sbe::EFn::kIsNumber, singleInputVar),
+                               singleInputVar}),
                 _b.makeNullConstant());
 
             pushExpr(_b.makeLet(
                 frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(avgOfArrayExpr)));
         } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, "avgOfArray");
+            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kAvgOfArray);
         }
     }
     void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
@@ -3279,11 +3302,11 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
-        visitMaxMinFunction(expr, _context, "maxOfArray");
+        visitMaxMinFunction(expr, _context, sbe::EFn::kMaxOfArray);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
-        visitMaxMinFunction(expr, _context, "minOfArray");
+        visitMaxMinFunction(expr, _context, sbe::EFn::kMinOfArray);
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
@@ -3314,10 +3337,11 @@ public:
                 SbExpr::makeExprPairVector(
                     SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
                                _b.makeNullConstant()},
-                    SbExprPair{_b.makeFunction("isArray", singleInputVar),
-                               _b.makeFillEmptyNull(_b.makeFunction("stdDevPop", singleInputVar))},
+                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
+                               _b.makeFillEmptyNull(
+                                   _b.makeFunction(sbe::EFn::kStdDevPop, singleInputVar))},
                     SbExprPair{
-                        _b.makeFunction("isNumber", singleInputVar),
+                        _b.makeFunction(sbe::EFn::kIsNumber, singleInputVar),
                         // Population standard deviation for a single numeric input is always 0.
                         _b.makeInt32Constant(0)}),
                 _b.makeNullConstant());
@@ -3325,7 +3349,7 @@ public:
             pushExpr(_b.makeLet(
                 frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(stdDevPopExpr)));
         } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, "stdDevPop");
+            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kStdDevPop);
         }
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
@@ -3344,16 +3368,16 @@ public:
                 SbExpr::makeExprPairVector(
                     SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
                                _b.makeNullConstant()},
-                    SbExprPair{
-                        _b.makeFunction("isArray", singleInputVar),
-                        _b.makeFillEmptyNull(_b.makeFunction("stdDevSamp", singleInputVar))}),
+                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
+                               _b.makeFillEmptyNull(
+                                   _b.makeFunction(sbe::EFn::kStdDevSamp, singleInputVar))}),
                 // Sample standard deviation is undefined for a single input.
                 _b.makeNullConstant());
 
             pushExpr(_b.makeLet(
                 frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(stdDevSampExpr)));
         } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, "stdDevSamp");
+            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kStdDevSamp);
         }
     }
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
@@ -3372,15 +3396,17 @@ public:
                 SbExpr::makeExprPairVector(
                     SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
                                _b.makeInt32Constant(0)},
-                    SbExprPair{_b.makeFunction("isArray", singleInputVar),
-                               _b.makeFillEmptyNull(_b.makeFunction("sumOfArray", singleInputVar))},
-                    SbExprPair{_b.makeFunction("isNumber", singleInputVar), singleInputVar}),
+                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
+                               _b.makeFillEmptyNull(
+                                   _b.makeFunction(sbe::EFn::kSumOfArray, singleInputVar))},
+                    SbExprPair{_b.makeFunction(sbe::EFn::kIsNumber, singleInputVar),
+                               singleInputVar}),
                 _b.makeInt32Constant(0));
 
             pushExpr(_b.makeLet(
                 frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(sumOfArrayExpr)));
         } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, "sumOfArray");
+            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kSumOfArray);
         }
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
@@ -3408,7 +3434,7 @@ public:
     void visit(const ExpressionRandom* expr) final {
         uassert(
             5155201, "$rand does not currently accept arguments", expr->getChildren().size() == 0);
-        auto expression = _b.makeFunction("rand");
+        auto expression = _b.makeFunction(sbe::EFn::kRand);
         pushExpr(std::move(expression));
     }
 
@@ -3416,7 +3442,7 @@ public:
         uassert(9940500,
                 "$currentDate does not currently accept arguments",
                 expr->getChildren().size() == 0);
-        auto expression = _b.makeFunction("currentDate");
+        auto expression = _b.makeFunction(sbe::EFn::kCurrentDate);
         pushExpr(std::move(expression));
     }
 
@@ -3480,7 +3506,7 @@ public:
                            _b.makeFail(ErrorCodes::Error{7157900},
                                        str::stream() << expr->getOpName()
                                                      << " expects argument of type timestamp")}),
-            _b.makeFunction("tsSecond", var));
+            _b.makeFunction(sbe::EFn::kTsSecond, var));
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(tsSecondExpr)));
     }
 
@@ -3499,7 +3525,7 @@ public:
                            _b.makeFail(ErrorCodes::Error{7157901},
                                        str::stream() << expr->getOpName()
                                                      << " expects argument of type timestamp")}),
-            _b.makeFunction("tsIncrement", var));
+            _b.makeFunction(sbe::EFn::kTsIncrement, var));
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(tsIncrementExpr)));
     }
 
@@ -3557,8 +3583,9 @@ private:
 
         SbExpr abtExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             std::move(inputValidationCases),
-            _b.makeFunction(
-                (opName == "$round" ? "round"_sd : "trunc"_sd), inputNumVar, inputPlaceVar));
+            _b.makeFunction((opName == "$round" ? sbe::EFn::kRound : sbe::EFn::kTrunc),
+                            inputNumVar,
+                            inputPlaceVar));
 
         // "place" argument defaults to 0.
         SbExpr placeExpr = hasPlaceArg ? popExpr() : _b.makeInt32Constant(0);
@@ -3572,7 +3599,7 @@ private:
      * Shared logic for $topN and $bottomN expressions
      */
     template <typename ExprType>
-    void visitTopNOrBottomN(const ExprType* expr, StringData functionName) {
+    void visitTopNOrBottomN(const ExprType* expr, sbe::EFn functionName) {
         auto input = popExpr();
         auto n = popExpr();
 
@@ -3584,12 +3611,12 @@ private:
         auto specConstant = _b.makeConstant(specTag, specVal);
 
         auto nIsNegative = _b.makeBinaryOp(abt::Operations::Lt, nVar, _b.makeInt64Constant(0));
-        auto argumentIsNotArray = _b.makeNot(_b.makeFunction("isArray", inputVar));
-        auto nIsNotNumericOrIntegral =
-            _b.makeBinaryOp(abt::Operations::Or,
-                            _b.generateNonNumericCheck(nVar),
-                            _b.makeFillEmptyTrue(_b.makeBinaryOp(
-                                abt::Operations::Neq, nVar, _b.makeFunction("trunc", nVar))));
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, inputVar));
+        auto nIsNotNumericOrIntegral = _b.makeBinaryOp(
+            abt::Operations::Or,
+            _b.generateNonNumericCheck(nVar),
+            _b.makeFillEmptyTrue(_b.makeBinaryOp(
+                abt::Operations::Neq, nVar, _b.makeFunction(sbe::EFn::kTrunc, nVar))));
 
         auto functionArgs = SbExpr::makeSeq(nVar, inputVar, std::move(specConstant));
 
@@ -3603,18 +3630,18 @@ private:
                 SbExprPair{_b.generateNullMissingOrUndefined(nVar), _b.makeNullConstant()},
                 SbExprPair{std::move(nIsNotNumericOrIntegral),
                            _b.makeFail(ErrorCodes::Error{1127469},
-                                       str::stream() << "$" << functionName
+                                       str::stream() << "$" << sbe::toString(functionName)
                                                      << " requires 'n' to be an integer")},
                 SbExprPair{
                     std::move(nIsNegative),
                     _b.makeFail(ErrorCodes::Error{11274610},
                                 str::stream()
-                                    << "$" << functionName
+                                    << "$" << toString(functionName)
                                     << " requires a non-negative integer for the n argument")},
                 SbExprPair{_b.generateNullMissingOrUndefined(inputVar), _b.makeNullConstant()},
                 SbExprPair{std::move(argumentIsNotArray),
                            _b.makeFail(ErrorCodes::Error{11274611},
-                                       str::stream() << "$" << functionName
+                                       str::stream() << "$" << sbe::toString(functionName)
                                                      << " input argument must be an array")}),
             _b.makeFunction(functionName, std::move(functionArgs)));
         pushExpr(_b.makeLet(
@@ -3625,7 +3652,7 @@ private:
      * Shared logic for $top and $bottom expressions
      */
     template <typename ExprType>
-    void visitTopOrBottom(const ExprType* expr, StringData functionName) {
+    void visitTopOrBottom(const ExprType* expr, sbe::EFn functionName) {
         auto input = popExpr();
 
         auto frameId = _context->state.frameId();
@@ -3634,7 +3661,7 @@ private:
         auto [specTag, specVal] = makeValue(expr->getSortPattern());
         auto specConstant = _b.makeConstant(specTag, specVal);
 
-        auto argumentIsNotArray = _b.makeNot(_b.makeFunction("isArray", inputVar));
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, inputVar));
 
         auto functionArgs = SbExpr::makeSeq(inputVar, std::move(specConstant));
 
@@ -3648,7 +3675,7 @@ private:
                 SbExprPair{_b.generateNullMissingOrUndefined(inputVar), _b.makeNullConstant()},
                 SbExprPair{std::move(argumentIsNotArray),
                            _b.makeFail(ErrorCodes::Error{11274612},
-                                       str::stream() << "$" << functionName
+                                       str::stream() << "$" << sbe::toString(functionName)
                                                      << " input argument must be an array")}),
             _b.makeFunction(functionName, std::move(functionArgs)));
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(input)), std::move(resultExpr)));
@@ -3677,7 +3704,8 @@ private:
         SbExpr::Vector exprs;
         exprs.reserve(numChildren);
         for (size_t i = 0; i < numChildren; ++i) {
-            exprs.emplace_back(_b.makeFillEmptyFalse(_b.makeFunction("coerceToBool", popExpr())));
+            exprs.emplace_back(
+                _b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kCoerceToBool, popExpr())));
         }
         std::reverse(exprs.begin(), exprs.end());
 
@@ -3704,7 +3732,8 @@ private:
 
         for (size_t i = 0; i < numCases; ++i) {
             auto valueExpr = popExpr();
-            auto conditionExpr = _b.makeFillEmptyFalse(_b.makeFunction("coerceToBool", popExpr()));
+            auto conditionExpr =
+                _b.makeFillEmptyFalse(_b.makeFunction(sbe::EFn::kCoerceToBool, popExpr()));
             cases.emplace_back(std::move(conditionExpr), std::move(valueExpr));
         }
 
@@ -3714,10 +3743,11 @@ private:
                                                                   std::move(defaultExpr)));
     }
 
-    void generateDateExpressionAcceptingTimeZone(StringData exprName, const Expression* expr) {
+    void generateDateExpressionAcceptingTimeZone(sbe::EFn exprName, const Expression* expr) {
         const auto& children = expr->getChildren();
         tassert(11051808,
-                str::stream() << "Expecting " << exprName << " expression to have 2 children nodes",
+                str::stream() << "Expecting " << sbe::toString(exprName)
+                              << " expression to have 2 children nodes",
                 children.size() == 2);
 
         auto timezoneExpression = children[1] ? popExpr() : _b.makeStrConstant("UTC"_sd);
@@ -3743,7 +3773,7 @@ private:
         // null, and is of the correct type.
         std::vector<SbExprPair> inputValidationCases;
         // Return the evaluation of the function, if it exists.
-        inputValidationCases.emplace_back(_b.makeFunction("exists"_sd, funcVar), funcVar);
+        inputValidationCases.emplace_back(_b.makeFunction(sbe::EFn::kExists, funcVar), funcVar);
         // Return null if any of the parameters is either null or missing.
         inputValidationCases.push_back(generateReturnNullIfNullMissingOrUndefined(dateVar));
 
@@ -3754,10 +3784,11 @@ private:
                 _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
             auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
             uassert(5157900,
-                    str::stream() << "$" << exprName << " parameter 'timezone' must be a string",
+                    str::stream() << "$" << sbe::toString(exprName)
+                                  << " parameter 'timezone' must be a string",
                     sbe::value::isString(timezoneTag));
             uassert(5157901,
-                    str::stream() << "$" << exprName
+                    str::stream() << "$" << sbe::toString(exprName)
                                   << " parameter 'timezone' must be a valid timezone",
                     sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
             auto [timezoneObjTag, timezoneObjVal] = sbe::value::makeCopyTimeZone(
@@ -3770,12 +3801,12 @@ private:
             inputValidationCases.emplace_back(
                 _b.generateNonStringCheck(timezoneVar),
                 _b.makeFail(ErrorCodes::Error{5157902},
-                            str::stream() << "$" << std::string{exprName}
+                            str::stream() << "$" << sbe::toString(exprName)
                                           << " parameter 'timezone' must be a string"));
             inputValidationCases.emplace_back(
-                _b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, timezoneVar)),
+                _b.makeNot(_b.makeFunction(sbe::EFn::kIsTimezone, timeZoneDBVar, timezoneVar)),
                 _b.makeFail(ErrorCodes::Error{5157903},
-                            str::stream() << "$" << std::string{exprName}
+                            str::stream() << "$" << sbe::toString(exprName)
                                           << " parameter 'timezone' must be a valid timezone"));
             arguments.push_back(timeZoneDBVar);
             arguments.push_back(timezoneVar);
@@ -3783,15 +3814,14 @@ private:
 
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
-            dateVar, ErrorCodes::Error{5157904}, exprName, "date"_sd));
+            dateVar, ErrorCodes::Error{5157904}, sbe::toString(exprName), "date"_sd));
 
-        pushExpr(_b.makeLet(
-            frameId,
-            SbExpr::makeSeq(std::move(dateExpression),
-                            std::move(timezoneExpression),
-                            _b.makeFunction(std::string{exprName}, std::move(arguments))),
-            _b.buildMultiBranchConditionalFromCaseValuePairs(std::move(inputValidationCases),
-                                                             _b.makeNothingConstant())));
+        pushExpr(_b.makeLet(frameId,
+                            SbExpr::makeSeq(std::move(dateExpression),
+                                            std::move(timezoneExpression),
+                                            _b.makeFunction(exprName, std::move(arguments))),
+                            _b.buildMultiBranchConditionalFromCaseValuePairs(
+                                std::move(inputValidationCases), _b.makeNothingConstant())));
     }
 
     /**
@@ -3807,11 +3837,11 @@ private:
                                                 ErrorCodes::Error errorCode,
                                                 StringData expressionName,
                                                 StringData parameterName) {
-        return {
-            _b.makeNot(_b.makeFunction("typeMatch", dateVar, _b.makeInt32Constant(dateTypeMask()))),
-            _b.makeFail(errorCode,
-                        str::stream() << expressionName << " parameter '" << parameterName
-                                      << "' must be coercible to date")};
+        return {_b.makeNot(_b.makeFunction(
+                    sbe::EFn::kTypeMatch, dateVar, _b.makeInt32Constant(dateTypeMask()))),
+                _b.makeFail(errorCode,
+                            str::stream() << expressionName << " parameter '" << parameterName
+                                          << "' must be coercible to date")};
     }
 
     /**
@@ -3832,7 +3862,7 @@ private:
     SbExpr generateIsEqualToStringCheck(SbVar var, StringData string) {
         return _b.makeBinaryOp(
             abt::Operations::And,
-            _b.makeFunction("isString", var),
+            _b.makeFunction(sbe::EFn::kIsString, var),
             _b.makeBinaryOp(abt::Operations::Eq, var, _b.makeStrConstant(string)));
     }
 
@@ -3840,7 +3870,7 @@ private:
      * Shared expression building logic for trignometric expressions to make sure the operand
      * is numeric and is not null.
      */
-    void generateTrigonometricExpression(StringData exprName) {
+    void generateTrigonometricExpression(sbe::EFn exprName) {
         auto arg = popExpr();
 
         auto frameId = _context->state.frameId();
@@ -3849,10 +3879,11 @@ private:
         auto genericTrigonometricExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullMissingOrUndefined(argVar), _b.makeNullConstant()},
-                SbExprPair{_b.makeFunction("isNumber", argVar), _b.makeFunction(exprName, argVar)}),
+                SbExprPair{_b.makeFunction(sbe::EFn::kIsNumber, argVar),
+                           _b.makeFunction(exprName, argVar)}),
             _b.makeFail(ErrorCodes::Error{7157800},
                         str::stream()
-                            << "$" << std::string{exprName} << " supports only numeric types"));
+                            << "$" << sbe::toString(exprName) << " supports only numeric types"));
 
         pushExpr(_b.makeLet(
             frameId, SbExpr::makeSeq(std::move(arg)), std::move(genericTrigonometricExpr)));
@@ -3862,7 +3893,7 @@ private:
      * Shared expression building logic for binary trigonometric expressions to make sure the
      * operands are numeric and are not null.
      */
-    void generateTrigonometricExpressionBinary(StringData exprName) {
+    void generateTrigonometricExpressionBinary(sbe::EFn exprName) {
         _context->ensureArity(2);
         auto rhs = popExpr();
         auto lhs = popExpr();
@@ -3876,15 +3907,16 @@ private:
                                                   _b.generateNullMissingOrUndefined(rhsVar));
 
         auto checkIsNumber = _b.makeBinaryOp(abt::Operations::And,
-                                             _b.makeFunction("isNumber", lhsVar),
-                                             _b.makeFunction("isNumber", rhsVar));
+                                             _b.makeFunction(sbe::EFn::kIsNumber, lhsVar),
+                                             _b.makeFunction(sbe::EFn::kIsNumber, rhsVar));
 
         auto genericTrigonometricExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
                 SbExprPair{std::move(checkNullOrMissing), _b.makeNullConstant()},
                 SbExprPair{std::move(checkIsNumber), _b.makeFunction(exprName, lhsVar, rhsVar)}),
             _b.makeFail(ErrorCodes::Error{7157801},
-                        str::stream() << "$" << exprName << " supports only numeric types"));
+                        str::stream()
+                            << "$" << sbe::toString(exprName) << " supports only numeric types"));
 
         pushExpr(_b.makeLet(frameId,
                             SbExpr::makeSeq(std::move(lhs), std::move(rhs)),
@@ -3895,7 +3927,7 @@ private:
      * Shared expression building logic for trignometric expressions with bounds for the valid
      * values of the argument.
      */
-    void generateTrigonometricExpressionWithBounds(StringData exprName,
+    void generateTrigonometricExpressionWithBounds(sbe::EFn exprName,
                                                    const DoubleBound& lowerBound,
                                                    const DoubleBound& upperBound) {
         auto arg = popExpr();
@@ -3912,7 +3944,7 @@ private:
             _b.makeBinaryOp(lowerCmp, argVar, _b.makeDoubleConstant(lowerBound.bound)),
             _b.makeBinaryOp(upperCmp, argVar, _b.makeDoubleConstant(upperBound.bound)));
 
-        auto checkIsNumber = _b.makeFunction("isNumber", argVar);
+        auto checkIsNumber = _b.makeFunction(sbe::EFn::kIsNumber, argVar);
         auto trigonometricExpr = _b.makeFunction(exprName, argVar);
 
         auto genericTrigonometricExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
@@ -3920,12 +3952,12 @@ private:
                 SbExprPair{_b.generateNullMissingOrUndefined(argVar), _b.makeNullConstant()},
                 SbExprPair{_b.makeNot(std::move(checkIsNumber)),
                            _b.makeFail(ErrorCodes::Error{7157802},
-                                       str::stream() << "$" << std::string{exprName}
+                                       str::stream() << "$" << sbe::toString(exprName)
                                                      << " supports only numeric types")},
                 SbExprPair{_b.generateNaNCheck(argVar), argVar},
                 SbExprPair{std::move(checkBounds), std::move(trigonometricExpr)}),
             _b.makeFail(ErrorCodes::Error{7157803},
-                        str::stream() << "Cannot apply $" << std::string{exprName}
+                        str::stream() << "Cannot apply $" << sbe::toString(exprName)
                                       << ", value must be in " << lowerBound.printLowerBound()
                                       << ", " << upperBound.printUpperBound()));
 
@@ -3938,7 +3970,7 @@ private:
      */
     void visitIndexOfFunction(const Expression* expr,
                               ExpressionVisitorContext* _context,
-                              const std::string& indexOfFunction) {
+                              sbe::EFn indexOfFunction) {
         const auto& children = expr->getChildren();
         tassert(11051807,
                 "Expecting expression to have between 2 and 4 children nodes",
@@ -3978,14 +4010,14 @@ private:
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullishOrNotRepresentableInt32Check(startIndexVar),
                            _b.makeFail(ErrorCodes::Error{7158003},
-                                       str::stream() << "$" << indexOfFunction
+                                       str::stream() << "$" << sbe::toString(indexOfFunction)
                                                      << " start index must resolve to a number")},
                 SbExprPair{_b.generateNegativeCheck(startIndexVar),
                            _b.makeFail(ErrorCodes::Error{7158004},
-                                       str::stream() << "$" << indexOfFunction
+                                       str::stream() << "$" << sbe::toString(indexOfFunction)
                                                      << " start index must be positive")}),
             _b.makeFunction(
-                "convert",
+                sbe::EFn::kConvert,
                 startIndexVar,
                 _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
         functionArgs.push_back(std::move(checkValidStartIndex));
@@ -3996,14 +4028,14 @@ private:
                 SbExpr::makeExprPairVector(
                     SbExprPair{_b.generateNullishOrNotRepresentableInt32Check(*endIndexVar),
                                _b.makeFail(ErrorCodes::Error{7158005},
-                                           str::stream() << "$" << indexOfFunction
+                                           str::stream() << "$" << sbe::toString(indexOfFunction)
                                                          << " end index must resolve to a number")},
                     SbExprPair{_b.generateNegativeCheck(*endIndexVar),
                                _b.makeFail(ErrorCodes::Error{7158006},
-                                           str::stream() << "$" << indexOfFunction
+                                           str::stream() << "$" << sbe::toString(indexOfFunction)
                                                          << " end index must be positive")}),
                 _b.makeFunction(
-                    "convert",
+                    sbe::EFn::kConvert,
                     *endIndexVar,
                     _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
             functionArgs.push_back(std::move(checkValidEndIndex));
@@ -4016,15 +4048,15 @@ private:
                 SbExprPair{_b.generateNonStringCheck(strVar),
                            _b.makeFail(ErrorCodes::Error{7158007},
                                        str::stream()
-                                           << "$" << indexOfFunction
+                                           << "$" << sbe::toString(indexOfFunction)
                                            << " string must resolve to a string or null")},
                 SbExprPair{_b.generateNullMissingOrUndefined(substrVar),
                            _b.makeFail(ErrorCodes::Error{7158008},
-                                       str::stream() << "$" << indexOfFunction
+                                       str::stream() << "$" << sbe::toString(indexOfFunction)
                                                      << " substring must resolve to a string")},
                 SbExprPair{_b.generateNonStringCheck(substrVar),
                            _b.makeFail(ErrorCodes::Error{7158009},
-                                       str::stream() << "$" << indexOfFunction
+                                       str::stream() << "$" << sbe::toString(indexOfFunction)
                                                      << " substring must resolve to a string")}),
             _b.makeFunction(indexOfFunction, std::move(functionArgs)));
 
@@ -4037,7 +4069,7 @@ private:
      */
     void visitMaxMinFunction(const Expression* expr,
                              ExpressionVisitorContext* _context,
-                             const std::string& maxMinFunction) {
+                             sbe::EFn maxMinFunction) {
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
 
@@ -4054,7 +4086,7 @@ private:
                     SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
                                _b.makeNullConstant()},
                     SbExprPair{
-                        _b.makeFunction("isArray", singleInputVar),
+                        _b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
                         // In the case of a single argument, if the input is an array, $min or $max
                         // operates on the elements of array to return a single value.
                         _b.makeFillEmptyNull(_b.makeFunction(maxMinFunction, singleInputVar))}),
@@ -4074,7 +4106,7 @@ private:
      */
     void generateExpressionFromAccumulatorExpression(const Expression* expr,
                                                      ExpressionVisitorContext* _context,
-                                                     const std::string& functionCall) {
+                                                     sbe::EFn functionCall) {
         size_t arity = expr->getChildren().size();
 
         SbExpr::Vector binds;
@@ -4092,8 +4124,8 @@ private:
         }
 
         // Take in all arguments and construct an array.
-        auto arrayExpr =
-            _b.makeLet(frameId, std::move(binds), _b.makeFunction("newArray", std::move(argVars)));
+        auto arrayExpr = _b.makeLet(
+            frameId, std::move(binds), _b.makeFunction(sbe::EFn::kNewArray, std::move(argVars)));
 
         pushExpr(_b.makeFillEmptyNull(_b.makeFunction(functionCall, std::move(arrayExpr))));
     }
@@ -4152,21 +4184,22 @@ private:
             // To match classic engine semantics, $setEquals and $setIsSubset should throw an error
             // for any non-array arguments including null and missing values.
             if (setOp == SetOperation::Equals || setOp == SetOperation::IsSubset) {
-                return _b.makeIf(
-                    _b.makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
-                    _b.makeFail(ErrorCodes::Error{7158100},
-                                str::stream()
-                                    << "All operands of $" << operatorName << " must be arrays."),
-                    _b.makeFunction(std::string{setFunctionName}, std::move(variables)));
+                return _b.makeIf(_b.makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
+                                 _b.makeFail(ErrorCodes::Error{7158100},
+                                             str::stream() << "All operands of $"
+                                                           << sbe::toString(operatorName)
+                                                           << " must be arrays."),
+                                 _b.makeFunction(setFunctionName, std::move(variables)));
             } else {
                 return _b.buildMultiBranchConditionalFromCaseValuePairs(
                     SbExpr::makeExprPairVector(
                         SbExprPair{std::move(checkNullAnyArgument), _b.makeNullConstant()},
                         SbExprPair{std::move(checkNotArrayAnyArgument),
                                    _b.makeFail(ErrorCodes::Error{7158101},
-                                               str::stream() << "All operands of $" << operatorName
+                                               str::stream() << "All operands of $"
+                                                             << sbe::toString(operatorName)
                                                              << " must be arrays.")}),
-                    _b.makeFunction(std::string{setFunctionName}, std::move(variables)));
+                    _b.makeFunction(setFunctionName, std::move(variables)));
             }
         }();
 
@@ -4174,25 +4207,28 @@ private:
         pushExpr(std::move(setExpr));
     }
 
-    std::pair<StringData, StringData> getSetOperatorAndFunctionNames(SetOperation setOp,
-                                                                     bool hasCollator) const {
+    std::pair<sbe::EFn, sbe::EFn> getSetOperatorAndFunctionNames(SetOperation setOp,
+                                                                 bool hasCollator) const {
         switch (setOp) {
             case SetOperation::Difference:
-                return std::make_pair("setDifference"_sd,
-                                      hasCollator ? "collSetDifference"_sd : "setDifference"_sd);
+                return std::make_pair(sbe::EFn::kSetDifference,
+                                      hasCollator ? sbe::EFn::kCollSetDifference
+                                                  : sbe::EFn::kSetDifference);
             case SetOperation::Intersection:
-                return std::make_pair("setIntersection"_sd,
-                                      hasCollator ? "collSetIntersection"_sd
-                                                  : "setIntersection"_sd);
+                return std::make_pair(sbe::EFn::kSetIntersection,
+                                      hasCollator ? sbe::EFn::kCollSetIntersection
+                                                  : sbe::EFn::kSetIntersection);
             case SetOperation::Union:
-                return std::make_pair("setUnion"_sd,
-                                      hasCollator ? "collSetUnion"_sd : "setUnion"_sd);
+                return std::make_pair(sbe::EFn::kSetUnion,
+                                      hasCollator ? sbe::EFn::kCollSetUnion : sbe::EFn::kSetUnion);
             case SetOperation::Equals:
-                return std::make_pair("setEquals"_sd,
-                                      hasCollator ? "collSetEquals"_sd : "setEquals"_sd);
+                return std::make_pair(sbe::EFn::kSetEquals,
+                                      hasCollator ? sbe::EFn::kCollSetEquals
+                                                  : sbe::EFn::kSetEquals);
             case SetOperation::IsSubset:
-                return std::make_pair("setIsSubset"_sd,
-                                      hasCollator ? "collSetIsSubset"_sd : "setIsSubset"_sd);
+                return std::make_pair(sbe::EFn::kSetIsSubset,
+                                      hasCollator ? sbe::EFn::kCollSetIsSubset
+                                                  : sbe::EFn::kSetIsSubset);
         }
         MONGO_UNREACHABLE;
     }
@@ -4200,7 +4236,7 @@ private:
     /**
      * Shared expression building logic for regex expressions.
      */
-    void generateRegexExpression(const ExpressionRegex* expr, StringData exprName) {
+    void generateRegexExpression(const ExpressionRegex* expr, sbe::EFn exprName) {
         size_t arity = expr->hasOptions() ? 3 : 2;
         _context->ensureArity(arity);
 
@@ -4213,9 +4249,9 @@ private:
         SbVar patternVar{outerFrameId, 1};
 
         auto generateRegexNullResponse = [&]() {
-            if (exprName == "regexMatch"_sd) {
+            if (exprName == sbe::EFn::kRegexMatch) {
                 return _b.makeBoolConstant(false);
-            } else if (exprName == "regexFindAll"_sd) {
+            } else if (exprName == sbe::EFn::kRegexFindAll) {
                 auto [emptyArrTag, emptyArrVal] = sbe::value::makeNewArray();
                 return _b.makeConstant(emptyArrTag, emptyArrVal);
             } else {
@@ -4225,7 +4261,7 @@ private:
 
         auto makeError = [&](int errorCode, StringData message) {
             return _b.makeFail(ErrorCodes::Error{errorCode},
-                               str::stream() << "$" << std::string{exprName} << ": " << message);
+                               str::stream() << "$" << sbe::toString(exprName) << ": " << message);
         };
 
         auto makeRegexFunctionCall = [&](SbExpr compiledRegex) {
@@ -4236,7 +4272,7 @@ private:
                 resultFrameId,
                 SbExpr::makeSeq(_b.makeFunction(exprName, std::move(compiledRegex), inputVar)),
                 _b.makeIf(
-                    _b.makeFunction("exists"_sd, resultVar),
+                    _b.makeFunction(sbe::EFn::kExists, resultVar),
                     resultVar,
                     makeError(5073403, "error occurred while executing the regular expression")));
         };
@@ -4269,14 +4305,14 @@ private:
             //     fail('pattern must be either string or BSON RegEx')
             // }
             auto patternArgument = _b.makeIf(
-                _b.makeFunction("isString"_sd, patternVar),
-                _b.makeIf(_b.makeFunction("hasNullBytes"_sd, patternVar),
+                _b.makeFunction(sbe::EFn::kIsString, patternVar),
+                _b.makeIf(_b.makeFunction(sbe::EFn::kHasNullBytes, patternVar),
                           makeError(5126602, "regex pattern must not have embedded null bytes"),
                           patternVar),
-                _b.makeIf(_b.makeFunction("typeMatch"_sd,
+                _b.makeIf(_b.makeFunction(sbe::EFn::kTypeMatch,
                                           patternVar,
                                           _b.makeInt32Constant(getBSONTypeMask(BSONType::regEx))),
-                          _b.makeFunction("getRegexPattern"_sd, patternVar),
+                          _b.makeFunction(sbe::EFn::kGetRegexPattern, patternVar),
                           makeError(5126601,
                                     "regex pattern must have either string or BSON RegEx type")));
 
@@ -4284,14 +4320,15 @@ private:
                 // If no options are passed to the expression, try to extract them from the
                 // pattern.
                 auto optionsArgument = _b.makeIf(
-                    _b.makeFunction("typeMatch"_sd,
+                    _b.makeFunction(sbe::EFn::kTypeMatch,
                                     patternVar,
                                     _b.makeInt32Constant(getBSONTypeMask(BSONType::regEx))),
-                    _b.makeFunction("getRegexFlags"_sd, patternVar),
+                    _b.makeFunction(sbe::EFn::kGetRegexFlags, patternVar),
                     _b.makeStrConstant(""_sd));
-                auto compiledRegex = _b.makeFunction(
-                    "regexCompile"_sd, std::move(patternArgument), std::move(optionsArgument));
-                return _b.makeIf(_b.makeFunction("isNull"_sd, patternVar),
+                auto compiledRegex = _b.makeFunction(sbe::EFn::kRegexCompile,
+                                                     std::move(patternArgument),
+                                                     std::move(optionsArgument));
+                return _b.makeIf(_b.makeFunction(sbe::EFn::kIsNull, patternVar),
                                  generateRegexNullResponse(),
                                  makeRegexFunctionCall(std::move(compiledRegex)));
             }
@@ -4332,12 +4369,12 @@ private:
                 //         stringOptions
                 //     }
                 auto stringOptions = _b.makeIf(
-                    _b.makeFunction("isString"_sd, userOptionsVar),
-                    _b.makeIf(_b.makeFunction("hasNullBytes"_sd, userOptionsVar),
+                    _b.makeFunction(sbe::EFn::kIsString, userOptionsVar),
+                    _b.makeIf(_b.makeFunction(sbe::EFn::kHasNullBytes, userOptionsVar),
                               makeError(5126604, "regex flags must not have embedded null bytes"),
                               userOptionsVar),
                     _b.makeIf(
-                        _b.makeFunction("isNull"_sd, userOptionsVar),
+                        _b.makeFunction(sbe::EFn::kIsNull, userOptionsVar),
                         _b.makeStrConstant(""_sd),
                         makeError(5126603, "regex flags must have either string or null type")));
 
@@ -4355,12 +4392,12 @@ private:
                     stringFrameId,
                     SbExpr::makeSeq(std::move(stringOptions)),
                     _b.makeIf(
-                        _b.makeFunction("typeMatch"_sd,
+                        _b.makeFunction(sbe::EFn::kTypeMatch,
                                         patternVar,
                                         _b.makeInt32Constant(getBSONTypeMask(BSONType::regEx))),
                         _b.makeLet(
                             bsonPatternFrameId,
-                            SbExpr::makeSeq(_b.makeFunction("getRegexFlags", patternVar)),
+                            SbExpr::makeSeq(_b.makeFunction(sbe::EFn::kGetRegexFlags, patternVar)),
                             _b.buildMultiBranchConditionalFromCaseValuePairs(
                                 SbExpr::makeExprPairVector(
                                     SbExprPair{generateIsEmptyString(stringVar), bsonPatternVar},
@@ -4373,17 +4410,17 @@ private:
 
             return _b.makeLet(optionsFrameId,
                               SbExpr::makeSeq(std::move(options), std::move(optionsArgument)),
-                              _b.makeIf(_b.makeFunction("isNull"_sd, patternVar),
+                              _b.makeIf(_b.makeFunction(sbe::EFn::kIsNull, patternVar),
                                         generateRegexNullResponse(),
                                         makeRegexFunctionCall(_b.makeFunction(
-                                            "regexCompile"_sd, patternVar, optionsVar))));
+                                            sbe::EFn::kRegexCompile, patternVar, optionsVar))));
         }();
 
         auto regexCall = _b.buildMultiBranchConditionalFromCaseValuePairs(
             SbExpr::makeExprPairVector(
                 SbExprPair{_b.generateNullMissingOrUndefined(inputVar),
                            generateRegexNullResponse()},
-                SbExprPair{_b.makeNot(_b.makeFunction("isString"_sd, inputVar)),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kIsString, inputVar)),
                            makeError(5073401, "input must be of type string")}),
             std::move(regexFunctionResult));
 
@@ -4416,12 +4453,12 @@ private:
         auto convertedAmountInt64 = [&]() {
             if (dateExprName == "dateAdd") {
                 return _b.makeFunction(
-                    "convert",
+                    sbe::EFn::kConvert,
                     origAmountVar,
                     _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
             } else if (dateExprName == "dateSubtract") {
                 return _b.makeFunction(
-                    "convert",
+                    sbe::EFn::kConvert,
                     _b.makeUnaryOp(abt::Operations::Neg, origAmountVar),
                     _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
             } else {
@@ -4449,12 +4486,13 @@ private:
                                        str::stream()
                                            << "$" << dateExprName
                                            << " expects timezone argument of type string")},
-                SbExprPair{_b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, tzVar)),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kIsTimezone, timeZoneDBVar, tzVar)),
                            _b.makeFail(ErrorCodes::Error{7157903},
                                        str::stream()
                                            << "$" << dateExprName << " expects a valid timezone")},
-                SbExprPair{_b.makeNot(_b.makeFunction(
-                               "typeMatch", startDateVar, _b.makeInt32Constant(dateTypeMask()))),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kTypeMatch,
+                                                      startDateVar,
+                                                      _b.makeInt32Constant(dateTypeMask()))),
                            _b.makeFail(ErrorCodes::Error{7157904},
                                        str::stream()
                                            << "$" << dateExprName
@@ -4463,15 +4501,16 @@ private:
                            _b.makeFail(ErrorCodes::Error{7157905},
                                        str::stream() << "$" << dateExprName
                                                      << " expects unit argument of type string")},
-                SbExprPair{_b.makeNot(_b.makeFunction("isTimeUnit", unitVar)),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kIsTimeUnit, unitVar)),
                            _b.makeFail(ErrorCodes::Error{7157906},
                                        str::stream()
                                            << "$" << dateExprName << " expects a valid time unit")},
-                SbExprPair{_b.makeNot(_b.makeFunction("exists", amountVar)),
+                SbExprPair{_b.makeNot(_b.makeFunction(sbe::EFn::kExists, amountVar)),
                            _b.makeFail(ErrorCodes::Error{7157907},
                                        str::stream() << "invalid $" << dateExprName
                                                      << " 'amount' argument value")}),
-            _b.makeFunction("dateAdd", timeZoneDBVar, startDateVar, unitVar, amountVar, tzVar));
+            _b.makeFunction(
+                sbe::EFn::kDateAdd, timeZoneDBVar, startDateVar, unitVar, amountVar, tzVar));
 
         pushExpr(_b.makeLet(frameId,
                             SbExpr::makeSeq(std::move(startDateExpr),
@@ -4669,8 +4708,8 @@ SbExpr generateExpressionCompare(StageBuilderState& state,
         auto undefinedTypeMask = static_cast<int32_t>(getBSONTypeMask(BSONType::undefined));
         return b.makeBinaryOp(
             abt::Operations::And,
-            b.makeFunction("exists"_sd, var),
-            b.makeFunction("typeMatch"_sd, var, b.makeInt32Constant(~undefinedTypeMask)));
+            b.makeFunction(sbe::EFn::kExists, var),
+            b.makeFunction(sbe::EFn::kTypeMatch, var, b.makeInt32Constant(~undefinedTypeMask)));
     };
 
     auto nothingFallbackCmp =

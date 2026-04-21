@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/agg_project.h"
 #include "mongo/db/exec/sbe/stages/and_hash.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
@@ -235,8 +236,8 @@ SbExpr SbExprBuilder::makeUndefinedConstant() {
     return abt::make<abt::Constant>(sbe::value::TypeTags::bsonUndefined, 0);
 }
 
-SbExpr SbExprBuilder::makeFunction(StringData name, SbExpr::Vector args) {
-    return abt::make<abt::FunctionCall>(std::string{name}, extractABT(args));
+SbExpr SbExprBuilder::makeFunction(sbe::EFn fn, SbExpr::Vector args) {
+    return abt::make<abt::FunctionCall>(fn, extractABT(args));
 }
 
 SbExpr SbExprBuilder::makeIf(SbExpr condExpr, SbExpr thenExpr, SbExpr elseExpr) {
@@ -277,11 +278,11 @@ SbExpr SbExprBuilder::makeLocalLambda2(sbe::FrameId frameId, SbExpr expr) {
 
 SbExpr SbExprBuilder::makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag) {
     return makeFunction(
-        "convert"_sd, std::move(expr), makeInt32Constant(static_cast<int32_t>(tag)));
+        sbe::EFn::kConvert, std::move(expr), makeInt32Constant(static_cast<int32_t>(tag)));
 }
 
 SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage) {
-    return makeFunction("fail"_sd, makeInt32Constant(error), makeStrConstant(errorMessage));
+    return makeFunction(sbe::EFn::kFail, makeInt32Constant(error), makeStrConstant(errorMessage));
 }
 
 SbExpr SbExprBuilder::makeFillEmpty(SbExpr expr, SbExpr altExpr) {
@@ -326,12 +327,12 @@ SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
     return makeFillEmptyTrue(makeFunction(
-        "typeMatch", std::move(expr), makeInt32Constant(getBSONTypeMask(BSONType::null))));
+        sbe::EFn::kTypeMatch, std::move(expr), makeInt32Constant(getBSONTypeMask(BSONType::null))));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
     return makeFillEmptyTrue(makeFunction(
-        "typeMatch",
+        sbe::EFn::kTypeMatch,
         std::move(expr),
         makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined))));
 }
@@ -341,28 +342,28 @@ SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbVar var) {
-    return makeFillEmptyTrue(
-        makeFunction("typeMatch"_sd, var, makeInt32Constant(getBSONTypeMask(BSONType::null))));
+    return makeFillEmptyTrue(makeFunction(
+        sbe::EFn::kTypeMatch, var, makeInt32Constant(getBSONTypeMask(BSONType::null))));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbVar var) {
     return makeFillEmptyTrue(makeFunction(
-        "typeMatch"_sd,
+        sbe::EFn::kTypeMatch,
         var,
         makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined))));
 }
 
 SbExpr SbExprBuilder::generateNonStringCheck(SbVar var) {
-    return makeNot(makeFunction("isString"_sd, var));
+    return makeNot(makeFunction(sbe::EFn::kIsString, var));
 }
 
 SbExpr SbExprBuilder::generateNonTimestampCheck(SbVar var) {
-    return makeNot(makeFunction("isTimestamp"_sd, var));
+    return makeNot(makeFunction(sbe::EFn::kIsTimestamp, var));
 }
 
 SbExpr SbExprBuilder::generateNegativeCheck(SbVar var) {
     return makeBinaryOp(abt::Operations::And,
-                        makeNot(makeFunction("isNaN"_sd, var)),
+                        makeNot(makeFunction(sbe::EFn::kIsNaN, var)),
                         makeBinaryOp(abt::Operations::Lt, var, makeInt32Constant(0)));
 }
 
@@ -371,42 +372,43 @@ SbExpr SbExprBuilder::generateNonPositiveCheck(SbVar var) {
 }
 
 SbExpr SbExprBuilder::generateNonNumericCheck(SbVar var) {
-    return makeNot(makeFunction("isNumber"_sd, var));
+    return makeNot(makeFunction(sbe::EFn::kIsNumber, var));
 }
 
 SbExpr SbExprBuilder::generateLongLongMinCheck(SbVar var) {
     return makeBinaryOp(
         abt::Operations::And,
-        makeFunction("typeMatch"_sd, var, makeInt32Constant(getBSONTypeMask(BSONType::numberLong))),
+        makeFunction(
+            sbe::EFn::kTypeMatch, var, makeInt32Constant(getBSONTypeMask(BSONType::numberLong))),
         makeBinaryOp(
             abt::Operations::Eq, var, makeInt64Constant(std::numeric_limits<int64_t>::min())));
 }
 
 SbExpr SbExprBuilder::generateNonArrayCheck(SbVar var) {
-    return makeNot(makeFunction("isArray"_sd, var));
+    return makeNot(makeFunction(sbe::EFn::kIsArray, var));
 }
 
 SbExpr SbExprBuilder::generateNonObjectCheck(SbVar var) {
-    return makeNot(makeFunction("isObject"_sd, var));
+    return makeNot(makeFunction(sbe::EFn::kIsObject, var));
 }
 
 SbExpr SbExprBuilder::generateNullishOrNotRepresentableInt32Check(SbVar var) {
     return makeBinaryOp(
         abt::Operations::Or,
         generateNullMissingOrUndefined(var),
-        makeNot(makeFunction("exists"_sd,
-                             makeFunction("convert"_sd,
+        makeNot(makeFunction(sbe::EFn::kExists,
+                             makeFunction(sbe::EFn::kConvert,
                                           var,
                                           makeInt32Constant(static_cast<int32_t>(
                                               sbe::value::TypeTags::NumberInt32))))));
 }
 
 SbExpr SbExprBuilder::generateNaNCheck(SbVar var) {
-    return makeFunction("isNaN"_sd, var);
+    return makeFunction(sbe::EFn::kIsNaN, var);
 }
 
 SbExpr SbExprBuilder::generateInfinityCheck(SbVar var) {
-    return makeFunction("isInfinity"_sd, var);
+    return makeFunction(sbe::EFn::kIsInfinity, var);
 }
 
 SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
@@ -416,7 +418,8 @@ SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
             // We can perform our numerical test with trunc. trunc will return nothing if we pass a
             // non-number to it. We return true if the comparison returns nothing, or if
             // var != trunc(var), indicating this is not a whole number.
-            makeFillEmptyTrue(makeBinaryOp(abt::Operations::Neq, var, makeFunction("trunc", var))),
+            makeFillEmptyTrue(
+                makeBinaryOp(abt::Operations::Neq, var, makeFunction(sbe::EFn::kTrunc, var))),
             makeBinaryOp(abt::Operations::Lt, var, makeInt32Constant(-20)),
             makeBinaryOp(abt::Operations::Gt, var, makeInt32Constant(100))));
 }

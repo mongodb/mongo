@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -57,14 +58,12 @@ public:
         value::OwnedValueAccessor aggAccessor;
         auto aggSlot = bindAccessor(&aggAccessor);
 
-        auto exprNamePrefix = std::string{"aggRemovableMinMaxN"};
-
         auto cap = internalQueryTopNAccumulatorBytes.load();
 
         auto initExpr = [&]() {
             if constexpr (Collation) {
                 return sbe::makeE<sbe::EFunction>(
-                    "aggRemovableMinMaxNCollInit",
+                    EFn::kAggRemovableMinMaxNCollInit,
                     sbe::makeEs(
                         makeE<EConstant>(value::TypeTags::NumberInt64, 1),
                         makeE<EConstant>(value::TypeTags::NumberInt32, cap),
@@ -74,28 +73,28 @@ public:
                                 CollatorInterfaceMock::MockType::kReverseString)))));
             } else {
                 return sbe::makeE<sbe::EFunction>(
-                    "aggRemovableMinMaxNInit",
+                    EFn::kAggRemovableMinMaxNInit,
                     sbe::makeEs(makeE<EConstant>(value::TypeTags::NumberInt64, 1),
                                 makeE<EConstant>(value::TypeTags::NumberInt32, cap)));
             }
         }();
         auto compiledInit = compileExpression(*initExpr);
 
-        auto addExpr = sbe::makeE<sbe::EFunction>(exprNamePrefix + "Add",
+        auto addExpr = sbe::makeE<sbe::EFunction>(EFn::kAggRemovableMinMaxNAdd,
                                                   sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledAdd = compileAggExpression(*addExpr, &aggAccessor);
 
-        auto removeExpr = sbe::makeE<sbe::EFunction>(exprNamePrefix + "Remove",
+        auto removeExpr = sbe::makeE<sbe::EFunction>(EFn::kAggRemovableMinMaxNRemove,
                                                      sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemove = compileAggExpression(*removeExpr, &aggAccessor);
 
         auto finalizeExpr = sbe::makeE<sbe::EPrimBinary>(
             sbe::EPrimBinary::fillEmpty,
             sbe::makeE<sbe::EFunction>(
-                "getElement",
-                sbe::makeEs(sbe::makeE<sbe::EFunction>(
-                                "aggRemovable" + std::string(isMin ? "MinN" : "MaxN") + "Finalize",
-                                sbe::makeEs(makeE<EVariable>(aggSlot))),
+                EFn::kGetElement,
+                sbe::makeEs(sbe::makeE<sbe::EFunction>(isMin ? EFn::kAggRemovableMinNFinalize
+                                                             : EFn::kAggRemovableMaxNFinalize,
+                                                       sbe::makeEs(makeE<EVariable>(aggSlot))),
                             makeE<EConstant>(value::TypeTags::NumberInt32, 0))),
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
         auto compiledFinalize = compileExpression(*finalizeExpr);
@@ -533,7 +532,7 @@ TEST_F(SBEMinMaxTest, MinMaxCapTest) {
     auto cap = internalQueryTopNAccumulatorBytes.load();
 
     auto initExpr = sbe::makeE<sbe::EFunction>(
-        "aggRemovableMinMaxNInit",
+        EFn::kAggRemovableMinMaxNInit,
         sbe::makeEs(makeE<EConstant>(value::TypeTags::NumberInt32, 1),
                     makeE<EConstant>(value::TypeTags::NumberDouble, cap)));
     auto compiledInit = compileExpression(*initExpr);

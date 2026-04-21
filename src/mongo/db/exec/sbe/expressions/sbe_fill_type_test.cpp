@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/unittest/unittest.h"
@@ -44,7 +45,7 @@ TEST_F(SBEFillTypeTest, FillType) {
     value::ViewOfValueAccessor fillAccessor;
     auto fillSlot = bindAccessor(&fillAccessor);
 
-    auto fillTypeExpr = sbe::makeE<sbe::EFunction>("fillType",
+    auto fillTypeExpr = sbe::makeE<sbe::EFunction>(EFn::kFillType,
                                                    sbe::makeEs(makeE<EVariable>(inputSlot),
                                                                makeE<EVariable>(typeMaskSlot),
                                                                makeE<EVariable>(fillSlot)));

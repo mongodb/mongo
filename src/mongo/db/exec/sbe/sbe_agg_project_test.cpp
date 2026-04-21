@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/agg_project.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -61,7 +62,7 @@ TEST_F(AggProjectStageTest, SimpleCountTest) {
             std::move(scanStage),
             makeAggExprVector(outSlot,
                               nullptr,
-                              makeFunction("sum",
+                              makeFunction(EFn::kSum,
                                            makeE<EConstant>(value::TypeTags::NumberInt64,
                                                             value::bitcastFrom<int64_t>(1)))),
             kEmptyPlanNodeId);
@@ -87,7 +88,7 @@ TEST_F(AggProjectStageTest, SimpleSumTest) {
         auto outSlot = generateSlotId();
         auto aggProject = makeS<AggProjectStage>(
             std::move(scanStage),
-            makeAggExprVector(outSlot, nullptr, makeFunction("sum", makeVariable(scanSlot))),
+            makeAggExprVector(outSlot, nullptr, makeFunction(EFn::kSum, makeVariable(scanSlot))),
             kEmptyPlanNodeId);
         return std::make_pair(outSlot, std::move(aggProject));
     };
@@ -113,7 +114,7 @@ TEST_F(AggProjectStageTest, SumWithInitTest) {
             makeAggExprVector(
                 outSlot,
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(100)),
-                makeFunction("sum", makeVariable(scanSlot))),
+                makeFunction(EFn::kSum, makeVariable(scanSlot))),
             kEmptyPlanNodeId);
         return std::make_pair(outSlot, std::move(aggProject));
     };

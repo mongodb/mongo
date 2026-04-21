@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/window.h"
@@ -103,9 +104,10 @@ public:
                                                  makeInt32Constant(*higherOffset)));
             }
             window.initExprs.push_back(nullptr);
-            window.addExprs.push_back(makeFunction("aggDoubleDoubleSum", makeVariable(valueSlot)));
+            window.addExprs.push_back(
+                makeFunction(EFn::kAggDoubleDoubleSum, makeVariable(valueSlot)));
             window.removeExprs.push_back(makeFunction(
-                "aggDoubleDoubleSum",
+                EFn::kAggDoubleDoubleSum,
                 sbe::makeE<sbe::EPrimUnary>(EPrimUnary::negate, makeVariable(valueSlot))));
 
             windows.emplace_back(std::move(window));
@@ -144,8 +146,8 @@ public:
             resultSlots.push_back(resultSlot);
             projects.emplace_back(
                 resultSlot,
-                makeE<EIf>(makeFunction("exists", makeVariable(windowSlot)),
-                           makeFunction("doubleDoubleSumFinalize", makeVariable(windowSlot)),
+                makeE<EIf>(makeFunction(EFn::kExists, makeVariable(windowSlot)),
+                           makeFunction(EFn::kDoubleDoubleSumFinalize, makeVariable(windowSlot)),
                            makeInt32Constant(0)));
         }
 

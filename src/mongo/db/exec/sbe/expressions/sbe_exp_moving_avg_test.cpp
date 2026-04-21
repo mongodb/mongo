@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo::sbe {
@@ -43,12 +44,12 @@ public:
         value::OwnedValueAccessor aggAccessor;
         auto aggSlot = bindAccessor(&aggAccessor);
 
-        auto expMovingAvgExpr =
-            sbe::makeE<sbe::EFunction>("aggExpMovingAvg", sbe::makeEs(makeE<EVariable>(inputSlot)));
+        auto expMovingAvgExpr = sbe::makeE<sbe::EFunction>(
+            EFn::kAggExpMovingAvg, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledExpMovingAvg = compileAggExpression(*expMovingAvgExpr, &aggAccessor);
 
         auto expMovingAvgExprFinalize = sbe::makeE<sbe::EFunction>(
-            "aggExpMovingAvgFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggExpMovingAvgFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledExpMovingAvgFinalize = compileExpression(*expMovingAvgExprFinalize);
 
         auto [stateArrayTag, stateArrayVal] = value::makeNewArray();

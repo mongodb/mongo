@@ -108,7 +108,7 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots,
         projections.emplace_back(
             projectSlots.back(),
             sbe::makeE<sbe::EFunction>(
-                "getElement"_sd,
+                EFn::kGetElement,
                 sbe::makeEs(sbe::makeE<sbe::EVariable>(scanSlot), std::move(indexExpr))));
     }
 

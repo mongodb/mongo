@@ -39,7 +39,6 @@
 #include <utility>
 
 namespace mongo::stage_builder {
-using namespace std::string_literals;
 void ExpressionConstEval::optimize(abt::ABT& n) {
     invariant(_varRefs.empty());
     invariant(_singleRef.empty());
@@ -64,7 +63,7 @@ void ExpressionConstEval::optimize(abt::ABT& n) {
         algebra::transport<true>(n, *this);
     }
 
-    // TODO: should we be clearing here?
+    // TODO SERVER-95539: should we be clearing here?
     _singleRef.clear();
 
     _staleDefs.clear();
@@ -488,117 +487,123 @@ void ExpressionConstEval::transport(abt::ABT& n,
 void ExpressionConstEval::transport(abt::ABT& n,
                                     const abt::FunctionCall& op,
                                     std::vector<abt::ABT>& args) {
-    if (args.size() == 1 && args[0].is<abt::Constant>()) {
-        // We can simplify exists(constant) to true if the said constant is not Nothing.
-        if (op.name() == "exists"s) {
-            auto [tag, val] = args[0].cast<abt::Constant>()->get();
-            swapAndUpdate(n, abt::Constant::boolean(tag != sbe::value::TypeTags::Nothing));
-        }
-
-        // We can simplify coerceToBool(constant).
-        if (op.name() == "coerceToBool"s) {
-            auto [tag, val] = args[0].cast<abt::Constant>()->get();
-            auto [resultTag, resultVal] = sbe::value::coerceToBool(tag, val);
-            swapAndUpdate(n, abt::make<abt::Constant>(resultTag, resultVal));
-        }
-
-        // We can simplify isTimeUnit(constant).
-        if (op.name() == "isTimeUnit"s) {
-            auto [tag, val] = args[0].cast<abt::Constant>()->get();
-            if (sbe::value::isString(tag)) {
-                swapAndUpdate(
-                    n,
-                    abt::Constant::boolean(isValidTimeUnit(sbe::value::getStringView(tag, val))));
-            } else {
-                swapAndUpdate(n, abt::Constant::nothing());
+    switch (op.fn()) {
+        case sbe::EFn::kExists:
+            // We can simplify exists(constant) to true if the said constant is not Nothing.
+            if (args.size() == 1 && args[0].is<abt::Constant>()) {
+                auto [tag, val] = args[0].cast<abt::Constant>()->get();
+                swapAndUpdate(n, abt::Constant::boolean(tag != sbe::value::TypeTags::Nothing));
             }
-        }
-    }
-
-    // We can simplify typeMatch(constant, constantMask).
-    if (args.size() == 2 && args[0].is<abt::Constant>() && args[1].is<abt::Constant>()) {
-        if (op.name() == "typeMatch"s) {
-            auto [tag, val] = args[0].cast<abt::Constant>()->get();
-            if (tag == sbe::value::TypeTags::Nothing) {
-                swapAndUpdate(n, abt::Constant::nothing());
-            } else {
-                auto [tagMask, valMask] = args[1].cast<abt::Constant>()->get();
-                if (tagMask == sbe::value::TypeTags::NumberInt32) {
-                    auto bsonMask = static_cast<uint32_t>(sbe::value::bitcastTo<int32_t>(valMask));
+            break;
+        case sbe::EFn::kCoerceToBool:
+            // We can simplify coerceToBool(constant).
+            if (args.size() == 1 && args[0].is<abt::Constant>()) {
+                auto [tag, val] = args[0].cast<abt::Constant>()->get();
+                auto [resultTag, resultVal] = sbe::value::coerceToBool(tag, val);
+                swapAndUpdate(n, abt::make<abt::Constant>(resultTag, resultVal));
+            }
+            break;
+        case sbe::EFn::kIsTimeUnit:
+            // We can simplify isTimeUnit(constant).
+            if (args.size() == 1 && args[0].is<abt::Constant>()) {
+                auto [tag, val] = args[0].cast<abt::Constant>()->get();
+                if (sbe::value::isString(tag)) {
                     swapAndUpdate(n,
-                                  abt::Constant::boolean((getBSONTypeMask(tag) & bsonMask) != 0));
+                                  abt::Constant::boolean(
+                                      isValidTimeUnit(sbe::value::getStringView(tag, val))));
+                } else {
+                    swapAndUpdate(n, abt::Constant::nothing());
                 }
             }
-        }
-
-        // We can simplify convert(constant).
-        if (op.name() == "convert"s) {
-            auto [tag, val] = args[0].cast<abt::Constant>()->get();
-            if (tag == sbe::value::TypeTags::Nothing) {
-                swapAndUpdate(n, abt::Constant::nothing());
-            } else {
-                auto [tagRhs, valRhs] = args[1].cast<abt::Constant>()->get();
-                if (tagRhs == sbe::value::TypeTags::NumberInt32) {
-                    sbe::value::TypeTags targetTypeTag =
-                        (sbe::value::TypeTags)sbe::value::bitcastTo<int32_t>(valRhs);
-                    auto [_, convertedTag, convertedVal] =
-                        sbe::value::genericNumConvert(tag, val, targetTypeTag);
-                    swapAndUpdate(n, abt::make<abt::Constant>(convertedTag, convertedVal));
-                }
-            }
-        }
-    }
-
-    if (op.name() == "newArray"s) {
-        bool allConstants = true;
-        for (const abt::ABT& arg : op.nodes()) {
-            if (!arg.is<abt::Constant>()) {
-                allConstants = false;
-                break;
-            }
-        }
-
-        if (allConstants) {
-            // All arguments are constants. Replace with an array constant.
-
-            sbe::value::Array array;
-            for (const abt::ABT& arg : op.nodes()) {
-                auto [tag, val] = arg.cast<abt::Constant>()->get();
-                // Copy the value before inserting into the array.
-                auto [tagCopy, valCopy] = sbe::value::copyValue(tag, val);
-                array.push_back(tagCopy, valCopy);
-            }
-
-            auto [tag, val] = sbe::value::makeCopyArray(array);
-            swapAndUpdate(n, abt::make<abt::Constant>(tag, val));
-        }
-    }
-    if (op.name() == "isInList"s) {
-        // If the child node is a Constant, check if the type is inList, then directly set to
-        // true/false.
-        if (args.size() == 1 && args[0].is<abt::Constant>()) {
-            const auto tag = args[0].cast<abt::Constant>()->get().tag;
-            swapAndUpdate(n, abt::Constant::boolean(tag == sbe::value::TypeTags::inList));
-        }
-    }
-    if (op.name() == "setIsSubset"s || op.name() == "setDifference"s || op.name() == "setEquals"s) {
-        // Convert any argument of type Array to an ArraySet.
-        for (size_t idx = 0; idx < args.size(); idx++) {
-            if (args[idx].is<abt::Constant>()) {
-                auto [tag, val] = args[idx].cast<abt::Constant>()->get();
-                switch (tag) {
-                    case sbe::value::TypeTags::Array:
-                    case sbe::value::TypeTags::ArrayMultiSet:
-                    case sbe::value::TypeTags::bsonArray: {
-                        auto [setTag, setVal] = sbe::value::makeNewArraySet(tag, val, nullptr);
-                        swapAndUpdate(args[idx], abt::make<abt::Constant>(setTag, setVal));
-                        break;
+            break;
+        case sbe::EFn::kTypeMatch:
+            // We can simplify typeMatch(constant, constantMask).
+            if (args.size() == 2 && args[0].is<abt::Constant>() && args[1].is<abt::Constant>()) {
+                auto [tag, val] = args[0].cast<abt::Constant>()->get();
+                if (tag == sbe::value::TypeTags::Nothing) {
+                    swapAndUpdate(n, abt::Constant::nothing());
+                } else {
+                    auto [tagMask, valMask] = args[1].cast<abt::Constant>()->get();
+                    if (tagMask == sbe::value::TypeTags::NumberInt32) {
+                        auto bsonMask =
+                            static_cast<uint32_t>(sbe::value::bitcastTo<int32_t>(valMask));
+                        swapAndUpdate(
+                            n, abt::Constant::boolean((getBSONTypeMask(tag) & bsonMask) != 0));
                     }
-                    default:
-                        break;
                 }
             }
+            break;
+        case sbe::EFn::kConvert:
+            // We can simplify convert(constant).
+            if (args.size() == 2 && args[0].is<abt::Constant>() && args[1].is<abt::Constant>()) {
+                auto [tag, val] = args[0].cast<abt::Constant>()->get();
+                if (tag == sbe::value::TypeTags::Nothing) {
+                    swapAndUpdate(n, abt::Constant::nothing());
+                } else {
+                    auto [tagRhs, valRhs] = args[1].cast<abt::Constant>()->get();
+                    if (tagRhs == sbe::value::TypeTags::NumberInt32) {
+                        sbe::value::TypeTags targetTypeTag =
+                            (sbe::value::TypeTags)sbe::value::bitcastTo<int32_t>(valRhs);
+                        auto [_, convertedTag, convertedVal] =
+                            sbe::value::genericNumConvert(tag, val, targetTypeTag);
+                        swapAndUpdate(n, abt::make<abt::Constant>(convertedTag, convertedVal));
+                    }
+                }
+            }
+            break;
+        case sbe::EFn::kNewArray: {
+            bool allConstants = true;
+            for (const abt::ABT& arg : op.nodes()) {
+                if (!arg.is<abt::Constant>()) {
+                    allConstants = false;
+                    break;
+                }
+            }
+            if (allConstants) {
+                // All arguments are constants. Replace with an array constant.
+                sbe::value::Array array;
+                for (const abt::ABT& arg : op.nodes()) {
+                    auto [tag, val] = arg.cast<abt::Constant>()->get();
+                    // Copy the value before inserting into the array.
+                    auto [tagCopy, valCopy] = sbe::value::copyValue(tag, val);
+                    array.push_back(tagCopy, valCopy);
+                }
+                auto [tag, val] = sbe::value::makeCopyArray(array);
+                swapAndUpdate(n, abt::make<abt::Constant>(tag, val));
+            }
+            break;
         }
+        case sbe::EFn::kIsInList:
+            // If the child node is a Constant, check if the type is inList, then directly set to
+            // true/false.
+            if (args.size() == 1 && args[0].is<abt::Constant>()) {
+                const auto tag = args[0].cast<abt::Constant>()->get().tag;
+                swapAndUpdate(n, abt::Constant::boolean(tag == sbe::value::TypeTags::inList));
+            }
+            break;
+        case sbe::EFn::kSetIsSubset:
+        case sbe::EFn::kSetDifference:
+        case sbe::EFn::kSetEquals:
+            // Convert any argument of type Array to an ArraySet.
+            for (size_t idx = 0; idx < args.size(); idx++) {
+                if (args[idx].is<abt::Constant>()) {
+                    auto [tag, val] = args[idx].cast<abt::Constant>()->get();
+                    switch (tag) {
+                        case sbe::value::TypeTags::Array:
+                        case sbe::value::TypeTags::ArrayMultiSet:
+                        case sbe::value::TypeTags::bsonArray: {
+                            auto [setTag, setVal] = sbe::value::makeNewArraySet(tag, val, nullptr);
+                            swapAndUpdate(args[idx], abt::make<abt::Constant>(setTag, setVal));
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+            }
+            break;
+        default:
+            break;
     }
 }
 
@@ -623,9 +628,9 @@ void ExpressionConstEval::transport(
         // If the condition is a Not we can remove it and swap the branches.
         swapAndUpdate(cond, std::exchange(condNot->get<0>(), abt::make<abt::Blackhole>()));
         std::swap(thenBranch, elseBranch);
-    } else if (auto funct = cond.cast<abt::FunctionCall>(); funct && funct->name() == "exists"s &&
-               funct->nodes().size() == 1 && funct->nodes()[0] == thenBranch &&
-               elseBranch.is<abt::Constant>()) {
+    } else if (auto funct = cond.cast<abt::FunctionCall>(); funct &&
+               funct->fn() == sbe::EFn::kExists && funct->nodes().size() == 1 &&
+               funct->nodes()[0] == thenBranch && elseBranch.is<abt::Constant>()) {
         // If the condition is an "exists" on an expression, the thenBranch is the same
         // expression and the elseBranch is a constant, the node is actually a FillEmpty. Note
         // that this is not true if the replacement value is an expression that can have side

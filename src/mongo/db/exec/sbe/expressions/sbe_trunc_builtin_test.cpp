@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -50,8 +51,8 @@ protected:
                                 value::TypeTags expectedTag,
                                 value::Value expectedValue) {
         auto [copyTag, copyValue] = value::copyValue(argumentTag, argumentValue);
-        auto truncExpr =
-            sbe::makeE<sbe::EFunction>("trunc", sbe::makeEs(makeE<EConstant>(copyTag, copyValue)));
+        auto truncExpr = sbe::makeE<sbe::EFunction>(
+            EFn::kTrunc, sbe::makeEs(makeE<EConstant>(copyTag, copyValue)));
         auto compiledExpr = compileExpression(*truncExpr);
 
         auto [actualTag, actualValue] = runCompiledExpression(compiledExpr.get());

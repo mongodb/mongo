@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/compiler.h"
@@ -69,16 +70,16 @@ public:
         auto aggSlot = bindAccessor(&aggAccessor);
 
         auto aggLinearFillCanAddExpr = sbe::makeE<sbe::EFunction>(
-            "aggLinearFillCanAdd", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggLinearFillCanAdd, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledLinearFillCanAdd = compileExpression(*aggLinearFillCanAddExpr);
 
         auto aggLinearFillAddExpr = sbe::makeE<sbe::EFunction>(
-            "aggLinearFillAdd",
+            EFn::kAggLinearFillAdd,
             sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
         auto compiledLinearFillAdd = compileAggExpression(*aggLinearFillAddExpr, &aggAccessor);
 
         auto aggLinearFillFinalize = sbe::makeE<sbe::EFunction>(
-            "aggLinearFillFinalize",
+            EFn::kAggLinearFillFinalize,
             sbe::makeEs(makeE<EVariable>(aggSlot), makeE<EVariable>(sortBySlot)));
         auto compiledLinearFillFinalize = compileExpression(*aggLinearFillFinalize);
 

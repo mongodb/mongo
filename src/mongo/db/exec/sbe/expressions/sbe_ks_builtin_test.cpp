@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
@@ -63,7 +64,7 @@ protected:
 
         auto [copyTag, copyVal] = value::copyValue(argTag, argVal);
 
-        auto ksExpr = makeE<EFunction>("ks",
+        auto ksExpr = makeE<EFunction>(EFn::kKs,
                                        makeEs(std::move(versionExpr),
                                               std::move(orderingExpr),
                                               makeE<EConstant>(copyTag, copyVal),

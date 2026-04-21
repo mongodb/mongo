@@ -33,6 +33,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -141,7 +142,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
 
     // Construct an invocation of "dateTrunc" function.
     auto dateTruncExpression =
-        sbe::makeE<sbe::EFunction>("dateTrunc",
+        sbe::makeE<sbe::EFunction>(EFn::kDateTrunc,
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(dateSlot),
                                                makeE<EVariable>(unitSlot),
@@ -152,7 +153,7 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
 
     // Construct an invocation of "valueBlockDateTrunc" function.
     auto valueBlockDateTruncExpression =
-        sbe::makeE<sbe::EFunction>("valueBlockDateTrunc",
+        sbe::makeE<sbe::EFunction>(EFn::kValueBlockDateTrunc,
                                    sbe::makeEs(makeE<EVariable>(bitsetSlot),
                                                makeE<EVariable>(blockSlot),
                                                makeE<EVariable>(timezoneDBSlot),

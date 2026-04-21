@@ -33,6 +33,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -126,7 +127,7 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
 
     // Construct an invocation of "dateDiff" function without 'startOfWeek' parameter.
     auto dateDiffExpression =
-        sbe::makeE<sbe::EFunction>("dateDiff",
+        sbe::makeE<sbe::EFunction>(EFn::kDateDiff,
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                makeE<EVariable>(startDateSlot),
                                                makeE<EVariable>(endDateSlot),
@@ -135,7 +136,7 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
     auto compiledDateDiff = compileExpression(*dateDiffExpression);
 
     // Construct an invocation of "dateDiff" function with 'startOfWeek' parameter.
-    dateDiffExpression = sbe::makeE<sbe::EFunction>("dateDiff",
+    dateDiffExpression = sbe::makeE<sbe::EFunction>(EFn::kDateDiff,
                                                     sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                                 makeE<EVariable>(startDateSlot),
                                                                 makeE<EVariable>(endDateSlot),
@@ -146,7 +147,7 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
 
     // Construct an invocation of "valueBlockDateDiff" function.
     auto valueBlockDateDiffExpression =
-        sbe::makeE<sbe::EFunction>("valueBlockDateDiff",
+        sbe::makeE<sbe::EFunction>(EFn::kValueBlockDateDiff,
                                    sbe::makeEs(makeE<EVariable>(bitsetSlot),
                                                makeE<EVariable>(blockSlot),
                                                makeE<EVariable>(timezoneDBSlot),
@@ -157,7 +158,7 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
 
     // Construct an invocation of "valueBlockDateDiff" function with 'startOfWeek' parameter.
     valueBlockDateDiffExpression =
-        sbe::makeE<sbe::EFunction>("valueBlockDateDiff",
+        sbe::makeE<sbe::EFunction>(EFn::kValueBlockDateDiff,
                                    sbe::makeEs(makeE<EVariable>(bitsetSlot),
                                                makeE<EVariable>(blockSlot),
                                                makeE<EVariable>(timezoneDBSlot),
@@ -404,7 +405,7 @@ TEST_F(SBEIsTimeUnitTest, Basic) {
     auto unitSlot = bindAccessor(&unitAccessor);
 
     auto isTimeUnitExpression =
-        sbe::makeE<sbe::EFunction>("isTimeUnit", sbe::makeEs(makeE<EVariable>(unitSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kIsTimeUnit, sbe::makeEs(makeE<EVariable>(unitSlot)));
     auto compiledIsTimeUnitExpression = compileExpression(*isTimeUnitExpression);
 
     // Verify that when passed Nothing returns Nothing.
@@ -432,7 +433,7 @@ TEST_F(SBEIsDayOfWeekTest, Basic) {
     auto dayOfWeekSlot = bindAccessor(&dayOfWeekAccessor);
 
     auto isDayOfWeekExpression =
-        sbe::makeE<sbe::EFunction>("isDayOfWeek", sbe::makeEs(makeE<EVariable>(dayOfWeekSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kIsDayOfWeek, sbe::makeEs(makeE<EVariable>(dayOfWeekSlot)));
     auto compiledIsDayOfWeekExpression = compileExpression(*isDayOfWeekExpression);
 
     // Verify that when passed Nothing returns Nothing.

@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -68,7 +69,7 @@ public:
             : sbe::makeE<sbe::EConstant>(value::TypeTags::Null, 0);
 
         auto aggDerivativeFinalize =
-            sbe::makeE<sbe::EFunction>("aggDerivativeFinalize",
+            sbe::makeE<sbe::EFunction>(EFn::kAggDerivativeFinalize,
                                        sbe::makeEs(std::move(unitMillisConst),
                                                    makeE<EVariable>(inputFirstSlot),
                                                    makeE<EVariable>(sortByFirstSlot),
@@ -136,7 +137,7 @@ public:
             : sbe::makeE<sbe::EConstant>(value::TypeTags::Null, 0);
 
         auto aggDerivativeFinalize =
-            sbe::makeE<sbe::EFunction>("aggDerivativeFinalize",
+            sbe::makeE<sbe::EFunction>(EFn::kAggDerivativeFinalize,
                                        sbe::makeEs(std::move(unitMillisConst),
                                                    makeE<EVariable>(inputFirstSlot),
                                                    makeE<EVariable>(sortByFirstSlot),

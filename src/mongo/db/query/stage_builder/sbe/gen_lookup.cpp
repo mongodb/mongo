@@ -32,6 +32,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -76,6 +77,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::stage_builder {
+
 
 /**
  * Helpers for building $lookup.
@@ -179,7 +181,7 @@ SbExpr generateLocalKeyStream(SbExpr inputExpr,
     SbExpr fieldExpr = topLevelFieldSlot
         ? SbExpr{*topLevelFieldSlot}
         : b.makeFunction(
-              "getField"_sd, std::move(inputExpr), b.makeStrConstant(fp.getFieldName(level)));
+              sbe::EFn::kGetField, std::move(inputExpr), b.makeStrConstant(fp.getFieldName(level)));
 
     if (level == fp.getPathLength() - 1) {
         // In the generation of the local keys, the last level doesn't
@@ -210,15 +212,16 @@ SbExpr generateLocalKeyStream(SbExpr inputExpr,
     // The result would be [1, [2]] that is already in the correct form and should not be processed
     // with unwindArray, or the result would be an incorrect [1, 2].
     sbe::FrameId traverseFrameId = state.frameId();
-    return b.makeLet(traverseFrameId,
-                     SbExpr::makeSeq(std::move(fieldExpr),
-                                     b.makeFunction("traverseP"_sd,
-                                                    SbLocalVar{traverseFrameId, 0},
-                                                    std::move(lambdaExpr),
-                                                    b.makeInt32Constant(1))),
-                     b.makeIf(b.makeFunction("isArray"_sd, SbLocalVar{traverseFrameId, 0}),
-                              b.makeFunction("unwindArray"_sd, SbLocalVar{traverseFrameId, 1}),
-                              SbLocalVar{traverseFrameId, 1}));
+    return b.makeLet(
+        traverseFrameId,
+        SbExpr::makeSeq(std::move(fieldExpr),
+                        b.makeFunction(sbe::EFn::kTraverseP,
+                                       SbLocalVar{traverseFrameId, 0},
+                                       std::move(lambdaExpr),
+                                       b.makeInt32Constant(1))),
+        b.makeIf(b.makeFunction(sbe::EFn::kIsArray, SbLocalVar{traverseFrameId, 0}),
+                 b.makeFunction(sbe::EFn::kUnwindArray, SbLocalVar{traverseFrameId, 1}),
+                 SbLocalVar{traverseFrameId, 1}));
 }
 
 // Creates an expression for traversing path 'fp' in the record from 'inputSlot' that implement MQL
@@ -252,7 +255,7 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
             getFieldFromObject = b.makeFillEmptyNull(topLevelFieldSlot);
         } else {
             getFieldFromObject = b.makeFillEmptyNull(b.makeFunction(
-                "getField"_sd, inputSlot, b.makeStrConstant(fp.getFieldName(level))));
+                sbe::EFn::kGetField, inputSlot, b.makeStrConstant(fp.getFieldName(level))));
         }
     } else {
         tassert(10800800, "arrayPosSlot must be provided", arrayPosSlot);
@@ -263,13 +266,13 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
         SbExpr shouldGetField = b.makeBooleanOpTree(
             abt::Operations::Or,
             b.makeBinaryOp(abt::Operations::Eq, *arrayPosSlot, b.makeInt64Constant(-1)),
-            b.makeFunction("isObject"_sd, inputSlot));
+            b.makeFunction(sbe::EFn::kIsObject, inputSlot));
 
-        getFieldFromObject =
-            b.makeIf(std::move(shouldGetField),
-                     b.makeFillEmptyNull(b.makeFunction(
-                         "getField"_sd, inputSlot, b.makeStrConstant(fp.getFieldName(level)))),
-                     b.makeNothingConstant());
+        getFieldFromObject = b.makeIf(
+            std::move(shouldGetField),
+            b.makeFillEmptyNull(b.makeFunction(
+                sbe::EFn::kGetField, inputSlot, b.makeStrConstant(fp.getFieldName(level)))),
+            b.makeNothingConstant());
     }
 
     if (level == fp.getPathLength() - 1) {
@@ -279,11 +282,12 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
         return b.makeLet(
             traverseFrameId,
             SbExpr::makeSeq(std::move(getFieldFromObject)),
-            b.makeIf(b.makeFunction("isArray"_sd, SbLocalVar{traverseFrameId, 0}),
-                     b.makeFunction("concatArrays"_sd,
-                                    SbLocalVar{traverseFrameId, 0},
-                                    b.makeFunction("newArray"_sd, SbLocalVar{traverseFrameId, 0})),
-                     b.makeFunction("newArray"_sd, SbLocalVar{traverseFrameId, 0})));
+            b.makeIf(
+                b.makeFunction(sbe::EFn::kIsArray, SbLocalVar{traverseFrameId, 0}),
+                b.makeFunction(sbe::EFn::kConcatArrays,
+                               SbLocalVar{traverseFrameId, 0},
+                               b.makeFunction(sbe::EFn::kNewArray, SbLocalVar{traverseFrameId, 0})),
+                b.makeFunction(sbe::EFn::kNewArray, SbLocalVar{traverseFrameId, 0})));
     }
 
     // Generate nested traversal.
@@ -313,15 +317,16 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
     // The result would be [1, [2]] that is already in the correct form and should not be processed
     // with unwindArray, or the result would be an incorrect [1, 2].
     sbe::FrameId getFieldFrameId = state.frameId();
-    return b.makeLet(getFieldFrameId,
-                     SbExpr::makeSeq(std::move(getFieldFromObject),
-                                     b.makeFunction("traverseP"_sd,
-                                                    SbLocalVar{getFieldFrameId, 0},
-                                                    std::move(lambdaForArrayExpr),
-                                                    b.makeInt32Constant(1))),
-                     b.makeIf(b.makeFunction("isArray"_sd, SbLocalVar{getFieldFrameId, 0}),
-                              b.makeFunction("unwindArray"_sd, SbLocalVar{getFieldFrameId, 1}),
-                              SbLocalVar{getFieldFrameId, 1}));
+    return b.makeLet(
+        getFieldFrameId,
+        SbExpr::makeSeq(std::move(getFieldFromObject),
+                        b.makeFunction(sbe::EFn::kTraverseP,
+                                       SbLocalVar{getFieldFrameId, 0},
+                                       std::move(lambdaForArrayExpr),
+                                       b.makeInt32Constant(1))),
+        b.makeIf(b.makeFunction(sbe::EFn::kIsArray, SbLocalVar{getFieldFrameId, 0}),
+                 b.makeFunction(sbe::EFn::kUnwindArray, SbLocalVar{getFieldFrameId, 1}),
+                 SbLocalVar{getFieldFrameId, 1}));
 }
 
 // Returns the vector of local slots to be used in lookup join, including the record slot and
@@ -382,26 +387,26 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForIndexScan(StageB
 
     auto lambdaIsArrayFrameId = state.frameId();
     SbLocalVar lambdaIsArrayVar(lambdaIsArrayFrameId, 0);
-    auto lambdaIsArrayExpr =
-        b.makeLocalLambda(lambdaIsArrayFrameId, b.makeFunction("isArray"_sd, lambdaIsArrayVar));
+    auto lambdaIsArrayExpr = b.makeLocalLambda(
+        lambdaIsArrayFrameId, b.makeFunction(sbe::EFn::kIsArray, lambdaIsArrayVar));
 
     auto lambdaFrameId = state.frameId();
     SbLocalVar lambdaVar(lambdaFrameId, 0);
     auto lambdaExpr =
         b.makeLocalLambda(lambdaFrameId,
-                          b.makeIf(b.makeFunction("isArray"_sd, lambdaVar),
+                          b.makeIf(b.makeFunction(sbe::EFn::kIsArray, lambdaVar),
                                    b.makeFillEmptyUndefined(b.makeFunction(
-                                       "getElement"_sd, lambdaVar, b.makeInt32Constant(0))),
+                                       sbe::EFn::kGetElement, lambdaVar, b.makeInt32Constant(0))),
                                    lambdaVar));
 
-    SbExpr expr = b.makeIf(b.makeFunction("traverseF"_sd,
+    SbExpr expr = b.makeIf(b.makeFunction(sbe::EFn::kTraverseF,
                                           localKeysSetSlot,
                                           std::move(lambdaIsArrayExpr),
                                           b.makeBoolConstant(false)),
-                           b.makeFunction("arrayToSet"_sd,
-                                          b.makeFunction("concatArrays"_sd,
+                           b.makeFunction(sbe::EFn::kArrayToSet,
+                                          b.makeFunction(sbe::EFn::kConcatArrays,
                                                          localKeysSetSlot,
-                                                         b.makeFunction("traverseP"_sd,
+                                                         b.makeFunction(sbe::EFn::kTraverseP,
                                                                         localKeysSetSlot,
                                                                         std::move(lambdaExpr),
                                                                         b.makeInt32Constant(1)))),
@@ -443,18 +448,18 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForLocal(StageBuild
             0,
             state,
             slots.getIfExists(std::make_pair(PlanStageSlots::kField, fp.getFieldName(0))))),
-        b.makeIf(b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, SbLocalVar{frameId, 0})),
-                 b.makeIf(b.makeFunction("isArrayEmpty"_sd, SbLocalVar{frameId, 0}),
+        b.makeIf(b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsArray, SbLocalVar{frameId, 0})),
+                 b.makeIf(b.makeFunction(sbe::EFn::kIsArrayEmpty, SbLocalVar{frameId, 0}),
                           b.makeConstant(arrayWithNullTag, arrayWithNullVal),
                           SbLocalVar{frameId, 0}),
-                 b.makeFunction("newArray"_sd, b.makeFillEmptyNull(SbLocalVar{frameId, 0}))));
+                 b.makeFunction(sbe::EFn::kNewArray, b.makeFillEmptyNull(SbLocalVar{frameId, 0}))));
 
     // Convert the array into an ArraySet that has no duplicate keys.
     if (state.getCollatorSlot()) {
-        expr =
-            b.makeFunction("collArrayToSet"_sd, SbSlot{*state.getCollatorSlot()}, std::move(expr));
+        expr = b.makeFunction(
+            sbe::EFn::kCollArrayToSet, SbSlot{*state.getCollatorSlot()}, std::move(expr));
     } else {
-        expr = b.makeFunction("arrayToSet"_sd, std::move(expr));
+        expr = b.makeFunction(sbe::EFn::kArrayToSet, std::move(expr));
     }
 
     auto [outStage, outSlots] =
@@ -484,10 +489,10 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForForeign(
         generateForeignKeyStream(inputSlot.toVar(), boost::none, fp, 0, state, topLevelFieldSlot);
     // Convert the array into an ArraySet that has no duplicate keys.
     if (state.getCollatorSlot()) {
-        expr =
-            b.makeFunction("collArrayToSet"_sd, SbSlot{*state.getCollatorSlot()}, std::move(expr));
+        expr = b.makeFunction(
+            sbe::EFn::kCollArrayToSet, SbSlot{*state.getCollatorSlot()}, std::move(expr));
     } else {
-        expr = b.makeFunction("arrayToSet"_sd, std::move(expr));
+        expr = b.makeFunction(sbe::EFn::kArrayToSet, std::move(expr));
     }
 
     auto [outStage, outSlots] =
@@ -512,11 +517,11 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
     const int sizeCap = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
     auto spillSlot = SbSlot{state.slotId()};
 
-    auto addToArrayExpr =
-        b.makeFunction("addToArrayCapped"_sd, foreignRecordSlot, b.makeInt32Constant(sizeCap));
+    auto addToArrayExpr = b.makeFunction(
+        sbe::EFn::kAddToArrayCapped, foreignRecordSlot, b.makeInt32Constant(sizeCap));
 
     auto concatArraysExpr =
-        b.makeFunction("aggConcatArraysCapped", spillSlot, b.makeInt32Constant(sizeCap));
+        b.makeFunction(sbe::EFn::kAggConcatArraysCapped, spillSlot, b.makeInt32Constant(sizeCap));
 
     SbHashAggAccumulatorVector accumulatorList;
     accumulatorList.emplace_back(SbHashAggAccumulator{
@@ -542,7 +547,7 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
     // is the array of matched records and the back element is their cumulative size (in bytes).
     auto [projectStage, projectOutSlots] = b.makeProject(
         std::move(innerBranch),
-        b.makeFunction("getElement",
+        b.makeFunction(sbe::EFn::kGetElement,
                        accumulatorSlot,
                        b.makeInt32Constant(static_cast<int>(sbe::vm::AggArrayWithSize::kValues))));
     innerBranch = std::move(projectStage);
@@ -635,7 +640,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
     auto frameId = state.frameId();
 
     auto lambdaArg = SbExpr{SbVar{frameId, 0}};
-    auto filter = b.makeFunction("isMember"_sd, lambdaArg.clone(), localKeySlot);
+    auto filter = b.makeFunction(sbe::EFn::kIsMember, lambdaArg.clone(), localKeySlot);
 
     // Recursively create traverseF expressions to iterate elements in 'foreignRecordSlot' with path
     // 'foreignFieldName', and check if key is in set 'localKeySlot'.
@@ -651,7 +656,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
 
         auto getFieldOrNull = b.makeFillEmptyNull(
             i == 0 ? topLevelFieldSlot
-                   : b.makeFunction("getField"_sd,
+                   : b.makeFunction(sbe::EFn::kGetField,
                                     lambdaArg.clone(),
                                     b.makeStrConstant(foreignFieldName.getFieldName(i))));
 
@@ -664,7 +669,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
             SbVar var = SbVar{localBindFrameId, 0};
 
             auto innerExpr =
-                b.makeIf(b.makeFunction("typeMatch"_sd,
+                b.makeIf(b.makeFunction(sbe::EFn::kTypeMatch,
                                         var,
                                         b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
                                                             getBSONTypeMask(BSONType::object))),
@@ -674,16 +679,17 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
             getFieldOrNull = b.makeLet(localBindFrameId, std::move(binds), std::move(innerExpr));
         }
 
-        filter = b.makeFunction("traverseF"_sd,
+        filter = b.makeFunction(sbe::EFn::kTraverseF,
                                 std::move(getFieldOrNull),
                                 std::move(arrayLambda),
                                 b.makeBoolConstant(i == foreignPathLength - 1) /*compareArray*/);
 
         if (i > 0) {
             // Ignoring the nulls produced by missing field in array.
-            filter = b.makeIf(b.makeFillEmptyTrue(b.makeFunction("isObject"_sd, lambdaArg.clone())),
-                              std::move(filter),
-                              b.makeBoolConstant(false));
+            filter = b.makeIf(
+                b.makeFillEmptyTrue(b.makeFunction(sbe::EFn::kIsObject, lambdaArg.clone())),
+                std::move(filter),
+                b.makeBoolConstant(false));
         }
     }
 
@@ -725,10 +731,11 @@ std::pair<SbSlotVector /*inner projects*/, SbStage> buildLoopJoinInnerProjects(
 
     // Build a 0-based counter per foreign row.
     SbBlockAggExprVector sbAggExprs;
-    sbAggExprs.emplace_back(SbBlockAggExpr{b.makeInt64Constant(-1) /*init*/,
-                                           SbExpr{} /*blockAgg*/,
-                                           b.makeFunction("sum", b.makeInt64Constant(1)) /*agg*/},
-                            indexSlot);
+    sbAggExprs.emplace_back(
+        SbBlockAggExpr{b.makeInt64Constant(-1) /*init*/,
+                       SbExpr{} /*blockAgg*/,
+                       b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(1)) /*agg*/},
+        indexSlot);
 
     VariableTypes varTypes;  // empty; we only use constants.
     auto [aggStage, _] = b.makeAggProject(varTypes, std::move(innerStage), std::move(sbAggExprs));
@@ -829,9 +836,9 @@ buildIndexSeekStage(StageBuilderState& state,
                 // For collated hashed indexes, apply collation before hashing.
                 auto [outStage, outSlots] = b.makeProject(
                     std::move(valueGeneratorStage),
-                    b.makeFunction("shardHash"_sd,
+                    b.makeFunction(sbe::EFn::kShardHash,
                                    state.getCollatorSlot()
-                                       ? b.makeFunction("collComparisonKey",
+                                       ? b.makeFunction(sbe::EFn::kCollComparisonKey,
                                                         valueForIndexBounds[i],
                                                         SbSlot{*state.getCollatorSlot()})
                                        : valueForIndexBounds[i]));
@@ -865,9 +872,9 @@ buildIndexSeekStage(StageBuilderState& state,
         }
         args.push_back(b.makeInt64Constant(static_cast<int64_t>(discriminator)));
 
-        StringData functionName = "ks"_sd;
+        sbe::EFn functionName = sbe::EFn::kKs;
         if (state.getCollatorSlot()) {
-            functionName = "collKs";
+            functionName = sbe::EFn::kCollKs;
             args.emplace_back(SbSlot{*state.getCollatorSlot()});
         }
 
@@ -1138,12 +1145,12 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     sbe::FrameId frameId = state.frameId();
     auto lambdaArg = SbExpr{SbVar{frameId, 0}};
     SbExpr typeMatchLambdaFilter = b.makeFunction(
-        "typeMatch"_sd,
+        sbe::EFn::kTypeMatch,
         lambdaArg.clone(),
         b.makeInt32Constant(getBSONTypeMask(BSONType::string) | getBSONTypeMask(BSONType::array) |
                             getBSONTypeMask(BSONType::object)));
     auto typeMatchLambdaFunction = b.makeLocalLambda(frameId, std::move(typeMatchLambdaFilter));
-    auto filter = b.makeNot(b.makeFunction("traverseF"_sd,
+    auto filter = b.makeNot(b.makeFunction(sbe::EFn::kTraverseF,
                                            SbExpr{localKeysSetSlot},
                                            std::move(typeMatchLambdaFunction),
                                            b.makeBoolConstant(false) /*compareArray*/));
@@ -1243,7 +1250,7 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
         // Aggregator to assemble the matched foreign documents into an array.
         SbBlockAggExpr agg{SbExpr{} /*init*/,
                            SbExpr{} /*blockAgg*/,
-                           b.makeFunction("addToArray", foreignRecordSlot) /*agg*/};
+                           b.makeFunction(sbe::EFn::kAddToArray, foreignRecordSlot) /*agg*/};
 
         auto [hl, lookupStageOutputSlot] = b.makeHashLookup(std::move(localKeysSetStage),
                                                             std::move(foreignKeyStage),
@@ -1551,7 +1558,7 @@ SbExpr generateArrayObliviousPathEvaluation(SbBuilder& b,
             // path component(s), which is why we start this loop from the current index.
             for (; i < path.getPathLength(); ++i) {
                 expr = b.makeFunction(
-                    "getField"_sd, std::move(expr), b.makeStrConstant(path.getFieldName(i)));
+                    sbe::EFn::kGetField, std::move(expr), b.makeStrConstant(path.getFieldName(i)));
             }
 
             return expr;

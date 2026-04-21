@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -42,6 +43,7 @@
 
 namespace mongo::stage_builder {
 namespace {
+
 template <typename F>
 struct FieldPathAndCondPreVisitor : public SelectiveConstExpressionVisitorBase {
     // To avoid overloaded-virtual warnings.
@@ -472,7 +474,7 @@ SbExpr getTopBottomNSortByExpr(StageBuilderState& state,
             } else if (sortPattern->size() > 1) {
                 // When the sort pattern has more than one part, we return an array containing
                 // each part's key expr (in order).
-                return b.makeFunction("newArray", std::move(sortKeys.keyExprs));
+                return b.makeFunction(sbe::EFn::kNewArray, std::move(sortKeys.keyExprs));
             } else {
                 MONGO_UNREACHABLE;
             }
@@ -493,7 +495,8 @@ SbExpr getTopBottomNSortByExpr(StageBuilderState& state,
         // generateCheapSortKey() returns a SortKeyComponentVector, but we need an array of
         // keys (or the sole part's key in cases where the sort pattern has only one part),
         // so we generate a call to sortKeyComponentVectorToArray() to perform the conversion.
-        return b.makeFunction("sortKeyComponentVectorToArray", std::move(sortKeys.fullKeyExpr));
+        return b.makeFunction(sbe::EFn::kSortKeyComponentVectorToArray,
+                              std::move(sortKeys.fullKeyExpr));
     } else {
         MONGO_UNREACHABLE;
     }
@@ -525,7 +528,7 @@ std::pair<SbExpr::Vector, bool> getBlockTopBottomNSortByExpr(StageBuilderState& 
                 useMK = true;
                 return std::move(sortKeys.keyExprs);
             } else {
-                return SbExpr::makeSeq(b.makeFunction("newArray"));
+                return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray));
             }
         }();
 
@@ -546,8 +549,8 @@ std::pair<SbExpr::Vector, bool> getBlockTopBottomNSortByExpr(StageBuilderState& 
         // generateCheapSortKey() returns a SortKeyComponentVector, but we need an array of
         // keys (or the sole part's key in cases where the sort pattern has only one part),
         // so we generate a call to sortKeyComponentVectorToArray() to perform the conversion.
-        auto fullKeyExpr =
-            b.makeFunction("sortKeyComponentVectorToArray", std::move(sortKeys.fullKeyExpr));
+        auto fullKeyExpr = b.makeFunction(sbe::EFn::kSortKeyComponentVectorToArray,
+                                          std::move(sortKeys.fullKeyExpr));
 
         return {SbExpr::makeSeq(std::move(fullKeyExpr)), useMK};
     } else {
@@ -939,7 +942,7 @@ SbExpr generateIdExpression(StageBuilderState& state,
             ++i;
         }
 
-        idFinalExpr = b.makeFunction("newObj"_sd, std::move(exprs));
+        idFinalExpr = b.makeFunction(sbe::EFn::kNewObj, std::move(exprs));
     }
 
     return idFinalExpr;
@@ -1226,7 +1229,7 @@ std::pair<SbStage, SbSlot> generateGroupResultObject(SbStage stage,
         funcArgs.emplace_back(finalSlots[i]);
     }
 
-    StringData newObjFn = groupNode->shouldProduceBson ? "newBsonObj"_sd : "newObj"_sd;
+    sbe::EFn newObjFn = groupNode->shouldProduceBson ? sbe::EFn::kNewBsonObj : sbe::EFn::kNewObj;
     SbExpr outputExpr = b.makeFunction(newObjFn, std::move(funcArgs));
 
     auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(outputExpr));
@@ -1274,7 +1277,7 @@ std::pair<SbStage, SbExpr::Vector> generateInitRootSlot(SbStage stage,
         }
 
         groupByKeyExprs.clear();
-        groupByKeyExprs.emplace_back(b.makeFunction("newObj"_sd, std::move(exprs)));
+        groupByKeyExprs.emplace_back(b.makeFunction(sbe::EFn::kNewObj, std::move(exprs)));
 
         idIsSingleKey = true;
     }
@@ -1311,7 +1314,7 @@ std::pair<SbStage, SbExpr::Vector> generateInitRootSlot(SbStage stage,
         // If we're not sure whether '_id' is an object, then we need to project the
         // aforementioned expression to a slot and use that.
         auto [emptyObjTag, emptyObjVal] = sbe::value::makeNewObject();
-        SbExpr idOrEmptyObjExpr = b.makeIf(b.makeFunction("isObject"_sd, groupByExpr.clone()),
+        SbExpr idOrEmptyObjExpr = b.makeIf(b.makeFunction(sbe::EFn::kIsObject, groupByExpr.clone()),
                                            groupByExpr.clone(),
                                            b.makeConstant(emptyObjTag, emptyObjVal));
 

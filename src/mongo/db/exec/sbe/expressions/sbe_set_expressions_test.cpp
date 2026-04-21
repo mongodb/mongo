@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -78,7 +79,8 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setUnionExpr = makeFunction("setUnion", makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setUnionExpr =
+        makeFunction(EFn::kSetUnion, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setUnionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -102,7 +104,8 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setUnionExpr = makeFunction("setUnion", makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setUnionExpr =
+        makeFunction(EFn::kSetUnion, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setUnionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -114,7 +117,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
 TEST_F(SBEBuiltinSetOpTest, AggSetUnion) {
     value::OwnedValueAccessor aggAccessor, inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
-    auto setUnionExpr = makeFunction("aggSetUnion", makeVariable(inputSlot));
+    auto setUnionExpr = makeFunction(EFn::kAggSetUnion, makeVariable(inputSlot));
     auto compiledExpr = compileAggExpression(*setUnionExpr, &aggAccessor);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -144,7 +147,7 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
     auto setIntersectionExpr =
-        makeFunction("setIntersection", makeVariable(arrSlot1), makeVariable(arrSlot2));
+        makeFunction(EFn::kSetIntersection, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -170,7 +173,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
     auto setIntersectionExpr =
-        makeFunction("setIntersection", makeVariable(arrSlot1), makeVariable(arrSlot2));
+        makeFunction(EFn::kSetIntersection, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -185,7 +188,7 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
     auto setDiffExpr =
-        makeFunction("setDifference", makeVariable(arrSlot1), makeVariable(arrSlot2));
+        makeFunction(EFn::kSetDifference, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -217,7 +220,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetDifference) {
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
     auto setDiffExpr =
-        makeFunction("setDifference", makeVariable(arrSlot1), makeVariable(arrSlot2));
+        makeFunction(EFn::kSetDifference, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -230,7 +233,8 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetEquals) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setEqualsExpr = makeFunction("setEquals", makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setEqualsExpr =
+        makeFunction(EFn::kSetEquals, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setEqualsExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -250,7 +254,8 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetEquals) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setEqualsExpr = makeFunction("setEquals", makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setEqualsExpr =
+        makeFunction(EFn::kSetEquals, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setEqualsExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -265,7 +270,7 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIsSubset) {
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
     auto setIsSubsetExpr =
-        makeFunction("setIsSubset", makeVariable(arrSlot1), makeVariable(arrSlot2));
+        makeFunction(EFn::kSetIsSubset, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIsSubsetExpr);
 
     // all elements are the same
@@ -317,7 +322,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIsSubset) {
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
     auto setIsSubsetExpr =
-        makeFunction("setIsSubset", makeVariable(arrSlot1), makeVariable(arrSlot2));
+        makeFunction(EFn::kSetIsSubset, makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIsSubsetExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));

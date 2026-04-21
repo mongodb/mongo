@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -139,7 +140,8 @@ TEST_F(SBERegexTest, ComputesRegexCompile) {
     auto patternSlot = bindAccessor(&slotAccessor1);
     auto optionsSlot = bindAccessor(&slotAccessor2);
     auto regexExpr = sbe::makeE<sbe::EFunction>(
-        "regexCompile", sbe::makeEs(makeE<EVariable>(patternSlot), makeE<EVariable>(optionsSlot)));
+        EFn::kRegexCompile,
+        sbe::makeEs(makeE<EVariable>(patternSlot), makeE<EVariable>(optionsSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
     auto [patternTag, patternVal] = value::makeNewString("^Many");
@@ -155,7 +157,7 @@ TEST_F(SBERegexTest, ComputesRegexMatch) {
     auto regexSlot = bindAccessor(&slotAccessor1);
     auto inputSlot = bindAccessor(&slotAccessor2);
     auto regexExpr = sbe::makeE<sbe::EFunction>(
-        "regexMatch", sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
+        EFn::kRegexMatch, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
     auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
@@ -177,7 +179,7 @@ TEST_F(SBERegexTest, ComputesRegexFind) {
     auto regexSlot = bindAccessor(&slotAccessor1);
     auto inputSlot = bindAccessor(&slotAccessor2);
     auto regexExpr = sbe::makeE<sbe::EFunction>(
-        "regexFind", sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
+        EFn::kRegexFind, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
     auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
@@ -199,7 +201,7 @@ TEST_F(SBERegexTest, ComputesRegexFindAll) {
     auto regexSlot = bindAccessor(&slotAccessor1);
     auto inputSlot = bindAccessor(&slotAccessor2);
     auto regexExpr = sbe::makeE<sbe::EFunction>(
-        "regexFindAll", sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
+        EFn::kRegexFindAll, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
     auto [arrTag, arrVal] = value::makeNewArray();

@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -100,7 +101,7 @@ TEST_F(SBEDateToPartsTest, BasicDateToParts) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto dateToPartsExpr = sbe::makeE<sbe::EFunction>("dateToParts",
+    auto dateToPartsExpr = sbe::makeE<sbe::EFunction>(EFn::kDateToParts,
                                                       sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                                   makeE<EVariable>(dateSlot),
                                                                   makeE<EVariable>(timezoneSlot)));

@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer_mock.h"
@@ -51,7 +52,7 @@ protected:
                                 value::SlotId shardKeySlot,
                                 bool expectedRes) {
         auto shardFiltererCheckExpr =
-            makeE<EFunction>("shardFilter",
+            makeE<EFunction>(EFn::kShardFilter,
                              makeEs(makeE<EConstant>(shardFilterer.first, shardFilterer.second),
                                     makeE<EVariable>(shardKeySlot)));
         auto compiledExpr = compileExpression(*shardFiltererCheckExpr);

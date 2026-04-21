@@ -31,6 +31,7 @@
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -123,17 +124,17 @@ public:
         auto aggSlot = bindAccessor(&aggAccessor);
 
         auto aggIntegralAddExpr = sbe::makeE<sbe::EFunction>(
-            "aggIntegralAdd",
+            EFn::kAggIntegralAdd,
             sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
         auto compiledIntegralAdd = compileAggExpression(*aggIntegralAddExpr, &aggAccessor);
 
         auto aggIntegralRemoveExpr = sbe::makeE<sbe::EFunction>(
-            "aggIntegralRemove",
+            EFn::kAggIntegralRemove,
             sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
         auto compiledIntegralRemove = compileAggExpression(*aggIntegralRemoveExpr, &aggAccessor);
 
         auto aggIntegralFinalize = sbe::makeE<sbe::EFunction>(
-            "aggIntegralFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggIntegralFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledIntegralFinalize = compileExpression(*aggIntegralFinalize);
 
         auto [stateTag, stateVal] = initState(unitMillis, isNonRemovable);
@@ -189,17 +190,17 @@ public:
         auto aggSlot = bindAccessor(&aggAccessor);
 
         auto aggIntegralAddExpr = sbe::makeE<sbe::EFunction>(
-            "aggIntegralAdd",
+            EFn::kAggIntegralAdd,
             sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
         auto compiledIntegralAdd = compileAggExpression(*aggIntegralAddExpr, &aggAccessor);
 
         auto aggIntegralRemoveExpr = sbe::makeE<sbe::EFunction>(
-            "aggIntegralRemove",
+            EFn::kAggIntegralRemove,
             sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
         auto compiledIntegralRemove = compileAggExpression(*aggIntegralRemoveExpr, &aggAccessor);
 
         auto aggIntegralFinalize = sbe::makeE<sbe::EFunction>(
-            "aggIntegralFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggIntegralFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledIntegralFinalize = compileExpression(*aggIntegralFinalize);
 
         auto [stateTag, stateVal] = initState(unitMillis, isNonRemovable);

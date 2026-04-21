@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -50,7 +51,7 @@ protected:
                                 std::pair<value::TypeTags, value::Value> inArray,
                                 bool expectedRes) {
         auto inExpr = makeE<EFunction>(
-            "isMember",
+            EFn::kIsMember,
             makeEs(makeE<EVariable>(inputSlot), makeE<EConstant>(inArray.first, inArray.second)));
         auto compiledExpr = compileExpression(*inExpr);
         auto actualRes = runCompiledExpressionPredicate(compiledExpr.get());
@@ -61,7 +62,7 @@ protected:
                                             std::pair<value::TypeTags, value::Value> inArray,
                                             value::SlotId collatorSlot,
                                             bool expectedRes) {
-        auto inExpr = makeE<EFunction>("collIsMember",
+        auto inExpr = makeE<EFunction>(EFn::kCollIsMember,
                                        makeEs(makeE<EVariable>(inputSlot),
                                               makeE<EConstant>(inArray.first, inArray.second),
                                               makeE<EVariable>(collatorSlot)));

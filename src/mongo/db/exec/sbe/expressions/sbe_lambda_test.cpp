@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/golden_test.h"
@@ -46,7 +47,7 @@ TEST_F(SBELambdaTest, TraverseP_AddOneToArray) {
     auto argSlot = bindAccessor(&slotAccessor);
     FrameId frame = 10;
     auto expr = sbe::makeE<sbe::EFunction>(
-        "traverseP",
+        EFn::kTraverseP,
         sbe::makeEs(makeE<EVariable>(argSlot),
                     makeE<ELocalLambda>(frame,
                                         makeE<EPrimBinary>(EPrimBinary::Op::add,
@@ -72,7 +73,7 @@ TEST_F(SBELambdaTest, TraverseP_AddOneToFirstArrayItem) {
     auto argSlot = bindAccessor(&slotAccessor);
     FrameId frame = 10;
     auto expr = sbe::makeE<sbe::EFunction>(
-        "traverseP",
+        EFn::kTraverseP,
         sbe::makeEs(makeE<EVariable>(argSlot),
                     makeE<ELocalLambda>(frame,
                                         makeE<EIf>(makeE<EPrimBinary>(EPrimBinary::Op::eq,
@@ -103,7 +104,7 @@ TEST_F(SBELambdaTest, TraverseF_OpEq) {
     auto argSlot = bindAccessor(&slotAccessor);
     FrameId frame = 10;
     auto expr = sbe::makeE<sbe::EFunction>(
-        "traverseF",
+        EFn::kTraverseF,
         sbe::makeEs(makeE<EVariable>(argSlot),
                     makeE<ELocalLambda>(frame,
                                         makeE<EPrimBinary>(EPrimBinary::Op::eq,
@@ -129,7 +130,7 @@ TEST_F(SBELambdaTest, TraverseF_OpEqFirstArrayItem) {
     auto argSlot = bindAccessor(&slotAccessor);
     FrameId frame = 10;
     auto expr = sbe::makeE<sbe::EFunction>(
-        "traverseF",
+        EFn::kTraverseF,
         sbe::makeEs(
             makeE<EVariable>(argSlot),
             makeE<ELocalLambda>(frame,
@@ -162,7 +163,7 @@ TEST_F(SBELambdaTest, TraverseF_WithLocalBind) {
     FrameId frame1 = 10;
     FrameId frame2 = 20;
     auto traverseExpr = sbe::makeE<sbe::EFunction>(
-        "traverseF",
+        EFn::kTraverseF,
         sbe::makeEs(makeE<EVariable>(frame2, 0),
                     makeE<ELocalLambda>(frame1,
                                         makeE<EPrimBinary>(EPrimBinary::Op::eq,

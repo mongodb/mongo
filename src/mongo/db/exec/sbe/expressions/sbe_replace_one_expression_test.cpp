@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -80,7 +81,7 @@ TEST_F(SBEReplaceOneExprTest, EmptyStrings) {
     auto inputSlot = bindAccessor(&inputAccessor);
     auto findSlot = bindAccessor(&findAccessor);
     auto replaceSlot = bindAccessor(&replaceAccessor);
-    auto replaceOneExpr = sbe::makeE<sbe::EFunction>("replaceOne",
+    auto replaceOneExpr = sbe::makeE<sbe::EFunction>(EFn::kReplaceOne,
                                                      sbe::makeEs(makeE<EVariable>(inputSlot),
                                                                  makeE<EVariable>(findSlot),
                                                                  makeE<EVariable>(replaceSlot)));
@@ -123,7 +124,7 @@ TEST_F(SBEReplaceOneExprTest, SmallStrings) {
     auto inputSlot = bindAccessor(&inputAccessor);
     auto findSlot = bindAccessor(&findAccessor);
     auto replaceSlot = bindAccessor(&replaceAccessor);
-    auto replaceOneExpr = sbe::makeE<sbe::EFunction>("replaceOne",
+    auto replaceOneExpr = sbe::makeE<sbe::EFunction>(EFn::kReplaceOne,
                                                      sbe::makeEs(makeE<EVariable>(inputSlot),
                                                                  makeE<EVariable>(findSlot),
                                                                  makeE<EVariable>(replaceSlot)));
@@ -151,7 +152,7 @@ TEST_F(SBEReplaceOneExprTest, BigStrings) {
     auto inputSlot = bindAccessor(&inputAccessor);
     auto findSlot = bindAccessor(&findAccessor);
     auto replaceSlot = bindAccessor(&replaceAccessor);
-    auto replaceOneExpr = sbe::makeE<sbe::EFunction>("replaceOne",
+    auto replaceOneExpr = sbe::makeE<sbe::EFunction>(EFn::kReplaceOne,
                                                      sbe::makeEs(makeE<EVariable>(inputSlot),
                                                                  makeE<EVariable>(findSlot),
                                                                  makeE<EVariable>(replaceSlot)));
@@ -183,7 +184,7 @@ TEST_F(SBEReplaceOneExprTest, BsonStrings) {
     auto inputSlot = bindAccessor(&inputAccessor);
     auto findSlot = bindAccessor(&findAccessor);
     auto replaceSlot = bindAccessor(&replaceAccessor);
-    auto replaceOneExpr = sbe::makeE<sbe::EFunction>("replaceOne",
+    auto replaceOneExpr = sbe::makeE<sbe::EFunction>(EFn::kReplaceOne,
                                                      sbe::makeEs(makeE<EVariable>(inputSlot),
                                                                  makeE<EVariable>(findSlot),
                                                                  makeE<EVariable>(replaceSlot)));
@@ -224,7 +225,7 @@ TEST_F(SBEReplaceOneExprTest, ComputesNothingIfNotString) {
     auto inputSlot = bindAccessor(&inputAccessor);
     auto findSlot = bindAccessor(&findAccessor);
     auto replaceSlot = bindAccessor(&replaceAccessor);
-    auto replaceOneExpr = sbe::makeE<sbe::EFunction>("replaceOne",
+    auto replaceOneExpr = sbe::makeE<sbe::EFunction>(EFn::kReplaceOne,
                                                      sbe::makeEs(makeE<EVariable>(inputSlot),
                                                                  makeE<EVariable>(findSlot),
                                                                  makeE<EVariable>(replaceSlot)));

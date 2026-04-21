@@ -67,7 +67,7 @@ typedef std::map<std::vector<int32_t>, std::vector<int32_t>> TestResultType;
 using TypedValue = std::pair<value::TypeTags, value::Value>;
 }  // namespace
 
-using AccNamesVector = std::vector<std::tuple<std::string, std::string, std::string>>;
+using AccNamesVector = std::vector<std::tuple<EFn, EFn, EFn>>;
 
 class BlockHashAggStageTest : public PlanStageTestFixture {
 public:
@@ -227,7 +227,7 @@ public:
                 std::unique_ptr<EExpression> blockAccFunc;
                 std::unique_ptr<EExpression> rowAccFunc;
 
-                if (blockAcc == "valueBlockAggCount") {
+                if (blockAcc == EFn::kValueBlockAggCount) {
                     // valueBlockAggCount is the exception - it takes just the bitset.
                     blockAccFunc = makeFunction(blockAcc, makeE<EVariable>(accumulatorBitset));
                     rowAccFunc = makeFunction(rowAcc);
@@ -365,11 +365,12 @@ public:
      *     to the input data and is of the form
      *       [block_accumulator_fn_name, row_accumulator_fn_name, merge_accumulator_fn_name]
      *     For example:
-     *       - The $min accumulator is represented by ["valueBlockAggMin", "min", "min"].
-     *       - The $count accumulator is represented by ["valueBlockAggCount", "count", "sum"].
-     *     The accumulators will be applied left-to-right to the fields included in 'inputData'
-     *     except that the $count accumulator always applies to the [bitset] Array, no matter where
-     *     or how many times it appears in the 'accNames' vector. I.e. the first non-$count
+     *       - The $min accumulator is represented by [EFn::kValueBlockAggMin, EFn::kMin,
+     * EFn::kMin].
+     *       - The $count accumulator is represented by [EFn::kValueBlockAggCount, EFn::kCount,
+     * EFn::kSum]. The accumulators will be applied left-to-right to the fields included in
+     * 'inputData' except that the $count accumulator always applies to the [bitset] Array, no
+     * matter where or how many times it appears in the 'accNames' vector. I.e. the first non-$count
      *     accumulator will apply to the first Array of field values, the second non-$count
      *     accumulator will apply to the second Array of field values, and so on.
      *
@@ -438,8 +439,11 @@ TEST_F(BlockHashAggStageTest, NoData) {
     std::vector<Bucket> buckets;
     // We should have an empty block with no data.
     TestResultType expected = {};
-    runBlockHashAggTest(
-        buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {}, assertPeakMemIsZero);
+    runBlockHashAggTest(buckets,
+                        {{EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin}},
+                        expected,
+                        {},
+                        assertPeakMemIsZero);
 }
 
 TEST_F(BlockHashAggStageTest, AllDataFiltered) {
@@ -448,8 +452,11 @@ TEST_F(BlockHashAggStageTest, AllDataFiltered) {
                                           .dataBlocks = {makeInt32sBlock({50, 20, 30})}}};
     // We should have an empty block with no data.
     TestResultType expected = {};
-    runBlockHashAggTest(
-        buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {}, assertPeakMemIsZero);
+    runBlockHashAggTest(buckets,
+                        {{EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin}},
+                        expected,
+                        {},
+                        assertPeakMemIsZero);
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMin) {
@@ -477,7 +484,7 @@ TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMin) {
      * 2 -> min(30, 60, 30, 50) = 30
      */
     TestResultType expected = {{{0}, {20}}, {{1}, {10}}, {{2}, {30}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggMin", "min", "min"}}, expected, {3});
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMinForceSpill) {
@@ -540,7 +547,7 @@ TEST_F(BlockHashAggStageTest, ScalarKeySingleAccumulatorMinForceSpill) {
     }
 
     runBlockHashAggTest(buckets,
-                        {{"valueBlockAggSum", "sum", "sum"}},
+                        {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}},
                         expected,
                         expectedOutputBlockSizes,
                         assertPeakMemGreaterThanZero,
@@ -555,7 +562,8 @@ TEST_F(BlockHashAggStageTest, ScalarKeyCount) {
                                    Bucket{.scalarId = makeInt32(1), .bitset = {true, false, true}},
                                    Bucket{.scalarId = makeInt32(1), .bitset = {true, true, false}}};
     TestResultType expected = {{{0}, {5}}, {{1}, {4}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {2});
+    runBlockHashAggTest(
+        buckets, {{EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum}}, expected, {2});
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeySum) {
@@ -583,7 +591,7 @@ TEST_F(BlockHashAggStageTest, ScalarKeySum) {
      * 2 -> 5+6+13+15 = 39
      */
     TestResultType expected = {{{0}, {3}}, {{1}, {24}}, {{2}, {39}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {3});
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, ScalarKeyMultipleAccumulators) {
@@ -611,9 +619,9 @@ TEST_F(BlockHashAggStageTest, ScalarKeyMultipleAccumulators) {
      */
     TestResultType expected = {{{25}, {20, 1, 0}}, {{50}, {75, 5, -150}}, {{100}, {60, 4, 2}}};
     runBlockHashAggTest(buckets,
-                        {{"valueBlockAggMin", "min", "min"},
-                         {"valueBlockAggCount", "count", "sum"},
-                         {"valueBlockAggMin", "min", "min"}},
+                        {{EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin},
+                         {EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum},
+                         {EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin}},
                         expected,
                         {3});
 }
@@ -626,7 +634,8 @@ TEST_F(BlockHashAggStageTest, Count) {
         Bucket{.ids = {makeInt32sBlock({101, 101, 99})}, .bitset = {true, true, false}}};
 
     TestResultType expected = {{{99}, {4}}, {{101}, {5}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {2});
+    runBlockHashAggTest(
+        buckets, {{EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum}}, expected, {2});
 }
 
 TEST_F(BlockHashAggStageTest, CountWithMonoBlockKeys) {
@@ -641,7 +650,8 @@ TEST_F(BlockHashAggStageTest, CountWithMonoBlockKeys) {
     };
 
     TestResultType expected = {{{99}, {4}}, {{101}, {5}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {2});
+    runBlockHashAggTest(
+        buckets, {{EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum}}, expected, {2});
 }
 
 TEST_F(BlockHashAggStageTest, CountWithMonoBlockKeysCompound) {
@@ -656,7 +666,7 @@ TEST_F(BlockHashAggStageTest, CountWithMonoBlockKeysCompound) {
                .bitset = {true, true, false}}};
     TestResultType expected = {
         {{99, 1000}, {2}}, {{99, 1001}, {2}}, {{101, 1000}, {4}}, {{101, 1001}, {1}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {4}
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum}}, expected, {4}
                         // Expected output block sizes.
     );
 }
@@ -685,7 +695,7 @@ TEST_F(BlockHashAggStageTest, SumBlockGroupByKey) {
      * 2 -> 5+6+13+15 = 39
      */
     TestResultType expected = {{{0}, {3}}, {{1}, {24}}, {{2}, {39}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {3});
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, expected, {3});
 }
 
 // Similar to the test above, but we change the groupby keys so they are different within each
@@ -718,7 +728,7 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys) {
      * 4 -> 12         = 12
      */
     TestResultType expected = {{{1}, {37}}, {{2}, {36}}, {{3}, {18}}, {{4}, {12}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {4});
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, expected, {4});
 }
 
 // Similar test as above but the "2" key appears in every block but is always false, so we make
@@ -757,7 +767,7 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
      */
     TestResultType expected = {
         {{1}, {37}}, {{3}, {18}}, {{4}, {12}}, {{5}, {7}}, {{6}, {22}}, {{7}, {21}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {6});
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, expected, {6});
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
@@ -786,9 +796,9 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
      */
     TestResultType expected = {{{25}, {100, 3, -150}}, {{50}, {60, 4, 3}}, {{100}, {20, 3, -2}}};
     runBlockHashAggTest(buckets,
-                        {{"valueBlockAggMin", "min", "min"},
-                         {"valueBlockAggCount", "count", "sum"},
-                         {"valueBlockAggMin", "min", "min"}},
+                        {{EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin},
+                         {EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum},
+                         {EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin}},
                         expected,
                         {3});
 }
@@ -805,7 +815,8 @@ TEST_F(BlockHashAggStageTest, CountCompoundKey) {
         Bucket{.ids = {makeInt32sBlock({1, 1, 0}), makeInt32sBlock({1, 1, 1})},
                .bitset = {true, true, false}}};
     TestResultType expected = {{{0, 0}, {2}}, {{0, 1}, {2}}, {{1, 0}, {2}}, {{1, 1}, {3}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggCount", "count", "sum"}}, expected, {4});
+    runBlockHashAggTest(
+        buckets, {{EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum}}, expected, {4});
 }
 
 // TODO SERVER-85731 Revisit input sizes if kMaxNumPartitionsForTokenizedPath changes.
@@ -847,7 +858,7 @@ TEST_F(BlockHashAggStageTest, SumCompoundKeysMissingKey) {
                                {{5, 6}, {7}},
                                {{6, 7}, {22}},
                                {{7, 8}, {21}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {6});
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, expected, {6});
 }
 
 // TODO SERVER-85731 Revisit input sizes if kMaxNumPartitionsForTokenizedPath changes.
@@ -892,7 +903,7 @@ TEST_F(BlockHashAggStageTest, HighPartitionSizeTokenizeBailoutTest) {
                                {{5, 4}, {22}},
                                {{4, 5}, {23}},
                                {{3, 6}, {24}}};
-    runBlockHashAggTest(buckets, {{"valueBlockAggSum", "sum", "sum"}}, expected, {12});
+    runBlockHashAggTest(buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, expected, {12});
 }
 
 TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
@@ -930,7 +941,7 @@ TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
     }
 
     runBlockHashAggTest(buckets,
-                        {{"valueBlockAggSum", "sum", "sum"}},
+                        {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}},
                         expected,
                         {BlockHashAggStage::kBlockOutSize,
                          BlockHashAggStage::kBlockOutSize,
@@ -1009,9 +1020,9 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentPartitionSizes) {
     }
 
     runBlockHashAggTest(buckets,
-                        {{"valueBlockAggSum", "sum", "sum"},
-                         {"valueBlockAggCount", "count", "sum"},
-                         {"valueBlockAggMin", "min", "min"}},
+                        {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum},
+                         {EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum},
+                         {EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin}},
                         expected,
                         {highPartitionSize - lowPartitionSize + 2});
 }

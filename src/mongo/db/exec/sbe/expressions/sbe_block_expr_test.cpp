@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -79,15 +80,15 @@ public:
                    std::vector<int32_t> filterPosInfo,
                    std::vector<boost::optional<bool>> expectedResult);
 
-    void testCmpScalar(EPrimBinary::Op, StringData cmpFunctionName, value::ValueBlock* valBlock);
+    void testCmpScalar(EPrimBinary::Op, EFn cmpFunctionName, value::ValueBlock* valBlock);
     void testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp,
-                                    StringData blockFunctionName,
+                                    EFn blockFunctionName,
                                     value::ValueBlock* bitsetBlock,
                                     value::ValueBlock* leftBlock,
                                     value::ValueBlock* rightBlock,
                                     bool monoBlockExpected = false);
     void testBlockScalarArithmeticOp(EPrimBinary::Op scalarOp,
-                                     StringData blockFunctionName,
+                                     EFn blockFunctionName,
                                      value::ValueBlock* bitsetBlock,
                                      value::ValueBlock* block,
                                      std::pair<value::TypeTags, value::Value> scalar);
@@ -99,7 +100,7 @@ public:
     enum class BlockType { HETEROGENEOUS = 0, MONOBLOCK, BOOLBLOCK };
 
     void testBlockLogicalOp(EPrimBinary::Op scalarOp,
-                            StringData blockFunctionName,
+                            EFn blockFunctionName,
                             value::ValueBlock* leftBlock,
                             value::ValueBlock* rightBlock,
                             BlockType bt = BlockType::HETEROGENEOUS);
@@ -158,7 +159,7 @@ public:
         value::ViewOfValueAccessor fillAccessor;
         auto fillSlot = bindAccessor(&fillAccessor);
 
-        auto fillTypeExpr = sbe::makeE<sbe::EFunction>("valueBlockFillType",
+        auto fillTypeExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockFillType,
                                                        sbe::makeEs(makeE<EVariable>(blockSlot),
                                                                    makeE<EVariable>(typeMaskSlot),
                                                                    makeE<EVariable>(fillSlot)));
@@ -228,8 +229,8 @@ private:
 TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
-    auto existsExpr =
-        sbe::makeE<sbe::EFunction>("valueBlockExists", sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto existsExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockExists,
+                                                 sbe::makeEs(makeE<EVariable>(blockSlot)));
     auto compiledExpr = compileExpression(*existsExpr);
 
     value::HeterogeneousBlock block;
@@ -251,7 +252,7 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchInvalidMaskTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto typeMatchExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockTypeMatch",
+        EFn::kValueBlockTypeMatch,
         sbe::makeEs(makeE<EVariable>(blockSlot),
                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
                                                value::bitcastFrom<double>(13.8))));
@@ -279,7 +280,7 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHeterogeneousTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto typeMatchExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockTypeMatch",
+        EFn::kValueBlockTypeMatch,
         sbe::makeEs(makeE<EVariable>(blockSlot),
                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                                getBSONTypeMask(BSONType::numberInt))));
@@ -313,7 +314,7 @@ TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto typeMatchExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockTypeMatch",
+        EFn::kValueBlockTypeMatch,
         sbe::makeEs(makeE<EVariable>(blockSlot),
                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                                getBSONTypeMask(BSONType::numberInt))));
@@ -423,7 +424,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneNoTimezoneDBTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto isTimezoneExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockIsTimezone",
+        EFn::kValueBlockIsTimezone,
         sbe::makeEs(sbe::makeE<sbe::EConstant>(value::TypeTags::NumberInt32, 0),
                     makeE<EVariable>(blockSlot)));
 
@@ -452,7 +453,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHeterogeneousTest) {
     auto blockSlot = bindAccessor(&blockAccessor);
     TimeZoneDatabase* tzdb = new TimeZoneDatabase();
     auto isTimezoneExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockIsTimezone",
+        EFn::kValueBlockIsTimezone,
         sbe::makeEs(sbe::makeE<sbe::EConstant>(value::TypeTags::timeZoneDB,
                                                value::bitcastFrom<TimeZoneDatabase*>(tzdb)),
                     makeE<EVariable>(blockSlot)));
@@ -481,7 +482,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
     auto blockSlot = bindAccessor(&blockAccessor);
     TimeZoneDatabase* tzdb = new TimeZoneDatabase();
     auto isTimezoneExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockIsTimezone",
+        EFn::kValueBlockIsTimezone,
         sbe::makeEs(sbe::makeE<sbe::EConstant>(value::TypeTags::timeZoneDB,
                                                value::bitcastFrom<TimeZoneDatabase*>(tzdb)),
                     makeE<EVariable>(blockSlot)));
@@ -540,8 +541,8 @@ TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
 TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
-    auto existsExpr =
-        sbe::makeE<sbe::EFunction>("valueBlockExists", sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto existsExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockExists,
+                                                 sbe::makeEs(makeE<EVariable>(blockSlot)));
     auto compiledExpr = compileExpression(*existsExpr);
 
     {
@@ -616,7 +617,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyShallowTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockFillEmpty",
+        EFn::kValueBlockFillEmpty,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillEmptyExpr);
 
@@ -647,7 +648,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyDeepTest) {
     value::OwnedValueAccessor fillAccessor;
     auto fillSlot = bindAccessor(&fillAccessor);
     auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockFillEmpty",
+        EFn::kValueBlockFillEmpty,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillEmptyExpr);
 
@@ -679,7 +680,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyNothingTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockFillEmpty",
+        EFn::kValueBlockFillEmpty,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillEmptyExpr);
 
@@ -710,7 +711,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockFillEmpty",
+        EFn::kValueBlockFillEmpty,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillEmptyExpr);
 
@@ -978,7 +979,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyBlockTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
     auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
-        "valueBlockFillEmptyBlock",
+        EFn::kValueBlockFillEmptyBlock,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillEmptyExpr);
 
@@ -1022,7 +1023,7 @@ TEST_F(SBEBlockExpressionTest, BlockCountTest) {
         bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
                              value::bitcastFrom<value::ValueBlock*>(bitset.get()));
 
-        auto compiledExpr = sbe::makeE<sbe::EFunction>("valueBlockAggCount",
+        auto compiledExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockAggCount,
                                                        sbe::makeEs(makeE<EVariable>(bitsetSlot)));
         auto compiledFinalExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
@@ -1196,7 +1197,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
 
     {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMin",
+            EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
@@ -1215,7 +1216,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
         aggAccessor.reset(false, value::TypeTags::Nothing, 0);
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMax",
+            EFn::kValueBlockAggMax,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
 
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
@@ -1259,7 +1260,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
 
     {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMin",
+            EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
 
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
@@ -1279,7 +1280,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
         aggAccessor.reset(false, value::TypeTags::Nothing, 0);
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMax",
+            EFn::kValueBlockAggMax,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
 
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
@@ -1317,7 +1318,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     {
         aggAccessor.reset(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMin",
+            EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
@@ -1336,7 +1337,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
         aggAccessor.reset(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100));
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMax",
+            EFn::kValueBlockAggMax,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
 
         auto compiledMaxExpr = compileAggExpression(*compiledExpr, &aggAccessor);
@@ -1360,7 +1361,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     {
         aggAccessor.reset(false, value::TypeTags::Nothing, 0);
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMin",
+            EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
@@ -1379,7 +1380,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
         aggAccessor.reset(false, value::TypeTags::Nothing, 0);
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggMax",
+            EFn::kValueBlockAggMax,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
 
         auto compiledMaxExpr = compileAggExpression(*compiledExpr, &aggAccessor);
@@ -1403,7 +1404,7 @@ TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
     FrameId frame = 10;
     // Multiply each value by two.
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockApplyLambda",
+        EFn::kValueBlockApplyLambda,
         sbe::makeEs(makeC(makeNothing()),
                     makeE<EVariable>(blockSlot),
                     makeE<ELocalLambda>(frame,
@@ -1439,7 +1440,7 @@ TEST_F(SBEBlockExpressionTest, BlockApplyMaskedLambdaTest) {
     FrameId frame = 10;
     // Multiply each value by two.
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockApplyLambda",
+        EFn::kValueBlockApplyLambda,
         sbe::makeEs(makeE<EVariable>(maskSlot),
                     makeE<EVariable>(blockSlot),
                     makeE<ELocalLambda>(frame,
@@ -1472,7 +1473,7 @@ TEST_F(SBEBlockExpressionTest, BlockApplyMaskedLambdaTest) {
 }
 
 void SBEBlockExpressionTest::testBlockLogicalOp(EPrimBinary::Op scalarOp,
-                                                StringData blockFunctionName,
+                                                EFn blockFunctionName,
                                                 value::ValueBlock* leftBlock,
                                                 value::ValueBlock* rightBlock,
                                                 BlockType bt) {
@@ -1575,7 +1576,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
 
     {  // AND
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &leftBlockValues,
                            &rightBlockValues);
     }
@@ -1583,21 +1584,23 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND reverse inputs.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &rightBlockValues,
                            &leftBlockValues);
     }
 
     {
         // OR
-        testBlockLogicalOp(
-            sbe::EPrimBinary::logicOr, "valueBlockLogicalOr", &leftBlockValues, &rightBlockValues);
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           EFn::kValueBlockLogicalOr,
+                           &leftBlockValues,
+                           &rightBlockValues);
     }
 
     {
         // OR reverse inputs.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            &rightBlockValues,
                            &leftBlockValues,
                            BlockType::BOOLBLOCK);
@@ -1613,7 +1616,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &rightBlockValues,
                            &leftBlockValues);
     }
@@ -1621,28 +1624,32 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND reverse inputs.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &rightBlockValues,
                            &leftBlockValues);
     }
 
     {
         // OR
-        testBlockLogicalOp(
-            sbe::EPrimBinary::logicOr, "valueBlockLogicalOr", &leftBlockValues, &rightBlockValues);
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           EFn::kValueBlockLogicalOr,
+                           &leftBlockValues,
+                           &rightBlockValues);
     }
 
     {
         // OR reverse inputs.
-        testBlockLogicalOp(
-            sbe::EPrimBinary::logicOr, "valueBlockLogicalOr", &rightBlockValues, &leftBlockValues);
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           EFn::kValueBlockLogicalOr,
+                           &rightBlockValues,
+                           &leftBlockValues);
     }
 
     // Monoblocks
     {
         // AND with false monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &leftBlockValues,
                            falseMonoblock.get());
     }
@@ -1650,7 +1657,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND with false monoblock reverse inputs.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            falseMonoblock.get(),
                            &leftBlockValues,
                            BlockType::MONOBLOCK);
@@ -1659,7 +1666,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR with false monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            &leftBlockValues,
                            falseMonoblock.get());
     }
@@ -1667,7 +1674,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR with false monoblock reverse inputs.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            falseMonoblock.get(),
                            &leftBlockValues);
     }
@@ -1675,7 +1682,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND with true monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &leftBlockValues,
                            trueMonoblock.get());
     }
@@ -1683,7 +1690,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND with true monoblock reverse inputs.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            trueMonoblock.get(),
                            &leftBlockValues);
     }
@@ -1691,7 +1698,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR with true monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            &leftBlockValues,
                            trueMonoblock.get());
     }
@@ -1699,7 +1706,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR with true monoblock reverse inputs.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            trueMonoblock.get(),
                            &leftBlockValues,
                            BlockType::MONOBLOCK);
@@ -1708,7 +1715,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND true monoblock and non boolean monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            leftMonoblock.get(),
                            trueMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1717,7 +1724,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND true monoblock and non boolean monoblock reversed.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            trueMonoblock.get(),
                            rightMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1726,7 +1733,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND false monoblock and non boolean monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            leftMonoblock.get(),
                            falseMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1735,7 +1742,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND false monoblock and non boolean monoblock reversed.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            falseMonoblock.get(),
                            rightMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1744,7 +1751,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND non boolean monoblocks.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            leftMonoblock.get(),
                            rightMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1753,7 +1760,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR true monoblock and non boolean monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            leftMonoblock.get(),
                            trueMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1762,7 +1769,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR true monoblock and non boolean monoblock reversed.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            trueMonoblock.get(),
                            rightMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1771,7 +1778,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR false monoblock and non boolean monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            leftMonoblock.get(),
                            falseMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1780,7 +1787,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR false monoblock and non boolean monoblock reversed.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            falseMonoblock.get(),
                            rightMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1789,7 +1796,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR non boolean monoblocks.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            leftMonoblock.get(),
                            rightMonoblock.get(),
                            BlockType::MONOBLOCK);
@@ -1812,7 +1819,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND non boolean produces Nothing monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &leftBlockValues,
                            &rightBlockValues,
                            BlockType::MONOBLOCK);
@@ -1821,7 +1828,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR non boolean produces Nothing monoblock.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            &leftBlockValues,
                            &rightBlockValues,
                            BlockType::MONOBLOCK);
@@ -1845,7 +1852,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // AND BoolBlock
         testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
-                           "valueBlockLogicalAnd",
+                           EFn::kValueBlockLogicalAnd,
                            &leftBlockValues,
                            &rightBlockValues,
                            BlockType::BOOLBLOCK);
@@ -1854,7 +1861,7 @@ TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
     {
         // OR BoolBlock.
         testBlockLogicalOp(sbe::EPrimBinary::logicOr,
-                           "valueBlockLogicalOr",
+                           EFn::kValueBlockLogicalOr,
                            &leftBlockValues,
                            &rightBlockValues,
                            BlockType::BOOLBLOCK);
@@ -1900,7 +1907,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
 
     {
         auto expr = makeE<sbe::EFunction>(
-            "valueBlockLogicalAnd",
+            EFn::kValueBlockLogicalAnd,
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(blockRightSlot)));
         auto compiledExpr = compileExpression(*expr);
 
@@ -1912,7 +1919,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
 
     {
         auto expr = makeE<sbe::EFunction>(
-            "valueBlockLogicalOr",
+            EFn::kValueBlockLogicalOr,
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(blockRightSlot)));
         auto compiledExpr = compileExpression(*expr);
 
@@ -1935,7 +1942,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
         for (size_t i = 0; i < blockSlots.size(); ++i) {
             for (size_t j = 0; j < blockSlots.size(); ++j) {
                 auto andExpr = makeE<sbe::EFunction>(
-                    "valueBlockLogicalAnd",
+                    EFn::kValueBlockLogicalAnd,
                     sbe::makeEs(makeE<EVariable>(blockSlots[i]), makeE<EVariable>(blockSlots[j])));
                 auto compiledAndExpr = compileExpression(*andExpr);
 
@@ -1943,7 +1950,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
                 value::ValueGuard andGuard(andTag, andVal);
 
                 auto orExpr = makeE<sbe::EFunction>(
-                    "valueBlockLogicalOr",
+                    EFn::kValueBlockLogicalOr,
                     sbe::makeEs(makeE<EVariable>(blockSlots[i]), makeE<EVariable>(blockSlots[j])));
                 auto compiledOrExpr = compileExpression(*orExpr);
 
@@ -1975,7 +1982,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
                                      value::bitcastFrom<value::ValueBlock*>(rightBoolBlock.get()));
 
         auto andExpr = makeE<sbe::EFunction>(
-            "valueBlockLogicalAnd",
+            EFn::kValueBlockLogicalAnd,
             sbe::makeEs(makeE<EVariable>(boolBlockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledAndExpr = compileExpression(*andExpr);
 
@@ -1983,7 +1990,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
         value::ValueGuard andGuard(andTag, andVal);
 
         auto orExpr = makeE<sbe::EFunction>(
-            "valueBlockLogicalOr",
+            EFn::kValueBlockLogicalOr,
             sbe::makeEs(makeE<EVariable>(boolBlockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledOrExpr = compileExpression(*orExpr);
 
@@ -1996,7 +2003,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
         // Test HeterogeneousBlock fallback when applying the op to a bool block on one side and
         // heterogeneous on the other.
         auto heterogeneousAndExpr = makeE<sbe::EFunction>(
-            "valueBlockLogicalAnd",
+            EFn::kValueBlockLogicalAnd,
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledHeterogeneousAndExpr = compileExpression(*andExpr);
 
@@ -2005,7 +2012,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
         value::ValueGuard andHeterogeneousGuard(andHeterogeneousTag, andHeterogeneousVal);
 
         auto heretergeneousOrExpr = makeE<sbe::EFunction>(
-            "valueBlockLogicalOr",
+            EFn::kValueBlockLogicalOr,
             sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(boolBlockRightSlot)));
         auto compiledHeterogeneousOrExpr = compileExpression(*orExpr);
 
@@ -2041,7 +2048,7 @@ void SBEBlockExpressionTest::testFoldF(std::vector<std::pair<value::TypeTags, va
 
     {
         auto expr = makeE<sbe::EFunction>(
-            "cellFoldValues_F",
+            EFn::kCellFoldValues_F,
             sbe::makeEs(makeE<EVariable>(valBlockSlot), makeE<EVariable>(cellBlockSlot)));
         auto compiledExpr = compileExpression(*expr);
 
@@ -2075,7 +2082,7 @@ TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
 
         {
             auto expr = makeE<sbe::EFunction>(
-                "cellFoldValues_F",
+                EFn::kCellFoldValues_F,
                 sbe::makeEs(makeE<EVariable>(valBlockSlot), makeE<EVariable>(cellBlockSlot)));
 
             auto [owned, runTag, runVal] = runExpression(*expr);
@@ -2198,7 +2205,7 @@ TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
 }
 
 void SBEBlockExpressionTest::testCmpScalar(EPrimBinary::Op scalarOp,
-                                           StringData cmpFunctionName,
+                                           EFn cmpFunctionName,
                                            value::ValueBlock* valBlock) {
     invariant(valBlock != nullptr);
 
@@ -2277,13 +2284,13 @@ TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarTest) {
         testBlock->push_back(tv);
     }
 
-    testCmpScalar(EPrimBinary::greater, "valueBlockGtScalar", testBlock.get());
-    testCmpScalar(EPrimBinary::greaterEq, "valueBlockGteScalar", testBlock.get());
-    testCmpScalar(EPrimBinary::less, "valueBlockLtScalar", testBlock.get());
-    testCmpScalar(EPrimBinary::lessEq, "valueBlockLteScalar", testBlock.get());
-    testCmpScalar(EPrimBinary::eq, "valueBlockEqScalar", testBlock.get());
-    testCmpScalar(EPrimBinary::neq, "valueBlockNeqScalar", testBlock.get());
-    testCmpScalar(EPrimBinary::cmp3w, "valueBlockCmp3wScalar", testBlock.get());
+    testCmpScalar(EPrimBinary::greater, EFn::kValueBlockGtScalar, testBlock.get());
+    testCmpScalar(EPrimBinary::greaterEq, EFn::kValueBlockGteScalar, testBlock.get());
+    testCmpScalar(EPrimBinary::less, EFn::kValueBlockLtScalar, testBlock.get());
+    testCmpScalar(EPrimBinary::lessEq, EFn::kValueBlockLteScalar, testBlock.get());
+    testCmpScalar(EPrimBinary::eq, EFn::kValueBlockEqScalar, testBlock.get());
+    testCmpScalar(EPrimBinary::neq, EFn::kValueBlockNeqScalar, testBlock.get());
+    testCmpScalar(EPrimBinary::cmp3w, EFn::kValueBlockCmp3wScalar, testBlock.get());
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarHomogeneousTest) {
@@ -2295,17 +2302,17 @@ TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarHomogeneousTest) {
     testBlocks.push_back(makeTestNothingBlock(2));
 
     for (auto& block : testBlocks) {
-        testCmpScalar(EPrimBinary::greater, "valueBlockGtScalar", block.get());
-        testCmpScalar(EPrimBinary::greaterEq, "valueBlockGteScalar", block.get());
-        testCmpScalar(EPrimBinary::less, "valueBlockLtScalar", block.get());
-        testCmpScalar(EPrimBinary::lessEq, "valueBlockLteScalar", block.get());
-        testCmpScalar(EPrimBinary::eq, "valueBlockEqScalar", block.get());
-        testCmpScalar(EPrimBinary::neq, "valueBlockNeqScalar", block.get());
+        testCmpScalar(EPrimBinary::greater, EFn::kValueBlockGtScalar, block.get());
+        testCmpScalar(EPrimBinary::greaterEq, EFn::kValueBlockGteScalar, block.get());
+        testCmpScalar(EPrimBinary::less, EFn::kValueBlockLtScalar, block.get());
+        testCmpScalar(EPrimBinary::lessEq, EFn::kValueBlockLteScalar, block.get());
+        testCmpScalar(EPrimBinary::eq, EFn::kValueBlockEqScalar, block.get());
+        testCmpScalar(EPrimBinary::neq, EFn::kValueBlockNeqScalar, block.get());
     }
 }
 
 void SBEBlockExpressionTest::testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp,
-                                                        StringData blockFunctionName,
+                                                        EFn blockFunctionName,
                                                         value::ValueBlock* bitsetBlock,
                                                         value::ValueBlock* leftBlock,
                                                         value::ValueBlock* rightBlock,
@@ -2397,7 +2404,7 @@ void SBEBlockExpressionTest::testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp
 
 void SBEBlockExpressionTest::testBlockScalarArithmeticOp(
     EPrimBinary::Op scalarOp,
-    StringData blockFunctionName,
+    EFn blockFunctionName,
     value::ValueBlock* bitsetBlock,
     value::ValueBlock* block,
     std::pair<value::TypeTags, value::Value> scalar) {
@@ -2542,12 +2549,9 @@ void SBEBlockExpressionTest::testBlockSum(sbe::value::OwnedValueAccessor& aggAcc
     bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
                          value::bitcastFrom<value::ValueBlock*>(bitset.get()));
 
-    std::string blockAggFuncName;
-    if (expectedResult.first == sbe::value::TypeTags::Array) {
-        blockAggFuncName = "valueBlockAggDoubleDoubleSum";
-    } else {
-        blockAggFuncName = "valueBlockAggSum";
-    }
+    EFn blockAggFuncName = (expectedResult.first == sbe::value::TypeTags::Array)
+        ? EFn::kValueBlockAggDoubleDoubleSum
+        : EFn::kValueBlockAggSum;
     auto compiledExpr = sbe::makeE<sbe::EFunction>(
         blockAggFuncName, sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
 
@@ -2567,7 +2571,7 @@ void SBEBlockExpressionTest::testBlockSum(sbe::value::OwnedValueAccessor& aggAcc
 }  // SBEBlockExpressionTest::testBlockSum
 
 TEST_F(SBEBlockExpressionTest, ValueBlockAddHeterogeneousTest) {
-    StringData fnName{"valueBlockAdd"};
+    EFn fnName{EFn::kValueBlockAdd};
     value::HeterogeneousBlock leftBlock;
     value::HeterogeneousBlock rightBlock;
 
@@ -2617,7 +2621,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockAddHeterogeneousTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockAddMonoBlockTest) {
-    StringData fnName{"valueBlockAdd"};
+    EFn fnName{EFn::kValueBlockAdd};
 
     value::Int32Block block;
     block.push_back(1);
@@ -2662,7 +2666,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockAddMonoBlockTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockAddScalarTest) {
-    StringData fnName{"valueBlockAdd"};
+    EFn fnName{EFn::kValueBlockAdd};
 
     value::Int32Block block;
     block.push_back(1);
@@ -2699,7 +2703,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockAddScalarTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockSubHeterogeneousTest) {
-    StringData fnName{"valueBlockSub"};
+    EFn fnName{EFn::kValueBlockSub};
 
     value::HeterogeneousBlock leftBlock;
     value::HeterogeneousBlock rightBlock;
@@ -2755,7 +2759,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockSubHeterogeneousTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockSubMonoBlockTest) {
-    StringData fnName{"valueBlockSub"};
+    EFn fnName{EFn::kValueBlockSub};
 
     value::Int32Block block;
     block.push_back(1);
@@ -2800,7 +2804,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockSubMonoBlockTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockSubScalarTest) {
-    StringData fnName{"valueBlockSub"};
+    EFn fnName{EFn::kValueBlockSub};
 
     value::Int32Block block;
     block.push_back(1);
@@ -2837,7 +2841,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockSubScalarTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockMultHeterogeneousTest) {
-    StringData fnName{"valueBlockMult"};
+    EFn fnName{EFn::kValueBlockMult};
 
     value::HeterogeneousBlock leftBlock;
     value::HeterogeneousBlock rightBlock;
@@ -2888,7 +2892,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockMultHeterogeneousTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockMultMonoBlockTest) {
-    StringData fnName{"valueBlockMult"};
+    EFn fnName{EFn::kValueBlockMult};
 
     value::Int32Block block;
     block.push_back(1);
@@ -2933,7 +2937,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockMultMonoBlockTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockMultScalarTest) {
-    StringData fnName{"valueBlockMult"};
+    EFn fnName{EFn::kValueBlockMult};
 
     value::Int32Block block;
     block.push_back(1);
@@ -2970,7 +2974,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockMultScalarTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockDivHeterogeneousTest) {
-    StringData fnName{"valueBlockDiv"};
+    EFn fnName{EFn::kValueBlockDiv};
 
     value::HeterogeneousBlock leftBlock;
     value::HeterogeneousBlock rightBlock;
@@ -3027,7 +3031,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockDivHeterogeneousTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockDivMonoBlockTest) {
-    StringData fnName{"valueBlockDiv"};
+    EFn fnName{EFn::kValueBlockDiv};
 
     value::Int32Block block;
     block.push_back(100);
@@ -3094,7 +3098,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockDivMonoBlockTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, ValueBlockDivScalarTest) {
-    StringData fnName{"valueBlockDiv"};
+    EFn fnName{EFn::kValueBlockDiv};
 
     value::Int32Block block;
     block.push_back(100);
@@ -3152,7 +3156,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockDivScalarTest) {
 
 
 TEST_F(SBEBlockExpressionTest, BlockNewTest) {
-    auto expr = makeE<sbe::EFunction>("valueBlockNewFill",
+    auto expr = makeE<sbe::EFunction>(EFn::kValueBlockNewFill,
                                       sbe::makeEs(makeC(makeBool(false)), makeC(makeInt32(7))));
     auto compiledExpr = compileExpression(*expr);
 
@@ -3170,7 +3174,8 @@ TEST_F(SBEBlockExpressionTest, BlockSizeTest) {
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(block.get()));
 
-    auto expr = makeE<sbe::EFunction>("valueBlockSize", sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto expr =
+        makeE<sbe::EFunction>(EFn::kValueBlockSize, sbe::makeEs(makeE<EVariable>(blockSlot)));
     auto compiledExpr = compileExpression(*expr);
 
     auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
@@ -3189,7 +3194,7 @@ TEST_F(SBEBlockExpressionTest, BitmapNoneTest) {
                         value::bitcastFrom<value::ValueBlock*>(block1.get()));
 
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockNone", sbe::makeEs(makeE<EVariable>(blockSlot), makeC(makeBool(true))));
+        EFn::kValueBlockNone, sbe::makeEs(makeE<EVariable>(blockSlot), makeC(makeBool(true))));
     auto compiledExpr = compileExpression(*expr);
 
     auto [runTag1, runVal1] = runCompiledExpression(compiledExpr.get());
@@ -3216,7 +3221,7 @@ TEST_F(SBEBlockExpressionTest, BlockLogicNotTest) {
                         value::bitcastFrom<value::ValueBlock*>(block.get()));
 
     auto expr =
-        makeE<sbe::EFunction>("valueBlockLogicalNot", sbe::makeEs(makeE<EVariable>(blockSlot)));
+        makeE<sbe::EFunction>(EFn::kValueBlockLogicalNot, sbe::makeEs(makeE<EVariable>(blockSlot)));
     auto compiledExpr = compileExpression(*expr);
 
     auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
@@ -3256,7 +3261,7 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
         blockAccessorMask.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(block.get()));
 
-        auto expr = makeE<sbe::EFunction>("valueBlockCombine",
+        auto expr = makeE<sbe::EFunction>(EFn::kValueBlockCombine,
                                           sbe::makeEs(makeE<EVariable>(blockLeftSlot),
                                                       makeE<EVariable>(blockRightSlot),
                                                       makeE<EVariable>(blockMaskSlot)));
@@ -3287,7 +3292,7 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
         blockAccessorMask.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(&block));
 
-        auto expr = makeE<sbe::EFunction>("valueBlockCombine",
+        auto expr = makeE<sbe::EFunction>(EFn::kValueBlockCombine,
                                           sbe::makeEs(makeE<EVariable>(blockLeftSlot),
                                                       makeE<EVariable>(blockRightSlot),
                                                       makeE<EVariable>(blockMaskSlot)));
@@ -3319,7 +3324,7 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
         blockAccessorMask.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(&block));
 
-        auto expr = makeE<sbe::EFunction>("valueBlockCombine",
+        auto expr = makeE<sbe::EFunction>(EFn::kValueBlockCombine,
                                           sbe::makeEs(makeE<EVariable>(blockLeftSlot),
                                                       makeE<EVariable>(blockRightSlot),
                                                       makeE<EVariable>(blockMaskSlot)));
@@ -3344,7 +3349,7 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
         blockAccessorMask.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(&block));
 
-        auto expr = makeE<sbe::EFunction>("valueBlockCombine",
+        auto expr = makeE<sbe::EFunction>(EFn::kValueBlockCombine,
                                           sbe::makeEs(makeE<EVariable>(blockLeftSlot),
                                                       makeE<EVariable>(blockRightSlot),
                                                       makeE<EVariable>(blockMaskSlot)));
@@ -3393,7 +3398,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestNumeric) {
     array->push_back(makeInt32(10));
 
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockIsMember",
+        EFn::kValueBlockIsMember,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EConstant>(arrayTag, arrayVal)));
 
     auto compiledExpr = compileExpression(*expr);
@@ -3425,7 +3430,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestString) {
     array->push_back(value::makeBigString("teststring10"));
 
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockIsMember",
+        EFn::kValueBlockIsMember,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EConstant>(arrayTag, arrayVal)));
 
     auto compiledExpr = compileExpression(*expr);
@@ -3451,7 +3456,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberOnNothingTest) {
                         value::bitcastFrom<value::ValueBlock*>(&block));
 
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockIsMember",
+        EFn::kValueBlockIsMember,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EConstant>(value::TypeTags::Nothing, 0)));
 
     auto compiledExpr = compileExpression(*expr);
@@ -3486,7 +3491,7 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberWithArraySet) {
     arraySet->push_back(makeInt32(10));
 
     auto expr = makeE<sbe::EFunction>(
-        "valueBlockIsMember",
+        EFn::kValueBlockIsMember,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EConstant>(arraySetTag, arraySetVal)));
 
     auto compiledExpr = compileExpression(*expr);
@@ -3520,8 +3525,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberWithInList) {
     auto inListConstant =
         makeE<EConstant>(value::TypeTags::inList, value::bitcastFrom<InList*>(inList.release()));
 
-    auto expr = makeE<sbe::EFunction>(
-        "valueBlockIsMember", sbe::makeEs(makeE<EVariable>(blockSlot), std::move(inListConstant)));
+    auto expr =
+        makeE<sbe::EFunction>(EFn::kValueBlockIsMember,
+                              sbe::makeEs(makeE<EVariable>(blockSlot), std::move(inListConstant)));
 
     auto compiledExpr = compileExpression(*expr);
 
@@ -3552,8 +3558,8 @@ TEST_F(SBEBlockExpressionTest, BlockCoerceToBool) {
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
 
-    auto expr =
-        makeE<sbe::EFunction>("valueBlockCoerceToBool", sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto expr = makeE<sbe::EFunction>(EFn::kValueBlockCoerceToBool,
+                                      sbe::makeEs(makeE<EVariable>(blockSlot)));
 
     auto compiledExpr = compileExpression(*expr);
 
@@ -3603,7 +3609,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
 
     {
         auto expr = sbe::makeE<sbe::EFunction>(
-            "valueBlockRound",
+            EFn::kValueBlockRound,
             sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
 
         auto compiledExpr = compileExpression(*expr);
@@ -3642,7 +3648,7 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
 
     {
         auto expr = sbe::makeE<sbe::EFunction>(
-            "valueBlockRound",
+            EFn::kValueBlockRound,
             sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
 
         auto compiledExpr = compileExpression(*expr);
@@ -3680,8 +3686,8 @@ TEST_F(SBEBlockExpressionTest, BlockRound) {
     }
 
     {
-        auto expr =
-            sbe::makeE<sbe::EFunction>("valueBlockRound", sbe::makeEs(makeE<EVariable>(blockSlot)));
+        auto expr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockRound,
+                                               sbe::makeEs(makeE<EVariable>(blockSlot)));
 
         auto compiledExpr = compileExpression(*expr);
 
@@ -3743,7 +3749,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
 
     {
         auto expr = sbe::makeE<sbe::EFunction>(
-            "valueBlockTrunc",
+            EFn::kValueBlockTrunc,
             sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
 
         auto compiledExpr = compileExpression(*expr);
@@ -3782,7 +3788,7 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
 
     {
         auto expr = sbe::makeE<sbe::EFunction>(
-            "valueBlockTrunc",
+            EFn::kValueBlockTrunc,
             sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
 
         auto compiledExpr = compileExpression(*expr);
@@ -3820,8 +3826,8 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
     }
 
     {
-        auto expr =
-            sbe::makeE<sbe::EFunction>("valueBlockTrunc", sbe::makeEs(makeE<EVariable>(blockSlot)));
+        auto expr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockTrunc,
+                                               sbe::makeEs(makeE<EVariable>(blockSlot)));
 
         auto compiledExpr = compileExpression(*expr);
 
@@ -3879,7 +3885,8 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
     block.push_back(makeNull());
 
     auto expr = sbe::makeE<sbe::EFunction>(
-        "valueBlockMod", sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
+        EFn::kValueBlockMod,
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
 
     auto compiledExpr = compileExpression(*expr);
 
@@ -4201,7 +4208,7 @@ TEST_F(SBEBlockExpressionTest, BlockDateAdd) {
     auto tzdb = std::make_unique<TimeZoneDatabase>();
 
     auto expr = sbe::makeE<sbe::EFunction>(
-        "valueBlockDateAdd",
+        EFn::kValueBlockDateAdd,
         sbe::makeEs(makeE<EVariable>(bitsetSlot),
                     makeE<EVariable>(blockSlot),
                     makeE<EConstant>(value::TypeTags::timeZoneDB,
@@ -4269,7 +4276,7 @@ TEST_F(SBEBlockExpressionTest, BlockNumConvert) {
     block.push_back(makeNull());
 
     auto expr = sbe::makeE<sbe::EFunction>(
-        "valueBlockConvert",
+        EFn::kValueBlockConvert,
         sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
 
     auto compiledExpr = compileExpression(*expr);
@@ -4429,7 +4436,7 @@ TEST_F(SBEBlockExpressionTest, CellFoldPTest) {
                             value::bitcastFrom<value::CellBlock*>(materializedCellBlock.get()));
 
     auto expr = makeE<sbe::EFunction>(
-        "cellFoldValues_P",
+        EFn::kCellFoldValues_P,
         sbe::makeEs(makeE<EVariable>(valBlockSlot), makeE<EVariable>(cellBlockSlot)));
 
     {
@@ -4472,7 +4479,7 @@ TEST_F(SBEBlockExpressionTest, CellBlockGetFlatValuesBlockTest) {
     cellBlockAccessor.reset(sbe::value::TypeTags::cellBlock,
                             value::bitcastFrom<value::CellBlock*>(materializedCellBlock.get()));
 
-    auto expr = makeE<sbe::EFunction>("cellBlockGetFlatValuesBlock",
+    auto expr = makeE<sbe::EFunction>(EFn::kCellBlockGetFlatValuesBlock,
                                       sbe::makeEs(makeE<EVariable>(cellBlockSlot)));
 
     auto [owned, runTag, runVal] = runExpression(*expr);
@@ -4522,11 +4529,11 @@ TEST_F(SBEBlockExpressionTest, BlockGetSortKey) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
 
-    auto ascSortKeyExpr = sbe::makeE<sbe::EFunction>("valueBlockGetSortKeyAsc",
+    auto ascSortKeyExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockGetSortKeyAsc,
                                                      sbe::makeEs(makeE<EVariable>(blockSlot)));
 
 
-    auto descSortKeyExpr = sbe::makeE<sbe::EFunction>("valueBlockGetSortKeyDesc",
+    auto descSortKeyExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockGetSortKeyDesc,
                                                       sbe::makeEs(makeE<EVariable>(blockSlot)));
 
     {
@@ -4599,12 +4606,12 @@ TEST_F(SBEBlockExpressionTest, BlockGetSortKey) {
         auto collatorSlot = bindAccessor(&collatorAccessor);
 
         auto ascSortKeyCollatorExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockGetSortKeyAsc",
+            EFn::kValueBlockGetSortKeyAsc,
             sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(collatorSlot)));
 
 
         auto descSortKeyCollatorExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockGetSortKeyDesc",
+            EFn::kValueBlockGetSortKeyDesc,
             sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(collatorSlot)));
 
 

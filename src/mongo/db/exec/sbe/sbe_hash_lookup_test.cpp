@@ -31,6 +31,7 @@
  * This file contains tests for sbe::HashLookupStage.
  */
 
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 
@@ -87,8 +88,9 @@ public:
 
         // Build and prepare for execution loop join of the two scan stages.
         value::SlotId lookupStageOutputSlot = generateSlotId();
-        SlotExprPair agg = std::make_pair(
-            lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+        SlotExprPair agg =
+            std::make_pair(lookupStageOutputSlot,
+                           makeFunction(EFn::kAddToArray, makeE<EVariable>(innerScanSlots[0])));
         auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
                                                   std::move(innerScanStage),
                                                   outerScanSlots[1],
@@ -311,7 +313,7 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
     // Build and prepare for execution loop join of the two scan stages.
     value::SlotId lookupStageOutputSlot = generateSlotId();
     SlotExprPair agg = std::make_pair(
-        lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+        lookupStageOutputSlot, makeFunction(EFn::kAddToArray, makeE<EVariable>(innerScanSlots[0])));
     auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
                                               std::move(innerScanStage),
                                               outerScanSlots[1],
@@ -421,7 +423,7 @@ TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
 
     value::SlotId lookupStageOutputSlot = generateSlotId();
     SlotExprPair agg = std::make_pair(
-        lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+        lookupStageOutputSlot, makeFunction(EFn::kAddToArray, makeE<EVariable>(innerScanSlots[0])));
     auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
                                               std::move(innerScanStage),
                                               outerScanSlots[1],
@@ -514,7 +516,7 @@ TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
 
     value::SlotId lookupStageOutputSlot = generateSlotId();
     SlotExprPair agg = std::make_pair(
-        lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+        lookupStageOutputSlot, makeFunction(EFn::kAddToArray, makeE<EVariable>(innerScanSlots[0])));
     auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
                                               std::move(innerScanStage),
                                               outerScanSlots[1],

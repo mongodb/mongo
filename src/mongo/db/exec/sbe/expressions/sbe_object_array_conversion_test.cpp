@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -128,7 +129,7 @@ TEST_F(SBEObjectArrayConversionTest, ObjectToArrayExpression) {
     auto inputSlot = bindAccessor(&inputAccessor);
 
     auto objectToArrayExpr =
-        sbe::makeE<sbe::EFunction>("objectToArray", sbe::makeEs(makeE<EVariable>(inputSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kObjectToArray, sbe::makeEs(makeE<EVariable>(inputSlot)));
     auto compiledObjectToArray = compileExpression(*objectToArrayExpr);
 
     // Test on Object input
@@ -166,7 +167,7 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
     auto inputSlot = bindAccessor(&inputAccessor);
 
     auto arrayToObjectExpr =
-        sbe::makeE<sbe::EFunction>("arrayToObject", sbe::makeEs(makeE<EVariable>(inputSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kArrayToObject, sbe::makeEs(makeE<EVariable>(inputSlot)));
     auto compiledArrayToObject = compileExpression(*arrayToObjectExpr);
 
     // Test with Array on first variant

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
@@ -40,7 +41,6 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -541,22 +541,30 @@ public:
  */
 class FunctionCall final : public ABTOpDynamicArity<0>, public ExpressionSyntaxSort {
     using Base = ABTOpDynamicArity<0>;
-    std::string _name;
+    sbe::EFn _fn;
 
 public:
-    FunctionCall(std::string inName, ABTVector inArgs)
-        : Base(std::move(inArgs)), _name(std::move(inName)) {
+    FunctionCall(sbe::EFn fn, ABTVector inArgs) : Base(std::move(inArgs)), _fn(fn) {
         for (auto& a : nodes()) {
             assertExprSort(a);
         }
     }
 
+    // Accepts a string name for backward compatibility; resolves via fromString() at construction.
+    FunctionCall(StringData inName, ABTVector inArgs)
+        : FunctionCall(sbe::fromString(inName), std::move(inArgs)) {}
+
     bool operator==(const FunctionCall& other) const {
-        return _name == other._name && nodes() == other.nodes();
+        return _fn == other._fn && nodes() == other.nodes();
     }
 
-    auto& name() const {
-        return _name;
+    // Returns the canonical string name for this function. O(1) array lookup, no allocation.
+    StringData name() const {
+        return sbe::toString(_fn);
+    }
+
+    sbe::EFn fn() const {
+        return _fn;
     }
 };
 

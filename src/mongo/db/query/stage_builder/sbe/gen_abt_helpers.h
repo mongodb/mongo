@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
@@ -41,14 +42,24 @@
 
 namespace mongo::stage_builder {
 
+// Prefer the EFn overloads below for any statically-known function name. These StringData
+// overloads are intended only for the runtime-name path (e.g. dynamically constructed names).
 inline auto makeABTFunction(StringData name, abt::ABTVector args) {
-    return abt::make<abt::FunctionCall>(std::string{name}, std::move(args));
+    return abt::make<abt::FunctionCall>(name, std::move(args));
 }
 
 template <typename... Args>
 inline auto makeABTFunction(StringData name, Args&&... args) {
-    return abt::make<abt::FunctionCall>(std::string{name},
-                                        abt::makeSeq(std::forward<Args>(args)...));
+    return abt::make<abt::FunctionCall>(name, abt::makeSeq(std::forward<Args>(args)...));
+}
+
+inline auto makeABTFunction(sbe::EFn fn, abt::ABTVector args) {
+    return abt::make<abt::FunctionCall>(fn, std::move(args));
+}
+
+template <typename... Args>
+inline auto makeABTFunction(sbe::EFn fn, Args&&... args) {
+    return abt::make<abt::FunctionCall>(fn, abt::makeSeq(std::forward<Args>(args)...));
 }
 
 inline auto makeABTConstant(sbe::value::TypeTags tag, sbe::value::Value value) {

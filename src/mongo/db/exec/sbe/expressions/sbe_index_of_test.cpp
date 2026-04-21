@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -65,7 +66,7 @@ public:
     value::OwnedValueAccessor endIndexAccessor;
     value::SlotId endIndexSlot = bindAccessor(&endIndexAccessor);
     std::unique_ptr<sbe::EExpression> indexOfBytesExprFullArgs =
-        sbe::makeE<sbe::EFunction>("indexOfBytes",
+        sbe::makeE<sbe::EFunction>(EFn::kIndexOfBytes,
                                    sbe::makeEs(makeE<EVariable>(stringSlot),
                                                makeE<EVariable>(substringSlot),
                                                makeE<EVariable>(startIndexSlot),
@@ -73,14 +74,14 @@ public:
     std::unique_ptr<vm::CodeFragment> compiledBytesExprFullArgs =
         compileExpression(*indexOfBytesExprFullArgs);
     std::unique_ptr<sbe::EExpression> indexOfBytesExprStartIndex =
-        sbe::makeE<sbe::EFunction>("indexOfBytes",
+        sbe::makeE<sbe::EFunction>(EFn::kIndexOfBytes,
                                    sbe::makeEs(makeE<EVariable>(stringSlot),
                                                makeE<EVariable>(substringSlot),
                                                makeE<EVariable>(startIndexSlot)));
     std::unique_ptr<vm::CodeFragment> compiledBytesExprStartIndex =
         compileExpression(*indexOfBytesExprStartIndex);
     std::unique_ptr<sbe::EExpression> indexOfCPExprFullArgs =
-        sbe::makeE<sbe::EFunction>("indexOfCP",
+        sbe::makeE<sbe::EFunction>(EFn::kIndexOfCP,
                                    sbe::makeEs(makeE<EVariable>(stringSlot),
                                                makeE<EVariable>(substringSlot),
                                                makeE<EVariable>(startIndexSlot),
@@ -88,7 +89,7 @@ public:
     std::unique_ptr<vm::CodeFragment> compiledCPExprFullArgs =
         compileExpression(*indexOfCPExprFullArgs);
     std::unique_ptr<sbe::EExpression> indexOfCPExprStartIndex =
-        sbe::makeE<sbe::EFunction>("indexOfCP",
+        sbe::makeE<sbe::EFunction>(EFn::kIndexOfCP,
                                    sbe::makeEs(makeE<EVariable>(stringSlot),
                                                makeE<EVariable>(substringSlot),
                                                makeE<EVariable>(startIndexSlot)));

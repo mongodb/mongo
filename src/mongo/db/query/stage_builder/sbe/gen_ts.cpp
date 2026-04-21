@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
@@ -46,6 +47,8 @@
 
 namespace mongo::stage_builder {
 namespace {
+
+
 struct CellPathReqsRet {
     std::vector<sbe::value::PathRequest> topLevelPaths;
     std::vector<sbe::value::PathRequest> traversePaths;
@@ -419,7 +422,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
             }
         }
 
-        auto newBsonObjExpr = b.makeFunction("newBsonObj"_sd, std::move(newBsonObjArgs));
+        auto newBsonObjExpr = b.makeFunction(sbe::EFn::kNewBsonObj, std::move(newBsonObjArgs));
 
         auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(newBsonObjExpr));
         stage = std::move(outStage);

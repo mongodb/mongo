@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -372,17 +373,17 @@ class EPrimBinary final : public EExpression {
 public:
     enum Op {
         // Logical operations. These operations are short-circuiting.
-        logicAnd,  // TODO: remove with SERVER-100579
-        logicOr,   // TODO: remove with SERVER-100579
+        logicAnd,  // TODO(SERVER-100579): remove
+        logicOr,   // TODO(SERVER-100579): remove
 
         // Nothing-handling operation. This is short-circuiting like logicOr,
         // but it checks Nothing / non-Nothing instead of false / true.
         fillEmpty,
 
         // Math operations.
-        add,  // TODO: remove with SERVER-100579
+        add,  // TODO(SERVER-100579): remove
         sub,
-        mul,  // TODO: remove with SERVER-100579
+        mul,  // TODO(SERVER-100579): remove
         div,
 
         // Comparison operations. These operations support taking a third "collator" arg.
@@ -467,7 +468,7 @@ private:
  */
 class EFunction final : public EExpression {
 public:
-    EFunction(StringData name, EExpression::Vector args) : _name(name) {
+    EFunction(EFn fn, EExpression::Vector args) : _fn(fn) {
         _nodes = std::move(args);
         validateNodes();
     }
@@ -481,7 +482,7 @@ public:
     size_t estimateSize() const final;
 
 private:
-    std::string _name;
+    EFn _fn;
 };
 
 /**

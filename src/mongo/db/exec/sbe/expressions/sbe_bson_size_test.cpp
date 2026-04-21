@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -49,7 +50,7 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForBsonDocument) {
     value::ViewOfValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     auto bsonSizeExpr =
-        sbe::makeE<sbe::EFunction>("bsonSize", sbe::makeEs(makeE<EVariable>(argSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kBsonSize, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*bsonSizeExpr);
 
     BSONObjBuilder objBuilder;
@@ -71,7 +72,7 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
     value::ViewOfValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     auto bsonSizeExpr =
-        sbe::makeE<sbe::EFunction>("bsonSize", sbe::makeEs(makeE<EVariable>(argSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kBsonSize, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*bsonSizeExpr);
 
     auto [tagArg1, valArg1] = value::makeNewString("Test string element");
@@ -94,7 +95,7 @@ TEST_F(SBEBsonSizeTest, ReturnsNothingForNonObject) {
     value::ViewOfValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     auto bsonSizeExpr =
-        sbe::makeE<sbe::EFunction>("bsonSize", sbe::makeEs(makeE<EVariable>(argSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kBsonSize, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*bsonSizeExpr);
 
     auto [tagArg1, valArg1] = value::makeNewString("Test string element");

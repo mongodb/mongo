@@ -51,6 +51,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -80,6 +81,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
 
 class SbeStageBuilderGroupTest : public SbeStageBuilderTestFixture {
 protected:
@@ -2517,7 +2519,7 @@ public:
      * BSON array, aggregates the values inside the array and returns the resulting SBE value.
      */
     std::pair<sbe::value::TypeTags, sbe::value::Value> makeOnePartialAggregate(
-        StringData aggFuncName, BSONArray valuesToAgg) {
+        sbe::EFn aggFuncName, BSONArray valuesToAgg) {
         // Make sure we are starting from a clean state.
         _inputAccessor.reset();
         _aggAccessor.reset();
@@ -2562,7 +2564,7 @@ public:
      * the output will be the SBE array [14, 6, 5].
      */
     std::pair<sbe::value::TypeTags, sbe::value::Value> makePartialAggArray(
-        StringData aggFuncName, BSONArray arrayOfArrays) {
+        sbe::EFn aggFuncName, BSONArray arrayOfArrays) {
         auto [arrTag, arrVal] = sbe::value::makeNewArray();
         sbe::value::ValueGuard guard{arrTag, arrVal};
 
@@ -2591,7 +2593,8 @@ public:
     }
 
     template <bool Collation>
-    void testCombinePartialAggsMultiAccumulator(std::string aggExpr,
+    void testCombinePartialAggsMultiAccumulator(sbe::EFn aggMerge,
+                                                sbe::EFn aggFinalize,
                                                 BSONArray mergeState,
                                                 BSONArray inputState,
                                                 BSONArray expArr) {
@@ -2602,19 +2605,16 @@ public:
             if constexpr (Collation) {
                 auto collatorSlotId = registerCollator(_state, &collator);
 
-                auto expr = sbe::makeFunction(aggExpr + "Merge",
+                auto expr = sbe::makeFunction(aggMerge,
                                               sbe::makeVariable(_inputSlotId.getId()),
                                               sbe::makeVariable(collatorSlotId));
-                auto finalizeExpr = sbe::makeFunction(aggExpr + "Finalize",
-                                                      sbe::makeVariable(aggSlot),
-                                                      sbe::makeVariable(collatorSlotId));
+                auto finalizeExpr = sbe::makeFunction(
+                    aggFinalize, sbe::makeVariable(aggSlot), sbe::makeVariable(collatorSlotId));
 
                 return {std::move(expr), std::move(finalizeExpr)};
             } else {
-                auto expr =
-                    sbe::makeFunction(aggExpr + "Merge", sbe::makeVariable(_inputSlotId.getId()));
-                auto finalizeExpr =
-                    sbe::makeFunction(aggExpr + "Finalize", sbe::makeVariable(aggSlot));
+                auto expr = sbe::makeFunction(aggMerge, sbe::makeVariable(_inputSlotId.getId()));
+                auto finalizeExpr = sbe::makeFunction(aggFinalize, sbe::makeVariable(aggSlot));
                 return {std::move(expr), std::move(finalizeExpr)};
             }
         }();
@@ -2644,7 +2644,8 @@ public:
         sbe::value::releaseValue(resultTag, resultVal);
     }
 
-    void testCombinePartialAggsMultiAccumulatorWithSortPattern(std::string aggExpr,
+    void testCombinePartialAggsMultiAccumulatorWithSortPattern(sbe::EFn aggMerge,
+                                                               sbe::EFn aggFinalize,
                                                                BSONArray mergeState,
                                                                BSONArray inputState,
                                                                sbe::SortSpec* sortSpec,
@@ -2653,11 +2654,11 @@ public:
             sbe::value::TypeTags::sortSpec, sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec));
 
         auto expr = sbe::makeFunction(
-            aggExpr + "Merge", sbe::makeVariable(_inputSlotId.getId()), sortSpecConstant->clone());
+            aggMerge, sbe::makeVariable(_inputSlotId.getId()), sortSpecConstant->clone());
 
         auto aggSlot = bindAccessor(&_aggAccessor);
-        auto finalExpr = sbe::makeFunction(
-            aggExpr + "Finalize", sbe::makeVariable(aggSlot), std::move(sortSpecConstant));
+        auto finalExpr =
+            sbe::makeFunction(aggFinalize, sbe::makeVariable(aggSlot), std::move(sortSpecConstant));
 
         auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
         _aggAccessor.reset(true, mergeStateTag, mergeStateVal);
@@ -3054,10 +3055,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMergeObjects) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSum) {
     auto [inputTag, inputVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd,
+        sbe::EFn::kAggDoubleDoubleSum,
         BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << BSON_ARRAY(4 << 6) << BSON_ARRAY(1 << 1 << 1)));
-    auto [expectedTag, expectedVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd, BSON_ARRAY(BSON_ARRAY(6) << BSON_ARRAY(16) << BSON_ARRAY(19)));
+    auto [expectedTag, expectedVal] =
+        makePartialAggArray(sbe::EFn::kAggDoubleDoubleSum,
+                            BSON_ARRAY(BSON_ARRAY(6) << BSON_ARRAY(16) << BSON_ARRAY(19)));
 
     // A field path expression is needed so that the merging expression is constructed to combine
     // DoubleDouble summations rather than doing a simple sum. The actual field name "foo" is
@@ -3070,13 +3072,13 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSum) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumInfAndNan) {
     auto [inputTag, inputVal] =
-        makePartialAggArray("aggDoubleDoubleSum"_sd,
+        makePartialAggArray(sbe::EFn::kAggDoubleDoubleSum,
                             BSON_ARRAY(BSON_ARRAY(1 << 2 << 3)
                                        << BSON_ARRAY(4 << std::numeric_limits<double>::infinity())
                                        << BSON_ARRAY(1 << 1 << 1)
                                        << BSON_ARRAY(std::numeric_limits<double>::quiet_NaN())));
     auto [expectedTag, expectedVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd,
+        sbe::EFn::kAggDoubleDoubleSum,
         BSON_ARRAY(BSON_ARRAY(6) << BSON_ARRAY(10 << std::numeric_limits<double>::infinity())
                                  << BSON_ARRAY(10 << std::numeric_limits<double>::infinity())
                                  << BSON_ARRAY(std::numeric_limits<double>::quiet_NaN())));
@@ -3092,11 +3094,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumInf
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumMixedTypes) {
     auto [inputTag, inputVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd,
+        sbe::EFn::kAggDoubleDoubleSum,
         BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(3ll << 4ll) << BSON_ARRAY(5.5 << 6.6)
                                       << BSON_ARRAY(Decimal128(7) << Decimal128(8))));
     auto [expectedTag, expectedVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd,
+        sbe::EFn::kAggDoubleDoubleSum,
         BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(1 << 2 << 3ll << 4ll)
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6)
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6
@@ -3117,10 +3119,10 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumLar
     const int64_t largeLong = std::numeric_limits<int64_t>::max() - 10;
 
     auto [inputTag, inputVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd,
+        sbe::EFn::kAggDoubleDoubleSum,
         BSON_ARRAY(BSON_ARRAY(largeLong << 1 << 1) << BSON_ARRAY(1ll << 1ll << 1ll)));
     auto [expectedTag, expectedVal] =
-        makePartialAggArray("aggDoubleDoubleSum"_sd,
+        makePartialAggArray(sbe::EFn::kAggDoubleDoubleSum,
                             BSON_ARRAY(BSON_ARRAY(largeLong + 2ll) << BSON_ARRAY(largeLong + 5ll)));
 
     // A field path expression is needed so that the merging expression is constructed to combine
@@ -3134,8 +3136,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumLar
     // Feed the result back into the input accessor. We finalize the resulting aggregate in order
     // to make sure that the resulting sum is mathematically correct.
     _inputAccessor.reset(_aggAccessor.copyOrMoveValue());
-    auto finalizeExpr =
-        sbe::makeFunction("doubleDoubleSumFinalize", sbe::makeVariable(_inputSlotId.getId()));
+    auto finalizeExpr = sbe::makeFunction(sbe::EFn::kDoubleDoubleSumFinalize,
+                                          sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberInt64);
@@ -3154,11 +3156,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAvg) {
     // Compile the first expression and make sure it can combine DoubleDouble summations as
     // expected.
     auto [inputTag, inputVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd,
+        sbe::EFn::kAggDoubleDoubleSum,
         BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(3ll << 4ll) << BSON_ARRAY(5.5 << 6.6)
                                       << BSON_ARRAY(Decimal128(7) << Decimal128(8))));
     auto [expectedTag, expectedVal] = makePartialAggArray(
-        "aggDoubleDoubleSum"_sd,
+        sbe::EFn::kAggDoubleDoubleSum,
         BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(1 << 2 << 3ll << 4ll)
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6)
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6
@@ -3177,11 +3179,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAvg) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevPop) {
     auto [inputTag, inputVal] = makePartialAggArray(
-        "aggStdDev"_sd,
+        sbe::EFn::kAggStdDev,
         BSON_ARRAY(BSON_ARRAY(5 << 10)
                    << BSON_ARRAY(6 << 8) << BSON_ARRAY("MISSING") << BSON_ARRAY(1 << 9 << 10)));
     auto [expectedTag, expectedVal] = makePartialAggArray(
-        "aggStdDev"_sd,
+        sbe::EFn::kAggStdDev,
         BSON_ARRAY(BSON_ARRAY(5 << 10)
                    << BSON_ARRAY(5 << 10 << 6 << 8) << BSON_ARRAY(5 << 10 << 6 << 8)
                    << BSON_ARRAY(5 << 10 << 6 << 8 << 1 << 9 << 10)));
@@ -3193,7 +3195,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevPop) {
     // Feed the result back into the input accessor.
     _inputAccessor.reset(_aggAccessor.copyOrMoveValue());
     auto finalizeExpr =
-        sbe::makeFunction("stdDevPopFinalize", sbe::makeVariable(_inputSlotId.getId()));
+        sbe::makeFunction(sbe::EFn::kStdDevPopFinalize, sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberDouble);
@@ -3202,11 +3204,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevPop) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
     auto [inputTag, inputVal] = makePartialAggArray(
-        "aggStdDev"_sd,
+        sbe::EFn::kAggStdDev,
         BSON_ARRAY(BSON_ARRAY(5 << 10)
                    << BSON_ARRAY(6 << 8) << BSON_ARRAY("MISSING") << BSON_ARRAY(1 << 9 << 10)));
     auto [expectedTag, expectedVal] = makePartialAggArray(
-        "aggStdDev"_sd,
+        sbe::EFn::kAggStdDev,
         BSON_ARRAY(BSON_ARRAY(5 << 10)
                    << BSON_ARRAY(5 << 10 << 6 << 8) << BSON_ARRAY(5 << 10 << 6 << 8)
                    << BSON_ARRAY(5 << 10 << 6 << 8 << 1 << 9 << 10)));
@@ -3218,7 +3220,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
     // Feed the result back into the input accessor.
     _inputAccessor.reset(_aggAccessor.copyOrMoveValue());
     auto finalizeExpr =
-        sbe::makeFunction("stdDevSampFinalize", sbe::makeVariable(_inputSlotId.getId()));
+        sbe::makeFunction(sbe::EFn::kStdDevSampFinalize, sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberDouble);
@@ -3227,7 +3229,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeBothArray) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggFirstN",
+        sbe::EFn::kAggFirstNMerge,
+        sbe::EFn::kAggFirstNFinalize,
         BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 16 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(1 << 2 << 3));
@@ -3235,7 +3238,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeBothArr
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNNoMerge) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggFirstN",
+        sbe::EFn::kAggFirstNMerge,
+        sbe::EFn::kAggFirstNFinalize,
         BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(1 << 2 << 6));
@@ -3243,7 +3247,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNNoMerge) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeArrayEmpty) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggFirstN",
+        sbe::EFn::kAggFirstNMerge,
+        sbe::EFn::kAggFirstNFinalize,
         BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(3 << 4 << 5));
@@ -3251,7 +3256,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeArrayEm
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNInputArrayEmpty) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggFirstN",
+        sbe::EFn::kAggFirstNMerge,
+        sbe::EFn::kAggFirstNFinalize,
         BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024 << true),
         BSON_ARRAY(3 << 4 << 5));
@@ -3259,7 +3265,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNInputArrayEm
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNMergeBothArray) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggLastN",
+        sbe::EFn::kAggLastNMerge,
+        sbe::EFn::kAggLastNFinalize,
         BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << 1ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(4 << 5) << 0ll << 3ll << 16 << 1024 << true),
         BSON_ARRAY(1 << 4 << 5));
@@ -3267,7 +3274,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNMergeBothArra
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNNoMerge) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggLastN",
+        sbe::EFn::kAggLastNMerge,
+        sbe::EFn::kAggLastNFinalize,
         BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 2ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 1ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(4 << 5 << 3));
@@ -3275,7 +3283,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNNoMerge) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayFull) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggLastN",
+        sbe::EFn::kAggLastNMerge,
+        sbe::EFn::kAggLastNFinalize,
         BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 0 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(5 << 3 << 4));
@@ -3283,7 +3292,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayFul
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayEmpty) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggLastN",
+        sbe::EFn::kAggLastNMerge,
+        sbe::EFn::kAggLastNFinalize,
         BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024 << true),
         BSON_ARRAY(5 << 3 << 4));
@@ -3291,7 +3301,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayEmp
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopN) {
     testCombinePartialAggsMultiAccumulatorWithSortPattern(
-        "aggTopN",
+        sbe::EFn::kAggTopNMerge,
+        sbe::EFn::kAggTopNFinalize,
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(5 << 5) << BSON_ARRAY(3 << 3) << BSON_ARRAY(1 << 1))
                    << 0ll << 3ll << 0 << INT_MAX << true),
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(6 << 6) << BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2))
@@ -3302,7 +3313,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopN) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsBottomN) {
     testCombinePartialAggsMultiAccumulatorWithSortPattern(
-        "aggBottomN",
+        sbe::EFn::kAggBottomNMerge,
+        sbe::EFn::kAggBottomNFinalize,
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3) << BSON_ARRAY(5 << 5))
                    << 0ll << 3ll << 0 << INT_MAX << true),
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4) << BSON_ARRAY(6 << 6))
@@ -3313,7 +3325,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsBottomN) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinN) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggMinN",
+        sbe::EFn::kAggMinNMerge,
+        sbe::EFn::kAggMinNFinalize,
         BSON_ARRAY(BSON_ARRAY(5 << 3 << 1) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(6 << 4 << 2) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(1 << 2 << 3));
@@ -3321,14 +3334,16 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinN) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxN) {
     testCombinePartialAggsMultiAccumulator<false>(
-        "aggMaxN",
+        sbe::EFn::kAggMaxNMerge,
+        sbe::EFn::kAggMaxNFinalize,
         BSON_ARRAY(BSON_ARRAY(1 << 3 << 5) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(BSON_ARRAY(2 << 4 << 6) << 0ll << 3ll << 24 << 1024 << true),
         BSON_ARRAY(6 << 5 << 4));
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinNCollator) {
-    testCombinePartialAggsMultiAccumulator<true>("aggMinN",
+    testCombinePartialAggsMultiAccumulator<true>(sbe::EFn::kAggMinNMerge,
+                                                 sbe::EFn::kAggMinNFinalize,
                                                  BSON_ARRAY(BSON_ARRAY("az" << "cx"
                                                                             << "ev")
                                                             << 0ll << 3ll << 24 << 1024 << true),
@@ -3340,7 +3355,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinNCollator) {
 }
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxNCollator) {
-    testCombinePartialAggsMultiAccumulator<true>("aggMaxN",
+    testCombinePartialAggsMultiAccumulator<true>(sbe::EFn::kAggMaxNMerge,
+                                                 sbe::EFn::kAggMaxNFinalize,
                                                  BSON_ARRAY(BSON_ARRAY("ev" << "cx"
                                                                             << "az")
                                                             << 0ll << 3ll << 24 << 1024 << true),

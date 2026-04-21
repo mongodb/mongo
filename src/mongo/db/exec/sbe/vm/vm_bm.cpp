@@ -35,6 +35,7 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
@@ -181,7 +182,7 @@ BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_NoCollator)(benchmark::S
     auto arraySetConstant = makeE<EConstant>(arraySet.first, arraySet.second);
 
     auto expr = makeE<EFunction>(
-        "isMember"_sd, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
+        sbe::EFn::kIsMember, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
     TagValue searchValue = generateRandomString(state.range(1) /*size*/);
     value::ValueGuard guard{searchValue.first, searchValue.second};
     benchmarkExpression(std::move(expr), {searchValue}, state);
@@ -196,7 +197,7 @@ BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator)(benchmark::Sta
     auto arraySetConstant = makeE<EConstant>(arraySet.first, arraySet.second);
 
     auto expr = makeE<EFunction>(
-        "isMember"_sd, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
+        sbe::EFn::kIsMember, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
     TagValue searchValue = generateRandomString(state.range(1) /*size*/);
     value::ValueGuard guard{searchValue.first, searchValue.second};
     benchmarkExpression(std::move(expr), {searchValue}, state);

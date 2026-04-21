@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/unittest/test_info.h"
@@ -116,7 +117,7 @@ public:
             value::SlotId lookupStageOutputSlot = sharedTest.generateSlotId();
             SlotExprPair agg =
                 std::make_pair(lookupStageOutputSlot,
-                               makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+                               makeFunction(EFn::kAddToArray, makeE<EVariable>(innerScanSlots[0])));
             auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
                                                       std::move(innerScanStage),
                                                       outerScanSlots[1],

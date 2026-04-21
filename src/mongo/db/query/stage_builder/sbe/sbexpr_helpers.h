@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -170,11 +171,11 @@ public:
     SbExpr makeStrConstant(StringData str);
     SbExpr makeUndefinedConstant();
 
-    SbExpr makeFunction(StringData name, SbExpr::Vector args);
+    SbExpr makeFunction(sbe::EFn fn, SbExpr::Vector args);
 
     template <typename... Args>
-    inline SbExpr makeFunction(StringData name, Args&&... args) {
-        return makeFunction(name, SbExpr::makeSeq(std::forward<Args>(args)...));
+    inline SbExpr makeFunction(sbe::EFn fn, Args&&... args) {
+        return makeFunction(fn, SbExpr::makeSeq(std::forward<Args>(args)...));
     }
 
     SbExpr makeIf(SbExpr condExpr, SbExpr thenExpr, SbExpr elseExpr);

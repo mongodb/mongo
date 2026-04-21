@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -78,23 +79,23 @@ public:
         auto countSlot = bindAccessor(&countAccessor);
 
         auto aggRemovableSumAdd = sbe::makeE<sbe::EFunction>(
-            "aggRemovableSumAdd", sbe::makeEs(makeE<EVariable>(inputSlot)));
+            EFn::kAggRemovableSumAdd, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovableSumAdd = compileAggExpression(*aggRemovableSumAdd, &sumAccessor);
 
         auto aggRemovableSumRemove = sbe::makeE<sbe::EFunction>(
-            "aggRemovableSumRemove", sbe::makeEs(makeE<EVariable>(inputSlot)));
+            EFn::kAggRemovableSumRemove, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovableSumRemove =
             compileAggExpression(*aggRemovableSumRemove, &sumAccessor);
 
         auto aggRemovableAvgFinalize = sbe::makeE<sbe::EFunction>(
-            "aggRemovableAvgFinalize",
+            EFn::kAggRemovableAvgFinalize,
             sbe::makeEs(makeE<EVariable>(sumSlot), makeE<EVariable>(countSlot)));
         auto compiledRemovableAvgFinalize = compileExpression(*aggRemovableAvgFinalize);
 
         auto isNullOrMissingExpr = sbe::makeE<sbe::EPrimBinary>(
             sbe::EPrimBinary::fillEmpty,
             sbe::makeE<sbe::EFunction>(
-                "typeMatch",
+                EFn::kTypeMatch,
                 sbe::makeEs(sbe::makeE<EVariable>(inputSlot),
                             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                                        getBSONTypeMask(BSONType::null) |
@@ -103,7 +104,7 @@ public:
 
         auto isNotNumberExpr = sbe::makeE<sbe::EPrimUnary>(
             sbe::EPrimUnary::logicNot,
-            sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(makeE<EVariable>(inputSlot))));
+            sbe::makeE<sbe::EFunction>(EFn::kIsNumber, sbe::makeEs(makeE<EVariable>(inputSlot))));
 
         auto aggRemovableCountAdd = sbe::makeE<sbe::EIf>(
             sbe::makeE<sbe::EPrimBinary>(

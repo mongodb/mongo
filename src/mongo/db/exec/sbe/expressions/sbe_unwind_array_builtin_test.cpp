@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -52,7 +53,7 @@ protected:
         std::unique_ptr<EExpression> arrayExpr = makeE<EConstant>(arrayCopyType, arrayCopyValue);
 
         std::unique_ptr<EExpression> unwoundExpr =
-            makeE<EFunction>("unwindArray", makeEs(std::move(arrayExpr)));
+            makeE<EFunction>(EFn::kUnwindArray, makeEs(std::move(arrayExpr)));
         std::unique_ptr<vm::CodeFragment> compiledExpr = compileExpression(*unwoundExpr);
 
         TypedValue actualValue = runCompiledExpression(compiledExpr.get());

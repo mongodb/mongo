@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -157,7 +158,7 @@ TEST_F(FilterStageTest, FilterIsNumberTest) {
         // Build a FilterStage whose filter expression is "isNumber(scanSlot)".
         auto filter = makeS<FilterStage<false>>(
             std::move(scanStage),
-            makeE<EFunction>("isNumber"_sd, makeEs(makeE<EVariable>(scanSlot))),
+            makeE<EFunction>(EFn::kIsNumber, makeEs(makeE<EVariable>(scanSlot))),
             kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(filter));

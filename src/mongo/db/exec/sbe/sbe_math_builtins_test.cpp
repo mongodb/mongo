@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -58,7 +59,7 @@ TEST_F(SBEMathBuiltinTest, Abs) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    auto callExpr = makeE<EFunction>("abs", makeEs(makeE<EVariable>(inputSlot)));
+    auto callExpr = makeE<EFunction>(EFn::kAbs, makeEs(makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -143,7 +144,7 @@ TEST_F(SBEMathBuiltinTest, Ceil) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    auto callExpr = makeE<EFunction>("ceil", makeEs(makeE<EVariable>(inputSlot)));
+    auto callExpr = makeE<EFunction>(EFn::kCeil, makeEs(makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -190,7 +191,7 @@ TEST_F(SBEMathBuiltinTest, Floor) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    auto callExpr = makeE<EFunction>("floor", makeEs(makeE<EVariable>(inputSlot)));
+    auto callExpr = makeE<EFunction>(EFn::kFloor, makeEs(makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -237,7 +238,7 @@ TEST_F(SBEMathBuiltinTest, Exp) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    auto callExpr = makeE<EFunction>("exp", makeEs(makeE<EVariable>(inputSlot)));
+    auto callExpr = makeE<EFunction>(EFn::kExp, makeEs(makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -285,7 +286,7 @@ TEST_F(SBEMathBuiltinTest, Ln) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    auto callExpr = makeE<EFunction>("ln", makeEs(makeE<EVariable>(inputSlot)));
+    auto callExpr = makeE<EFunction>(EFn::kLn, makeEs(makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -342,7 +343,7 @@ TEST_F(SBEMathBuiltinTest, Log10) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    auto callExpr = makeE<EFunction>("log10", makeEs(makeE<EVariable>(inputSlot)));
+    auto callExpr = makeE<EFunction>(EFn::kLog10, makeEs(makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -387,7 +388,7 @@ TEST_F(SBEMathBuiltinTest, Sqrt) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    auto callExpr = makeE<EFunction>("sqrt", makeEs(makeE<EVariable>(inputSlot)));
+    auto callExpr = makeE<EFunction>(EFn::kSqrt, makeEs(makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -459,8 +460,8 @@ TEST_F(SBEMathBuiltinTest, Pow) {
     auto inputSlot1 = bindAccessor(&inputAccessor1);
     auto inputSlot2 = bindAccessor(&inputAccessor2);
 
-    auto callExpr =
-        makeE<EFunction>("pow", makeEs(makeE<EVariable>(inputSlot1), makeE<EVariable>(inputSlot2)));
+    auto callExpr = makeE<EFunction>(
+        EFn::kPow, makeEs(makeE<EVariable>(inputSlot1), makeE<EVariable>(inputSlot2)));
     auto compiledExpr = compileExpression(*callExpr);
 
     {
@@ -852,12 +853,13 @@ TEST_F(SBEMathBuiltinTest, InvalidInputsToUnaryNumericFunctions) {
     value::OwnedValueAccessor inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
 
-    std::vector<std::string> functionNames = {"abs", "ceil", "floor", "exp", "ln", "log10", "sqrt"};
+    std::vector<EFn> functionNames = {
+        EFn::kAbs, EFn::kCeil, EFn::kFloor, EFn::kExp, EFn::kLn, EFn::kLog10, EFn::kSqrt};
     std::vector<std::unique_ptr<vm::CodeFragment>> compiledExpressionList;
     std::transform(functionNames.begin(),
                    functionNames.end(),
                    std::back_inserter(compiledExpressionList),
-                   [&](std::string name) {
+                   [&](EFn name) {
                        auto callExpr = makeE<EFunction>(name, makeEs(makeE<EVariable>(inputSlot)));
                        return compileExpression(*callExpr);
                    });
@@ -935,7 +937,8 @@ TEST_F(SBEMathBuiltinTest, DoubleDoubleSummation) {
         value::OwnedValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
-        auto callExpr = makeE<EFunction>("doubleDoubleSum", makeEs(makeE<EVariable>(inputSlot)));
+        auto callExpr =
+            makeE<EFunction>(EFn::kDoubleDoubleSum, makeEs(makeE<EVariable>(inputSlot)));
         auto compiledExpr = compileExpression(*callExpr);
 
         auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"-1.0"});
@@ -957,7 +960,7 @@ TEST_F(SBEMathBuiltinTest, DoubleDoubleSummation) {
             args.push_back(makeE<EConstant>(tag, val));
         }
 
-        auto callExpr = makeE<EFunction>("doubleDoubleSum", std::move(args));
+        auto callExpr = makeE<EFunction>(EFn::kDoubleDoubleSum, std::move(args));
         auto compiledExpr = compileExpression(*callExpr);
 
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());

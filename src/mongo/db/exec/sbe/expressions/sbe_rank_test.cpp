@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -52,22 +53,22 @@ TEST_F(SBERankTest, ComputeRank) {
     auto denseRankSlot = bindAccessor(&denseRankAccessor);
     auto argSlot = bindAccessor(&argAccessor);
     auto rankExpr = sbe::makeE<sbe::EFunction>(
-        "aggRank",
+        EFn::kAggRank,
         sbe::makeEs(
             makeE<EVariable>(argSlot),
             makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true))));
     auto compiledRankExpr = compileAggExpression(*rankExpr, &rankAccessor);
     auto denseRankExpr = sbe::makeE<sbe::EFunction>(
-        "aggDenseRank",
+        EFn::kAggDenseRank,
         sbe::makeEs(
             makeE<EVariable>(argSlot),
             makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true))));
     auto compiledDenseRankExpr = compileAggExpression(*denseRankExpr, &denseRankAccessor);
     auto finalRankExpr =
-        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(rankSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kAggRankFinalize, sbe::makeEs(makeE<EVariable>(rankSlot)));
     auto finalCompiledRankExpr = compileExpression(*finalRankExpr);
-    auto finalDenseRankExpr =
-        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(denseRankSlot)));
+    auto finalDenseRankExpr = sbe::makeE<sbe::EFunction>(
+        EFn::kAggRankFinalize, sbe::makeEs(makeE<EVariable>(denseRankSlot)));
     auto finalCompiledDenseRankExpr = compileExpression(*finalDenseRankExpr);
 
     std::vector<int> values{100, 200, 200, 200, 300};
@@ -98,22 +99,22 @@ TEST_F(SBERankTest, ComputeRankBeyond32Bit) {
     auto denseRankSlot = bindAccessor(&denseRankAccessor);
     auto argSlot = bindAccessor(&argAccessor);
     auto rankExpr = sbe::makeE<sbe::EFunction>(
-        "aggRank",
+        EFn::kAggRank,
         sbe::makeEs(
             makeE<EVariable>(argSlot),
             makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true))));
     auto compiledRankExpr = compileAggExpression(*rankExpr, &rankAccessor);
     auto denseRankExpr = sbe::makeE<sbe::EFunction>(
-        "aggDenseRank",
+        EFn::kAggDenseRank,
         sbe::makeEs(
             makeE<EVariable>(argSlot),
             makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true))));
     auto compiledDenseRankExpr = compileAggExpression(*denseRankExpr, &denseRankAccessor);
     auto finalRankExpr =
-        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(rankSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kAggRankFinalize, sbe::makeEs(makeE<EVariable>(rankSlot)));
     auto finalCompiledRankExpr = compileExpression(*finalRankExpr);
-    auto finalDenseRankExpr =
-        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(denseRankSlot)));
+    auto finalDenseRankExpr = sbe::makeE<sbe::EFunction>(
+        EFn::kAggRankFinalize, sbe::makeEs(makeE<EVariable>(denseRankSlot)));
     auto finalCompiledDenseRankExpr = compileExpression(*finalDenseRankExpr);
 
     auto setInt32MaxRankState = [](value::OwnedValueAccessor& accessor) {
@@ -175,24 +176,24 @@ TEST_F(SBERankTest, ComputeRankWithCollation) {
     auto collatorSlot = bindAccessor(&collatorAccessor);
 
     auto rankExpr = sbe::makeE<sbe::EFunction>(
-        "aggRankColl",
+        EFn::kAggRankColl,
         sbe::makeEs(
             makeE<EVariable>(argSlot),
             makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true)),
             makeE<EVariable>(collatorSlot)));
     auto compiledRankExpr = compileAggExpression(*rankExpr, &rankAccessor);
     auto denseRankExpr = sbe::makeE<sbe::EFunction>(
-        "aggDenseRankColl",
+        EFn::kAggDenseRankColl,
         sbe::makeEs(
             makeE<EVariable>(argSlot),
             makeE<EConstant>(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true)),
             makeE<EVariable>(collatorSlot)));
     auto compiledDenseRankExpr = compileAggExpression(*denseRankExpr, &denseRankAccessor);
     auto finalRankExpr =
-        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(rankSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kAggRankFinalize, sbe::makeEs(makeE<EVariable>(rankSlot)));
     auto finalCompiledRankExpr = compileExpression(*finalRankExpr);
-    auto finalDenseRankExpr =
-        sbe::makeE<sbe::EFunction>("aggRankFinalize", sbe::makeEs(makeE<EVariable>(denseRankSlot)));
+    auto finalDenseRankExpr = sbe::makeE<sbe::EFunction>(
+        EFn::kAggRankFinalize, sbe::makeEs(makeE<EVariable>(denseRankSlot)));
     auto finalCompiledDenseRankExpr = compileExpression(*finalDenseRankExpr);
 
     auto collator =

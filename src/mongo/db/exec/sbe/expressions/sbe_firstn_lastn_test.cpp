@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -55,22 +56,23 @@ public:
         value::OwnedValueAccessor aggAccessor;
         auto aggSlot = bindAccessor(&aggAccessor);
 
-        auto exprNamePrefix = "aggRemovable" + std::string(isFirstN ? "FirstN" : "LastN");
-
         auto initExpr = sbe::makeE<sbe::EFunction>(
-            exprNamePrefix + "Init",
+            isFirstN ? EFn::kAggRemovableFirstNInit : EFn::kAggRemovableLastNInit,
             sbe::makeEs(makeE<EConstant>(value::TypeTags::NumberInt32, n)));
         auto compiledInit = compileExpression(*initExpr);
 
-        auto addExpr = sbe::makeE<sbe::EFunction>(exprNamePrefix + "Add",
+        auto addExpr = sbe::makeE<sbe::EFunction>(isFirstN ? EFn::kAggRemovableFirstNAdd
+                                                           : EFn::kAggRemovableLastNAdd,
                                                   sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledAdd = compileAggExpression(*addExpr, &aggAccessor);
 
-        auto removeExpr = sbe::makeE<sbe::EFunction>(exprNamePrefix + "Remove",
+        auto removeExpr = sbe::makeE<sbe::EFunction>(isFirstN ? EFn::kAggRemovableFirstNRemove
+                                                              : EFn::kAggRemovableLastNRemove,
                                                      sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemove = compileAggExpression(*removeExpr, &aggAccessor);
 
-        auto finalizeExpr = sbe::makeE<sbe::EFunction>(exprNamePrefix + "Finalize",
+        auto finalizeExpr = sbe::makeE<sbe::EFunction>(isFirstN ? EFn::kAggRemovableFirstNFinalize
+                                                                : EFn::kAggRemovableLastNFinalize,
                                                        sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledFinalize = compileExpression(*finalizeExpr);
 
@@ -113,9 +115,9 @@ public:
                                      value::TypeTags tag,
                                      value::Value val,
                                      int expErrCode) {
-        auto initExpr = sbe::makeE<sbe::EFunction>(
-            "aggRemovable" + std::string(isFirstN ? "FirstN" : "LastN") + "Init",
-            sbe::makeEs(makeE<EConstant>(tag, val)));
+        auto initExpr = sbe::makeE<sbe::EFunction>(isFirstN ? EFn::kAggRemovableFirstNInit
+                                                            : EFn::kAggRemovableLastNInit,
+                                                   sbe::makeEs(makeE<EConstant>(tag, val)));
         auto compiledInit = compileExpression(*initExpr);
 
         Status status = [&]() {

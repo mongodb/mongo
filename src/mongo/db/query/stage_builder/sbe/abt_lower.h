@@ -39,8 +39,6 @@ namespace mongo::stage_builder::abt_lower {
 
 using namespace abt;
 
-static constexpr auto kParameterFunctionName = "getParam";
-
 class VarResolver {
 public:
     using LowerFuncT = std::function<std::unique_ptr<sbe::EExpression>(const ProjectionName&)>;

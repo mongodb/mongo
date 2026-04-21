@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -54,16 +55,16 @@ public:
         auto aggSlot = bindAccessor(&aggAccessor);
 
         auto aggRemovableSumAdd = sbe::makeE<sbe::EFunction>(
-            "aggRemovableSumAdd", sbe::makeEs(makeE<EVariable>(inputSlot)));
+            EFn::kAggRemovableSumAdd, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovableSumAdd = compileAggExpression(*aggRemovableSumAdd, &aggAccessor);
 
         auto aggRemovableSumRemove = sbe::makeE<sbe::EFunction>(
-            "aggRemovableSumRemove", sbe::makeEs(makeE<EVariable>(inputSlot)));
+            EFn::kAggRemovableSumRemove, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovableSumRemove =
             compileAggExpression(*aggRemovableSumRemove, &aggAccessor);
 
         auto aggRemovableSumFinalize = sbe::makeE<sbe::EFunction>(
-            "aggRemovableSumFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggRemovableSumFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledRemovableSumFinalize = compileExpression(*aggRemovableSumFinalize);
 
         // call RemovableSumOp (Add/Remove) on the inputs and call finalize() method after each op

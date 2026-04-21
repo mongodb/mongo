@@ -30,8 +30,8 @@
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/algebra/polyvalue.h"
@@ -208,7 +208,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
         isMemberArgs.push_back(std::move(lhs));
         isMemberArgs.push_back(std::move(rhs));
 
-        return sbe::makeE<sbe::EFunction>("isMember", std::move(isMemberArgs));
+        return sbe::makeE<sbe::EFunction>(sbe::EFn::kIsMember, std::move(isMemberArgs));
     }
 
     sbe::EPrimBinary::Op sbeOp = getEPrimBinaryOp(op.op());
@@ -292,105 +292,92 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpres
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     const FunctionCall& fn, std::vector<std::unique_ptr<sbe::EExpression>> args) {
-    auto name = fn.name();
+    const auto efn = fn.fn();
 
-    if (name == "fail") {
-        uassert(6250200, "Invalid number of arguments to fail()", fn.nodes().size() == 2);
-        const auto* codeConstPtr = fn.nodes().at(0).cast<Constant>();
-        const auto* messageConstPtr = fn.nodes().at(1).cast<Constant>();
+    switch (efn) {
+        case sbe::EFn::kFail: {
+            uassert(6250200, "Invalid number of arguments to fail()", fn.nodes().size() == 2);
+            const auto* codeConstPtr = fn.nodes().at(0).cast<Constant>();
+            const auto* messageConstPtr = fn.nodes().at(1).cast<Constant>();
 
-        uassert(6250201,
-                "First argument to fail() must be a 32-bit integer constant",
-                codeConstPtr != nullptr && codeConstPtr->isValueInt32());
-        uassert(6250202,
-                "Second argument to fail() must be a string constant",
-                messageConstPtr != nullptr && messageConstPtr->isString());
+            uassert(6250201,
+                    "First argument to fail() must be a 32-bit integer constant",
+                    codeConstPtr != nullptr && codeConstPtr->isValueInt32());
+            uassert(6250202,
+                    "Second argument to fail() must be a string constant",
+                    messageConstPtr != nullptr && messageConstPtr->isString());
 
-        return sbe::makeE<sbe::EFail>(static_cast<ErrorCodes::Error>(codeConstPtr->getValueInt32()),
-                                      messageConstPtr->getString());
+            return sbe::makeE<sbe::EFail>(
+                static_cast<ErrorCodes::Error>(codeConstPtr->getValueInt32()),
+                messageConstPtr->getString());
+        }
+
+        case sbe::EFn::kConvert: {
+            uassert(6250203, "Invalid number of arguments to convert()", fn.nodes().size() == 2);
+            const auto* constPtr = fn.nodes().at(1).cast<Constant>();
+
+            uassert(6250204,
+                    "Second argument to convert() must be a 32-bit integer constant",
+                    constPtr != nullptr && constPtr->isValueInt32());
+            int32_t constVal = constPtr->getValueInt32();
+
+            uassert(6250205,
+                    "Second argument to convert() must be a numeric type tag",
+                    constVal >= static_cast<int32_t>(std::numeric_limits<uint8_t>::min()) &&
+                        constVal <= static_cast<int32_t>(std::numeric_limits<uint8_t>::max()) &&
+                        sbe::value::isNumber(static_cast<sbe::value::TypeTags>(constVal)));
+
+            return sbe::makeE<sbe::ENumericConvert>(std::move(args.at(0)),
+                                                    static_cast<sbe::value::TypeTags>(constVal));
+        }
+
+        case sbe::EFn::kTypeMatch: {
+            uassert(6250206, "Invalid number of arguments to typeMatch()", fn.nodes().size() == 2);
+            const auto* constPtr = fn.nodes().at(1).cast<Constant>();
+
+            uassert(6250207,
+                    "Second argument to typeMatch() must be a 32-bit integer constant",
+                    constPtr != nullptr && constPtr->isValueInt32());
+
+            return sbe::makeE<sbe::EFunction>(
+                sbe::EFn::kTypeMatch,
+                sbe::makeEs(std::move(args.at(0)),
+                            sbe::makeE<sbe::EConstant>(
+                                sbe::value::TypeTags::NumberInt32,
+                                sbe::value::bitcastFrom<int32_t>(constPtr->getValueInt32()))));
+        }
+
+        case sbe::EFn::kGetParam: {
+            uassert(8128700, "Invalid number of arguments to getParam()", fn.nodes().size() == 2);
+            const auto* paramId = fn.nodes().at(0).cast<Constant>();
+
+            uassert(10367400,
+                    "First argument to getParam() must be a 32-bit integer constant",
+                    paramId != nullptr && paramId->isValueInt32());
+
+            auto paramIdVal = paramId->getValueInt32();
+
+            auto slotId = [&]() {
+                auto it = _inputParamToSlotMap.find(paramIdVal);
+                if (it != _inputParamToSlotMap.end()) {
+                    // This input parameter id has already been tied to a particular runtime
+                    // environment slot. Just return that slot to the caller. This can happen if a
+                    // query planning optimization or rewrite chose to clone one of the input
+                    // expressions from the user's query.
+                    return it->second;
+                }
+
+                auto newSlotId = _providedSlots.registerSlot(
+                    sbe::value::TypeTags::Nothing, 0, false /* owned */, &_slotIdGenerator);
+                _inputParamToSlotMap.emplace(paramIdVal, newSlotId);
+                return newSlotId;
+            }();
+
+            return sbe::makeE<sbe::EVariable>(slotId);
+        }
+
+        default:
+            return sbe::makeE<sbe::EFunction>(efn, toInlinedVector(std::move(args)));
     }
-
-    if (name == "convert") {
-        uassert(6250203, "Invalid number of arguments to convert()", fn.nodes().size() == 2);
-        const auto* constPtr = fn.nodes().at(1).cast<Constant>();
-
-        uassert(6250204,
-                "Second argument to convert() must be a 32-bit integer constant",
-                constPtr != nullptr && constPtr->isValueInt32());
-        int32_t constVal = constPtr->getValueInt32();
-
-        uassert(6250205,
-                "Second argument to convert() must be a numeric type tag",
-                constVal >= static_cast<int32_t>(std::numeric_limits<uint8_t>::min()) &&
-                    constVal <= static_cast<int32_t>(std::numeric_limits<uint8_t>::max()) &&
-                    sbe::value::isNumber(static_cast<sbe::value::TypeTags>(constVal)));
-
-        return sbe::makeE<sbe::ENumericConvert>(std::move(args.at(0)),
-                                                static_cast<sbe::value::TypeTags>(constVal));
-    }
-
-    if (name == "typeMatch") {
-        uassert(6250206, "Invalid number of arguments to typeMatch()", fn.nodes().size() == 2);
-        const auto* constPtr = fn.nodes().at(1).cast<Constant>();
-
-        uassert(6250207,
-                "Second argument to typeMatch() must be a 32-bit integer constant",
-                constPtr != nullptr && constPtr->isValueInt32());
-
-        return sbe::makeE<sbe::EFunction>(
-            "typeMatch",
-            sbe::makeEs(std::move(args.at(0)),
-                        sbe::makeE<sbe::EConstant>(
-                            sbe::value::TypeTags::NumberInt32,
-                            sbe::value::bitcastFrom<int32_t>(constPtr->getValueInt32()))));
-    }
-
-    if (name == kParameterFunctionName) {
-        uassert(8128700, "Invalid number of arguments to getParam()", fn.nodes().size() == 2);
-        const auto* paramId = fn.nodes().at(0).cast<Constant>();
-
-        uassert(10367400,
-                "First argument to getParam() must be a 32-bit integer constant",
-                paramId != nullptr && paramId->isValueInt32());
-
-        auto paramIdVal = paramId->getValueInt32();
-
-        auto slotId = [&]() {
-            auto it = _inputParamToSlotMap.find(paramIdVal);
-            if (it != _inputParamToSlotMap.end()) {
-                // This input parameter id has already been tied to a particular runtime environment
-                // slot. Just return that slot to the caller. This can happen if a query planning
-                // optimization or rewrite chose to clone one of the input expressions from the
-                // user's query.
-                return it->second;
-            }
-
-            auto newSlotId = _providedSlots.registerSlot(
-                sbe::value::TypeTags::Nothing, 0, false /* owned */, &_slotIdGenerator);
-            _inputParamToSlotMap.emplace(paramIdVal, newSlotId);
-            return newSlotId;
-        }();
-
-        return sbe::makeE<sbe::EVariable>(slotId);
-    }
-
-    // TODO - this is an open question how to do the name mappings.
-    if (name == "$sum") {
-        name = "sum";
-    } else if (name == "$first") {
-        name = "first";
-    } else if (name == "$last") {
-        name = "last";
-    } else if (name == "$min") {
-        name = "min";
-    } else if (name == "$max") {
-        name = "max";
-    } else if (name == "$addToSet") {
-        name = "addToSet";
-    } else if (name == "$push") {
-        name = "addToArray";
-    }
-
-    return sbe::makeE<sbe::EFunction>(name, toInlinedVector(std::move(args)));
 }
 }  // namespace mongo::stage_builder::abt_lower

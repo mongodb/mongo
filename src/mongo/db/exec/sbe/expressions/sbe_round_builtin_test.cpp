@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/decimal128.h"
@@ -62,7 +63,7 @@ TEST_F(EExpressionTestFixture, RoundOneArg) {
 
     // Construct an invocation of round function.
     auto roundExpression =
-        sbe::makeE<sbe::EFunction>("round", sbe::makeEs(makeE<EVariable>(numSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kRound, sbe::makeEs(makeE<EVariable>(numSlot)));
     auto compiledRound = compileExpression(*roundExpression);
 
     struct TestCase {
@@ -125,7 +126,7 @@ TEST_F(EExpressionTestFixture, RoundTwoArgs) {
 
     // Construct an invocation of round function.
     auto roundExpression = sbe::makeE<sbe::EFunction>(
-        "round", sbe::makeEs(makeE<EVariable>(numSlot), makeE<EVariable>(placeSlot)));
+        EFn::kRound, sbe::makeEs(makeE<EVariable>(numSlot), makeE<EVariable>(placeSlot)));
     auto compiledRound = compileExpression(*roundExpression);
 
     struct TestCase {

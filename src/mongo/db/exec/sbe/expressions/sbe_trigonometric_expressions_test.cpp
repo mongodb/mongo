@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -73,7 +74,7 @@ protected:
 TEST_F(SBETrigonometricExprTest, ComputesAcos) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto acosExpr = sbe::makeE<sbe::EFunction>("acos", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto acosExpr = sbe::makeE<sbe::EFunction>(EFn::kAcos, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*acosExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
@@ -98,7 +99,8 @@ TEST_F(SBETrigonometricExprTest, ComputesAcos) {
 TEST_F(SBETrigonometricExprTest, ComputesAcosh) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto acoshExpr = sbe::makeE<sbe::EFunction>("acosh", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto acoshExpr =
+        sbe::makeE<sbe::EFunction>(EFn::kAcosh, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*acoshExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -123,7 +125,7 @@ TEST_F(SBETrigonometricExprTest, ComputesAcosh) {
 TEST_F(SBETrigonometricExprTest, ComputesAsin) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto asinExpr = sbe::makeE<sbe::EFunction>("asin", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto asinExpr = sbe::makeE<sbe::EFunction>(EFn::kAsin, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*asinExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
@@ -148,7 +150,8 @@ TEST_F(SBETrigonometricExprTest, ComputesAsin) {
 TEST_F(SBETrigonometricExprTest, ComputesAsinh) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto asinhExpr = sbe::makeE<sbe::EFunction>("asinh", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto asinhExpr =
+        sbe::makeE<sbe::EFunction>(EFn::kAsinh, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*asinhExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
@@ -174,7 +177,7 @@ TEST_F(SBETrigonometricExprTest, ComputesAsinh) {
 TEST_F(SBETrigonometricExprTest, ComputesAtan) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto atanExpr = sbe::makeE<sbe::EFunction>("atan", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto atanExpr = sbe::makeE<sbe::EFunction>(EFn::kAtan, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*atanExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -199,7 +202,8 @@ TEST_F(SBETrigonometricExprTest, ComputesAtan) {
 TEST_F(SBETrigonometricExprTest, ComputesAtanh) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto atanhExpr = sbe::makeE<sbe::EFunction>("atanh", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto atanhExpr =
+        sbe::makeE<sbe::EFunction>(EFn::kAtanh, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*atanhExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
@@ -226,7 +230,7 @@ TEST_F(SBETrigonometricExprTest, ComputesAtan2) {
     auto argSlot1 = bindAccessor(&slotAccessor1);
     auto argSlot2 = bindAccessor(&slotAccessor2);
     auto atan2Expr = sbe::makeE<sbe::EFunction>(
-        "atan2", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
+        EFn::kAtan2, sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*atan2Expr);
 
     slotAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -257,7 +261,7 @@ TEST_F(SBETrigonometricExprTest, ComputesAtan2) {
 TEST_F(SBETrigonometricExprTest, ComputesCos) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto cosExpr = sbe::makeE<sbe::EFunction>("cos", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto cosExpr = sbe::makeE<sbe::EFunction>(EFn::kCos, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*cosExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -282,7 +286,7 @@ TEST_F(SBETrigonometricExprTest, ComputesCos) {
 TEST_F(SBETrigonometricExprTest, ComputesCosh) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto coshExpr = sbe::makeE<sbe::EFunction>("cosh", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto coshExpr = sbe::makeE<sbe::EFunction>(EFn::kCosh, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*coshExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -308,7 +312,7 @@ TEST_F(SBETrigonometricExprTest, ComputesDegreesToRadians) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     auto degreesToRadiansExpr =
-        sbe::makeE<sbe::EFunction>("degreesToRadians", sbe::makeEs(makeE<EVariable>(argSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kDegreesToRadians, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*degreesToRadiansExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(45));
@@ -334,7 +338,7 @@ TEST_F(SBETrigonometricExprTest, ComputesRadiansToDegrees) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     auto radiansToDegreesExpr =
-        sbe::makeE<sbe::EFunction>("radiansToDegrees", sbe::makeEs(makeE<EVariable>(argSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kRadiansToDegrees, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*radiansToDegreesExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -360,7 +364,7 @@ TEST_F(SBETrigonometricExprTest, ComputesRadiansToDegrees) {
 TEST_F(SBETrigonometricExprTest, ComputesSin) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto sinExpr = sbe::makeE<sbe::EFunction>("sin", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto sinExpr = sbe::makeE<sbe::EFunction>(EFn::kSin, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*sinExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -385,7 +389,7 @@ TEST_F(SBETrigonometricExprTest, ComputesSin) {
 TEST_F(SBETrigonometricExprTest, ComputesSinh) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto sinhExpr = sbe::makeE<sbe::EFunction>("sinh", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto sinhExpr = sbe::makeE<sbe::EFunction>(EFn::kSinh, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*sinhExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -409,7 +413,7 @@ TEST_F(SBETrigonometricExprTest, ComputesSinh) {
 TEST_F(SBETrigonometricExprTest, ComputesTan) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto tanExpr = sbe::makeE<sbe::EFunction>("tan", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto tanExpr = sbe::makeE<sbe::EFunction>(EFn::kTan, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*tanExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
@@ -434,7 +438,7 @@ TEST_F(SBETrigonometricExprTest, ComputesTan) {
 TEST_F(SBETrigonometricExprTest, ComputesTanh) {
     value::OwnedValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
-    auto tanhExpr = sbe::makeE<sbe::EFunction>("tanh", sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto tanhExpr = sbe::makeE<sbe::EFunction>(EFn::kTanh, sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*tanhExpr);
 
     slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));

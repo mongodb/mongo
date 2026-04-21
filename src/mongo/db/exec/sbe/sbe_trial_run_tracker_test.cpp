@@ -35,6 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/fetch.h"
@@ -260,9 +261,9 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
                 countsSlot,
                 generateSlotId(),
                 makeFunction(
-                    "sum",
+                    EFn::kSum,
                     makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
-                makeFunction("fail",
+                makeFunction(EFn::kFail,
                              makeInt32Constant(ErrorCodes::NotImplemented),
                              makeStringConstant("Unexpected merge with allowDiskUse=false")))),
             true,

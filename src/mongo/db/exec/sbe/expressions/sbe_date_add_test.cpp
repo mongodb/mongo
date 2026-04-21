@@ -33,6 +33,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -76,7 +77,7 @@ TEST_F(SBEBuiltinDateAddTest, ComputesDateAdd) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto dateAddExpr = sbe::makeE<sbe::EFunction>("dateAdd",
+    auto dateAddExpr = sbe::makeE<sbe::EFunction>(EFn::kDateAdd,
                                                   sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                               makeE<EVariable>(startDateSlot),
                                                               makeE<EVariable>(unitSlot),
@@ -128,7 +129,7 @@ TEST_F(SBEBuiltinDateAddTest, ReturnsNothingDateAdd) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto dateAddExpr = sbe::makeE<sbe::EFunction>("dateAdd",
+    auto dateAddExpr = sbe::makeE<sbe::EFunction>(EFn::kDateAdd,
                                                   sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
                                                               makeE<EVariable>(startDateSlot),
                                                               makeE<EVariable>(unitSlot),

@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -65,21 +66,21 @@ public:
         auto aggSlot = bindAccessor(&aggAccessor);
 
         auto aggCovarianceAdd = sbe::makeE<sbe::EFunction>(
-            "aggCovarianceAdd",
+            EFn::kAggCovarianceAdd,
             sbe::makeEs(makeE<EVariable>(inputSlotX), makeE<EVariable>(inputSlotY)));
         auto compiledCovarianceAdd = compileAggExpression(*aggCovarianceAdd, &aggAccessor);
 
         auto aggCovarianceRemove = sbe::makeE<sbe::EFunction>(
-            "aggCovarianceRemove",
+            EFn::kAggCovarianceRemove,
             sbe::makeEs(makeE<EVariable>(inputSlotX), makeE<EVariable>(inputSlotY)));
         auto compiledCovarianceRemove = compileAggExpression(*aggCovarianceRemove, &aggAccessor);
 
         auto aggCovarianceFinalizeSamp = sbe::makeE<sbe::EFunction>(
-            "aggCovarianceSampFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggCovarianceSampFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledCovarianceFinalizeSamp = compileExpression(*aggCovarianceFinalizeSamp);
 
         auto aggCovarianceFinalizePop = sbe::makeE<sbe::EFunction>(
-            "aggCovariancePopFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggCovariancePopFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledCovarianceFinalizePop = compileExpression(*aggCovarianceFinalizePop);
 
         // call CovarianceOp (Add/Remove) on the inputs and call finalize() method after each op

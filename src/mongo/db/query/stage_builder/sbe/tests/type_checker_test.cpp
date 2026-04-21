@@ -586,5 +586,13 @@ TEST(TypeCheckerTest, NotOnNonBooleanCanReturnNothing) {
             .typesMask);
 }
 
+// The FunctionCall(StringData, ABTVector) constructor must resolve the string name to its EFn
+// value at construction time so that fn() returns the enum and name() returns the canonical string.
+TEST(TypeCheckerTest, FunctionCallStringConstructorResolvesEFn) {
+    auto node = make<FunctionCall>("abs", ABTVector{});
+    ASSERT_EQUALS(sbe::EFn::kAbs, node.cast<FunctionCall>()->fn());
+    ASSERT_EQUALS("abs"_sd, node.cast<FunctionCall>()->name());
+}
+
 }  // namespace
 }  // namespace mongo::stage_builder

@@ -30,12 +30,12 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
-#include <string>
 #include <utility>
 
 namespace mongo::sbe {
@@ -51,7 +51,7 @@ protected:
      * Compiles and runs the expression over the input TypedValue 'timestampValue' and validates if
      * the computed TypedValue is same as the 'expectedValue'.
      */
-    void validateExpression(const std::string& builtinMethodName,
+    void validateExpression(EFn builtinMethodName,
                             TypedValue timestampValue,
                             TypedValue expectedValue) {
         value::ViewOfValueAccessor valueAccessor;
@@ -83,7 +83,7 @@ TEST_F(SBEBuiltinTsSecondTest, HandlesTimestamp) {
     value::ValueGuard guardSbeTimestamp{sbeTimestamp};
     value::ValueGuard guardExpectedSecs{expectedSecs};
 
-    validateExpression("tsSecond", sbeTimestamp, expectedSecs);
+    validateExpression(EFn::kTsSecond, sbeTimestamp, expectedSecs);
 }
 
 TEST_F(SBEBuiltinTsSecondTest, HandlesInvalidTimestamp) {
@@ -94,7 +94,7 @@ TEST_F(SBEBuiltinTsSecondTest, HandlesInvalidTimestamp) {
     value::ValueGuard guardSbeInvalidTimestamp{sbeInvalidTimestamp};
     value::ValueGuard guardExpectedNothing{expectedNothing};
 
-    validateExpression("tsSecond", sbeInvalidTimestamp, expectedNothing);
+    validateExpression(EFn::kTsSecond, sbeInvalidTimestamp, expectedNothing);
 }
 
 TEST_F(SBEBuiltinTsIncrementTest, HandlesTimestamp) {
@@ -105,7 +105,7 @@ TEST_F(SBEBuiltinTsIncrementTest, HandlesTimestamp) {
     value::ValueGuard guardSbeTimestamp{sbeTimestamp};
     value::ValueGuard guardExpectedInc{expectedInc};
 
-    validateExpression("tsIncrement", sbeTimestamp, expectedInc);
+    validateExpression(EFn::kTsIncrement, sbeTimestamp, expectedInc);
 }
 
 TEST_F(SBEBuiltinTsIncrementTest, HandlesInvalidTimestamp) {
@@ -116,7 +116,7 @@ TEST_F(SBEBuiltinTsIncrementTest, HandlesInvalidTimestamp) {
     value::ValueGuard guardSbeInvalidTimestamp{sbeInvalidTimestamp};
     value::ValueGuard guardExpectedNothing{expectedNothing};
 
-    validateExpression("tsIncrement", sbeInvalidTimestamp, expectedNothing);
+    validateExpression(EFn::kTsIncrement, sbeInvalidTimestamp, expectedNothing);
 }
 
 }  // namespace mongo::sbe

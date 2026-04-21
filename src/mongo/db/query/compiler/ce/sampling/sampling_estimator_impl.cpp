@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
@@ -277,7 +278,8 @@ std::unique_ptr<sbe::PlanStage> makeProjectStage(std::unique_ptr<sbe::PlanStage>
     // Create a built-in SBE makeBsonObj func and pass in the 2 args: MakeObjSpec and slot to read
     // input doc from (inputSlot).
     auto func = sbe::makeE<sbe::EFunction>(
-        "makeBsonObj"_sd, sbe::makeEs(std::move(specExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
+        sbe::EFn::kMakeBsonObj,
+        sbe::makeEs(std::move(specExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
     return sbe::makeProjectStage(std::move(stage), 0 /* nodeId */, outputSlot, std::move(func));
 }
 }  // namespace

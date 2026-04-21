@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -71,7 +72,7 @@ TEST_F(SBEVariableTest, LocalVariable) {
     auto expr = sbe::makeE<ELocalBind>(
         frame,
         makeEs(makeC(value::makeNewString("abcdeghijklmnop"_sd))),
-        makeE<EFunction>("newArray"_sd,
+        makeE<EFunction>(EFn::kNewArray,
                          makeEs(makeE<EVariable>(frame, 0), makeE<EVariable>(frame, 0))));
     printInputExpression(os, *expr);
 
@@ -88,7 +89,7 @@ TEST_F(SBEVariableTest, LocalVariableMove) {
     FrameId frame = 10;
     auto expr = sbe::makeE<ELocalBind>(frame,
                                        makeEs(makeC(value::makeNewString("abcdeghijklmnop"_sd))),
-                                       makeE<EFunction>("newArray"_sd,
+                                       makeE<EFunction>(EFn::kNewArray,
                                                         makeEs(makeE<EVariable>(frame, 0, true),
                                                                makeE<EVariable>(frame, 0, true))));
     printInputExpression(os, *expr);

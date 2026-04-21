@@ -29,10 +29,12 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_window_function.h"
 
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 
 namespace mongo::stage_builder {
 namespace {
+
 template <typename ReturnT, typename InputsT, typename... Args>
 using BuildFnType =
     std::function<ReturnT(const WindowOp&, std::unique_ptr<InputsT>, StageBuilderState&, Args...)>;
@@ -176,14 +178,16 @@ SbExpr::Vector buildWindowAddSum(const WindowOp& op,
                                  std::unique_ptr<AddSingleInput> inputs,
                                  StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableSumAdd", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovableSumAdd, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildWindowRemoveSum(const WindowOp& op,
                                     std::unique_ptr<AddSingleInput> inputs,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableSumRemove", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovableSumRemove, std::move(inputs->inputExpr)));
 }
 
 SbExpr buildWindowFinalizeSum(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
@@ -193,7 +197,7 @@ SbExpr buildWindowFinalizeSum(const WindowOp& op, StageBuilderState& state, SbSl
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggRemovableSumFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggRemovableSumFinalize, std::move(exprs));
 }
 
 SbExpr::Vector buildWindowAddCovariance(const WindowOp& op,
@@ -210,7 +214,8 @@ SbExpr::Vector buildWindowRemoveCovariance(const WindowOp& op,
     auto argX = std::move(inputs->covarianceX);
     auto argY = std::move(inputs->covarianceY);
 
-    return SbExpr::makeSeq(b.makeFunction("aggCovarianceRemove", std::move(argX), std::move(argY)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggCovarianceRemove, std::move(argX), std::move(argY)));
 }
 
 SbExpr buildWindowFinalizeCovarianceSamp(const WindowOp& op,
@@ -229,14 +234,16 @@ SbExpr::Vector buildWindowAddPush(const WindowOp& op,
                                   std::unique_ptr<AddSingleInput> inputs,
                                   StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovablePushAdd", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovablePushAdd, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildWindowRemovePush(const WindowOp& op,
                                      std::unique_ptr<AddSingleInput> inputs,
                                      StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovablePushRemove", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovablePushRemove, std::move(inputs->inputExpr)));
 }
 
 SbExpr buildWindowFinalizePush(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
@@ -246,7 +253,7 @@ SbExpr buildWindowFinalizePush(const WindowOp& op, StageBuilderState& state, SbS
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggRemovablePushFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggRemovablePushFinalize, std::move(exprs));
 }
 
 SbExpr::Vector buildWindowAddConcatArrays(const WindowOp& op,
@@ -256,7 +263,7 @@ SbExpr::Vector buildWindowAddConcatArrays(const WindowOp& op,
 
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
-    auto expr = b.makeIf(b.makeFunction("isArray", argValue),
+    auto expr = b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
                          argValue,
                          b.makeFail(ErrorCodes::TypeMismatch,
                                     "Expected new value for $concatArrays to be an array"_sd));
@@ -264,8 +271,9 @@ SbExpr::Vector buildWindowAddConcatArrays(const WindowOp& op,
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
     const int cap = internalQueryMaxConcatArraysBytes.load();
-    return SbExpr::makeSeq(b.makeFunction(
-        "aggRemovableConcatArraysAdd", std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableConcatArraysAdd,
+                                          std::move(argWithTypeCheck),
+                                          b.makeInt32Constant(cap)));
 }
 
 SbExpr::Vector buildWindowRemoveConcatArrays(const WindowOp& op,
@@ -276,7 +284,7 @@ SbExpr::Vector buildWindowRemoveConcatArrays(const WindowOp& op,
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
     auto expr =
-        b.makeIf(b.makeFunction("isArray", argValue),
+        b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
                  argValue,
                  b.makeFail(ErrorCodes::TypeMismatch,
                             "Expected value to remove for $concatArrays to be an array"_sd));
@@ -284,12 +292,12 @@ SbExpr::Vector buildWindowRemoveConcatArrays(const WindowOp& op,
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
     return SbExpr::makeSeq(
-        b.makeFunction("aggRemovableConcatArraysRemove", std::move(argWithTypeCheck)));
+        b.makeFunction(sbe::EFn::kAggRemovableConcatArraysRemove, std::move(argWithTypeCheck)));
 }
 
 SbExpr::Vector buildWindowInitializeConcatArrays(const WindowOp& op, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableConcatArraysInit"));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableConcatArraysInit));
 }
 
 SbExpr buildWindowFinalizeConcatArrays(const WindowOp& op,
@@ -301,7 +309,7 @@ SbExpr buildWindowFinalizeConcatArrays(const WindowOp& op,
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggRemovableConcatArraysFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggRemovableConcatArraysFinalize, std::move(exprs));
 }
 
 SbExpr::Vector buildWindowInitializeIntegral(const WindowOp& op,
@@ -312,7 +320,7 @@ SbExpr::Vector buildWindowInitializeIntegral(const WindowOp& op,
     auto unitExpr = std::move(inputs->inputExpr);
 
     return SbExpr::makeSeq(
-        b.makeFunction("aggIntegralInit", std::move(unitExpr), b.makeBoolConstant(false)));
+        b.makeFunction(sbe::EFn::kAggIntegralInit, std::move(unitExpr), b.makeBoolConstant(false)));
 }
 
 SbExpr::Vector buildWindowAddIntegral(const WindowOp& op,
@@ -330,7 +338,7 @@ SbExpr::Vector buildWindowRemoveIntegral(const WindowOp& op,
     auto sortByExpr = std::move(inputs->sortBy);
 
     return SbExpr::makeSeq(
-        b.makeFunction("aggIntegralRemove", std::move(inputExpr), std::move(sortByExpr)));
+        b.makeFunction(sbe::EFn::kAggIntegralRemove, std::move(inputExpr), std::move(sortByExpr)));
 }
 
 SbExpr buildWindowFinalizeIntegral(const WindowOp& op,
@@ -345,12 +353,12 @@ SbExpr::Vector buildWindowInitializeDerivative(const WindowOp& op, StageBuilderS
 
 SbExpr::Vector buildWindowAddDerivative(const WindowOp& op, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(1)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(1)));
 }
 
 SbExpr::Vector buildWindowRemoveDerivative(const WindowOp& op, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(-1)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(-1)));
 }
 
 SbExpr buildWindowFinalizeDerivative(const WindowOp& op,
@@ -364,7 +372,8 @@ SbExpr::Vector buildWindowAddStdDev(const WindowOp& op,
                                     std::unique_ptr<AddSingleInput> inputs,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableStdDevAdd", std::move(inputs->inputExpr)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovableStdDevAdd, std::move(inputs->inputExpr)));
 }
 
 SbExpr::Vector buildWindowRemoveStdDev(const WindowOp& op,
@@ -372,7 +381,7 @@ SbExpr::Vector buildWindowRemoveStdDev(const WindowOp& op,
                                        StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(
-        b.makeFunction("aggRemovableStdDevRemove", std::move(inputs->inputExpr)));
+        b.makeFunction(sbe::EFn::kAggRemovableStdDevRemove, std::move(inputs->inputExpr)));
 }
 
 SbExpr buildWindowFinalizeStdDevSamp(const WindowOp& op,
@@ -385,7 +394,7 @@ SbExpr buildWindowFinalizeStdDevSamp(const WindowOp& op,
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggRemovableStdDevSampFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggRemovableStdDevSampFinalize, std::move(exprs));
 }
 
 SbExpr buildWindowFinalizeStdDevPop(const WindowOp& op,
@@ -398,7 +407,7 @@ SbExpr buildWindowFinalizeStdDevPop(const WindowOp& op,
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggRemovableStdDevPopFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggRemovableStdDevPopFinalize, std::move(exprs));
 }
 
 SbExpr::Vector buildWindowAddAvg(const WindowOp& op,
@@ -408,15 +417,15 @@ SbExpr::Vector buildWindowAddAvg(const WindowOp& op,
 
     SbExpr::Vector exprs;
 
-    exprs.push_back(b.makeFunction("aggRemovableSumAdd", inputs->inputExpr.clone()));
+    exprs.push_back(b.makeFunction(sbe::EFn::kAggRemovableSumAdd, inputs->inputExpr.clone()));
 
     // For the counter we need to skip non-numeric values ourselves.
-    auto addend =
-        b.makeIf(b.makeFunction("isNumber", b.makeFillEmptyNull(std::move(inputs->inputExpr))),
-                 b.makeInt64Constant(1),
-                 b.makeInt64Constant(0));
+    auto addend = b.makeIf(
+        b.makeFunction(sbe::EFn::kIsNumber, b.makeFillEmptyNull(std::move(inputs->inputExpr))),
+        b.makeInt64Constant(1),
+        b.makeInt64Constant(0));
 
-    auto counterExpr = b.makeFunction("sum", std::move(addend));
+    auto counterExpr = b.makeFunction(sbe::EFn::kSum, std::move(addend));
     exprs.push_back(std::move(counterExpr));
 
     return exprs;
@@ -428,14 +437,14 @@ SbExpr::Vector buildWindowRemoveAvg(const WindowOp& op,
     SbExprBuilder b(state);
 
     SbExpr::Vector exprs;
-    exprs.push_back(b.makeFunction("aggRemovableSumRemove", inputs->inputExpr.clone()));
+    exprs.push_back(b.makeFunction(sbe::EFn::kAggRemovableSumRemove, inputs->inputExpr.clone()));
 
     // For the counter we need to skip non-numeric values ourselves.
-    auto subtrahend =
-        b.makeIf(b.makeFunction("isNumber", b.makeFillEmptyNull(std::move(inputs->inputExpr))),
-                 b.makeInt64Constant(-1),
-                 b.makeInt64Constant(0));
-    auto counterExpr = b.makeFunction("sum", std::move(subtrahend));
+    auto subtrahend = b.makeIf(
+        b.makeFunction(sbe::EFn::kIsNumber, b.makeFillEmptyNull(std::move(inputs->inputExpr))),
+        b.makeInt64Constant(-1),
+        b.makeInt64Constant(0));
+    auto counterExpr = b.makeFunction(sbe::EFn::kSum, std::move(subtrahend));
     exprs.push_back(std::move(counterExpr));
     return exprs;
 }
@@ -453,17 +462,17 @@ SbExpr buildWindowFinalizeAvg(const WindowOp& op, StageBuilderState& state, SbSl
         exprs.push_back(slot);
     }
 
-    return b.makeFunction("aggRemovableAvgFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggRemovableAvgFinalize, std::move(exprs));
 }
 
 SbExpr::Vector buildWindowAddFirstLast(const WindowOp& op, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(1)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(1)));
 }
 
 SbExpr::Vector buildWindowRemoveFirstLast(const WindowOp& op, StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(-1)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(-1)));
 }
 
 SbExpr buildWindowFinalizeFirstLast(const WindowOp& op,
@@ -478,7 +487,7 @@ SbExpr buildWindowFinalizeFirstLast(const WindowOp& op,
     auto thenExpr = b.makeFillEmpty(std::move(inputExpr), defaultVal.clone());
     return b.makeIf(
         b.makeBooleanOpTree(abt::Operations::And,
-                            b.makeFunction("exists", slots[0]),
+                            b.makeFunction(sbe::EFn::kExists, slots[0]),
                             b.makeBinaryOp(abt::Operations::Gt, slots[0], b.makeInt64Constant(0))),
         std::move(thenExpr),
         std::move(defaultVal));
@@ -492,22 +501,23 @@ SbExpr::Vector buildWindowInitializeFirstN(const WindowOp& op,
     auto maxSizeArg = std::move(inputs->maxSize);
     uassert(8070609, "$firstN init argument should be a constant", maxSizeArg.isConstantExpr());
 
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableFirstNInit", std::move(maxSizeArg)));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovableFirstNInit, std::move(maxSizeArg)));
 }
 
 SbExpr::Vector buildWindowAddFirstN(const WindowOp& op,
                                     std::unique_ptr<AddSingleInput> inputs,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(
-        b.makeFunction("aggRemovableFirstNAdd", b.makeFillEmptyNull(std::move(inputs->inputExpr))));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableFirstNAdd,
+                                          b.makeFillEmptyNull(std::move(inputs->inputExpr))));
 }
 
 SbExpr::Vector buildWindowRemoveFirstN(const WindowOp& op,
                                        std::unique_ptr<AddSingleInput> inputs,
                                        StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableFirstNRemove",
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableFirstNRemove,
                                           b.makeFillEmptyNull(std::move(inputs->inputExpr))));
 }
 
@@ -515,7 +525,7 @@ SbExpr buildWindowFinalizeFirstN(const WindowOp& op, StageBuilderState& state, S
     SbExprBuilder b(state);
 
     tassert(8070605, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableFirstNFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggRemovableFirstNFinalize, slots[0]);
 }
 
 SbExpr::Vector buildWindowInitializeLastN(const WindowOp& op,
@@ -526,22 +536,22 @@ SbExpr::Vector buildWindowInitializeLastN(const WindowOp& op,
     auto maxSizeArg = std::move(inputs->maxSize);
     uassert(8070610, "$lastN init argument should be a constant", maxSizeArg.isConstantExpr());
 
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableLastNInit", std::move(maxSizeArg)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableLastNInit, std::move(maxSizeArg)));
 }
 
 SbExpr::Vector buildWindowAddLastN(const WindowOp& op,
                                    std::unique_ptr<AddSingleInput> inputs,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(
-        b.makeFunction("aggRemovableLastNAdd", b.makeFillEmptyNull(std::move(inputs->inputExpr))));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableLastNAdd,
+                                          b.makeFillEmptyNull(std::move(inputs->inputExpr))));
 }
 
 SbExpr::Vector buildWindowRemoveLastN(const WindowOp& op,
                                       std::unique_ptr<AddSingleInput> inputs,
                                       StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggRemovableLastNRemove",
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableLastNRemove,
                                           b.makeFillEmptyNull(std::move(inputs->inputExpr))));
 }
 
@@ -549,7 +559,7 @@ SbExpr buildWindowFinalizeLastN(const WindowOp& op, StageBuilderState& state, Sb
     SbExprBuilder b(state);
 
     tassert(8070606, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableLastNFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggRemovableLastNFinalize, slots[0]);
 }
 
 SbExpr::Vector buildWindowInitializeSetCommon(const WindowOp& op, StageBuilderState& state) {
@@ -559,9 +569,10 @@ SbExpr::Vector buildWindowInitializeSetCommon(const WindowOp& op, StageBuilderSt
     SbExpr::Vector exprs;
 
     if (collatorSlot) {
-        exprs.push_back(b.makeFunction("aggRemovableSetCommonCollInit", SbSlot{*collatorSlot}));
+        exprs.push_back(
+            b.makeFunction(sbe::EFn::kAggRemovableSetCommonCollInit, SbSlot{*collatorSlot}));
     } else {
-        exprs.push_back(b.makeFunction("aggRemovableSetCommonInit"));
+        exprs.push_back(b.makeFunction(sbe::EFn::kAggRemovableSetCommonInit));
     }
     return exprs;
 }
@@ -572,8 +583,9 @@ SbExpr::Vector buildWindowAddAddToSet(const WindowOp& op,
     SbExprBuilder b(state);
 
     const int cap = internalQueryMaxAddToSetBytes.load();
-    return SbExpr::makeSeq(b.makeFunction(
-        "aggRemovableAddToSetAdd", std::move(inputs->inputExpr), b.makeInt32Constant(cap)));
+    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kAggRemovableAddToSetAdd,
+                                          std::move(inputs->inputExpr),
+                                          b.makeInt32Constant(cap)));
 }
 
 SbExpr::Vector buildWindowRemoveAddToSet(const WindowOp& op,
@@ -581,7 +593,7 @@ SbExpr::Vector buildWindowRemoveAddToSet(const WindowOp& op,
                                          StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(
-        b.makeFunction("aggRemovableAddToSetRemove", std::move(inputs->inputExpr)));
+        b.makeFunction(sbe::EFn::kAggRemovableAddToSetRemove, std::move(inputs->inputExpr)));
 }
 
 SbExpr buildWindowFinalizeSetCommon(const WindowOp& op,
@@ -593,7 +605,7 @@ SbExpr buildWindowFinalizeSetCommon(const WindowOp& op,
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggRemovableSetCommonFinalize", std::move(exprs));
+    return b.makeFunction(sbe::EFn::kAggRemovableSetCommonFinalize, std::move(exprs));
 }
 
 SbExpr::Vector buildWindowAddSetUnion(const WindowOp& op,
@@ -604,7 +616,7 @@ SbExpr::Vector buildWindowAddSetUnion(const WindowOp& op,
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
     auto expr = b.makeIf(
-        b.makeFunction("isArray", argValue),
+        b.makeFunction(sbe::EFn::kIsArray, argValue),
         argValue,
         b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
     auto argWithTypeCheck =
@@ -612,7 +624,7 @@ SbExpr::Vector buildWindowAddSetUnion(const WindowOp& op,
 
     const int cap = internalQueryMaxSetUnionBytes.load();
     return SbExpr::makeSeq(b.makeFunction(
-        "aggRemovableSetUnionAdd", std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
+        sbe::EFn::kAggRemovableSetUnionAdd, std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
 }
 
 SbExpr::Vector buildWindowRemoveSetUnion(const WindowOp& op,
@@ -622,7 +634,7 @@ SbExpr::Vector buildWindowRemoveSetUnion(const WindowOp& op,
 
     auto frameId = state.frameId();
     auto argValue = SbLocalVar{frameId, 0};
-    auto expr = b.makeIf(b.makeFunction("isArray", argValue),
+    auto expr = b.makeIf(b.makeFunction(sbe::EFn::kIsArray, argValue),
                          argValue,
                          b.makeFail(ErrorCodes::TypeMismatch,
                                     "Expected value to remove for $setUnion to be an array"_sd));
@@ -630,7 +642,7 @@ SbExpr::Vector buildWindowRemoveSetUnion(const WindowOp& op,
         b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
 
     return SbExpr::makeSeq(
-        b.makeFunction("aggRemovableSetUnionRemove", std::move(argWithTypeCheck)));
+        b.makeFunction(sbe::EFn::kAggRemovableSetUnionRemove, std::move(argWithTypeCheck)));
 }
 
 SbExpr::Vector buildWindowInitializeMinMax(const WindowOp& op, StageBuilderState& state) {
@@ -642,13 +654,13 @@ SbExpr::Vector buildWindowInitializeMinMax(const WindowOp& op, StageBuilderState
     auto cap = internalQueryTopNAccumulatorBytes.load();
 
     if (collatorSlot) {
-        exprs.push_back(b.makeFunction("aggRemovableMinMaxNCollInit",
+        exprs.push_back(b.makeFunction(sbe::EFn::kAggRemovableMinMaxNCollInit,
                                        b.makeInt32Constant(1),
                                        b.makeInt32Constant(cap),
                                        SbSlot{*collatorSlot}));
     } else {
         exprs.push_back(b.makeFunction(
-            "aggRemovableMinMaxNInit", b.makeInt32Constant(1), b.makeInt32Constant(cap)));
+            sbe::EFn::kAggRemovableMinMaxNInit, b.makeInt32Constant(1), b.makeInt32Constant(cap)));
     }
     return exprs;
 }
@@ -668,13 +680,13 @@ SbExpr::Vector buildWindowInitializeMinMaxN(const WindowOp& op,
     auto collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
-        exprs.push_back(b.makeFunction("aggRemovableMinMaxNCollInit",
+        exprs.push_back(b.makeFunction(sbe::EFn::kAggRemovableMinMaxNCollInit,
                                        std::move(maxSizeArg),
                                        b.makeInt32Constant(cap),
                                        SbSlot{*collatorSlot}));
     } else {
         exprs.push_back(b.makeFunction(
-            "aggRemovableMinMaxNInit", std::move(maxSizeArg), b.makeInt32Constant(cap)));
+            sbe::EFn::kAggRemovableMinMaxNInit, std::move(maxSizeArg), b.makeInt32Constant(cap)));
     }
     return exprs;
 }
@@ -683,52 +695,56 @@ SbExpr::Vector buildWindowAddMinMaxN(const WindowOp& op,
                                      std::unique_ptr<AddSingleInput> inputs,
                                      StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction(
-        "aggRemovableMinMaxNAdd", b.makeFunction("setToArray", std::move(inputs->inputExpr))));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovableMinMaxNAdd,
+                       b.makeFunction(sbe::EFn::kSetToArray, std::move(inputs->inputExpr))));
 }
 
 SbExpr::Vector buildWindowRemoveMinMaxN(const WindowOp& op,
                                         std::unique_ptr<AddSingleInput> inputs,
                                         StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction(
-        "aggRemovableMinMaxNRemove", b.makeFunction("setToArray", std::move(inputs->inputExpr))));
+    return SbExpr::makeSeq(
+        b.makeFunction(sbe::EFn::kAggRemovableMinMaxNRemove,
+                       b.makeFunction(sbe::EFn::kSetToArray, std::move(inputs->inputExpr))));
 }
 
 SbExpr buildWindowFinalizeMinN(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8178130, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableMinNFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggRemovableMinNFinalize, slots[0]);
 }
 
 SbExpr buildWindowFinalizeMaxN(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8178131, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableMaxNFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggRemovableMaxNFinalize, slots[0]);
 }
 
 SbExpr buildWindowFinalizeMin(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8124914, "Expected a single slot", slots.size() == 1);
-    return b.makeFillEmptyNull(b.makeFunction("getElement",
-                                              b.makeFunction("aggRemovableMinNFinalize", slots[0]),
-                                              b.makeInt32Constant(0)));
+    return b.makeFillEmptyNull(
+        b.makeFunction(sbe::EFn::kGetElement,
+                       b.makeFunction(sbe::EFn::kAggRemovableMinNFinalize, slots[0]),
+                       b.makeInt32Constant(0)));
 }
 
 SbExpr buildWindowFinalizeMax(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8124915, "Expected a single slot", slots.size() == 1);
-    return b.makeFillEmptyNull(b.makeFunction("getElement",
-                                              b.makeFunction("aggRemovableMaxNFinalize", slots[0]),
-                                              b.makeInt32Constant(0)));
+    return b.makeFillEmptyNull(
+        b.makeFunction(sbe::EFn::kGetElement,
+                       b.makeFunction(sbe::EFn::kAggRemovableMaxNFinalize, slots[0]),
+                       b.makeInt32Constant(0)));
 }
 
 SbExpr::Vector buildWindowInitializeTopBottomN(StageBuilderState& state,
-                                               std::string func,
+                                               sbe::EFn func,
                                                std::unique_ptr<InitAccumNInputs> inputs) {
     SbExprBuilder b(state);
 
@@ -744,11 +760,12 @@ SbExpr::Vector buildWindowInitializeTopBottomN(StageBuilderState& state,
 SbExpr::Vector buildWindowInitializeTopN(const WindowOp& op,
                                          std::unique_ptr<InitAccumNInputs> inputs,
                                          StageBuilderState& state) {
-    return buildWindowInitializeTopBottomN(state, "aggRemovableTopNInit", std::move(inputs));
+    return buildWindowInitializeTopBottomN(
+        state, sbe::EFn::kAggRemovableTopNInit, std::move(inputs));
 }
 
 SbExpr::Vector buildRemovableTopBottomN(StageBuilderState& state,
-                                        std::string func,
+                                        sbe::EFn func,
                                         std::unique_ptr<AddTopBottomNInputs> inputs) {
     SbExprBuilder b(state);
 
@@ -761,47 +778,49 @@ SbExpr::Vector buildRemovableTopBottomN(StageBuilderState& state,
 SbExpr::Vector buildWindowAddTopN(const WindowOp& op,
                                   std::unique_ptr<AddTopBottomNInputs> inputs,
                                   StageBuilderState& state) {
-    return buildRemovableTopBottomN(state, "aggRemovableTopNAdd", std::move(inputs));
+    return buildRemovableTopBottomN(state, sbe::EFn::kAggRemovableTopNAdd, std::move(inputs));
 }
 
 SbExpr::Vector buildWindowRemoveTopN(const WindowOp& op,
                                      std::unique_ptr<AddTopBottomNInputs> inputs,
                                      StageBuilderState& state) {
-    return buildRemovableTopBottomN(state, "aggRemovableTopNRemove", std::move(inputs));
+    return buildRemovableTopBottomN(state, sbe::EFn::kAggRemovableTopNRemove, std::move(inputs));
 }
 
 SbExpr buildWindowFinalizeTopN(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8155710, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableTopNFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggRemovableTopNFinalize, slots[0]);
 }
 
 SbExpr buildWindowFinalizeTop(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8155721, "Expected a single slot", slots.size() == 1);
-    return b.makeFillEmptyNull(b.makeFunction("getElement",
-                                              b.makeFunction("aggRemovableTopNFinalize", slots[0]),
-                                              b.makeInt32Constant(0)));
+    return b.makeFillEmptyNull(
+        b.makeFunction(sbe::EFn::kGetElement,
+                       b.makeFunction(sbe::EFn::kAggRemovableTopNFinalize, slots[0]),
+                       b.makeInt32Constant(0)));
 }
 
 SbExpr::Vector buildWindowInitializeBottomN(const WindowOp& op,
                                             std::unique_ptr<InitAccumNInputs> inputs,
                                             StageBuilderState& state) {
-    return buildWindowInitializeTopBottomN(state, "aggRemovableBottomNInit", std::move(inputs));
+    return buildWindowInitializeTopBottomN(
+        state, sbe::EFn::kAggRemovableBottomNInit, std::move(inputs));
 }
 
 SbExpr::Vector buildWindowAddBottomN(const WindowOp& op,
                                      std::unique_ptr<AddTopBottomNInputs> inputs,
                                      StageBuilderState& state) {
-    return buildRemovableTopBottomN(state, "aggRemovableBottomNAdd", std::move(inputs));
+    return buildRemovableTopBottomN(state, sbe::EFn::kAggRemovableBottomNAdd, std::move(inputs));
 }
 
 SbExpr::Vector buildWindowRemoveBottomN(const WindowOp& op,
                                         std::unique_ptr<AddTopBottomNInputs> inputs,
                                         StageBuilderState& state) {
-    return buildRemovableTopBottomN(state, "aggRemovableBottomNRemove", std::move(inputs));
+    return buildRemovableTopBottomN(state, sbe::EFn::kAggRemovableBottomNRemove, std::move(inputs));
 }
 
 SbExpr buildWindowFinalizeBottomN(const WindowOp& op,
@@ -810,7 +829,7 @@ SbExpr buildWindowFinalizeBottomN(const WindowOp& op,
     SbExprBuilder b(state);
 
     tassert(8155714, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableBottomNFinalize", slots[0]);
+    return b.makeFunction(sbe::EFn::kAggRemovableBottomNFinalize, slots[0]);
 }
 
 SbExpr buildWindowFinalizeBottom(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
@@ -818,8 +837,8 @@ SbExpr buildWindowFinalizeBottom(const WindowOp& op, StageBuilderState& state, S
 
     tassert(8155722, "Expected a single slot", slots.size() == 1);
     return b.makeFillEmptyNull(
-        b.makeFunction("getElement",
-                       b.makeFunction("aggRemovableBottomNFinalize", slots[0]),
+        b.makeFunction(sbe::EFn::kGetElement,
+                       b.makeFunction(sbe::EFn::kAggRemovableBottomNFinalize, slots[0]),
                        b.makeInt32Constant(0)));
 }
 

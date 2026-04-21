@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -51,7 +52,7 @@ protected:
         auto [arrayCopyType, arrayCopyValue] = value::copyValue(array.first, array.second);
         auto arrayExpr = makeE<EConstant>(arrayCopyType, arrayCopyValue);
 
-        auto isArrayEmptyExpr = makeE<EFunction>("isArrayEmpty", makeEs(std::move(arrayExpr)));
+        auto isArrayEmptyExpr = makeE<EFunction>(EFn::kIsArrayEmpty, makeEs(std::move(arrayExpr)));
         auto compiledExpr = compileExpression(*isArrayEmptyExpr);
 
         auto actualValue = runCompiledExpression(compiledExpr.get());

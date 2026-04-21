@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -66,7 +67,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToUpper) {
     value::OwnedValueAccessor toUpperAccessor;
     auto toUpperSlot = bindAccessor(&toUpperAccessor);
     auto toUpperExpr =
-        sbe::makeE<sbe::EFunction>("toUpper", sbe::makeEs(makeE<EVariable>(toUpperSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kToUpper, sbe::makeEs(makeE<EVariable>(toUpperSlot)));
     auto compiledExpr = compileExpression(*toUpperExpr);
 
     // SmallString test.
@@ -133,7 +134,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToLower) {
     value::OwnedValueAccessor toLowerAccessor;
     auto toLowerSlot = bindAccessor(&toLowerAccessor);
     auto toLowerExpr =
-        sbe::makeE<sbe::EFunction>("toLower", sbe::makeEs(makeE<EVariable>(toLowerSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kToLower, sbe::makeEs(makeE<EVariable>(toLowerSlot)));
     auto compiledExpr = compileExpression(*toLowerExpr);
 
     // SmallString test.

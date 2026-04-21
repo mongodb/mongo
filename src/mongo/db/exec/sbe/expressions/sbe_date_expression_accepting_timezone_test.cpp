@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -80,7 +81,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfYear) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto dayOfYearExpr = sbe::makeE<sbe::EFunction>("dayOfYear",
+    auto dayOfYearExpr = sbe::makeE<sbe::EFunction>(EFn::kDayOfYear,
                                                     sbe::makeEs(makeE<EVariable>(dateSlot),
                                                                 makeE<EVariable>(timezoneDBSlot),
                                                                 makeE<EVariable>(timezoneSlot)));
@@ -113,7 +114,8 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfYear) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     dayOfYearExpr = sbe::makeE<sbe::EFunction>(
-        "dayOfYear", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kDayOfYear,
+        sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledDayOfYear = compileExpression(*dayOfYearExpr);
 
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
@@ -131,7 +133,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfMonth) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto dayOfMonthExpr = sbe::makeE<sbe::EFunction>("dayOfMonth",
+    auto dayOfMonthExpr = sbe::makeE<sbe::EFunction>(EFn::kDayOfMonth,
                                                      sbe::makeEs(makeE<EVariable>(dateSlot),
                                                                  makeE<EVariable>(timezoneDBSlot),
                                                                  makeE<EVariable>(timezoneSlot)));
@@ -164,7 +166,8 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfMonth) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     dayOfMonthExpr = sbe::makeE<sbe::EFunction>(
-        "dayOfMonth", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kDayOfMonth,
+        sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledDayOfMonth = compileExpression(*dayOfMonthExpr);
 
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
@@ -182,7 +185,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfWeek) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto dayOfWeekExpr = sbe::makeE<sbe::EFunction>("dayOfWeek",
+    auto dayOfWeekExpr = sbe::makeE<sbe::EFunction>(EFn::kDayOfWeek,
                                                     sbe::makeEs(makeE<EVariable>(dateSlot),
                                                                 makeE<EVariable>(timezoneDBSlot),
                                                                 makeE<EVariable>(timezoneSlot)));
@@ -215,7 +218,8 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfWeek) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     dayOfWeekExpr = sbe::makeE<sbe::EFunction>(
-        "dayOfWeek", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kDayOfWeek,
+        sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledDayOfWeek = compileExpression(*dayOfWeekExpr);
 
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
@@ -234,7 +238,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicYear) {
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
     // Test $year with variable timezone
-    auto yearExpr = sbe::makeE<sbe::EFunction>("year",
+    auto yearExpr = sbe::makeE<sbe::EFunction>(EFn::kYear,
                                                sbe::makeEs(makeE<EVariable>(dateSlot),
                                                            makeE<EVariable>(timezoneDBSlot),
                                                            makeE<EVariable>(timezoneSlot)));
@@ -304,7 +308,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicYear) {
 
     // test $year with constant timezone
     yearExpr = sbe::makeE<sbe::EFunction>(
-        "year", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kYear, sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledYear = compileExpression(*yearExpr);
 
     // Test $year returns the correct value.
@@ -335,7 +339,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMonth) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto monthExpr = sbe::makeE<sbe::EFunction>("month",
+    auto monthExpr = sbe::makeE<sbe::EFunction>(EFn::kMonth,
                                                 sbe::makeEs(makeE<EVariable>(dateSlot),
                                                             makeE<EVariable>(timezoneDBSlot),
                                                             makeE<EVariable>(timezoneSlot)));
@@ -371,7 +375,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMonth) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     monthExpr = sbe::makeE<sbe::EFunction>(
-        "month", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kMonth, sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledMonth = compileExpression(*monthExpr);
 
     dateAccessor.reset(
@@ -392,7 +396,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicHour) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto hourExpr = sbe::makeE<sbe::EFunction>("hour",
+    auto hourExpr = sbe::makeE<sbe::EFunction>(EFn::kHour,
                                                sbe::makeEs(makeE<EVariable>(dateSlot),
                                                            makeE<EVariable>(timezoneDBSlot),
                                                            makeE<EVariable>(timezoneSlot)));
@@ -428,7 +432,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicHour) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     hourExpr = sbe::makeE<sbe::EFunction>(
-        "hour", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kHour, sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledHour = compileExpression(*hourExpr);
 
     dateAccessor.reset(value::TypeTags::Date,
@@ -449,7 +453,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMinute) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto minuteExpr = sbe::makeE<sbe::EFunction>("minute",
+    auto minuteExpr = sbe::makeE<sbe::EFunction>(EFn::kMinute,
                                                  sbe::makeEs(makeE<EVariable>(dateSlot),
                                                              makeE<EVariable>(timezoneDBSlot),
                                                              makeE<EVariable>(timezoneSlot)));
@@ -485,7 +489,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMinute) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     minuteExpr = sbe::makeE<sbe::EFunction>(
-        "minute", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kMinute, sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledMinute = compileExpression(*minuteExpr);
 
     dateAccessor.reset(value::TypeTags::Date,
@@ -506,7 +510,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicSecond) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto secondExpr = sbe::makeE<sbe::EFunction>("second",
+    auto secondExpr = sbe::makeE<sbe::EFunction>(EFn::kSecond,
                                                  sbe::makeEs(makeE<EVariable>(dateSlot),
                                                              makeE<EVariable>(timezoneDBSlot),
                                                              makeE<EVariable>(timezoneSlot)));
@@ -542,7 +546,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicSecond) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     secondExpr = sbe::makeE<sbe::EFunction>(
-        "second", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kSecond, sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledSecond = compileExpression(*secondExpr);
 
     dateAccessor.reset(value::TypeTags::Date,
@@ -563,7 +567,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMillisecond) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto millisecondExpr = sbe::makeE<sbe::EFunction>("millisecond",
+    auto millisecondExpr = sbe::makeE<sbe::EFunction>(EFn::kMillisecond,
                                                       sbe::makeEs(makeE<EVariable>(dateSlot),
                                                                   makeE<EVariable>(timezoneDBSlot),
                                                                   makeE<EVariable>(timezoneSlot)));
@@ -599,7 +603,8 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMillisecond) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     millisecondExpr = sbe::makeE<sbe::EFunction>(
-        "millisecond", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kMillisecond,
+        sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledMillisecond = compileExpression(*millisecondExpr);
 
     dateAccessor.reset(value::TypeTags::Date,
@@ -620,7 +625,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicWeek) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto weekExpr = sbe::makeE<sbe::EFunction>("week",
+    auto weekExpr = sbe::makeE<sbe::EFunction>(EFn::kWeek,
                                                sbe::makeEs(makeE<EVariable>(dateSlot),
                                                            makeE<EVariable>(timezoneDBSlot),
                                                            makeE<EVariable>(timezoneSlot)));
@@ -656,7 +661,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicWeek) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     weekExpr = sbe::makeE<sbe::EFunction>(
-        "week", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kWeek, sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledWeek = compileExpression(*weekExpr);
 
     dateAccessor.reset(value::TypeTags::Date,
@@ -677,7 +682,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeekYear) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto isoWeekYearExpr = sbe::makeE<sbe::EFunction>("isoWeekYear",
+    auto isoWeekYearExpr = sbe::makeE<sbe::EFunction>(EFn::kIsoWeekYear,
                                                       sbe::makeEs(makeE<EVariable>(dateSlot),
                                                                   makeE<EVariable>(timezoneDBSlot),
                                                                   makeE<EVariable>(timezoneSlot)));
@@ -713,7 +718,8 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeekYear) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     isoWeekYearExpr = sbe::makeE<sbe::EFunction>(
-        "isoWeekYear", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kIsoWeekYear,
+        sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledISOWeekYear = compileExpression(*isoWeekYearExpr);
 
     dateAccessor.reset(value::TypeTags::Date,
@@ -734,7 +740,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISODayOfWeek) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto isoDayOfWeekExpr = sbe::makeE<sbe::EFunction>("isoDayOfWeek",
+    auto isoDayOfWeekExpr = sbe::makeE<sbe::EFunction>(EFn::kIsoDayOfWeek,
                                                        sbe::makeEs(makeE<EVariable>(dateSlot),
                                                                    makeE<EVariable>(timezoneDBSlot),
                                                                    makeE<EVariable>(timezoneSlot)));
@@ -770,7 +776,8 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISODayOfWeek) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     isoDayOfWeekExpr = sbe::makeE<sbe::EFunction>(
-        "isoDayOfWeek", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kIsoDayOfWeek,
+        sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledISODayOfWeek = compileExpression(*isoDayOfWeekExpr);
 
     dateAccessor.reset(value::TypeTags::Date,
@@ -791,7 +798,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeek) {
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
 
-    auto isoWeekExpr = sbe::makeE<sbe::EFunction>("isoWeek",
+    auto isoWeekExpr = sbe::makeE<sbe::EFunction>(EFn::kIsoWeek,
                                                   sbe::makeEs(makeE<EVariable>(dateSlot),
                                                               makeE<EVariable>(timezoneDBSlot),
                                                               makeE<EVariable>(timezoneSlot)));
@@ -827,7 +834,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeek) {
     value::OwnedValueAccessor timezoneObjAccessor;
     auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
     isoWeekExpr = sbe::makeE<sbe::EFunction>(
-        "isoWeek", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+        EFn::kIsoWeek, sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
     compiledISOWeek = compileExpression(*isoWeekExpr);
 
     dateAccessor.reset(value::TypeTags::Date,

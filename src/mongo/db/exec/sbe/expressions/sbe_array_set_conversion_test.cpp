@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -105,7 +106,7 @@ TEST_F(SBEArraySetConversionTest, ArrayToSetExpression) {
     value::SlotId inputSlot = bindAccessor(&inputAccessor);
 
     std::unique_ptr<EExpression> arrayToSetExpr =
-        sbe::makeE<sbe::EFunction>("arrayToSet", sbe::makeEs(makeE<EVariable>(inputSlot)));
+        sbe::makeE<sbe::EFunction>(EFn::kArrayToSet, sbe::makeEs(makeE<EVariable>(inputSlot)));
     std::unique_ptr<vm::CodeFragment> compiledArrayToSet = compileExpression(*arrayToSetExpr);
 
     // Test with Array on first variant
@@ -156,7 +157,7 @@ TEST_F(SBEArraySetConversionTest, CollArrayToSetExpression) {
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
 
     std::unique_ptr<EExpression> arrayToSetExpr = sbe::makeE<sbe::EFunction>(
-        "collArrayToSet",
+        EFn::kCollArrayToSet,
         sbe::makeEs(makeE<EConstant>(value::TypeTags::collator,
                                      value::bitcastFrom<CollatorInterface*>(collator.release())),
                     makeE<EVariable>(inputSlot)));

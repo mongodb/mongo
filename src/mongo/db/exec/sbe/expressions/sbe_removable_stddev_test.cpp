@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -56,20 +57,20 @@ public:
         value::OwnedValueAccessor aggAccessor;
         auto aggSlot = bindAccessor(&aggAccessor);
 
-        auto aggStdDevAdd = sbe::makeE<sbe::EFunction>("aggRemovableStdDevAdd",
+        auto aggStdDevAdd = sbe::makeE<sbe::EFunction>(EFn::kAggRemovableStdDevAdd,
                                                        sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledStdDevAdd = compileAggExpression(*aggStdDevAdd, &aggAccessor);
 
         auto aggCovarianceRemove = sbe::makeE<sbe::EFunction>(
-            "aggRemovableStdDevRemove", sbe::makeEs(makeE<EVariable>(inputSlot)));
+            EFn::kAggRemovableStdDevRemove, sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledStdDevRemove = compileAggExpression(*aggCovarianceRemove, &aggAccessor);
 
         auto aggStdDevFinalizeSamp = sbe::makeE<sbe::EFunction>(
-            "aggRemovableStdDevSampFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggRemovableStdDevSampFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledStdDevFinalizeSamp = compileExpression(*aggStdDevFinalizeSamp);
 
         auto aggStdDevFinalizePop = sbe::makeE<sbe::EFunction>(
-            "aggRemovableStdDevPopFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+            EFn::kAggRemovableStdDevPopFinalize, sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledStdDevFinalizePop = compileExpression(*aggStdDevFinalizePop);
 
         // call StdDevOp (Add/Remove) on the inputs and call finalize() method after each op
