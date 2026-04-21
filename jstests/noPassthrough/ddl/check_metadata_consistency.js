@@ -626,11 +626,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
     let inconsistencies_chunks = db.checkMetadataConsistency().toArray();
-    assert.eq(inconsistencies_chunks.length, 1);
-    assert.eq(
+    assert.eq(inconsistencies_chunks.length, 2);
+    assert.contains(
         "TrackedUnshardedCollectionHasMultipleChunks",
-        inconsistencies_chunks[0].type,
-        tojson(inconsistencies_chunks[0]),
+        inconsistencies_chunks.map((x) => x.type),
+        tojson(inconsistencies_chunks),
     );
 
     // Clean up the database to pass the hooks that detect inconsistencies
@@ -659,8 +659,12 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
     let inconsistencies_key = db.checkMetadataConsistency().toArray();
-    assert.eq(1, inconsistencies_key.length);
-    assert.eq("TrackedUnshardedCollectionHasInvalidKey", inconsistencies_key[0].type, tojson(inconsistencies_key[0]));
+    assert.eq(2, inconsistencies_key.length);
+    assert.contains(
+        "TrackedUnshardedCollectionHasInvalidKey",
+        inconsistencies_key.map((x) => x.type),
+        tojson(inconsistencies_key),
+    );
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
@@ -810,7 +814,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(configDB.collections.update({_id: kNss}, {$unset: {defaultCollation: ""}}));
 
     const inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(1, inconsistencies.length);
+    assert.eq(2, inconsistencies.length);
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {defaultCollation: localCollation}},
         {shards: ["config"], options: {defaultCollation: {}}},

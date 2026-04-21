@@ -115,15 +115,16 @@ void executeLocalDelete(DBDirectClient& dbClient,
 
 void writeCollectionMetadataLocally(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    const CollectionType& coll,
+                                    const ShardCatalogCollectionTypeBase& coll,
                                     const std::vector<ChunkType>& chunks) {
     DBDirectClient dbClient(opCtx);
 
     auto serializedNs = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
-    executeLocalUpdates(dbClient,
-                        NamespaceString::kConfigShardCatalogCollectionsNamespace,
-                        {makeUpsertEntry(BSON(CollectionType::kNssFieldName << serializedNs),
-                                         coll.toShardCatalogBSON())});
+    executeLocalUpdates(
+        dbClient,
+        NamespaceString::kConfigShardCatalogCollectionsNamespace,
+        {makeUpsertEntry(BSON(ShardCatalogCollectionTypeBase::kNssFieldName << serializedNs),
+                         coll.toBSON())});
 
     tassert(
         10281500, "Expected to find at least one chunk for a tracked collection", !chunks.empty());
@@ -272,7 +273,7 @@ void commitRefineShardKeyLocally(OperationContext* opCtx, const NamespaceString&
     auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
 
     // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
-    writeCollectionMetadataLocally(opCtx, nss, coll, ownedChunks);
+    writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
 
     // Delete stale chunks from config.shard.catalog.chunks whose shard key bounds do not match the
     // refined key pattern. This can occur when the shard catalog has an out-of-date view of the
@@ -317,7 +318,7 @@ void commitCreateCollectionLocally(OperationContext* opCtx, const NamespaceStrin
     auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
 
     // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
-    writeCollectionMetadataLocally(opCtx, nss, coll, ownedChunks);
+    writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
 
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
     invalidateCollectionMetadataOnSecondaries(
@@ -342,7 +343,7 @@ void commitCreateCollectionChunklessLocally(OperationContext* opCtx, const Names
     std::vector<ChunkType> placeholderChunks{std::move(placeholder)};
 
     // Write the collection document and the placeholder chunk to the shard catalog.
-    writeCollectionMetadataLocally(opCtx, nss, coll, placeholderChunks);
+    writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), placeholderChunks);
 
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
     invalidateCollectionMetadataOnSecondaries(

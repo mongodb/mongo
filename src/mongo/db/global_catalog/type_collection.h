@@ -115,7 +115,7 @@ public:
     using GlobalCatalogCollectionTypeBase::kUuidFieldName;
 
     // Make getters and setters accessible.
-    using GlobalCatalogCollectionTypeBase::getCommonCollectionBase;
+    using GlobalCatalogCollectionTypeBase::getComparableFields;
     using GlobalCatalogCollectionTypeBase::getDefragmentationPhase;
     using GlobalCatalogCollectionTypeBase::getKeyPattern;
     using GlobalCatalogCollectionTypeBase::getMaxChunkSizeBytes;
@@ -197,6 +197,8 @@ public:
      * collection.
      */
     BSONObj toShardCatalogBSON() const;
+
+    ShardCatalogCollectionTypeBase asShardCatalogType() const;
 };
 
 }  // namespace mongo

@@ -51,7 +51,7 @@ enums:
 structs:
     CommonCollectionTypeBase:
         description:
-            "Represents the layout and contents of documents contained in the both config
+            "Represents the layout and contents of documents contained in both config
             server's config.collections collection as well as the shard's config.shard.catalog.collections
             collection."
         strict: false
@@ -73,11 +73,6 @@ structs:
                     prior to 2.2, this value wasn't being written. In such cases, it will
                     default to an all-zero OID."
                 optional: true
-            lastmod:
-                cpp_name: updatedAt
-                type: date
-                description: "Contains the time of when the collection was either created."
-                optional: false
             timestamp:
                 type: timestamp
                 description:
@@ -148,7 +143,13 @@ structs:
                     "Time-series collection fields. Only set when this is a time-series
                     buckets collection."
                 optional: true
-
+            # The time it was last updated at is never stored in memory, therefore making in-memory checks difficult if comparing
+            # against the durable state. We avoid using this for comparison purposes in consistency checks.
+            lastmod:
+                cpp_name: updatedAt
+                type: date
+                description: "Contains the time of when the collection was either created."
+                optional: false
     ShardCatalogCollectionTypeBase:
         description:
             "Represents the layout and contents of documents contained in the shard's
@@ -156,8 +157,8 @@ structs:
         strict: false
         inline_chained_structs: true
         chained_structs:
-            CommonCollectionTypeBase: commonCollectionBase
-            CommonCollectionTypeBaseIncomparable: commonCollectionBaseIncomparable
+            CommonCollectionTypeBase: comparableFields
+            CommonCollectionTypeBaseIncomparable: nonComparableFields
 
     GlobalCatalogCollectionTypeBase:
         description:
@@ -166,8 +167,8 @@ structs:
         strict: false
         inline_chained_structs: true
         chained_structs:
-            CommonCollectionTypeBase: commonCollectionBase
-            CommonCollectionTypeBaseIncomparable: commonCollectionBaseIncomparable
+            CommonCollectionTypeBase: comparableFields
+            CommonCollectionTypeBaseIncomparable: nonComparableFields
         fields:
             maxChunkSizeBytes:
                 type: safeInt64

@@ -1453,7 +1453,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_UuidMisma
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "uuid"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"_sd));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_ShardKeyMismatch) {
@@ -1474,7 +1474,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_ShardKeyM
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"_sd));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_UuidAndShardKeyMismatch) {
@@ -1496,8 +1496,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_UuidAndSh
 
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "uuid"_sd));
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardKeyPattern"_sd));
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "shardCatalogEntry"_sd));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_SplitChunksSameDomain) {
@@ -1857,7 +1856,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_UuidMismatch) {
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "uuid"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "shardCatalogEntry"_sd, "durableShardCatalog"_sd));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ShardKeyMismatch) {
@@ -1888,7 +1887,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ShardKeyMismatch) {
 
     ASSERT_EQ(1,
               countInconsistenciesWithDetailFieldAndSource(
-                  inconsistencies, "shardKeyPattern"_sd, "durableShardCatalog"_sd));
+                  inconsistencies, "shardCatalogEntry"_sd, "durableShardCatalog"_sd));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ChunksDomainMismatch) {

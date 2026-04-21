@@ -97,9 +97,16 @@ void CollectionType::setMaxChunkSizeBytes(int64_t value) {
 
 BSONObj CollectionType::toShardCatalogBSON() const {
     BSONObjBuilder builder;
-    getCommonCollectionBase().serialize(&builder);
-    getCommonCollectionBaseIncomparable().serialize(&builder);
+    getComparableFields().serialize(&builder);
+    getNonComparableFields().serialize(&builder);
     return builder.obj();
+}
+
+ShardCatalogCollectionTypeBase CollectionType::asShardCatalogType() const {
+    ShardCatalogCollectionTypeBase result;
+    result.setComparableFields(getComparableFields());
+    result.setNonComparableFields(getNonComparableFields());
+    return result;
 }
 
 }  // namespace mongo

@@ -206,8 +206,7 @@ std::vector<ChunkType> getChunksFromGlobalCatalog(OperationContext* opCtx,
     return chunksStatus.getValue();
 }
 
-std::vector<ChunkType> getChunksFromInMemoryShardCatalog(OperationContext* opCtx,
-                                                         const CollectionMetadata& coll,
+std::vector<ChunkType> getChunksFromInMemoryShardCatalog(const CollectionMetadata& coll,
                                                          const ShardId& shardId) {
     std::vector<ChunkType> chunks;
 
@@ -437,8 +436,7 @@ boost::optional<BSONObj> validateChunksDomainCoverage(
  * against the global catalog (either in-memory or durable).
  *
  * The following checks are performed:
- *  - Consistency of the collection UUID between the global and shard catalogs
- *  - Consistency of the shard key pattern between the global and shard catalogs
+ *  - Consistency of the shard catalog entry and the global catalog entry
  *  - No chunks in the shard catalog that are neither currently owned by the shard
  *    nor have ever been owned by it in the past (shard id absent from the history)
  *  - Consistency of chunk range coverage between the global and shard catalogs:
@@ -459,52 +457,39 @@ boost::optional<BSONObj> validateChunksDomainCoverage(
  * still contain chunks that have already disappeared from the in-memory shard catalog
  * after migration but have not yet propagated to the global catalog.
  */
-void validateCollectionMetadata(const NamespaceString& nss,
-                                const UUID& uuid,
-                                const BSONObj& shardKeyPattern,
-                                const ShardId& shardId,
-                                const std::vector<ChunkType>& shardCatalogChunks,
-                                const CollectionType& globalCatalogCollection,
-                                const std::vector<ChunkType>& globalCatalogChunks,
-                                StringData sourceName,
-                                std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    // TODO (SERVER-121929): Extend the following checks to validate more collection's fields.
+void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCatalogCollection,
+                                 const std::vector<ChunkType>& shardCatalogChunks,
+                                 const CollectionType& globalCatalogCollection,
+                                 const std::vector<ChunkType>& globalCatalogChunks,
+                                 const ShardId& shardId,
+                                 StringData sourceName,
+                                 std::vector<MetadataInconsistencyItem>& inconsistencies) {
+
     auto inMemoryValidationCheck = sourceName == kInMemoryShardCatalogSourceScope;
 
-    if (uuid != globalCatalogCollection.getUuid()) {
+    if (shardCatalogCollection.getComparableFields() !=
+        globalCatalogCollection.getComparableFields()) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
-                nss,
+                globalCatalogCollection.getNss(),
                 globalCatalogCollection.getUuid(),
-                BSON("field" << "uuid" << "source" << sourceName << "shardCatalog"
-                             << uuid.toString() << "globalCatalog"
-                             << globalCatalogCollection.getUuid().toString())}));
-    }
-
-    if (shardKeyPattern.woCompare(globalCatalogCollection.getKeyPattern().toBSON()) != 0) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
-            InconsistentShardCatalogCollectionMetadataDetails{
-                nss,
-                globalCatalogCollection.getUuid(),
-                BSON("field" << "shardKeyPattern" << "source" << sourceName << "shardCatalog"
-                             << shardKeyPattern << "globalCatalog"
-                             << globalCatalogCollection.getKeyPattern().toBSON())}));
+                BSON("field" << "shardCatalogEntry" << "source" << sourceName << "shardCatalog"
+                             << shardCatalogCollection.toBSON() << "globalCatalog"
+                             << globalCatalogCollection.toShardCatalogBSON())}));
     }
 
     if (auto mismatchDetail = validateAllShardChunksOwned(shardCatalogChunks, shardId)) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
-                nss,
+                globalCatalogCollection.getNss(),
                 globalCatalogCollection.getUuid(),
                 BSON("field" << "chunkHistory"
                              << "source" << sourceName << "mismatch" << *mismatchDetail)}));
     }
 
-    // TODO (SERVER-121930): Extend the following checks to strictly validate all chunks'
-    // ranges.
+    // TODO (SERVER-121930): Extend the following checks to strictly validate all chunks' ranges.
 
     // For in-memory catalog, the domain coverage should be enforced only on currently owned
     // chunks, allowing for slight de-sync of chunks owned in the past during chunk migrations
@@ -516,12 +501,38 @@ void validateCollectionMetadata(const NamespaceString& nss,
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
-                nss,
+                globalCatalogCollection.getNss(),
                 globalCatalogCollection.getUuid(),
                 BSON("field" << "chunksDomain"
                              << "source" << sourceName << "mismatch" << *mismatchDetail)}));
     }
 }
+
+CollectionType toCollectionType(const CollectionMetadata& cm) {
+    CollectionType result{cm.getChunkManager()->getNss(),
+                          cm.getCollPlacementVersion().epoch(),
+                          cm.getCollPlacementVersion().getTimestamp(),
+                          Date_t::now(),
+                          cm.getUUID(),
+                          cm.getKeyPattern()};
+    // Unsplittable collections only serialize the field when the flag is set to true
+    if (cm.isUnsplittable()) {
+        result.setUnsplittable(true);
+    }
+    if (auto collator = cm.getChunkManager()->getDefaultCollator()) {
+        const auto& spec = collator->getSpec();
+        result.setDefaultCollation(spec.toBSON());
+    }
+    result.setUnique(cm.isUniqueShardKey());
+    result.setTimeseriesFields(cm.getTimeseriesFields());
+    result.setReshardingFields(cm.getReshardingFields());
+    // The allowMigrations field is only set to false in the event migrations aren't allowed. In any
+    // other case it's unset.
+    if (!cm.allowMigrations()) {
+        result.setAllowMigrations(false);
+    }
+    return result;
+};
 
 void checkCollectionMetadataInShardCatalog(
     OperationContext* opCtx,
@@ -589,12 +600,9 @@ void checkCollectionMetadataInShardCatalog(
         return;
     }
 
-    auto chunksInMemoryShardCatalog =
-        getChunksFromInMemoryShardCatalog(opCtx, *inMemoryShardCatalogMetadata, shardId);
-
-    // If the shard placement version is {0, 0}, the shard thinks it owns no chunks. Other fieds
+    // If the shard placement version is {0, 0}, the shard thinks it owns no chunks. Other fields
     // (i.e. shard key, uuid, etc.) may be stale, so skip full metadata validation. In this case,
-    // only verify the global catalog also shows no chunks currently owned by this shard.
+    // only verify the global catalog also shows no chunks for this shard.
     // Note: It's still possible for global catalog to store chunks previously owned for the
     // shard, and shard no longer storing the chunk during migrations
     if (!inMemoryShardCatalogMetadata->getShardPlacementVersion().isSet()) {
@@ -611,19 +619,22 @@ void checkCollectionMetadataInShardCatalog(
                                      << static_cast<int>(chunksInGlobalCatalog.size()))}));
             }
         }
-
         return;
     }
 
-    validateCollectionMetadata(nss,
-                               inMemoryShardCatalogMetadata->getUUID(),
-                               inMemoryShardCatalogMetadata->getShardKeyPattern().toBSON(),
-                               shardId,
-                               chunksInMemoryShardCatalog,
-                               *collectionInGlobalCatalog,
-                               chunksInGlobalCatalog,
-                               kInMemoryShardCatalogSourceScope,
-                               inconsistencies);
+    auto chunksInMemoryShardCatalog =
+        getChunksFromInMemoryShardCatalog(*inMemoryShardCatalogMetadata, shardId);
+
+    ShardCatalogCollectionTypeBase shardCatalogCollectionInMemory =
+        toCollectionType(*inMemoryShardCatalogMetadata).asShardCatalogType();
+
+    validateShardCatalogEntries(shardCatalogCollectionInMemory,
+                                chunksInMemoryShardCatalog,
+                                *collectionInGlobalCatalog,
+                                chunksInGlobalCatalog,
+                                shardId,
+                                kInMemoryShardCatalogSourceScope,
+                                inconsistencies);
 
     if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
             VersionContext::getDecoration(opCtx),
@@ -648,15 +659,13 @@ void checkCollectionMetadataInShardCatalog(
         return;
     }
 
-    validateCollectionMetadata(nss,
-                               collectionInDurableShardCatalog->getUuid(),
-                               collectionInDurableShardCatalog->getKeyPattern().toBSON(),
-                               shardId,
-                               chunksInDurableShardCatalog,
-                               *collectionInGlobalCatalog,
-                               chunksInGlobalCatalog,
-                               kDurableShardCatalogSourceScope,
-                               inconsistencies);
+    validateShardCatalogEntries(collectionInDurableShardCatalog->asShardCatalogType(),
+                                chunksInDurableShardCatalog,
+                                *collectionInGlobalCatalog,
+                                chunksInGlobalCatalog,
+                                shardId,
+                                kDurableShardCatalogSourceScope,
+                                inconsistencies);
 }
 
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
