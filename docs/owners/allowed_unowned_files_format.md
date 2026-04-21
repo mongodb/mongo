@@ -2,15 +2,20 @@
 
 ## ALLOWED_UNOWNED_FILES.yml File Format
 
-This file is for repos that require all files be owned. Some files may be listed here as an exception and will be added to the end of the CODEOWNERS.
+This file is for repos that require all files be owned. Some files may be listed here as an
+exception and will be added to the end of the CODEOWNERS.
 
-`version` is the current version of the `ALLOWED_UNOWNED_FILES.yml` file format. The only version is `1.0.0`.
+`version` is the current version of the `ALLOWED_UNOWNED_FILES.yml` file format. The only version is
+`1.0.0`.
 
 `filters` are a list of filters that each have a `filter` and `justificaiton` field.
 
-`filter` is a file path. This file path must start with a `/` and is relative to the root repo directory. Directories or globs are not supported at the moment to ensure careful selection of files allowed to be unowned. This can be reconsidered if proper usecases appear.
+`filter` is a file path. This file path must start with a `/` and is relative to the root repo
+directory. Directories or globs are not supported at the moment to ensure careful selection of files
+allowed to be unowned. This can be reconsidered if proper usecases appear.
 
-`justification` is the reason why this file should be unowned. A common case is that this is a generated file that has checks in CI to ensure it is in the correct format.
+`justification` is the reason why this file should be unowned. A common case is that this is a
+generated file that has checks in CI to ensure it is in the correct format.
 
 ### Example file
 
@@ -23,7 +28,8 @@ filters: # List of all filters
 
 ### Configuration
 
-This can be configured in any repo with `bazel_rules_mongo` by putting the following lines in your `.bazelrc` file:
+This can be configured in any repo with `bazel_rules_mongo` by putting the following lines in your
+`.bazelrc` file:
 
 ```
 common --define codeowners_have_allowed_unowned_files=True

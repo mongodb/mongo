@@ -1,10 +1,12 @@
 # MongoDB Development with Dev Containers
 
-**⚠️ BETA:** The devcontainer setup is currently in Beta stage. Please report issues and feedback to the team.
+**⚠️ BETA:** The devcontainer setup is currently in Beta stage. Please report issues and feedback to
+the team.
 
 ## 📚 Documentation Index
 
-This is the comprehensive guide for developing MongoDB using Dev Containers. Choose the guide that best fits your needs:
+This is the comprehensive guide for developing MongoDB using Dev Containers. Choose the guide that
+best fits your needs:
 
 ### 🚀 [Getting Started](./getting-started.md)
 
@@ -80,7 +82,8 @@ This is the comprehensive guide for developing MongoDB using Dev Containers. Cho
 
 ## What are Dev Containers?
 
-Dev Containers provide a consistent, reproducible development environment using Docker containers. This ensures:
+Dev Containers provide a consistent, reproducible development environment using Docker containers.
+This ensures:
 
 - ✅ **Consistency**: Everyone works with identical tooling and dependencies
 - ✅ **Isolation**: Your host system stays clean

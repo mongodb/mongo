@@ -1,10 +1,12 @@
 # Extensions
 
-This module provides utilities for setting up and configuring MongoDB extensions in resmoke test suites.
+This module provides utilities for setting up and configuring MongoDB extensions in resmoke test
+suites.
 
 ## Overview
 
-Extensions are dynamically loaded shared objects (`.so` files) that provide additional functionality to MongoDB. The utilities in this folder can handle:
+Extensions are dynamically loaded shared objects (`.so` files) that provide additional functionality
+to MongoDB. The utilities in this folder can handle:
 
 1. Discovering extension `.so` files in build directories
 2. Generating `.conf` configuration files for extensions
@@ -12,7 +14,8 @@ Extensions are dynamically loaded shared objects (`.so` files) that provide addi
 
 ## Configuration File Generation in Tests
 
-Extension `.conf` files are YAML configuration files that tell the server how to load an extension. They contain:
+Extension `.conf` files are YAML configuration files that tell the server how to load an extension.
+They contain:
 
 - `sharedLibraryPath`: Path to the `.so` file
 - `extensionOptions`: Optional configuration parameters for the extension
@@ -30,9 +33,11 @@ extensionOptions:
 
 The `generate_extension_configs.py` module creates `.conf` files:
 
-1. Receives a list of `.so` file paths (either from automatic discovery via `find_and_generate_extension_configs.py`, or manually via `--so-files` command-line argument)
+1. Receives a list of `.so` file paths (either from automatic discovery via
+   `find_and_generate_extension_configs.py`, or manually via `--so-files` command-line argument)
 2. For each `.so`, creates a `.conf` file in the temp directory (`/tmp/mongo/extensions/`)
-3. Looks up corresponding extension options from `src/mongo/db/extension/test_examples/configurations.yml`, if any are specified
+3. Looks up corresponding extension options from
+   `src/mongo/db/extension/test_examples/configurations.yml`, if any are specified
 4. Writes the config file with `sharedLibraryPath` and any `extensionOptions`
 
 ### Automatic Discovery and Generation

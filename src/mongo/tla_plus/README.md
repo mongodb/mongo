@@ -1,8 +1,8 @@
 # MongoDB TLA+/PlusCal Specifications
 
 This folder contains formal specifications of various components in order to check their
-correctness. Some are experiments, some reflect MongoDB's actual implementation. See the
-comments in each spec for details.
+correctness. Some are experiments, some reflect MongoDB's actual implementation. See the comments in
+each spec for details.
 
 Some specs are intended for model-checking. They are in subdirectories like:
 

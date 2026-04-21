@@ -7,7 +7,8 @@ places with more detailed documentation.
 Third-party storage engines are integrated through self-contained modules that can be dropped into
 an existing MongoDB source tree, and will be automatically configured and included.
 
-For more context and information on how this API is used, see the [Catalog](../shard_role/shard_catalog/README.md).
+For more context and information on how this API is used, see the
+[Catalog](../shard_role/shard_catalog/README.md).
 
 ## Record Stores
 
@@ -16,7 +17,8 @@ them. All MongoDB collections are implemented with a [RecordStore](record_store.
 implemented with a [SortedDataInterface](sorted_data_interface.h). By using the
 [KVEngine](kv/kv_engine.h) class, you only have to deal with the abstraction, as the
 [StorageEngineImpl](storage_engine_impl.h) implements the [StorageEngine](storage_engine.h)
-interface, using record stores for catalogs. See the [Catalog](../shard_role/shard_catalog/README.md) for more information.
+interface, using record stores for catalogs. See the
+[Catalog](../shard_role/shard_catalog/README.md) for more information.
 
 ### Record Identities
 
@@ -41,7 +43,8 @@ MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all 
 ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
 with respect to other accesses.
 
-See the [Catalog](../shard_role/shard_catalog/README.md) and [Concurrency Control](../shard_role/lock_manager/README.md) for more information.
+See the [Catalog](../shard_role/shard_catalog/README.md) and
+[Concurrency Control](../shard_role/lock_manager/README.md) for more information.
 
 ## Transactions
 
@@ -156,19 +159,21 @@ scope before `commit()` is called, the storage transaction is rolled back and al
 are lost. Reads can be performed outside of a `WriteUnitOfWork` block; storage transactions outside
 of a `WriteUnitOfWork` are always rolled back, since there are no writes to commit.
 
-The WriteUnitOfWork has a [`groupOplogEntries` option](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/storage/write_unit_of_work.h#L74)
-to replicate multiple writes transactionally. This option uses the [`BatchedWriteContext` class](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/op_observer/batched_write_context.h#L47)
+The WriteUnitOfWork has a
+[`groupOplogEntries` option](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/storage/write_unit_of_work.h#L74)
+to replicate multiple writes transactionally. This option uses the
+[`BatchedWriteContext` class](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/op_observer/batched_write_context.h#L47)
 to stage writes and to generate a single applyOps entry at commit, similar to what multi-document
-transactions do via the [`TransactionParticipant` class](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/transaction/transaction_participant.h#L117).
-Unlike a multi-document transaction, the applyOps entry lacks the `lsId` and the `txnNumber`
-fields. Callers must ensure that the WriteUnitOfWork does not generate more than 16MB of oplog,
-otherwise the operation will fail with `TransactionTooLarge` code.
+transactions do via the
+[`TransactionParticipant` class](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/transaction/transaction_participant.h#L117).
+Unlike a multi-document transaction, the applyOps entry lacks the `lsId` and the `txnNumber` fields.
+Callers must ensure that the WriteUnitOfWork does not generate more than 16MB of oplog, otherwise
+the operation will fail with `TransactionTooLarge` code.
 
-As of MongoDB 6.0, the `groupOplogEntries` mode is only used by the [BatchedDeleteStage](../exec/classic/batched_delete_stage.h)
-for efficient mass-deletes.
+As of MongoDB 6.0, the `groupOplogEntries` mode is only used by the
+[BatchedDeleteStage](../exec/classic/batched_delete_stage.h) for efficient mass-deletes.
 
-See
-[WriteUnitOfWork](write_unit_of_work.h).
+See [WriteUnitOfWork](write_unit_of_work.h).
 
 ## Lazy initialization of storage transactions
 
@@ -207,8 +212,8 @@ the write transaction until it succeeds, accompanied by a bounded exponential ba
 
 ## TemporarilyUnavailableException
 
-A TemporarilyUnavailableException may be thrown inside the server to indicate that an operation cannot
-complete without blocking and must be retried. The storage engine may throw a
+A TemporarilyUnavailableException may be thrown inside the server to indicate that an operation
+cannot complete without blocking and must be retried. The storage engine may throw a
 TemporarilyUnavailableException (converted to a TemporarilyUnavailable error for users) when an
 operation is excessively rolled-back in the storage engine due to cache pressure or any reason that
 would prevent the operation from completing without impacting concurrent operations. The operation
@@ -269,7 +274,9 @@ Format of idents in the WiredTiger storage engine:
   - `collection-d3575067-0cd9-4239-a9e8-f6af884fc6fe`
   - `index-a22eca47-c9e1-4df4-a043-d10e4cd45b40`
 
-Idents created in earlier versions of the server (pre v8.2) use a `<counter> + <random number>` combination as the `<unique identifier>` (e.g: `index-62-2245557986372974053`). Future versions of the server must continue to recognize both formats.
+Idents created in earlier versions of the server (pre v8.2) use a `<counter> + <random number>`
+combination as the `<unique identifier>` (e.g: `index-62-2245557986372974053`). Future versions of
+the server must continue to recognize both formats.
 
 Server flags that alter the form of idents (this applies to indexes as well):
 
@@ -283,9 +290,10 @@ There are three components to startup recovery. The first step, of course, is st
 engine. More detail about WiredTiger's startup recovery procedure can be found
 [here](wiredtiger/README.md#startup-recovery).
 
-The other two parts of storage startup recovery bring the [catalog](../shard_role/shard_catalog/README.md) back into
-a consistent state. The catalog typically refers to MongoDB's notion of collections and indexes, but
-it's important to note that storage engines such as WiredTiger have their own notion of a catalog.
+The other two parts of storage startup recovery bring the
+[catalog](../shard_role/shard_catalog/README.md) back into a consistent state. The catalog typically
+refers to MongoDB's notion of collections and indexes, but it's important to note that storage
+engines such as WiredTiger have their own notion of a catalog.
 
 The first step of recovering the catalog is to bring MongoDB's catalog in line with the storage
 engine's. This is called reconciliation. Except for rare cases, every MongoDB collection is a
@@ -294,30 +302,36 @@ their own ident. [The WiredTiger README](wiredtiger/README.md) describes the rel
 creating/dropping a collection and the underlying creation/deletion of a table which justifies the
 following logic. In short, the following logic is necessary because not all storage engines can
 create and drop idents transactionally. When reconciling, every ident that is not "pointed to" by a
-MongoDB record store or index [gets
-dropped](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L720-L734). A MongoDB record store that points to an ident that doesn't exist is considered [a fatal
-error](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L737-L752). An index that doesn't point to an ident is [ignored and
-logged](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L787-L799) because there are certain cases where the catalog entry may reference an index ident which
-is no longer present, such as when an unclean shutdown occurs before a checkpoint is taken during
-startup recovery.
+MongoDB record store or index
+[gets dropped](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L720-L734).
+A MongoDB record store that points to an ident that doesn't exist is considered
+[a fatal error](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L737-L752).
+An index that doesn't point to an ident is
+[ignored and logged](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L787-L799)
+because there are certain cases where the catalog entry may reference an index ident which is no
+longer present, such as when an unclean shutdown occurs before a checkpoint is taken during startup
+recovery.
 
-The second step of recovering the catalog is [reconciling unfinished index
-builds](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L754-L758), that could have different outcomes:
+The second step of recovering the catalog is
+[reconciling unfinished index builds](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L754-L758),
+that could have different outcomes:
 
-- An [index build with a
-  UUID](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L801-L804) is an unfinished two-phase build and must be restarted, unless we are [resuming
-  it](/src/mongo/db/index_builds/README.md#resumable-index-builds). This resume information is stored in an internal ident written at
-  (clean) shutdown. If we fail to resume the index build, we will clean up the internal ident and
-  restart the index build in the background.
-- An [unfinished index build on
-  standalone](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L845-L849) will be discarded (no oplog entry was ever written saying the index exists).
+- An
+  [index build with a UUID](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L801-L804)
+  is an unfinished two-phase build and must be restarted, unless we are
+  [resuming it](/src/mongo/db/index_builds/README.md#resumable-index-builds). This resume
+  information is stored in an internal ident written at (clean) shutdown. If we fail to resume the
+  index build, we will clean up the internal ident and restart the index build in the background.
+- An
+  [unfinished index build on standalone](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L845-L849)
+  will be discarded (no oplog entry was ever written saying the index exists).
 
-After storage completes its recovery, control is passed to [replication
-recovery](../repl/README.md#startup-recovery). While storage recovery is responsible for recovering
-the oplog to meet durability guarantees and getting the two catalogs in sync, replication recovery
-takes responsibility for getting collection data in sync with the oplog. Replication starts
-replaying oplog from the [recovery
-timestamp](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine.h#L553-L558).
+After storage completes its recovery, control is passed to
+[replication recovery](../repl/README.md#startup-recovery). While storage recovery is responsible
+for recovering the oplog to meet durability guarantees and getting the two catalogs in sync,
+replication recovery takes responsibility for getting collection data in sync with the oplog.
+Replication starts replaying oplog from the
+[recovery timestamp](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine.h#L553-L558).
 
 See the [WiredTiger README](wiredtiger/README.md#checkpoints) for more details.
 
@@ -357,11 +371,11 @@ commit-level durability for all operations since the last checkpoint. On startup
 writes are re-applied to the data from the last checkpoint. Without journaling, all writes between
 checkpoints would be lost.
 
-Storage engines need to [support
-checkpoints](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/storage/storage_engine.h#L235)
+Storage engines need to
+[support checkpoints](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/storage/storage_engine.h#L235)
 for MongoDB to take advantage of this, otherwise MongoDB will act as an ephemeral data store. The
-frequency of these checkpoints is determined by the ['storage.syncPeriodSecs' or
-'syncdelay'](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/mongod_options_storage.idl#L130-L136)
+frequency of these checkpoints is determined by the
+['storage.syncPeriodSecs' or 'syncdelay'](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/mongod_options_storage.idl#L130-L136)
 options.
 
 # Journaling
@@ -397,8 +411,7 @@ the implementation.
 
 Code Links:
 
-- [_The JournalFlusher
-  class_](control/journal_flusher.h)
+- [_The JournalFlusher class_](control/journal_flusher.h)
   - Periodically and upon request flushes the journal to disk.
 
 # Fast Truncation on Internal Collections
@@ -456,7 +469,8 @@ A new truncate marker is created when either:
 CollectionTruncateMarkers support collections that meet the following requirements:
 
 - Insert and truncate only. No updates or individual document deletes.
-- [Clustered](../shard_role/shard_catalog/README.md#clustered-collections) with no secondary indexes.
+- [Clustered](../shard_role/shard_catalog/README.md#clustered-collections) with no secondary
+  indexes.
 - RecordId's in Timestamp order.
 - Deletion of content follows RecordId ordering.
   - This is a general property of clustered capped collections.
@@ -475,8 +489,8 @@ Collections who use CollectionTruncateMarkers share the following properties:
   - Deleting with untimestamped, unreplicated range truncation means point-in-time reads may see
     inconsistent data.
 
-Each collection utilizing CollectionTruncateMarkers must implement its [own
-policy](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/storage/collection_truncate_markers.h#L299-L302)
+Each collection utilizing CollectionTruncateMarkers must implement its
+[own policy](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/storage/collection_truncate_markers.h#L299-L302)
 to determine when there are excess markers and it is time for truncation.
 
 ### In-Memory Initialization
@@ -493,7 +507,8 @@ metrics will converge closer to the correct values.
 - [Change stream pre-images collection](#pre-images-collection-truncation) -
   `PreImagesTruncateMarkersPerNsUUID`
 
-Read about the WiredTiger implementation of Oplog Truncation Markers [here](wiredtiger/README.md#oplog-truncation).
+Read about the WiredTiger implementation of Oplog Truncation Markers
+[here](wiredtiger/README.md#oplog-truncation).
 
 ### Change Stream Collection Truncation
 
@@ -526,8 +541,8 @@ A pre-image is expired if either (1) 'expireAfterSeconds' is set and the pre-ima
 or (2) its 'ts' is less than or equal to the oldest oplog entry timestamp.
 
 `ChangeStreamExpiredPreImagesRemover` iterates over each set of `PreImagesTruncateMarkersPerNsUUID`,
-and issues a ranged truncate from the truncate marker's last record to the minimum RecordId for
-the nsUUID when there is an expired truncate marker.
+and issues a ranged truncate from the truncate marker's last record to the minimum RecordId for the
+nsUUID when there is an expired truncate marker.
 
 #### Replication of Pre-Images Collection Truncation
 
@@ -570,34 +585,29 @@ once when the job is installed and runs for the first time.
 In replicated truncates mode, only the current primary executes the pre-image removal. On every
 step-up as a primary, the node installs the pre-images removal job, as part of the
 `onStepUpComplete` callback of the `ReplicaSetAwareInterface`. When a node steps down, the pre-image
-truncation job is stopped as part of the `onStepDown` callback.
-If a step-up or step-down happens while the pre-images removal job is currently executing, the
-current removal job iteration can fail with a `NotWritablePrimary` error. This is expected and does
-not cause problems, as the new primary will take over the deletions afterwards.
-In replicated truncates mode, sampling of the documents in the pre-images collection is performed on
-every step-up as a primary.
+truncation job is stopped as part of the `onStepDown` callback. If a step-up or step-down happens
+while the pre-images removal job is currently executing, the current removal job iteration can fail
+with a `NotWritablePrimary` error. This is expected and does not cause problems, as the new primary
+will take over the deletions afterwards. In replicated truncates mode, sampling of the documents in
+the pre-images collection is performed on every step-up as a primary.
 
 #### Cleanup After Unclean Shutdown
 
 When using unreplicated truncates, all expired pre-images are truncated at startup after an unclean
 shutdown. WiredTiger truncate cannot guarantee a consistent view of previously truncated data on
-unreplicated, untimestamped ranges after a crash.
-Unlike the oplog, the change stream pre-image collection is not logged, does not persist any special
-timestamps, and it's possible that previously truncated documents can resurface after shutdown.
+unreplicated, untimestamped ranges after a crash. Unlike the oplog, the change stream pre-image
+collection is not logged, does not persist any special timestamps, and it's possible that previously
+truncated documents can resurface after shutdown.
 
 ### Code spelunking starting points:
 
-- [The CollectionTruncateMarkers
-  class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/collection_truncate_markers.h#L78)
+- [The CollectionTruncateMarkers class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/collection_truncate_markers.h#L78)
   - The main api for CollectionTruncateMarkers.
-- [The OplogTruncateMarkers
-  class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h#L45)
+- [The OplogTruncateMarkers class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h#L45)
   - Oplog specific truncate markers.
-- [The PreImagesTruncateMarkersPerNsUUID
-  class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
+- [The PreImagesTruncateMarkersPerNsUUID class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
   - Truncate markers for a given nsUUID captured within a pre-images collection.
-- [The PreImagesTruncateManager
-  class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/change_stream_pre_images_truncate_manager.h#L71)
+- [The PreImagesTruncateManager class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/change_stream_pre_images_truncate_manager.h#L71)
   - Manages pre-image truncate markers.
 
 # Oplog Collection
@@ -670,11 +680,18 @@ disregarding any oplog holes.
 
 # DiskSpaceMonitor
 
-The `DiskSpaceMonitor` is a `ServiceContext` decoration that monitors available disk space every second in the database path and executes registered actions when disk space falls below specified thresholds. The `DiskSpaceMonitor` is started during MongoDB initialization.
+The `DiskSpaceMonitor` is a `ServiceContext` decoration that monitors available disk space every
+second in the database path and executes registered actions when disk space falls below specified
+thresholds. The `DiskSpaceMonitor` is started during MongoDB initialization.
 
-Actions are registered with a threshold function which should return the number of threshold bytes and a action function. When the available disk space <= the number of threshold bytes, we perform the action function. Each action receives a unique ID for deregistration or to run specific actions as needed. Actions can be run by its unique ID (`runAction`) or collectively (`runAllActions`).
+Actions are registered with a threshold function which should return the number of threshold bytes
+and a action function. When the available disk space <= the number of threshold bytes, we perform
+the action function. Each action receives a unique ID for deregistration or to run specific actions
+as needed. Actions can be run by its unique ID (`runAction`) or collectively (`runAllActions`).
 
-An example of a use of the `DiskSpaceMonitor` is the `IndexBuildsCoordinator` registers actions to kill index builds when disk space is low when neither `directoryPerDb` nor `directoryForIndexes` is enabled.
+An example of a use of the `DiskSpaceMonitor` is the `IndexBuildsCoordinator` registers actions to
+kill index builds when disk space is low when neither `directoryPerDb` nor `directoryForIndexes` is
+enabled.
 
 # Glossary
 
@@ -685,8 +702,8 @@ timestamped write happens to commit first. Oplog holes can exist in-memory and p
 advancing past oplog holes. Tracks in-memory oplog holes.
 
 **snapshot**: A snapshot consists of a consistent view of data in the database. When a snapshot is
-opened with a timestamp, snapshot only shows data committed with a timestamp less than or equal
-to the snapshot's timestamp.
+opened with a timestamp, snapshot only shows data committed with a timestamp less than or equal to
+the snapshot's timestamp.
 
 **snapshot isolation**: A guarantee that all reads in a transaction see the same consistent snapshot
 of the database. Reads with snapshot isolation are repeatable, only see committed data, and never

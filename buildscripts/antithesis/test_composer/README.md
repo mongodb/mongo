@@ -17,8 +17,8 @@ For background on Antithesis, the base images, and the broader CI pipeline, see
 
 Scripts must be executable and live directly under the template directory (not in subdirectories).
 The prefix of the filename determines scheduling behavior. Any file that doesn't match a known
-prefix — including files in subdirectories or files prefixed with `helper_` — is ignored by
-Test Composer and can be used for shared logic.
+prefix — including files in subdirectories or files prefixed with `helper_` — is ignored by Test
+Composer and can be used for shared logic.
 
 ### Driver commands
 
@@ -27,18 +27,18 @@ Run during fault injection periods. At least one driver or `anytime_*` command i
 - **`parallel_driver_<name>`** — runs concurrently with other parallel drivers, including itself.
   Use for continuous client operations, parallel workloads, and availability checks under faults.
 
-- **`singleton_driver_<name>`** — runs as the only active driver in a history branch.
-  Use for porting existing integration tests or workloads that shouldn't overlap with other drivers.
+- **`singleton_driver_<name>`** — runs as the only active driver in a history branch. Use for
+  porting existing integration tests or workloads that shouldn't overlap with other drivers.
 
-- **`serial_driver_<name>`** — runs only when no other driver commands are active.
-  Use for validation steps and operations that require quiescence.
+- **`serial_driver_<name>`** — runs only when no other driver commands are active. Use for
+  validation steps and operations that require quiescence.
 
 ### Quiescent commands
 
 Run in the absence of faults.
 
-- **`first_<name>`** — optional one-time setup that runs once before any driver commands start.
-  Use for data initialization, schema setup, and bootstrapping.
+- **`first_<name>`** — optional one-time setup that runs once before any driver commands start. Use
+  for data initialization, schema setup, and bootstrapping.
 
 - **`eventually_<name>`** — runs after driver commands start; halts all drivers and stops faults,
   creating a new history branch. Use for testing eventual consistency and post-recovery state.
@@ -57,8 +57,8 @@ Run in the absence of faults.
 ### `basic_js_commands`
 
 Parallel JavaScript workload against a single `mongod`. All commands share retry logic defined in
-[`js/commands.js`](basic_js_commands/js/commands.js) that handles transient network errors,
-server selection failures, and retryable write errors.
+[`js/commands.js`](basic_js_commands/js/commands.js) that handles transient network errors, server
+selection failures, and retryable write errors.
 
 | Script                                           | Function                      | Notes                                                                       |
 | ------------------------------------------------ | ----------------------------- | --------------------------------------------------------------------------- |
@@ -86,13 +86,13 @@ infrastructure for Test Composer. Both scripts use
 
 ## Best practices
 
-- **Retry logic** — always handle transient network errors and server selection failures.
-  See [`commands.js`](basic_js_commands/js/commands.js) for a reusable retry wrapper.
+- **Retry logic** — always handle transient network errors and server selection failures. See
+  [`commands.js`](basic_js_commands/js/commands.js) for a reusable retry wrapper.
 - **Randomize** — the more variation you introduce, the more state space Antithesis can explore.
   Antithesis controls and can reproduce the random seed, so interesting paths can be re-explored.
 - **Idempotency** — design scripts to tolerate being killed and restarted at any point.
-- **Start simple** — begin with a `singleton_driver_*` to port an existing test, then evolve
-  toward parallel drivers as confidence grows.
+- **Start simple** — begin with a `singleton_driver_*` to port an existing test, then evolve toward
+  parallel drivers as confidence grows.
 
 ## Running locally
 
@@ -126,8 +126,8 @@ docker compose -f docker_compose/<suite_name>/docker-compose.yml \
   /opt/antithesis/test/v1/basic_js_commands/parallel_driver_mongod_aggregate.sh
 ```
 
-The `/scripts/print_connection_string.sh` helper used by each script is generated automatically
-from the resmoke fixture's connection string and placed in the config image during the build step.
+The `/scripts/print_connection_string.sh` helper used by each script is generated automatically from
+the resmoke fixture's connection string and placed in the config image during the build step.
 
 ## Adding a new template
 

@@ -1,8 +1,7 @@
 # Query Data Generator
 
-This is a data generation framework for Query benchmarks.
-It is intended to be a way to easily produce workloads for Query testing use cases.
-Key features of this work:
+This is a data generation framework for Query benchmarks. It is intended to be a way to easily
+produce workloads for Query testing use cases. Key features of this work:
 
 - Data schema are declarative. Relationships are interspersed in the schema, however.
 - Correlations are easy to model. This is done through a combination of three mechanisms.
@@ -84,7 +83,8 @@ look for a default distribution for the type:
 
 - For basic python `<type>`s, the default function is the Faker function `py<type>`. See
   https://faker.readthedocs.io/en/master/providers/faker.providers.python.html
-- For a nested object type, the data generator will generate instances of the type by looking its definition.
+- For a nested object type, the data generator will generate instances of the type by looking its
+  definition.
 
 In this example, `InnerObject.f` will be populated by the `faker.pylist` function, and the fully
 populated `InnerObject` will be used to populate `OuterObject.f`.
@@ -105,8 +105,8 @@ The specification class has two positional arguments:
 
 1. `source`, which is the distribution itself. This can take three forms:
 
-   a. A function. The function signature should be `def
-func(fac: datagen.util.CorrelatedDataFactory, **kwargs)`. Passing the CorrelatedDataFactory
+   a. A function. The function signature should be
+   `def func(fac: datagen.util.CorrelatedDataFactory, **kwargs)`. Passing the CorrelatedDataFactory
    through the function allows the values produced to be recorded.
 
    b. A type. In this case, the default distribution for the type will be used.
@@ -119,9 +119,9 @@ func(fac: datagen.util.CorrelatedDataFactory, **kwargs)`. Passing the Correlated
    match `dependson` will be passed into `source`, along with any values that have been passed down
    from parent objects.
 
-   In the example below, `NestedObject2.i2_1` depends on `NestedObject.i1_1`. Because `dependson` can
-   only pass in a value of a field belonging to the same object, the value of `OuterObject.o_1` is
-   passed into the distribution function for `OuterObject.o_3` so that the `NestedObject2`
+   In the example below, `NestedObject2.i2_1` depends on `NestedObject.i1_1`. Because `dependson`
+   can only pass in a value of a field belonging to the same object, the value of `OuterObject.o_1`
+   is passed into the distribution function for `OuterObject.o_3` so that the `NestedObject2`
    distribution function can see it.
 
    ```
@@ -158,8 +158,8 @@ This data generator supports the following external distributions:
 - Any function available to a [`faker.Faker`](https://faker.readthedocs.io/en/master/index.html)
   instance. In order to use the same seed as the rest of the data generator, you should call the
   function from `datagen.random.global_faker()`.
-- Any function available to a [`numpy Random
-Generator`](https://numpy.org/doc/stable/reference/random/generator.html) In order
+- Any function available to a
+  [`numpy Random Generator`](https://numpy.org/doc/stable/reference/random/generator.html) In order
   to use the same seed as the rest of the data generator, you should call the function from
   `datagen.random.numpy_random()`. Note that the numpy Random generator does not support built-in
   correlation capabilities because it uses a rng that we have not figured out how to override.
@@ -305,12 +305,11 @@ and derivation.
 ### Linear scaling
 
 In linear scaling, two fields `a` and `b` (drawn from discrete, ordered sets) are correlated
-indirectly by instead correlating them to a hidden value `n`.
-Each distinct `n` maps to a potentially non-unique (`a`, `b`) pair.
-In the common case, as `n` increases, so do the values of `a` and `b`, though they might not
-increase at the same rates as each other.
-Any linear correlation can be represented this way, including inverse correlations (by simply
-reversing the order of traversal for that field).
+indirectly by instead correlating them to a hidden value `n`. Each distinct `n` maps to a
+potentially non-unique (`a`, `b`) pair. In the common case, as `n` increases, so do the values of
+`a` and `b`, though they might not increase at the same rates as each other. Any linear correlation
+can be represented this way, including inverse correlations (by simply reversing the order of
+traversal for that field).
 
 This diagram provides a simple visual of how this works:
 
@@ -326,11 +325,9 @@ Thus, `a` and `b` are directly correlated.
 ### Derivation
 
 Linear scaling alone is insufficient for representing many of the correlations in which we are
-interested.
-For example, salary might depend on not only the employee's level, but also their team and track
-(whether they are a manager, etc.).
-To represent such a correlation, one might think about salary as a multivariate function of the
-employee's level, team, and track, such as:
+interested. For example, salary might depend on not only the employee's level, but also their team
+and track (whether they are a manager, etc.). To represent such a correlation, one might think about
+salary as a multivariate function of the employee's level, team, and track, such as:
 
 ```
 f: (level, team, track) -> salary
@@ -341,8 +338,7 @@ Fortunately, this is fairly easy to model in Python as... regular functions.
 ## Implementation
 
 Linear scaling is primarily implemented using a custom random number generator,
-`datagen.random.CorrelatedRng`.
-This subclass of `random.Random` makes two important changes:
+`datagen.random.CorrelatedRng`. This subclass of `random.Random` makes two important changes:
 
 1. Replaces modulus-based arithmetic with multiplication-based arithmetic.
 2. Maintains a cache of states so that random number generations are deterministically repeatable.
@@ -351,7 +347,8 @@ This subclass of `random.Random` makes two important changes:
 
 ## Generating completely uncorrelated data
 
-Completely uncorrelated data is generated if a given specification does not use the `correlation` distribution:
+Completely uncorrelated data is generated if a given specification does not use the `correlation`
+distribution:
 
 ```python
 @dataclasses.dataclass
@@ -360,8 +357,8 @@ class Uncorrelated:
     field2: Specification(source=uniform(["a", "b"]))
 ```
 
-The configuration above produces a collection where `field1` and `field2` are completely uncorrelated
-so that all combinations of values are equally likely:
+The configuration above produces a collection where `field1` and `field2` are completely
+uncorrelated so that all combinations of values are equally likely:
 
 ```
 Enterprise test> db.Uncorrelated.aggregate([{ $group: { _id: {field1: "$field1", field2:"$field2"}, count: { $count: {} }}}, {$sort: {"_id.field1":1, "_id.field2":1}}] ) ;
@@ -375,9 +372,9 @@ Enterprise test> db.Uncorrelated.aggregate([{ $group: { _id: {field1: "$field1",
 
 ## Generating partially correlated data
 
-By default, if a field specification is configured to use a particular correlation, all data generated
-for it will be 100% correlated. To mix in some uncorrelated data, create a `choice` between a
-`correlation` distribution and a non-`correlation` distribution:
+By default, if a field specification is configured to use a particular correlation, all data
+generated for it will be 100% correlated. To mix in some uncorrelated data, create a `choice`
+between a `correlation` distribution and a non-`correlation` distribution:
 
 ```python
 from datagen.distribution import correlation, uniform
@@ -407,7 +404,8 @@ Enterprise test> db.Uncorrelated.aggregate([{ $group: { _id: {field1: "$field1",
 
 ## Generating objects
 
-There are two ways to generate objects -- either directly from a Python dict or from a class that is defined in the spec.
+There are two ways to generate objects -- either directly from a Python dict or from a class that is
+defined in the spec.
 
 ### Generating from a python dict
 
@@ -484,14 +482,20 @@ produces the following `.schema` fragment:
 python extract_schema.py --db tpch --uri "mongodb://localhost:20000" > out/tpch.schema
 ```
 
-This will extract the schema from one or more collections in the database and dump the extracted metadata to stdout in `.schema` format.
+This will extract the schema from one or more collections in the database and dump the extracted
+metadata to stdout in `.schema` format.
 
-As `.schema` files do not natively support multiple collections, so if no collection is specified via `--collection`, the metadata from
-all the collections will be joined together in a single schema specification.
+As `.schema` files do not natively support multiple collections, so if no collection is specified
+via `--collection`, the metadata from all the collections will be joined together in a single schema
+specification.
 
-Each collection will be sampled using `{"$sample": {"size": 10000}}` unless a different value is specified using `--sample-size`. Note that
-the use of sample size that is smaller than the collection size has the following side effects:
+Each collection will be sampled using `{"$sample": {"size": 10000}}` unless a different value is
+specified using `--sample-size`. Note that the use of sample size that is smaller than the
+collection size has the following side effects:
 
-- The `missing_count` and `unique` sections of the schema will reflect just the sample, and not the entire collection.
-- The `min` and the `max` are based on the values from the sample and are not the global min and max for the collection.
-- Tf a given field was not present in the sample at all, it will also not be present in the output schema.
+- The `missing_count` and `unique` sections of the schema will reflect just the sample, and not the
+  entire collection.
+- The `min` and the `max` are based on the values from the sample and are not the global min and max
+  for the collection.
+- Tf a given field was not present in the sample at all, it will also not be present in the output
+  schema.

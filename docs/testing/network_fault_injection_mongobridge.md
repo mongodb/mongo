@@ -2,11 +2,23 @@
 
 ## Overview
 
-[Mongobridge](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/src/mongo/tools/mongobridge_tool/bridge.cpp#L1) is a network fault injection testing tool that allows test authors to intentionally simulate network issues such as connection failures, message delays, or packet loss during communication to any node in a cluster. It acts as a transparent proxy between MongoDB processes and their clients, enabling controlled network fault injection for testing distributed system behavior.
+[Mongobridge](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/src/mongo/tools/mongobridge_tool/bridge.cpp#L1)
+is a network fault injection testing tool that allows test authors to intentionally simulate network
+issues such as connection failures, message delays, or packet loss during communication to any node
+in a cluster. It acts as a transparent proxy between MongoDB processes and their clients, enabling
+controlled network fault injection for testing distributed system behavior.
 
 ## How It Works
 
-When `ReplSetTest` or `ShardingTest` are instructed to use `mongobridge`, they will [set up a mongobridge process](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/jstests/libs/replsettest.js#L2962) for each node that [creates a ProxiedConnection](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/src/mongo/tools/mongobridge_tool/bridge.cpp#L323-L324) between the node and any clients (including other nodes in the cluster) attempting to communicate with it. When test authors send a command to a node, mongobridge [intercepts the command and applies any configured actions](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/src/mongo/tools/mongobridge_tool/bridge.cpp#L395-L430) onto the commands before forwarding the command along to the node itself. This allows simple fault injection from the test author's perspective.
+When `ReplSetTest` or `ShardingTest` are instructed to use `mongobridge`, they will
+[set up a mongobridge process](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/jstests/libs/replsettest.js#L2962)
+for each node that
+[creates a ProxiedConnection](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/src/mongo/tools/mongobridge_tool/bridge.cpp#L323-L324)
+between the node and any clients (including other nodes in the cluster) attempting to communicate
+with it. When test authors send a command to a node, mongobridge
+[intercepts the command and applies any configured actions](https://github.com/mongodb/mongo/blob/e810af1916caaedb1cde8d1e1b74bb50b2461daf/src/mongo/tools/mongobridge_tool/bridge.cpp#L395-L430)
+onto the commands before forwarding the command along to the node itself. This allows simple fault
+injection from the test author's perspective.
 
 ## Quick Start
 
@@ -23,7 +35,8 @@ To use mongobridge in your tests:
    });
    ```
 
-   - **Test commands must be enabled**: Mongobridge's `*From` commands require `enableTestCommands: true` (which is the default in test environments)
+   - **Test commands must be enabled**: Mongobridge's `*From` commands require
+     `enableTestCommands: true` (which is the default in test environments)
 
 2. **Inject network faults** using bridge commands:
 
@@ -38,11 +51,16 @@ To use mongobridge in your tests:
    st.rs0.getPrimary().acceptConnectionsFrom(st.rs0.getSecondary());
    ```
 
-3. Operations that depend on communication between the affected nodes will fail or timeout as expected.
+3. Operations that depend on communication between the affected nodes will fail or timeout as
+   expected.
 
 ## What to keep in mind
 
-Be aware that there are consequences to injecting network faults between nodes that can cause downstream impact in (for example) heartbeats, sync source selection, and SDAM, and so after a fault has been injected the test may not be in the state you expect it to be in for future commands. It is best to keep mongobridge tests relatively short and targeted to ensure that flakiness due to these faults doesn't impact the rest of your testing.
+Be aware that there are consequences to injecting network faults between nodes that can cause
+downstream impact in (for example) heartbeats, sync source selection, and SDAM, and so after a fault
+has been injected the test may not be in the state you expect it to be in for future commands. It is
+best to keep mongobridge tests relatively short and targeted to ensure that flakiness due to these
+faults doesn't impact the rest of your testing.
 
 ## Command Reference
 
@@ -71,7 +89,8 @@ node.acceptConnectionsFrom([node1, node2, node3]); // Multiple nodes
 node.rejectConnectionsFrom(otherNode);
 ```
 
-**Effect**: New connections are rejected, existing connections are closed when a new request is sent over them
+**Effect**: New connections are rejected, existing connections are closed when a new request is sent
+over them
 
 **Use case**: Simulating complete network partitions
 
@@ -183,7 +202,8 @@ primary.discardMessagesFrom(secondary, 0.3);
 
 ### Limitations
 
-- **OP_QUERY exhaust**: Not supported for legacy exhaust queries (OP_MSG exhaust cursors are supported)
+- **OP_QUERY exhaust**: Not supported for legacy exhaust queries (OP_MSG exhaust cursors are
+  supported)
 - **Direct connections**: Only works when connections go through the bridge proxy
 - **TLS support**: Mongobridge is not supported if the cluster is using TLS.
 

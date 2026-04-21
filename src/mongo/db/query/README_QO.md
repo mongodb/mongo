@@ -1,6 +1,8 @@
 # Query Optimization Architecture Guide
 
-This page provides an overview of the source code architecture for MongoDB's Query Optimization system. It is designed for engineers working on the core server, with introductory sections offering low-level details particularly useful for new members of the QO team.
+This page provides an overview of the source code architecture for MongoDB's Query Optimization
+system. It is designed for engineers working on the core server, with introductory sections offering
+low-level details particularly useful for new members of the QO team.
 
 ## Table of Contents
 
@@ -22,7 +24,8 @@ This page provides an overview of the source code architecture for MongoDB's Que
    - [QueryTester](query_tester/README.md)
    - [Fuzzers](https://github.com/10gen/jstestfuzz/blob/master/HitchhikersGuide.md)
    - [Locust perf tests](https://github.com/10gen/dsi/tree/master/workloads/query-optimization)
-     - [Generic QO benchmark](https://github.com/10gen/dsi/blob/master/workloads/query-optimization/generic/README.md), a.k.a. Synthetic Benchmarks.
+     - [Generic QO benchmark](https://github.com/10gen/dsi/blob/master/workloads/query-optimization/generic/README.md),
+       a.k.a. Synthetic Benchmarks.
 
 ## High-Level Diagram
 

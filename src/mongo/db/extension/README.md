@@ -1,11 +1,11 @@
 # MongoDB Extensions API
 
-This document aims to provide a high-level overview for the MongoDB Extensions API.
-An extension is an ahead-of-time compiled object that is dynamically loaded into the server
-to provide additional functionality. This object provides a handful of functions the server
-may invoke to setup/teardown the extension and register new functionality. Each extension may be
-updated independently from the server, meaning that functionality can be added or altered without
-building and releasing a new version of the server.
+This document aims to provide a high-level overview for the MongoDB Extensions API. An extension is
+an ahead-of-time compiled object that is dynamically loaded into the server to provide additional
+functionality. This object provides a handful of functions the server may invoke to setup/teardown
+the extension and register new functionality. Each extension may be updated independently from the
+server, meaning that functionality can be added or altered without building and releasing a new
+version of the server.
 
 This is a work in progress and more sections will be added gradually.
 
@@ -28,14 +28,14 @@ interact with it directly.
 The Host Connector layer is responsible for creating a safe interface for the C++ host code to
 interact with the extension using the C Public API. The host does not need to be aware of any of the
 C types that are introduced in the Public API. Instead, the Host Connector provides C++ classes and
-functions which abstract away the complexity and memory ownership concerns of interfacing with the
-C API.
+functions which abstract away the complexity and memory ownership concerns of interfacing with the C
+API.
 
 In general, every abstraction in the Public API has a respective C++ interface implemented in the
 Host Connector which the host is expected to use. This allows us to encapsulate and control where
 conversions across the API boundary between C and C++ take place, leading to more maintainable code
-and minimizing the risk of programmer errors in the host code. The Host Connector code lives within the
-C++ namespace `mongo::extension::host_connector` and can be found under the
+and minimizing the risk of programmer errors in the host code. The Host Connector code lives within
+the C++ namespace `mongo::extension::host_connector` and can be found under the
 `mongo/db/extension/host_connector` directory.
 
 The core host logic lives in `mongo/db/extension/host` within the C++ namespace
@@ -44,9 +44,9 @@ In other words, logic in `mongo::extension::host` should only refer to data stru
 `mongo::extension::host_connector` and should _not_ refer to any data structures from the Public API
 directly.
 
-**NOTE:** The exception to the `host`/`host_connector` division is the connector logic that wraps host services
-(like the HostPortal). Since that logic has many other server dependencies, the host services
-connector logic lives with the `host` logic.
+**NOTE:** The exception to the `host`/`host_connector` division is the connector logic that wraps
+host services (like the HostPortal). Since that logic has many other server dependencies, the host
+services connector logic lives with the `host` logic.
 
 ## C++ SDK
 
@@ -56,8 +56,8 @@ API.
 
 The Extensions API initiative will only support Rust extensions in production. The Search team will
 own the Rust SDK. However, the Query team develops and maintains a C++ SDK for the purpose of
-writing internal unit and integration tests. The C++ SDK can be found under
-`mongo/db/extension/sdk` directory.
+writing internal unit and integration tests. The C++ SDK can be found under `mongo/db/extension/sdk`
+directory.
 
 In general, every abstraction in the Public API has a respective C++ interface implemented in the
 C++ SDK which extension developers are expected to use to build their extension. This includes
@@ -69,9 +69,9 @@ maintainable code and minimizing the risk of programmer errors in extension code
 
 TODO SERVER-107651 Remove SDK dependency on mongo/base library.
 
-Currently, the SDK relies on the mongo/base library for BSON/BSONObj representation,
-as well as DBException and other exception handling functionality. Ideally we should remove that
-dependency since it's possible that linking mongo/base in an extension library could cause issues like
+Currently, the SDK relies on the mongo/base library for BSON/BSONObj representation, as well as
+DBException and other exception handling functionality. Ideally we should remove that dependency
+since it's possible that linking mongo/base in an extension library could cause issues like
 host<>extension symbol conflicts at load time or run time. SERVER-107651 tracks the work to remove
-that dependency entirely. In the meantime, please avoid adding new usages of that library outside
-of BSON representation and exception handling.
+that dependency entirely. In the meantime, please avoid adding new usages of that library outside of
+BSON representation and exception handling.

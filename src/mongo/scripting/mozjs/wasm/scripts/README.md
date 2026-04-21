@@ -1,12 +1,15 @@
 # WASM Build Scripts
 
-These scripts implement the WASM build steps that Bazel runs via genrules. You can run them **from Bazel** (as usual) or **standalone** for debugging or CI. All behaviour is controlled by environment variables; each script's header lists every variable and a short example.
+These scripts implement the WASM build steps that Bazel runs via genrules. You can run them **from
+Bazel** (as usual) or **standalone** for debugging or CI. All behaviour is controlled by environment
+variables; each script's header lists every variable and a short example.
 
 ---
 
 ## Run order
 
-To build **mozjs_wasm_api.wasm** (the main WASM API module) outside Bazel, run scripts in this order:
+To build **mozjs_wasm_api.wasm** (the main WASM API module) outside Bazel, run scripts in this
+order:
 
 | Step | Script                         | Produces                              |
 | ---- | ------------------------------ | ------------------------------------- |
@@ -14,19 +17,26 @@ To build **mozjs_wasm_api.wasm** (the main WASM API module) outside Bazel, run s
 | 2    | `extract_rust_shims.sh`        | `rust_shims.a` (from that tarball)    |
 | 3    | `compile_mozjs_wasm_api.sh`    | `mozjs_wasm_api.wasm`                 |
 
-Step 3 needs the tarball, `rust_shims.a`, the MongoDB base **linkset** response files (`.libs.rsp` etc.), and all MozJS/WIT sources. The linkset files normally come from building `//src/mongo/scripting/mozjs/wasm:mongo_base_linkset` in Bazel; for a fully standalone build you'd need to copy those RSP files out of the Bazel output tree.
+Step 3 needs the tarball, `rust_shims.a`, the MongoDB base **linkset** response files (`.libs.rsp`
+etc.), and all MozJS/WIT sources. The linkset files normally come from building
+`//src/mongo/scripting/mozjs/wasm:mongo_base_linkset` in Bazel; for a fully standalone build you'd
+need to copy those RSP files out of the Bazel output tree.
 
-**Helper (not run directly):** `compile_wasi_source.sh` — compiles one C/C++ file at a time; called by `compile_mozjs_wasm_api.sh` via `xargs`.
+**Helper (not run directly):** `compile_wasi_source.sh` — compiles one C/C++ file at a time; called
+by `compile_mozjs_wasm_api.sh` via `xargs`.
 
 ---
 
 ## Invocation examples
 
-Assume you are in the **MongoDB repo root** and have a WASI SDK at `$WASI_SDK` (e.g. `/opt/wasi-sdk` or `$HOME/wasi-sdk-24.0`). Paths below are relative to the repo root unless noted.
+Assume you are in the **MongoDB repo root** and have a WASI SDK at `$WASI_SDK` (e.g. `/opt/wasi-sdk`
+or `$HOME/wasi-sdk-24.0`). Paths below are relative to the repo root unless noted.
 
 ### 1. Build SpiderMonkey (WASI Preview 2)
 
-Produces a tarball with `libjs_static.a`, headers, and Rust shims. Requires SpiderMonkey source (e.g. from Bazel's external repo or a local gecko checkout) and the Rust shim sources under `support/rust_shims/`.
+Produces a tarball with `libjs_static.a`, headers, and Rust shims. Requires SpiderMonkey source
+(e.g. from Bazel's external repo or a local gecko checkout) and the Rust shim sources under
+`support/rust_shims/`.
 
 ```bash
 cd src/mongo/scripting/mozjs/wasm
@@ -54,7 +64,9 @@ bash scripts/extract_rust_shims.sh
 
 ### 3. Build mozjs_wasm_api.wasm
 
-Requires the SpiderMonkey tarball, `rust_shims.a`, the linkset files, all MozJS/WIT sources, and the WIT component-type object. Easiest is to run from the package dir and point at Bazel's outputs for linkset and WIT object; fill in the source lists from the genrule in `BUILD.bazel` if needed.
+Requires the SpiderMonkey tarball, `rust_shims.a`, the linkset files, all MozJS/WIT sources, and the
+WIT component-type object. Easiest is to run from the package dir and point at Bazel's outputs for
+linkset and WIT object; fill in the source lists from the genrule in `BUILD.bazel` if needed.
 
 ```bash
 cd src/mongo/scripting/mozjs/wasm
@@ -85,7 +97,8 @@ export OUTPUT=out/mozjs_wasm_api.wasm
 bash scripts/compile_mozjs_wasm_api.sh
 ```
 
-For the exact source lists and paths, run the corresponding genrule once and inspect the `cmd` in `BUILD.bazel`, or run the build via Bazel and use the script only for repros.
+For the exact source lists and paths, run the corresponding genrule once and inspect the `cmd` in
+`BUILD.bazel`, or run the build via Bazel and use the script only for repros.
 
 ---
 

@@ -1,6 +1,8 @@
 # Disambiguation of Various Query Shape Concepts
 
-You have probably arrived here while reading or thinking about one query shape concept and are wondering how it relates to other similar concepts. This page aims to describe the different purposes and discriminating qualities of the following:
+You have probably arrived here while reading or thinking about one query shape concept and are
+wondering how it relates to other similar concepts. This page aims to describe the different
+purposes and discriminating qualities of the following:
 
 - Query Shape
 - Query Stats Key
@@ -34,11 +36,7 @@ Consider a query like the following.
 ```js
 db.runCommand({
   aggregate: "foo",
-  pipeline: [
-    {$match: {x: {$gte: 2}}},
-    {$replaceWith: "$subDoc"},
-    {$out: "bar"},
-  ],
+  pipeline: [{$match: {x: {$gte: 2}}}, {$replaceWith: "$subDoc"}, {$out: "bar"}],
   comment: "I am just a humble example",
   readConcern: {level: "majority"},
 });
@@ -49,14 +47,16 @@ Let's use this example to draw a contrast between the concepts which are observa
 > Note: when writing this example I chose `$replaceWith` as an example of a stage which cannot be
 > pushed into the access planner (the classic engine is not planned to ever support `$replaceWith`,
 > and SBE does not at time of this writing). There are plans to support this in SBE at which point
-> this example will become stale, but at least for quite some time there will remain some stages which
-> are unsupported for push down into the access plan, and the general theme/concept still holds.
+> this example will become stale, but at least for quite some time there will remain some stages
+> which are unsupported for push down into the access plan, and the general theme/concept still
+> holds.
 
 ### The `planCacheShapeHash` (The Artist Formerly Known as `queryHash`)
 
-For this query, the `planCacheShapeHash` will just consider the namespace and the $match predicate.
-It would be the same shape or at least very similar to a find command with an `{x: {$gte: 10}}`
-filter, since the access planner won't see/consider`$replaceWith` and everything after that.
+For this query, the `planCacheShapeHash` will just consider the namespace and the
+$match predicate.
+It would be the same shape or at least very similar to a find command with an `{x: {$gte:
+10}}` filter, since the access planner won't see/consider`$replaceWith` and everything after that.
 
 ### The `planCacheKeyHash`
 
@@ -82,36 +82,37 @@ have a simple diagnostic name like the others. This will shapify the whole comma
 
 There are several things to keep in mind when deciding this question:
 
-1. The Query Stats Store Key is generally meant to be the most discriminating way to collect metrics.
-   It is always possible for consumers of the metrics to perform their own grouping operation to
-   collapse two or more groups back into one, but it is impossible to undo a grouping. That being said,
-   we also cannot afford to have infinite entries, so there is a balance. As an example, we do not want
-   to track each and every 'comment' separately, since we know of cases where customers may use the
-   comment field as a sort of request ID with very high cardinality.
+1. The Query Stats Store Key is generally meant to be the most discriminating way to collect
+   metrics. It is always possible for consumers of the metrics to perform their own grouping
+   operation to collapse two or more groups back into one, but it is impossible to undo a grouping.
+   That being said, we also cannot afford to have infinite entries, so there is a balance. As an
+   example, we do not want to track each and every 'comment' separately, since we know of cases
+   where customers may use the comment field as a sort of request ID with very high cardinality.
 
 2. The Query Shape is the key used for query settings application. Any two queries with the same
-   shape will have the same settings applied. It would then logically follow that any two queries with
-   the same query stats store key also have the same query settings applied, since the query shape
-   is part of the query stats store key.
+   shape will have the same settings applied. It would then logically follow that any two queries
+   with the same query stats store key also have the same query settings applied, since the query
+   shape is part of the query stats store key.
 
 3. The Query Shape is generally meant to capture anything semantically important to the query. If an
    option may change the results, it should probably go here. If the option might only impact
    performance or isolation, it should not go here. A couple examples:
 
-   - The 'maxTimeMs' is not part of the query shape since it does not matter for the semantics of the
-     query - it's purely an operational concern.
-   - As a trickier example, 'readConcern' was also excluded from the query shape since it only impacts
-     isolation guarantees. A shapified version is included in the query stats store key. From a query
-     language perspective, it does not really dictate which documents will semantically match the query -
-     it's purely a matter of timing. It was deemed more of an operational option/concern. This is a close
-     call, because - considering shard filtering and the readConcern level 'available', which does not
-     apply shard filtering - a different readConcern level may actually impact which query plan is
-     appropriate, and so it probably should play a discriminating role in a plan cache key. A key thought
-     experiment here was that a query setting for two identical queries which differ only by readConcern
-     should probably apply to both.
-   - Finally, another borderline example, the 'hint' option is **not** part of the query shape because
-     it should only impact performance. The 'hint' is part of the query stats store key. Further, the
-     team decided that a query setting should likely impact all queries which differ only by hint (and it
-     should override that hint). If an operator sees that a particular query shape should prefer one
-     index type, it should logically apply to all queries of that shape. One day we may add the ability
-     to override a query setting via a hint, but this is the intended behavior for now.
+   - The 'maxTimeMs' is not part of the query shape since it does not matter for the semantics of
+     the query - it's purely an operational concern.
+   - As a trickier example, 'readConcern' was also excluded from the query shape since it only
+     impacts isolation guarantees. A shapified version is included in the query stats store key.
+     From a query language perspective, it does not really dictate which documents will semantically
+     match the query - it's purely a matter of timing. It was deemed more of an operational
+     option/concern. This is a close call, because - considering shard filtering and the readConcern
+     level 'available', which does not apply shard filtering - a different readConcern level may
+     actually impact which query plan is appropriate, and so it probably should play a
+     discriminating role in a plan cache key. A key thought experiment here was that a query setting
+     for two identical queries which differ only by readConcern should probably apply to both.
+   - Finally, another borderline example, the 'hint' option is **not** part of the query shape
+     because it should only impact performance. The 'hint' is part of the query stats store key.
+     Further, the team decided that a query setting should likely impact all queries which differ
+     only by hint (and it should override that hint). If an operator sees that a particular query
+     shape should prefer one index type, it should logically apply to all queries of that shape. One
+     day we may add the ability to override a query setting via a hint, but this is the intended
+     behavior for now.

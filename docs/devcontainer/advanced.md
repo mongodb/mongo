@@ -1,8 +1,10 @@
 # Advanced Dev Container Usage
 
-This guide covers advanced workflows and power user features for managing multiple containers, backups, and complex development scenarios.
+This guide covers advanced workflows and power user features for managing multiple containers,
+backups, and complex development scenarios.
 
-**Looking to customize your devcontainer?** See the [Customization Guide](./customization.md) for dotfiles, VS Code settings, extensions, and performance tuning.
+**Looking to customize your devcontainer?** See the [Customization Guide](./customization.md) for
+dotfiles, VS Code settings, extensions, and performance tuning.
 
 ## Table of Contents
 

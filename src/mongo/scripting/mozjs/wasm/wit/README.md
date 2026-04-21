@@ -21,6 +21,5 @@ extern "C" int32_t exports_api_mynewfunc(void) {
 }
 ```
 
-The C bindings (`api.c`, `api.h`, `api_component_type.o`) are generated
-automatically at build time by the `wit_bindgen_c` rule in
-`src/mongo/scripting/mozjs/wasm/BUILD.bazel`.
+The C bindings (`api.c`, `api.h`, `api_component_type.o`) are generated automatically at build time
+by the `wit_bindgen_c` rule in `src/mongo/scripting/mozjs/wasm/BUILD.bazel`.

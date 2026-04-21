@@ -92,13 +92,12 @@ reference to the old file and starts writing immediately to the new file by call
 
 FTDC writes two types of files in `diagnostic.data`.
 
-**Archive files**: `metrics.%Y-%m-%dT%H-%M-%SZ-CCCCC`
-where
+**Archive files**: `metrics.%Y-%m-%dT%H-%M-%SZ-CCCCC` where
 
 - `%Y-%m-%dT%H-%M-%SZ` - `strftime` format string to format a UTC date time string. Ex:
   `2024-03-08T22-58-41Z`
-- `CCCCC` - is a five digit uniquifier in case multiple files are opened in one second. It is
-  always `00000` except in unit tests.
+- `CCCCC` - is a five digit uniquifier in case multiple files are opened in one second. It is always
+  `00000` except in unit tests.
 
 It is an append only file which can be read with `bsondump`. It is composed of several types of bson
 documents. See [`Archive Format`](#archive-file-format). FTDC creates new archive files on server
@@ -217,7 +216,8 @@ document as its baseline.
 #### Run length encoding of zeros
 
 A sequence of zeros is compressed to a pair of numbers `[0, x]` where `x` is non-zero positive
-integer that indicates the number of zeros in a sequence. For instance, an array of zeros `[0, 0, 0, 0]` is transformed to `[0, 4]`.
+integer that indicates the number of zeros in a sequence. For instance, an array of zeros
+`[0, 0, 0, 0]` is transformed to `[0, 4]`.
 
 #### Varint compression
 
@@ -242,8 +242,8 @@ For instance, for the following sequence of documents:
 {"a": 4, "x" : 2, "s" : "t"}
 ```
 
-The first `a : 1` is stored as the reference document. FTDC then builds an array of `[2, 3, 4, 2, 2,
-2]` to represent the `a` field followed by the `x` field.
+The first `a : 1` is stored as the reference document. FTDC then builds an array of
+`[2, 3, 4, 2, 2, 2]` to represent the `a` field followed by the `x` field.
 
 Next, FTDC computes the delta for each sample in the chunk from the previous chunk. Nothing changes
 in the reference document but array is transformed to `[1, 1, 1, 0, 0, 0]`.

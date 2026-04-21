@@ -60,34 +60,34 @@ Typically, locks are granted in the order they are queued, but some LockRequest 
 specially selected to break this rule. One behavior is _enqueueAtFront_, which allows important lock
 acquisitions to cut to the front of the line, in order to expedite them. Currently, all mode X and S
 locks for the three Global Resources (Global, MultiDocumentTransactionsBarrier, RSTL) automatically
-use this option.
-Another behavior is _compatibleFirst_, which allows compatible lock requests to cut ahead of others
-waiting in the queue and be granted immediately; note that this mode might starve queued lock
-requests indefinitely.
+use this option. Another behavior is _compatibleFirst_, which allows compatible lock requests to cut
+ahead of others waiting in the queue and be granted immediately; note that this mode might starve
+queued lock requests indefinitely.
 
 ### Replication State Transition Lock (RSTL)
 
 The Replication State Transition Lock is of ResourceType Global, so it must be locked prior to
 locking any Database level resource. This lock is used to synchronize replica state transitions
-(typically transitions between PRIMARY, SECONDARY, and ROLLBACK states).
-More information on the RSTL is contained in the [Replication Architecture Guide](https://github.com/mongodb/mongo/blob/b4db8c01a13fd70997a05857be17548b0adec020/src/mongo/db/repl/README.md#replication-state-transition-lock)
+(typically transitions between PRIMARY, SECONDARY, and ROLLBACK states). More information on the
+RSTL is contained in the
+[Replication Architecture Guide](https://github.com/mongodb/mongo/blob/b4db8c01a13fd70997a05857be17548b0adec020/src/mongo/db/repl/README.md#replication-state-transition-lock)
 
 ### Global Lock
 
-The resource known as the Global Lock is of ResourceType Global. It is currently used to
-synchronize shutdown, so that all operations are finished with the storage engine before closing it.
-Certain types of global storage engine operations, such as recoverToStableTimestamp(), also require
-this lock to be held in exclusive mode.
+The resource known as the Global Lock is of ResourceType Global. It is currently used to synchronize
+shutdown, so that all operations are finished with the storage engine before closing it. Certain
+types of global storage engine operations, such as recoverToStableTimestamp(), also require this
+lock to be held in exclusive mode.
 
 ### Tenant Lock
 
-A resource of ResourceType Tenant is used when a database belongs to a tenant. It is used to synchronize
-change streams enablement and disablement for a tenant operation with other operations associated with the tenant.
-Before v8.3, enabling or disabling of change streams (by creating or dropping a change collection)
-for a tenant used to take this lock in exclusive (X) mode. This use case does not exist in v8.3 and
-higher. Tenant locks are still present, but may be removed in the future.
-Acquiring this resource with an intent lock is an indication that the operation is doing reads (IS)
-or writes (IX) at the database or lower level.
+A resource of ResourceType Tenant is used when a database belongs to a tenant. It is used to
+synchronize change streams enablement and disablement for a tenant operation with other operations
+associated with the tenant. Before v8.3, enabling or disabling of change streams (by creating or
+dropping a change collection) for a tenant used to take this lock in exclusive (X) mode. This use
+case does not exist in v8.3 and higher. Tenant locks are still present, but may be removed in the
+future. Acquiring this resource with an intent lock is an indication that the operation is doing
+reads (IS) or writes (IX) at the database or lower level.
 
 ### Database Lock
 
@@ -105,8 +105,10 @@ ResourceType, as locking at this level is done in the storage engine itself for 
 
 ### Document Level Concurrency Control
 
-Each storage engine is responsible for locking at the document level. The [WiredTiger storage
-engine](../../storage/wiredtiger/README.md) uses MVCC [multi-version concurrency control][Multiversion concurrency control] along with optimistic locking in order to provide concurrency guarantees.
+Each storage engine is responsible for locking at the document level. The
+[WiredTiger storage engine](../../storage/wiredtiger/README.md) uses MVCC [multi-version concurrency
+control][Multiversion concurrency control] along with optimistic locking in order to provide
+concurrency guarantees.
 
 ## Two-Phase Locking
 

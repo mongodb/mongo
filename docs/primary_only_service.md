@@ -1,10 +1,10 @@
 # PrimaryOnlyService
 
 The PrimaryOnlyService machinery provides a way to register tasks that should run only when current
-node is Primary, and should be driven to completion across replica set failovers on the new
-Primary. It is intended to be used by tasks that can be modeled as a state machine with a single
-MongoDB document containing the current state, which newly-elected Primaries can use to rebuild the
-state of the task after failover and pick up where the old Primary left off.
+node is Primary, and should be driven to completion across replica set failovers on the new Primary.
+It is intended to be used by tasks that can be modeled as a state machine with a single MongoDB
+document containing the current state, which newly-elected Primaries can use to rebuild the state of
+the task after failover and pick up where the old Primary left off.
 
 ## Classes
 
@@ -62,16 +62,17 @@ what state it is in and thus what work still needs to be performed, and what wor
 completed by the previous Primary.
 
 To see an example bare-bones PrimaryOnlyService implementation to use as a reference, check out the
-TestService defined in this unit test: https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/primary_only_service_test.cpp
+TestService defined in this unit test:
+https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/primary_only_service_test.cpp
 
 ## Behavior during state transitions
 
 At stepUp, each PrimaryOnlyService queries its state document collection, and for each document
-found, creates and launches a PrimaryOnlyService::Instance initialized off of the state
-document. This happens asynchronously relative to the core replication stepUp process - there is no
-guarantee that when stepUp completes and the RSTL lock is dropped that the PrimaryOnlyServices have
-finished rebuilding all their Instances. At stepDown all Instances are interrupted, but the threads
-running their work are not joined, and the Instance objects containing their in-memory state are not
+found, creates and launches a PrimaryOnlyService::Instance initialized off of the state document.
+This happens asynchronously relative to the core replication stepUp process - there is no guarantee
+that when stepUp completes and the RSTL lock is dropped that the PrimaryOnlyServices have finished
+rebuilding all their Instances. At stepDown all Instances are interrupted, but the threads running
+their work are not joined, and the Instance objects containing their in-memory state are not
 released, until the next stepUp. This is done to reduce the likelihood of blocking within the state
 transition process and delaying it for the entire node. This behavior does, however, guarantee that
 there will never be two Instances of the same PrimaryOnlyService with the same InstanceID running at

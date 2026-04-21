@@ -10,8 +10,9 @@ with a given operation. The `VersionContext` serves as an indirection to store a
 making the code more flexible for future needs. It is defined as a decoration of the
 `OperationContext` class.
 
-> Please Note: The VersionContext is only available for use for sharding coordinators. SPM-4227 plans to
-> extend this concept to more operations (see [warnings section](#warnings-and-future-outlook)).
+> Please Note: The VersionContext is only available for use for sharding coordinators. SPM-4227
+> plans to extend this concept to more operations (see
+> [warnings section](#warnings-and-future-outlook)).
 
 ## How to Use VersionContext
 
@@ -24,15 +25,15 @@ The `VersionContext` provides the following methods:
   `VersionContext`.
 
 - `optional<FCVSnapshot> VersionContext::getOperationFCV()`: Returns the snapshot corresponding to
-  the attached OFCV. It returns `boost::none` if no OFCV value is associated. Access to this method is
-  restricted to the `FCVGatedFeatureFlag` class only.
+  the attached OFCV. It returns `boost::none` if no OFCV value is associated. Access to this method
+  is restricted to the `FCVGatedFeatureFlag` class only.
 
 ### Initialization, Persistence, and Recovery
 
 The OFCV for a sharding coordinator is created within the
-`ShardingCoordinatorService::getOrCreateInstance` function, where the node’s local FCV is
-captured and set on a `VersionContext` instance. This value is then passed to a spawned sharding
-coordinator through a specific field within the coordinator state document, extending the
+`ShardingCoordinatorService::getOrCreateInstance` function, where the node’s local FCV is captured
+and set on a `VersionContext` instance. This value is then passed to a spawned sharding coordinator
+through a specific field within the coordinator state document, extending the
 `ForwardableOperationMetadata` definition to ensure propagation between subsequent coordinator
 phases. This mechanism ensures persistence across various stages and allows for recovery in case of
 crashes and failovers.
@@ -65,8 +66,8 @@ to accommodate OFCV-based checks. Non-FCV-gated feature flags (represented by
 
 ## Warnings and Future Outlook
 
-Currently, the OFCV is primarily applied to sharding coordinators. Other operations can run across FCV
-change boundaries, which requires careful handling. A transitional API is in place for FCV-gated
+Currently, the OFCV is primarily applied to sharding coordinators. Other operations can run across
+FCV change boundaries, which requires careful handling. A transitional API is in place for FCV-gated
 feature flag checks, relying on `FCVSnapshot` if no OFCV is available.
 
 Future work aims to enable non-ShardingCoordinator operations to:
@@ -75,17 +76,17 @@ Future work aims to enable non-ShardingCoordinator operations to:
 2. Check that the FCV has not transitioned when acquiring a write lock or `FixedFCVRegion`.
 3. If the FCV has transitioned, kill the operation or allow callers to decide the resolution.
 
-Once these capabilities are introduced for non-ShardingCoordinator operations, the feature flag API can be
-streamlined to directly use `VersionContext::getDecoration(opCtx)` for
+Once these capabilities are introduced for non-ShardingCoordinator operations, the feature flag API
+can be streamlined to directly use `VersionContext::getDecoration(opCtx)` for
 `FCVGatedFeatureFlag::isEnabled` calls.
 
 ## Multiversion Considerations
 
 Changes related to `VersionContext` are controlled by a `SnapshotFCVInDDLCoordinators` feature flag,
 enabled with FCV \>= 9.0. Note that despite the flag name, it affects all sharding coordinators, not
-just DDL coordinators. This flag determines if the OFCV is set upon sharding coordinator startup. Sharding
-coordinators and participants will then distinguish between old and new behaviors based on the OFCV
-value itself:
+just DDL coordinators. This flag determines if the OFCV is set upon sharding coordinator startup.
+Sharding coordinators and participants will then distinguish between old and new behaviors based on
+the OFCV value itself:
 
 - **OFCV == None**: Fall back on the current FCV behavior.
 - **OFCV \!= None**: Behave according to the OFCV.
@@ -95,6 +96,7 @@ binaries are involved.
 
 ## Diagnosis/Debuggability
 
-Information about the associated OFCV will be introduced to `config.changelog` logs for each sharding
-coordinator and to general sharding logs for cordinator startup, participant requests, and other FCV-related
-cases. The OFCV for a given operation will also be added to the output of the `currentOp` command.
+Information about the associated OFCV will be introduced to `config.changelog` logs for each
+sharding coordinator and to general sharding logs for cordinator startup, participant requests, and
+other FCV-related cases. The OFCV for a given operation will also be added to the output of the
+`currentOp` command.

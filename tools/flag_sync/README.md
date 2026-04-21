@@ -1,13 +1,15 @@
 # What is Flag Sync?
 
-Flag Sync is a tool to allow engineers to quickly introduce or disable flags on remote client systems.
-Currently, this is used to enable or disable certain Bazel flags across user workstations or CI hosts.
+Flag Sync is a tool to allow engineers to quickly introduce or disable flags on remote client
+systems. Currently, this is used to enable or disable certain Bazel flags across user workstations
+or CI hosts.
 
 # Basic usage
 
 ## Prerequisites
 
-Make sure you have valid AWS admin credentials for `devprod-build`. `aws configure sso` is the easiest way to do so.
+Make sure you have valid AWS admin credentials for `devprod-build`. `aws configure sso` is the
+easiest way to do so.
 
 ## Get list of flags for a namespace
 

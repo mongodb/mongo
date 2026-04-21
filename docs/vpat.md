@@ -56,9 +56,10 @@ Contact for more Information: https://www.mongodb.com/contact
 ### Note to 1194.22
 
 The Board interprets paragraphs (a) through (k) of this section as consistent with the following
-priority 1 Checkpoints of the Web Content Accessibility Guidelines 1.0 (WCAG 1.0) (May 5 1999) published by the Web
-Accessibility Initiative of the World Wide Web Consortium: Paragraph (a) - 1.1, (b) - 1.4, (c\) - 2.1, (d) - 6.1,
-(e) - 1.2, (f) - 9.1, (g) - 5.1, (h) - 5.2, (i) - 12.1, (j) - 7.1, (k) - 11.4.
+priority 1 Checkpoints of the Web Content Accessibility Guidelines 1.0 (WCAG 1.0) (May 5 1999)
+published by the Web Accessibility Initiative of the World Wide Web Consortium: Paragraph (a) - 1.1,
+(b) - 1.4, (c\) - 2.1, (d) - 6.1, (e) - 1.2, (f) - 9.1, (g) - 5.1, (h) - 5.2, (i) - 12.1, (j) - 7.1,
+(k) - 11.4.
 
 ## Section 1194.23 Telecommunications Products – Detail
 

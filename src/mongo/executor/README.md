@@ -6,12 +6,12 @@ asynchronously. The various types of executors provide different properties desc
 
 ## OutOfLineExecutor
 
-The `OutOfLineExecutor` is the base class for other asynchronous execution APIs.
-The `OutOfLineExecutor` declares a function `void schedule(Task task)` to delegate asynchronous
+The `OutOfLineExecutor` is the base class for other asynchronous execution APIs. The
+`OutOfLineExecutor` declares a function `void schedule(Task task)` to delegate asynchronous
 execution of `task` to the executor, and each executor type implements `schedule` when extending
-`OutOfLineExecutor`. A contract for `OutOfLineExecutor` is that calls to schedule will not block
-the caller.
-For more details and the semantics of executor APIs, see the comments in the [header file](/src/mongo/util/out_of_line_executor.h).
+`OutOfLineExecutor`. A contract for `OutOfLineExecutor` is that calls to schedule will not block the
+caller. For more details and the semantics of executor APIs, see the comments in the
+[header file](/src/mongo/util/out_of_line_executor.h).
 
 ### OutOfLineExecutor Wrappers
 
@@ -27,12 +27,12 @@ include:
 
 ## TaskExecutor
 
-`TaskExecutor` is an abstract class inheriting from `OutOfLineExecutor` that supports the notion
-of events and callbacks. `TaskExecutor` provides an interface for:
+`TaskExecutor` is an abstract class inheriting from `OutOfLineExecutor` that supports the notion of
+events and callbacks. `TaskExecutor` provides an interface for:
 
 - Scheduling tasks, with functionality for cancellation or scheduling at a later time if desired.
-- Creating events, having threads subscribe to the events, and notifying the subscribed threads
-  when desired.
+- Creating events, having threads subscribe to the events, and notifying the subscribed threads when
+  desired.
 - Scheduling remote and exhaust commands from a single or multiple remote hosts.
 
 ### Example Usage
@@ -50,10 +50,12 @@ of events and callbacks. `TaskExecutor` provides an interface for:
 - `ScopedTaskExecutor`: wraps a `TaskExecutor` and cancels any outstanding operations on
   destruction.
 - `PinnedConnectionTaskExecutor`: wraps a `TaskExecutor` and acts as a `ScopedTaskExecutor` that
-  additionally runs all RPCs/remote operations scheduled through it over the same transport connection.
+  additionally runs all RPCs/remote operations scheduled through it over the same transport
+  connection.
 - `TaskExecutorCursor`: manages a remote cursor that uses an asynchronous task executor to run all
-  stages of the command cursor protocol (initial command, getMore, killCursors). Offers a `pinConnections`
-  option that utilizes a `PinnedConnectionTaskExecutor` to run all operations on the cursor over the
-  same transport connection.
+  stages of the command cursor protocol (initial command, getMore, killCursors). Offers a
+  `pinConnections` option that utilizes a `PinnedConnectionTaskExecutor` to run all operations on
+  the cursor over the same transport connection.
 - `TaskExecutorPool`: represents a pool of `TaskExecutors`. Work which requires a `TaskExecutor` can
-  ask for an executor from the pool. This allows for work to be distributed across several executors.
+  ask for an executor from the pool. This allows for work to be distributed across several
+  executors.

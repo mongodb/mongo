@@ -2,7 +2,10 @@
 
 This is a testing feature of the mongod and mongos, built into resmoke.py!
 
-The config fuzzer is a resmoke feature that randomizes various server parameters of both mongod and mongos on startup. These fuzzed parameters should not affect the correctness of any tests. Therefore, the config fuzzer can be enabled for any test or suite run with resmoke to ensure the database is resilient to abnormal server configurations.
+The config fuzzer is a resmoke feature that randomizes various server parameters of both mongod and
+mongos on startup. These fuzzed parameters should not affect the correctness of any tests.
+Therefore, the config fuzzer can be enabled for any test or suite run with resmoke to ensure the
+database is resilient to abnormal server configurations.
 
 More information can be displayed in the resmoke --help output:
 
@@ -25,15 +28,22 @@ The bulk of the fuzzing logic is in [mongo_fuzzer_configs.py](./mongo_fuzzer_con
 
 ## How does it work?
 
-The config fuzzer assigns random values to various tunable parameters. Server parameters and their ranges are specified manually by developers and are not discovered automatically in any way.
+The config fuzzer assigns random values to various tunable parameters. Server parameters and their
+ranges are specified manually by developers and are not discovered automatically in any way.
 
-When the above resmoke flags are used, the [plugin](./plugin.py) implicitly enables the [FuzzRuntimeParameters](../../../buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py) hook for testing.
+When the above resmoke flags are used, the [plugin](./plugin.py) implicitly enables the
+[FuzzRuntimeParameters](../../../buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py)
+hook for testing.
 
 ## Where and When does it run on evergreen?
 
-The config fuzzer is represented as a handful of evergreen tasks with "_config_fuzzer_" in the name. Search "config_fuzzer" in the [etc/](../../../etc) directory to find all the evergreen tasks.
+The config fuzzer is represented as a handful of evergreen tasks with "_config_fuzzer_" in the name.
+Search "config_fuzzer" in the [etc/](../../../etc) directory to find all the evergreen tasks.
 
-Arguably the simplest evergreen task, `config_fuzzer_jsCore`, runs the "core" (i.e. `jstests/core`) resmoke suite with the config fuzzer parameters to resmoke set, and excludes some incompatible tests ([src link](https://github.com/mongodb/mongo/blob/a2e7e83a135c3096de7f360b88de1b3cdc1caaf2/etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml#L1956-L1975)). Here is a sampling of some of the task names:
+Arguably the simplest evergreen task, `config_fuzzer_jsCore`, runs the "core" (i.e. `jstests/core`)
+resmoke suite with the config fuzzer parameters to resmoke set, and excludes some incompatible tests
+([src link](https://github.com/mongodb/mongo/blob/a2e7e83a135c3096de7f360b88de1b3cdc1caaf2/etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml#L1956-L1975)).
+Here is a sampling of some of the task names:
 
 - `config_fuzzer_concurrency_replication`
 - `config_fuzzer_concurrency_sharded_replication`
@@ -41,7 +51,10 @@ Arguably the simplest evergreen task, `config_fuzzer_jsCore`, runs the "core" (i
 
 ## Reproducing a config fuzzer failure
 
-In the Evergreen task view, click on the Logs tab, then Task Logs, and open in Parsely. Search for "Fuzzed" ([source link](https://github.com/mongodb/mongo/blob/ca1c935aca43ca2e028507e2a878d4e12f50355b/buildscripts/resmokelib/run/__init__.py#L352-L366)). The output will look similar to this:
+In the Evergreen task view, click on the Logs tab, then Task Logs, and open in Parsely. Search for
+"Fuzzed"
+([source link](https://github.com/mongodb/mongo/blob/ca1c935aca43ca2e028507e2a878d4e12f50355b/buildscripts/resmokelib/run/__init__.py#L352-L366)).
+The output will look similar to this:
 
 <details>
 <summary>Logs</summary>
@@ -112,13 +125,22 @@ In the Evergreen task view, click on the Logs tab, then Task Logs, and open in P
 
 </details>
 
-The log line starting with "resmoke.py invocation for local usage" and the one with "configFuzzSeed" provide an option `--configFuzzSeed=5583430894313922699` that can be used to generate the same fuzzed server parameters locally in resmoke.
+The log line starting with "resmoke.py invocation for local usage" and the one with "configFuzzSeed"
+provide an option `--configFuzzSeed=5583430894313922699` that can be used to generate the same
+fuzzed server parameters locally in resmoke.
 
 ## Running the config fuzzer locally
 
-Before running the Resmoke config fuzzer command, you need to obtain the necessary binaries. You can download them from the "Files" section of the `archive_dist_test` task in Evergreen (e.g., binaries from the `amazon2-arm64-compile` variant). Alternatively, if you don't require those specific binaries, you can use `db-contrib-tool` to download the binaries (e.g., by running `bazel run db-contrib-tool -- setup-repro-env master`).
+Before running the Resmoke config fuzzer command, you need to obtain the necessary binaries. You can
+download them from the "Files" section of the `archive_dist_test` task in Evergreen (e.g., binaries
+from the `amazon2-arm64-compile` variant). Alternatively, if you don't require those specific
+binaries, you can use `db-contrib-tool` to download the binaries (e.g., by running
+`bazel run db-contrib-tool -- setup-repro-env master`).
 
-To re-run a command locally that failed through the config fuzzer, you can navigate to the specific test that failed, and under files you can find a name titled "Resmoke.py Invocation for Local Usage". If you are replicating an older config fuzzer invocation, remove the command line argument "`--installDir=dist-test/bin`". A simple example command is shown below:
+To re-run a command locally that failed through the config fuzzer, you can navigate to the specific
+test that failed, and under files you can find a name titled "Resmoke.py Invocation for Local
+Usage". If you are replicating an older config fuzzer invocation, remove the command line argument
+"`--installDir=dist-test/bin`". A simple example command is shown below:
 
 ```
 buildscripts/resmoke.py run jstests/noPassthrough/bulk_write_w0.js \
@@ -127,7 +149,12 @@ buildscripts/resmoke.py run jstests/noPassthrough/bulk_write_w0.js \
   --configFuzzSeed=7956511060361033919
 ```
 
-It is easiest to pipe the output to another text file and then to analyze the output through there. The format of the file is slightly different, as you will not be able to explicitly look up Fuzzed, but you can look up one of the fuzzed config parameters to find the list of fuzzed config parameter settings. A subset of a log from running the above command on [this version](https://github.com/mongodb/mongo/commit/856e4ecd8612b19c8ba281cf23450d74b5838650) of master yields is the following:
+It is easiest to pipe the output to another text file and then to analyze the output through there.
+The format of the file is slightly different, as you will not be able to explicitly look up Fuzzed,
+but you can look up one of the fuzzed config parameters to find the list of fuzzed config parameter
+settings. A subset of a log from running the above command on
+[this version](https://github.com/mongodb/mongo/commit/856e4ecd8612b19c8ba281cf23450d74b5838650) of
+master yields is the following:
 
 ```
 js_test:bulk_write_w0] Skip waiting to connect to node with pid=2522712, port=20040
@@ -140,7 +167,8 @@ js_test:bulk_write_w0] Skip waiting to connect to node with pid=2522712, port=20
 
 ## Adding a new parameter to be fuzzed to the config fuzzer
 
-There are two broad categories of parameters in the config fuzzer, that each have two sub-categories of parameters:
+There are two broad categories of parameters in the config fuzzer, that each have two sub-categories
+of parameters:
 
 1. mongo parameters
    - mongod parameters
@@ -151,25 +179,43 @@ There are two broad categories of parameters in the config fuzzer, that each hav
 
 ### Adding new mongo parameters
 
-Mongo parameters and their properties (e.g. min, max, default) are stored in [config_fuzzer_limits.py](./config_fuzzer_limits.py).
+Mongo parameters and their properties (e.g. min, max, default) are stored in
+[config_fuzzer_limits.py](./config_fuzzer_limits.py).
 
-Below is a list of ways to fuzz configs which are supported without having to also change [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py).
-Please ensure that you add it correctly to the `mongod` or `mongos` subdictionary.
+Below is a list of ways to fuzz configs which are supported without having to also change
+[mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py). Please ensure that you add it correctly to the
+`mongod` or `mongos` subdictionary.
 
-You need to specify if your parameter should be fuzzed at runtime, startup, or both by declaring the `fuzz_at` key for the parameter. The `fuzz_at` key should be a list that can contain the values `startup`, `runtime`, or both. The eligible values are specified in the `set_at` keys of the corresponding `.idl` files.
+You need to specify if your parameter should be fuzzed at runtime, startup, or both by declaring the
+`fuzz_at` key for the parameter. The `fuzz_at` key should be a list that can contain the values
+`startup`, `runtime`, or both. The eligible values are specified in the `set_at` keys of the
+corresponding `.idl` files.
 
-For a parameter that is only fuzzed at startup, the fuzzer will generate a fuzzed value for the parameter and set it when starting up the server.
+For a parameter that is only fuzzed at startup, the fuzzer will generate a fuzzed value for the
+parameter and set it when starting up the server.
 
-For a parameter fuzzed at runtime, the fuzzer will generate a fuzzed value for the parameter while running the server based on a `period` key that is required for fuzzed runtime parameters.
-The `period` key describes how often the parameter should be changed, in seconds. Every `period` seconds, the fuzzer will select a new random value for the parameter and use the setParameter command to update the value of the
-parameter on every node in the cluster while the suite is running. This is perfomed by the [FuzzRuntimeParameters](../../../buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py) hook.
+For a parameter fuzzed at runtime, the fuzzer will generate a fuzzed value for the parameter while
+running the server based on a `period` key that is required for fuzzed runtime parameters. The
+`period` key describes how often the parameter should be changed, in seconds. Every `period`
+seconds, the fuzzer will select a new random value for the parameter and use the setParameter
+command to update the value of the parameter on every node in the cluster while the suite is
+running. This is perfomed by the
+[FuzzRuntimeParameters](../../../buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py)
+hook.
 
-For parameters with complex fuzzing logic or interdependencies with other parameters, you can set `"custom_fuzz_value_assignment": True` to bypass the standard fuzzing logic. Parameters with this flag must be handled explicitly in the special handling functions (`generate_special_mongod_startup_parameters()` for startup parameters or `generate_special_runtime_parameters()` for runtime parameters). Note that parameter dependency logic is currently only supported for startup fuzzing - runtime fuzzing operates on individual parameters. See the section below on parameters requiring special handling for more details.
+For parameters with complex fuzzing logic or interdependencies with other parameters, you can set
+`"custom_fuzz_value_assignment": True` to bypass the standard fuzzing logic. Parameters with this
+flag must be handled explicitly in the special handling functions
+(`generate_special_mongod_startup_parameters()` for startup parameters or
+`generate_special_runtime_parameters()` for runtime parameters). Note that parameter dependency
+logic is currently only supported for startup fuzzing - runtime fuzzing operates on individual
+parameters. See the section below on parameters requiring special handling for more details.
 
-Let `choices = [choice1, choice2, ..., choiceN]` be an array of choices that the parameter can have as a value.
-The parameters are added in order of priority chosen in the if-elif-else statement in `generate_normal_mongo_parameters()`
-in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py).
-So, if you added the fields `default`, `min`, and `max` for a `param`, case 4 would get evaluated over case 5.
+Let `choices = [choice1, choice2, ..., choiceN]` be an array of choices that the parameter can have
+as a value. The parameters are added in order of priority chosen in the if-elif-else statement in
+`generate_normal_mongo_parameters()` in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py). So, if
+you added the fields `default`, `min`, and `max` for a `param`, case 4 would get evaluated over
+case 5.
 
 1. `param = rng.uniform(min, max)`
 
@@ -218,40 +264,58 @@ So, if you added the fields `default`, `min`, and `max` for a `param`, case 4 wo
    "param": {"default": default}
    ```
 
-   > Note: For the default case, please add the value `"fuzz_at": ["startup"]` (the default value gets set at "startup").
+   > Note: For the default case, please add the value `"fuzz_at": ["startup"]` (the default value
+   > gets set at "startup").
 
-If you have a parameter that depends on another parameter being generated (see `throughputProbingInitialConcurrency` needing to be initialized before
-`throughputProbingMinConcurrency` and `throughputProbingMaxConcurrency` as an example in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py)) or behavior that
-differs from the above cases, please do the following steps:
+If you have a parameter that depends on another parameter being generated (see
+`throughputProbingInitialConcurrency` needing to be initialized before
+`throughputProbingMinConcurrency` and `throughputProbingMaxConcurrency` as an example in
+[mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py)) or behavior that differs from the above cases,
+please do the following steps:
 
-1. Add the parameter and the needed information to [config_fuzzer_limits.py](./config_fuzzer_limits.py) (ensure to correctly add to the `mongod` or `mongos` sub-dictionary), including `"custom_fuzz_value_assignment": True` to indicate it requires special handling
+1. Add the parameter and the needed information to
+   [config_fuzzer_limits.py](./config_fuzzer_limits.py) (ensure to correctly add to the `mongod` or
+   `mongos` sub-dictionary), including `"custom_fuzz_value_assignment": True` to indicate it
+   requires special handling
 
 In [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py):
 
-2. Add the parameter's special handling in `generate_special_mongod_startup_parameters()` or `generate_special_mongos_startup_parameters()` for startup parameters, or `generate_special_runtime_parameters()` for runtime parameters
+2. Add the parameter's special handling in `generate_special_mongod_startup_parameters()` or
+   `generate_special_mongos_startup_parameters()` for startup parameters, or
+   `generate_special_runtime_parameters()` for runtime parameters
 
-> Note: Parameter dependencies (where one parameter's value constrains another) are currently only supported for startup fuzzing. Runtime fuzzing handles parameters individually.
+> Note: Parameter dependencies (where one parameter's value constrains another) are currently only
+> supported for startup fuzzing. Runtime fuzzing handles parameters individually.
 
-If you add a flow control parameter, please add the the parameter's name to `flow_control_params` in `generate_mongod_parameters`.
+If you add a flow control parameter, please add the the parameter's name to `flow_control_params` in
+`generate_mongod_parameters`.
 
-> Note: The main distinction between min/max vs. lower-bound/upper_bound is there is some transformation involving the lower and upper bounds,
-> while the min/max should be the true min/max of the parameters. You should also include the true min/max of the parameter so this can be logged.
-> If the min/max is not inclusive, this is added as a note above the parameter.
+> Note: The main distinction between min/max vs. lower-bound/upper_bound is there is some
+> transformation involving the lower and upper bounds, while the min/max should be the true min/max
+> of the parameters. You should also include the true min/max of the parameter so this can be
+> logged. If the min/max is not inclusive, this is added as a note above the parameter.
 
 ### Adding new WiredTiger parameters
 
-WiredTiger parameters and their properties (e.g. min, max, default) are stored in [config_fuzzer_wt_limits.py](./config_fuzzer_wt_limits.py).
+WiredTiger parameters and their properties (e.g. min, max, default) are stored in
+[config_fuzzer_wt_limits.py](./config_fuzzer_wt_limits.py).
 
-> These _can not_ be fuzzed with the [FuzzRuntimeParameters](../../../buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py) hook because they are only set on startup (these parameters are used in the wt configuration string).
+> These _can not_ be fuzzed with the
+> [FuzzRuntimeParameters](../../../buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py)
+> hook because they are only set on startup (these parameters are used in the wt configuration
+> string).
 
-Below is a list of ways to fuzz configs which are supported without having to also change [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py).
-
-Please ensure that you add it correctly to the `wt` (eviction parameters) or `wt_table` subdictionary.
-
-Let `choices = [choice1, choice2, ..., choiceN]` be an array of choices that the parameter can have as a value.
-
-The parameters are added in order of priority chosen in the if-elif-else statement in `generate_normal_wt_parameters()` in
+Below is a list of ways to fuzz configs which are supported without having to also change
 [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py).
+
+Please ensure that you add it correctly to the `wt` (eviction parameters) or `wt_table`
+subdictionary.
+
+Let `choices = [choice1, choice2, ..., choiceN]` be an array of choices that the parameter can have
+as a value.
+
+The parameters are added in order of priority chosen in the if-elif-else statement in
+`generate_normal_wt_parameters()` in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py).
 
 1. `param = rng.choices(choices)`, where choices is an array
 
@@ -281,25 +345,32 @@ The parameters are added in order of priority chosen in the if-elif-else stateme
    "param": {"min": min, "max": max}
    ```
 
-If you have a parameter that depends on another parameter being generated (see `eviction_target` needing to be initialized before
-`eviction_trigger` as an example in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py)) or behavior that differs from the above cases,
+If you have a parameter that depends on another parameter being generated (see `eviction_target`
+needing to be initialized before `eviction_trigger` as an example in
+[mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py)) or behavior that differs from the above cases,
 please do the following steps:
 
-1. Add the parameter and the needed information to [config_fuzzer_wt_limits.py](./config_fuzzer_wt_limits.py) (ensure to correctly add to the `wt` or `wt_table` sub-dictionary)
+1. Add the parameter and the needed information to
+   [config_fuzzer_wt_limits.py](./config_fuzzer_wt_limits.py) (ensure to correctly add to the `wt`
+   or `wt_table` sub-dictionary)
 
 In [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py):
 
-2. Add the parameter to `excluded_normal_params` in `generate_eviction_configs()` or `generate_table_configs()`
-3. Add the parameter's special handling in `generate_special_eviction_configs()` or `generate_special_table_configs()`
+2. Add the parameter to `excluded_normal_params` in `generate_eviction_configs()` or
+   `generate_table_configs()`
+3. Add the parameter's special handling in `generate_special_eviction_configs()` or
+   `generate_special_table_configs()`
 
-> The main distinction between min/max vs. lower-bound/upper_bound is there is some transformation involving the lower and upper bounds,
-> while the min/max should be the true min/max of the parameters. You should also include the true min/max of the parameter so this can be logged.
-> If the min/max is not inclusive, this is added as a note above the parameter.
+> The main distinction between min/max vs. lower-bound/upper_bound is there is some transformation
+> involving the lower and upper bounds, while the min/max should be the true min/max of the
+> parameters. You should also include the true min/max of the parameter so this can be logged. If
+> the min/max is not inclusive, this is added as a note above the parameter.
 
 ## Exclusions
 
 - `jstests/libs/override_methods/config_fuzzer_incompatible_commands.js`
   - These commands are too impactful to run with the config fuzzer
 - The `does_not_support_config_fuzzer` jstest tag
-  - Tests with this tag may manually specify server parameters modified by the fuzzer or read global state that is modified in some way by the fuzzer.
+  - Tests with this tag may manually specify server parameters modified by the fuzzer or read global
+    state that is modified in some way by the fuzzer.
   - Just because a test is failing does not mean it is incompatible with the config fuzzer.

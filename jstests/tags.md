@@ -1,6 +1,8 @@
 # JS Test Tags
 
-JS Test files can leverage "tags" that suites can key off of to include and/or exclude as necessary. Not scheduling a test to run is much faster than the test doing an early-return when preconditions are not met.
+JS Test files can leverage "tags" that suites can key off of to include and/or exclude as necessary.
+Not scheduling a test to run is much faster than the test doing an early-return when preconditions
+are not met.
 
 The simplest use case is having something like the following at the top of your js test file:
 
@@ -38,7 +40,10 @@ and can also include (meta) comments:
  */
 ```
 
-The tags are meant to be used in suite configurations, to [`include_with_any_tags`](../buildscripts/resmokeconfig/suites/README.md#selectorinclude_with_any_tags) and/or [`exclude_with_any_tags`](../buildscripts/resmokeconfig/suites/README.md#selectorexclude_with_any_tags):
+The tags are meant to be used in suite configurations, to
+[`include_with_any_tags`](../buildscripts/resmokeconfig/suites/README.md#selectorinclude_with_any_tags)
+and/or
+[`exclude_with_any_tags`](../buildscripts/resmokeconfig/suites/README.md#selectorexclude_with_any_tags):
 
 ```bash
 test_kind: js_test
@@ -50,7 +55,8 @@ selector:
     - disabled_for_fcv_6_1_upgrade
 ```
 
-Build variants can also use tags via the `test_flags` expansion, which facilitates tag-exclusions _across suites_ that run with the variant:
+Build variants can also use tags via the `test_flags` expansion, which facilitates tag-exclusions
+_across suites_ that run with the variant:
 
 ```
     expansions:
@@ -60,6 +66,9 @@ Build variants can also use tags via the `test_flags` expansion, which facilitat
 
 ## Available Tags
 
-There is no current exhaustive list, since tags are arbitrary labels and do not need to be "registered". However, tags are always "global", and many are reused. Names should have communicate clear intent; and be reused/consolidated when appropriate.
+There is no current exhaustive list, since tags are arbitrary labels and do not need to be
+"registered". However, tags are always "global", and many are reused. Names should have communicate
+clear intent; and be reused/consolidated when appropriate.
 
-> Use `buildscripts/resmoke.py list-tags` to find which tags are actively referenced by suite configs, although there may be more in JS files and Build Variant expansions.
+> Use `buildscripts/resmoke.py list-tags` to find which tags are actively referenced by suite
+> configs, although there may be more in JS files and Build Variant expansions.

@@ -1,13 +1,14 @@
 # mongo gpg builds
 
-This directory contains a script to produce **portable `gpg` binaries** for all our supported linux platforms:
+This directory contains a script to produce **portable `gpg` binaries** for all our supported linux
+platforms:
 
 - **Linux** (`manylinux2014` glibc 2.17 baseline): `x86_64`, `aarch64`, `s390x`, `ppc64le`
 
 In particular, it builds gnupg-2.5.16 from source.
 
-This script is used to generate the binaries that we use bring into bazel as a dependency to sign test extensions.
-All artifacts are placed in the `dist/` directory.
+This script is used to generate the binaries that we use bring into bazel as a dependency to sign
+test extensions. All artifacts are placed in the `dist/` directory.
 
 ---
 
@@ -61,8 +62,8 @@ ARCH=ppc64le PLATFORM=linux/ppc64le ./build_gpg_manylinux.sh
 
 ## 📜 License & Attribution
 
-These scripts build **gpg** and its required dependencies from sources originally obtained from:
-👉 <https://www.gnupg.org/ftp/gcrypt/gnupg/> and <https://gnupg.org/download/index.html>
+These scripts build **gpg** and its required dependencies from sources originally obtained from: 👉
+<https://www.gnupg.org/ftp/gcrypt/gnupg/> and <https://gnupg.org/download/index.html>
 
 The exact sources can be obtained at the following URLs:
 

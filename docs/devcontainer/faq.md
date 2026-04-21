@@ -6,14 +6,16 @@ Frequently asked questions about MongoDB development with dev containers.
 
 ### What is a dev container?
 
-A dev container (development container) is a Docker container configured specifically for development. It includes:
+A dev container (development container) is a Docker container configured specifically for
+development. It includes:
 
 - All build tools and dependencies
 - IDE configuration and extensions
 - Persistent storage for caches and settings
 - Consistent environment across all developers
 
-Think of it as a portable, reproducible development environment that runs on any machine with Docker.
+Think of it as a portable, reproducible development environment that runs on any machine with
+Docker.
 
 [Learn more about dev containers →](https://containers.dev/)
 
@@ -43,11 +45,14 @@ Report issues to help improve it for everyone!
   - Pros: Works without SSH keys, simpler for read-only access
   - Cons: May require password/token for push operations
 
-See the [Getting Started guide SSH setup section](./getting-started.md#4-configure-ssh-keys-recommended) for details.
+See the
+[Getting Started guide SSH setup section](./getting-started.md#4-configure-ssh-keys-recommended) for
+details.
 
 ### How do SSH keys work with devcontainers?
 
-VS Code automatically forwards your SSH agent to the container, so you don't need to copy keys into the container.
+VS Code automatically forwards your SSH agent to the container, so you don't need to copy keys into
+the container.
 
 **Requirements:**
 
@@ -65,7 +70,8 @@ ssh-add -l
 ssh -T git@github.com
 ```
 
-**Inside the container**, Git commands will automatically use your host's SSH keys through agent forwarding.
+**Inside the container**, Git commands will automatically use your host's SSH keys through agent
+forwarding.
 
 [Learn more about SSH agent forwarding →](https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials)
 
@@ -126,7 +132,8 @@ First-time setup includes:
 - WSL2 installed and configured
 - Docker Desktop with WSL2 integration enabled
 
-**Important:** Clone repository in WSL2 filesystem (not `/mnt/c/`), not Windows filesystem, for best performance.
+**Important:** Clone repository in WSL2 filesystem (not `/mnt/c/`), not Windows filesystem, for best
+performance.
 
 ### Can I use this on Apple Silicon (M1/M2/M3)?
 
@@ -161,7 +168,8 @@ docker cp <container_id>:/workspaces/mongo/file.txt ~/Downloads/
 
 **Option 3: Use bind mount** (sacrifices performance)
 
-Open your existing local repository in VS Code and use "Dev Containers: Reopen in Container". This uses a bind mount which allows direct host filesystem access but is slower, especially on macOS.
+Open your existing local repository in VS Code and use "Dev Containers: Reopen in Container". This
+uses a bind mount which allows direct host filesystem access but is slower, especially on macOS.
 
 ### Can I use my existing local clone?
 
@@ -369,8 +377,7 @@ gcc --version  # Should show the MongoDB toolchain GCC version
 ls -la ~/.config/engflow_auth/
 ```
 
-**Re-authenticate:**
-Contact MongoDB team for authentication flow.
+**Re-authenticate:** Contact MongoDB team for authentication flow.
 
 **Build locally instead:**
 
@@ -406,13 +413,15 @@ Allocate as much disk space as you can comfortably spare. We recommend at least 
 
 **Allocate as much as possible** while leaving enough for your host OS to function (~4-8 GB).
 
-More RAM = faster builds with more parallel jobs. MongoDB builds are resource-intensive and benefit greatly from additional memory.
+More RAM = faster builds with more parallel jobs. MongoDB builds are resource-intensive and benefit
+greatly from additional memory.
 
 ### How many CPU cores should I allocate?
 
 **Allocate as many cores as possible** while leaving a couple for your host OS (1-2 cores).
 
-Bazel parallelizes well; more cores = significantly faster builds. If you have 8+ cores available, MongoDB builds will complete much faster.
+Bazel parallelizes well; more cores = significantly faster builds. If you have 8+ cores available,
+MongoDB builds will complete much faster.
 
 ### Can I reduce resource usage?
 
@@ -437,7 +446,8 @@ bazel clean  # Clear build outputs
 bazel clean --expunge  # Clear everything (reclaim disk space)
 ```
 
-> **Note:** Reducing resources will make builds slower. If possible, it's better to allocate more resources to Docker instead.
+> **Note:** Reducing resources will make builds slower. If possible, it's better to allocate more
+> resources to Docker instead.
 
 ### How do I monitor resource usage?
 
@@ -492,7 +502,8 @@ But you lose VS Code integration, extensions, and convenience features.
 - **Architecture Details**: [architecture.md](./architecture.md)
 - **Troubleshooting**: [troubleshooting.md](./troubleshooting.md)
 - **Advanced Topics**: [advanced.md](./advanced.md)
-- **VS Code Docs**: [code.visualstudio.com/docs/devcontainers](https://code.visualstudio.com/docs/devcontainers/containers)
+- **VS Code Docs**:
+  [code.visualstudio.com/docs/devcontainers](https://code.visualstudio.com/docs/devcontainers/containers)
 
 ### Who do I contact for help?
 

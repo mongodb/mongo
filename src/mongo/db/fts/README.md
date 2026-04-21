@@ -4,8 +4,8 @@ MongoDB has had support for creating 'text' indexes for a long time (since at le
 recently, this support has been deprioritized in favor of Atlas Search and the $search aggregation
 stage.
 
-Please refer to our documentation for some more detailed examples of using the feature.
-Here we will go into the implementation a bit.
+Please refer to our documentation for some more detailed examples of using the feature. Here we will
+go into the implementation a bit.
 
 An FTS index in MongoDB is implemented as a multikey, sparse B-Tree in terms of the actual data
 structure. As an example, consider this index:
@@ -64,8 +64,8 @@ Note:
 - the score is calculated according to some fairly complex logic, involving the relative frequency
   of each term. Generally, rarer (more unique) terms get higher scores.
 - The index spec has two 'text' terms, but they are consolidated into one part of the index. Any
-  number of 'text' index components can occur next to each other, and will always result in a '\_fts'
-  component for the term and an '\_ftsx' component for the score.
+  number of 'text' index components can occur next to each other, and will always result in a
+  '\_fts' component for the term and an '\_ftsx' component for the score.
 - The scores are computed **with only one document considered at a time**. This means that if a
   particular token is quite rare within a single document, it'll get a high score even if it is
   otherwise quite common in the broader dataset. This is one notable benefit of the Atlas Search

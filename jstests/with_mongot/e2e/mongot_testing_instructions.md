@@ -1,12 +1,20 @@
 # Introduction
 
-To run aggregation pipelines containing $search or $vectorSearch stages, you will need a mongot binary. You have the choice of running tests with a mongot binary currently running in production on Atlas (release), the latest mongot binary created via the most recent merge to 10gen/mongot repo (latest), or a mongot binary with unmerged local changes.
+To run aggregation pipelines containing $search or $vectorSearch stages, you will need a mongot
+binary. You have the choice of running tests with a mongot binary currently running in production on
+Atlas (release), the latest mongot binary created via the most recent merge to 10gen/mongot repo
+(latest), or a mongot binary with unmerged local changes.
 
 ## Using release or latest mongot
 
-In order to acquire a release or latest mongot binary, from your ~/mongo directory you will need to know your virtual workstations OS and architecture. Assuming your VM is on ubuntu (the default), run `lscpu` in your terminal and inspect the first line of the response to confirm your VM's architecture.
+In order to acquire a release or latest mongot binary, from your ~/mongo directory you will need to
+know your virtual workstations OS and architecture. Assuming your VM is on ubuntu (the default), run
+`lscpu` in your terminal and inspect the first line of the response to confirm your VM's
+architecture.
 
-The default behavior of setup-mongot-repro assume you want to download the latest version of mongot binary compatible with linux x86_64. In which case, if this works for your VM/testing needs, you can run:
+The default behavior of setup-mongot-repro assume you want to download the latest version of mongot
+binary compatible with linux x86_64. In which case, if this works for your VM/testing needs, you can
+run:
 
 ######
 
@@ -48,7 +56,8 @@ If your VM is running macos, you can install the latest macos compatible mongot 
 
     bazel run db-contrib-tool -- setup-mongot-repro-env --platform macos --installDir build/install/bin
 
-Clearly, many options to play around with! To learn more about setup-mongot-repro-env command line options, use
+Clearly, many options to play around with! To learn more about setup-mongot-repro-env command line
+options, use
 
 ######
 
@@ -56,7 +65,8 @@ Clearly, many options to play around with! To learn more about setup-mongot-repr
 
 ## Compiling mongot from source
 
-If you want to need to include unmerged changes in your mongot binary, you can compile a mongot with said changes locally on your VM. You will need to:
+If you want to need to include unmerged changes in your mongot binary, you can compile a mongot with
+said changes locally on your VM. You will need to:
 
 1. **Clone the mongot repo to your VM**
 
@@ -65,8 +75,7 @@ If you want to need to include unmerged changes in your mongot binary, you can c
     git clone git@github.com:10gen/mongot.git
 
 2. **cd into your mongot repo and checkout the in-development branch you're interested in**
-3. **Compile mongot**
-   If your VM is linux x86_64:
+3. **Compile mongot** If your VM is linux x86_64:
 
 ######
 
@@ -84,7 +93,8 @@ If your VM is linux aarch64:
 
     tar -xvzf bazel-bin/deploy/mongot-localdev.tgz
 
-5. **Move the resulting mongot binary** into the build directory that the server build system places mongod, mongos and shell binaries:
+5. **Move the resulting mongot binary** into the build directory that the server build system places
+   mongod, mongos and shell binaries:
 
 ######
 
@@ -92,7 +102,8 @@ If your VM is linux aarch64:
 
 ## Adding Tests
 
-To create a new search integration test, add a jstest to **jstests/with_mongot/e2e**. Any tests added there can be run in **single node replica set** or **sharded cluster environment**.
+To create a new search integration test, add a jstest to **jstests/with_mongot/e2e**. Any tests
+added there can be run in **single node replica set** or **sharded cluster environment**.
 
 **To run your test as a single node replica set:**
 
@@ -112,19 +123,40 @@ To note, until SERVER-86616 is completed, your test will have to follow a partic
 2. Create a search index
 3. Run your queries
 
-This order is required to ensure correctness. This is due to the nature of data replication between mongot and mongod. Mongot replicates data from mongod via a $changeStream and is thus eventually consistent with mongod collection data. Currently, the testing infrastructure ensures correctness by expecting engineers do not make document changes after index creation (as dictated by above order) + by having the createSearchIndex shell helper wait until mongot confirms the requested mongot index is queryable before returning. More specifically, createSearchIndex uses the status of the search index (READY) generated from $listSearchIndexes to know that the collection data has been fully replicated and indexed. If we update documents or add documents after index creation, the status of $listSearchIndexes doesn't guarantee anything about the status of data replication and queries could return incorrect results.
+This order is required to ensure correctness. This is due to the nature of data replication between
+mongot and mongod. Mongot replicates data from mongod via a
+$changeStream and is thus eventually
+consistent with mongod collection data. Currently, the testing infrastructure ensures correctness by
+expecting engineers do not make document changes after index creation (as dictated by above order) +
+by having the createSearchIndex shell helper wait until mongot confirms the requested mongot index
+is queryable before returning. More specifically, createSearchIndex uses the status of the search
+index (READY) generated from $listSearchIndexes to know that the collection data has been fully
+replicated and indexed. If we update documents or add documents after index creation, the status of
+$listSearchIndexes
+doesn't guarantee anything about the status of data replication and queries could return incorrect
+results.
 
 ## Downloading a mongot binary from an evergreen artifact
 
-You can download the mongot binary that a specific evergreen patch or version utilized, which can be useful for trying to replicate errors.
+You can download the mongot binary that a specific evergreen patch or version utilized, which can be
+useful for trying to replicate errors.
 
-You can download the mongot binary from any build variant that compiles mongot--i.e., variants which include the expansion `build_mongot: true` ([example](https://github.com/mongodb/mongo/blob/848b5264be2d0f93d21ffe2e4058e810f8ea18f2/etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml#L194)). More specifically, that includes:
+You can download the mongot binary from any build variant that compiles mongot--i.e., variants which
+include the expansion `build_mongot: true`
+([example](https://github.com/mongodb/mongo/blob/848b5264be2d0f93d21ffe2e4058e810f8ea18f2/etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml#L194)).
+More specifically, that includes:
 
-- Compile variants that are depended upon by variants which run the search end to end tests, such as the variant `amazon-linux2023-arm64-static-compile` _(! Amazon Linux 2023 arm64 Enterprise Shared Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)_
-- Variants that compile mongot **and** run the search end to end tests, such as: `amazon-linux2023-arm64-mongot-integration-patchable` _(AL2023 arm64 mongot integration tasks)_
-  - Note that this will be true of any of the build variants that include `mongot` in the name, such as _Enterprise RHEL 8.0 Mongot Integration_
+- Compile variants that are depended upon by variants which run the search end to end tests, such as
+  the variant `amazon-linux2023-arm64-static-compile` _(! Amazon Linux 2023 arm64 Enterprise Shared
+  Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2023 arm64 Atlas
+  Enterprise (all feature flags)_
+- Variants that compile mongot **and** run the search end to end tests, such as:
+  `amazon-linux2023-arm64-mongot-integration-patchable` _(AL2023 arm64 mongot integration tasks)_
+  - Note that this will be true of any of the build variants that include `mongot` in the name, such
+    as _Enterprise RHEL 8.0 Mongot Integration_
 
-If you're confused about evergreen build variants, check out [Intro to Evergreen Concepts](https://docs.google.com/document/d/1kHi0YuzuRcMs1sRgXRRwy5-cSF4vasAT8lQjkg2hXCU/edit?usp=sharing).
+If you're confused about evergreen build variants, check out
+[Intro to Evergreen Concepts](https://docs.google.com/document/d/1kHi0YuzuRcMs1sRgXRRwy5-cSF4vasAT8lQjkg2hXCU/edit?usp=sharing).
 
 The general format of the command is:
 
@@ -132,22 +164,33 @@ The general format of the command is:
 
     bazel run db-contrib-tool -- setup-repro-env --variant <evergreen variant name> <evergreen patch id OR associated git commit hash>
 
-Specifically, to download from the `AL2023 x86 mongot integration tasks cron only` build variant, you could run:
+Specifically, to download from the `AL2023 x86 mongot integration tasks cron only` build variant,
+you could run:
 
 ######
 
     bazel run db-contrib-tool -- setup-repro-env --variant amazon-linux-2023-x86-mongot-integration-cron-only 23b790a2a81767b8edbbc266043a205029867b74
 
-By default, the download will be placed in `build/multiversion_bin/<githash_patchid OR githash>/dist_test/`, but you can also specify a location via the `--installDir` option. For example:
+By default, the download will be placed in
+`build/multiversion_bin/<githash_patchid OR githash>/dist_test/`, but you can also specify a
+location via the `--installDir` option. For example:
 
 ######
 
     bazel run db-contrib-tool -- setup-repro-env --variant amazon-linux2023-arm64-static-compile 23b790a2a81767b8edbbc266043a205029867b74 --installDir=build/multiversion_bin/my_variant
 
-Will place the mongot binary in `build/multiversion_bin/my_variant/23b790a2a81767b8edbbc266043a205029867b74/dist_test/bin/mongot-localdev`
+Will place the mongot binary in
+`build/multiversion_bin/my_variant/23b790a2a81767b8edbbc266043a205029867b74/dist_test/bin/mongot-localdev`
 
-General information about the `setup-repro-env` command can be found in its [README](https://github.com/10gen/db-contrib-tool/blob/main/src/db_contrib_tool/setup_repro_env/README.md#setting-up-a-specific-mongodb-version). Note that if you want to download the mongot binary, you'll have to pass in an appropriate `--variant`: if you don't specify, a variant that makes sense for your machine's architecture will be automatically chosen for you, and will very likely will not be one of the variants that compiles mongot.
+General information about the `setup-repro-env` command can be found in its
+[README](https://github.com/10gen/db-contrib-tool/blob/main/src/db_contrib_tool/setup_repro_env/README.md#setting-up-a-specific-mongodb-version).
+Note that if you want to download the mongot binary, you'll have to pass in an appropriate
+`--variant`: if you don't specify, a variant that makes sense for your machine's architecture will
+be automatically chosen for you, and will very likely will not be one of the variants that compiles
+mongot.
 
 ### Didn't Find What You're Looking For?
 
-Visit [the landing page](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.
+Visit
+[the landing page](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md)
+for all $search/$vectorSearch/$searchMeta related documentation for server contributors.

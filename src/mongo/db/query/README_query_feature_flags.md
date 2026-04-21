@@ -90,9 +90,9 @@ To answer this, we provide an abbreviated transcript of developers discussing th
 
 Parker Felix:
 
-> Hi, I've been discussing a concern I've had around FCV transitions and v1/v2 oplog entries
-> in #server-replication and wanted to move the discussion here. After adding an FCV check for
-> applying v2 oplog entries, I noticed in a failure in a test that:
+> Hi, I've been discussing a concern I've had around FCV transitions and v1/v2 oplog entries in
+> #server-replication and wanted to move the discussion here. After adding an FCV check for applying
+> v2 oplog entries, I noticed in a failure in a test that:
 >
 > 1. Starts a v2 eligible update
 > 2. Hangs the update after checking the feature flag and deciding it can use the v2 oplog path
@@ -117,8 +117,8 @@ Parker Felix:
 Wenquin Ye:
 
 > What's the specific concern with acquiring a global IX lock. Are we afraid that it may block or
-> starve some other important user operation? There is some precedent for user operations to acquire a
-> global IX lock to serialize with setFCV. For example [transactions acquire the global IX
+> starve some other important user operation? There is some precedent for user operations to acquire
+> a global IX lock to serialize with setFCV. For example [transactions acquire the global IX
 > lock][txns_acquire_ix_lock_ref] when started. Also regarding, why we haven't seen this before,
 > maybe it's just because we haven't done extensive downgrade testing until now. For instance [I
 > recall finding another node crash issue that technically exists on the downgrade from 5.0 to
@@ -126,12 +126,12 @@ Wenquin Ye:
 
 Parker Felix:
 
-> I guess I'm concerned about performance implications of changing what locks updates
-> use but I'm not that familiar with our locking mechanisms. I'm also not sure if the update
-> completing before the setFCV takes effect gives us strong enough guarantees. If setFCV has an
-> associated oplog entry and oplog entries need to be processed in order, that might be sufficient
-> for ensuring that there are no outstanding v2 oplog entries once we have completed the FCV
-> transition to 4.4 (and can then have 4.4 binaries in the replica set).
+> I guess I'm concerned about performance implications of changing what locks updates use but I'm
+> not that familiar with our locking mechanisms. I'm also not sure if the update completing before
+> the setFCV takes effect gives us strong enough guarantees. If setFCV has an associated oplog entry
+> and oplog entries need to be processed in order, that might be sufficient for ensuring that there
+> are no outstanding v2 oplog entries once we have completed the FCV transition to 4.4 (and can then
+> have 4.4 binaries in the replica set).
 
 huayu:
 
@@ -161,12 +161,11 @@ josef:
 > 1. Starts a v2 eligible update
 > 2. Hangs the update after checking the feature flag and deciding it can use the v2 oplog path
 > 3. Starts an FCV 7.0->4.4 downgrade, disabling the feature flag on the primary and
->    secondaries"checking the feature flag and deciding it can use the v2 oplog path" has to happen after
->    acquiring the collection lock (which by extension acquires the global lock) and the lock must be
->    held for the entire duration of the write unit of work WUOW. This way there's no interleaving with
->    FCV changes.
->    Oh and, if this is a multi-update, it should do the above after every yield/resume, that is,
->    for each document it updates.
+>    secondaries"checking the feature flag and deciding it can use the v2 oplog path" has to happen
+>    after acquiring the collection lock (which by extension acquires the global lock) and the lock
+>    must be held for the entire duration of the write unit of work WUOW. This way there's no
+>    interleaving with FCV changes. Oh and, if this is a multi-update, it should do the above after
+>    every yield/resume, that is, for each document it updates.
 
 Parker Felix:
 
@@ -176,9 +175,9 @@ Parker Felix:
 > driver][update_driver_decision_ref]. The update's MODE_IX lock will conflict with the [MODE_S
 > lock][MODE_S_lock_ref] taken by setFeatureCompatibilityVersion, so one will block after the other.
 > In the event of a yield during the update query, we [don't persist any data from the update
-> driver][no_persistence_update_driver_ref] and will check the value of the flag again after the yield
-> in case it has changed. I think this should then guarantee that the secondaries will process the
-> remaining v2 oplog entries before the setFCV downgrade oplog entry.
+> driver][no_persistence_update_driver_ref] and will check the value of the flag again after the
+> yield in case it has changed. I think this should then guarantee that the secondaries will process
+> the remaining v2 oplog entries before the setFCV downgrade oplog entry.
 
 huayu:
 
@@ -193,9 +192,8 @@ Parker Felix:
 
 ianb:
 
-> FWIW one of
-> the tests has an assertion about the order of the oplog entries to this
-> effect: [v2_delta_oplog_entries_fcv.js][v2_delta_oplog_entries_fcv_dot_js]
+> FWIW one of the tests has an assertion about the order of the oplog entries to this effect:
+> [v2_delta_oplog_entries_fcv.js][v2_delta_oplog_entries_fcv_dot_js]
 
 ```js
 // Check that the sequence of oplog entries is right. We expect to see the following
@@ -220,11 +218,11 @@ huayu:
 
 Parker Felix:
 
-> It seems like FCV gated feature flags are disabled when the FCV transition starts
-> rather than upon completion of FCV downgrade. For this test, we hang the update after it checks the
-> value of the feature flag and determines it can generate a v2 oplog. While the update is hanging, we
-> initiate an FCV downgrade to 4.4, disabling the feature flag on the secondaries. When we resume the
-> update, it still produces a v2 oplog entry that was then failing the feature flag check in oplog
+> It seems like FCV gated feature flags are disabled when the FCV transition starts rather than upon
+> completion of FCV downgrade. For this test, we hang the update after it checks the value of the
+> feature flag and determines it can generate a v2 oplog. While the update is hanging, we initiate
+> an FCV downgrade to 4.4, disabling the feature flag on the secondaries. When we resume the update,
+> it still produces a v2 oplog entry that was then failing the feature flag check in oplog
 > application that I am going to remove.
 
 huayu:
@@ -238,7 +236,8 @@ huayu:
 > 3. We start an FCV downgrade to 4.4. This will transition the FCV to the downgrading to 4.4. phase
 >    which means the feature flag is disabled. This also writes an oplog entry to update the FCV doc
 >    to downgrading to 4.4 to the oplog
-> 4. The FCV downgrade will hang waiting to acquire the global lock in S mode [here][MODE_S_lock_ref]
+> 4. The FCV downgrade will hang waiting to acquire the global lock in S mode
+>    [here][MODE_S_lock_ref]
 > 5. We resume the update which writes an v2 oplog entry to the oplog
 > 6. FCV downgrade can now acquire the global lock, and at the end it transitions the FCV to 4.4 and
 >    writes an oplog entry for that
@@ -286,17 +285,25 @@ cannot offer any more specific advice.
 
 [fcv_readme]: /src/mongo/db/repl/FCV_AND_FEATURE_FLAG_README.md
 [version_context]: /src/mongo/db/version_context.h
-[good_parse_example]: https://github.com/mongodb/mongo/blob/8ac5a0c814a5e8a0f79825327fdf6c3aa118c0fa/src/mongo/db/pipeline/document_source.cpp#L135
+[good_parse_example]:
+  https://github.com/mongodb/mongo/blob/8ac5a0c814a5e8a0f79825327fdf6c3aa118c0fa/src/mongo/db/pipeline/document_source.cpp#L135
 [SERVER-103028]: https://jira.mongodb.org/browse/SERVER-103028
 [SERVER-91281]: https://jira.mongodb.org/browse/SERVER-91281
 [SERVER-109985]: https://jira.mongodb.org/browse/SERVER-109985
 [SERVER-91269]: https://jira.mongodb.org/browse/SERVER-91269
-[txns_acquire_ix_lock_ref]: https://github.com/mongodb/mongo/blob/965823ff377bc04ac0a4fce344aa9ab3f7e4eed0/src/mongo/db/transaction/transaction_participant.cpp#L1746-L1747
+[txns_acquire_ix_lock_ref]:
+  https://github.com/mongodb/mongo/blob/965823ff377bc04ac0a4fce344aa9ab3f7e4eed0/src/mongo/db/transaction/transaction_participant.cpp#L1746-L1747
 [related_downgrade_crash_ref]: https://jira.mongodb.org/browse/SERVER-103343
-[dedicated_fcv_batch_ref]: https://github.com/mongodb/mongo/blob/770e79f6262294b67da4845a2872e123f7401a0b/src/mongo/db/namespace_string.cpp#L153-L162
-[ix_lock_ref]: https://github.com/mongodb/mongo/blob/5fca8916aebed11980bdb11437ade6e5baa49198/src/mongo/db/query/write_ops/write_ops_exec.cpp#L753-L757
-[update_driver_decision_ref]: https://github.com/mongodb/mongo/blob/da243b43b0879ff263a1d1ff68dcb204a5e40e47/src/mongo/db/update/update_driver.cpp#L296-L299
+[dedicated_fcv_batch_ref]:
+  https://github.com/mongodb/mongo/blob/770e79f6262294b67da4845a2872e123f7401a0b/src/mongo/db/namespace_string.cpp#L153-L162
+[ix_lock_ref]:
+  https://github.com/mongodb/mongo/blob/5fca8916aebed11980bdb11437ade6e5baa49198/src/mongo/db/query/write_ops/write_ops_exec.cpp#L753-L757
+[update_driver_decision_ref]:
+  https://github.com/mongodb/mongo/blob/da243b43b0879ff263a1d1ff68dcb204a5e40e47/src/mongo/db/update/update_driver.cpp#L296-L299
 
-[MODE_S_lock_ref]: https://github.com/mongodb/mongo/blob/339bd22e371a069a167db2b7ede52c6a299fa55d/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1388-L1393  
-[no_persistence_update_driver_ref]: https://github.com/mongodb/mongo/blob/5fca8916aebed11980bdb11437ade6e5baa49198/src/mongo/db/exec/update_stage.cpp#L534-L546
-[v2_delta_oplog_entries_fcv_dot_js]: https://github.com/mongodb/mongo/blob/da243b43b0879ff263a1d1ff68dcb204a5e40e47/jstests/multiVersion/s8/v2_delta_oplog_entries_fcv.js#L268-L274v2_delta_oplog_entries_fcv.js
+[MODE_S_lock_ref]:
+https://github.com/mongodb/mongo/blob/339bd22e371a069a167db2b7ede52c6a299fa55d/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1388-L1393  
+[no_persistence_update_driver_ref]:
+https://github.com/mongodb/mongo/blob/5fca8916aebed11980bdb11437ade6e5baa49198/src/mongo/db/exec/update_stage.cpp#L534-L546
+[v2_delta_oplog_entries_fcv_dot_js]:
+https://github.com/mongodb/mongo/blob/da243b43b0879ff263a1d1ff68dcb204a5e40e47/jstests/multiVersion/s8/v2_delta_oplog_entries_fcv.js#L268-L274v2_delta_oplog_entries_fcv.js

@@ -1,10 +1,12 @@
 # JS Debugging in the MongoDB Shell
 
-> The [**VSCode Extension**](./vscode/README.md) provides interactive functionality using the VSCode UI.
+> The [**VSCode Extension**](./vscode/README.md) provides interactive functionality using the VSCode
+> UI.
 >
 > The remainder documents the supported `debugger` statement callbacks.
 
-Use the `--jsdbg` flag for resmoke (or the `--jsDebugMode` flag directly on the mongo shell) to trigger an interactive debug prompt when `debugger` statements are hit in JS test code.
+Use the `--jsdbg` flag for resmoke (or the `--jsDebugMode` flag directly on the mongo shell) to
+trigger an interactive debug prompt when `debugger` statements are hit in JS test code.
 
 Sample JS Test:
 
@@ -19,7 +21,8 @@ assert.eq(q, "foo");
 print("Test Passed!");
 ```
 
-Running this test will fail since `x != 7`, and the `debugger` is a no-op (does not have any callback handler):
+Running this test will fail since `x != 7`, and the `debugger` is a no-op (does not have any
+callback handler):
 
 ```bash
 buildscripts/resmoke.py run --suites=no_passthrough jstests/my_test.js
@@ -82,10 +85,13 @@ JSDEBUG> Continuing execution...
 
 ## Architecture
 
-- `debugger.cpp` is the main shell logic to invoke/wait in response to breakpoints and the UI. It interacts with the SpiderMonkey Debugger API.
-- `adapter.cpp` is the Debug Adapter Protocol (DAP) message handler and TCP client. This connects to the VSCode extension, specifically `./vscode/session.js`.
+- `debugger.cpp` is the main shell logic to invoke/wait in response to breakpoints and the UI. It
+  interacts with the SpiderMonkey Debugger API.
+- `adapter.cpp` is the Debug Adapter Protocol (DAP) message handler and TCP client. This connects to
+  the VSCode extension, specifically `./vscode/session.js`.
   - This should _not_ handle any BSON/JSON directly, and only interface with the protocol.
-- `protocol.cpp` is the relevant implementation of the [DAP specification](https://microsoft.github.io/debug-adapter-protocol//specification.html).
+- `protocol.cpp` is the relevant implementation of the
+  [DAP specification](https://microsoft.github.io/debug-adapter-protocol//specification.html).
   - This should stand on its own _without_ the adapter, and encapsulate all BSON/JSON manipulation.
 
 The VSCode client code is in `./vscode`, see more in its [README.md](./vscode/README.md).

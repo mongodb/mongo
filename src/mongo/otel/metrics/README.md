@@ -1,13 +1,13 @@
 # MongoDB Open Telemetry Metrics API
 
-This module provides an OpenTelemetry-compatible metrics API for instrumenting MongoDB code.
-Metrics are created through the `MetricsService` and can be tested using the provided test
-utilities. This is supported in mongos and mongod.
+This module provides an OpenTelemetry-compatible metrics API for instrumenting MongoDB code. Metrics
+are created through the `MetricsService` and can be tested using the provided test utilities. This
+is supported in mongos and mongod.
 
 ## Creating Metrics
 
-Metrics are created by calling the `create*` functions on the
-[`MetricsService`](metrics_service.h), which is accessed via the `MetricService` instance:
+Metrics are created by calling the `create*` functions on the [`MetricsService`](metrics_service.h),
+which is accessed via the `MetricService` instance:
 
 ```cpp
 #include "mongo/otel/metrics/metric_names.h"
@@ -27,10 +27,10 @@ metrics.
 ### MetricName Registry
 
 All metric names must be registered in the [`MetricNames`](metric_names.h) class. This central
-registry ensures the N&O team has full ownership over new OTel metrics in the server for
-centralized collaboration with downstream OTel consumers. OTel metrics are stored in time-series
-DBs by the SRE team, and a sudden increase in metrics will result in operational costs ballooning
-for the SRE team, which is why N&O owns this registry.
+registry ensures the N&O team has full ownership over new OTel metrics in the server for centralized
+collaboration with downstream OTel consumers. OTel metrics are stored in time-series DBs by the SRE
+team, and a sudden increase in metrics will result in operational costs ballooning for the SRE team,
+which is why N&O owns this registry.
 
 When adding a new metric, add a `static constexpr MetricName` entry to the `MetricNames` class in
 `metric_names.h`, grouped under your team name:
@@ -110,7 +110,8 @@ exception.
 
 ### UpDownCounter
 
-**Use when:** You need a cumulative sum that can increase **and** decrease via `add()` (OpenTelemetry
+**Use when:** You need a cumulative sum that can increase **and** decrease via `add()`
+(OpenTelemetry
 [UpDownCounter](https://opentelemetry.io/docs/specs/otel/metrics/api/#updowncounter)). This is
 distinct from a **Gauge**, which represents an observed point-in-time value (see below).
 
@@ -162,9 +163,10 @@ information.
 
 **Metric attributes are not currently supported.** The OpenTelemetry standard supports attaching
 key-value attributes (also known as labels or tags) to metrics, enabling queries like
-`query_count{database="admin"}`. However, this API intentionally does not expose attributes
-because the default attribute implementation has performance implications. Please reach out to
-the Networking and Observability team if you'd like this feature prioritized ([SERVER-117025](https://jira.mongodb.org/browse/SERVER-117025)).
+`query_count{database="admin"}`. However, this API intentionally does not expose attributes because
+the default attribute implementation has performance implications. Please reach out to the
+Networking and Observability team if you'd like this feature prioritized
+([SERVER-117025](https://jira.mongodb.org/browse/SERVER-117025)).
 
 ## Performance Considerations
 
@@ -176,15 +178,15 @@ regressions in hot code paths.
 Counters, UpDownCounters, and Gauges use **lock-free atomic operations** and are safe to use in
 performance-sensitive code.
 
-**Use Counters, UpDownCounters, and Gauges** for metrics recorded on every request or in latency-critical paths.
+**Use Counters, UpDownCounters, and Gauges** for metrics recorded on every request or in
+latency-critical paths.
 
 ### Histograms: Acquires Locks (Avoid in Hot Paths)
 
-> [!WARNING]
-> The underlying OpenTelemetry library acquires locks during histogram `Record()` operations.
-> Avoid using histograms in performance-sensitive code paths where lock contention could impact
-> latency or throughput. [SERVER-117030](https://jira.mongodb.org/browse/SERVER-117030) tracks
-> improvements to histogram performance.
+> [!WARNING] The underlying OpenTelemetry library acquires locks during histogram `Record()`
+> operations. Avoid using histograms in performance-sensitive code paths where lock contention could
+> impact latency or throughput. [SERVER-117030](https://jira.mongodb.org/browse/SERVER-117030)
+> tracks improvements to histogram performance.
 
 **When to use histograms:**
 
@@ -229,9 +231,9 @@ code correctly records metrics.
 
 ### OtelMetricsCapturer
 
-`OtelMetricsCapturer` sets up an in-memory metrics exporter that captures all metrics created
-during a test. **OtelMetricsCapturer must be constructed before any metrics are created** to
-ensure they are captured.
+`OtelMetricsCapturer` sets up an in-memory metrics exporter that captures all metrics created during
+a test. **OtelMetricsCapturer must be constructed before any metrics are created** to ensure they
+are captured.
 
 ```cpp
 #include "mongo/otel/metrics/metric_names.h"
@@ -288,8 +290,8 @@ mongo_cc_unit_test(
 
 ## serverStatus Integration
 
-Metrics can optionally be exposed in the `serverStatus` command response under the `metrics`
-section by specifying `serverStatusOptions` when creating a metric:
+Metrics can optionally be exposed in the `serverStatus` command response under the `metrics` section
+by specifying `serverStatusOptions` when creating a metric:
 
 ```cpp
 #include "mongo/db/topology/cluster_role.h"
@@ -319,8 +321,8 @@ This metric appears in the `serverStatus` response under the `metrics` section:
 
 ### Dotted Path
 
-The `dottedPath` field specifies the path under `metrics`. Do **not** include a `metrics.`
-prefix. It is added automatically.
+The `dottedPath` field specifies the path under `metrics`. Do **not** include a `metrics.` prefix.
+It is added automatically.
 
 ### Role
 
@@ -345,9 +347,9 @@ Each metric type serializes differently in the serverStatus response:
 
 ## Exporting Metrics
 
-Metrics can be exported in [OTLP format](https://opentelemetry.io/docs/specs/otlp/) using either
-the file exporter or HTTP exporter. Configure these via server parameters at startup. Note that
-only one exporter can be active at a time.
+Metrics can be exported in [OTLP format](https://opentelemetry.io/docs/specs/otlp/) using either the
+file exporter or HTTP exporter. Configure these via server parameters at startup. Note that only one
+exporter can be active at a time.
 
 ### File Exporter
 

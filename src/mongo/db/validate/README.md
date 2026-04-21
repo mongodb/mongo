@@ -6,12 +6,12 @@ informs us whether there’s any data corruption present in the collection at th
 There are two forms of validation, foreground and background.
 
 - Foreground validation requires exclusive access to the collection which prevents CRUD operations
-  from running. The benefit of this is that we're not validating a potentially stale snapshot and that
-  allows us to perform corrective operations such as fixing the collection's fast count.
+  from running. The benefit of this is that we're not validating a potentially stale snapshot and
+  that allows us to perform corrective operations such as fixing the collection's fast count.
 
-- Background validation runs lock-free on the collection and reads using a timestamp in
-  order to have a consistent view across the collection and its indexes. This mode allows CRUD
-  operations to be performed without being blocked.
+- Background validation runs lock-free on the collection and reads using a timestamp in order to
+  have a consistent view across the collection and its indexes. This mode allows CRUD operations to
+  be performed without being blocked.
 
 Additionally, users can specify that they'd like to perform a `full` validation.
 
@@ -32,9 +32,12 @@ Additionally, users can specify that they'd like to perform a `full` validation.
 ## Types of Validation
 
 - Verifies the collection's durable catalog entry and in-memory state match.
-- Indexes are marked as [multikey](../shard_role/shard_catalog/README.md#multikey-indexes) correctly.
-- Index [multikey](../shard_role/shard_catalog/README.md#multikey-indexes) paths cover all of the records in the `RecordStore`.
-- Indexes are not missing [multikey](../shard_role/shard_catalog/README.md#multikey-indexes) metadata information.
+- Indexes are marked as [multikey](../shard_role/shard_catalog/README.md#multikey-indexes)
+  correctly.
+- Index [multikey](../shard_role/shard_catalog/README.md#multikey-indexes) paths cover all of the
+  records in the `RecordStore`.
+- Indexes are not missing [multikey](../shard_role/shard_catalog/README.md#multikey-indexes)
+  metadata information.
 - Index entries are in increasing order if the sort order is ascending.
 - Index entries are in decreasing order if the sort order is descending.
 - Unique indexes do not have duplicate keys.
@@ -54,28 +57,31 @@ Additionally, users can specify that they'd like to perform a `full` validation.
 
 - Instantiates the objects used throughout the validation procedure.
   - [ValidateState](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_state.h)
-    maintains the state for the collection being validated, such as locking, cursor management
-    for the collection and each index, data throttling (for background validation), and general
+    maintains the state for the collection being validated, such as locking, cursor management for
+    the collection and each index, data throttling (for background validation), and general
     information about the collection.
   - [IndexConsistency](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.h)
-    descendents keep track of the number of keys detected in the record store and indexes. Detects when there
-    are index inconsistencies and maintains the information about the inconsistencies for
+    descendents keep track of the number of keys detected in the record store and indexes. Detects
+    when there are index inconsistencies and maintains the information about the inconsistencies for
     reporting.
   - [ValidateAdaptor](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.h)
-    used to traverse the record store and indexes. Validates that the records seen are valid
-    `BSON` conformant to most [BSON specifications](https://bsonspec.org/spec.html). In `full`
-    and `checkBSONConformance` validation modes, all `BSON` checks, including the time-consuming
-    ones, will be enabled.
+    used to traverse the record store and indexes. Validates that the records seen are valid `BSON`
+    conformant to most [BSON specifications](https://bsonspec.org/spec.html). In `full` and
+    `checkBSONConformance` validation modes, all `BSON` checks, including the time-consuming ones,
+    will be enabled.
 - If a `full` validation was requested, we run the storage engines validation hooks at this point to
   allow a more thorough check to be performed.
-- Validates the [collection’s in-memory](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection.h)
-  state with the [durable catalog](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/durable_catalog.h#L242-L243)
-  entry information to ensure there are [no mismatches](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L363-L425)
+- Validates the
+  [collection’s in-memory](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection.h)
+  state with the
+  [durable catalog](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/durable_catalog.h#L242-L243)
+  entry information to ensure there are
+  [no mismatches](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L363-L425)
   between the two.
 - [Initializes all the cursors](https://github.com/mongodb/mongo/blob/07765dda62d4709cddc9506ea378c0d711791b57/src/mongo/db/catalog/validate_state.cpp#L144-L205)
   on the `RecordStore` and `SortedDataInterface` of each index in the `ValidateState` object.
-  - We choose a read timestamp (`ReadSource`) based on the validation mode: `kNoTimestamp`
-    for foreground validation and `kProvided` for background validation.
+  - We choose a read timestamp (`ReadSource`) based on the validation mode: `kNoTimestamp` for
+    foreground validation and `kProvided` for background validation.
 - Traverses the `RecordStore` using the `ValidateAdaptor` object.
   - [Validates each record and adds the document's index key set to the IndexConsistency objects](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
     for consistency checks at later stages.
@@ -88,7 +94,8 @@ Additionally, users can specify that they'd like to perform a `full` validation.
     - Index keys (paths) will
       [decrement](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L239-L248)
       the respective bucket.
-  - Checks that the `RecordId` is in [increasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L305-L308).
+  - Checks that the `RecordId` is in
+    [increasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L305-L308).
   - [Adjusts the fast count](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L348-L353)
     stored in the `RecordStore` (when performing a foreground validation only).
 - Traverses the index entries for each index in the collection.
@@ -100,13 +107,15 @@ Additionally, users can specify that they'd like to perform a `full` validation.
     there.
   - If a bucket has a `value greater than 0`, then we are missing index entries.
   - If a bucket has a `value less than 0`, then we have extra index entries.
-- Upon detection of any index inconsistencies, the [second phase of validation](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L186-L240)
+- Upon detection of any index inconsistencies, the
+  [second phase of validation](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L186-L240)
   is executed. If no index inconsistencies were detected, we’re finished and we report back to the
   user.
   - The second phase of validation re-runs the first phase and expands its memory footprint by
-    recording the detailed information of the keys that were inconsistent during the first phase
-    of validation (keys that hashed to buckets where the value was not 0 in the end).
-  - This is used to [pinpoint exactly where the index inconsistencies were detected](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L109-L202)
+    recording the detailed information of the keys that were inconsistent during the first phase of
+    validation (keys that hashed to buckets where the value was not 0 in the end).
+  - This is used to
+    [pinpoint exactly where the index inconsistencies were detected](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L109-L202)
     and to report them.
 
 ## Repair Mode
@@ -128,12 +137,14 @@ inconsistencies. Repair mode can fix inconsistencies by applying the following r
 Repair mode is used by startup repair to avoid rebuilding indexes. Repair mode may also be used on
 standalone nodes by passing `{ repair: true }` to the validate command.
 
-See [RepairMode](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/catalog/collection_validation.h#L71).
+See
+[RepairMode](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/catalog/collection_validation.h#L71).
 
 ## Pre-fetching
 
-Pre-fetching is an optimisation feature used in validate. When a page has been read from disk, prefetch workers pre-emptively
-read neighbouring leaf pages into the cache in an attempt to avoid waiting on I/O.
+Pre-fetching is an optimisation feature used in validate. When a page has been read from disk,
+prefetch workers pre-emptively read neighbouring leaf pages into the cache in an attempt to avoid
+waiting on I/O.
 
 It is currently enabled by default across all variants. See PM-3292 for more details.
 
@@ -149,27 +160,42 @@ validator.
 
 ## Timestamped Validation
 
-An optional parameter `atClusterTime` can be provided to perform validation at a specific `readTimestamp`. This timestamp follows the same rules as using `readConcern: snapshot`.
+An optional parameter `atClusterTime` can be provided to perform validation at a specific
+`readTimestamp`. This timestamp follows the same rules as using `readConcern: snapshot`.
 
 ## Collection Validation Hashes
 
-The collection validation can be used to compute order-independent SHA-256–based hashes over the collection’s contents. The resulting hash can be used to compare collection contents across nodes of a replica set to check for inter-node consistency. The collection hashing feature can only be used on a standalone node and is not supported against a replica set. The following parameters are used for the collection hashing.
+The collection validation can be used to compute order-independent SHA-256–based hashes over the
+collection’s contents. The resulting hash can be used to compare collection contents across nodes of
+a replica set to check for inter-node consistency. The collection hashing feature can only be used
+on a standalone node and is not supported against a replica set. The following parameters are used
+for the collection hashing.
 
 - `collHash`: <bool>
-  - Enables hash computation for the collection. When present, validate computes a combined hash over the collection’s documents.
+  - Enables hash computation for the collection. When present, validate computes a combined hash
+    over the collection’s documents.
 - `hashPrefixes`: <array<string>>
-  - Requests a bucketed view of the collection keyed by prefixes of the per-document \_id hash. Buckets are returned in the `partial` field and are used to iteratively narrow down inconsistent regions across nodes. When `hashPrefixes` is present, validate skips the top-level all/metadata hashes as an optimization.
+  - Requests a bucketed view of the collection keyed by prefixes of the per-document \_id hash.
+    Buckets are returned in the `partial` field and are used to iteratively narrow down inconsistent
+    regions across nodes. When `hashPrefixes` is present, validate skips the top-level all/metadata
+    hashes as an optimization.
 - `revealHashedIds`: <array<string>>
-  - For each supplied hash or hash prefix, validate returns the corresponding \_id values so that callers can identify which documents differ between nodes.
+  - For each supplied hash or hash prefix, validate returns the corresponding \_id values so that
+    callers can identify which documents differ between nodes.
 
-Collection Validation Hashes output is grouped under a top level `collHash` object in the Validate reply.
+Collection Validation Hashes output is grouped under a top level `collHash` object in the Validate
+reply.
 
 - `collHash.all` – combined hash of all documents in the collection.
 - `collHash.metadata` – combined hash of all idents of the collection and its indexes.
-- `collHash.partial` – map from hash prefix to `{ hash, count }` buckets when `hashPrefixes` is provided.
-- `collHash.revealedIds` – map from hash (or prefix) to a list of \_id values when `revealHashedIds` is provided.
+- `collHash.partial` – map from hash prefix to `{ hash, count }` buckets when `hashPrefixes` is
+  provided.
+- `collHash.revealedIds` – map from hash (or prefix) to a list of \_id values when `revealHashedIds`
+  is provided.
 
-The intended usage of this feature is a multi-pass "drill-down" to identify document inconsistencies between nodes. This process is described below and an example of it can be seen in our [Javascript Testing](https://github.com/mongodb/mongo/blob/1390ce7a08db1536fe0f0b0b6ff7b2f7d8163086/jstests/noPassthrough/validate/libs/validate_find_repl_set_divergence.js).
+The intended usage of this feature is a multi-pass "drill-down" to identify document inconsistencies
+between nodes. This process is described below and an example of it can be seen in our
+[Javascript Testing](https://github.com/mongodb/mongo/blob/1390ce7a08db1536fe0f0b0b6ff7b2f7d8163086/jstests/noPassthrough/validate/libs/validate_find_repl_set_divergence.js).
 
 - Initial pass
   - Call validate with `collHash: true, atClusterTime: x` on each node.
@@ -177,14 +203,19 @@ The intended usage of this feature is a multi-pass "drill-down" to identify docu
   - If there is a difference, proceed with the process. Otherwise no inconsistency.
 - Bucketing
   - Call validate with `collHash: true, atClusterTime: x, hashPrefixes: []`.
-  - For each node, validate computes per-bucket hashes under collHash.partial, using the first N hex characters as bucket keys.
-  - Callers compare bucket hashes across nodes to determine which prefixes (for example, "aa") are inconsistent.
+  - For each node, validate computes per-bucket hashes under collHash.partial, using the first N hex
+    characters as bucket keys.
+  - Callers compare bucket hashes across nodes to determine which prefixes (for example, "aa") are
+    inconsistent.
 - Drill down
-  - For each inconsistent prefix p, call validate again with `collHash: true, atClusterTime: x, hashPrefixes: [p1, p2, ...]`.
+  - For each inconsistent prefix p, call validate again with
+    `collHash: true, atClusterTime: x, hashPrefixes: [p1, p2, ...]`.
   - Validate extends the bucket the prefix (for example, p="aa" -> buckets aaa, aab, …).
-  - Recursively continue this step for each inconsistent prefix until the `count` field is equal to 1, or when a prefix bucket no longer contains data.
+  - Recursively continue this step for each inconsistent prefix until the `count` field is equal to
+    1, or when a prefix bucket no longer contains data.
 - Reveal IDs
-  - Call validate with `collHash: true, atClusterTime: x, revealHashedIds: [p1, p2, ...]` for each prefix.
+  - Call validate with `collHash: true, atClusterTime: x, revealHashedIds: [p1, p2, ...]` for each
+    prefix.
   - Returns the `_id` fields of all documents that map to prefix `p`.
 
 ## Errors and Warnings
@@ -198,8 +229,8 @@ In a general sense, errors are real detected issues which impact the correctness
 whereas warnings are usually not correctness-related or not guaranteed to be. When adding a new
 error, consider whether the finding would previously have been allowed, we shouldn't retroactively
 start flagging previously-allowed things as errors unless they directly impact the correctness of
-the database. In a more specific sense, `|errors| > 0 <==> valid == false`, so errors are created
-in order to draw attention to a specific finding, by declaring that the collection is invalid.
+the database. In a more specific sense, `|errors| > 0 <==> valid == false`, so errors are created in
+order to draw attention to a specific finding, by declaring that the collection is invalid.
 
 Some examples:
 
@@ -207,7 +238,7 @@ Some examples:
   - To assist the user, a _warning_ is generated to count the number of such inconsistencies.
 - Reports on repairs/changes made to the database during validation are _warnings_.
 - Limitations that the validator encounters during its operation (e.g. due to memory pressure, or
-  inability to gain exclusive access to tables) are a _warning_ since they don't prove that there
-  is an issue, but they may hide issues.
+  inability to gain exclusive access to tables) are a _warning_ since they don't prove that there is
+  an issue, but they may hide issues.
 - Invalid UTF-8 strings in BSON objects are a _warning_ since they were historically considered
   valid.

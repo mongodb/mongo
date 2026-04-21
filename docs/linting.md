@@ -60,9 +60,8 @@ Ex: `bash buildscripts/yamllinters.sh`
 
 ## Python Linters
 
-The `bazel run lint` command runs all Python linters as well as several other linters in our code base. You can
-run auto-remediations via:
-`bazel run lint --fix`.
+The `bazel run lint` command runs all Python linters as well as several other linters in our code
+base. You can run auto-remediations via: `bazel run lint --fix`.
 
 Ex: `bazel run lint`
 

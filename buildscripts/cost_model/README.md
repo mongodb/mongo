@@ -18,7 +18,8 @@ source python3-venv/bin/activate
 (python3-venv) bazel build --config=opt install-devcore
 ```
 
-3. Run mongod instance (only for CBR calibration, because join_start.py manages mongod's lifecycle itself):
+3. Run mongod instance (only for CBR calibration, because join_start.py manages mongod's lifecycle
+   itself):
 
 ```sh
 (python3-venv) bazel-bin/install-mongod/bin/mongod --setParameter internalMeasureQueryExecutionTimeInNanoseconds=true
@@ -74,16 +75,21 @@ source cm/bin/activate
   ```sh
   (cm) python join_start.py
   ```
-  To skip the constant calibration (warm scan, CPU, sequential I/O, random I/O) and only run the join algorithm comparison:
+  To skip the constant calibration (warm scan, CPU, sequential I/O, random I/O) and only run the
+  join algorithm comparison:
   ```sh
   (cm) python join_start.py --join-only
   ```
-  To iterate quickly on cost model changes, reuse pre-recorded execution times from a previous full run. This skips actual query execution, only running `queryPlanner` explains to collect fresh cost estimates:
+  To iterate quickly on cost model changes, reuse pre-recorded execution times from a previous full
+  run. This skips actual query execution, only running `queryPlanner` explains to collect fresh cost
+  estimates:
   ```sh
   (cm) python join_start.py --execution-times join_output/join_times_in-cache.csv join_output/join_times_exceeds-cache.csv
   ```
 
-**Note:** For CBR calibration, the first time it will take a while since it has to generate the data. Afterwards, as long as you aren't modifying the collections, you can comment out `await generator.populate_collections()` in `start.py` - this will make it a lot faster.
+**Note:** For CBR calibration, the first time it will take a while since it has to generate the
+data. Afterwards, as long as you aren't modifying the collections, you can comment out
+`await generator.populate_collections()` in `start.py` - this will make it a lot faster.
 
 8. When done, deactivate the environment:
 

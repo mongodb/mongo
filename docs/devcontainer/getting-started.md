@@ -1,16 +1,19 @@
 # Getting Started with MongoDB Dev Containers
 
-This guide will walk you through setting up your MongoDB development environment using Dev Containers.
+This guide will walk you through setting up your MongoDB development environment using Dev
+Containers.
 
 ## Prerequisites
 
 ### 1. Install Docker
 
-Dev Containers require Docker to be installed and running on your system. Choose one of the following Docker providers:
+Dev Containers require Docker to be installed and running on your system. Choose one of the
+following Docker providers:
 
 #### Option A: Rancher Desktop (Recommended)
 
-[Rancher Desktop](https://rancherdesktop.io/) is our recommended Docker provider for devcontainer development.
+[Rancher Desktop](https://rancherdesktop.io/) is our recommended Docker provider for devcontainer
+development.
 
 **Installation:**
 
@@ -20,28 +23,34 @@ Dev Containers require Docker to be installed and running on your system. Choose
    - **Container Engine**: Select `dockerd (moby)` ⚠️ **Important!**
    - **Configure Path**: Select "Automatic"
 
-**Recommended Settings:**
-After installation, increase resources for better build performance:
+**Recommended Settings:** After installation, increase resources for better build performance:
 
 1. Open Rancher Desktop → Preferences → Virtual Machine
 2. **Memory**: Allocate as much as your system allows (leave ~4-8 GB for your host OS)
 3. **CPUs**: Allocate as many cores as possible (leave 1-2 for your host OS)
-4. **Disk**: Rancher Desktop doesn't have a UI for disk size. To increase it, see [Troubleshooting - Increase Docker disk allocation](./troubleshooting.md#build-fails-with-no-space-left-on-device) for instructions.
+4. **Disk**: Rancher Desktop doesn't have a UI for disk size. To increase it, see
+   [Troubleshooting - Increase Docker disk allocation](./troubleshooting.md#build-fails-with-no-space-left-on-device)
+   for instructions.
 5. Apply changes and restart Rancher Desktop
 
-> **Tip:** More resources = faster builds. MongoDB builds benefit significantly from additional CPU cores and memory.
+> **Tip:** More resources = faster builds. MongoDB builds benefit significantly from additional CPU
+> cores and memory.
 
-**IMPORTANT!**: If you already have VSCode open when you install Rancher Desktop, make sure to restart VSCode otherwise it may not find the Docker socket and VSCode will prompt you to install Docker Desktop instead.
+**IMPORTANT!**: If you already have VSCode open when you install Rancher Desktop, make sure to
+restart VSCode otherwise it may not find the Docker socket and VSCode will prompt you to install
+Docker Desktop instead.
 
 #### Option B: Docker Desktop
 
 [Docker Desktop](https://www.docker.com/products/docker-desktop/) is a popular alternative.
 
-> **Note on Licensing**: Docker Desktop may require a paid license for commercial use. Please review the licensing terms to ensure compliance with your use case.
+> **Note on Licensing**: Docker Desktop may require a paid license for commercial use. Please review
+> the licensing terms to ensure compliance with your use case.
 
 **Installation:**
 
-1. Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
+1. Download from
+   [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
 2. Install and start Docker Desktop
 3. Go to Settings → Resources and allocate generously:
    - **Memory**: Allocate as much as possible (leave ~4-8 GB for your host OS)
@@ -52,7 +61,8 @@ After installation, increase resources for better build performance:
 
 [OrbStack](https://orbstack.dev/) is a lightweight, fast Docker alternative for macOS.
 
-> **Note on Licensing**: OrbStack may require a paid license for commercial use. Please review the licensing terms to ensure compliance with your use case.
+> **Note on Licensing**: OrbStack may require a paid license for commercial use. Please review the
+> licensing terms to ensure compliance with your use case.
 
 **Installation:**
 
@@ -64,12 +74,14 @@ After installation, increase resources for better build performance:
 
 For Linux users, you can use Docker Engine directly.
 
-**Installation:**
-Follow the official guide: [docs.docker.com/engine/install](https://docs.docker.com/engine/install/)
+**Installation:** Follow the official guide:
+[docs.docker.com/engine/install](https://docs.docker.com/engine/install/)
 
 ### 2. Create SSH Directory (Required)
 
-> **⚠️ Critical:** You **must** have a `~/.ssh` directory on your host machine before building the devcontainer. The devcontainer requires this directory to exist, regardless of whether you use SSH or HTTPS to clone the repository.
+> **⚠️ Critical:** You **must** have a `~/.ssh` directory on your host machine before building the
+> devcontainer. The devcontainer requires this directory to exist, regardless of whether you use SSH
+> or HTTPS to clone the repository.
 
 ```bash
 # On your HOST machine (not inside the container)
@@ -87,13 +99,17 @@ Download and install VS Code from [code.visualstudio.com](https://code.visualstu
 1. Open VS Code
 2. Go to Extensions (⌘/Ctrl+Shift+X)
 3. Search for "Dev Containers"
-4. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension by Microsoft
+4. Install the
+   [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+   extension by Microsoft
 
 ### 5. Configure SSH Keys (Recommended)
 
-To clone the repository using SSH (recommended for contributors), you'll need SSH keys configured with GitHub.
+To clone the repository using SSH (recommended for contributors), you'll need SSH keys configured
+with GitHub.
 
-> **⚠️ Important:** Run all commands in this section on your **host machine** (not inside the container). SSH keys need to be set up before cloning the repository into the container.
+> **⚠️ Important:** Run all commands in this section on your **host machine** (not inside the
+> container). SSH keys need to be set up before cloning the repository into the container.
 
 #### Check if you have SSH keys
 
@@ -183,7 +199,8 @@ Get-Service ssh-agent | Set-Service -StartupType Automatic
 Start-Service ssh-agent
 ```
 
-> **Note:** VS Code automatically forwards your SSH agent to the container, so your keys will be available inside the devcontainer.
+> **Note:** VS Code automatically forwards your SSH agent to the container, so your keys will be
+> available inside the devcontainer.
 
 [Learn more about using SSH keys with GitHub →](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
 
@@ -191,7 +208,8 @@ Start-Service ssh-agent
 
 ### Step 1: Clone Repository in Named Container Volume
 
-For **optimal performance**, especially on macOS, clone the repository directly into a Docker volume rather than your local filesystem. This is crucial for Bazel performance.
+For **optimal performance**, especially on macOS, clone the repository directly into a Docker volume
+rather than your local filesystem. This is crucial for Bazel performance.
 
 #### Why Named Volumes?
 
@@ -397,7 +415,8 @@ ssh-add ~/.ssh/id_ed25519
 # Command Palette → "Dev Containers: Rebuild Container"
 ```
 
-**VS Code SSH Agent Forwarding**: The Dev Containers extension automatically forwards your SSH agent, but this requires:
+**VS Code SSH Agent Forwarding**: The Dev Containers extension automatically forwards your SSH
+agent, but this requires:
 
 - SSH agent running on host with keys loaded
 - SSH key files in default location (`~/.ssh/`)

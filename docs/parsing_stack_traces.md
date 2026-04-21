@@ -12,16 +12,16 @@ To find the correct binary for a specific log you need to:
 curl -O http://s3.amazonaws.com/downloads.mongodb.org/linux/mongodb-linux-x86_64-debugsymbols-1.x.x.tgz
 ```
 
-You can also get the debugsymbols archive for official builds through [the Downloads page][1]. In the
-Archived Releases section, click on the appropriate platform link to view the available archives.
-Select the appropriate debug symbols archive.
+You can also get the debugsymbols archive for official builds through [the Downloads page][1]. In
+the Archived Releases section, click on the appropriate platform link to view the available
+archives. Select the appropriate debug symbols archive.
 
 ## Using mongosymb.py to get file and line numbers
 
-Stacktraces are logged on a line with `msg` `BACKTRACE`. The full backtrace contents are available in
-an attribute named `bt`. To convert this into a list of source locations with file and line numbers,
-copy the contents of the `bt` JSON blob into a file, then direct the contents of that file into
-the standard input of `buildscripts/mongosymb.py`:
+Stacktraces are logged on a line with `msg` `BACKTRACE`. The full backtrace contents are available
+in an attribute named `bt`. To convert this into a list of source locations with file and line
+numbers, copy the contents of the `bt` JSON blob into a file, then direct the contents of that file
+into the standard input of `buildscripts/mongosymb.py`:
 
 ```
 cat bt | buildscripts/mongosymb.py --debug-file-resolver=path path/to/debug/symbols/file
@@ -55,8 +55,8 @@ $ cat bt | buildscripts/mongosymb.py --debug-file-resolver=path bazel-bin/instal
 
 ## Stack Trace Schema
 
-Stack traces are typically logged as log message 31380, having a `bt` attribute
-that holds a JSON object value:
+Stack traces are typically logged as log message 31380, having a `bt` attribute that holds a JSON
+object value:
 
 ```json
 "bt": {
@@ -86,10 +86,9 @@ that holds a JSON object value:
 }
 ```
 
-The "processInfo" subobject has other information about the process, but
-the most important thing for the stack trace is the "somap", which is an
-array of all dynamically linked ELF files, including the main executable,
-and where in memory they were loaded.
+The "processInfo" subobject has other information about the process, but the most important thing
+for the stack trace is the "somap", which is an array of all dynamically linked ELF files, including
+the main executable, and where in memory they were loaded.
 
 Partial example showing a few typical frames:
 

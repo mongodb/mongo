@@ -1,10 +1,14 @@
 # Customizing Your Dev Container
 
-This guide covers personal customizations you can make to your MongoDB devcontainer **without modifying the repository's devcontainer configuration**. These are user-level settings that only affect your development environment.
+This guide covers personal customizations you can make to your MongoDB devcontainer **without
+modifying the repository's devcontainer configuration**. These are user-level settings that only
+affect your development environment.
 
-**Want to modify the devcontainer setup for everyone?** See [Contributing Customizations](#contributing-customizations) at the bottom.
+**Want to modify the devcontainer setup for everyone?** See
+[Contributing Customizations](#contributing-customizations) at the bottom.
 
-**For general VS Code settings** (themes, fonts, keybindings), see the [VS Code documentation](https://code.visualstudio.com/docs/getstarted/settings).
+**For general VS Code settings** (themes, fonts, keybindings), see the
+[VS Code documentation](https://code.visualstudio.com/docs/getstarted/settings).
 
 ## Table of Contents
 
@@ -76,7 +80,9 @@ This applies to all devcontainers you work with, not just MongoDB.
 
 ## Contributing Customizations
 
-The customizations above are all user-level and don't require changes to the repository. If you want to modify the devcontainer setup itself to benefit all MongoDB developers, you'll need to submit a PR.
+The customizations above are all user-level and don't require changes to the repository. If you want
+to modify the devcontainer setup itself to benefit all MongoDB developers, you'll need to submit a
+PR.
 
 **Examples of repository-level customizations:**
 
@@ -108,4 +114,5 @@ The customizations above are all user-level and don't require changes to the rep
 - [Architecture](./architecture.md) - How devcontainers work
 - [Advanced Usage](./advanced.md) - Multiple containers, backups, workflows
 - [Troubleshooting](./troubleshooting.md) - Fix issues
-- [VS Code Dev Containers Documentation](https://code.visualstudio.com/docs/devcontainers/containers) - General VS Code features
+- [VS Code Dev Containers Documentation](https://code.visualstudio.com/docs/devcontainers/containers) -
+  General VS Code features

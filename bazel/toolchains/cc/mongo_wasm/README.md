@@ -11,7 +11,8 @@ To use the WASI SDK apply the `wasi_compatible` with a select statement:
     })
 ```
 
-If your target is defined in terms of a traditional bazel C/C++ target you can use the WASI transition in order to ensure the bazel options are WASI compatible.
+If your target is defined in terms of a traditional bazel C/C++ target you can use the WASI
+transition in order to ensure the bazel options are WASI compatible.
 
 ```python
 load("//bazel/toolchains/cc/wasm/toolchain:with_wasi_config.bzl", "with_wasi_config")

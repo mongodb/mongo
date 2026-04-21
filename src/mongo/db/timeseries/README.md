@@ -1,34 +1,42 @@
 # Time-Series Collections
 
-MongoDB supports a new collection type for storing time-series data with the [timeseries](../shard_role/ddl/create.idl)
-collection option. A time-series collection presents a simple interface for inserting and querying
-measurements while organizing the actual data in buckets.
+MongoDB supports a new collection type for storing time-series data with the
+[timeseries](../shard_role/ddl/create.idl) collection option. A time-series collection presents a
+simple interface for inserting and querying measurements while organizing the actual data in
+buckets.
 
-A minimally configured time-series collection is defined by providing the [timeField](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L187-L196)
-at creation. Optionally, a [metaField](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L197-L207) may also be specified to help group
-measurements in the buckets. MongoDB also supports an expiration mechanism on measurements through
-the `expireAfterSeconds` option.
+A minimally configured time-series collection is defined by providing the
+[timeField](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L187-L196)
+at creation. Optionally, a
+[metaField](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L197-L207)
+may also be specified to help group measurements in the buckets. MongoDB also supports an expiration
+mechanism on measurements through the `expireAfterSeconds` option.
 
-A (viewful) time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../shard_role/shard_catalog/README.md) by a
-combination of a view and a system collection:
+A (viewful) time-series collection `mytscoll` in the `mydb` database is represented in the
+[catalog](../shard_role/shard_catalog/README.md) by a combination of a view and a system collection:
 
-- The non-materialized view `mydb.mytscoll` is defined with the bucket collection as the source collection with
-  certain properties:
-  - Writes (inserts only) are allowed on the view. Every document inserted must contain a time field.
+- The non-materialized view `mydb.mytscoll` is defined with the bucket collection as the source
+  collection with certain properties:
+  - Writes (inserts only) are allowed on the view. Every document inserted must contain a time
+    field.
   - Querying the view implicitly unwinds the data in the underlying bucket collection to return
     documents in their original non-bucketed form.
-    - The aggregation stage [$\_internalUnpackBucket](../pipeline/document_source_internal_unpack_bucket.h) is used to
-      unwind the bucket data for the view. For more information about this stage and query rewrites for
-      time-series collections see [query/timeseries/README](../query/timeseries/README.md).
+    - The aggregation stage
+      [$\_internalUnpackBucket](../pipeline/document_source_internal_unpack_bucket.h) is used to
+      unwind the bucket data for the view. For more information about this stage and query rewrites
+      for time-series collections see [query/timeseries/README](../query/timeseries/README.md).
 - The system collection has the namespace `mydb.system.buckets.mytscoll` and is where the actual
   data is stored.
-  - Each document in the bucket collection represents a set of time-series data within a period of time.
-  - If a meta-data field is defined at creation time, this will be used to organize the buckets so that
-    all measurements within a bucket have a common meta-data value.
-  - Besides the time range, buckets are also constrained by the total number and size of measurements.
+  - Each document in the bucket collection represents a set of time-series data within a period of
+    time.
+  - If a meta-data field is defined at creation time, this will be used to organize the buckets so
+    that all measurements within a bucket have a common meta-data value.
+  - Besides the time range, buckets are also constrained by the total number and size of
+    measurements.
 
-Time-series collections can also be sharded. For more information about sharding-specific implementation
-details, see [db/global_catalog/README_timeseries.md](../global_catalog/README_timeseries.md).
+Time-series collections can also be sharded. For more information about sharding-specific
+implementation details, see
+[db/global_catalog/README_timeseries.md](../global_catalog/README_timeseries.md).
 
 ## Bucket Collection Schema
 
@@ -79,8 +87,8 @@ Uncompressed bucket (version 1):
 ```
 
 The number of elements in "data.\<time field\>" indicates the number of measurements in the bucket.
-A non-time-field data field can have missing values, also referred to as skips, but it cannot
-have more elements than the timefield.
+A non-time-field data field can have missing values, also referred to as skips, but it cannot have
+more elements than the timefield.
 
 There are two types of compressed buckets, version 2 and version 3. They differ only in that the
 entries in the data field of version 2 buckets are sorted on the time field, whereas this is not
@@ -128,43 +136,51 @@ The versions that a bucket can take are V1, V2, and V3.
 
 V1 buckets are uncompressed and their measurements are not sorted on time, V2 buckets are compressed
 and have their measurements sorted on time, and V3 buckets are compressed but do not have their
-measurements sorted on time. When we say that a bucket is compressed, we mean that for each field
-in its data, the measurements for that field are stored in a BSONColumn [(More about BSONColumn and the binary data type, BinData7)](#bucket-collection-schema).
+measurements sorted on time. When we say that a bucket is compressed, we mean that for each field in
+its data, the measurements for that field are stored in a BSONColumn
+[(More about BSONColumn and the binary data type, BinData7)](#bucket-collection-schema).
 
-Starting in 8.0, newly created buckets will be V2 by default. V2 and V3 buckets in the BucketCatalog maintain
-a BSONColumnBuilder for each data field. These builders are append-only, meaning that new measurements can only
-be added to the end of the builder." If measurements come out of order by time into the
-same bucket (which is more likely to happen during low cardinality concurrent bulk loads), we will promote
-a V2 bucket to a V3 bucket. The bucket will behave the same way, the only difference being that
-the measurements in a V3 bucket are not guaranteed to be in-order on time (and in fact, must have
-at least one out-of-order measurement). Queries can also be less performant on V3 buckets, since they
-cannot rely on the fact that V3 buckets have their measurements in order by time.
+Starting in 8.0, newly created buckets will be V2 by default. V2 and V3 buckets in the BucketCatalog
+maintain a BSONColumnBuilder for each data field. These builders are append-only, meaning that new
+measurements can only be added to the end of the builder." If measurements come out of order by time
+into the same bucket (which is more likely to happen during low cardinality concurrent bulk loads),
+we will promote a V2 bucket to a V3 bucket. The bucket will behave the same way, the only difference
+being that the measurements in a V3 bucket are not guaranteed to be in-order on time (and in fact,
+must have at least one out-of-order measurement). Queries can also be less performant on V3 buckets,
+since they cannot rely on the fact that V3 buckets have their measurements in order by time.
 
 New V1 buckets will no longer be created in 8.0+, but existing V1 buckets from upgrades will
 continue to be supported. Closed V1 buckets can be reopened, and will be compressed when more
-measurements are inserted into them. Specifically, the bucket will be sorted and compressed as V2 the
-[moment it is reopened](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/timeseries/timeseries_write_util.cpp#L738-L745), and the insert [will then operate](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/timeseries/timeseries_write_util.cpp#L1119-L1125) on a compressed bucket.
+measurements are inserted into them. Specifically, the bucket will be sorted and compressed as V2
+the
+[moment it is reopened](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/timeseries/timeseries_write_util.cpp#L738-L745),
+and the insert
+[will then operate](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/timeseries/timeseries_write_util.cpp#L1119-L1125)
+on a compressed bucket.
 
 ### BSONColumnBuilder
 
-Each V2 and V3 bucket has a `MeasurementMap`, which is a map from each data field (excluding the meta field) in a bucket
-to a corresponding BSONColumnBuilder for that field. For example, if a bucket has a timefield `time`,
-there will be a mapping (`time` -> BSONColumnnBuilder for the BSONColumn of time data).
+Each V2 and V3 bucket has a `MeasurementMap`, which is a map from each data field (excluding the
+meta field) in a bucket to a corresponding BSONColumnBuilder for that field. For example, if a
+bucket has a timefield `time`, there will be a mapping (`time` -> BSONColumnnBuilder for the
+BSONColumn of time data).
 
-BSONColumnBuilder stores binary data that can represent either the entire BSONColumn for a field or a partial
-BSONColumn. When we are adding the measurements for a new field, its binary data will represent the entire BSONColumn
-for that field. When we are appending measurements to existing fields, it will instead store the binary data
-representing a partial BSONColumn which only includes the new measurements that have been added - the binary data difference
-representing these new measurements can be retrieved by calling `intermediate()`. This binary data difference is used to generate
-a DocDiff for the BSONColumn.
+BSONColumnBuilder stores binary data that can represent either the entire BSONColumn for a field or
+a partial BSONColumn. When we are adding the measurements for a new field, its binary data will
+represent the entire BSONColumn for that field. When we are appending measurements to existing
+fields, it will instead store the binary data representing a partial BSONColumn which only includes
+the new measurements that have been added - the binary data difference representing these new
+measurements can be retrieved by calling `intermediate()`. This binary data difference is used to
+generate a DocDiff for the BSONColumn.
 
 ### DocDiff Support for BSONColumn
 
 In order to avoid replicating entire compressed bucket documents, we take advantage of the fact that
 adding elements to the BSONColumn is append-only and utilize DocDiff. Since with each addition only
-the last few bytes of a BSONColumn binary change, we construct a DocDiff that includes information about
-what the new binary data to be added is as well as at what offset to copy it into, for each field.
-This approach works better in terms of oplog size and oplog entry size as the write batch size increases.
+the last few bytes of a BSONColumn binary change, we construct a DocDiff that includes information
+about what the new binary data to be added is as well as at what offset to copy it into, for each
+field. This approach works better in terms of oplog size and oplog entry size as the write batch
+size increases.
 
 The DocDiff will take the form below:
 
@@ -214,13 +230,15 @@ parameter.
 
 ## Batched Inserts
 
-When a batch of inserts is processed by the write path, this typically comes from an `insertMany` command,
-the batch is [organized by meta value and sorted](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L522-L543) in time ascending order to ensure efficient bucketing
-and insertion. Prior versions would perform bucket targeting for each measurement in the order the user
-specified. This could lead to poor insert performance and very sub-optimal bucketing behavior if the user's
-batch was in time descending order. This change in batching also significantly reduces the number of stripe
-lock acquisitions which in turn reduces contention on the stripe lock. The stripe lock is acquired roughly
-once per batch per meta, instead of per measurement during the staging phase of a write.
+When a batch of inserts is processed by the write path, this typically comes from an `insertMany`
+command, the batch is
+[organized by meta value and sorted](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L522-L543)
+in time ascending order to ensure efficient bucketing and insertion. Prior versions would perform
+bucket targeting for each measurement in the order the user specified. This could lead to poor
+insert performance and very sub-optimal bucketing behavior if the user's batch was in time
+descending order. This change in batching also significantly reduces the number of stripe lock
+acquisitions which in turn reduces contention on the stripe lock. The stripe lock is acquired
+roughly once per batch per meta, instead of per measurement during the staging phase of a write.
 
 ## Indexes
 
@@ -281,24 +299,23 @@ Index types that are not supported on time-series collections include
 ## BucketCatalog
 
 In order to facilitate efficient bucketing, we maintain the set of open buckets in the
-`BucketCatalog` found in [bucket_catalog.h](bucket_catalog/bucket_catalog.h). A writer will attempt to insert each
-document in its input batch to the `BucketCatalog`, which will return either a handle to a
-`BucketCatalog::WriteBatch` or information that can be used to retrieve a bucket from disk to
+`BucketCatalog` found in [bucket_catalog.h](bucket_catalog/bucket_catalog.h). A writer will attempt
+to insert each document in its input batch to the `BucketCatalog`, which will return either a handle
+to a `BucketCatalog::WriteBatch` or information that can be used to retrieve a bucket from disk to
 reopen. A second attempt to insert the document, potentially into the reopened bucket, should return
 a `BucketCatalog::WriteBatch`.
 
-Internally, the `BucketCatalog` maintains a list of updates to each bucket document. When a batch
-is committed, it will pivot the insertions into the column-format for the buckets as well as
-determine any updates necessary for the `control` fields (e.g. `control.min` and `control.max`).
+Internally, the `BucketCatalog` maintains a list of updates to each bucket document. When a batch is
+committed, it will pivot the insertions into the column-format for the buckets as well as determine
+any updates necessary for the `control` fields (e.g. `control.min` and `control.max`).
 
-The first time a write batch is committed for a given bucket, the newly-formed document is
-inserted. On subsequent batch commits, we perform an update operation. Instead of generating the
-full document (a so-called "classic" update), we create a DocDiff directly (a "delta" or "v2"
-update).
+The first time a write batch is committed for a given bucket, the newly-formed document is inserted.
+On subsequent batch commits, we perform an update operation. Instead of generating the full document
+(a so-called "classic" update), we create a DocDiff directly (a "delta" or "v2" update).
 
-Any time a bucket document is updated without going through the `BucketCatalog`, the writer needs
-to notify the `BucketCatalog` by calling `timeseries::handleDirectWrite` or `BucketCatalog::clear`
-so that it can update its internal state and avoid writing any data which may corrupt the bucket
+Any time a bucket document is updated without going through the `BucketCatalog`, the writer needs to
+notify the `BucketCatalog` by calling `timeseries::handleDirectWrite` or `BucketCatalog::clear` so
+that it can update its internal state and avoid writing any data which may corrupt the bucket
 format.
 
 ### Bucket Reopening
@@ -318,16 +335,19 @@ The query-based reopening path relies on a `{<metaField>: 1, <timeField>: 1}` in
 efficiently. This index is created by default for new time series collections created in v6.3+. If
 the index does not exist, then query-based reopening will not be used.
 
-When we reopen compressed buckets, in order to avoid fully decompressing and then fully re-compressing
-the bucket we instantiate the bucket's BSONColumnBuilders from the existing BSONColumn binaries. Currently
-BSONColumn only supports optimized instantiation for scalar values; if an object or array type is
-[detected](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/bson/column/bsoncolumnbuilder.cpp#L1387-L1388) in the input BSONColumn binary, the BSONColumnBuilder will fully decompress and re-create the
+When we reopen compressed buckets, in order to avoid fully decompressing and then fully
+re-compressing the bucket we instantiate the bucket's BSONColumnBuilders from the existing
+BSONColumn binaries. Currently BSONColumn only supports optimized instantiation for scalar values;
+if an object or array type is
+[detected](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/bson/column/bsoncolumnbuilder.cpp#L1387-L1388)
+in the input BSONColumn binary, the BSONColumnBuilder will fully decompress and re-create the
 BSONColumn for the metric we are reopening.
 
 ### Bucket Closure and Archival
 
 A bucket is permanently closed by setting the optional `control.closed` flag, which makes it
-ineligible for reopening. This can only be done manually for [Atlas Online Archive](https://www.mongodb.com/docs/atlas/online-archive/manage-online-archive/).
+ineligible for reopening. This can only be done manually for
+[Atlas Online Archive](https://www.mongodb.com/docs/atlas/online-archive/manage-online-archive/).
 
 If the `BucketCatalog` is using more memory than its given threshold (controlled by the server
 parameter `timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to archive or close idle
@@ -357,8 +377,9 @@ When a new bucket is opened by the `BucketCatalog`, the timestamp component of i
 equivalently the value of its `control.min.<time field>`, will be taken from the first measurement
 inserted to the bucket and rounded down based on the `bucketRoundingSeconds`. This rounding will
 generally be accomplished by basic modulus arithmetic operating on the number of seconds since the
-epoch i.e. for an input timestamp `t` and a rounding value `r`, the rounded timestamp will be
-taken as `t - (t % r)`. See [jstests/core/timeseries/ddl/bucket_timestamp_rounding.js](../../../../jstests/core/timeseries/ddl/bucket_timestamp_rounding.js)
+epoch i.e. for an input timestamp `t` and a rounding value `r`, the rounded timestamp will be taken
+as `t - (t % r)`. See
+[jstests/core/timeseries/ddl/bucket_timestamp_rounding.js](../../../../jstests/core/timeseries/ddl/bucket_timestamp_rounding.js)
 for edge cases on rounding and bucket timespans.
 
 A user may choose to set `bucketMaxSpanSeconds` and `bucketRoundingSeconds` directly when creating a
@@ -375,7 +396,10 @@ some reasonable presets of "seconds", "minutes" and "hours".
 | _Minutes_   | 3,600 (1 hour)          | 86,400 (1 day)         |
 | _Hours_     | 86,400 (1 day)          | 2,592,000 (30 days)    |
 
-Chart sources: [bucketRoundingSeconds](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries_options.cpp#L374-L387) and [bucketMaxSpanSeconds](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries_options.cpp#L265-L279).
+Chart sources:
+[bucketRoundingSeconds](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries_options.cpp#L374-L387)
+and
+[bucketMaxSpanSeconds](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries_options.cpp#L265-L279).
 
 If the user does not specify any bucketing parameters when creating a collection, the default value
 is `{granularity: "seconds"}`.
@@ -387,17 +411,20 @@ presets or vice versa, as long as the associated seconds parameters do not decre
 
 ## Bucket Timestamps
 
-Though the time component of the bucket's ObjectID should be equal to the `control.min.<time>` field,
-the ObjectID type stores timestamps as 4-byte unix timestamps with precision of seconds from 1970 to
-2038 that can overflow. The control block stores an 8-byte timestamp with precision of milliseconds.
+Though the time component of the bucket's ObjectID should be equal to the `control.min.<time>`
+field, the ObjectID type stores timestamps as 4-byte unix timestamps with precision of seconds from
+1970 to 2038 that can overflow. The control block stores an 8-byte timestamp with precision of
+milliseconds.
 
-This timestamp will overflow for positive timestamps greater than 2038-01-17T03:14:07.000Z, or negative timestamps represented by dates before 1970-01-01T00:00:00.000Z. In the event of an overflow, the most significant bit of the timeseries bucket `_id` field will be set to `1`. This allows a collection to quickly determine that a collection contains extended-range timestamps.
+This timestamp will overflow for positive timestamps greater than 2038-01-17T03:14:07.000Z, or
+negative timestamps represented by dates before 1970-01-01T00:00:00.000Z. In the event of an
+overflow, the most significant bit of the timeseries bucket `_id` field will be set to `1`. This
+allows a collection to quickly determine that a collection contains extended-range timestamps.
 
 The bucket's ObjectID has no inherent relation to the time component of the `_id` of a measurement.
-The `_id` of a measurement (not the bucket) will have a time component that is indicative of
-insert time, not measurement time. Insert time and measurement time are roughly correlated for
-real-time workloads, but for loading historical data or late-arriving measurements these two
-will skew.
+The `_id` of a measurement (not the bucket) will have a time component that is indicative of insert
+time, not measurement time. Insert time and measurement time are roughly correlated for real-time
+workloads, but for loading historical data or late-arriving measurements these two will skew.
 
 ## Updates and Deletes
 
@@ -424,13 +451,13 @@ update operation will be applied to the matched measurements, and the updated me
 inserted into new bucket documents. If all measurements match the query predicate, the whole bucket
 document will be deleted.
 
-To avoid the [Halloween Problem](https://en.wikipedia.org/wiki/Halloween_Problem) for `{multi: true}`
-updates, a [Spool Stage](../exec/classic/spool.h)
-is used to record all record ids of the bucket documents returned from the scan stage. This, along
-with inserting updated measurements to new buckets, helps avoid seeing measurements already updated
-by the current update command. If the query is non-selective and there are too many matching bucket
-documents, the spool stage will spill record ids of matching bucket documents when it hits the
-maximum memory usage limit.
+To avoid the [Halloween Problem](https://en.wikipedia.org/wiki/Halloween_Problem) for
+`{multi: true}` updates, a [Spool Stage](../exec/classic/spool.h) is used to record all record ids
+of the bucket documents returned from the scan stage. This, along with inserting updated
+measurements to new buckets, helps avoid seeing measurements already updated by the current update
+command. If the query is non-selective and there are too many matching bucket documents, the spool
+stage will spill record ids of matching bucket documents when it hits the maximum memory usage
+limit.
 
 Since time-series updates will perform at least two writes to storage (a modification to the
 original bucket document and inserts of new bucket documents), the oplog entries are grouped
@@ -452,56 +479,74 @@ they are run through the Internal Transaction API to make sure the two writes to
 
 ### Errors When Staging and Committing Measurements
 
-We have three phases of a time-series write. Each phase of the time-series write has a distinct acquisition of the stripe lock:
+We have three phases of a time-series write. Each phase of the time-series write has a distinct
+acquisition of the stripe lock:
 
-1. Staging - The bucket catalog represents the in-memory representation of buckets. Staging involves changing bucket metadata to prepare for the insertion of measurements into the bucket catalog, but doesn't involve compressing or inserting measurements into the bucket catalog.
-2. Committing - Compressing measurements into an appropriate bucket document and writing the bucket document to storage.
+1. Staging - The bucket catalog represents the in-memory representation of buckets. Staging involves
+   changing bucket metadata to prepare for the insertion of measurements into the bucket catalog,
+   but doesn't involve compressing or inserting measurements into the bucket catalog.
+2. Committing - Compressing measurements into an appropriate bucket document and writing the bucket
+   document to storage.
 3. Finish - Modifying the bucket catalog to reflect what was written to storage.
 
-> [!NOTE]
-> Retrying time-series writes within the server is a distinct process from retryable writes, which is retrying writes from the outside the server in the driver. This section discusses retries within the server, which also handles retryable writes (see contains retry in the image below).
+> [!NOTE] Retrying time-series writes within the server is a distinct process from retryable writes,
+> which is retrying writes from the outside the server in the driver. This section discusses retries
+> within the server, which also handles retryable writes (see contains retry in the image below).
 
 ![SERVER-103329 Drawings (7)](https://github.com/user-attachments/assets/aceb7dfb-45f3-4aac-a0cb-744f080ead76)
 
 #### Error Examples
 
 - Continuable
-  - DuplicateKey: occurs when there is collision from OID generation when we attempt to perform a timeseries insert from a batch.
+  - DuplicateKey: occurs when there is collision from OID generation when we attempt to perform a
+    timeseries insert from a batch.
 - Non-continuable
   - Exceptions: such as a StaleConfig exception when attempting to acquire the buckets collection.
 
 ### Calculating Memory Usage
 
-Memory usage for Buckets, the BucketCatalog, and other aspects of time-series collection internals (Stripes, BucketMetadata, etc)
-is calculated using the [Tracking Allocator](../../util/tracking/allocator.h).
+Memory usage for Buckets, the BucketCatalog, and other aspects of time-series collection internals
+(Stripes, BucketMetadata, etc) is calculated using the
+[Tracking Allocator](../../util/tracking/allocator.h).
 
 ### Freezing Buckets
 
-When bucket compression fails, we will fail the insert prompting the user to retry the write and "freeze"
-the bucket that we failed to compress. Once a bucket is frozen, we will no longer attempt to write to it.
+When bucket compression fails, we will fail the insert prompting the user to retry the write and
+"freeze" the bucket that we failed to compress. Once a bucket is frozen, we will no longer attempt
+to write to it.
 
 ### Stripes
 
-The bucket catalog uses the concept of lock striping to provide efficient parallelism and synchronization across
-CRUD operations to buckets in the bucket catalog. The potentially very large number of meta values (thousands or millions)
-in the time-series collection are hashed down to a hard-coded number of 32 stripes. Each meta value will always map to the
-same stripe. This hash function is opaque to the user, and not configurable.
+The bucket catalog uses the concept of lock striping to provide efficient parallelism and
+synchronization across CRUD operations to buckets in the bucket catalog. The potentially very large
+number of meta values (thousands or millions) in the time-series collection are hashed down to a
+hard-coded number of 32 stripes. Each meta value will always map to the same stripe. This hash
+function is opaque to the user, and not configurable.
 
-Performing a time-series write, beginning in 8.2+, acquires the stripe lock 3 times for each write to the collection, once for
-each phase described above in [Errors When Staging and Committing Measurements](#Errors-When-Staging-and-Committing-Measurements).
+Performing a time-series write, beginning in 8.2+, acquires the stripe lock 3 times for each write
+to the collection, once for each phase described above in
+[Errors When Staging and Committing Measurements](#Errors-When-Staging-and-Committing-Measurements).
 
 <img width="1364" alt="bucket_catalog_stripe" src="https://github.com/user-attachments/assets/c6016335-34e3-4f62-b46a-0f0a970f2c05" />
 
-Recall that each bucket contains up to [timeseriesBucketMaxCount](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L58) (1,000) measurements within a span of time, `bucketMaxSpanSeconds`. And further, the bucket
-catalog maintains an invariant of at most 1 open bucket per unique meta value. This diagram shows
-how measurements map to each open bucket, which map to a specific stripe. The hashing function may not distribute the
-client's writes to stripes evenly, but on the whole there is a good chance that stripe contention won't be a bottleneck since
-there are often more or the same number of stripes to cores on the database server. And note that certain stripes may be hot
-if the workload accesses many buckets (meta values) that map to the same stripe. In 8.2+, while holding the stripe lock during
-a write, only a small amount of work is done intentionally. This has lessened the impact of stripe contention.
+Recall that each bucket contains up to
+[timeseriesBucketMaxCount](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L58)
+(1,000) measurements within a span of time, `bucketMaxSpanSeconds`. And further, the bucket catalog
+maintains an invariant of at most 1 open bucket per unique meta value. This diagram shows how
+measurements map to each open bucket, which map to a specific stripe. The hashing function may not
+distribute the client's writes to stripes evenly, but on the whole there is a good chance that
+stripe contention won't be a bottleneck since there are often more or the same number of stripes to
+cores on the database server. And note that certain stripes may be hot if the workload accesses many
+buckets (meta values) that map to the same stripe. In 8.2+, while holding the stripe lock during a
+write, only a small amount of work is done intentionally. This has lessened the impact of stripe
+contention.
 
-The [Stripe](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L115-L149) struct stores most of the core components of the [Bucket Catalog](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L161-L191). The structures within it generally compose
-the memory usage of the Bucket Catalog (see: [bucket_catalog::getMemoryUsage](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L190-L206)).
+The
+[Stripe](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L115-L149)
+struct stores most of the core components of the
+[Bucket Catalog](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L161-L191).
+The structures within it generally compose the memory usage of the Bucket Catalog (see:
+[bucket_catalog::getMemoryUsage](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L190-L206)).
 
 # References
 
@@ -512,22 +557,25 @@ See:
 
 **bucket**: A group of measurements with the same meta-data over a limited period of time.
 
-- **active bucket**: A bucket that is either archived or open. It forms the cardinality managed by the
-  BucketCatalog.
+- **active bucket**: A bucket that is either archived or open. It forms the cardinality managed by
+  the BucketCatalog.
 
-- **archived bucket**: A bucket that resides on-disk with a crumb of info [still in memory](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L132-L137)
-  to support efficient reopening without querying. Adding new measurements to this
-  bucket will require materializing data from disk.
+- **archived bucket**: A bucket that resides on-disk with a crumb of info
+  [still in memory](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L132-L137)
+  to support efficient reopening without querying. Adding new measurements to this bucket will
+  require materializing data from disk.
 
-- **closed bucket**: A bucket that solely exists on-disk. It could have been closed for a few reasons:
+- **closed bucket**: A bucket that solely exists on-disk. It could have been closed for a few
+  reasons:
 
   - too large (number of measurements or physical size of bucket)
   - memory pressure
 
-- **frozen bucket**: A bucket that is no longer eligible for new measurements due to inability to compress.
+- **frozen bucket**: A bucket that is no longer eligible for new measurements due to inability to
+  compress.
 
-- **idle bucket**: A bucket that is open but does not have any pending uncommitted measurements. Relevant
-  to closing buckets due to memory pressure.
+- **idle bucket**: A bucket that is open but does not have any pending uncommitted measurements.
+  Relevant to closing buckets due to memory pressure.
 
 - **open bucket**: A bucket that resides in memory. It can efficiently accept new measurements.
 
@@ -547,8 +595,8 @@ viewful time-series or viewless time-series. By default, refers to a viewful tim
 implementation's view.
 
 **viewful time-series**: A time-series collection setup where time-series data is made available
-through a collection type representing a writable non-materialized view. This view
-allows storing and querying a number of time-series, each with different meta-data.
+through a collection type representing a writable non-materialized view. This view allows storing
+and querying a number of time-series, each with different meta-data.
 
 [TODO (SERVER-102458)]: # "Update documentation on viewful vs viewless timeseries collections."
 

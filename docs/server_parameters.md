@@ -37,9 +37,9 @@ Users can set or modify a server parameter at startup and/or runtime, depending 
 specified for `set_at`. For instance, `logLevel` may be set at both startup and runtime, as
 indicated by `set_at` (see the above code snippet).
 
-At startup, server parameters may be set using the `--setParameter` command line option.
-At runtime, the `setParameter` command may be used to modify server parameters.
-See the [`setParameter` documentation][set-parameter] for details.
+At startup, server parameters may be set using the `--setParameter` command line option. At runtime,
+the `setParameter` command may be used to modify server parameters. See the [`setParameter`
+documentation][set-parameter] for details.
 
 ## How to get the value provided for a parameter
 
@@ -99,27 +99,28 @@ must be unique across the server instance. More information on the specific fiel
 
 - `set_at` (required): Must contain the value `startup`, `runtime`, [`startup`, `runtime`], or
   `cluster`. If `runtime` is specified along with `cpp_varname`, then `decltype(cpp_varname)` must
-  refer to a thread-safe storage type, specifically: `Atomic<T>`, `std::atomic<T>`,
-  or `boost::synchronized<T>`. Parameters declared as `cluster` can only be set at runtime and exhibit
+  refer to a thread-safe storage type, specifically: `Atomic<T>`, `std::atomic<T>`, or
+  `boost::synchronized<T>`. Parameters declared as `cluster` can only be set at runtime and exhibit
   numerous differences. See [Cluster Server Parameters](cluster-server-parameters) below.
 
-- `description` (required): Free-form text field currently used only for commenting the generated C++
-  code. Future uses may preserve this value for a possible `{listSetParameters:1}` command or other
-  programmatic and potentially user-facing purposes.
+- `description` (required): Free-form text field currently used only for commenting the generated
+  C++ code. Future uses may preserve this value for a possible `{listSetParameters:1}` command or
+  other programmatic and potentially user-facing purposes.
 
 - `cpp_vartype`: Declares the full storage type. If `cpp_vartype` is not defined, it may be inferred
   from the C++ variable referenced by `cpp_varname`.
 
-- `cpp_varname`: Declares the underlying variable or C++ `struct` member to use when setting or reading the
-  server parameter. If defined together with `cpp_vartype`, the storage will be declared as a global
-  variable, and externed in the generated header file. If defined alone, a variable of this name will
-  assume to have been declared and defined by the implementer, and its type will be automatically
-  inferred at compile time. If `cpp_varname` is not defined, then `cpp_class` must be specified.
+- `cpp_varname`: Declares the underlying variable or C++ `struct` member to use when setting or
+  reading the server parameter. If defined together with `cpp_vartype`, the storage will be declared
+  as a global variable, and externed in the generated header file. If defined alone, a variable of
+  this name will assume to have been declared and defined by the implementer, and its type will be
+  automatically inferred at compile time. If `cpp_varname` is not defined, then `cpp_class` must be
+  specified.
 
 - `cpp_class`: Declares a custom `ServerParameter` class in the generated header using the provided
   string, or the name field in the associated map. The declared class will require an implementation
-  of `setFromString()`, and optionally `set()`, `append()`, and a constructor.
-  See [Specialized Server Parameters](#specialized-server-parameters) below.
+  of `setFromString()`, and optionally `set()`, `append()`, and a constructor. See
+  [Specialized Server Parameters](#specialized-server-parameters) below.
 
 - `default`: String or expression map representation of the initial value.
 
@@ -127,10 +128,10 @@ must be unique across the server instance. More information on the specific fiel
   This is a required field and must be explicitly set to `false` to disable redaction.
 
 - `omit_in_ftdc`: Only applies to cluster parameters. If set to `true`, then the cluster parameter
-  will be omitted when `getClusterParameter` is invoked with `omitInFTDC: true`.
-  In practice, FTDC runs `getClusterParameter` with this option periodically to
-  collect configuration metadata about the server and setting this flag to true
-  for a cluster parameter ensures that its value(s) will not be exposed in FTDC.
+  will be omitted when `getClusterParameter` is invoked with `omitInFTDC: true`. In practice, FTDC
+  runs `getClusterParameter` with this option periodically to collect configuration metadata about
+  the server and setting this flag to true for a cluster parameter ensures that its value(s) will
+  not be exposed in FTDC.
 
 - `test_only`: Set to `true` to disable this set parameter if `enableTestCommands` is not specified.
 
@@ -141,26 +142,27 @@ must be unique across the server instance. More information on the specific fiel
   new value has been stored. Prototype: `Status(const cpp_vartype&);`
 
 - `condition`: Up to five conditional rules for deciding whether or not to apply this server
-  parameter. `preprocessor` will be evaluated first, followed by `constexpr`, then finally `expr`. If
-  no provided setting evaluates to `false`, the server parameter will be registered. `feature_flag` and
-  `min_fcv` are evaluated after the parameter is registered, and instead affect whether the parameter
-  is enabled. `min_fcv` is a string of the form `X.Y`, representing the minimum FCV version for which
-  this parameter should be enabled. `feature_flag` is the name of a feature flag variable upon which
-  this server parameter depends -- if the feature flag is disabled, this parameter will be disabled.
-  `feature_flag` should be removed when all other instances of that feature flag are deleted, which
-  typically is done after the next LTS version of the server is branched. `min_fcv` should be removed
-  after it is no longer possible to downgrade to a FCV lower than that version - this occurs when the
-  next LTS version of the server is branched.
+  parameter. `preprocessor` will be evaluated first, followed by `constexpr`, then finally `expr`.
+  If no provided setting evaluates to `false`, the server parameter will be registered.
+  `feature_flag` and `min_fcv` are evaluated after the parameter is registered, and instead affect
+  whether the parameter is enabled. `min_fcv` is a string of the form `X.Y`, representing the
+  minimum FCV version for which this parameter should be enabled. `feature_flag` is the name of a
+  feature flag variable upon which this server parameter depends -- if the feature flag is disabled,
+  this parameter will be disabled. `feature_flag` should be removed when all other instances of that
+  feature flag are deleted, which typically is done after the next LTS version of the server is
+  branched. `min_fcv` should be removed after it is no longer possible to downgrade to a FCV lower
+  than that version - this occurs when the next LTS version of the server is branched.
 
 - `validator`: Zero or many validation rules to impose on the setting. All specified rules must pass
-  to consider the new setting valid. `lt`, `gt`, `lte`, `gte` fields provide for simple numeric limits
-  or expression maps which evaluate to numeric values. For all other validation cases, specify
-  callback as a C++ function or static method. Note that validation rules (including callback) may run
-  in any order. To perform an action after all validation rules have completed, `on_update` should be
-  preferred instead. Callback prototype: `Status(const cpp_vartype&, const boost::optional<TenantId>&);`
+  to consider the new setting valid. `lt`, `gt`, `lte`, `gte` fields provide for simple numeric
+  limits or expression maps which evaluate to numeric values. For all other validation cases,
+  specify callback as a C++ function or static method. Note that validation rules (including
+  callback) may run in any order. To perform an action after all validation rules have completed,
+  `on_update` should be preferred instead. Callback prototype:
+  `Status(const cpp_vartype&, const boost::optional<TenantId>&);`
 
-- `is_deprecated`: Mark the server parameter as deprecated. Warns users if the server parameter
-  is ever used. Defaults to false.
+- `is_deprecated`: Mark the server parameter as deprecated. Warns users if the server parameter is
+  ever used. Defaults to false.
 
 Any symbols such as global variables or callbacks used by a server parameter must be imported using
 the usual IDL machinery via `globals.cpp_includes`. Similarly, all generated code will be nested
@@ -240,9 +242,8 @@ to any other work, this custom constructor must invoke its parent's constructor.
 Status {name}::set(const BSONElement& val, const boost::optional<TenantId>& tenantId);
 ```
 
-Otherwise the base class implementation `ServerParameter::set` is used. It
-invokes `setFromString` using a string representation of `val`, if the `val` is
-holding one of the supported types.
+Otherwise the base class implementation `ServerParameter::set` is used. It invokes `setFromString`
+using a string representation of `val`, if the `val` is holding one of the supported types.
 
 `override_validate`: If `true`, the implementer must provide a `validate` member function as:
 
@@ -261,8 +262,8 @@ must be provided with the following signature:
 Status {name}::append(OperationContext*, BSONObjBuilder*, StringData, const boost::optional<TenantId>& tenantId);
 ```
 
-`override_warn_if_deprecated`: If `true`, allows a custom warnIfDeprecated() method to be defined, defaults
-to `false`.
+`override_warn_if_deprecated`: If `true`, allows a custom warnIfDeprecated() method to be defined,
+defaults to `false`.
 
 Lastly, a `setFromString` method must always be provided with the following signature:
 
@@ -318,17 +319,17 @@ preferred to implementing custom parameter propagation whenever possible.
 
 `setClusterParameter` persists the new value of the indicated cluster server parameter onto a
 majority of nodes on non-sharded replica sets. On sharded clusters, it majority-writes the new value
-onto every shard and the config server. This ensures that every **mongod** in the cluster will be able
-to recover the most recently written value for all cluster server parameters on restart.
+onto every shard and the config server. This ensures that every **mongod** in the cluster will be
+able to recover the most recently written value for all cluster server parameters on restart.
 Additionally, `setClusterParameter` blocks until the majority write succeeds in a replica set
-deployment, which guarantees that the parameter value will not be rolled back after being set.
-In a sharded cluster deployment, the new value has to be majority-committed on the config shard and
+deployment, which guarantees that the parameter value will not be rolled back after being set. In a
+sharded cluster deployment, the new value has to be majority-committed on the config shard and
 locally-committed on all other shards.
 
 The cluster parameters are persisted in the `config.clusterParameters` collections and cached in
-memory on every **mongod**. The cache updates are done by the `ClusterServerParameterOpObserver` class.
-Every **mongos** also maintains an in-memory cache by polling the config server for updated cluster
-server parameter values every `clusterServerParameterRefreshIntervalSecs` using the
+memory on every **mongod**. The cache updates are done by the `ClusterServerParameterOpObserver`
+class. Every **mongos** also maintains an in-memory cache by polling the config server for updated
+cluster server parameter values every `clusterServerParameterRefreshIntervalSecs` using the
 `ClusterParameterRefresher` periodic job.
 
 `getClusterParameter` returns the cached value of the requested cluster server parameter on the node
@@ -347,10 +348,10 @@ following members to the resulting type:
   was updated; used by runtime audit configuration, and to prevent concurrent and redundant cluster
   parameter updates.
 
-It is highly recommended to specify validation rules or a callback function via the `param.validator`
-field. These validators are called before the new value of the cluster server parameter is written
-to disk during `setClusterParameter`.
-See [server_parameter_with_storage_test.idl][cluster-server-param-with-storage-test] and
+It is highly recommended to specify validation rules or a callback function via the
+`param.validator` field. These validators are called before the new value of the cluster server
+parameter is written to disk during `setClusterParameter`. See
+[server_parameter_with_storage_test.idl][cluster-server-param-with-storage-test] and
 [server_parameter_with_storage_test_structs.idl][cluster-server-param-with-storage-test-structs] for
 examples.
 
@@ -394,21 +395,21 @@ Tue `reset()` method must be implemented and should update the cluster server pa
 default value.
 
 All cluster server parameters are tenant-aware, meaning that on serverless clusters, each tenant has
-an isolated set of parameters. The `setClusterParameter` and `getClusterParameter` commands will pass
-the `tenantId` on the command request to the `ServerParameter`'s methods. On dedicated
+an isolated set of parameters. The `setClusterParameter` and `getClusterParameter` commands will
+pass the `tenantId` on the command request to the `ServerParameter`'s methods. On dedicated
 (non-serverless) clusters, `boost::none` will be passed. IDL-defined cluster server parameters will
 handle the passed-in `tenantId` automatically and store separate parameter values per-tenant.
-Specialized server parameters will have to take care to correctly handle the passed-in `tenantId` and
-to enforce tenant isolation.
+Specialized server parameters will have to take care to correctly handle the passed-in `tenantId`
+and to enforce tenant isolation.
 
 Like normal server parameters, cluster server parameters can be defined to be dependent on a minimum
-FCV version or a specific feature flag using the `condition.min_fcv` and `condition.feature_flag` syntax discussed
-above. During FCV downgrade, the cluster parameter value stored on disk will be deleted if either:
-(1) The downgraded FCV is lower than the cluster parameter's `min_fcv`, or (2) The cluster
-parameter's `feature_flag` is disabled on the downgraded FCV. While a cluster server parameter is
-disabled due to either of these conditions, `setClusterParameter` on it will always fail, and
-`getClusterParameter` will fail on **mongod**, and return the default value on **mongos** -- this
-difference in behavior is due to **mongos** being unaware of the current FCV.
+FCV version or a specific feature flag using the `condition.min_fcv` and `condition.feature_flag`
+syntax discussed above. During FCV downgrade, the cluster parameter value stored on disk will be
+deleted if either: (1) The downgraded FCV is lower than the cluster parameter's `min_fcv`, or (2)
+The cluster parameter's `feature_flag` is disabled on the downgraded FCV. While a cluster server
+parameter is disabled due to either of these conditions, `setClusterParameter` on it will always
+fail, and `getClusterParameter` will fail on **mongod**, and return the default value on **mongos**
+-- this difference in behavior is due to **mongos** being unaware of the current FCV.
 
 See [server_parameter_specialized_test.idl][specialized-cluster-server-param-test-idl] and
 [server_parameter_specialized_test.h][specialized-cluster-server-param-test-data] for examples.
@@ -582,9 +583,11 @@ classDiagram
 [parameters.idl]: ../src/mongo/db/commands/parameters.idl
 [set-parameter]: https://docs.mongodb.com/manual/reference/parameters/#synopsis
 [get-parameter]: https://docs.mongodb.com/manual/reference/command/getParameter/#getparameter
-[quiet-param]: https://github.com/mongodb/mongo/search?q=serverGlobalParams+quiet+extension:idl&type=code
+[quiet-param]:
+  https://github.com/mongodb/mongo/search?q=serverGlobalParams+quiet+extension:idl&type=code
 [ftdc-file-size-param]: ../src/mongo/db/ftdc/ftdc_server.idl
 [cluster-server-param-with-storage-test]: ../src/mongo/idl/server_parameter_with_storage_test.idl
-[cluster-server-param-with-storage-test-structs]: ../src/mongo/idl/server_parameter_with_storage_test_structs.idl
+[cluster-server-param-with-storage-test-structs]:
+  ../src/mongo/idl/server_parameter_with_storage_test_structs.idl
 [specialized-cluster-server-param-test-idl]: ../src/mongo/idl/server_parameter_specialized_test.idl
 [specialized-cluster-server-param-test-data]: ../src/mongo/idl/server_parameter_specialized_test.h

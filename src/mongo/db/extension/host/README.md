@@ -26,8 +26,8 @@ comprehensive set of interfaces in the API which the extension must service.
 .so file and find the `get_mongodb_extension` symbol.
 
 Once the host has access to the top-level extension logic exposed through `get_mongodb_extension`,
-the extension and host perform a version negotiation to agree upon an Extensions API version that
-is supported by both modules. Last, the host calls `initialize()` for the extension to register its
+the extension and host perform a version negotiation to agree upon an Extensions API version that is
+supported by both modules. Last, the host calls `initialize()` for the extension to register its
 aggregation stages through the host portal.
 
 If there are any issues while loading an extension, an error will be logged and startup will fail.
@@ -39,7 +39,9 @@ startup option were successfully loaded, and we will log a success message.
 Each extension loaded at startup must have:
 
 1. A `SharedLibrary` file (`*.so`) - the compiled extension
-2. A configuration file (`<extensionName>.conf`) - located under `/etc/mongo/extensions`. In test environments (when test commands are enabled), the config directory is `/tmp/mongo/extensions` instead.
+2. A configuration file (`<extensionName>.conf`) - located under `/etc/mongo/extensions`. In test
+   environments (when test commands are enabled), the config directory is `/tmp/mongo/extensions`
+   instead.
 
 Configuration files use YAML syntax and must define:
 

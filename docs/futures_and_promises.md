@@ -68,11 +68,11 @@ Future<Message> call(Message& toSend) {
 First, notice that our calls to `TransportSession::sourceMessage` and
 `TransportSession::sinkMessage` have been replaced with calls to asynchronous versions of those
 functions. These asynchronous versions are future-returning; they don't block, but also don't return
-a result right away. Instead, they return a future that we can chain continuations onto; `then,
-onError` and `onCompletion` are all member functions of `Future<T>` that take a callable as argument
-and invoke that callable when the chained-to future is ready. Unsurprisingly, continuations chained
-with `.then` are run when the future is readied successfully with a `T`, and therefore callables
-chained with `.then` should take a `T` as argument. Mirroring this behavior, `.onError`
+a result right away. Instead, they return a future that we can chain continuations onto;
+`then, onError` and `onCompletion` are all member functions of `Future<T>` that take a callable as
+argument and invoke that callable when the chained-to future is ready. Unsurprisingly, continuations
+chained with `.then` are run when the future is readied successfully with a `T`, and therefore
+callables chained with `.then` should take a `T` as argument. Mirroring this behavior, `.onError`
 continuations are run only when the future is readied with an error, and continuations chained this
 way take a `Status` as argument which they can inspect to discover the error explaining why a `T`
 could not be delivered. Continuations chained with `.onCompletion` are run when the future resolves,
@@ -107,18 +107,17 @@ associated Futures exactly one time, and must do so before being destroyed (othe
 will be set with the `ErrorCodes::BrokenPromise` error, which is considered a programmer error and
 may crash debug builds of the server in the future).
 
-To create a `Promise` that has a Future, you may use the [`PromiseAndFuture<T>`][pf]
-utility type. Upon construction, it contains a created `Promise<T>` and its
-corresponding `Future<T>`. The perhaps-familiar `makePromiseFuture<T>` factory
-function now simply returns `PromiseAndFuture<T>{}`.
+To create a `Promise` that has a Future, you may use the [`PromiseAndFuture<T>`][pf] utility type.
+Upon construction, it contains a created `Promise<T>` and its corresponding `Future<T>`. The
+perhaps-familiar `makePromiseFuture<T>` factory function now simply returns `PromiseAndFuture<T>{}`.
 
-As was previously alluded to, it's
-also possible to make a "ready future" - one that has no associated promise and is already filled
-with a value or error. These might be useful in cases where the code that produces values in a way
-that's normally asynchronous happens to have one available already when a request comes in, and
-would like to return it right away. To create such a ready future, use `Future<T>::makeReady()`, or
-the helper function [makeReadyFutureWith(Func&& func)][mrfw] which will call the specified `func`
-and create a ready `Future` from its returned value.
+As was previously alluded to, it's also possible to make a "ready future" - one that has no
+associated promise and is already filled with a value or error. These might be useful in cases where
+the code that produces values in a way that's normally asynchronous happens to have one available
+already when a request comes in, and would like to return it right away. To create such a ready
+future, use `Future<T>::makeReady()`, or the helper function [makeReadyFutureWith(Func&&
+func)][mrfw] which will call the specified `func` and create a ready `Future` from its returned
+value.
 
 Lastly, there might be occasions when multiple futures should be fulfilled with the same value, at
 the same time. This use case is best served by `SharedPromise` and the associated `SharedSemiFuture`
@@ -144,8 +143,8 @@ calling threads, and return `Future<T>`s to those threads that will be readied o
 available. The service may have its own internal threads it uses to produce `T`s, and doesn't want
 to lend out its internal threads to do the work chained via continuations to the `Future<T>`s it's
 given to calling threads. Instead, it needs to insist that continuations are not chained onto the
-futures it gives out, or that the caller receiving the future
-arranges for some _other_ thread to run continuations.
+futures it gives out, or that the caller receiving the future arranges for some _other_ thread to
+run continuations.
 
 Fortunately, the service can enforce these guarantees using two types closely related to
 `Future<T>`: the types `SemiFuture<T>` and `ExecutorFuture<T>`.
@@ -270,33 +269,32 @@ will traverse the remaining continuation chain, and find the continuation chaine
 is run.
 
 Note that all of the continuation-chaining functions we've discussed, like `.then()`, return future-
-like types themselves (i.e. `Future<T>`, `SemiFuture<T>`, and the like). When we chain
-continuations in the manner we've been discussing here, subsequent continuations run when the future
-returned by the previous continuation is ready, and the future-like type is "unwrapped" such that
-the type wrapped by the future (or, in the case of failure, the error) is passed directly to the
-subsequent continuation. For more detail on this topic, see the block comment above the
-continuation-chaining member functions in [future.h][future], starting above the definition for
-`then()`.
+like types themselves (i.e. `Future<T>`, `SemiFuture<T>`, and the like). When we chain continuations
+in the manner we've been discussing here, subsequent continuations run when the future returned by
+the previous continuation is ready, and the future-like type is "unwrapped" such that the type
+wrapped by the future (or, in the case of failure, the error) is passed directly to the subsequent
+continuation. For more detail on this topic, see the block comment above the continuation-chaining
+member functions in [future.h][future], starting above the definition for `then()`.
 
 At some point, we may have no more continuations to add to a future chain, and will want to either
 synchronously extract the value or error held in the last future of the chain, or add a callback to
 asynchronously consume this value. The `.get()` and `.getAsync()` members of future-like types
-provide these facilities for terminating a future chain by extracting or asynchronously
-consuming the result of the chain. The `.getAsync()` function works much like `.onCompletion()`,
-taking a `Status` or `StatusWith<T>` and running regardless of whether or not the previous link in
-the chain resolved with error or success, and running asynchronously when the previous results are
-ready (to determine what thread `.getAsync()` will run on, follow the rules laid out in the previous
-"Where Do Continuations Run?" section.) Conversely, `.get()` takes no arguments, and blocks when it
-is called until the entirety of the continuation chain is resolved, with the final result given back
-to the blocking caller. Note that if the final result of the chain was an error that can be
-converted to a MongoDB `Status` type (i.e. either a `Status`-family type or `DBException`), it will
-be re-thrown as a `DBException` at the site where `.get()` is called when it is available. If the
-code calling `.get()` is not capable of handling an exception, use `.getNoThrow()` instead to
-extract the same error in the form of a `Status`. In the case of `.getAsync()`, all errors are
-converted to `Status`, and crucially, callables chained as continuations via `.getAsync()` cannot
-throw any exceptions, as there is no appropriate context with which to handle an asynchronous
-exception. If an exception is thrown from a continuation chained via `.getAsync()`, the entire
-process will be terminated (i.e. the program will crash).
+provide these facilities for terminating a future chain by extracting or asynchronously consuming
+the result of the chain. The `.getAsync()` function works much like `.onCompletion()`, taking a
+`Status` or `StatusWith<T>` and running regardless of whether or not the previous link in the chain
+resolved with error or success, and running asynchronously when the previous results are ready (to
+determine what thread `.getAsync()` will run on, follow the rules laid out in the previous "Where Do
+Continuations Run?" section.) Conversely, `.get()` takes no arguments, and blocks when it is called
+until the entirety of the continuation chain is resolved, with the final result given back to the
+blocking caller. Note that if the final result of the chain was an error that can be converted to a
+MongoDB `Status` type (i.e. either a `Status`-family type or `DBException`), it will be re-thrown as
+a `DBException` at the site where `.get()` is called when it is available. If the code calling
+`.get()` is not capable of handling an exception, use `.getNoThrow()` instead to extract the same
+error in the form of a `Status`. In the case of `.getAsync()`, all errors are converted to `Status`,
+and crucially, callables chained as continuations via `.getAsync()` cannot throw any exceptions, as
+there is no appropriate context with which to handle an asynchronous exception. If an exception is
+thrown from a continuation chained via `.getAsync()`, the entire process will be terminated (i.e.
+the program will crash).
 
 ## Notes and Links
 

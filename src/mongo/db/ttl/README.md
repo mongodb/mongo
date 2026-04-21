@@ -1,8 +1,8 @@
 # The TTLMonitor
 
 The TTLMonitor runs as a background job on each mongod. On a mongod primary, the TTLMonitor is
-responsible for removing documents expired on [TTL
-Indexes](https://www.mongodb.com/docs/manual/core/index-ttl/) across the mongod instance. It
+responsible for removing documents expired on
+[TTL Indexes](https://www.mongodb.com/docs/manual/core/index-ttl/) across the mongod instance. It
 continuously runs in a loop that sleeps for
 ['ttlMonitorSleepSecs'](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl#L39)
 and then performs a TTL Pass to remove all expired documents.
@@ -37,10 +37,8 @@ is specified, the TTLMonitor will batch deletes and provides fair TTL deletion a
 
 _Code spelunking starting points:_
 
-- [_The TTLMonitor
-  Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.h)
-- [_The TTLCollectionCache
-  Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl_collection_cache.h)
+- [_The TTLMonitor Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.h)
+- [_The TTLCollectionCache Class_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl_collection_cache.h)
 - [_ttl.idl_](https://github.com/mongodb/mongo/blob/d88a892d5b18035bd0f5393a42690e705c2007d7/src/mongo/db/ttl.idl)
 
 # Timeseries Collections

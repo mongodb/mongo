@@ -1,7 +1,7 @@
 # Test Commands
 
-All test commands are denoted with the `.testOnly()` modifier to the `MONGO_REGISTER_COMMAND` invocation.
-For example:
+All test commands are denoted with the `.testOnly()` modifier to the `MONGO_REGISTER_COMMAND`
+invocation. For example:
 
 ```c++
 MONGO_REGISTER_COMMAND(EchoCommand).testOnly();
@@ -9,9 +9,9 @@ MONGO_REGISTER_COMMAND(EchoCommand).testOnly();
 
 ## How to enable
 
-To be able to run these commands, the server must be started with the `enableTestCommands=1`
-server parameter (e.g. `--setParameter enableTestCommands=1`). Resmoke.py often sets this server
-parameter for testing.
+To be able to run these commands, the server must be started with the `enableTestCommands=1` server
+parameter (e.g. `--setParameter enableTestCommands=1`). Resmoke.py often sets this server parameter
+for testing.
 
 ## Examples
 

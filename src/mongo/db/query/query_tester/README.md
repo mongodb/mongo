@@ -2,17 +2,27 @@
 
 ## Overview
 
-**QueryTester** is a test harness designed to streamline E2E logic testing of MongoDB queries. It validates query results by executing them against a live MongoDB instance (e.g. `mongod`, `mongos`, or any system that implements the MongoDB wire protocol) and comparing the output to pre-defined expected results.
+**QueryTester** is a test harness designed to streamline E2E logic testing of MongoDB queries. It
+validates query results by executing them against a live MongoDB instance (e.g. `mongod`, `mongos`,
+or any system that implements the MongoDB wire protocol) and comparing the output to pre-defined
+expected results.
 
-QueryTester is ideal for small, reproducible test cases that verify query behavior with minimal setup. This tool follows a focused paradigm, exclusively supporting queries and DML operations with configurable settings. Support for passthroughs may be added in the future.
+QueryTester is ideal for small, reproducible test cases that verify query behavior with minimal
+setup. This tool follows a focused paradigm, exclusively supporting queries and DML operations with
+configurable settings. Support for passthroughs may be added in the future.
 
-QueryTester does not currently support extensive setup or complex infrastructure, but it is designed to be extensible, with the potential to handle more complex environments in the future. The overall goal of Tester's design, however, is to validate query logic in a simple, clear, and consistent manner.
+QueryTester does not currently support extensive setup or complex infrastructure, but it is designed
+to be extensible, with the potential to handle more complex environments in the future. The overall
+goal of Tester's design, however, is to validate query logic in a simple, clear, and consistent
+manner.
 
-Each QueryTester use case expects three files to work together: a `.test`, a `.results`, and a `.coll`. See [below](#file-types-and-formats) for templates of each.
+Each QueryTester use case expects three files to work together: a `.test`, a `.results`, and a
+`.coll`. See [below](#file-types-and-formats) for templates of each.
 
 ## Debugging BFs
 
-See [Runbook: Triaging Query Correctness BFs](https://docs.google.com/document/d/1lIdwnR_pMoYEBKL8Np8X4igMqIUultegy8As_9g2R8Y/edit?tab=t.0#heading=h.13k8s02tb8j3)
+See
+[Runbook: Triaging Query Correctness BFs](https://docs.google.com/document/d/1lIdwnR_pMoYEBKL8Np8X4igMqIUultegy8As_9g2R8Y/edit?tab=t.0#heading=h.13k8s02tb8j3)
 
 ## Getting Started
 
@@ -26,7 +36,8 @@ bazel build install-mongotest
 
 The tester expects a mongod/mongos to be running, and will execute tests against that process.
 
-To run a single test for the first time, try using the following command from the root of the mongo repo:
+To run a single test for the first time, try using the following command from the root of the mongo
+repo:
 
 ```sh
 mongotest -t <QueryTesterDir>/tests/manual_tests/example/testA.test --drop --load --mode compare
@@ -61,14 +72,12 @@ To perform other operations, consult the table below.
 
 ### .test
 
-See `tests/manual_tests/example/testA.test`. The file format is as follows:
-First line must be the testName (matching the filename without the extension).
-Second line is the database to run the test against.
-Third line is a list of collection files to load. All collections are expected to be in a `collections` directory somewhere along the path to the test file.
-Fourth line is a newline noting the end of the header.
-After the header, each line is a test line:
-`<testType> {commandToRun}`
-with each test line being followed by a newline.
+See `tests/manual_tests/example/testA.test`. The file format is as follows: First line must be the
+testName (matching the filename without the extension). Second line is the database to run the test
+against. Third line is a list of collection files to load. All collections are expected to be in a
+`collections` directory somewhere along the path to the test file. Fourth line is a newline noting
+the end of the header. After the header, each line is a test line: `<testType> {commandToRun}` with
+each test line being followed by a newline.
 
 The template is as follows:
 
@@ -100,8 +109,10 @@ The template is as follows:
 
 ### .results
 
-See `tests/manual_tests/example/testA.results`.
-These have the same format as .test files above, with the exception that each test must be followed by a line with the expected documents. These are allowed to be on multiple lines, and a result array is read as the line after the test until the next newline.
+See `tests/manual_tests/example/testA.results`. These have the same format as .test files above,
+with the exception that each test must be followed by a line with the expected documents. These are
+allowed to be on multiple lines, and a result array is read as the line after the test until the
+next newline.
 
 The template is as follows:
 
@@ -119,13 +130,14 @@ The template is as follows:
 ... further tests and results
 ```
 
-Some files have a `.queryShapeHash.results` extension. These are the expected results for the queryShapeHash test type, and they only contain the queryShapeHash, as in the `tests/manual_tests/example/testQueryShapeHash.queryShapeHash.results` example.
+Some files have a `.queryShapeHash.results` extension. These are the expected results for the
+queryShapeHash test type, and they only contain the queryShapeHash, as in the
+`tests/manual_tests/example/testQueryShapeHash.queryShapeHash.results` example.
 
 ### .coll
 
-See `tests/manual_tests/example/basic.coll`.
-These files are split into two sections divided by an empty line.
-Above the empty line are index definitions, one per line. They can be of the form:
+See `tests/manual_tests/example/basic.coll`. These files are split into two sections divided by an
+empty line. Above the empty line are index definitions, one per line. They can be of the form:
 
 1. `{<index>}`, or
 2. `{key: <index>}`, or
@@ -150,9 +162,8 @@ The template is as follows:
 ### Comments
 
 Whole-line inline comments can be added in any `.test`, `.results`, and `.coll` file by starting the
-line with `//`.
-Partial-line comments, such as `foo // comment`, are not supported, and the line will be read in its
-entirety.
+line with `//`. Partial-line comments, such as `foo // comment`, are not supported, and the line
+will be read in its entirety.
 
 Comments in input `.test` and `.results` files will be persisted in the output as much as possible.
 

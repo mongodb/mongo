@@ -1,15 +1,13 @@
 # WASM MozJS — AOT Compilation Pipeline
 
-This package provides build-time AOT (ahead-of-time) compilation of the
-MozJS WASM component so it can be embedded directly into a binary as a
-pre-compiled artifact.
+This package provides build-time AOT (ahead-of-time) compilation of the MozJS WASM component so it
+can be embedded directly into a binary as a pre-compiled artifact.
 
 ## Why AOT?
 
-The raw `.wasm` component takes ~40 s to JIT-compile with wasmtime at
-runtime. AOT compilation does this work once at build time, producing a
-serialized `.cwasm` that can be deserialized near-instantly via
-`Component::deserialize()`.
+The raw `.wasm` component takes ~40 s to JIT-compile with wasmtime at runtime. AOT compilation does
+this work once at build time, producing a serialized `.cwasm` that can be deserialized
+near-instantly via `Component::deserialize()`.
 
 ## Pipeline
 
@@ -32,8 +30,8 @@ serialized `.cwasm` that can be deserialized near-instantly via
  linked into final binary       (symbols: _binary_mozjs_wasm_api_cwasm_{start,end})
 ```
 
-The AOT tool **must** be built with the same wasmtime library version and
-engine configuration as the binary that will deserialize the `.cwasm`.
+The AOT tool **must** be built with the same wasmtime library version and engine configuration as
+the binary that will deserialize the `.cwasm`.
 
 ## Bazel Targets
 
@@ -44,8 +42,8 @@ engine configuration as the binary that will deserialize the `.cwasm`.
 
 ## Linking into a Binary
 
-To embed the pre-compiled WASM module into mongod/mongos or any other
-binary, add the embedded object as a linker input:
+To embed the pre-compiled WASM module into mongod/mongos or any other binary, add the embedded
+object as a linker input:
 
 ```python
 mongo_cc_binary(

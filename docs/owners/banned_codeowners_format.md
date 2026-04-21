@@ -15,7 +15,8 @@ Banned owners should be separated by newlines. Empty lines and lines starting wi
 
 ### Configuration
 
-This can be configured in any repo with `bazel_rules_mongo` by putting the following lines in your `.bazelrc` file:
+This can be configured in any repo with `bazel_rules_mongo` by putting the following lines in your
+`.bazelrc` file:
 
 ```
 common --define codeowners_have_banned_codeowners=True

@@ -55,8 +55,8 @@ bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-p
 
 ## Storage Execution
 
-The smoke test suites for storage execution are divided up into components. The smoke test suite
-for all of the components that storage execution owns can be run with the following:
+The smoke test suites for storage execution are divided up into components. The smoke test suite for
+all of the components that storage execution owns can be run with the following:
 
 ```
 bazel test --test_output=summary  --test_tag_filters=-intermediate_debug,server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl //...
@@ -76,7 +76,8 @@ There are currently no smoke test integration tests for this component.
 
 ### Server-Collection-Write-Path
 
-The unit and integration tests for the server-collection-write-path component can be run with the following:
+The unit and integration tests for the server-collection-write-path component can be run with the
+following:
 
 ```
 bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-collection-write-path //...
@@ -112,7 +113,8 @@ There are currently no smoke test integration tests for this component.
 
 ### Server-Storage-Engine-Integration
 
-The unit and integration tests for the server-storage-engine-integration component can be run with the following:
+The unit and integration tests for the server-storage-engine-integration component can be run with
+the following:
 
 ```
 bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-storage-engine-integration //...

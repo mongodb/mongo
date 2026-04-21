@@ -70,10 +70,10 @@ is enabled.
 
 ## Oscillations
 
-There are known scenarios in which the Flow Control mechanism causes write throughput to
-oscillate. There is no known work that can be done to eliminate oscillations entirely for this
-mechanism without hindering other aspects of the mechanism. Work was done (see SERVER-39867) to
-dampen the oscillations at the expense of throughput.
+There are known scenarios in which the Flow Control mechanism causes write throughput to oscillate.
+There is no known work that can be done to eliminate oscillations entirely for this mechanism
+without hindering other aspects of the mechanism. Work was done (see SERVER-39867) to dampen the
+oscillations at the expense of throughput.
 
 ## Throttling internal operations
 

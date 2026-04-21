@@ -2,11 +2,13 @@
 
 Resmoke is MongoDB's integration test runner.
 
-The JS Tests it can run live in the `jstests/` directory - reference its [README](../../jstests/README.md) to learn about their content.
+The JS Tests it can run live in the `jstests/` directory - reference its
+[README](../../jstests/README.md) to learn about their content.
 
 ## Build
 
-Though the source is built with bazel, resmoke is not yet integrated. This means that the source has to be built prior to using resmoke, eg:
+Though the source is built with bazel, resmoke is not yet integrated. This means that the source has
+to be built prior to using resmoke, eg:
 
 ```
 bazel build install-dist-test
@@ -41,11 +43,13 @@ bazel build install-dist-test
                         Generate a mongod.conf and mongos.conf using config fuzzer.
 ```
 
-Note: `bisect`, `setup-multiversion`, and `symbolize` commands have been moved to [`db-contrib-tool`](https://github.com/10gen/db-contrib-tool#readme).
+Note: `bisect`, `setup-multiversion`, and `symbolize` commands have been moved to
+[`db-contrib-tool`](https://github.com/10gen/db-contrib-tool#readme).
 
 ## Suites
 
-Many of the above commands use the concept of a "suite". Loosely, suites group which tests run, and how.
+Many of the above commands use the concept of a "suite". Loosely, suites group which tests run, and
+how.
 
 Read more about suites [here](../../buildscripts/resmokeconfig/suites/README.md).
 
@@ -59,43 +63,47 @@ The most typical approach is to run a particular JS test file given a suite, eg:
 buildscripts/resmoke.py run --suites=no_passthrough jstests/noPassthrough/shell/js/string.js
 ```
 
-That executes the content of that file, using the suite configuration as a fixture setup. The suite "no_passthrough" is associated with the file [buildscripts/resmokeconfig/suites/no_passthrough.yml](../../buildscripts/resmokeconfig/suites/no_passthrough.yml).
+That executes the content of that file, using the suite configuration as a fixture setup. The suite
+"no_passthrough" is associated with the file
+[buildscripts/resmokeconfig/suites/no_passthrough.yml](../../buildscripts/resmokeconfig/suites/no_passthrough.yml).
 
-Run has **100+ flags**! Use `resmoke run --help` to inspect them. To avoid risk of multiple sources of truth that can drift and become stale, **we do not attempt to document them all here** - they should each be self-descriptive and documented within the CLI help.
+Run has **100+ flags**! Use `resmoke run --help` to inspect them. To avoid risk of multiple sources
+of truth that can drift and become stale, **we do not attempt to document them all here** - they
+should each be self-descriptive and documented within the CLI help.
 
 Below are very high-level descriptions for high-usage flags.
 
 ### Suites (`--suites`)
 
-The run subcommand can run suites (list of tests and the MongoDB topology and
-configuration to run them against), and explicitly named test files.
+The run subcommand can run suites (list of tests and the MongoDB topology and configuration to run
+them against), and explicitly named test files.
 
-A single suite can be specified using the `--suite` flag, and multiple suites
-can be specified by providing a comma separated list to the `--suites` flag.
+A single suite can be specified using the `--suite` flag, and multiple suites can be specified by
+providing a comma separated list to the `--suites` flag.
 
 Additional documentation on our suite configuration can be found in
 [buildscripts/resmokeconfig/suites/README.md](../../buildscripts/resmokeconfig/suites/README.md).
 
 ### Testable Installations (`--installDir`)
 
-resmoke can run tests against any testable installation of MongoDB (such
-as ASAN, Debug, Release). When possible, resmoke will automatically locate and
-run with a locally built copy of MongoDB Server, so long as that build was
-installed to a subdirectory of the root of the git repository, and there is
-exactly one build. In other situations, the `--installDir` flag, passed to run
-subcommand, can be used to indicate the location of the mongod/mongos binaries.
+resmoke can run tests against any testable installation of MongoDB (such as ASAN, Debug, Release).
+When possible, resmoke will automatically locate and run with a locally built copy of MongoDB
+Server, so long as that build was installed to a subdirectory of the root of the git repository, and
+there is exactly one build. In other situations, the `--installDir` flag, passed to run subcommand,
+can be used to indicate the location of the mongod/mongos binaries.
 
-As an alternative, you may instead prefer to use the resmoke.py wrapper script
-located in the same directory as the mongod binary, which will automatically
-set `installDir` for you.
+As an alternative, you may instead prefer to use the resmoke.py wrapper script located in the same
+directory as the mongod binary, which will automatically set `installDir` for you.
 
-Note that this wrapper is unavailable in packaged installations of MongoDB
-Server, such as those provided by Homebrew, and other package managers. If you
-would like to run tests against a packaged installation, you must explicitly
-pass `--installDir` to resmoke.py
+Note that this wrapper is unavailable in packaged installations of MongoDB Server, such as those
+provided by Homebrew, and other package managers. If you would like to run tests against a packaged
+installation, you must explicitly pass `--installDir` to resmoke.py
 
 ### Resmoke test telemetry
 
 We capture telemetry from resmoke using open telemetry.
 
-Using open telemetry (OTel) we capture more specific information about the internals of resmoke. This data is used for improvements specifically when running in evergreen. This data is captured on every resmoke invocation but only sent to honeycomb when running in evergreen. More info about how we use OTel in resmoke can be found [here](otel_resmoke.md).
+Using open telemetry (OTel) we capture more specific information about the internals of resmoke.
+This data is used for improvements specifically when running in evergreen. This data is captured on
+every resmoke invocation but only sent to honeycomb when running in evergreen. More info about how
+we use OTel in resmoke can be found [here](otel_resmoke.md).

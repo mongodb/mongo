@@ -6,33 +6,49 @@ node. In some contexts we refer to this as metadata and to operations changing t
 BSON documents that each describe properties of a collection and its indexes. An in-memory catalog
 caches this data for more efficient access.
 
-The catalog provides a mapping from logical user-level namespaces to durable storage engine entities and provides a concurrency control layer to safely modify collections and indexes metadata for DDL operations.
+The catalog provides a mapping from logical user-level namespaces to durable storage engine entities
+and provides a concurrency control layer to safely modify collections and indexes metadata for DDL
+operations.
 
 See the [Storage Engine API](../../storage/README.md) for relevant information.
 
 ## Durable Catalog
 
-Catalog information is persisted as storage table with the `_mdb_catalog` [ident](../../storage/README.md#idents). Each entry in this table is indexed with a 64-bit `RecordId`, referred to as the `Catalog ID`, and contains a BSON document that describes the properties of a collection and its indexes.
+Catalog information is persisted as storage table with the `_mdb_catalog`
+[ident](../../storage/README.md#idents). Each entry in this table is indexed with a 64-bit
+`RecordId`, referred to as the `Catalog ID`, and contains a BSON document that describes the
+properties of a collection and its indexes.
 
-To manage the `_mdb_catalog` data efficiently and maintain correct layering between components, the server divides responsibilities between two key modules:
+To manage the `_mdb_catalog` data efficiently and maintain correct layering between components, the
+server divides responsibilities between two key modules:
 
 - `MDBCatalog` class
 
   - Persistence Layer: Manages the physical storage of the `_mdb_catalog` table.
   - BSON Entries: Reads and writes entries as raw BSON documents.
-  - Field Awareness: Knows only about top-level BSON fields such as `ident`, `idxIdent`, `md`, and `ns`. It does not interpret or validate higher-level semantics of an `_mdb_catalog` entry.
+  - Field Awareness: Knows only about top-level BSON fields such as `ident`, `idxIdent`, `md`, and
+    `ns`. It does not interpret or validate higher-level semantics of an `_mdb_catalog` entry.
 
 - `durable_catalog` namespace
 
-  - Parsing & Serialization: Knows how to interpret and generate the BSON documents for the `_mdb_catalog` entries, translating between server abstractions (like `CollectionOptions`) and the on-disk format.
-  - Abstraction Layer: Serves as the main entry point for server components to interact with the `_mdb_catalog`, abstracting away BSON parsing and storage details.
+  - Parsing & Serialization: Knows how to interpret and generate the BSON documents for the
+    `_mdb_catalog` entries, translating between server abstractions (like `CollectionOptions`) and
+    the on-disk format.
+  - Abstraction Layer: Serves as the main entry point for server components to interact with the
+    `_mdb_catalog`, abstracting away BSON parsing and storage details.
 
 **Example Flow**: Creating a Collection
 
 - The user issues `db.createCollection(<collName>, <options>)`.
-- The 'options' are represented internally as ['CollectionOptions'](https://github.com/mongodb/mongo/blob/88c79d8e8221cb2a73cc324b0bc21e7f3211fa63/src/mongo/db/catalog/collection_options.h).
-- The `durable_catalog` translates information about the new collection (such as `CollectionOptions` and other details from the command path) into a properly formatted BSON document suitable for storage in the `_mdb_catalog`. It dispatches the document and `RecordStore::Options` for the new collection to the `MDBCatalog`.
-- The `MDBCatalog` writes the document directly to the `_mdb_catalog`. It then uses the `RecordStore::Options` to create a `RecordStore` which allocates space for the new collection on disk.
+- The 'options' are represented internally as
+  ['CollectionOptions'](https://github.com/mongodb/mongo/blob/88c79d8e8221cb2a73cc324b0bc21e7f3211fa63/src/mongo/db/catalog/collection_options.h).
+- The `durable_catalog` translates information about the new collection (such as `CollectionOptions`
+  and other details from the command path) into a properly formatted BSON document suitable for
+  storage in the `_mdb_catalog`. It dispatches the document and `RecordStore::Options` for the new
+  collection to the `MDBCatalog`.
+- The `MDBCatalog` writes the document directly to the `_mdb_catalog`. It then uses the
+  `RecordStore::Options` to create a `RecordStore` which allocates space for the new collection on
+  disk.
 
 Starting in v5.2, catalog entries for time-series collections have a new flag called
 `timeseriesBucketsMayHaveMixedSchemaData` in the `md` field. Time-series collections upgraded from
@@ -43,8 +59,8 @@ part of the upgrade process and is removed as part of the downgrade process thro
 Starting in v7.1, catalog entries for time-series collections have a new flag called
 `timeseriesBucketingParametersHaveChanged` in the `md` field.
 
-**Example**: an entry in the mdb catalog for a collection `test.employees` with an in-progress
-index build on `{lastName: 1}`:
+**Example**: an entry in the mdb catalog for a collection `test.employees` with an in-progress index
+build on `{lastName: 1}`:
 
 ```
  {'ident': 'collection-8a3a1418-4f05-44d6-aca7-59a2f7b30248',
@@ -72,11 +88,12 @@ index build on `{lastName: 1}`:
 
 ### $listCatalog Aggregation Pipeline Operator
 
-[$listCatalog](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/pipeline/document_source_list_catalog.h#L46) is an internal aggregation pipeline operator that may be used to inspect the contents
-of the durable catalog on a running server. For catalog entries that refer to views, additional
-information is retrieved from the enclosing database's `system.views` collection. The $listCatalog
-is generally run on the admin database to obtain a complete view of the durable catalog, provided
-the caller has the required
+[$listCatalog](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/pipeline/document_source_list_catalog.h#L46)
+is an internal aggregation pipeline operator that may be used to inspect the contents of the durable
+catalog on a running server. For catalog entries that refer to views, additional information is
+retrieved from the enclosing database's `system.views` collection. The $listCatalog is generally run
+on the admin database to obtain a complete view of the durable catalog, provided the caller has the
+required
 [administrative privileges](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/pipeline/document_source_list_catalog.cpp#L55).
 Example command invocation and output from
 [list_catalog.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/core/catalog/list_catalog.js#L98)):
@@ -220,11 +237,13 @@ Collection-less $listCatalog: [
 The `$listCatalog` also supports running on a specific collection. See example in
 [list_catalog.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/core/catalog/list_catalog.js#L77).
 
-This aggregation pipeline operator is primarily intended for internal diagnostics and applications that require information not
-currently provided by [listDatabases](https://www.mongodb.com/docs/v6.0/reference/command/listDatabases/),
+This aggregation pipeline operator is primarily intended for internal diagnostics and applications
+that require information not currently provided by
+[listDatabases](https://www.mongodb.com/docs/v6.0/reference/command/listDatabases/),
 [listCollections](https://www.mongodb.com/docs/v6.0/reference/command/listCollections/), and
-[listIndexes](https://www.mongodb.com/docs/v6.0/reference/command/listIndexes/). The three commands referenced are part of the
-[Stable API](https://www.mongodb.com/docs/v6.0/reference/stable-api/) with a well-defined output format (see
+[listIndexes](https://www.mongodb.com/docs/v6.0/reference/command/listIndexes/). The three commands
+referenced are part of the [Stable API](https://www.mongodb.com/docs/v6.0/reference/stable-api/)
+with a well-defined output format (see
 [listIndexes IDL](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L225)).
 
 #### Read Concern Support
@@ -242,24 +261,27 @@ point in time during each command invocation.
 
 #### Examples of differences between listIndexes and $listCatalog results
 
-The `$listCatalog` operator does not format its results with the IDL-derived formatters generated for the `listIndexes` command.
-This has implications for applications that read the mdb catalog using $listCatalog rather than the recommended listIndexes
+The `$listCatalog` operator does not format its results with the IDL-derived formatters generated
+for the `listIndexes` command. This has implications for applications that read the mdb catalog
+using
+$listCatalog rather than the recommended listIndexes
 command. Below is an example of where the `listIndexes` results may differ from `$listCatalog`.
 
 | Index Type                                                     | Index Option                                                                                                                          | createIndexes                               | listIndexes                                                         | $listCatalog                                                         |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | [Sparse](https://www.mongodb.com/docs/v6.0/core/index-sparse/) | [sparse (safeBool)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L84) | `db.t.createIndex({a: 1}, {sparse: 12345})` | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : true }` | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : 12345 }` |
 
-Note that some index fields that previously exhibited differences between `listIndexes` and `$listCatalog` no longer do. For
-example, `expireAfterSeconds` and `bits` are now converted to integers before being persisted on disk, so `$listCatalog` returns
-the same integer values as `listIndexes` for these fields.
+Note that some index fields that previously exhibited differences between `listIndexes` and
+`$listCatalog` no longer do. For example, `expireAfterSeconds` and `bits` are now converted to
+integers before being persisted on disk, so `$listCatalog` returns the same integer values as
+`listIndexes` for these fields.
 
 #### $listCatalog in a sharded cluster
 
-The `$listCatalog` operator supports running in a sharded cluster where the `$listCatalog`
-result from each shard is combined at the router with additional identifying information similar
-to the [shard](https://www.mongodb.com/docs/v6.0/reference/operator/aggregation/indexStats/#std-label-indexStats-output-shard) output field
-of the `$indexStats` operator. The following is a sample test output from
+The `$listCatalog` operator supports running in a sharded cluster where the `$listCatalog` result
+from each shard is combined at the router with additional identifying information similar to the
+[shard](https://www.mongodb.com/docs/v6.0/reference/operator/aggregation/indexStats/#std-label-indexStats-output-shard)
+output field of the `$indexStats` operator. The following is a sample test output from
 [sharding/list_catalog.js](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/jstests/sharding/list_catalog.js#L40):
 
 ```
@@ -361,11 +383,11 @@ that happen after requesting an instance. If it is desired to observe writes whi
 instance then the reader must refresh it.
 
 Catalog writes are handled with the `CollectionCatalog::write(callback)` interface. It provides the
-necessary [copy-on-write][] abstractions. A writable catalog instance is created by making a
-shallow copy of the existing catalog. The actual write is implemented in the supplied callback which
-is allowed to throw. Execution of the write callbacks are serialized and may run on a different
-thread than the thread calling `CollectionCatalog::write`. Users should take care of not performing
-any blocking operations in these callbacks as it would block all other DDL writes in the system.
+necessary [copy-on-write][] abstractions. A writable catalog instance is created by making a shallow
+copy of the existing catalog. The actual write is implemented in the supplied callback which is
+allowed to throw. Execution of the write callbacks are serialized and may run on a different thread
+than the thread calling `CollectionCatalog::write`. Users should take care of not performing any
+blocking operations in these callbacks as it would block all other DDL writes in the system.
 
 To avoid a bottleneck in the case the catalog contains a large number of collections (being slow to
 copy), immutable data structures are used, concurrent writes are also batched together. Any thread
@@ -379,18 +401,17 @@ instance by the copying thread.
 
 Objects of the `Collection` class provide access to a collection's properties between
 [DDL](#glossary) operations that modify these properties. Modifications are synchronized using
-[copy-on-write][]. Reads access immutable `Collection` instances. Writes, such as rename
-collection, apply changes to a clone of the latest `Collection` instance and then atomically install
-the new `Collection` instance in the catalog. It is possible for operations that read at different
-points in time to use different `Collection` objects.
+[copy-on-write][]. Reads access immutable `Collection` instances. Writes, such as rename collection,
+apply changes to a clone of the latest `Collection` instance and then atomically install the new
+`Collection` instance in the catalog. It is possible for operations that read at different points in
+time to use different `Collection` objects.
 
 Notable properties of `Collection` objects are:
 
 - catalog ID - to look up or change information from the '\_mdb_catalog' (either through the
   'MDBCatalog' directly, or through the 'durable_catalog' namespace when parsing is helpful).
 - UUID - Identifier that remains for the lifetime of the underlying MongoDB collection, even across
-  DDL operations such as renames, and is consistent between different nodes and shards in a
-  cluster.
+  DDL operations such as renames, and is consistent between different nodes and shards in a cluster.
 - NamespaceString - The current name associated with the collection.
 - Collation and validation properties.
 - Decorations that are either `Collection` instance specific or shared between all `Collection`
@@ -403,10 +424,11 @@ In addition `Collection` objects have shared ownership of:
 - A `RecordStore` - an interface to access and manipulate the documents in the collection as stored
   by the storage engine.
 
-A writable `Collection` may only be requested in an active [WriteUnitOfWork](../../storage/README.md#WriteUnitOfWork). The
-new `Collection` instance is installed in the catalog when the storage transaction commits as the
-first `onCommit` [Changes](../../storage/README.md#changes) that run. This means that it is not allowed
-to perform any modification to catalog, collection or index instances in `onCommit` handlers. Such
+A writable `Collection` may only be requested in an active
+[WriteUnitOfWork](../../storage/README.md#WriteUnitOfWork). The new `Collection` instance is
+installed in the catalog when the storage transaction commits as the first `onCommit`
+[Changes](../../storage/README.md#changes) that run. This means that it is not allowed to perform
+any modification to catalog, collection or index instances in `onCommit` handlers. Such
 modifications would break the immutability property of these instances for readers. If the storage
 transaction rolls back then the writable `Collection` object is simply discarded and no change is
 ever made to the catalog.
@@ -414,9 +436,9 @@ ever made to the catalog.
 A writable `Collection` is a clone of the existing `Collection`, members are either deep or
 shallowed copied. Notably, a shallow copy is made for the [`IndexCatalog`](#index-catalog).
 
-The oplog `Collection` follows special rules, it does not use [copy-on-write][] or any other form
-of synchronization. Modifications operate directly on the instance installed in the catalog. It is
-not allowed to read concurrently with writes on the oplog `Collection`.
+The oplog `Collection` follows special rules, it does not use [copy-on-write][] or any other form of
+synchronization. Modifications operate directly on the instance installed in the catalog. It is not
+allowed to read concurrently with writes on the oplog `Collection`.
 
 Finally, there are two kinds of decorations on `Collection` objects. The `Collection` object derives
 from `DecorableCopyable` and requires `Decoration`s to implement a copy-constructor. Collection
@@ -572,15 +594,12 @@ and prevents the reaper from dropping the collection and index tables during the
 
 _Code spelunking starting points:_
 
-- [_The KVDropPendingIdentReaper
-  class_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/kv/kv_drop_pending_ident_reaper.h)
+- [_The KVDropPendingIdentReaper class_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/kv/kv_drop_pending_ident_reaper.h)
   - Handles the second phase of collection/index drop. Runs when notified.
-- [_The TimestampMonitor and TimestampListener
-  classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.h#L178-L313)
+- [_The TimestampMonitor and TimestampListener classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.h#L178-L313)
   - The TimestampMonitor starts a periodic job to notify the reaper of the latest timestamp that is
     okay to reap.
-- [_Code that signals the reaper with a
-  timestamp_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L932-L949)
+- [_Code that signals the reaper with a timestamp_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L932-L949)
 
 # Read Operations
 
@@ -591,10 +610,10 @@ achieve this by establishing consistent in-memory and storage engine on-disk sta
 their operations. Lock-free reads explicitly open a storage transaction while setting up consistent
 in-memory and on-disk read state. Internal reads with collection level locks implicitly start
 storage transactions later via the MongoDB integration layer on the first attempt to read from a
-collection or index. Unless a read operation is part of a larger write operation, the transaction
-is rolled-back automatically when the last GlobalLock is released, explicitly during query yielding,
-or from a call to abandonSnapshot(). Lock-free read operations must re-establish consistent state
-after a query yield, just as at the start of a read operation.
+collection or index. Unless a read operation is part of a larger write operation, the transaction is
+rolled-back automatically when the last GlobalLock is released, explicitly during query yielding, or
+from a call to abandonSnapshot(). Lock-free read operations must re-establish consistent state after
+a query yield, just as at the start of a read operation.
 
 See
 [~GlobalLock](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/concurrency/d_concurrency.h#L228-L239),
@@ -607,8 +626,8 @@ Collection reads act directly on a
 [RecordStore](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/record_store.h#L202)
 or
 [RecordCursor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/record_store.h#L102).
-The Collection object also provides [higher-level
-accessors](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/catalog/collection.h#L279)
+The Collection object also provides
+[higher-level accessors](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/catalog/collection.h#L279)
 to the RecordStore.
 
 ## Index Reads
@@ -628,8 +647,8 @@ Because of this, reads on secondaries are generally required to read at replicat
 [SERVER-34192](https://jira.mongodb.org/browse/SERVER-34192)). LastApplied is used because on
 secondaries it is only updated after each oplog batch, which is a known consistent state of data.
 
-AGCFR provides the mechanism for secondary reads. This is implemented by switching the ReadSource of [eligible
-readers](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/snapshot_helper.cpp#L106)
+AGCFR provides the mechanism for secondary reads. This is implemented by switching the ReadSource of
+[eligible readers](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/snapshot_helper.cpp#L106)
 to read at
 [kLastApplied](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/recovery_unit.h#L411).
 
@@ -637,12 +656,15 @@ to read at
 
 Operations that write to collections and indexes must take collection locks. Storage engines require
 all operations to hold at least a collection IX lock to provide document-level concurrency.
-Operations must perform writes in the scope of a [WriteUnitOfWork](../../storage/README.md#writeunitofwork).
+Operations must perform writes in the scope of a
+[WriteUnitOfWork](../../storage/README.md#writeunitofwork).
 
 ## Collection and Index Writes
 
 Collection write operations (inserts, updates, and deletes) perform storage engine writes to both
-the collection's RecordStore and relevant index's SortedDataInterface in the same storage transaction, or WUOW. This ensures that completed, not-building indexes are always consistent with collection data.
+the collection's RecordStore and relevant index's SortedDataInterface in the same storage
+transaction, or WUOW. This ensures that completed, not-building indexes are always consistent with
+collection data.
 
 ## Vectored Inserts
 
@@ -715,9 +737,9 @@ and [Multikey Indexes - MongoDB Manual](https://docs.mongodb.com/manual/core/ind
 # Clustered Collections
 
 Clustered collections store documents ordered by their cluster key on the RecordStore. The cluster
-key must currently be `{_id: 1}` and unique.
-Clustered collections may be created with the `clusteredIndex` collection creation option. The
-`clusteredIndex` option accepts the following formats:
+key must currently be `{_id: 1}` and unique. Clustered collections may be created with the
+`clusteredIndex` collection creation option. The `clusteredIndex` option accepts the following
+formats:
 
 - A document that specifies the clustered index configuration.
   ```
@@ -757,19 +779,23 @@ increasing cluster key values.
 
 Because unlike regular capped collections, clustered collections do not need to preserve insertion
 order, they allow non-serialized concurrent writes. In order to avoid missing documents while
-tailing a clustered collection, the user is required to enforce visibility rules similar to the ['no
-holes' point](../../storage/README.md#oplog-visibility). Majority read concern is similarly required.
+tailing a clustered collection, the user is required to enforce visibility rules similar to the
+['no holes' point](../../storage/README.md#oplog-visibility). Majority read concern is similarly
+required.
 
 ## Clustered RecordIds
 
 `RecordId`s can be arbitrarily long and are encoded as binary strings using each document's cluster
 key value, rather than a 64-bit integer. The binary string is generate using `KeyString` and
-discards the `TypeBits`. The [`kSmallStr` format](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/record_id.h#L330)
-supports small binary strings like the ones used for time series buckets. The [`kLargeStr` format](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/record_id.h#L336)
+discards the `TypeBits`. The
+[`kSmallStr` format](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/record_id.h#L330)
+supports small binary strings like the ones used for time series buckets. The
+[`kLargeStr` format](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/record_id.h#L336)
 supports larger strings and can be cheaply passed by value.
 
 Secondary indexes append `RecordId`s to the end of the `KeyString`. Because a `RecordId` in a
-clustered collection can be arbitrarily long, its size is appended at the end and [encoded](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/storage/key_string.cpp#L608)
+clustered collection can be arbitrarily long, its size is appended at the end and
+[encoded](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/storage/key_string.cpp#L608)
 right-to-left over up to 4 bytes, using the lower 7 bits of a byte, the high bit serving as a
 continuation bit.
 
@@ -788,7 +814,9 @@ However, legacy indexes (indexes that were created pre-3.4) still need to be han
 where a customer with legacy indexes upgrades to MongoDB 3.4+. The server treats any non-negative
 numerical index key and non-numerical index key value as an ascending index, and treats negative
 numerical values as descending. The exception to this is any form of a negative 0 (-0, -0.0, etc);
-these are treated as ascending. Details on how these values are treated can be found in [ordering.h](/src/mongo/bson/ordering.h), and examples of legacy indexes can be found in [this test](/src/mongo/bson/ordering_test.cpp).
+these are treated as ascending. Details on how these values are treated can be found in
+[ordering.h](/src/mongo/bson/ordering.h), and examples of legacy indexes can be found in
+[this test](/src/mongo/bson/ordering_test.cpp).
 
 # Glossary
 
@@ -797,8 +825,8 @@ context of relational databases. DDL operations in the MongoDB context include i
 creation or drop, as well as `collMod` operations.
 
 **snapshot**: A snapshot consists of a consistent view of data in the database. When a snapshot is
-opened with a timestamp, snapshot only shows data committed with a timestamp less than or equal
-to the snapshot's timestamp.
+opened with a timestamp, snapshot only shows data committed with a timestamp less than or equal to
+the snapshot's timestamp.
 
 **storage transaction**: A concept provided by a pluggable storage engine through which changes to
 data in the database can be performed. In order to satisfy the MongoDB pluggable storage engine

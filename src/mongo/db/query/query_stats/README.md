@@ -1,9 +1,9 @@
 # Query Stats
 
 This directory is the home of the infrastructure related to recording runtime query statistics for
-the database. It is not to be confused with `src/mongo/db/query/compiler/stats/` which is the home of the
-logic for computing and maintaining statistics about a collection or index's data distribution - for
-use by the query planner.
+the database. It is not to be confused with `src/mongo/db/query/compiler/stats/` which is the home
+of the logic for computing and maintaining statistics about a collection or index's data
+distribution - for use by the query planner.
 
 The system will collect metrics for each query execution, and the results will be aggregated in a
 structure called the [`QueryStatsStore`](#querystatsstore) upon completion of each successful
@@ -31,8 +31,8 @@ db.example.findOne({x: 53});
 then the `QueryStatsStore` should contain an entry for a single query shape which would record 2
 executions and some related statistics (see [`QueryStatsEntry`](query_stats_entry.h) for details).
 
-For more information on query shape and the overlap here, see
-[query shape disambiguation][disambiguation] and [query shape docs][query shape].
+For more information on query shape and the overlap here, see [query shape
+disambiguation][disambiguation] and [query shape docs][query shape].
 
 The query stats store has _more_ dimensions (i.e. more granularity) to group incoming queries than
 just the query shape. For example, these queries would all three have the same shape but the first
@@ -50,36 +50,37 @@ size will be treated separately from the example which does not specify a batch 
 #### Engineering Considerations
 
 The dimensions considered will depend on the command, but can generally be found in the
-[`Key`](key.h) interface, which will generate the query stats store keys by which
-we accumulate statistics. As one example, you can find the
-[`FindKey`](find_key.h) which will include all the things tracked in the
-`FindCmdQueryStatsStoreKeyComponents` (including `batchSize` shown in this example).
+[`Key`](key.h) interface, which will generate the query stats store keys by which we accumulate
+statistics. As one example, you can find the [`FindKey`](find_key.h) which will include all the
+things tracked in the `FindCmdQueryStatsStoreKeyComponents` (including `batchSize` shown in this
+example).
 
 ### Query Stats Store Cache Size
 
 The size of the`QueryStatsStore` can be set by the server parameter
 [`internalQueryStatsCacheSize`](#server-parameters), and the partitions will be created based off
-that. See [`queryStatsStoreManagerRegisterer`][partition calculation comment] for more details about how
-the number of partitions and their size is determined; Each partition is an LRU cache, therefore, if
-adding a new entry to the partition makes it go over its size limit, the least recently used entries
-will be evicted to drop below the max size. Eviction will be tracked in the new [server status
-metrics](#server-status-metrics) for queryStats.
+that. See [`queryStatsStoreManagerRegisterer`][partition calculation comment] for more details about
+how the number of partitions and their size is determined; Each partition is an LRU cache,
+therefore, if adding a new entry to the partition makes it go over its size limit, the least
+recently used entries will be evicted to drop below the max size. Eviction will be tracked in the
+new [server status metrics](#server-status-metrics) for queryStats.
 
 ## Metric Collection
 
 At a high level, when a query is run and collection of query stats is enabled, during planning we
-call [`registerRequest`][register request] in which the query stats store key will be
-generated based on the query's shape and the various other dimensions. The key will always be serialized
-and stored on the `opDebug`. For commands that support `getMore`s, it will also be stored on the cursor, so that we can
-continue to aggregate the operation's metrics until it is complete.
+call [`registerRequest`][register request] in which the query stats store key will be generated
+based on the query's shape and the various other dimensions. The key will always be serialized and
+stored on the `opDebug`. For commands that support `getMore`s, it will also be stored on the cursor,
+so that we can continue to aggregate the operation's metrics until it is complete.
 
-Once the query execution is fully complete, [`writeQueryStats`][write query stats] will be called and
-will either retrieve the entry for the key from the store if it exists and update it, or create a new one and add it to the store.
-See more details in the [comments][write query stats comments].
+Once the query execution is fully complete, [`writeQueryStats`][write query stats] will be called
+and will either retrieve the entry for the key from the store if it exists and update it, or create
+a new one and add it to the store. See more details in the [comments][write query stats comments].
 
 ### Adding New Metrics
 
-When adding a new metric to Query Stats, follow these steps to ensure the metric is valuable, performant, and maintainable.
+When adding a new metric to Query Stats, follow these steps to ensure the metric is valuable,
+performant, and maintainable.
 
 #### 1. Define Clear Value Proposition
 
@@ -87,30 +88,48 @@ Before implementing, ask yourself:
 
 - What specific insight does this metric provide that isn't already available?
 - Is this metric actionable for users (user observability, TSEs, and perf engineers)?
-- Does this metric help diagnose performance issues, understand workload patterns, or optimize query planning?
+- Does this metric help diagnose performance issues, understand workload patterns, or optimize query
+  planning?
 - Can it be derived from existing metrics through simple calculations? (If yes, reconsider.)
 
 #### 2. Define the Metric in `QueryStatsEntry`
 
-Add the metric to the appropriate section of [`QueryStatsEntry`](query_stats_entry.h) using the appropriate `AggregatedMetric` type (e.g., `AggregatedMetric<uint64_t>` for counters or derived values like rate). Follow the existing patterns for organization if applicable (e.g., cursor stats, query execution stats, planner stats, write stats).
+Add the metric to the appropriate section of [`QueryStatsEntry`](query_stats_entry.h) using the
+appropriate `AggregatedMetric` type (e.g., `AggregatedMetric<uint64_t>` for counters or derived
+values like rate). Follow the existing patterns for organization if applicable (e.g., cursor stats,
+query execution stats, planner stats, write stats).
 
 #### 3. Connect new Metric all the way to `OpDebug::AdditiveMetrics`
 
-- Add the metric to [`OpDebug::AdditiveMetrics`](../../op_debug.cpp) and `OpDebug::AdditiveMetrics::add` to capture raw values during execution.
+- Add the metric to [`OpDebug::AdditiveMetrics`](../../op_debug.cpp) and
+  `OpDebug::AdditiveMetrics::add` to capture raw values during execution.
 - Add a corresponding field to [`QueryStatsSnapshot`](query_stats.h) to transport the value.
-- Update [`query_stats::captureMetrics()`](query_stats.cpp) to extract and transform the metric from `OpDebug::AdditiveMetrics` into the snapshot.
+- Update [`query_stats::captureMetrics()`](query_stats.cpp) to extract and transform the metric from
+  `OpDebug::AdditiveMetrics` into the snapshot.
 
 If you need to propagate a metric from mongod to mongos, then define:
 
-- In the cursor response [`cursor_response.idl`](../client_cursor/cursor_response.idl), add your metric field to the `CursorMetrics` struct and let IDL codegen generate the serialization/deserialization BSON logic. Ensure the field is optional so older clients/routers can ignore it gracefully.
-- Define the shard aggregation logic for the metric in [`data_bearing_node_metrics.h`](data_bearing_node_metrics.h) under `DataBearingNodeMetrics::add()` and `DataBearingNodeMetrics::aggregateCursorMetrics()`, alongside `OpDebug::AdditiveMetrics::aggregateCursorMetrics()` and `OpDebug::getCursorMetrics()`. Use these aggregation semantics: addition for totals (e.g., `docsExamined`), maximum for maximums (e.g., `maxAcquisitionDelinquency`), OR for boolean flags (e.g., `hasSortStage`), and AND for conjunctions (e.g., `fromPlanCache`).
+- In the cursor response [`cursor_response.idl`](../client_cursor/cursor_response.idl), add your
+  metric field to the `CursorMetrics` struct and let IDL codegen generate the
+  serialization/deserialization BSON logic. Ensure the field is optional so older clients/routers
+  can ignore it gracefully.
+- Define the shard aggregation logic for the metric in
+  [`data_bearing_node_metrics.h`](data_bearing_node_metrics.h) under `DataBearingNodeMetrics::add()`
+  and `DataBearingNodeMetrics::aggregateCursorMetrics()`, alongside
+  `OpDebug::AdditiveMetrics::aggregateCursorMetrics()` and `OpDebug::getCursorMetrics()`. Use these
+  aggregation semantics: addition for totals (e.g., `docsExamined`), maximum for maximums (e.g.,
+  `maxAcquisitionDelinquency`), OR for boolean flags (e.g., `hasSortStage`), and AND for
+  conjunctions (e.g., `fromPlanCache`).
 
 #### 4. Instrument with the Query Lifecycle
 
-Determine where in the query execution path the metric should be set in `OpDebug::AdditiveMetrics` by getting the `OpDebug` member of `CurOp`:
+Determine where in the query execution path the metric should be set in `OpDebug::AdditiveMetrics`
+by getting the `OpDebug` member of `CurOp`:
 
-- Identify the appropriate point where the metric value is available (i.e., during planning, execution, or on cursor operations). Avoid setting it multiple times.
-- Metrics collection occurs in the hot path of query execution and must add negligible CPU and memory cost.
+- Identify the appropriate point where the metric value is available (i.e., during planning,
+  execution, or on cursor operations). Avoid setting it multiple times.
+- Metrics collection occurs in the hot path of query execution and must add negligible CPU and
+  memory cost.
 
 #### 5. Add Regression Tests
 
@@ -118,24 +137,29 @@ Determine where in the query execution path the metric should be set in `OpDebug
 - Verify aggregation correctness with edge cases (zero values, overflow, boundary conditions, etc.)
 - Validate metrics appear correctly in `$queryStats` output.
 - Test in sharded clusters to verify proper flow from shards to router and correct aggregation.
-- Determine which benchmarks could be impacted (i.e., query latency, throughput, resource utilization). If the metric is recorded only once during the query's lifetime, the performance impact should be minimal and further validation may not be necessary. Ensure benchmarks are run with query stats sampling enabled.
+- Determine which benchmarks could be impacted (i.e., query latency, throughput, resource
+  utilization). If the metric is recorded only once during the query's lifetime, the performance
+  impact should be minimal and further validation may not be necessary. Ensure benchmarks are run
+  with query stats sampling enabled.
 
 If you have any questions, feel free to contact `#query-integration-observability` Slack channel.
 
 ### Data-bearing Node Metrics
 
 Some metrics are only known to data-bearing nodes. When a query is selected for query stats
-gathering in a sharded cluster, the router requests that the shards gather those metrics and
-include them in cursor responses by setting the `includeQueryStatsMetrics` field to `true` in
-requests it makes to the shards. The router then aggregates the metrics received from the shards
-into its own query stats store. In executing such a query, the local shard may need to send further
-queries to other (foreign) shards. In such cases, the local shard forwards the
-`includeQueryStatsMetrics` field to the foreign shard(s). The local shard then aggregates the
-metrics it receives into those it includes in its response.
+gathering in a sharded cluster, the router requests that the shards gather those metrics and include
+them in cursor responses by setting the `includeQueryStatsMetrics` field to `true` in requests it
+makes to the shards. The router then aggregates the metrics received from the shards into its own
+query stats store. In executing such a query, the local shard may need to send further queries to
+other (foreign) shards. In such cases, the local shard forwards the `includeQueryStatsMetrics` field
+to the foreign shard(s). The local shard then aggregates the metrics it receives into those it
+includes in its response.
 
 ### Metrics Reference
 
-The following table summarizes all query stats metrics. Some metrics computed on the router are rolled up from the shards, and some are computed locally. The "Router Notes" column clarifies how the metric is computed.
+The following table summarizes all query stats metrics. Some metrics computed on the router are
+rolled up from the shards, and some are computed locally. The "Router Notes" column clarifies how
+the metric is computed.
 
 | Metric                                                         | Description                                                                                       | Router Notes                                                                                              |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -194,66 +218,76 @@ top-level leaves room for sub-components in a nested section and avoids ambiguit
 boundaries.
 
 Place a metric in a **nested subsection** when it belongs to a specific functionality or component.
-When naming the subsection and metric, consider: where is it collected, and which part of the
-system is it meant to help debug?
+When naming the subsection and metric, consider: where is it collected, and which part of the system
+is it meant to help debug?
 
 ### Rate Limiting
 
 Whether or not query stats will be recorded for a specific query execution depends on a Rate
-Limiter, which limits the number of recordings based on the [server parameters](#server-parameters). The goal of the rate limiter
-is to minimize impact to overall system performance through restricting traffic. Our rate limiter provides two algorithms:
-Window-based policy and sample-based policy. Window-based policy limits the number of recordings per second, whereas sample-based
-policy limits the fraction of queries to be recorded. If a query is run but the rate limiter decides not to record it, the query
-will still execute as expected but query stats will not be updated in the query stats store. See details [here](rate_limiting.h).
+Limiter, which limits the number of recordings based on the [server parameters](#server-parameters).
+The goal of the rate limiter is to minimize impact to overall system performance through restricting
+traffic. Our rate limiter provides two algorithms: Window-based policy and sample-based policy.
+Window-based policy limits the number of recordings per second, whereas sample-based policy limits
+the fraction of queries to be recorded. If a query is run but the rate limiter decides not to record
+it, the query will still execute as expected but query stats will not be updated in the query stats
+store. See details [here](rate_limiting.h).
 
 ### Explain
 
-Non-aggregate command types take separate paths when the command is run as an explain as opposed to when
-they are not run as an explain. We do not collect query stats metrics on the explain-only paths. However, aggregate
-explains run through the same path as non-explains, so query stats are collected for aggregate explains.
+Non-aggregate command types take separate paths when the command is run as an explain as opposed to
+when they are not run as an explain. We do not collect query stats metrics on the explain-only
+paths. However, aggregate explains run through the same path as non-explains, so query stats are
+collected for aggregate explains.
 
-In the aggregate case, `explain` is not included in the query shape, so an aggregation command that has `explain: true`,
-vs. the same command without it will have the same query shape. However we do want to collect separate metrics
-for these as they are different, so we include `explain` as a dimension in the query stats store key if present (for agg only).
+In the aggregate case, `explain` is not included in the query shape, so an aggregation command that
+has `explain: true`, vs. the same command without it will have the same query shape. However we do
+want to collect separate metrics for these as they are different, so we include `explain` as a
+dimension in the query stats store key if present (for agg only).
 
 ### Views
 
-Queries on views are always run as an aggregation, since the view is defined as a pipeline. Because of this,
-query stats for non-aggregate commands on views would be registered and collected as aggregates without intervention.
-There are two considerations here:
+Queries on views are always run as an aggregation, since the view is defined as a pipeline. Because
+of this, query stats for non-aggregate commands on views would be registered and collected as
+aggregates without intervention. There are two considerations here:
 
 #### 1. Registering the request
 
-We want all commands on views to be registered as the original command type rather than as an aggregate.
-We do this by making sure to call `registerRequest` before the top-level command path redirects to the aggregate
-path, which sets the query stats store key on `CurOp`. This will prevent it from being regenerated as an agg.
+We want all commands on views to be registered as the original command type rather than as an
+aggregate. We do this by making sure to call `registerRequest` before the top-level command path
+redirects to the aggregate path, which sets the query stats store key on `CurOp`. This will prevent
+it from being regenerated as an agg.
 
-However, note that there are special cases even beyond this. When a query is rate-limited in the original `registerRequest`
-call, or when it is being run as an explain, we will not set the query stats store key, but we still do not want
-the aggregate path to register the request. To handle this case, we set the `disableForSubqueryExecution` flag on the
-`OpDebug.QueryStatsInfo` struct to indicate that this request should not be registered for query stats.
+However, note that there are special cases even beyond this. When a query is rate-limited in the
+original `registerRequest` call, or when it is being run as an explain, we will not set the query
+stats store key, but we still do not want the aggregate path to register the request. To handle this
+case, we set the `disableForSubqueryExecution` flag on the `OpDebug.QueryStatsInfo` struct to
+indicate that this request should not be registered for query stats.
 
 #### 2. Collecting the metrics
 
-Regardless of where the query stats store key was generated, the aggregate path will attempt to collect metrics
-for any query that has a key populated on `OpDebug`. This is acceptable in many cases, but for commands that must
-do post-processing after running the view aggregation pipeline (specifically, the distinct command), this results
-in incorrect metrics. These commands must take care to not pass the generated query stats store key to the aggregation
-path and instead collect metrics on their own after the aggregation pipeline is complete.
+Regardless of where the query stats store key was generated, the aggregate path will attempt to
+collect metrics for any query that has a key populated on `OpDebug`. This is acceptable in many
+cases, but for commands that must do post-processing after running the view aggregation pipeline
+(specifically, the distinct command), this results in incorrect metrics. These commands must take
+care to not pass the generated query stats store key to the aggregation path and instead collect
+metrics on their own after the aggregation pipeline is complete.
 
 ### Change Streams
 
-Query stats also behaves a bit differently for change stream queries. For change stream collections, like normal collections,
-we will still collect query stats on creation. However, an important difference is that we will actually treat each `getMore` as its own query,
-and collect and update query stats for each one rather than accumulating them on the cursor and recording once execution
-completes. We have a flag to determine whether the collection has a change stream, [\_queryStatsWillNeverExhaust][query stats will never exhaust],
-and decide based on that whether to take the change stream approach.
+Query stats also behaves a bit differently for change stream queries. For change stream collections,
+like normal collections, we will still collect query stats on creation. However, an important
+difference is that we will actually treat each `getMore` as its own query, and collect and update
+query stats for each one rather than accumulating them on the cursor and recording once execution
+completes. We have a flag to determine whether the collection has a change stream,
+[\_queryStatsWillNeverExhaust][query stats will never exhaust], and decide based on that whether to
+take the change stream approach.
 
 ## Metric Retrieval
 
 To retrieve the stats gathered in the `QueryStatsStore`, there is a new aggregation stage,
 `$queryStats`. This stage must be the first in a pipeline and it must be run against the admin
-database. The structure of the command is as follows (note `aggregate: 1` reflecting there is no collection):
+database. The structure of the command is as follows (note `aggregate: 1` reflecting there is no
+collection):
 
 ```js
 db.adminCommand({
@@ -263,10 +297,7 @@ db.adminCommand({
       $queryStats: {
         tranformIdentifiers: {
           algorithm: "hmac-sha-256",
-          hmacKey: BinData(
-            8,
-            "87c4082f169d3fef0eef34dc8e23458cbb457c3sf3n2",
-          ) /* bindata
+          hmacKey: BinData(8, "87c4082f169d3fef0eef34dc8e23458cbb457c3sf3n2") /* bindata
                 subtype 8 - a new type for sensitive data */,
         },
       },
@@ -346,8 +377,9 @@ following way:
 
 - `key`: Query Stats Key.
 - `keyHash`: Hash of the Query Stats Store Key representative value. Corresponds to the `key` field.
-- `queryShapeHash`: Hash of the Query Shape representative value. Corresponds to the `key.queryShape` field.
-  This is particularly useful for cross-referencing query statistics with Persistent Query Settings.
+- `queryShapeHash`: Hash of the Query Shape representative value. Corresponds to the
+  `key.queryShape` field. This is particularly useful for cross-referencing query statistics with
+  Persistent Query Settings.
 - `asOf`: UTC time when $queryStats read this entry from the store. This will not return the same
   UTC time for each result. The data structure used for the store is partitioned, and each partition
   will be read at a snapshot individually. You may see up to the number of partitions in unique
@@ -366,56 +398,62 @@ following way:
 - `metrics.totalExecMicros`: Estimated time spent computing and returning all batches, which is the
   same as the above for single-batch queries, as well as for change streams.
 - `metrics.cpuNanos`: Estimated total CPU time spent by a query operation in nanoseconds. This value
-  should always be greater than 0 and will not be returned on platforms other than Linux, since collecting
-  cpu time is only supported on Linux.
+  should always be greater than 0 and will not be returned on platforms other than Linux, since
+  collecting cpu time is only supported on Linux.
 - `metrics.workingTimeMillis`: Various broken down statistics for the estimated time spent executing
   this query, excluding time spent blocked.
-- `metrics.cursor.firstResponseExecMicros`: Estimated time spent computing and returning the first batch.
-- `metrics.queryExec.docsReturned`: Various broken down statistics for the number of documents returned by
-  observation of this query.
-- `metrics.queryExec.keysExamined`: Various broken down statistics for the number of index keys examined while
-  executing this query, including getMores.
-- `metrics.queryExec.docsExamined`: Various broken down statistics for the number of documents examined while
-  executing this query, including getMores.
-- `metrics.queryExec.bytesRead`: Various broken down statistics for the number of bytes read from disk while
-  executing this query, including getMores.
-- `metrics.queryExec.readTimeMicros`: Various broken down statistics for the amount of time spent reading from disk
-  while executing this query, including getMores.
-- `metrics.queryExec.delinquentAcquisitions`: Number of times that an execution ticket acquisition was overdue by
-  a query operation, including getMores.
-- `metrics.queryExec.totalAcquisitionDelinquencyMillis`: Total time in milliseconds that an execution ticket
-  acquisition was overdue by a query operation, including getMores.
-- `metrics.queryExec.maxAcquisitionDelinquencyMillis`: Maximum time in milliseconds that an execution ticket
-  acquisition was overdue by a query operation, including getMores.
+- `metrics.cursor.firstResponseExecMicros`: Estimated time spent computing and returning the first
+  batch.
+- `metrics.queryExec.docsReturned`: Various broken down statistics for the number of documents
+  returned by observation of this query.
+- `metrics.queryExec.keysExamined`: Various broken down statistics for the number of index keys
+  examined while executing this query, including getMores.
+- `metrics.queryExec.docsExamined`: Various broken down statistics for the number of documents
+  examined while executing this query, including getMores.
+- `metrics.queryExec.bytesRead`: Various broken down statistics for the number of bytes read from
+  disk while executing this query, including getMores.
+- `metrics.queryExec.readTimeMicros`: Various broken down statistics for the amount of time spent
+  reading from disk while executing this query, including getMores.
+- `metrics.queryExec.delinquentAcquisitions`: Number of times that an execution ticket acquisition
+  was overdue by a query operation, including getMores.
+- `metrics.queryExec.totalAcquisitionDelinquencyMillis`: Total time in milliseconds that an
+  execution ticket acquisition was overdue by a query operation, including getMores.
+- `metrics.queryExec.maxAcquisitionDelinquencyMillis`: Maximum time in milliseconds that an
+  execution ticket acquisition was overdue by a query operation, including getMores.
 - `metrics.queryExec.totalTimeQueuedMicros`: Time spent queued for execution control.
 - `metrics.queryExec.totalAdmissions`: Number of admission control events.
-- `metrics.queryExec.wasLoadShed`: Aggregate counts of the number of query executions that were and were not load shed.
-- `metrics.queryExec.wasDeprioritized`: Aggregate counts of the number of query executions that were and were not deprioritized.
-- `metrics.queryExec.wasMarkedNonDeprioritizable`: Aggregate counts of the number of query executions that were and were not marked as non-deprioritizable.
-- `metrics.queryExec.numInterruptChecksPerSec`: Number of times checkForInterrupt is called per second by a
-  query operation, including getMores.
-- `metrics.queryExec.overdueInterruptApproxMaxMillis`: Maximum time in milliseconds that checkForInterrupt was
-  delayed for a sampled query operation, including getMores.
+- `metrics.queryExec.wasLoadShed`: Aggregate counts of the number of query executions that were and
+  were not load shed.
+- `metrics.queryExec.wasDeprioritized`: Aggregate counts of the number of query executions that were
+  and were not deprioritized.
+- `metrics.queryExec.wasMarkedNonDeprioritizable`: Aggregate counts of the number of query
+  executions that were and were not marked as non-deprioritizable.
+- `metrics.queryExec.numInterruptChecksPerSec`: Number of times checkForInterrupt is called per
+  second by a query operation, including getMores.
+- `metrics.queryExec.overdueInterruptApproxMaxMillis`: Maximum time in milliseconds that
+  checkForInterrupt was delayed for a sampled query operation, including getMores.
 - `metrics.queryExec.peakTrackedMemBytes`: Peak memory usage for the node.
 - `metrics.queryExec.clusterPeakTrackedMemBytes`: Peak memory usage across the cluster.
-- `metrics.queryPlanner.hasSortStage`: Aggregate counts of the number of query executions that did and did not
-  include a sort stage, respectively.
-- `metrics.queryPlanner.usedDisk`: Aggregate counts of the number of query executions that did and did not use
-  disk, respectively.
-- `metrics.queryPlanner.fromMultiPlanner`: Aggregate counts of the number of query executions that did and did
-  not use the multi-planner, respectively. A query is considered to have used the multi-planner
-  if any internal query generated as part of its execution used the multi-planner.
-- `metrics.queryPlanner.fromPlanCache`: Aggregate counts of the number of query executions that did and did
-  not use the plan cache, respectively. A query is considered to have not used the plan cache if
-  any internal query generated as part of its execution did not use the plan cache.
-- `metrics.queryPlanner.planningTimeMicros`: The wall-clock time in microseconds from the moment a planning
-  request is received to the moment the winning plan is finalized. This metric is expected to be positive
-  regardless of whether the plan came from (e.g. multi-planner, cost-based ranker, plan cache).
-- `metrics.queryPlanner.costBasedRanker.cardinalityEstimationMethods`: Aggregate counts of the number of times a
-  source of query plan cost estimate was used (e.g. sampling, heuristics). The count will be 0 if the source was not used.
-- `metrics.queryPlanner.costBasedRanker.nDocsSampled`: The number of documents sampled when using cost-based ranker (CBR)
-  with sampling method. This metric is expected to be 0 if CBR was not used to generate the plan or another CE
-  method was used, like histogram.
+- `metrics.queryPlanner.hasSortStage`: Aggregate counts of the number of query executions that did
+  and did not include a sort stage, respectively.
+- `metrics.queryPlanner.usedDisk`: Aggregate counts of the number of query executions that did and
+  did not use disk, respectively.
+- `metrics.queryPlanner.fromMultiPlanner`: Aggregate counts of the number of query executions that
+  did and did not use the multi-planner, respectively. A query is considered to have used the
+  multi-planner if any internal query generated as part of its execution used the multi-planner.
+- `metrics.queryPlanner.fromPlanCache`: Aggregate counts of the number of query executions that did
+  and did not use the plan cache, respectively. A query is considered to have not used the plan
+  cache if any internal query generated as part of its execution did not use the plan cache.
+- `metrics.queryPlanner.planningTimeMicros`: The wall-clock time in microseconds from the moment a
+  planning request is received to the moment the winning plan is finalized. This metric is expected
+  to be positive regardless of whether the plan came from (e.g. multi-planner, cost-based ranker,
+  plan cache).
+- `metrics.queryPlanner.costBasedRanker.cardinalityEstimationMethods`: Aggregate counts of the
+  number of times a source of query plan cost estimate was used (e.g. sampling, heuristics). The
+  count will be 0 if the source was not used.
+- `metrics.queryPlanner.costBasedRanker.nDocsSampled`: The number of documents sampled when using
+  cost-based ranker (CBR) with sampling method. This metric is expected to be 0 if CBR was not used
+  to generate the plan or another CE method was used, like histogram.
 - `metrics.writes`: Contains the metrics relevant to writes.
 - `metrics.writes.nMatched`: The number of documents selected for update.
 - `metrics.writes.nUpserted`: The number of documents inserted by an upsert.
@@ -467,9 +505,10 @@ following way:
     for write commands.
     - `0` - Disable recording write commands.
     - `1` - Enable recording write commands.
-  - This parameter is only effective if query stats is already enabled via `internalQueryStatsRateLimit`
-    or `internalQueryStatsSampleRate`.
-  - This parameter may become a floating point value to support percentage-based sampling in the future.
+  - This parameter is only effective if query stats is already enabled via
+    `internalQueryStatsRateLimit` or `internalQueryStatsSampleRate`.
+  - This parameter may become a floating point value to support percentage-based sampling in the
+    future.
 
 - `logComponentVerbosity.queryStats`:
   - Controls the logging behavior for query stats. See [Logging](#logging) for details.
@@ -523,9 +562,15 @@ output one document per query stats key - output in the "key" field.
 
 [disambiguation]: /src/mongo/db/query/README_query_shape_disambiguation.md
 [query shape]: /src/mongo/db/query/query_shape/README.md
-[query stats store]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L100-L104
-[partition calculation comment]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.cpp#L173-179
-[register request]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L196-L199
-[write query stats]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L253-L258
-[write query stats comments]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L243-L252
-[query stats will never exhaust]: https://github.com/mongodb/mongo/blob/8be794e1983e2b24938489ad2b018b630ea9b563/src/mongo/db/clientcursor.h#L510
+[query stats store]:
+  https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L100-L104
+[partition calculation comment]:
+  https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.cpp#L173-179
+[register request]:
+  https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L196-L199
+[write query stats]:
+  https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L253-L258
+[write query stats comments]:
+  https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L243-L252
+[query stats will never exhaust]:
+  https://github.com/mongodb/mongo/blob/8be794e1983e2b24938489ad2b018b630ea9b563/src/mongo/db/clientcursor.h#L510

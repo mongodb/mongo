@@ -1,10 +1,13 @@
 # Building Bazel from Source to target the S390X Architecture
 
-Bazel doesn't release to the S390X architecture. To address this, MongoDB maintains our own Bazel build that we perform on our S390X development systems.
+Bazel doesn't release to the S390X architecture. To address this, MongoDB maintains our own Bazel
+build that we perform on our S390X development systems.
 
 # JDK?
 
-Bazel usually comes with a built-in JDK. However, the tooling used to build the built-in JDK doesn't support S390X. To get around this, an external JDK must be present on both the system compiling the Bazel executable itself as well as the host running Bazel as a build system.
+Bazel usually comes with a built-in JDK. However, the tooling used to build the built-in JDK doesn't
+support S390X. To get around this, an external JDK must be present on both the system compiling the
+Bazel executable itself as well as the host running Bazel as a build system.
 
 On the MongoDB S390X Evergreen static hosts and dev hosts, the OpenJDK 21 installation exists at:
 

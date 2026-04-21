@@ -38,18 +38,21 @@ resmoke_suite_test(
 
 ### Test Sharding
 
-Test sharding allows you to split a large test suite across multiple parallel test executions, significantly reducing total test time. When `shard_count` is specified, Bazel will:
+Test sharding allows you to split a large test suite across multiple parallel test executions,
+significantly reducing total test time. When `shard_count` is specified, Bazel will:
 
 1. Run the test target multiple times in parallel (up to the specified shard count)
 2. Each shard receives a unique shard index (0 to N-1)
 3. The resmoke runner uses these values to determine which subset of tests to run in each shard
 4. Each shard produces its own test output and logs
 
-Note: sharding is an alternative to the resmoke `--jobs` flag, which should not be used with `resmoke_suite_test`.
+Note: sharding is an alternative to the resmoke `--jobs` flag, which should not be used with
+`resmoke_suite_test`.
 
 ### Test Logs and Output Directory
 
-Bazel creates a dedicated output directory for each test run under the `bazel-testlogs` symlink in your workspace root.
+Bazel creates a dedicated output directory for each test run under the `bazel-testlogs` symlink in
+your workspace root.
 
 For a test target `//jstests/suites/query-execution:core`, the outputs are like:
 
@@ -78,7 +81,8 @@ bazel test //jstests/suites/query-execution:core --test_sharding_strategy=disabl
 
 #### Run with additional resmoke flags:
 
-Any `--test_arg` in the bazel command will be propagated as a flag to resmoke.py. To modify the resmoke invocation with any of resmoke's flags, add them as `--test_arg`s.
+Any `--test_arg` in the bazel command will be propagated as a flag to resmoke.py. To modify the
+resmoke invocation with any of resmoke's flags, add them as `--test_arg`s.
 
 ```
 # Runs all tests from the core suite with timeseries in their name, twice, with all feature flags enabled.

@@ -1,12 +1,14 @@
 # mongo rapidyaml wheel builds
 
-This directory contains scripts to produce versioned `rapidyaml` wheels that can be uploaded to S3 and consumed directly instead of building from the git dependency in `pyproject.toml`.
+This directory contains scripts to produce versioned `rapidyaml` wheels that can be uploaded to S3
+and consumed directly instead of building from the git dependency in `pyproject.toml`.
 
 The scripts default to the `rapidyaml` commit currently pinned in `pyproject.toml`:
 
 - `a5d485fd44719e1c03e059177fc1f695fc462b66`
 
-They also require `RAPIDYAML_VERSION` to be set explicitly. The MongoDB fork does not currently publish git tags, so `setuptools-scm` cannot infer a stable release version on its own.
+They also require `RAPIDYAML_VERSION` to be set explicitly. The MongoDB fork does not currently
+publish git tags, so `setuptools-scm` cannot infer a stable release version on its own.
 
 All artifacts are written to `dist/`.
 
@@ -47,11 +49,14 @@ RAPIDYAML_VERSION=0.9.0.post0 ARCH=ppc64le PLATFORM=linux/ppc64le ./build_rapidy
 
 ### macOS
 
-Run the script on each target macOS architecture you want to publish. The script intentionally builds for the host arch only, which keeps wheel tags and interpreter usage straightforward.
+Run the script on each target macOS architecture you want to publish. The script intentionally
+builds for the host arch only, which keeps wheel tags and interpreter usage straightforward.
 
-The script creates and uses a temporary virtualenv, so it works with Homebrew-managed Python installations that reject direct `pip install` into the system environment.
+The script creates and uses a temporary virtualenv, so it works with Homebrew-managed Python
+installations that reject direct `pip install` into the system environment.
 
-It also leaves `Python.framework` external during delocation, so the wheel should be built with the same Python distribution family you expect consumers to use.
+It also leaves `Python.framework` external during delocation, so the wheel should be built with the
+same Python distribution family you expect consumers to use.
 
 ```bash
 RAPIDYAML_VERSION=0.9.0.post0 PYTHON_BIN=python3.13 ./build_rapidyaml_macos.sh
@@ -67,15 +72,19 @@ $env:PYTHON_BIN = "C:\Python313\python.exe"
 .\build_rapidyaml_windows_x64.ps1
 ```
 
-Note: `pyproject.toml` currently excludes `rapidyaml` on Windows, so a Windows wheel is only needed if that marker changes later.
+Note: `pyproject.toml` currently excludes `rapidyaml` on Windows, so a Windows wheel is only needed
+if that marker changes later.
 
 ## Build Behavior
 
 - The Linux script builds inside the appropriate `manylinux2014` image and runs `auditwheel repair`.
-- The macOS script creates a temporary virtualenv, installs its build tooling there, and runs `delocate-wheel` while excluding `Python.framework` from bundling.
+- The macOS script creates a temporary virtualenv, installs its build tooling there, and runs
+  `delocate-wheel` while excluding `Python.framework` from bundling.
 - The Windows script runs `delvewheel repair` after building.
-- Every script clones the `mongodb-forks/rapidyaml` repo, checks out the requested ref, initializes submodules, builds a wheel, and performs a simple `import ryml` smoke test.
-- Linux defaults to `cp313-cp313`, which matches the repo's current Python version. Override that when you need a wheel for a different interpreter.
+- Every script clones the `mongodb-forks/rapidyaml` repo, checks out the requested ref, initializes
+  submodules, builds a wheel, and performs a simple `import ryml` smoke test.
+- Linux defaults to `cp313-cp313`, which matches the repo's current Python version. Override that
+  when you need a wheel for a different interpreter.
 
 ## Environment Variables
 
@@ -94,7 +103,8 @@ Note: `pyproject.toml` currently excludes `rapidyaml` on Windows, so a Windows w
 
 ## Consuming the Wheels
 
-Once the wheels are uploaded, you can replace the current git dependency in `pyproject.toml` with URL-based entries scoped by platform markers.
+Once the wheels are uploaded, you can replace the current git dependency in `pyproject.toml` with
+URL-based entries scoped by platform markers.
 
 For example:
 

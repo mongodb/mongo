@@ -33,24 +33,24 @@ outputs.
   code changes.
 
 - Multiple test variations MAY be bundled into a single test. Recommended when testing same feature
-  with different inputs. This helps reviewing the outputs by grouping similar tests together, and also
-  reduces the number of output files.
+  with different inputs. This helps reviewing the outputs by grouping similar tests together, and
+  also reduces the number of output files.
 
 - Changes to test fixture or test code that affect non-trivial amount test outputs MUST BE done in
   separate pull request from production code changes:
 
   - Pull request for test code only changes can be easily reviewed, even if large number of test
-    outputs are modified. While such changes can still introduce merge conflicts, they don't introduce
-    risk of regression (if outputs were valid
+    outputs are modified. While such changes can still introduce merge conflicts, they don't
+    introduce risk of regression (if outputs were valid
   - Pull requests with mixed production
 
 - Tests in the same suite SHOULD share the fixtures when appropriate. This reduces cost of adding
-  new tests to the suite. Changes to the fixture may only affect expected outputs from that fixtures,
-  and those output can be updated in bulk.
+  new tests to the suite. Changes to the fixture may only affect expected outputs from that
+  fixtures, and those output can be updated in bulk.
 
 - Tests in different suites SHOULD NOT reuse/share fixtures. Changes to the fixture can affect large
-  number of expected outputs.
-  There are exceptions to that rule, and tests in different suites MAY reuse/share fixtures if:
+  number of expected outputs. There are exceptions to that rule, and tests in different suites MAY
+  reuse/share fixtures if:
 
   - Test fixture is considered stable and changes rarely.
   - Tests suites are related, either by sharing tests, or testing similar components.
@@ -59,9 +59,8 @@ outputs.
 
 - Tests SHOULD print both inputs and outputs of the tested code. This makes it easy for reviewers to
   verify of the expected outputs are indeed correct by having both input and output next to each
-  other.
-  Otherwise finding the input used to produce the new output may not be practical, and might not even
-  be included in the diff.
+  other. Otherwise finding the input used to produce the new output may not be practical, and might
+  not even be included in the diff.
 
 - When resolving merge conflicts on the expected output files, one of the approaches below SHOULD be
   used:
@@ -71,8 +70,8 @@ outputs.
     hanges done by local branch.
   - "Accept yours", rerun the tests and verify the new outputs. This approach requires knowledge of
     production/test code changes in "theirs" branch. However, if such changes resulted in
-    straightforward and repetitive output changes, like due to printing code change or fixture change,
-    it may be easier to verify than reinspecting local changes.
+    straightforward and repetitive output changes, like due to printing code change or fixture
+    change, it may be easier to verify than reinspecting local changes.
 
 - Expected test outputs SHOULD be reused across tightly-coupled test suites. The suites are
   tightly-coupled if:
@@ -92,8 +91,8 @@ outputs.
   - Versioned tests, where expected behavior is the same for majority of test inputs/scenarios.
 
 - AVOID manually modifying expected output files. Those files are considered to be auto generated.
-  Instead, run the tests and then copy the generated output as a new expected output file. See "How to
-  diff and accept new test outputs" section for instructions.
+  Instead, run the tests and then copy the generated output as a new expected output file. See "How
+  to diff and accept new test outputs" section for instructions.
 
 # How to use write Golden Data tests?
 
@@ -121,9 +120,10 @@ outputs. Verifies the output with the expected output that is in the source repo
 
 See: [golden_test.h](../src/mongo/unittest/golden_test.h)
 
-Before running `bazel test`, set up the golden test framework as described in the `Setup` section below.
-This will ensure that the C++ test outputs are written to a location where `buildscripts/golden_test.py`
-can find them so that the `diff` and `accept` functions work as expected.
+Before running `bazel test`, set up the golden test framework as described in the `Setup` section
+below. This will ensure that the C++ test outputs are written to a location where
+`buildscripts/golden_test.py` can find them so that the `diff` and `accept` functions work as
+expected.
 
 **Example:**
 
@@ -160,8 +160,7 @@ TEST_F(MySuiteFixture, MyFeatureBTest) {
 }
 ```
 
-Also see self-test:
-[golden_test_test.cpp](../src/mongo/unittest/golden_test_test.cpp)
+Also see self-test: [golden_test_test.cpp](../src/mongo/unittest/golden_test_test.cpp)
 
 # How to diff and accept new test outputs on a workstation
 
@@ -177,13 +176,15 @@ buildscripts/golden_test.py requires a one-time workstation setup.
 Note: this setup is only required to use buildscripts/golden_test.py itself. It is NOT required to
 just run the Golden Data tests when not using buildscripts/golden_test.py.
 
-1. Create a yaml config file, as described by [Appendix - Config file reference](#appendix---config-file-reference).
+1. Create a yaml config file, as described by
+   [Appendix - Config file reference](#appendix---config-file-reference).
 2. Set GOLDEN_TEST_CONFIG_PATH environment variable to config file location, so that is available
    when running tests and when running buildscripts/golden_test.py tool.
 
 ### Automatic Setup
 
-Use buildscripts/golden_test.py builtin setup to initialize default config for your current platform.
+Use buildscripts/golden_test.py builtin setup to initialize default config for your current
+platform.
 
 **Instructions for Linux**
 
@@ -195,8 +196,8 @@ buildscripts/golden_test.py setup
 
 **Instructions for Windows**
 
-Run buildscripts/golden_test.py setup utility.
-You may be asked for a password, when not running in "Run as administrator" shell.
+Run buildscripts/golden_test.py setup utility. You may be asked for a password, when not running in
+"Run as administrator" shell.
 
 ```cmd
 c:\python\python310\python.exe buildscripts/golden_test.py setup
@@ -295,7 +296,8 @@ $> buildscripts/golden_test.py --help
 
 ### Update multiple expected files at once
 
-Some tests will run in multiple passthroughs or build variants, so they have multiple expected files.
+Some tests will run in multiple passthroughs or build variants, so they have multiple expected
+files.
 
 Whenever the test is updated, all the expected files should be updated together as well.
 
@@ -306,8 +308,8 @@ buildscripts/golden_test.py --verbose clean-run-accept jstests/query_golden/NAME
 This option uses `resmoke.py find-suites` to determine the passthrough suites a test belongs to and
 runs them.
 
-If the test is found to only belong to the `query_golden_classic` passthrough, it is assumed that
-it can have multiple expected results due to being run under multiple build variants with a different
+If the test is found to only belong to the `query_golden_classic` passthrough, it is assumed that it
+can have multiple expected results due to being run under multiple build variants with a different
 `internalQueryFrameworkControl` settings. So the test will be run with various values for
 `internalQueryFrameworkControl`.
 
@@ -348,22 +350,21 @@ outputRootPattern:
   type: String
   optional: true
   description:
-    Root path patten that will be used to write expected and actual test outputs for all tests
-    in the test run.
-    If not specified a temporary folder location will be used.
-    Path pattern string may use '%' characters in the last part of the path. '%' characters in
-    the last part of the path will be replaced with random lowercase hexadecimal digits.
-  examples: /var/tmp/test_output/out-%%%%-%%%%-%%%%-%%%%
-    /var/tmp/test_output
+    Root path patten that will be used to write expected and actual test outputs for all tests in
+    the test run. If not specified a temporary folder location will be used. Path pattern string may
+    use '%' characters in the last part of the path. '%' characters in the last part of the path
+    will be replaced with random lowercase hexadecimal digits.
+  examples: /var/tmp/test_output/out-%%%%-%%%%-%%%%-%%%% /var/tmp/test_output
 
 diffCmd:
   type: String
   optional: true
-  description: Shell command to diff a single golden test run output.
-    {{expected}} and {{actual}} variables should be used and will be replaced  with expected and
-    actual output folder paths respectively.
-    This property is not used to decide whether the test passes or fails; it is only used to
-    display differences once we've decided that a test failed.
-  examples: git diff --no-index "{{expected}}" "{{actual}}"
-    diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
+  description:
+    Shell command to diff a single golden test run output. {{expected}} and {{actual}} variables
+    should be used and will be replaced  with expected and actual output folder paths respectively.
+    This property is not used to decide whether the test passes or fails; it is only used to display
+    differences once we've decided that a test failed.
+  examples:
+    git diff --no-index "{{expected}}" "{{actual}}" diff -ruN --unidirectional-new-file
+    --color=always "{{expected}}" "{{actual}}"
 ```

@@ -17,21 +17,21 @@ A value is any entity that we are interested in accessing or manipulating during
 These can range from simple values like integers and strings to more complex values like objects and
 arrays. They closely resemble values in functional programming languages, that is, they are neither
 shared, nor do they have identity (i.e. variables with the same numeric value are not conceptually
-different entities). Some SBE values are [modeled off of
-BSONTypes](https://github.com/mongodb/mongo/blob/f2b093acd48aee3c63d1a0e80a101eeb9925834a/src/mongo/bson/bsontypes.h#L63-L114)
+different entities). Some SBE values are
+[modeled off of BSONTypes](https://github.com/mongodb/mongo/blob/f2b093acd48aee3c63d1a0e80a101eeb9925834a/src/mongo/bson/bsontypes.h#L63-L114)
 while others represent internal C++ types such as
 [collators](https://github.com/mongodb/mongo/blob/d19ea3f3ff51925e3b45c593217f8901373e4336/src/mongo/db/exec/sbe/values/value.h#L216-L217).
 
 One type that deserves a special mention is `Nothing`, which indicates the absence of a value. It is
 often used in SBE to indicate that a result cannot be computed instead of raising an exception
-(similar to the [Maybe
-Monad](<https://en.wikipedia.org/wiki/Monad_(functional_programming)#An_example:_Maybe>) in many
-functional programming languages).
+(similar to the
+[Maybe Monad](<https://en.wikipedia.org/wiki/Monad_(functional_programming)#An_example:_Maybe>) in
+many functional programming languages).
 
-Values are identified by a [1 byte
-TypeTag](https://github.com/mongodb/mongo/blob/d19ea3f3ff51925e3b45c593217f8901373e4336/src/mongo/db/exec/sbe/values/value.h#L132-L254)
-, which denotes the type of the value that we are looking at, and an [8 byte
-value](https://github.com/mongodb/mongo/blob/d19ea3f3ff51925e3b45c593217f8901373e4336/src/mongo/db/exec/sbe/values/value.h#L328-L331),
+Values are identified by a
+[1 byte TypeTag](https://github.com/mongodb/mongo/blob/d19ea3f3ff51925e3b45c593217f8901373e4336/src/mongo/db/exec/sbe/values/value.h#L132-L254)
+, which denotes the type of the value that we are looking at, and an
+[8 byte value](https://github.com/mongodb/mongo/blob/d19ea3f3ff51925e3b45c593217f8901373e4336/src/mongo/db/exec/sbe/values/value.h#L328-L331),
 which is the value itself. If the value is shallow (that is, it requires 8 bytes or less to
 represent), then the 8 bytes are used to store the value itself. If the value requires more than 8
 bytes, the 8 bytes are used to store a pointer to a heap-allocated block of memory which contains
@@ -41,8 +41,7 @@ the value.
 
 In order to use values to implement the semantics of a given query language, we need a mechanism to
 compute over them. To accomplish this, SBE provides an expression language defined by the
-[EExpression
-class](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L55-L66).
+[EExpression class](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L55-L66).
 EExpressions form a tree and their goal is to produce values during evaluation. It's worth noting
 that EExpressions aren't tied to expressions in the Mongo Query Language, rather, they are meant to
 be building blocks that can be combined to express arbitrary query language semantics. Below is an
@@ -60,12 +59,14 @@ overview of the different EExpression types:
 - [ESwitch](https://github.com/mongodb/mongo/blob/a04e7eea7dea44ee536703dbd98e7f832a495d11/src/mongo/db/exec/sbe/expressions/expression.h#L509-L567):
   Represents a multi-conditional switch expression (a.k.a. if-then-elif-...-else expression).
 - [EFunction](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L416-L438):
-  Represents a named, built-in function supported natively by the engine. At the time of writing, there are over [150 such
-  functions](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.cpp#L564-L567).
+  Represents a named, built-in function supported natively by the engine. At the time of writing,
+  there are over
+  [150 such functions](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.cpp#L564-L567).
   Note that function parameters are evaluated first and then are passed as arguments to the
   function.
 - [EFail](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L511-L534):
-  Represents an exception and produces a query fatal error if reached at query runtime. It supports numeric error codes and error strings.
+  Represents an exception and produces a query fatal error if reached at query runtime. It supports
+  numeric error codes and error strings.
 - [ENumericConvert](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L536-L566):
   Represents the conversion of an arbitrary value to a target numeric type.
 - [EVariable](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L281-L319)
@@ -75,27 +76,27 @@ overview of the different EExpression types:
   when we want to reference some intermediate value multiple times.
 - [ELocalLambda](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L487-L507)
   Represents an anonymous function which takes one or two input parameters. Many `EFunctions` accept
-  these as parameters. A good example of this is the [`traverseF`
-  function](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L1329-L1357):
+  these as parameters. A good example of this is the
+  [`traverseF` function](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L1329-L1357):
   it accepts 2 parameters: an input and an `ELocalLambda`. If the input is an array, the
   `ELocalLambda` is applied to each element in the array, otherwise, it is applied to the input on
-  its own. The second argument of the lambda receives the 0-based position of the element being examined;
-  when the `ELocalLambda` is being applied to the entire input, the second argument will have a value of -1.
+  its own. The second argument of the lambda receives the 0-based position of the element being
+  examined; when the `ELocalLambda` is being applied to the entire input, the second argument will
+  have a value of -1.
 
-EExpressions cannot be executed directly. Rather, [they are
-compiled](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L81-L84)
+EExpressions cannot be executed directly. Rather,
+[they are compiled](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L81-L84)
 into executable
 [`ByteCode`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.h#L1382)
-in the SBE Virtual Machine, or VM. SBE `ByteCode` execution closely resembles the [fetch, decode,
-execute](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L9638-L9641)
-cycle in assembly/machine code execution. In particular, EExpressions are compiled to [a linear
-buffer of
-instructions](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.h#L1356-L1357)
-and execution state is represented by a [program
-counter](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L9635-L9638)
+in the SBE Virtual Machine, or VM. SBE `ByteCode` execution closely resembles the
+[fetch, decode, execute](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L9638-L9641)
+cycle in assembly/machine code execution. In particular, EExpressions are compiled to
+[a linear buffer of instructions](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.h#L1356-L1357)
+and execution state is represented by a
+[program counter](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L9635-L9638)
 (a pointer into the instruction buffer, which is computed by taking the address of the buffer and
-adding an offset to it) and [a
-stack](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.h#L2192-L2199)
+adding an offset to it) and
+[a stack](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.h#L2192-L2199)
 which maintains values produced during execution. Generally speaking, instructions will obtain their
 arguments by popping arguments off of the stack and will push the result of evaluation onto the
 stack.
@@ -108,8 +109,7 @@ in detail, please reference [the Virtual Machine section below](#virtual-machine
 To make use of SBE values (either those produced by executing `ByteCode`, or those maintained
 elsewhere), we need a mechanism to reference them throughout query execution. This is where slots
 come into play: A slot is a mechanism for reading and writing values at query runtime. Each slot is
-[uniquely identified by a numeric
-SlotId](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L41-L48).
+[uniquely identified by a numeric SlotId](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L41-L48).
 Put another way, slots conceptually represent values that we care about during query execution,
 including:
 
@@ -118,9 +118,8 @@ including:
 - The individual components of a sort key (where each component is bound to its own slot)
 - The result of executing some computation expressed in the input query
 
-SlotIds by themselves don't provide a means to access or set values, rather, [slots are associated
-with
-SlotAccessors](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L50-L55),
+SlotIds by themselves don't provide a means to access or set values, rather,
+[slots are associated with SlotAccessors](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/values/slot.h#L50-L55),
 which provide the API to read the values bound to slots as well as to write new values into slots.
 There are several types of SlotAccessors, but the most common are the following:
 
@@ -163,15 +162,16 @@ perform query execution using values, EExpressions, and slots. They are the node
 execution tree when combined. PlanStages are pull-based in that they pull data from their child
 stages (as opposed to a push-based model where stages offer data to parent stages).
 
-A single `PlanStage` may have any number of children and performs some action, implements some algorithm,
-or maintains some execution state, such as:
+A single `PlanStage` may have any number of children and performs some action, implements some
+algorithm, or maintains some execution state, such as:
 
 - Computing values bound to slots
 - Managing the lifetime of values in slots
 - Executing compiled `ByteCode`
 - Buffering values into memory
 
-SBE PlanStages also follow an iterator model and perform query execution through the following steps:
+SBE PlanStages also follow an iterator model and perform query execution through the following
+steps:
 
 - First, a caller prepares a PlanStage tree for execution by calling `prepare()`.
 - Once the tree is prepared, the caller then calls `open()` to initialize the tree with any state
@@ -182,15 +182,17 @@ SBE PlanStages also follow an iterator model and perform query execution through
   values from slots.
 - Finally, `close()` is called to indicate that query execution is complete and release resources.
 
-The following subsections describe [the PlanStage API](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/stages.h#L557-L651) introduced above in greater detail:
+The following subsections describe
+[the PlanStage API](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/stages.h#L557-L651)
+introduced above in greater detail:
 
 ### `virtual void prepare(CompileCtx& ctx) = 0;`
 
 This method prepares a `PlanStage` (and, recursively, its children) for execution by:
 
 - Performing slot resolution, that is, obtaining `SlotAccessors` for all slots that this stage
-  references and verifying that all slot accesses are valid. Typically, this is done by asking
-  child stages for a `SlotAccessor*` via `getAccessor()`.
+  references and verifying that all slot accesses are valid. Typically, this is done by asking child
+  stages for a `SlotAccessor*` via `getAccessor()`.
 - Compiling `EExpressions` into executable `ByteCode`. Note that `EExpressions` can reference slots
   through the `ctx` parameter.
 
@@ -206,8 +208,8 @@ good example of this is the
 [`HashAggStage`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/hash_agg.cpp#L273):
 stages above a `HashAggStage` in the tree parent stages cannot access slots below the
 `HashAggStage`. This is because this stage will exhaust its PlanStage subtree, which renders all
-slots in said subtree invalid. For more details on slot resolution, consult [the corresponding
-section](#slot-resolution).
+slots in said subtree invalid. For more details on slot resolution, consult
+[the corresponding section](#slot-resolution).
 
 ### `virtual void open(bool reOpen) = 0;`
 
@@ -233,8 +235,8 @@ expensive and ultimately redundant. This is where the `reOpen` parameter of `ope
 set to `true`, it provides the opportunity to execute an optimized a sequence of `close()` and
 `open()` calls.
 
-A good example of this is the [HashAgg
-stage](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/hash_agg.cpp#L426):
+A good example of this is the
+[HashAgg stage](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/hash_agg.cpp#L426):
 calling `HashAgg::open()` involves draining a child stage and buffering values into a hash table.
 Closing the plan and then immediately opening it would involve destroying the internal hash table
 and then reconstructing it, which wastes a lot of work. Instead, calling `open(reOpen = true)`
@@ -258,26 +260,23 @@ At the time of writing, there are 36 PlanStages. As such, only a handful of comm
 Advances a storage cursor over a collection. This stage can function both as a 'scan' (read the
 contents of a collection from start to finish) or as a 'seek' (position the cursor to a specific
 RecordId, and read until EOF or a RecordId upper bound). It returns `IS_EOF` if the cursor is
-exhausted or if the underlying storage cursor has advanced beyond the seek bounds. ScanStage [owns
-slots for the Record and RecordId
-returned](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/scan.h#L393-L398)
+exhausted or if the underlying storage cursor has advanced beyond the seek bounds. ScanStage
+[owns slots for the Record and RecordId returned](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/scan.h#L393-L398)
 from the cursor and will update them on each call to `getNext()` if these slots are defined.
 
-The ScanStage [supports binding the values of top level fields from records to
-slots](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/scan.cpp#L584-L640).
+The ScanStage
+[supports binding the values of top level fields from records to slots](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/scan.cpp#L584-L640).
 This is a very useful optimization as it saves parent stages from having to perform a linear time
 lookup over the input BSON for each top level field.
 
 ### [IndexScanStageBase::getNext()](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/ix_scan.cpp#L289-L345)
 
-Advances a storage cursor over an index. Note that this PlanStage is abstract and must [be derived
-from to describe how to seek the
-index](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/ix_scan.h#L127-L128).
-Much like `ScanStage`, `IndexScanStageBase` [maintains slots for the index key and the RecordId corresponding to the
-key](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/ix_scan.h#L172-L186).
-It also has an optimization that allows for [binding a subset of the components of the index key
-returned by the index to
-slots](https://github.com/mongodb/mongo/blob/dbbabbdc0f3ef6cbb47500b40ae235c1258b741a/src/mongo/db/exec/sbe/values/value.cpp#L889-L929).
+Advances a storage cursor over an index. Note that this PlanStage is abstract and must
+[be derived from to describe how to seek the index](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/ix_scan.h#L127-L128).
+Much like `ScanStage`, `IndexScanStageBase`
+[maintains slots for the index key and the RecordId corresponding to the key](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/ix_scan.h#L172-L186).
+It also has an optimization that allows for
+[binding a subset of the components of the index key returned by the index to slots](https://github.com/mongodb/mongo/blob/dbbabbdc0f3ef6cbb47500b40ae235c1258b741a/src/mongo/db/exec/sbe/values/value.cpp#L889-L929).
 
 ### [FilterStage::getNext()](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/filter.h#L127-L141)
 
@@ -290,11 +289,11 @@ Implements a join over an outer subplan and an inner subplan. Though it implemen
 Join algorithm, it is not necessarily used to implement a `$lookup` or even a traditional join,
 rather, it models a runtime loop. More precisely, for every call to `getNext()` on the outer stage,
 `LoopJoinStage` reopens the inner stage and calls `getNext()` on it. The inner stage is iterated on
-subsequent `getNext()` calls until `IS_EOF` is returned. This stage supports [Right, Left, and Outer
-Joins](https://github.com/mongodb/mongo/blob/dbbabbdc0f3ef6cbb47500b40ae235c1258b741a/src/mongo/db/exec/sbe/stages/loop_join.h#L47).
+subsequent `getNext()` calls until `IS_EOF` is returned. This stage supports
+[Right, Left, and Outer Joins](https://github.com/mongodb/mongo/blob/dbbabbdc0f3ef6cbb47500b40ae235c1258b741a/src/mongo/db/exec/sbe/stages/loop_join.h#L47).
 
-Note that slots from the outer stage can be made visible to [inner stage via
-LoopJoinStage::\_outerCorrelated](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/loop_join.cpp#L105-L107),
+Note that slots from the outer stage can be made visible to
+[inner stage via LoopJoinStage::\_outerCorrelated](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/loop_join.cpp#L105-L107),
 which adds said slots to the `CompileCtx` during `prepare()`. Conceptually, this is similar to the
 rules around scoped variables in for loops in many programming languages:
 
@@ -333,7 +332,8 @@ Indexes:
 db.alumni.find({"major" : "Computer Science", "year": 2020});
 ```
 
-The query plan chosen by the classic optimizer, represented as a `QuerySolution` tree, to answer this query is as follows:
+The query plan chosen by the classic optimizer, represented as a `QuerySolution` tree, to answer
+this query is as follows:
 
 ```
 {
@@ -369,9 +369,10 @@ The query plan chosen by the classic optimizer, represented as a `QuerySolution`
 }
 ```
 
-In particular, it is an `IXSCAN` over the `{"major": 1}` index, followed by a `FETCH` and a filter of
-`year = 2020`. The SBE plan (generated by the [SBE stage builder](../docs/sbe.md#sbe-stage-builders) with the [plan
-cache](#sbe-plan-cache) disabled) for this query plan is as follows:
+In particular, it is an `IXSCAN` over the `{"major": 1}` index, followed by a `FETCH` and a filter
+of `year = 2020`. The SBE plan (generated by the
+[SBE stage builder](../docs/sbe.md#sbe-stage-builders) with the [plan cache](#sbe-plan-cache)
+disabled) for this query plan is as follows:
 
 ```
 *** SBE runtime environment slots ***
@@ -406,8 +407,8 @@ at a point in time:
 Initially, all slots hold a value of `Nothing`. Note also that some slots have been omitted for
 brevity, namely, s3, s4, and s6 (which correspond to a `SnapshotId`, an index identifier and an
 index key pattern, respectively). These slots are used to implement the index key consistency and
-corruption checks and as such, are beyond the scope of this example (see the [yielding
-section](#yielding) for more information on these checks).
+corruption checks and as such, are beyond the scope of this example (see the
+[yielding section](#yielding) for more information on these checks).
 
 Execution starts by calling `getNext()` on the `filter` stage, which will call `getNext()` on its
 child `nlj` stage. `nlj` will call `getNext()` once on its outer child (the `ixseek` stage) before
@@ -454,14 +455,14 @@ to the reader.
 
 ## SBE Plan Cache
 
-There exists a plan cache for SBE; see the [relevant
-README](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/query/README.md#sbe-plan-cache)
+There exists a plan cache for SBE; see the
+[relevant README](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/query/README.md#sbe-plan-cache)
 for more details.
 
 ## Runtime Planners
 
-See [Classic Runtime Planners for SBE
-README](/src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/README.md).
+See
+[Classic Runtime Planners for SBE README](/src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/README.md).
 
 ## Incomplete Sections Below (TODO)
 

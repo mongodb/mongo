@@ -22,12 +22,12 @@ db.example.findOne({x: "string"});
 While different literal _values_ result in the same shape (matching `x` for 23 vs 53), different
 BSON _types_ of the literal are considered distinct shapes (matching `x` for 53 vs "string").
 
-The concept of a query shape exists not just for the find command, but for many of the CRUD
-commands (distinct, count, and aggregate). It also includes most (but not all) components of these
-commands, not just the query predicate (MatchExpression). In these ways, "query" is meant more
-generally. While some components included in the query shape are shared across the different types
-of commands (e.g., the "hint" field), some are unique. For example, a find command would include a
-`filter` while an aggregate command would have a `pipeline`.
+The concept of a query shape exists not just for the find command, but for many of the CRUD commands
+(distinct, count, and aggregate). It also includes most (but not all) components of these commands,
+not just the query predicate (MatchExpression). In these ways, "query" is meant more generally.
+While some components included in the query shape are shared across the different types of commands
+(e.g., the "hint" field), some are unique. For example, a find command would include a `filter`
+while an aggregate command would have a `pipeline`.
 
 You can see which components are considered part of the query shape or not for each specific shape
 type in their respective "shape component" classes, whose purpose is to determine which components
@@ -65,11 +65,11 @@ There are 3 different serialization options:
 - `kToDebugTypeString`: human readable format, type string of the literal is serialized
   - `{x: 5, y: "hello"}` -> `{x: "?number", y: "?string"}`
 - `kToRepresentativeParseableValue`: literal serialized to one canonical value for given type, which
-  must be parseable - `{x: 5, y: "hello"}` -> `{x: 1, y: "?"}` - An example of a query which is serialized differently due to the parseable requirement is `{x:
-{$regex: "^p.*"}}`. If we serialized the pattern as if it were a normal string we would end up
-  with `{x: {$regex: "?"}}` however `"?"` is not a valid regex pattern, so this would fail
-  parsing. Instead we will serialize it this way to maintain parseability, `{x: {$regex:
-"\\?"}}`, since `"\\?"` is valid regex.
+  must be parseable - `{x: 5, y: "hello"}` -> `{x: 1, y: "?"}` - An example of a query which is
+  serialized differently due to the parseable requirement is `{x: {$regex: "^p.*"}}`. If we
+  serialized the pattern as if it were a normal string we would end up with `{x: {$regex: "?"}}`
+  however `"?"` is not a valid regex pattern, so this would fail parsing. Instead we will serialize
+  it this way to maintain parseability, `{x: {$regex: "\\?"}}`, since `"\\?"` is valid regex.
 
 See [serialization_options.h](serialization_options.h) for more details.
 
@@ -85,4 +85,5 @@ transformed from user input.
 
 <!-- Links -->
 
-[query-stats-disambiguation]: /src/mongo/db/query/README_query_shape_disambiguation#query-stats-vs-query-shape-which-options-go-where
+[query-stats-disambiguation]:
+  /src/mongo/db/query/README_query_shape_disambiguation#query-stats-vs-query-shape-which-options-go-where

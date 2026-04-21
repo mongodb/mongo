@@ -28,7 +28,8 @@ Docker version <version> or later is required
 
 **Solution**
 
-Restart VSCode. If you install Rancher Desktop while you already have VSCode open, it doesn't properly detect the Docker socket and prompts you to install Docker Desktop by mistake.
+Restart VSCode. If you install Rancher Desktop while you already have VSCode open, it doesn't
+properly detect the Docker socket and prompts you to install Docker Desktop by mistake.
 
 ## Container Build Issues
 
@@ -48,7 +49,9 @@ Error response from daemon: invalid mount config for type "bind": bind source pa
 
 **Root Cause:**
 
-The devcontainer configuration mounts your `~/.ssh` directory to enable Git operations over SSH. If this directory doesn't exist on your host machine, the container fails to start. **This directory is required even if you plan to use HTTPS instead of SSH for cloning.**
+The devcontainer configuration mounts your `~/.ssh` directory to enable Git operations over SSH. If
+this directory doesn't exist on your host machine, the container fails to start. **This directory is
+required even if you plan to use HTTPS instead of SSH for cloning.**
 
 **Solutions:**
 
@@ -73,7 +76,8 @@ SSH agent forwarding behavior varies by Docker provider on macOS:
   - With dockerd runtime: Automatic agent forwarding
   - With containerd runtime: Agent forwarding requires additional setup
 
-To use SSH agent forwarding, ensure your SSH keys are added to your host's SSH agent before starting the container:
+To use SSH agent forwarding, ensure your SSH keys are added to your host's SSH agent before starting
+the container:
 
 ```bash
 ssh-add ~/.ssh/id_ed25519  # or your key name
@@ -117,7 +121,8 @@ Error: failed to solve: write /var/lib/docker/...: no space left on device
       disk: 100GB
       ```
    4. Start Rancher Desktop
-   5. If Rancher Desktop was previously initialized, you may need to perform a factory reset (Preferences → Troubleshooting → Reset Kubernetes) for the disk size change to take effect.
+   5. If Rancher Desktop was previously initialized, you may need to perform a factory reset
+      (Preferences → Troubleshooting → Reset Kubernetes) for the disk size change to take effect.
 
    **On Windows (WSL2):**
 
@@ -125,7 +130,8 @@ Error: failed to solve: write /var/lib/docker/...: no space left on device
 
    1. Stop Rancher Desktop
    2. Run: `wsl --shutdown`
-   3. Follow Microsoft's guide to increase WSL2 disk size: https://learn.microsoft.com/en-us/windows/wsl/disk-space
+   3. Follow Microsoft's guide to increase WSL2 disk size:
+      https://learn.microsoft.com/en-us/windows/wsl/disk-space
 
    **Docker Desktop:**
 
@@ -174,7 +180,8 @@ Error: Failed to download toolchain
    curl -I "$(grep TOOLCHAIN_URL .devcontainer/toolchain_config.env | cut -d'"' -f2)"
    ```
 
-3. **If toolchain URL is broken**, report it to the MongoDB team. This is a devcontainer configuration issue that needs to be fixed upstream.
+3. **If toolchain URL is broken**, report it to the MongoDB team. This is a devcontainer
+   configuration issue that needs to be fixed upstream.
 
 ### Build Fails with Checksum Mismatch
 
@@ -203,7 +210,8 @@ Got: def456...
    # Command Palette → "Dev Containers: Rebuild Container Without Cache"
    ```
 
-3. **If problem persists**, this is likely a devcontainer configuration issue - report it to the MongoDB team.
+3. **If problem persists**, this is likely a devcontainer configuration issue - report it to the
+   MongoDB team.
 
 ### Container Fails to Start
 
@@ -288,11 +296,9 @@ Got: def456...
 - File save is delayed
 - Terminal autocomplete is slow
 
-**Root Cause:**
-Bind mounts on macOS use osxfs which has high latency for filesystem operations.
+**Root Cause:** Bind mounts on macOS use osxfs which has high latency for filesystem operations.
 
-**Solution:**
-✅ **Use named volumes instead of bind mounts** (see Getting Started guide)
+**Solution:** ✅ **Use named volumes instead of bind mounts** (see Getting Started guide)
 
 ### High CPU Usage
 
@@ -517,7 +523,8 @@ fatal: Could not read from remote repository.
    ssh-add ~/.ssh/id_ed25519  # or id_rsa
    ```
 
-See [Getting Started - SSH Setup](./getting-started.md#4-configure-ssh-keys-recommended) for detailed instructions.
+See [Getting Started - SSH Setup](./getting-started.md#4-configure-ssh-keys-recommended) for
+detailed instructions.
 
 ### SSH Works on Host But Not in Container
 
@@ -527,8 +534,7 @@ See [Getting Started - SSH Setup](./getting-started.md#4-configure-ssh-keys-reco
 - Same operations fail inside devcontainer
 - "Permission denied" or asks for password
 
-**Root Cause:**
-SSH agent forwarding isn't working properly.
+**Root Cause:** SSH agent forwarding isn't working properly.
 
 **Solutions:**
 
@@ -633,8 +639,7 @@ git config --global credential.helper store
 # Next time you enter credentials, they'll be saved
 ```
 
-**Option 3: Fix SSH agent forwarding**:
-See "SSH Works on Host But Not in Container" section above.
+**Option 3: Fix SSH agent forwarding**: See "SSH Works on Host But Not in Container" section above.
 
 ### Multiple SSH Keys (Personal + Work)
 
@@ -868,8 +873,7 @@ ModuleNotFoundError: No module named 'pymongo'
 - History cleared
 - Python venv empty
 
-**Root Cause:**
-Volumes not mounting correctly
+**Root Cause:** Volumes not mounting correctly
 
 **Solutions:**
 
@@ -917,8 +921,8 @@ docker cp <container_id>:/workspaces/mongo/file.txt ~/Downloads/
 # Right-click file → Download...
 ```
 
-**To edit with external tools:**
-Use bind mounts instead of named volumes (but sacrifices performance).
+**To edit with external tools:** Use bind mounts instead of named volumes (but sacrifices
+performance).
 
 ### Volume Fills Up Disk
 
@@ -1070,8 +1074,7 @@ permission denied while trying to connect to Docker daemon
 - Slow builds
 - Out of memory errors
 
-**Solution:**
-Go to Docker Desktop → Settings → Resources and allocate generously:
+**Solution:** Go to Docker Desktop → Settings → Resources and allocate generously:
 
 - **CPUs**: Allocate as many as possible (leave 1-2 for host OS)
 - **Memory**: Allocate as much as possible (leave ~4-8 GB for host OS)
@@ -1087,8 +1090,7 @@ Go to Docker Desktop → Settings → Resources and allocate generously:
 - Docker-outside-of-docker doesn't work
 - Volume mounts fail
 
-**Solution:**
-OrbStack has some limitations with devcontainer features. Try:
+**Solution:** OrbStack has some limitations with devcontainer features. Try:
 
 1. Update to latest OrbStack version
 2. Check OrbStack documentation for devcontainer compatibility
@@ -1177,7 +1179,8 @@ cd mongo
 
 If your issue isn't covered here:
 
-1. **Check VS Code Docs**: [code.visualstudio.com/docs/devcontainers](https://code.visualstudio.com/docs/devcontainers/containers)
+1. **Check VS Code Docs**:
+   [code.visualstudio.com/docs/devcontainers](https://code.visualstudio.com/docs/devcontainers/containers)
 2. **Search Issues**: MongoDB GitHub repository issues
 3. **Ask the Team**: MongoDB developers Slack/chat
 4. **File a Bug**: Include:

@@ -19,15 +19,22 @@ Use VSCode's Debugger UI with resmoke's `--jsdbg` flag.
   - Continue to the next breakpoint
 - **REPL**
   - Use the Debug Console to inspect/modify variables and evaluate expressions
-  - debugger; statements will pause at the terminal for user input, to inspect/modify variables and evaluate expressions.
+  - debugger; statements will pause at the terminal for user input, to inspect/modify variables and
+    evaluate expressions.
 
 ### Limitations
 
-- Step functionality (step, step in, step out) is not supported. Each currently redirects to the Continue functionality.
+- Step functionality (step, step in, step out) is not supported. Each currently redirects to the
+  Continue functionality.
 - Watching variables is not supported.
-- Deeply nested variables are truncated in the Variables sidebar display, with only 1 level of expansion. Use the Debug Console to inspect more. See [SERVER-121664](https://jira.mongodb.org/browse/SERVER-121664).
-- Breakpoints set while the shell is paused take effect immediately. Breakpoints set while the shell is running will apply the next time a breakpoint is hit (the shell is not interrupted mid-execution).
-- The debugger uses port 9229, the default Chrome debugging port. Any open Chrome debuggers (eg. Developer Tools open in a Chrome tab) will conflict with this VSCode Debugger.
+- Deeply nested variables are truncated in the Variables sidebar display, with only 1 level of
+  expansion. Use the Debug Console to inspect more. See
+  [SERVER-121664](https://jira.mongodb.org/browse/SERVER-121664).
+- Breakpoints set while the shell is paused take effect immediately. Breakpoints set while the shell
+  is running will apply the next time a breakpoint is hit (the shell is not interrupted
+  mid-execution).
+- The debugger uses port 9229, the default Chrome debugging port. Any open Chrome debuggers (eg.
+  Developer Tools open in a Chrome tab) will conflict with this VSCode Debugger.
 
 ## Install
 
@@ -69,7 +76,8 @@ Extension 'mongo-shell-debugger-1.0.0.vsix' was successfully installed.
 2. Add a breakpoint next to the line number (a red dot)
 3. Start the debugger. Either:
    - Press F5 while in a JS file to start the (VSCode) debug server, or
-   - In the "Run and Debug" side bar, choose "Attach to MongoDB Shell" in the dropdown, and click the play button.
+   - In the "Run and Debug" side bar, choose "Attach to MongoDB Shell" in the dropdown, and click
+     the play button.
      > You should see the following in the "Debug Console" of VSCode:
    ```
    Debug server listening on port 9229
@@ -137,16 +145,16 @@ Extension 'mongo-shell-debugger-1.0.0.vsix' was successfully installed.
 
 **Breakpoints set before shell connects**
 
-session.js stores breakpoints as `Breakpoint` objects with locally-assigned IDs and responds
-to VSCode immediately with unverified status. When the shell connects, step 4 above delivers
-them all. The shell responds with verified status, and session.js emits `BreakpointEvent("changed")`
-using the same IDs so VSCode updates the gutter indicators.
+session.js stores breakpoints as `Breakpoint` objects with locally-assigned IDs and responds to
+VSCode immediately with unverified status. When the shell connects, step 4 above delivers them all.
+The shell responds with verified status, and session.js emits `BreakpointEvent("changed")` using the
+same IDs so VSCode updates the gutter indicators.
 
 **Breakpoints set after shell connects**
 
-`setBreakpoints` is forwarded to the shell immediately. The shell applies them retroactively
-to any already-loaded scripts (via `debugger.findScripts()`) and to any scripts that load in
-the future (via `onNewScript`). The shell's response is passed directly back to VSCode.
+`setBreakpoints` is forwarded to the shell immediately. The shell applies them retroactively to any
+already-loaded scripts (via `debugger.findScripts()`) and to any scripts that load in the future
+(via `onNewScript`). The shell's response is passed directly back to VSCode.
 
 **Breakpoint Hit**
 
@@ -173,17 +181,19 @@ Newline-delimited JSON over TCP, eg:
 - Main compartment: runs user JS, is observed by Debugger
 - Debugger compartment: owns Debugger instance, separate from debuggee
 
-> MozJS prohibits compartment "re-entry": we can spin-wait in JS and call C++, but that can't call back into JS execution. It can get/set properties, but it can't invoke any execution.
+> MozJS prohibits compartment "re-entry": we can spin-wait in JS and call C++, but that can't call
+> back into JS execution. It can get/set properties, but it can't invoke any execution.
 
 **Breakpoint Mechanism**
 
-`_breakpoints` (source URL → set of line numbers) is the canonical server-side state. It is
-always up to date regardless of when breakpoints were set.
+`_breakpoints` (source URL → set of line numbers) is the canonical server-side state. It is always
+up to date regardless of when breakpoints were set.
 
-- **New scripts**: `onNewScript` fires, reads from `_breakpoints`, calls `script.setBreakpoint(offset, {hit: handler})`
+- **New scripts**: `onNewScript` fires, reads from `_breakpoints`, calls
+  `script.setBreakpoint(offset, {hit: handler})`
 - **Already-loaded scripts**: when `setBreakpoints` arrives while running, the URL is queued in
-  `_pendingBPUpdateUrls`. The shared `__spinwait` (defined in `helpers.js`) detects this flag
-  while paused in any scenario (breakpoint hit, exception, or `debugger;` statement), calls
+  `_pendingBPUpdateUrls`. The shared `__spinwait` (defined in `helpers.js`) detects this flag while
+  paused in any scenario (breakpoint hit, exception, or `debugger;` statement), calls
   `debugger.findScripts({url})`, clears stale breakpoints, and re-applies the current set.
 - **Hit handler**: stores location, invokes C++ pause logic, then calls shared `__spinwait`
 

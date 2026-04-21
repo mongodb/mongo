@@ -62,13 +62,15 @@ To ensure new commits don’t introduce breaking changes to the current API vers
 [compatibility checker script](https://github.com/mongodb/mongo/blob/6aaad044a819a50a690b932afeda9aa278ba0f2e/buildscripts/idl/idl_check_compatibility.py).
 All commands in a stable API version must specify their inputs and outputs in IDL to be
 compatibility checked (the only exception is the `explain` command whose output is not part of API
-V1). As a side note, many command implementations derive from `TypedCommand`, which ensures
-that the implementation uses the IDL spec.
+V1). As a side note, many command implementations derive from `TypedCommand`, which ensures that the
+implementation uses the IDL spec.
 
-The compatibility checker script compares IDL files from the new commit against both the base
-commit and all [releases](https://github.com/mongodb/mongo/blob/10439de079b03a981ead7f5566e6f539a6f9becd/buildscripts/idl/checkout_idl_files_from_past_releases.py)
-from 5.0.0 onwards. This compatibility checker script will run in evergreen patch builds
-and in the commit queue. The script that evergreen runs is [here](https://github.com/mongodb/mongo/blob/4594ea6598ce28d01c5c5d76164b1cfeeba1494f/evergreen/check_idl_compat.sh).
+The compatibility checker script compares IDL files from the new commit against both the base commit
+and all
+[releases](https://github.com/mongodb/mongo/blob/10439de079b03a981ead7f5566e6f539a6f9becd/buildscripts/idl/checkout_idl_files_from_past_releases.py)
+from 5.0.0 onwards. This compatibility checker script will run in evergreen patch builds and in the
+commit queue. The script that evergreen runs is
+[here](https://github.com/mongodb/mongo/blob/4594ea6598ce28d01c5c5d76164b1cfeeba1494f/evergreen/check_idl_compat.sh).
 
 ### Running the Compatibility Checker Locally
 
@@ -97,10 +99,10 @@ python buildscripts/idl/idl_check_compatibility.py -v --old-include idls/r6.0.3/
 Query Optimization Team._**
 
 Adding a new IDL command requires the `api_version` field, which indicates which Stable API version
-this command is in. **_By default, the `api_version` field should be `""`._** Only if you are adding the
-command to the Stable API, then `api_version` should be the API version you are adding it to
-(currently `"1"`). **_By adding it to the Stable API, this means you cannot remove this
-command within this API version._**
+this command is in. **_By default, the `api_version` field should be `""`._** Only if you are adding
+the command to the Stable API, then `api_version` should be the API version you are adding it to
+(currently `"1"`). **_By adding it to the Stable API, this means you cannot remove this command
+within this API version._**
 
 Adding a new command parameter or reply field requires the `stability` field. This field indicates
 whether the command parameter/reply field is part of the Stable API. There are three options for
@@ -111,11 +113,12 @@ Only if the field should be added to the Stable API, then you should mark the fi
 `stability: stable`in IDL. Additionally, in `idl_check_compatibility.py` you must add the field to
 the `ALLOWED_STABLE_FIELDS_LIST`. This list was added so that engineers are aware that by making a
 field part of the stable API, **_the field cannot be changed in any way that would violate the
-Stable API guidelines_** (see [above](/src/mongo/db/STABLE_API_README.md#compatibility)).
-Crucially, this means the field **_cannot be removed or changed to `stability: unstable` or
+Stable API guidelines_** (see [above](/src/mongo/db/STABLE_API_README.md#compatibility)). Crucially,
+this means the field **_cannot be removed or changed to `stability: unstable` or
 `stability: internal`_** while we are in the current API version.
 
-The format of adding a field to the list is `<command_name>-<command_param_or_reply_field>-<field_name>`.
+The format of adding a field to the list is
+`<command_name>-<command_param_or_reply_field>-<field_name>`.
 
 ### `stability: unstable` vs. `stability: internal`
 
@@ -131,9 +134,9 @@ should be marked as `stability: internal`.
 
 ### `IGNORE_STABLE_TO_UNSTABLE_LIST`
 
-The `IGNORE_STABLE_TO_UNSTABLE_LIST` exists because there have been cases where a field was added
-to the Stable API accidentally, and since the field was strictly internal / not documented to users,
-we changed the field to be unstable. (Note that these kinds of changes have to go through the same
+The `IGNORE_STABLE_TO_UNSTABLE_LIST` exists because there have been cases where a field was added to
+the Stable API accidentally, and since the field was strictly internal / not documented to users, we
+changed the field to be unstable. (Note that these kinds of changes have to go through the same
 approval process.) Normally changing a field from `stability: stable` to `stability: unstable` or
 `stability: internal` would throw an error, so the `IGNORE_STABLE_TO_UNSTABLE_LIST` acts as an allow
 list for these exceptions.
@@ -144,12 +147,13 @@ reviewed by the Query Optimization Team._**
 ### The BSON serialization `any` type
 
 The `bson_serialization_type` is used to define the BSON type that an IDL field will serialize to.
-In some cases, we need custom serializers defined in C++ to perform more complex logic,
-such as validating the given type or accepting multiple types for the field. If we use these custom
+In some cases, we need custom serializers defined in C++ to perform more complex logic, such as
+validating the given type or accepting multiple types for the field. If we use these custom
 serializers, we specify the `bson_serialization_type` to be `any`. However, the compatibility
-checker script can’t type check `any` , since the main logic for the type exists outside of the
-IDL file. As many commands have valid reasons for using type `any`, we do not restrict usage.
-Instead, the command must be added to an [allowlist](https://github.com/mongodb/mongo/blob/6aaad044a819a50a690b932afeda9aa278ba0f2e/buildscripts/idl/idl_check_compatibility.py#L52).
+checker script can’t type check `any` , since the main logic for the type exists outside of the IDL
+file. As many commands have valid reasons for using type `any`, we do not restrict usage. Instead,
+the command must be added to an
+[allowlist](https://github.com/mongodb/mongo/blob/6aaad044a819a50a690b932afeda9aa278ba0f2e/buildscripts/idl/idl_check_compatibility.py#L52).
 This also applies to any fields marked as `stability: unstable`. This is to prevent unexpected
 errors when modifying a field from `stability: unstable` to `stability: stable`. By intentionally
 opting in, we assume the implementer understands the implications and has valid reasons to use

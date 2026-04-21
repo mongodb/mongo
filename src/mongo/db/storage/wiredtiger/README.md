@@ -4,8 +4,9 @@
 
 Creating a collection (record store) or index requires two WT operations that cannot be made
 atomic/transactional. A WT table must be created with
-[WT_SESSION::create](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a358ca4141d59c345f401c58501276bbb "WiredTiger Docs") and an insert/update must be made in the \_mdb_catalog table (MongoDB's
-catalog). MongoDB orders these as such:
+[WT_SESSION::create](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a358ca4141d59c345f401c58501276bbb "WiredTiger Docs")
+and an insert/update must be made in the \_mdb_catalog table (MongoDB's catalog). MongoDB orders
+these as such:
 
 1. Create the WT table
 1. Update \_mdb_catalog to reference the table
@@ -25,8 +26,8 @@ indistinguishable from the creation case, establishing a strong invariant.
 
 # Checkpoints
 
-The WiredTiger storage engine [supports
-checkpoints](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L443-L647)
+The WiredTiger storage engine
+[supports checkpoints](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L443-L647)
 , which are a read-only, static view of one or more data sources. When WiredTiger takes a
 checkpoint, it writes all of the data in a snapshot to the disk in a consistent way across all of
 the data files.
@@ -34,25 +35,29 @@ the data files.
 To avoid taking unnecessary checkpoints on an idle server, WiredTiger will only take checkpoints for
 the following scenarios:
 
-- When the [stable timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary) is greater than or
-  equal to the [initial data timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary), we take a
+- When the [stable timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary) is
+  greater than or equal to the
+  [initial data timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary), we take a
   stable checkpoint, which is a durable view of the data at a particular timestamp. This is for
   steady-state replication.
-- The [initial data timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary) is not set, so we
-  must take a full checkpoint. This is when there is no consistent view of the data, such as during
-  initial sync.
+- The [initial data timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary) is not
+  set, so we must take a full checkpoint. This is when there is no consistent view of the data, such
+  as during initial sync.
 
 Not only does checkpointing provide us with durability for the database, but it also enables us to
 take [backups of the data](/src/mongo/db/storage/README.md#file-system-backups).
 
 When WiredTiger takes a checkpoint, it uses the
-[`stable_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L2011 "Github") (effectively a `read_timestamp`) for what data should be persisted in the checkpoint.
-Every "data write" (collection/index contents, \_mdb_catalog contents) corresponding to an oplog
-entry with a timestamp <= the `stable_timestamp` will be included in this checkpoint. None of the
-data writes later than the `stable_timestamp` are included in the checkpoint. When the checkpoint is
-completed, the `stable_timestamp` is known as the checkpoint's
-[`checkpoint_timestamp`](https://github.com/mongodb/mongo/blob/834a3c49d9ea9bfe2361650475158fc0dbb374cd/src/third_party/wiredtiger/src/meta/meta_ckpt.c#L921 "Github"). When WiredTiger starts up on a checkpoint, that checkpoint's timestamp is known as the
-[`recovery_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L684 "Github"). The recovery timestamp is used for Replication startup recovery.
+[`stable_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L2011 "Github")
+(effectively a `read_timestamp`) for what data should be persisted in the checkpoint. Every "data
+write" (collection/index contents, \_mdb_catalog contents) corresponding to an oplog entry with a
+timestamp <= the `stable_timestamp` will be included in this checkpoint. None of the data writes
+later than the `stable_timestamp` are included in the checkpoint. When the checkpoint is completed,
+the `stable_timestamp` is known as the checkpoint's
+[`checkpoint_timestamp`](https://github.com/mongodb/mongo/blob/834a3c49d9ea9bfe2361650475158fc0dbb374cd/src/third_party/wiredtiger/src/meta/meta_ckpt.c#L921 "Github").
+When WiredTiger starts up on a checkpoint, that checkpoint's timestamp is known as the
+[`recovery_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L684 "Github").
+The recovery timestamp is used for Replication startup recovery.
 
 # Journaling
 
@@ -64,15 +69,12 @@ however, MongoDB does not create the `local.oplog.rs` collection and all collect
 
 Code links:
 
-- [_Code that ultimately calls flush journal on
-  WiredTiger_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/wiredtiger/wiredtiger_session_cache.cpp#L241-L362)
+- [_Code that ultimately calls flush journal on WiredTiger_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/wiredtiger/wiredtiger_session_cache.cpp#L241-L362)
   - Skips flushing if ephemeral mode engine; may do a journal flush or take a checkpoint depending
     on server settings.
-- [_Control of whether journaling is
-  enabled_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h#L451)
+- [_Control of whether journaling is enabled_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h#L451)
   - 'durable' confusingly means journaling is enabled.
-- [_Whether WT journals a
-  collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
+- [_Whether WT journals a collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
 
 # Startup Recovery
 
@@ -82,7 +84,8 @@ its entries are to re-insert items into MongoDB's oplog collection.
 
 ## Rollback to Stable
 
-Rollback-to-stable is an operation that retains only modifications that are considered stable. In other words, we are rolling back to the latest checkpoint.
+Rollback-to-stable is an operation that retains only modifications that are considered stable. In
+other words, we are rolling back to the latest checkpoint.
 
 The Replication and Storage Engine integration layers kill all user operations and all internal
 threads that could access the storage engine. This is necessary because
@@ -99,8 +102,8 @@ threads are restarted, and two-phase index builds are resumed.
 See [here](https://source.wiredtiger.com/develop/arch-rts.html) for WiredTiger's architecture guide
 on rollback-to-stable.
 
-See [here](/src/mongo/db/repl/README.md#rollback-recover-to-a-timestamp-rtt) for more information on what
-happens in the replication layer during rollback-to-stable.
+See [here](/src/mongo/db/repl/README.md#rollback-recover-to-a-timestamp-rtt) for more information on
+what happens in the replication layer during rollback-to-stable.
 
 ## Repair
 
@@ -120,8 +123,8 @@ MongoDB repair attempts to address the following forms of corruption:
 - Missing WiredTiger data files
   - Includes all collections, `_mdb_catalog`, and `sizeStorer`
 - Index inconsistencies
-  - Validate [repair mode](/src/mongo/db/validate/README.md#repair-mode) attempts to fix index inconsistencies to avoid a full index
-    rebuild.
+  - Validate [repair mode](/src/mongo/db/validate/README.md#repair-mode) attempts to fix index
+    inconsistencies to avoid a full index rebuild.
   - Indexes are rebuilt on collections after they have been salvaged or if they fail validation and
     validate repair mode is unable to fix all errors.
 - Un-salvageable collection data files
@@ -137,28 +140,26 @@ MongoDB repair attempts to address the following forms of corruption:
 
 1. Initialize the WiredTigerKVEngine. If a call to `wiredtiger_open` returns the `WT_TRY_SALVAGE`
    error code, this indicates there is some form of corruption in the WiredTiger metadata. Attempt
-   to [salvage the
-   metadata](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1046-L1071)
+   to
+   [salvage the metadata](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1046-L1071)
    by using the WiredTiger `salvage=true` configuration option.
-2. Initialize the StorageEngine and [salvage the `_mdb_catalog` table, if
-   needed](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L95).
+2. Initialize the StorageEngine and
+   [salvage the `_mdb_catalog` table, if needed](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L95).
 3. Recover orphaned collections.
-   - If an [ident](/src/mongo/db/storage/README.md#glossary) is known to WiredTiger but is not present in the `_mdb_catalog`,
-     [create a new
-     collection](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L145-L189)
+   - If an [ident](/src/mongo/db/storage/README.md#glossary) is known to WiredTiger but is not
+     present in the `_mdb_catalog`,
+     [create a new collection](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L145-L189)
      with the prefix `local.orphan.<ident-name>` that references this ident.
-   - If an ident is present in the `_mdb_catalog` but not known to WiredTiger, [attempt to recover
-     the
-     ident](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L197-L229).
-     This [procedure for orphan
-     recovery](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605)
+   - If an ident is present in the `_mdb_catalog` but not known to WiredTiger,
+     [attempt to recover the ident](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L197-L229).
+     This
+     [procedure for orphan recovery](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605)
      is a less reliable and more invasive. It involves moving the corrupt data file to a temporary
      file, creates a new table with the same name, replaces the original data file over the new one,
      and
      [salvages](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605)
      the table in attempt to reconstruct the table.
-4. [Verify collection data
-   files](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1195-L1226),
+4. [Verify collection data files](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1195-L1226),
    and salvage if necessary.
    - If call to WiredTiger
      [verify()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a0334da4c85fe8af4197c9a7de27467d3)
@@ -166,38 +167,36 @@ MongoDB repair attempts to address the following forms of corruption:
      [salvage()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#ab3399430e474f7005bd5ea20e6ec7a8e),
      which recovers as much data from a WT data file as possible.
    - If a salvage is unsuccessful, rename the data file with a `.corrupt` suffix.
-   - If a data file is missing or a salvage was unsuccessful, [drop the original table from the
-     metadata, and create a new, empty
-     table](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1262-L1274)
+   - If a data file is missing or a salvage was unsuccessful,
+     [drop the original table from the metadata, and create a new, empty table](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1262-L1274)
      under the original name. This allows MongoDB to continue to start up despite present
      corruption.
-   - After any salvage operation, [all indexes are
-     rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L134-L149)
+   - After any salvage operation,
+     [all indexes are rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L134-L149)
      for that collection.
 5. Validate collection and index consistency
-   - [Collection validation](/src/mongo/db/validate/README.md) checks for consistency between the collection
-     and indexes. Validate repair mode attempts to fix any inconsistencies it finds.
+   - [Collection validation](/src/mongo/db/validate/README.md) checks for consistency between the
+     collection and indexes. Validate repair mode attempts to fix any inconsistencies it finds.
 6. Rebuild indexes
    - If a collection's data has been salvaged or any index inconsistencies are not repairable by
-     validate repair mode, [all indexes are
-     rebuilt](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/repair.cpp#L273-L275).
+     validate repair mode,
+     [all indexes are rebuilt](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/repair.cpp#L273-L275).
    - While a unique index is being rebuilt, if any documents are found to have duplicate keys, then
      those documents are inserted into a lost and found collection with the format
      `local.lost_and_found.<collection UUID>`.
-7. [Invalidate the replica set
-   configuration](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L460-L485)
-   if data has been or could have been modified. This [prevents a repaired node from
-   joining](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L486-L494)
+7. [Invalidate the replica set configuration](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L460-L485)
+   if data has been or could have been modified. This
+   [prevents a repaired node from joining](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L486-L494)
    and threatening the consistency of its replica set.
 
 Additionally:
 
 - When repair starts, it creates a temporary file, `_repair_incomplete` that is only removed when
-  repair completes. The server [will not start up
-  normally](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_init.cpp#L82-L86)
+  repair completes. The server
+  [will not start up normally](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_init.cpp#L82-L86)
   as long as this file is present.
-- Repair [will restore a
-  missing](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L434)
+- Repair
+  [will restore a missing](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L434)
   `featureCompatibilityVersion` document in the `admin.system.version` to the lower FCV version
   available.
 
@@ -208,19 +207,25 @@ The oplog collection can be truncated both at the front end (most recent entries
 be deleted when new writes increase the collection size past the cap. MongoDB using the WiredTiger
 storage engine with `--replSet` handles oplog collection deletion specially via
 OplogTruncateMarkers, an oplog specific implementation of the
-[CollectionTruncateMarkers](/src/mongo/db/storage/README.md#collectionTruncateMarkers) mechanism, ignoring the generic capped
-collection deletion mechanism. The front of the oplog may be truncated back to a particular
-timestamp during replication startup recovery or replication rollback.
+[CollectionTruncateMarkers](/src/mongo/db/storage/README.md#collectionTruncateMarkers) mechanism,
+ignoring the generic capped collection deletion mechanism. The front of the oplog may be truncated
+back to a particular timestamp during replication startup recovery or replication rollback.
 
 A new truncate marker is created when the in-progress marker segment contains more than the minimum
 bytes needed to complete the segment; and the oldest truncate marker's oplog is deleted when the
 oplog size exceeds its cap size setting.
 
-Oplog sampling operates in two modes: asynchronous and synchronous. By default, it uses asynchronous mode, where oplog sampling and initial marker generation happen in the background as part of the OplogCapMaintainer thread. This setup ensures that startup is not blocked and oplog reads and writes are available during tartup. Until the initial marker generation is complete, no new truncate markers can be created for these new oplog writes.
+Oplog sampling operates in two modes: asynchronous and synchronous. By default, it uses asynchronous
+mode, where oplog sampling and initial marker generation happen in the background as part of the
+OplogCapMaintainer thread. This setup ensures that startup is not blocked and oplog reads and writes
+are available during tartup. Until the initial marker generation is complete, no new truncate
+markers can be created for these new oplog writes.
 
-Asynchronous mode offers better performance, allowing faster startups and restarts while improving overall node availability. One potential trade-off to consider is the possible increased disk usage.
+Asynchronous mode offers better performance, allowing faster startups and restarts while improving
+overall node availability. One potential trade-off to consider is the possible increased disk usage.
 
-You can switch between asynchronous and synchronous modes by adjusting the OplogSamplingAsyncEnabled server parameter.
+You can switch between asynchronous and synchronous modes by adjusting the OplogSamplingAsyncEnabled
+server parameter.
 
 Oplog sampling and marker generation is skipped when using `--restore` or `--magicRestore`.
 
@@ -249,8 +254,8 @@ cleared. On unclean shutdown, however, parallel writes can be active and therefo
 exist. MongoDB allows secondaries to read their sync source's oplog as soon as there are no
 _in-memory_ oplog holes, ensuring data consistency on the secondaries. Primaries, therefore, can
 allow oplog entries to be replicated and then lose that data themselves, in an unclean shutdown,
-before the replicated oplog entries become persisted. Primaries use the `oplogTruncateAfterPoint`
-to continually track oplog holes on disk in order to eliminate them after an unclean shutdown.
+before the replicated oplog entries become persisted. Primaries use the `oplogTruncateAfterPoint` to
+continually track oplog holes on disk in order to eliminate them after an unclean shutdown.
 Additionally, secondaries apply batches of oplog entries out of order and similarly must use the
 `oplogTruncateAfterPoint` to track batch boundaries in order to avoid unknown oplog holes after an
 unclean shutdown.
@@ -263,33 +268,35 @@ where we handle errors from WiredTiger and convert to MongoDB errors.
 
 # Cherry-picked WT log Details
 
-- The WT log is a write ahead log. Before a [transaction commit](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a712226eca5ade5bd123026c624468fa2 "WiredTiger Docs") returns to the application, logged writes
-  must have their log entry bytes written into WiredTiger's log buffer. Depending on `sync` setting,
-  those bytes may or may not be on disk.
+- The WT log is a write ahead log. Before a
+  [transaction commit](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a712226eca5ade5bd123026c624468fa2 "WiredTiger Docs")
+  returns to the application, logged writes must have their log entry bytes written into
+  WiredTiger's log buffer. Depending on `sync` setting, those bytes may or may not be on disk.
 - MongoDB only chooses to log writes to a subset of WT's tables (e.g: the oplog).
-- MongoDB does not `sync` the log on transaction commit. But rather uses the [log
-  flush](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a1843292630960309129dcfe00e1a3817 "WiredTiger Docs") API. This optimization is two-fold. Writes that do not require to be
-  persisted do not need to wait for durability on disk. Second, this pattern allows for batching
-  of writes to go to disk for improved throughput.
+- MongoDB does not `sync` the log on transaction commit. But rather uses the
+  [log flush](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a1843292630960309129dcfe00e1a3817 "WiredTiger Docs")
+  API. This optimization is two-fold. Writes that do not require to be persisted do not need to wait
+  for durability on disk. Second, this pattern allows for batching of writes to go to disk for
+  improved throughput.
 - WiredTiger's log is similar to MongoDB's oplog in that multiple writers can concurrently copy
-  their bytes representing a log record into WiredTiger's log buffer similar to how multiple
-  MongoDB writes can concurrently generate oplog entries.
-- MongoDB's optime generator for the oplog is analogous to WT's LSN (log sequence number)
-  generator. Both are a small critical section to ensure concurrent writes don't get the same
-  timestamp key/memory address to write an oplog entry value/log bytes into.
+  their bytes representing a log record into WiredTiger's log buffer similar to how multiple MongoDB
+  writes can concurrently generate oplog entries.
+- MongoDB's optime generator for the oplog is analogous to WT's LSN (log sequence number) generator.
+  Both are a small critical section to ensure concurrent writes don't get the same timestamp
+  key/memory address to write an oplog entry value/log bytes into.
 - While MongoDB's oplog writes are logical (the key is a timestamp), WT's are obviously more
-  physical (the key is a memory->disk location). WiredTiger is writing to a memory buffer. Thus before a
-  transaction commit can go to the log buffer to "request a slot", it must know how many bytes it's
-  going to write. Compare this to a multi-statement transaction replicating as a single applyOps
-  versus each statement generating an individual oplog entry for each write that's part of the
-  transaction.
-- MongoDB testing sometimes uses a [WT debugging
-  option](https://github.com/mongodb/mongo/blob/a7bd84dc5ad15694864526612bceb3877672d8a9/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L601 "Github") that will write "no-op" log entries for other operations performed on a
-  transaction. Such as setting a timestamp or writing to a table that is not configured to be
-  written to WT's log (e.g: a typical user collection and index).
+  physical (the key is a memory->disk location). WiredTiger is writing to a memory buffer. Thus
+  before a transaction commit can go to the log buffer to "request a slot", it must know how many
+  bytes it's going to write. Compare this to a multi-statement transaction replicating as a single
+  applyOps versus each statement generating an individual oplog entry for each write that's part of
+  the transaction.
+- MongoDB testing sometimes uses a
+  [WT debugging option](https://github.com/mongodb/mongo/blob/a7bd84dc5ad15694864526612bceb3877672d8a9/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L601 "Github")
+  that will write "no-op" log entries for other operations performed on a transaction. Such as
+  setting a timestamp or writing to a table that is not configured to be written to WT's log (e.g: a
+  typical user collection and index).
 
-The most important WT log entry for MongoDB is one that represents an insert into the
-oplog.
+The most important WT log entry for MongoDB is one that represents an insert into the oplog.
 
 ```
   { "lsn" : [1,57984],
@@ -318,9 +325,9 @@ oplog.
   }
 ```
 
-- `lsn` is a log sequence number. The WiredTiger log files are named with numbers as a
-  suffix, e.g: `WiredTigerLog.0000000001`. In this example, the LSN's first value `1` maps to log
-  file `0000000001`. The second value `57984` is the byte offset in the file.
+- `lsn` is a log sequence number. The WiredTiger log files are named with numbers as a suffix, e.g:
+  `WiredTigerLog.0000000001`. In this example, the LSN's first value `1` maps to log file
+  `0000000001`. The second value `57984` is the byte offset in the file.
 - `hdr_flags` stands for header flags. Think HTTP headers. MongoDB configures WiredTiger to use
   snappy compression on its journal entries. Small journal entries (< 128 bytes?) won't be
   compressed.
@@ -332,11 +339,11 @@ oplog.
 - `ops` is a list of operations that are part of the transaction. A transaction that inserts two
   documents and removes a third will see three entries. Two `row_put` operations followed by a
   `row_remove`.
-- `ops.fileid` refers to the WT table that the operation is performed against. The fileid mapping
-  is held in the `WiredTiger.wt` file (a table within itself). This value is faked for WT's
-  logging debug mode for tables which MongoDB is not logging.
-- `ops.key` and `ops.value` are the binary representations of the inserted document (`value` is omitted
-  for removal).
+- `ops.fileid` refers to the WT table that the operation is performed against. The fileid mapping is
+  held in the `WiredTiger.wt` file (a table within itself). This value is faked for WT's logging
+  debug mode for tables which MongoDB is not logging.
+- `ops.key` and `ops.value` are the binary representations of the inserted document (`value` is
+  omitted for removal).
 - `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
 
 [copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
@@ -345,95 +352,83 @@ oplog.
 
 ## Eviction and Application-threads
 
-Wiredtiger tries to keep cache utilization within acceptable ranges. The
-process of removing data from the cache (sometimes by writing it to disk) is
-called "eviction". Eviction occurs depending on whether the cache's size
-exceeds certain "trigger" and "target" limits set by the user:
+Wiredtiger tries to keep cache utilization within acceptable ranges. The process of removing data
+from the cache (sometimes by writing it to disk) is called "eviction". Eviction occurs depending on
+whether the cache's size exceeds certain "trigger" and "target" limits set by the user:
 
 - `cache < target` : no eviction occurs
 - `target <= cache < trigger` : only internal threads will perform eviction.
-- `cache >= trigger` : wiredtiger will block application threads from performing
-  their work until cache returns to acceptable ranges. This is often called
-  "recruitment" because, rather than leave the threads idle, they too are used
-  to perform eviction.
+- `cache >= trigger` : wiredtiger will block application threads from performing their work until
+  cache returns to acceptable ranges. This is often called "recruitment" because, rather than leave
+  the threads idle, they too are used to perform eviction.
 
 ## Cache-Pressure and Stalls
 
-Recruiting application threads is associated with periods of unavailability in
-the presence of large, long-running transactions.
+Recruiting application threads is associated with periods of unavailability in the presence of
+large, long-running transactions.
 
-- Until a transaction finishes, its state is held in-memory and it can not be
-  evicted. If enough of these transactions fill the cache, none will be
-  evicted and none will make progress (wiredtiger will have recruited them).
-- When transactions are committed or aborted, wiredtiger uses that time to
-  perform some eviction. This causes unexpected latency increases for many
-  operations, and is particularly problematic during shutdown/stepdown as they
-  can't complete in a timely fashion.
+- Until a transaction finishes, its state is held in-memory and it can not be evicted. If enough of
+  these transactions fill the cache, none will be evicted and none will make progress (wiredtiger
+  will have recruited them).
+- When transactions are committed or aborted, wiredtiger uses that time to perform some eviction.
+  This causes unexpected latency increases for many operations, and is particularly problematic
+  during shutdown/stepdown as they can't complete in a timely fashion.
 
 ## Monitoring
 
-To alleviate these problems, the server has mechanisms to detect cache-pressure
-and remediate it.
+To alleviate these problems, the server has mechanisms to detect cache-pressure and remediate it.
 
-Wiredtiger's implememntation is the `WiredTigerCachePressureMonitor`. This
-monitor queries internal wiredtiger stats to determine:
+Wiredtiger's implememntation is the `WiredTigerCachePressureMonitor`. This monitor queries internal
+wiredtiger stats to determine:
 
 - if the triggers have been reached or exceeded
 - how long since we have made any commits/progress
 - how much time is being spent by application threads in eviction
 
-If all of the above metrics exceed an allowed limit, a cache-pressure situation
-is flagged.
+If all of the above metrics exceed an allowed limit, a cache-pressure situation is flagged.
 
-Outside of the storage engine, mongo maintains a thread to perdiodically check
-for cache-pressure and act on it, called the
-`PeriodicThreadToRollbackUnderCachePressure`. This thread queries wiredtiger
-for cache-pressure and, if detected, aborts the oldest transactions until the
+Outside of the storage engine, mongo maintains a thread to perdiodically check for cache-pressure
+and act on it, called the `PeriodicThreadToRollbackUnderCachePressure`. This thread queries
+wiredtiger for cache-pressure and, if detected, aborts the oldest transactions until the
 cache-pressure goes away.
 
 ## Interrupting Eviction
 
-Operations in wiredtiger normally can't be controlled by the mongod process
-once it calls a wiredtiger API. This would usually mean we are unable to abort
-operations recruited for eviction, in spite of the above monitor.
+Operations in wiredtiger normally can't be controlled by the mongod process once it calls a
+wiredtiger API. This would usually mean we are unable to abort operations recruited for eviction, in
+spite of the above monitor.
 
-To solve this, wiredtiger has functionality to periodically query whether a
-given application thread should stop evicting, if the
-`WT_EVENT_HANDLER.handle_general` returns nonzero for a `WT_EVENT_EVICTION`
-event, then wiredtiger will pull that application thread out of eviction early,
-either returning normally (for optional kinds of eviction) or erroring (if the
-eviction was a mandatory prerequisite for that thread's operation).
+To solve this, wiredtiger has functionality to periodically query whether a given application thread
+should stop evicting, if the `WT_EVENT_HANDLER.handle_general` returns nonzero for a
+`WT_EVENT_EVICTION` event, then wiredtiger will pull that application thread out of eviction early,
+either returning normally (for optional kinds of eviction) or erroring (if the eviction was a
+mandatory prerequisite for that thread's operation).
 
-This functionality is needed to allow both cache-pressure aborts and
-idle-session aborts to roll-back active transactions.
+This functionality is needed to allow both cache-pressure aborts and idle-session aborts to
+roll-back active transactions.
 
 ## Detection and Tuning
 
-Cache-pressure detection is not a "one-size-fits-all" solution for end users.
-Depending on their workload, how spiky it is, and how many large/long transactions
-they use, they may require different configuration to detect/remediate
-cache-pressure as it appears for them.
+Cache-pressure detection is not a "one-size-fits-all" solution for end users. Depending on their
+workload, how spiky it is, and how many large/long transactions they use, they may require different
+configuration to detect/remediate cache-pressure as it appears for them.
 
-Mongod provides several mechanisms for configuring the cache-pressure
-mechanism:
+Mongod provides several mechanisms for configuring the cache-pressure mechanism:
 
-- CachePressureEvictionStallThresholdProportion controls how much our
-  application threads' time is allowed to count towards eviction before we
-  decide to call it "cache-pressure". Lower values make the monitor more likely
-  to decide that we are in cache-pressure.
-- CachePressureExponentiallyDecayingMovingAverageAlphaValue controls how
-  susceptible the monitor is to mis-detecting cache-pressure when the number of
-  read/write tickets varies a lot. Lower values smooth-out the monitor's view
-  of tickets.
-- CachePressureEvictionStallDetectionWindowSeconds controls how much time the
-  monitor will wait while under cache-pressure before allowing rollbacks to
-  take place. Lower values make the monitor more responsive.
-- CachePressureQueryPeriodMilliseconds controls the frequency that we check for
-  cache-pressure. Lower values increase the frequency of checking.
-- CachePressureAbortSessionKillLimitPerBatch controls how many transactions
-  per-second can be aborted when under cache-pressure. Lower values limit the
-  number (i.e. they cause cache-pressure events to either involve fewer aborts
-  or take longer to remediate).
+- CachePressureEvictionStallThresholdProportion controls how much our application threads' time is
+  allowed to count towards eviction before we decide to call it "cache-pressure". Lower values make
+  the monitor more likely to decide that we are in cache-pressure.
+- CachePressureExponentiallyDecayingMovingAverageAlphaValue controls how susceptible the monitor is
+  to mis-detecting cache-pressure when the number of read/write tickets varies a lot. Lower values
+  smooth-out the monitor's view of tickets.
+- CachePressureEvictionStallDetectionWindowSeconds controls how much time the monitor will wait
+  while under cache-pressure before allowing rollbacks to take place. Lower values make the monitor
+  more responsive.
+- CachePressureQueryPeriodMilliseconds controls the frequency that we check for cache-pressure.
+  Lower values increase the frequency of checking.
+- CachePressureAbortSessionKillLimitPerBatch controls how many transactions per-second can be
+  aborted when under cache-pressure. Lower values limit the number (i.e. they cause cache-pressure
+  events to either involve fewer aborts or take longer to remediate).
 
 # Table of MongoDB <-> WiredTiger <-> Log version numbers
 

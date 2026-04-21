@@ -1,12 +1,14 @@
 # mongo ripgrep builds
 
-This directory contains scripts to produce **portable, high-performance `ripgrep` binaries** for all major platforms:
+This directory contains scripts to produce **portable, high-performance `ripgrep` binaries** for all
+major platforms:
 
 - **Linux** (`manylinux2014` glibc 2.17 baseline): `x86_64`, `aarch64`, `s390x`, `ppc64le`
 - **macOS** universal2 (`x86_64` + `arm64`)
 - **Windows** x86_64 (MSVC)
 
-Each build uses **bundled static PCRE2**, **LTO**, and conservative CPU baselines to maximize portability.  
+Each build uses **bundled static PCRE2**, **LTO**, and conservative CPU baselines to maximize
+portability.  
 All artifacts are placed in the `dist/` directory.
 
 ---

@@ -1,10 +1,13 @@
 # Building Bazel from Source to target the PPC64LE Architecture
 
-Bazel doesn't release to the PPC64LE architecture. To address this, MongoDB maintains our own Bazel build that we perform on our PPC64LE development systems.
+Bazel doesn't release to the PPC64LE architecture. To address this, MongoDB maintains our own Bazel
+build that we perform on our PPC64LE development systems.
 
 # JDK?
 
-Bazel usually comes with a built-in JDK. However, the tooling used to build the built-in JDK doesn't support PPC64LE. To get around this, an external JDK must be present on both the system compiling the Bazel executable itself as well as the host running Bazel as a build system.
+Bazel usually comes with a built-in JDK. However, the tooling used to build the built-in JDK doesn't
+support PPC64LE. To get around this, an external JDK must be present on both the system compiling
+the Bazel executable itself as well as the host running Bazel as a build system.
 
 On the MongoDB PPC64LE Evergreen static hosts and dev hosts, the OpenJDK 21 installation exists at:
 

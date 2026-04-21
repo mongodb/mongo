@@ -1,10 +1,9 @@
 # MozJS WASM Engine
 
-The WASM engine wraps SpiderMonkey into a WASI Preview 2 component
-(`mozjs_wasm_api.wasm`) that the host (mongod/mongos) loads via Wasmtime. The
-host calls exported WIT functions to create JS contexts, compile functions,
-invoke them with BSON arguments, and read back BSON results — all inside a
-sandboxed WebAssembly instance.
+The WASM engine wraps SpiderMonkey into a WASI Preview 2 component (`mozjs_wasm_api.wasm`) that the
+host (mongod/mongos) loads via Wasmtime. The host calls exported WIT functions to create JS
+contexts, compile functions, invoke them with BSON arguments, and read back BSON results — all
+inside a sandboxed WebAssembly instance.
 
 ## Architecture
 
@@ -35,8 +34,8 @@ Key files in this directory:
 
 ## WIT Interface
 
-The public API is defined in `../wit/mozjs.wit` (package `mongo:mozjs`, world
-`api`). The world exports a single `mozjs` interface:
+The public API is defined in `../wit/mozjs.wit` (package `mongo:mozjs`, world `api`). The world
+exports a single `mozjs` interface:
 
 - `initialize-engine` / `shutdown-engine` / `interrupt-current-op` — lifecycle
 - `create-function(source)` → `function-handle` — compile JS source
@@ -50,16 +49,14 @@ C bindings live in `../wit_gen/generated/` and are produced by:
 wit-bindgen c ../wit --out-dir ../wit_gen/generated
 ```
 
-The generated `api.h` declares the `exports_*` symbols that `api.cpp`
-implements. The generated `api_component_type.o` is linked into the final
-`.wasm` to embed the component type section.
+The generated `api.h` declares the `exports_*` symbols that `api.cpp` implements. The generated
+`api_component_type.o` is linked into the final `.wasm` to embed the component type section.
 
 ## Building
 
 Everything is driven by Bazel from `../BUILD.bazel`.
 
-Without `--define=build_mozjs_wasm=true` a prebuilt `.wasm` is fetched from S3
-instead.
+Without `--define=build_mozjs_wasm=true` a prebuilt `.wasm` is fetched from S3 instead.
 
 **Build WASM module and run unit tests:**
 
@@ -67,8 +64,8 @@ instead.
 bazel test //src/mongo/scripting/mozjs/wasm:wasm_mozjs_test --define=build_mozjs_wasm=true --spawn_strategy=local
 ```
 
-Tests load `mozjs_wasm_api.wasm` into Wasmtime, instantiate it as a WASI
-Preview 2 component, and exercise every WIT export.
+Tests load `mozjs_wasm_api.wasm` into Wasmtime, instantiate it as a WASI Preview 2 component, and
+exercise every WIT export.
 
 ## Dependencies
 
