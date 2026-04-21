@@ -106,6 +106,16 @@ def _reexec_current_python(env_var: str = MODULES_READY_ENV) -> None:
     wrapper_debug("python deps changed; restarting wrapper interpreter")
     env = os.environ.copy()
     env[env_var] = "1"
+    if os.name == "nt":
+        # os.execve on Windows spawns a new process and immediately exits the
+        # current one; tools/bazel.bat then reads MONGO_BAZEL_WRAPPER_ARGS
+        # before the new process has written it.  subprocess.run keeps the
+        # current process alive until the child finishes, so bazel.bat reads
+        # the file only after the child has written the correct args.
+        import subprocess
+
+        result = subprocess.run([sys.executable, *sys.argv], env=env)
+        sys.exit(result.returncode)
     os.execve(sys.executable, [sys.executable, *sys.argv], env)
 
 
