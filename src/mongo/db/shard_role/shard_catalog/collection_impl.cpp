@@ -1163,38 +1163,8 @@ int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,
 }
 
 bool CollectionImpl::isEmpty(OperationContext* opCtx) const {
-    auto cursor = getCursor(opCtx, true /* forward */);
-
-    auto cursorEmptyCollRes = (!cursor->next()) ? true : false;
-
-    // Return the cursor result directly for untracked collections when the provider only uses
-    // replicated fast count.
-    if (rss::ReplicatedStorageService::get(opCtx)
-            .getPersistenceProvider()
-            .shouldUseReplicatedFastCount() &&
-        !isReplicatedFastCountEligible(_ns)) {
-        return cursorEmptyCollRes;
-    }
-
-    auto fastCount = numRecords(opCtx);
-    auto fastCountEmptyCollRes = (fastCount == 0) ? true : false;
-
-    if (cursorEmptyCollRes != fastCountEmptyCollRes) {
-        BSONObjBuilder bob;
-        bob.appendNumber("fastCount", static_cast<long long>(fastCount));
-        bob.append("cursor", str::stream() << (cursorEmptyCollRes ? "0" : ">=1"));
-
-        LOGV2_DEBUG(20292,
-                    2,
-                    "Detected erroneous fast count for collection {namespace}({uuid}) "
-                    "[{getRecordStore_getIdent}]. Record count reported by: {bob_obj}",
-                    logAttrs(ns()),
-                    "uuid"_attr = uuid(),
-                    "getRecordStore_getIdent"_attr = getRecordStore()->getIdent(),
-                    "bob_obj"_attr = bob.obj());
-    }
-
-    return cursorEmptyCollRes;
+    auto cursor = getCursor(opCtx, /*forward=*/true);
+    return !cursor->next().has_value();
 }
 
 uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
