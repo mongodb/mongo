@@ -3,6 +3,9 @@
  *
  * @tags: [
  *   does_not_support_stepdowns,
+ *   # deleteMany can receive CallbackCancelled when a primary steps down during a config shard
+ *   # transition.
+ *   config_shard_incompatible,
  *   requires_fcv_63,
  *   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
  *   # first stage in a pipeline. This will be incomplatible with timeseries.
