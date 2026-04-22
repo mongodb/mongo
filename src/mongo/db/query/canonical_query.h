@@ -290,6 +290,10 @@ public:
     void setCqPipeline(std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
                        bool containsEntirePipeline);
 
+    void clearCqPipeline();
+
+    void removeSuffixFromCqPipeline(size_t sourcesToRemove);
+
     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline() const {
         return _cqPipeline;
     }

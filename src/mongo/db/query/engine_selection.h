@@ -38,19 +38,29 @@ namespace mongo {
 
 enum class EngineChoice { kClassic, kSbe };
 
+struct EngineSelectionResult {
+    EngineChoice engine = EngineChoice::kClassic;
+    /**
+     * When SBE is the chosen engine and a query solution was specified, 'planPushdownRoot'
+     * indicates the top-most QuerySolutionNode that should run in SBE. The remainder of the tree
+     * should run in classic.
+     */
+    const QuerySolutionNode* planPushdownRoot = nullptr;
+};
+
 /*
- * Returns enum indicating engine choice given the query details. An optional query solution may be
+ * Returns the engine choice given the query details. An optional query solution may be
  * passed in, which will be analyzed for SBE eligibility depending on the plan shape.
  */
-EngineChoice chooseEngine(OperationContext* opCtx,
-                          const MultipleCollectionAccessor& collections,
-                          CanonicalQuery* cq,
-                          Pipeline* pipeline,
-                          bool needsMerge,
-                          std::unique_ptr<QueryPlannerParams> plannerParams,
-                          const QuerySolution* solution = nullptr,
-                          const std::function<void()>& extendSolutionWithPipelineFn = nullptr,
-                          bool attachPipelineStages = true);
+EngineSelectionResult chooseEngine(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    CanonicalQuery* cq,
+    const Pipeline* pipeline,
+    bool needsMerge,
+    std::unique_ptr<QueryPlannerParams> plannerParams,
+    const QuerySolution* solution = nullptr,
+    const std::function<void()>& extendSolutionWithPipelineFn = nullptr);
 
 /*
  * Selects the execution engine, guaranteeing that if SBE is chosen, the query solution will be
@@ -60,9 +70,8 @@ EngineChoice chooseEngine(OperationContext* opCtx,
 EngineChoice extendSolutionAndSelectEngine(std::unique_ptr<QuerySolution>& solution,
                                            OperationContext* opCtx,
                                            CanonicalQuery* cq,
-                                           Pipeline* pipeline,
+                                           const Pipeline* pipeline,
                                            const MultipleCollectionAccessor& collections,
-                                           QueryPlannerParams& plannerParams,
-                                           bool attachPipelineStages = true);
+                                           QueryPlannerParams& plannerParams);
 
 }  // namespace mongo

@@ -74,6 +74,17 @@ namespace {
 
 namespace wcp = ::mongo::wildcard_planning;
 
+void assertSupportsLeftMostBranchTraversal(const QuerySolutionNode* node) {
+    // At the moment, we only extend a solution plan with a tree for $group stage(s), which have
+    // exactly one child. The only node with more than one child that we accept is $lookup,
+    // where we descend down the first child, representing the main collection. We'll replace
+    // the left-most branch descent with a full tree traversal, if/when it becomes necessary.
+    tassert(5842800,
+            "Only chain extension trees are supported",
+            node->children.size() == 1 || node->getType() == StageType::STAGE_EQ_LOOKUP ||
+                node->getType() == StageType::STAGE_EQ_LOOKUP_UNWIND);
+}
+
 // Create an ordred interval list which represents the bounds for all BSON elements of type String,
 // Object, or Array.
 OrderedIntervalList buildStringBoundsOil(const std::string& keyName) {
@@ -337,46 +348,59 @@ void QuerySolution::assignNodeIds(PlanNodeId& lastNodeId, QuerySolutionNode& nod
     node._nodeId = ++lastNodeId;
 }
 
-void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot,
-                               bool keepSentinel) {
+int QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot) {
     auto current = extensionRoot.get();
     if (current == nullptr || current->getType() == StageType::STAGE_SENTINEL) {
         // Nothing to do for a trivial extension.
-        return;
+        return 0;
     }
 
     QuerySolutionNode* parentOfSentinel = nullptr;
+    int extensionDepth = 0;
     while (current->getType() != StageType::STAGE_SENTINEL) {
         parentOfSentinel = current;
         tassert(5842801,
                 "Cannot find the sentinel node in the extension tree",
                 !parentOfSentinel->children.empty());
 
-        // At the moment, we only extend a solution plan with a tree for $group stage(s), which have
-        // exactly one child. The only node with more than one child that we accept is $lookup,
-        // where we descend down the first child, representing the main collection. We'll replace
-        // the left-most branch descent with a full tree traversal, if/when it becomes necessary.
-        tassert(5842800,
-                "Only chain extension trees are supported",
-                parentOfSentinel->children.size() == 1 ||
-                    parentOfSentinel->getType() == StageType::STAGE_EQ_LOOKUP ||
-                    parentOfSentinel->getType() == StageType::STAGE_EQ_LOOKUP_UNWIND);
+        assertSupportsLeftMostBranchTraversal(parentOfSentinel);
+
         current = parentOfSentinel->children[0].get();
+        ++extensionDepth;
     }
     tassert(11986304,
             "Expected the sentinel node passed to extendWith() to be a leaf node.",
             current->children.empty());
     QuerySolutionNode* oldRoot = _root.get();
-    // If `keepSentinel` is set, make the _root a child of the existing sentinel node. Otherwise,
-    // attach _root to the parent of the sentinel (deleting the sentinel).
-    if (keepSentinel) {
-        current->children.push_back(std::move(_root));
-    } else {
-        parentOfSentinel->children[0] = std::move(_root);
-    }
+    parentOfSentinel->children[0] = std::move(_root);
     setRoot(std::move(extensionRoot));
     // setRoot may re-assign node ids, so we assign this value after calling setRoot.
     _unextendedRootId = oldRoot->nodeId();
+    return extensionDepth;
+}
+
+int QuerySolution::removePathFromExtension(PlanNodeId targetNode) {
+    if (targetNode == kEmptyPlanNodeId) {
+        return 0;
+    }
+
+    auto current = &_root;
+    int depth = 0;
+    while ((*current)->nodeId() != targetNode) {
+        QuerySolutionNode* currentPtr = current->get();
+
+        assertSupportsLeftMostBranchTraversal(currentPtr);
+
+        tassert(12152002,
+                "Cannot remove a path that extends beyond the unextended root node",
+                currentPtr->nodeId() != _unextendedRootId);
+
+        current = &currentPtr->children[0];
+        ++depth;
+    }
+
+    setRoot(std::move(*current));
+    return depth;
 }
 
 void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {

@@ -35,11 +35,6 @@
 
 namespace mongo {
 
-struct EngineSelectionResult {
-    EngineChoice engine;
-    const QuerySolutionNode* planPushdownRoot;
-};
-
 /**
  * Returns 'false' for query plans that can not be executed in SBE.
  */

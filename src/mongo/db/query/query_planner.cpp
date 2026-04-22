@@ -1871,7 +1871,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     const CanonicalQuery& query,
     std::unique_ptr<QuerySolution>&& solution,
     const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos,
-    bool keepSentinel) {
+    bool skipProjectGroupOptimization) {
     if (query.cqPipeline().empty()) {
         return std::move(solution);
     }
@@ -2053,8 +2053,17 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         tasserted(5842400, "Pipeline contains unsupported stage for SBE pushdown");
     }
 
-    solution->extendWith(std::move(solnForAgg), keepSentinel);
-    if (!keepSentinel) {
+    int extensionDepth = solution->extendWith(std::move(solnForAgg));
+
+    // Assert a property that is important because of how plan-based pushdown is implemented. It
+    // works by removing the number of rejected QSN stages from the canonical query pipeline,
+    // assuming that one QSN stage is the equivalent of one pipeline DocumentSource.
+    tassert(
+        12152001,
+        "Mismatch between number of stages in the QSN extension and the canonical query pipeline",
+        static_cast<size_t>(extensionDepth) == innerPipelineStages.size());
+
+    if (!skipProjectGroupOptimization) {
         solution = QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
     }
 

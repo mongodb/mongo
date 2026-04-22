@@ -91,10 +91,8 @@ EngineSelectionPlanner::EngineSelectionPlanner(std::unique_ptr<PlannerInterface>
         return;
     }
 
-    const bool needToAttachStagesToCq =
-        cq->cqPipeline().empty() && !_result.plannerParams->replanningData.has_value();
     _result.engineSelection = extendSolutionAndSelectEngine(
-        solution, opCtx, cq, pipeline, collections, *_result.plannerParams, needToAttachStagesToCq);
+        solution, opCtx, cq, pipeline, collections, *_result.plannerParams);
 }
 
 PlanRankingResult EngineSelectionPlanner::extractPlanRankingResult() {

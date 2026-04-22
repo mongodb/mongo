@@ -219,39 +219,78 @@ const aggregationTests = [
     {
         agg: [lookup, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, ffSbeEqLookupUnwind],
+        pushDownPattern: [true, (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape)],
     },
     {
         agg: [group, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, ffSbeEqLookupUnwind],
+        pushDownPattern: [true, (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape)],
     },
     {
         agg: [lookup, match, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, ffSbeNonLeadingMatch, ffSbeEqLookupUnwind],
+        pushDownPattern: [
+            true,
+            ffSbeNonLeadingMatch,
+            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+        ],
+    },
+    // This test case covers the scenario where the QSN cut has to remove 3 stages from the QSN instead of just one.
+    {
+        agg: [lookup, match, lookupUnwind, neutralProject, group],
+        planShapesThatTriggerSbe: allShapes,
+        pushDownPattern: [
+            true,
+            ffSbeNonLeadingMatch,
+            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            ffSbeTransformStages,
+            true,
+        ],
     },
     {
         agg: [lookup, neutralProject, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, ffSbeTransformStages, ffSbeEqLookupUnwind],
+        pushDownPattern: [
+            true,
+            ffSbeTransformStages,
+            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+        ],
     },
     {
         agg: [group, match, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, ffSbeNonLeadingMatch, ffSbeEqLookupUnwind],
+        pushDownPattern: [
+            true,
+            ffSbeNonLeadingMatch,
+            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+        ],
     },
     {
         agg: [group, neutralProject, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [true, ffSbeTransformStages, ffSbeEqLookupUnwind],
+        pushDownPattern: [
+            true,
+            ffSbeTransformStages,
+            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+        ],
     },
 ];
 
-function assertEngineUsed(test, pipeline, expectedEngine) {
+function resolvePushDownPatternValue(patternEntry, planShape) {
+    if (typeof patternEntry === "function") {
+        return Boolean(patternEntry(planShape));
+    }
+    return Boolean(patternEntry);
+}
+
+function resolvePushDownPattern(test, planShape) {
+    return test.pushDownPattern.map((entry) => resolvePushDownPatternValue(entry, planShape));
+}
+
+function assertEngineUsed(test, pipeline, expectedEngine, planShape) {
     const explain = coll.explain().aggregate(pipeline);
     const actualEngine = getEngine(explain);
-    assert.eq(actualEngine, expectedEngine, explain);
+    assert.eq(actualEngine, expectedEngine, tojson(explain, "", true));
 
     // If the query used SBE, assert that the proper stages were pushed down.
     if (expectedEngine === "sbe") {
@@ -262,20 +301,21 @@ function assertEngineUsed(test, pipeline, expectedEngine) {
         // If SBE is fully enabled, all stages should have been pushed down. Otherwise,
         // it depends on the feature flags enabled.
         if (sbeFullyEnabled) {
-            assert.eq(actualNumDocSources, 0, explain);
+            assert.eq(actualNumDocSources, 0, tojson(explain, "", true));
             return;
         }
 
         // Analyze the aggregation to determine how many stages we expect in the document
         // source part of explain. For each `true` in `test.pushDownPattern`, we remove
         // a stage from `remainingDocSources`, indicating the stage has been pushed down.
+        const resolvedPushDownPattern = resolvePushDownPattern(test, planShape);
         let remainingDocSources = [...test.agg];
         let i = 0;
-        while (test.pushDownPattern[i]) {
+        while (resolvedPushDownPattern[i]) {
             remainingDocSources.shift();
             i++;
         }
-        assert.eq(actualNumDocSources, remainingDocSources.length, explain);
+        assert.eq(actualNumDocSources, remainingDocSources.length, tojson(explain, "", true));
     }
 }
 
@@ -289,7 +329,8 @@ function getExpectedEngine(planShape, test) {
     // At this point, SBE is used if the plan shape requirement for the query is satisfied
     // and the first stage indicates it will be pushed down.
     const sbeEligibleShapeUsed = test.planShapesThatTriggerSbe.includes(planShape);
-    return test.pushDownPattern[0] && sbeEligibleShapeUsed ? "sbe" : "classic";
+    const firstStagePushesDown = resolvePushDownPatternValue(test.pushDownPattern[0], planShape);
+    return firstStagePushesDown && sbeEligibleShapeUsed ? "sbe" : "classic";
 }
 
 function testWithAllPlanShapes(test) {
@@ -298,7 +339,7 @@ function testWithAllPlanShapes(test) {
         const expectedEngine = getExpectedEngine(shape, test);
 
         // Assert the correct engine is used and stages are pushed down for the pipeline.
-        assertEngineUsed(test, [...shape, ...flatAgg], expectedEngine);
+        assertEngineUsed(test, [...shape, ...flatAgg], expectedEngine, shape);
     }
 }
 

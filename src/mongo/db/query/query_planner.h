@@ -108,7 +108,7 @@ public:
         const CanonicalQuery& query,
         std::unique_ptr<QuerySolution>&& solution,
         const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos,
-        bool keepSentinel = false);
+        bool skipProjectGroupOptimization = false);
 
     /**
      * Returns the list of possible query solutions for the provided 'query' for multi-planning.

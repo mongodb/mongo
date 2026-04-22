@@ -1212,7 +1212,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                                              .canonicalQuery = *canonicalQuery,
                                              .collections = collections,
                                              .plannerOptions = plannerOptions,
-                                         })) == EngineChoice::kSbe;
+                                         }))
+                            .engine == EngineChoice::kSbe;
 
     // If distinct multi-planning is enabled and we have a distinct property, we may not be able to
     // commit to SBE yet.

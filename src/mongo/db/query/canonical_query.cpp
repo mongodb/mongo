@@ -421,6 +421,23 @@ void CanonicalQuery::setCqPipeline(std::vector<boost::intrusive_ptr<DocumentSour
     }
 }
 
+void CanonicalQuery::clearCqPipeline() {
+    _cqPipeline.clear();
+    _containsEntirePipeline = false;
+}
+
+void CanonicalQuery::removeSuffixFromCqPipeline(size_t sourcesToRemove) {
+    if (sourcesToRemove == 0) {
+        return;
+    }
+    tassert(12152000,
+            "Removing suffix from CQ pipeline failed, count greater than pipeline size",
+            sourcesToRemove <= _cqPipeline.size());
+
+    _cqPipeline.erase(_cqPipeline.end() - sourcesToRemove, _cqPipeline.end());
+    _containsEntirePipeline = false;
+}
+
 bool CanonicalQuery::shouldParameterizeSbe(MatchExpression* matchExpr) const {
     if (_disablePlanCache || _isUncacheableSbe || !feature_flags::gFeatureFlagSbeFull.isEnabled() ||
         QueryPlannerCommon::hasNode(matchExpr, MatchExpression::TEXT)) {
