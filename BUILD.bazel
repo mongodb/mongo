@@ -545,14 +545,6 @@ filegroup(
     ]),
 )
 
-# Multiversion binaries downloaded using db-contrib-tool, setting --linkDir to this directory.
-filegroup(
-    name = "multiversion_binaries",
-    srcs = glob([
-        "multiversion_binaries/**",
-    ]),
-)
-
 alias(
     name = "db-contrib-tool",
     actual = "//bazel/db_contrib_tool:db-contrib-tool",

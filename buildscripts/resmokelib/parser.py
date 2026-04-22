@@ -49,6 +49,11 @@ def get_parser(usage=None):
         default=os.environ.get("EXTERNAL_MODULE_CONFIG", None),
         help="Path to external module configuration YAML file (can also use EXTERNAL_MODULE_CONFIG env var)",
     )
+    parser.add_argument(
+        "--mongoVersionFile",
+        dest="mongo_version_file",
+        help="A YAML file containing the current `mongo_version`.",
+    )
 
     # Add sub-commands.
     for plugin in _PLUGINS:

@@ -69,6 +69,12 @@ py_binary(
 py_binary(
     name = "resmoke",
     srcs = ["resmoke.py"],
+    data = [
+        "//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml",
+        "//buildscripts/resmokeconfig:resmoke_modules.yml",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+        "//src/mongo/util/version:releases.yml",
+    ],
     main = "resmoke.py",
     visibility = ["//visibility:public"],
     deps = [

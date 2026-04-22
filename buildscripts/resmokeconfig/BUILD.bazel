@@ -53,9 +53,7 @@ mongo_js_library(
 
 # This is an experimental test target for running the jstestfuzz
 # suite as a bazel test. It runs in an experimental Evergreen task on an
-# infrequent build variant. You should not worry about this target being
-# perfectly up-to-date with the suite config, nor create similar bazel targets
-# for other suites. Cleanup with SERVER-103537.
+# infrequent build variant. Cleanup with SERVER-103537.
 resmoke_suite_test(
     name = "jstestfuzz",
     srcs = [
@@ -73,23 +71,15 @@ resmoke_suite_test(
 
 # This is an experimental test target for running the multiversion_sanity_check
 # suite as a bazel test. It runs in an experimental Evergreen task on an
-# infrequent build variant. You should not worry about this target being
-# perfectly up-to-date with the suite config, nor create similar bazel targets
-# for other suites. Cleanup with SERVER-103537.
+# infrequent build variant. Cleanup with SERVER-103537.
 resmoke_suite_test(
-    name = "bazel_multiversion_sanity_check_last_continuous_new_new_old",
-    srcs = [
-        "//jstests/core/testing:mixed_version_replica_set.js",
+    name = "multiversion_sanity_check_last_continuous_new_new_old",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/multiversion_sanity_check_last_continuous_new_new_old.yml",
+    multiversion_deps = [
+        "//bazel/resmoke/multiversion:last-continuous",
     ],
-    config = ":matrix_suites/generated_suites/multiversion_sanity_check_last_continuous_new_new_old.yml",
-    data = [
-        ":matrix_suites/mappings/multiversion_sanity_check_last_continuous_new_new_old.yml",
-        ":matrix_suites/overrides/multiversion.yml",
-        "//:multiversion_binaries",
-    ],
-    shard_count = 1,
     tags = [
-        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+        "experimental-resmoke-bazel",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -99,23 +89,15 @@ resmoke_suite_test(
 
 # This is an experimental test target for running the multiversion_sanity_check
 # suite as a bazel test. It runs in an experimental Evergreen task on an
-# infrequent build variant. You should not worry about this target being
-# perfectly up-to-date with the suite config, nor create similar bazel targets
-# for other suites. Cleanup with SERVER-103537.
+# infrequent build variant. Cleanup with SERVER-103537.
 resmoke_suite_test(
-    name = "bazel_multiversion_sanity_check_last_lts_new_new_old",
-    srcs = [
-        "//jstests/core/testing:mixed_version_replica_set.js",
+    name = "multiversion_sanity_check_last_lts_new_new_old",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/multiversion_sanity_check_last_lts_new_new_old.yml",
+    multiversion_deps = [
+        "//bazel/resmoke/multiversion:last-lts",
     ],
-    config = ":matrix_suites/generated_suites/multiversion_sanity_check_last_lts_new_new_old.yml",
-    data = [
-        ":matrix_suites/mappings/multiversion_sanity_check_last_lts_new_new_old.yml",
-        ":matrix_suites/overrides/multiversion.yml",
-        "//:multiversion_binaries",
-    ],
-    shard_count = 1,
     tags = [
-        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+        "experimental-resmoke-bazel",
     ],
     deps = [
         "//src/mongo/db:mongod",

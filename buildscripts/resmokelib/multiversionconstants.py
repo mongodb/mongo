@@ -115,7 +115,14 @@ def in_spawn_host():
     return False
 
 
-if (in_git_root_dir() or "BUILD_WORKSPACE_DIRECTORY" in os.environ) and not in_spawn_host():
+_version_file_explicitly_set = _config.MONGO_VERSION_FILE != os.path.join(
+    _config.RESMOKE_ROOT, ".resmoke_mongo_version.yml"
+)
+if (
+    not _version_file_explicitly_set
+    and (in_git_root_dir() or "BUILD_WORKSPACE_DIRECTORY" in os.environ)
+    and not in_spawn_host()
+):
     generate_mongo_version_file()
 else:
     LOGGER.info("Skipping generating mongo version file since we're not in the root of a git repo")

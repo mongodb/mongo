@@ -1,0 +1,36 @@
+load("//bazel/resmoke/multiversion:multiversion.bzl", "multiversion_setup")
+
+# Visibility is restricted to tests because multiversion_setup downloads
+# binaries from Evergreen at build time.  Allowing arbitrary targets to depend
+# on externally-fetched, non-hermetic artifacts would undermine build
+# reproducibility.
+package(default_visibility = [
+    "//buildscripts:__subpackages__",
+    "//jstests:__subpackages__",
+])
+
+sh_binary(
+    name = "run_db_contrib_tool",
+    srcs = ["run_db_contrib_tool.sh"],
+    visibility = ["//visibility:private"],
+)
+
+multiversion_setup(
+    name = "7.0",
+    version = "7.0",
+)
+
+multiversion_setup(
+    name = "8.0.16",
+    version = "8.0.16",
+)
+
+multiversion_setup(
+    name = "last-continuous",
+    version = "last-continuous",
+)
+
+multiversion_setup(
+    name = "last-lts",
+    version = "last-lts",
+)

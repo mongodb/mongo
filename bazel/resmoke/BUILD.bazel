@@ -13,6 +13,25 @@ genrule(
 )
 
 genrule(
+    name = "multiversion_config",
+    srcs = [":resmoke_mongo_version"],
+    outs = [".multiversion_config.yml"],
+    cmd = """
+export GIT_DIR=$$(dirname "$$(readlink -f WORKSPACE.bazel)")/.git
+$(location //buildscripts:resmoke) \
+    --mongoVersionFile $(location :resmoke_mongo_version) \
+    multiversion-config \
+    --config-file-output $@ > /dev/null
+""",
+    tags = [
+        "no-cache",
+        "no-remote",
+    ],
+    tools = ["//buildscripts:resmoke"],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
     name = "on_feature_flags",
     srcs = [],
     outs = ["on_feature_flags.txt"],

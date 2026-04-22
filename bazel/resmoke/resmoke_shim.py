@@ -1,5 +1,6 @@
 import os
 import pathlib
+import shutil
 import signal
 import sys
 import tempfile
@@ -7,6 +8,7 @@ import uuid
 from functools import cache
 
 import psutil
+import yaml
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
@@ -36,6 +38,35 @@ def add_volatile_arg(args, flag, key):
     val = get_from_volatile_status(key)
     if val:
         args.append(flag + val)
+
+
+def add_multiversion_exclude_tags(args):
+    """Read the multiversion config and add --excludeWithAnyTags for multiversion tests."""
+    config_file = os.environ.get("MULTIVERSION_CONFIG_FILE")
+    if not config_file or not os.path.exists(config_file):
+        return
+
+    with open(config_file) as f:
+        config = yaml.safe_load(f)
+
+    # Map multiversion_setup version names to multiversion-config fields.
+    versions = os.environ.get("MULTIVERSION_VERSIONS", "").split(",")
+    fcv_tags = set()
+    for version in versions:
+        if version == "last-lts":
+            tag_field = "requires_fcv_tag_lts"
+        elif version == "last-continuous":
+            tag_field = "requires_fcv_tag_continuous"
+        else:
+            continue
+        tags_str = config.get(tag_field, "")
+        if tags_str:
+            fcv_tags.update(tags_str.split(","))
+
+    exclude = "multiversion_incompatible,backport_required_multiversion"
+    if fcv_tags:
+        exclude += "," + ",".join(sorted(fcv_tags))
+    args.append("--excludeWithAnyTags=" + exclude)
 
 
 def add_evergreen_build_info(args):
@@ -197,6 +228,7 @@ if __name__ == "__main__":
             resmoke_args.append("--storageEngineCacheSizeGB=1")
 
     add_evergreen_build_info(resmoke_args)
+    add_multiversion_exclude_tags(resmoke_args)
 
     if os.environ.get("DEPS_PATH"):
         # Modify DEPS_PATH to use os.pathsep, rather than ':'
@@ -250,6 +282,15 @@ if __name__ == "__main__":
     resmoke_args.append(f"--archiveDirectory={os.path.join(outputs_dir, 'data_archives')}")
 
     with ctx:
+        if undeclared_output_dir:
+            for arg in resmoke_args:
+                if arg.startswith("--multiversionDir="):
+                    mv_dir = os.path.abspath(arg.split("=", 1)[1])
+                    src = os.path.join(mv_dir, "multiversion-downloads.json")
+                    if os.path.exists(src):
+                        dest = "multiversion-downloads-" + os.path.basename(mv_dir) + ".json"
+                        shutil.copy(src, os.path.join(undeclared_output_dir, dest))
+
         cli.main(resmoke_args)
 
     lock.release()

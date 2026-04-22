@@ -136,6 +136,7 @@ def resmoke_suite_test(
         tags = [],
         timeout = "eternal",
         exec_properties = {},
+        multiversion_deps = [],
         **kwargs):
     """Creates a Bazel test target for a resmoke suite.
 
@@ -156,6 +157,8 @@ def resmoke_suite_test(
         tags: Bazel tags.
         timeout: Bazel test timeout.
         exec_properties: Execution properties for remote execution.
+        multiversion_deps: List of multiversion_setup targets whose output
+            directories are passed to resmoke as --multiversionDir entries.
         **kwargs: Additional arguments passed to py_test (e.g., shard_count).
     """
 
@@ -246,7 +249,15 @@ def resmoke_suite_test(
         "//src/third_party/schemastore.org:schemas",
         "//x509:generate_main_certificates",
     ]
-    merged_data = data + [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs]
+    multiversion_config = ["//bazel/resmoke:multiversion_config"] if multiversion_deps else []
+
+    # Each multiversion_setup target "last-lts" also produces a "last-lts_exclude_tags"
+    multiversion_exclude_tags = [
+        (dep.rsplit(":", 1)[0] + ":" + dep.rsplit(":", 1)[1] + "_exclude_tags") if ":" in dep else dep + "_exclude_tags"
+        for dep in multiversion_deps
+    ]
+
+    merged_data = data + [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags
 
     py_test(
         name = name,
@@ -267,12 +278,17 @@ def resmoke_suite_test(
         args = [
             "run",
             "--suites=$(location %s)" % native.package_relative_label(generated_config),
-            "--multiversionDir=multiversion_binaries",
             "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
             "--archiveMode=directory",
             "--archiveLimitMb=500",
             "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
             "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
+        ] + [
+            "--multiversionDir=$(location %s)" % native.package_relative_label(dep)
+            for dep in multiversion_deps
+        ] + [
+            "--tagFile=$(location %s)" % native.package_relative_label(tag)
+            for tag in multiversion_exclude_tags
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "resources:port_block:1", "resmoke_suite_test"],
         timeout = timeout,
@@ -281,7 +297,13 @@ def resmoke_suite_test(
             "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
             "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
             "PYTHON_IMPORTS_FILE": "$(location %s)" % native.package_relative_label(python_imports_target),
-        } | select({
+        } | ({
+            "MULTIVERSION_CONFIG_FILE": "$(location //bazel/resmoke:multiversion_config)",
+            "MULTIVERSION_VERSIONS": ",".join([
+                dep.rsplit(":", 1)[1] if ":" in dep else dep
+                for dep in multiversion_deps
+            ]),
+        } if multiversion_deps else {}) | select({
             "//bazel/resmoke:installed_dist_test_enabled": {},
             "//bazel/resmoke:skip_deps_for_cquery_enabled": {},
             "//conditions:default": {"DEPS_PATH": deps_path},
