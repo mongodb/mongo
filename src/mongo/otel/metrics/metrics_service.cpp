@@ -46,20 +46,10 @@
 namespace mongo::otel::metrics {
 
 #ifdef MONGO_CONFIG_OTEL
-namespace {
+using metrics_service_detail::makeObservableInstrument;
+using metrics_service_detail::observableCallback;
 
-// Static callback function for metric types that are observable.
-template <template <typename> class MetricT, typename ValueT>
-void observableCallback(opentelemetry::metrics::ObserverResult observer_result, void* state) {
-    invariant(state != nullptr);
-    auto* const metric = static_cast<MetricT<ValueT>*>(state);
-    auto observer = std::get_if<std::shared_ptr<opentelemetry::metrics::ObserverResultT<ValueT>>>(
-        &observer_result);
-    invariant(observer != nullptr && *observer != nullptr);
-    for (const auto& entry : metric->values()) {
-        (*observer)->Observe(entry.value, entry.attributes);
-    }
-}
+namespace {
 
 // Creates a view with the provided aggregation type and aggregation configuration.
 void createView(WithLock,
@@ -102,86 +92,6 @@ void createAndRegisterHistogramView(WithLock lock,
                unit,
                opentelemetry::sdk::metrics::AggregationType::kHistogram,
                std::move(aggregationConfig));
-}
-
-template <typename T>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument> makeObservableInstrument(
-    opentelemetry::metrics::MeterProvider& provider,
-    std::string name,
-    std::string description,
-    MetricUnit unit);
-
-template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
-makeObservableInstrument<ObservableCounter<int64_t>>(
-    opentelemetry::metrics::MeterProvider& provider,
-    std::string name,
-    std::string description,
-    MetricUnit unit) {
-    return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableCounter(toStdStringViewForInterop(name),
-                                       description,
-                                       toStdStringViewForInterop(toString(unit)));
-}
-
-template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
-makeObservableInstrument<ObservableCounter<double>>(opentelemetry::metrics::MeterProvider& provider,
-                                                    std::string name,
-                                                    std::string description,
-                                                    MetricUnit unit) {
-    return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableCounter(toStdStringViewForInterop(name),
-                                        description,
-                                        toStdStringViewForInterop(toString(unit)));
-}
-
-template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
-makeObservableInstrument<UpDownCounter<int64_t>>(opentelemetry::metrics::MeterProvider& provider,
-                                                 std::string name,
-                                                 std::string description,
-                                                 MetricUnit unit) {
-    return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableUpDownCounter(toStdStringViewForInterop(name),
-                                             description,
-                                             toStdStringViewForInterop(toString(unit)));
-}
-
-template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
-makeObservableInstrument<UpDownCounter<double>>(opentelemetry::metrics::MeterProvider& provider,
-                                                std::string name,
-                                                std::string description,
-                                                MetricUnit unit) {
-    return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableUpDownCounter(toStdStringViewForInterop(name),
-                                              description,
-                                              toStdStringViewForInterop(toString(unit)));
-}
-
-template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
-makeObservableInstrument<Gauge<int64_t>>(opentelemetry::metrics::MeterProvider& provider,
-                                         std::string name,
-                                         std::string description,
-                                         MetricUnit unit) {
-    return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableGauge(toStdStringViewForInterop(name),
-                                     description,
-                                     toStdStringViewForInterop(toString(unit)));
-}
-
-template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
-makeObservableInstrument<Gauge<double>>(opentelemetry::metrics::MeterProvider& provider,
-                                        std::string name,
-                                        std::string description,
-                                        MetricUnit unit) {
-    return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableGauge(toStdStringViewForInterop(name),
-                                      description,
-                                      toStdStringViewForInterop(toString(unit)));
 }
 
 template <typename T>
@@ -302,28 +212,6 @@ void MetricsService::initialize(opentelemetry::metrics::MeterProvider& provider)
     // destructors of any observable instrument instance(s) created before initialization.
     _observableInstruments = std::move(newObservableInstruments);
 }
-#endif  // MONGO_CONFIG_OTEL
-
-#ifdef MONGO_CONFIG_OTEL
-template <template <typename> class MetricT, typename T>
-void MetricsService::_addObservable(WithLock,
-                                    const std::string& nameStr,
-                                    MetricT<T>* metricPtr,
-                                    std::string description,
-                                    MetricUnit unit) {
-    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    auto observable = makeObservableInstrument<MetricT<T>>(*provider, nameStr, description, unit);
-    tassert(ErrorCodes::InternalError,
-            fmt::format("Could not create observable instrument for metric: {}", nameStr),
-            observable != nullptr);
-    observable->AddCallback(observableCallback<MetricT, T>, metricPtr);
-    _observableInstruments.push_back(std::move(observable));
-}
-
-template void MetricsService::_addObservable<ObservableCounter, int64_t>(
-    WithLock, const std::string&, ObservableCounter<int64_t>*, std::string, MetricUnit);
-template void MetricsService::_addObservable<ObservableCounter, double>(
-    WithLock, const std::string&, ObservableCounter<double>*, std::string, MetricUnit);
 #endif  // MONGO_CONFIG_OTEL
 
 void MetricsService::_registerServerStatusTree(
