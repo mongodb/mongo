@@ -635,6 +635,21 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
         })
         .then([this, executor, updatedCoordinatorDoc] {
             return resharding::WithAutomaticRetry([this, executor, updatedCoordinatorDoc] {
+                       // If the coordinator doc was already removed by a previous
+                       // attempt, the entire post-commit sequence already ran to completion.
+                       // Short-circuit so that retries are idempotent.
+                       {
+                           auto opCtx = _makeOperationContext();
+                           if (!resharding::tryGetCoordinatorDoc(
+                                    opCtx.get(), _coordinatorDoc.getReshardingUUID())
+                                    .has_value()) {
+                               LOGV2(12498500,
+                                     "Resharding coordinator document already removed; "
+                                     "skipping post-commit retry",
+                                     "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+                               return ExecutorFuture<void>(**executor);
+                           }
+                       }
                        return ExecutorFuture<void>(**executor)
                            .then([this] {
                                return resharding::waitForMajority(_ctHolder->getStepdownToken(),

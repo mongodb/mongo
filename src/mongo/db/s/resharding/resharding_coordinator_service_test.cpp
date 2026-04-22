@@ -2744,6 +2744,68 @@ TEST_F(ReshardingCoordinatorServiceTest, AbortDuringCommitDoesNotCauseInfiniteRe
     ASSERT_OK(coordinator->getCompletionFuture().getNoThrow());
 }
 
+TEST_F(ReshardingCoordinatorServiceTest, TransientErrorAfterCoordinatorDocRemovedDoesNotFassert) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kApplying,
+                                                      CoordinatorStateEnum::kBlockingWrites,
+                                                      CoordinatorStateEnum::kCommitting};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator();
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+    coordinator->onOkayToEnterCritical();
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+    makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
+
+    auto pauseBeforeRemovingDoc =
+        globalFailPointRegistry().find("reshardingPauseCoordinatorBeforeRemovingStateDoc");
+    auto timesEntered = pauseBeforeRemovingDoc->setMode(FailPoint::alwaysOn, 0);
+
+    makeDonorsProceedToDoneWithAssert(opCtx);
+    makeRecipientsProceedToDoneWithAssert(opCtx);
+
+    // Wait for the coordinator to reach the pause point (it has finished awaiting participants
+    // and is about to remove the coordinator doc).
+    pauseBeforeRemovingDoc->waitForTimesEntered(timesEntered + 1);
+
+    // Arm the WC failure failpoint so the next transaction (the one that removes the coordinator
+    // document) will commit successfully but report a transient error. This causes
+    // WithAutomaticRetry to retry the entire post-commit block.
+    globalFailPointRegistry()
+        .find("shardingCatalogManagerWithTransactionFailWCAfterCommit")
+        ->setMode(FailPoint::nTimes, 1);
+
+    // Unpause: the coordinator removes the doc, gets the transient error, retries, and the
+    // idempotent check at the top of the retry block detects the doc is gone and short-circuits.
+    pauseBeforeRemovingDoc->setMode(FailPoint::off, 0);
+
+    // The coordinator must complete successfully.
+    ASSERT_OK(coordinator->getCompletionFuture().getNoThrow());
+}
+
 TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingInitNoRefreshSendsInitCmd) {
     RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", true);
