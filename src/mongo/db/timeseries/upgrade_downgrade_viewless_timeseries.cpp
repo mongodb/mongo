@@ -281,14 +281,12 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
         // Idempotency check
         if (mainColl && mainColl->isTimeseriesCollection() &&
             mainColl->isNewTimeseriesWithoutView() && !bucketsColl) {
-            // TODO(SERVER-114517): Investigate if we should relax this check.
             tassert(11483003,
                     "Found an already upgraded timeseries collection but with an unexpected UUID",
                     !expectedUUID || mainColl->uuid() == *expectedUUID);
             return;
         }
 
-        // TODO(SERVER-114517): Investigate if we should relax this check.
         tassert(11483005,
                 "The buckets collection to upgrade does not have the expected UUID",
                 !expectedUUID || bucketsColl->uuid() == *expectedUUID);
@@ -357,14 +355,12 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
         // Idempotency check: already downgraded to viewful format
         if (bucketsColl && bucketsColl->isTimeseriesCollection() &&
             !bucketsColl->isNewTimeseriesWithoutView() && !mainColl) {
-            // TODO(SERVER-114517): Investigate if we should relax this check.
             tassert(11483012,
                     "Found an already downgraded timeseries collection but with unexpected UUID",
                     !expectedUUID || bucketsColl->uuid() == *expectedUUID);
             return;
         }
 
-        // TODO(SERVER-114517): Investigate if we should relax this check.
         tassert(11483014,
                 "The viewless collection to downgrade does not have the expected UUID",
                 !expectedUUID || mainColl->uuid() == *expectedUUID);
