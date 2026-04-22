@@ -2,8 +2,6 @@
  * Verifies bounded collection scan operation for collections clustered by _id.
  *
  * @tags: [
- *   # The expected doc examined is incorrect in multiversion tests with mongod below 8.0.
- *   requires_fcv_90,
  *   # Does not support sharding
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
