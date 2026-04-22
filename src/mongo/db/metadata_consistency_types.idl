@@ -57,7 +57,7 @@ enums:
             kZonesRangeOverlap: "ZonesRangeOverlap"
             kTrackedUnshardedCollectionHasMultipleChunks: "TrackedUnshardedCollectionHasMultipleChunks"
             kTrackedUnshardedCollectionHasInvalidKey: "TrackedUnshardedCollectionHasInvalidKey"
-
+            kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -82,6 +82,7 @@ enums:
             kZonesRangeOverlap: "Found two overlapping zones"
             kTrackedUnshardedCollectionHasMultipleChunks: "Found tracked unsharded collection with more than one chunks"
             kTrackedUnshardedCollectionHasInvalidKey: "Found tracked unsharded collection with invalid shard-key"
+            kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
@@ -441,4 +442,22 @@ structs:
                               DDL operations on a database"
                 type: exactInt64
                 validator: { gte: 0, lte: 2147483647 } # [0, 2^31 - 1]
+                optional: true
+
+    UniqueIndexInconsistencyInfo:
+        description: "Details about unique index misconfiguration."
+        strict: false
+        fields:
+            index:
+                type: object
+                description: "Index with the issue."
+            shard:
+                type: shard_id
+                description: "Shard id where the issue was found."
+            issue:
+                type: string
+                description: "Uniqueness issue found."
+            shardKey:
+                type: object
+                description: "Collection shard key."
                 optional: true

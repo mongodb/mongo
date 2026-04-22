@@ -95,7 +95,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& shardingCatalogCollections,
-    const std::vector<CollectionPtr>& localCatalogCollections);
+    const std::vector<CollectionPtr>& localCatalogCollections,
+    bool optionalCheckIndexes);
 
 /**
  * For every collection, check that all the shards currently owning chunks for that collection have

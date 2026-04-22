@@ -145,11 +145,16 @@ public:
             const auto configsvrCollections =
                 getCollectionsListFromConfigServer(opCtx, nss, commandLevel);
 
-            auto inconsistencies = checkCollectionMetadataConsistency(
-                opCtx, nss, commandLevel, shardId, primaryShardId, configsvrCollections);
+            const auto optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
+            auto inconsistencies = checkCollectionMetadataConsistency(opCtx,
+                                                                      nss,
+                                                                      commandLevel,
+                                                                      shardId,
+                                                                      primaryShardId,
+                                                                      configsvrCollections,
+                                                                      optionalCheckIndexes);
 
             // If this is the primary shard of the db coordinate index check across shards
-            const auto optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
             if (shardId == primaryShardId) {
                 if (optionalCheckIndexes) {
                     auto indexInconsistencies =
@@ -237,7 +242,8 @@ public:
             const MetadataConsistencyCommandLevelEnum& commandLevel,
             const ShardId& shardId,
             const ShardId& primaryShardId,
-            const std::vector<mongo::CollectionType>& shardingCatalogCollections) {
+            const std::vector<mongo::CollectionType>& shardingCatalogCollections,
+            bool optionalCheckIndexes) {
             std::vector<CollectionPtr> localCatalogCollections;
             auto collCatalogSnapshot = [&] {
                 switch (commandLevel) {
@@ -311,7 +317,8 @@ public:
                 shardId,
                 primaryShardId,
                 shardingCatalogCollections,
-                localCatalogCollections);
+                localCatalogCollections,
+                optionalCheckIndexes);
         }
 
         NamespaceString ns() const override {
