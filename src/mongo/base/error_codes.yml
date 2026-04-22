@@ -1253,5 +1253,11 @@ error_codes:
       categories: [ConnectionFatalMessageParseError],
     }
 
+  - {
+      code: 504,
+      name: StreamProcessorIcebergRetryableError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
