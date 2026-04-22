@@ -477,6 +477,8 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // If the routing table exists, then the collection is tracked in the router role and we can
     // validate if it is timeseries. If the collection is untracked, this validation will happen in
     // the shard role.
+    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // search stage.
     if (request.getIsHybridSearch() && cri && cri->hasRoutingTable()) {
         uassert(10557300,
                 "$rankFusion and $scoreFusion are unsupported on timeseries collections",
@@ -561,6 +563,14 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     const auto wasDesugaredHere =
         !alreadyDesugared && LiteParsedDesugarer::desugar(&clonedLPP, ifrContext);
 
+    bool extensionsInHybridSearchEnabled = expCtx->getIfrContext() &&
+        expCtx->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    bool criIsSharded = cri && cri->hasRoutingTable();
+    if (extensionsInHybridSearchEnabled && criIsSharded) {
+        clonedLPP.validateWithCollectionMetadata(cri.get());
+    }
+
     // Parse the user's original pipeline pre-desugar to capture query stats. Passing through
     // wasDesugaredHere will determine whether a StubMongoProcessInterface will be attached to this
     // parse or not.
@@ -609,6 +619,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         pipeline = Pipeline::parseFromLiteParsed(clonedLPP, expCtx);
     }
 
+    // TODO SERVER-117803 Delete this duplicated check.
     if (cri && cri->hasRoutingTable()) {
         pipeline->validateWithCollectionMetadata(cri.get());
     }

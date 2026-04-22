@@ -186,6 +186,17 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
     }
 }
 
+void LiteParsedPipeline::validateTimeseries() const {
+    for (const auto& stage : _stageSpecs) {
+        auto stageConstraints = stage->constraints();
+        auto unsupportedStage = stageConstraints.timeseriesUnsupportedStageName.value_or(
+            StringData(stage->getParseTimeName()));
+        uassert(12093200,
+                str::stream() << unsupportedStage << " is unsupported for timeseries collections",
+                stageConstraints.canRunOnTimeseries);
+    }
+}
+
 void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;

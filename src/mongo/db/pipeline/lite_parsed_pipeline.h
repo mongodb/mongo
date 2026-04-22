@@ -52,6 +52,10 @@
 
 namespace mongo {
 
+// TODO SERVER-123689 Remove these or write investigation comment.
+class CollectionRoutingInfo;
+class CollectionOrViewAcquisition;
+
 using StageSpecs = std::vector<std::unique_ptr<LiteParsedDocumentSource>>;
 
 /**
@@ -390,12 +394,21 @@ public:
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
 
     /**
+     * Validates the pipeline against collection metadata. Checks stage constraints (e.g.
+     * canRunOnTimeseries) using the provided collection routing info or acquisition.
+     * Mirrors Pipeline::validateWithCollectionMetadata.
+     */
+    void validateWithCollectionMetadata(const CollectionOrViewAcquisition& collOrView) const;
+    void validateWithCollectionMetadata(const CollectionRoutingInfo& cri) const;
+
+    /**
      * Checks that specific stage types are not present in the pipeline that are disallowed
      * in the definition of a view. Recursively checks sub-pipelines.
      */
     void checkStagesAllowedInViewDefinition() const;
 
-    // TODO SERVER-121974: Remove this once we can validate views for hybrid search in LiteParsed.
+    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // search stage.
     bool isRunningAgainstView_ForHybridSearch() const {
         return _isRunningAgainstView_ForHybridSearch;
     }
@@ -460,6 +473,11 @@ public:
 private:
     friend struct ViewInfo;
 
+    /**
+     * Checks that no stage in the pipeline has canRunOnTimeseries == false.
+     */
+    void validateTimeseries() const;
+
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
     StageSpecs _stageSpecs;
@@ -468,8 +486,8 @@ private:
 
     // This variable specifies whether the pipeline is running on a view's namespace. This is
     // currently needed for $rankFusion/$scoreFusion positional validation.
-    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
-    // search stage.
+    // TODO SERVER-121974 This can be removed once hybrid search views are validated in
+    // LiteParsed using the LiteParsedConstraints.
     bool _isRunningAgainstView_ForHybridSearch = false;
 
     /**

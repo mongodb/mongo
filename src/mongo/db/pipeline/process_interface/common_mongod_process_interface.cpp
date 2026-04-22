@@ -67,6 +67,7 @@
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -831,14 +832,23 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     }
 
     CollectionOrViewAcquisitionMap allAcquisitions;
+    auto serializedPipeline = pipeline->serializeToBson();
     bool isAnySecondaryCollectionNotLocal =
-        acquireCollectionsForPipeline(expCtx, pipeline->serializeToBson(), allAcquisitions);
+        acquireCollectionsForPipeline(expCtx, serializedPipeline, allAcquisitions);
 
     // Find the primary acquisition, so we can use it in 'performPreOptimizationRewrites'.
     const auto& itr = allAcquisitions.find(expCtx->getNamespaceString());
     tassert(10313201, "Must acquire the primary namespace", itr != allAcquisitions.end());
     const CollectionOrViewAcquisition& primaryAcquisition = itr->second;
-    pipeline->validateWithCollectionMetadata(primaryAcquisition);
+    if (expCtx->getIfrContext() &&
+        expCtx->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+        LiteParsedPipeline(expCtx->getNamespaceString(), serializedPipeline)
+            .validateWithCollectionMetadata(primaryAcquisition);
+    } else {
+        // TODO SERVER-117803 Delete this duplicated check.
+        pipeline->validateWithCollectionMetadata(primaryAcquisition);
+    }
     pipeline->performPreOptimizationRewrites(expCtx, primaryAcquisition);
 
     if (optimizePipeline) {

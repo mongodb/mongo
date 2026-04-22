@@ -77,7 +77,9 @@ const errorTests = [
         stage: "$_internalSearchIdLookup",
         pipeline: [{$_internalSearchIdLookup: {}}],
         expectedErrorCodes: [
+            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
             10557302, // check for 'canRunOnTimeseries' failed.
+            12093200, // LiteParsed timeseries validation.
         ],
     },
     {
@@ -141,7 +143,8 @@ const errorTests = [
     {
         stage: "$_internalJoinHint",
         pipeline: [{$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}}],
-        expectedErrorCodes: [40602, 10557302, 40324, ErrorCodes.IllegalOperation],
+        // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+        expectedErrorCodes: [40602, 10557302, 12093200, 40324, ErrorCodes.IllegalOperation],
     },
 ];
 

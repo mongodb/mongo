@@ -66,6 +66,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -1610,7 +1611,22 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
 
             const CollectionRoutingInfo& cri =
                 routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString());
-            pipelineToTarget->validateWithCollectionMetadata(cri);
+
+            // TODO SERVER-124003 Figure out a way to either avoid this serialized BSON or reuse it
+            // as much as possible.
+            LiteParsedPipeline liteParsedPipeline(expCtx->getNamespaceString(),
+                                                  pipelineToTarget->serializeToBson());
+            PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
+
+            if (expCtx->getIfrContext() &&
+                expCtx->getIfrContext()->getSavedFlagValue(
+                    feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+                liteParsedPipeline.validateWithCollectionMetadata(cri);
+            } else {
+                // TODO SERVER-117803 Delete this duplicated check.
+                pipelineToTarget->validateWithCollectionMetadata(cri);
+            }
+
             pipelineToTarget->performPreOptimizationRewrites(expCtx, cri);
 
             if (optimizePipeline) {
@@ -1622,8 +1638,6 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
                                                pipelineToTarget->serializeToBson());
             aggregation_request_helper::addIfrFlagsToRequest(aggRequest, expCtx->getIfrContext());
 
-            LiteParsedPipeline liteParsedPipeline(aggRequest);
-            PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
             aggregation_request_helper::addQuerySettingsToRequest(aggRequest, expCtx);
 
             auto shardDispatchResults =
@@ -1736,6 +1750,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     AggregateCommandRequest aggRequest,
+    PipelineDataSource pipelineDataSource,
     RoutingContext& routingCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
@@ -1748,9 +1763,6 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
             "Pipeline should not start with $mergeCursors",
             pipeline->empty() ||
                 !pipeline->getSources().front()->isInstanceOf<DocumentSourceMergeCursors>());
-
-    LiteParsedPipeline liteParsedPipeline(aggRequest);
-    PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
 
     std::unique_ptr<Pipeline> pipelineToTarget = pipeline->clone();
     TargetingResults pipelineTargetingInfo =
@@ -1861,14 +1873,16 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             // We must have a clone of the pipeline in case this loop is retried.
             std::unique_ptr<Pipeline> pipelineToTarget = pipeline->clone();
-            return targetShardsAndAddMergeCursorsWithRoutingCtx(expCtx,
-                                                                std::move(pipelineToTarget),
-                                                                aggRequest,
-                                                                routingCtx,
-                                                                shardCursorsSortSpec,
-                                                                shardTargetingPolicy,
-                                                                readConcern,
-                                                                useCollectionDefaultCollator);
+            return targetShardsAndAddMergeCursorsWithRoutingCtx(
+                expCtx,
+                std::move(pipelineToTarget),
+                aggRequest,
+                getPipelineDataSource(LiteParsedPipeline(aggRequest)),
+                routingCtx,
+                shardCursorsSortSpec,
+                shardTargetingPolicy,
+                readConcern,
+                useCollectionDefaultCollator);
         });
 }
 
@@ -1924,9 +1938,23 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
 
             const CollectionRoutingInfo& cri =
                 routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString());
-            pipelineToTarget->validateWithCollectionMetadata(cri);
-            pipelineToTarget->performPreOptimizationRewrites(expCtx, cri);
 
+            // TODO SERVER-124003 Figure out a way to either avoid this serialized BSON or reuse it
+            // as much as possible.
+            LiteParsedPipeline liteParsedPipeline(expCtx->getNamespaceString(),
+                                                  pipelineToTarget->serializeToBson());
+            PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
+
+            if (expCtx->getIfrContext() &&
+                expCtx->getIfrContext()->getSavedFlagValue(
+                    feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+                liteParsedPipeline.validateWithCollectionMetadata(cri);
+            } else {
+                // TODO SERVER-117803 Delete this duplicated check.
+                pipelineToTarget->validateWithCollectionMetadata(cri);
+            }
+
+            pipelineToTarget->performPreOptimizationRewrites(expCtx, cri);
             if (optimizePipeline) {
                 optimizePipeline(pipelineToTarget.get());
             }
@@ -1938,12 +1966,14 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
 
             AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
                                                pipelineToTarget->serializeToBson());
+
             aggregation_request_helper::addIfrFlagsToRequest(aggRequest, expCtx->getIfrContext());
 
             return targetShardsAndAddMergeCursorsWithRoutingCtx(
                 expCtx,
                 std::move(pipelineToTarget),
                 aggRequest,
+                pipelineDataSource,
                 routingCtx,
                 boost::none /* shardCursorsSortSpec */,
                 shardTargetingPolicy,

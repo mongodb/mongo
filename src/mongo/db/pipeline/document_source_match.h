@@ -85,7 +85,7 @@ public:
     // $match with $text is not allowed on timeseries collections.
     Constraints constraints() const override {
         if (_isTextQuery) {
-            return {.canRunOnTimeseries = false};
+            return {.canRunOnTimeseries = false, .timeseriesUnsupportedStageName = "$text"_sd};
         }
         return {};
     }

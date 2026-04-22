@@ -92,6 +92,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
@@ -1064,6 +1065,15 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     auto secondParseRequirement =
         desugaredHere ? SecondParseRequirement::kReparseFromLPP : SecondParseRequirement::kNone;
 
+    // Validate the entire lite parsed pipeline with the view definition.
+    if (expCtx->getIfrContext() &&
+        expCtx->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+        if (aggCatalogState.lockAcquired()) {
+            desugaredLPP.validateWithCollectionMetadata(aggCatalogState.getMainCollectionOrView());
+        }
+    }
+
     // Parse the user's original pipeline pre-desugar to capture query stats. If the pipeline was
     // desugared (and thus will need a reparse), this initial parse will be executed with a
     // StubMongoProcessInterface to indicate that the pipeline isn't expected to execute queries.
@@ -1088,6 +1098,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     expCtx->stopExpressionCounters();
 
     // Validate the entire pipeline with the view definition.
+    // TODO SERVER-117803 Delete this duplicated check.
     if (aggCatalogState.lockAcquired()) {
         pipeline->validateWithCollectionMetadata(aggCatalogState.getMainCollectionOrView());
     }

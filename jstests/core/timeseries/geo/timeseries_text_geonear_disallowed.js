@@ -65,14 +65,16 @@ assert.commandFailedWithCode(
 // Text indices are disallowed on collections clustered by _id.
 assert.commandFailedWithCode(tsColl.createIndex({"tags.descr": "text"}), ErrorCodes.InvalidOptions);
 // Since a Text index can't be created, a $text query should fail due to a missing index.
+// TODO SERVER-117803 Delete code 10830400 once we only validate in LPP.
 assert.commandFailedWithCode(
     assert.throws(() => tsColl.find({$text: {$search: "1"}}).itcount()),
-    [ErrorCodes.IndexNotFound, 10830400],
+    [ErrorCodes.IndexNotFound, 10830400, 12093200],
 );
 // TODO SERVER-108560 remove '17313' error code when 9.0 becomes last LTS, and we only have viewless timeseries.
+// TODO SERVER-117803 Delete code 10830400 once we only validate in LPP.
 assert.commandFailedWithCode(
     assert.throws(() => tsColl.aggregate([{$match: {$text: {$search: "1"}}}]).itcount()),
-    [ErrorCodes.IndexNotFound, 17313, 10830400],
+    [ErrorCodes.IndexNotFound, 17313, 10830400, 12093200],
 );
 
 // $where cannot be used inside a $match stage and therefore is unsupported on timeseries collections.
