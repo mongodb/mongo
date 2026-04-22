@@ -13,8 +13,7 @@ rst.initiate();
 
 // Background query analysis operations such as index creation may throw off
 // the checks between the replSetGetStatus result and the last oplog entry.
-// TODO SERVER-124430: This should be deleted if we move this into
-// ReplSetTest initiateForDisagg.
+// TODO SERVER-109841: This should be deleted if we move this into ReplSetTest.
 rst.waitForQueryAnalysisWriterSetup();
 
 const db = rst.getPrimary().getDB("oplog_scan_optimizations");
