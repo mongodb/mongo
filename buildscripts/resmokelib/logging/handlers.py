@@ -253,13 +253,18 @@ class BufferedFileHandler(BufferedHandler):
 
     def _flush_buffer_with_lock(self, buf, close_called):
         """Write the buffered log lines to the destination file."""
-        self.file.writelines(buf)
+        if not self.file.closed:
+            self.file.writelines(buf)
 
     def close(self):
         """Close the handler and the file descriptor."""
         super().close()
 
-        self.file.close()
+        # Acquire the flush lock to ensure any in-progress flush from the flush
+        # thread completes before we close the file descriptor. Without this,
+        # a racing flush can call writelines() on a closed file.
+        with self._BufferedHandler__flush_lock:
+            self.file.close()
 
 
 class HTTPHandler(object):
