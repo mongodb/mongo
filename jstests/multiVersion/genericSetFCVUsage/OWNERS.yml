@@ -45,3 +45,6 @@ filters:
   - "s2_index_v4_downgrade.js":
     approvers:
       - 10gen/query-integration-features
+  - "fcv_upgrade_downgrade_during_index_build.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

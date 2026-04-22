@@ -1,6 +1,6 @@
 /**
  * If a user attempts to downgrade the server while there is an index build in progress, the
- * downgrade should succeed without blocking.
+ * downgrade will fail before performing any work.
  * @tags: [
  *   requires_replication,
  * ]
@@ -40,12 +40,12 @@ const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
 // Downgrade the primary using the setFeatureCompatibilityVersion command.
-try {
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-} finally {
-    IndexBuildTest.resumeIndexBuilds(primary);
-}
+assert.commandFailedWithCode(
+    primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    ErrorCodes.BackgroundOperationInProgressForNamespace,
+);
 
+IndexBuildTest.resumeIndexBuilds(primary);
 IndexBuildTest.waitForIndexBuildToStop(testDB);
 
 createIdx();
