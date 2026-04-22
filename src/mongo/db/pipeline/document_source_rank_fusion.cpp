@@ -35,6 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -91,6 +92,83 @@ std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::
 
     return std::make_unique<DocumentSourceRankFusion::LiteParsed>(
         spec, nss, std::move(liteParsedPipelines));
+}
+
+void DocumentSourceRankFusion::LiteParsed::validate() const {
+    static const std::string rankPipelineMsg =
+        "All subpipelines to the $rankFusion stage must begin with one of $search, "
+        "$vectorSearch, $geoNear, or have a $sort in the pipeline.";
+
+    // Validate pipeline names are unique. We navigate _originalBson directly (rather than
+    // through IDL parsing) so the StringData from fieldNameStringData() points into the
+    // stable _originalBson member and avoids use-after-free.
+    auto pipelinesObj = _originalBson.Obj()["input"].Obj()["pipelines"].Obj();
+    StringDataSet seenNames;
+    for (const auto& elem : pipelinesObj) {
+        auto pipelineName = elem.fieldNameStringData();
+        uassertStatusOKWithContext(
+            FieldPath::validateFieldName(pipelineName),
+            "$rankFusion pipeline names must follow the naming rules of field path expressions.");
+        uassert(
+            12108714,
+            str::stream() << "$rankFusion pipeline names must be unique, but found duplicate name '"
+                          << pipelineName << "'.",
+            seenNames.insert(pipelineName).second);
+    }
+
+    for (const auto& pipeline : _pipelines) {
+        const auto& stages = pipeline.getStages();
+
+        // Each input pipeline must not be empty.
+        uassert(12108700,
+                str::stream() << "$rankFusion input pipeline cannot be empty. " << rankPipelineMsg,
+                !stages.empty());
+
+        // TODO SERVER-115791: Remove this once extension $vectorSearch is supported in hybrid
+        // search pipelines. This must be checked before the ranked/selection checks because
+        // extension $vectorSearch doesn't report isRankedStage on its LiteParsedExpandable.
+        if (pipeline.hasExtensionVectorSearchStage()) {
+            vector_search_metrics::inHybridSearchKickbackRetryCount.increment();
+            uassertStatusOK(
+                Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
+                       "$vectorSearch-as-an-extension is not allowed in a $rankFusion pipeline."));
+        }
+
+        if (pipeline.hasExtensionSearchStage()) {
+            search_metrics::inHybridSearchKickbackRetryCount.increment();
+            uassertStatusOK(
+                Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagSearchExtension.getName()),
+                       "$search-as-an-extension is not allowed in a $rankFusion pipeline."));
+        }
+
+        // No nested hybrid search stages ($rankFusion/$scoreFusion).
+        uassert(12108701,
+                "$rankFusion input pipeline has a nested hybrid search stage "
+                "($rankFusion/$scoreFusion). " +
+                    rankPipelineMsg,
+                !pipeline.hasHybridSearchStage());
+
+        // Pipeline must be ranked.
+        uassert(12108702,
+                "Pipeline did not begin with a ranked stage and did not contain an explicit "
+                "$sort stage. " +
+                    rankPipelineMsg,
+                pipeline.isRankedPipeline());
+
+        // All stages must be selection stages and must not contain $score.
+        for (const auto& stage : stages) {
+            uassert(12108703,
+                    "$rankFusion input pipelines must not contain a $score stage.",
+                    stage->getParseTimeName() != "$score");
+            uassert(12108704,
+                    str::stream()
+                        << stage->getParseTimeName()
+                        << " is not a selection stage because it modifies or transforms the input "
+                           "documents. Only stages that retrieve, limit, or order documents are "
+                           "allowed.",
+                    stage->isSelectionStage());
+        }
+    }
 }
 
 /**

@@ -490,6 +490,11 @@ public:
     }
 
     /**
+     * Stage-specific validation. Called by LiteParsedPipeline::validate().
+     */
+    virtual void validate() const {};
+
+    /**
      * Returns true if this is a search stage ($search, $vectorSearch, $rankFusion, etc.)
      */
     virtual bool isSearchStage() const {

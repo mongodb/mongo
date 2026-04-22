@@ -5570,5 +5570,130 @@ TEST_F(DocumentSourceRankFusionTest, InternalFieldBehaviorThroughGroupAndReshape
     ASSERT_TRUE(results[0]["__hs_name1_score"_sd].missing());
     ASSERT_TRUE(results[1]["__hs_name1_score"_sd].missing());
 }
+// Tests for DocumentSourceRankFusion::LiteParsed::validate().
+// These call validate() directly on the LiteParsed object.
+
+TEST_F(DocumentSourceRankFusionTest, ValidateSucceedsWithValidRankedPipeline) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$sort: {x: 1}}]
+                }
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceRankFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    liteParsed->validate();  // Should not throw.
+}
+
+TEST_F(DocumentSourceRankFusionTest, ValidateThrowsOnEmptySubpipeline) {
+    auto nss = getExpCtx()->getNamespaceString();
+    std::vector<LiteParsedPipeline> pipelines;
+    pipelines.emplace_back(nss, std::vector<BSONObj>{});
+
+    auto spec =
+        BSON("$rankFusion" << BSON("input" << BSON("pipelines" << BSON("p1" << BSONArray()))));
+    auto liteParsed = std::make_unique<DocumentSourceRankFusion::LiteParsed>(
+        spec.firstElement(), nss, std::move(pipelines));
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108700);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ValidateThrowsOnNonRankedPipeline) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$match: {x: 1}}]
+                }
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceRankFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108702);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ValidateThrowsOnNonSelectionStage) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$sort: {x: 1}}, {$addFields: {y: 1}}]
+                }
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceRankFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108704);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ValidateThrowsOnNestedHybridSearch) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$rankFusion: {input: {pipelines: {inner: [{$sort: {x: 1}}]}}}}]
+                }
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceRankFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108701);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ValidateThrowsOnDuplicatePipelineNames) {
+    // Construct BSON with duplicate pipeline names manually since fromjson deduplicates.
+    auto spec =
+        BSON("$rankFusion" << BSON(
+                 "input" << BSON("pipelines" << BSON(
+                                     "dup" << BSON_ARRAY(BSON("$sort" << BSON("x" << 1))) << "dup"
+                                           << BSON_ARRAY(BSON("$sort" << BSON("y" << 1)))))));
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceRankFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108714);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ValidateThrowsOnScoreStageInPipeline) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$sort: {x: 1}}, {$score: {}}]
+                }
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceRankFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108703);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ValidateSucceedsWithMultipleValidPipelines) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    byX: [{$sort: {x: 1}}],
+                    byY: [{$sort: {y: -1}}]
+                }
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceRankFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    liteParsed->validate();  // Should not throw.
+}
+
 }  // namespace
 }  // namespace mongo

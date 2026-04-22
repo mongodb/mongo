@@ -84,6 +84,81 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
         spec, nss, std::move(liteParsedPipelines));
 }
 
+// TODO SERVER-121091 This is currently repeated code with $rankFusion but we can merge both once we
+// have an internal LiteParsed hybrid search stage.
+void DocumentSourceScoreFusion::LiteParsed::validate() const {
+    static const std::string scorePipelineMsg =
+        "All subpipelines to the $scoreFusion stage must begin with one of $search, "
+        "$vectorSearch, or have a custom $score in the pipeline.";
+
+    // Validate pipeline names are unique. We navigate _originalBson directly (rather than
+    // through IDL parsing) so the StringData from fieldNameStringData() points into the
+    // stable _originalBson member and avoids use-after-free.
+    auto pipelinesObj = _originalBson.Obj()["input"].Obj()["pipelines"].Obj();
+    StringDataSet seenNames;
+    for (const auto& elem : pipelinesObj) {
+        auto pipelineName = elem.fieldNameStringData();
+        uassertStatusOKWithContext(
+            FieldPath::validateFieldName(pipelineName),
+            "$scoreFusion pipeline names must follow the naming rules of field path expressions.");
+        uassert(12108715,
+                str::stream()
+                    << "$scoreFusion pipeline names must be unique, but found duplicate name '"
+                    << pipelineName << "'.",
+                seenNames.insert(pipelineName).second);
+    }
+
+    for (const auto& pipeline : _pipelines) {
+        const auto& stages = pipeline.getStages();
+
+        // Each input pipeline must not be empty.
+        uassert(12108710,
+                str::stream() << "$scoreFusion input pipeline cannot be empty. "
+                              << scorePipelineMsg,
+                !stages.empty());
+
+        // TODO SERVER-117661: Remove this once extension $vectorSearch is supported in hybrid
+        // search pipelines. This must be checked before the scored/selection checks because
+        // extension $vectorSearch doesn't report isScoredStage on its LiteParsedExpandable.
+        search_helpers::throwIfrKickbackIfNecessary(
+            pipeline.hasExtensionVectorSearchStage(),
+            feature_flags::gFeatureFlagVectorSearchExtension,
+            vector_search_metrics::inHybridSearchKickbackRetryCount,
+            "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
+
+        search_helpers::throwIfrKickbackIfNecessary(
+            pipeline.hasExtensionSearchStage(),
+            feature_flags::gFeatureFlagSearchExtension,
+            search_metrics::inHybridSearchKickbackRetryCount,
+            "$search-as-an-extension is not allowed in a $scoreFusion pipeline.");
+
+        // No nested hybrid search stages ($rankFusion/$scoreFusion).
+        uassert(12108711,
+                "$scoreFusion input pipeline has a nested hybrid search stage "
+                "($rankFusion/$scoreFusion). " +
+                    scorePipelineMsg,
+                !pipeline.hasHybridSearchStage());
+
+        // Pipeline must be scored.
+        uassert(12108712,
+                "Pipeline did not begin with a scored stage and did not contain an explicit "
+                "$score stage. " +
+                    scorePipelineMsg,
+                pipeline.isScoredPipeline());
+
+        // All stages must be selection stages.
+        for (const auto& stage : stages) {
+            uassert(12108713,
+                    str::stream()
+                        << stage->getParseTimeName()
+                        << " is not a selection stage because it modifies or transforms the input "
+                           "documents. Only stages that retrieve, limit, or order documents are "
+                           "allowed.",
+                    stage->isSelectionStage());
+        }
+    }
+}
+
 /**
  * Checks that the input pipeline is a valid scored pipeline. This means it is either one of
  * $search, $vectorSearch, $scoreFusion, $rankFusion (which have scored output) or has an explicit

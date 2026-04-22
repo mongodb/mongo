@@ -8902,5 +8902,106 @@ TEST_F(DocumentSourceScoreFusionTest, InternalFieldBehaviorThroughGroupAndReshap
     ASSERT_TRUE(results[0]["__hs_name1_score"_sd].missing());
     ASSERT_TRUE(results[1]["__hs_name1_score"_sd].missing());
 }
+// Tests for DocumentSourceScoreFusion::LiteParsed::validate().
+
+TEST_F(DocumentSourceScoreFusionTest, ValidateSucceedsWithValidScoredPipeline) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$sort: {x: 1}}, {$score: {}}]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceScoreFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    liteParsed->validate();  // Should not throw.
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ValidateThrowsOnEmptySubpipeline) {
+    auto nss = getExpCtx()->getNamespaceString();
+    std::vector<LiteParsedPipeline> pipelines;
+    pipelines.emplace_back(nss, std::vector<BSONObj>{});
+
+    auto spec = BSON("$scoreFusion" << BSON("input" << BSON("pipelines" << BSON("p1" << BSONArray())
+                                                                        << "normalization"
+                                                                        << "none")));
+    auto liteParsed = std::make_unique<DocumentSourceScoreFusion::LiteParsed>(
+        spec.firstElement(), nss, std::move(pipelines));
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108710);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ValidateThrowsOnNonScoredPipeline) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$match: {x: 1}}]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceScoreFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108712);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ValidateThrowsOnNonSelectionStage) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$sort: {x: 1}}, {$score: {}}, {$addFields: {y: 1}}]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceScoreFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108713);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ValidateThrowsOnNestedHybridSearch) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    p1: [{$scoreFusion: {input: {pipelines: {inner: [{$sort: {x: 1}}, {$score: {}}]}, normalization: "none"}}}]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceScoreFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108711);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ValidateSucceedsWithMultipleValidPipelines) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    byX: [{$sort: {x: 1}}, {$score: {}}],
+                    byY: [{$sort: {y: -1}}, {$score: {}}]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+
+    auto nss = getExpCtx()->getNamespaceString();
+    auto liteParsed = DocumentSourceScoreFusion::LiteParsed::parse(nss, spec.firstElement(), {});
+    liteParsed->validate();  // Should not throw.
+}
+
 }  // namespace
 }  // namespace mongo

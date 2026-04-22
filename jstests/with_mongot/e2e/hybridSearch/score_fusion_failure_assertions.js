@@ -148,7 +148,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    9402500,
+    [9402500, 12108712],
 );
 
 // Check that non-selection pipeline is invalid
@@ -165,7 +165,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    9402502,
+    [9402502, 12108713],
 );
 
 assert.commandFailedWithCode(
@@ -190,7 +190,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10473003,
+    [10473003, 12108711],
 );
 
 assert.commandFailedWithCode(
@@ -214,7 +214,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10473003,
+    [10473003, 12108711],
 );
 
 assert.commandFailedWithCode(
@@ -240,7 +240,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10170100,
+    [10170100, 12108711],
 );
 
 assert.commandFailedWithCode(
@@ -266,5 +266,5 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10473003,
+    [10473003, 12108711],
 );

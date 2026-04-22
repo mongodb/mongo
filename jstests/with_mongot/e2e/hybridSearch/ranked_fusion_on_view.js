@@ -308,6 +308,6 @@ const runRankFusionViewTest = (testName, inputPipelines, viewPipeline, checkCorr
             pipeline: [{$rankFusion: {input: {pipelines: {p: []}}}}],
             cursor: {},
         }),
-        9834300,
+        [9834300, 12108700],
     );
 })();

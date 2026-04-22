@@ -20,7 +20,10 @@ function runPipeline(pipeline) {
 }
 
 // Check that unranked pipeline is invalid.
-assert.commandFailedWithCode(runPipeline([{$rankFusion: {input: {pipelines: {searchone: [{$limit: 5}]}}}}]), 9191100);
+assert.commandFailedWithCode(
+    runPipeline([{$rankFusion: {input: {pipelines: {searchone: [{$limit: 5}]}}}}]),
+    [9191100, 12108702],
+);
 
 // Check that non-selection pipeline is invalid
 assert.commandFailedWithCode(
@@ -29,7 +32,7 @@ assert.commandFailedWithCode(
             $rankFusion: {input: {pipelines: {searchone: [{$sort: {_id: 1}}, {$project: {score1: 1}}]}}},
         },
     ]),
-    9191103,
+    [9191103, 12108704],
 );
 
 assert.commandFailedWithCode(
@@ -42,7 +45,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10473002,
+    [10473002, 12108701],
 );
 
 assert.commandFailedWithCode(
@@ -66,7 +69,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10473002,
+    [10473002, 12108701],
 );
 
 assert.commandFailedWithCode(
@@ -81,14 +84,14 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10170100,
+    [10170100, 12108701],
 );
 
 // Check that LPP validation catches that $rankFusion is not the first stage. This test may help
 // expose discrepancies across sharding topologies.
 assert.commandFailedWithCode(
     runPipeline([{$limit: 10}, {$rankFusion: {input: {pipelines: {nested: [{$sort: {_id: 1}}]}}}}]),
-    10170100,
+    [10170100, 12108701],
 );
 
 // Check that $score is not an allowed stage in $rankFusion.
@@ -100,7 +103,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10614800,
+    [10614800, 12108703],
 );
 assert.commandFailedWithCode(
     runPipeline([
@@ -110,7 +113,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10614800,
+    [10614800, 12108703],
 );
 assert.commandFailedWithCode(
     runPipeline([
@@ -125,7 +128,7 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10614800,
+    [10614800, 12108703],
 );
 assert.commandFailedWithCode(
     runPipeline([
@@ -140,5 +143,5 @@ assert.commandFailedWithCode(
             },
         },
     ]),
-    10614800,
+    [10614800, 12108703],
 );

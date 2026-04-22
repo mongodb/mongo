@@ -16,10 +16,14 @@ for (let i = 0; i < nDocs; i++) {
 assert.commandWorked(bulk.execute());
 
 // $sample by itself is not a ranked pipeline.
-assertErrorCode(coll, [{$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: nDocs}}]}}}}], 9191100);
+assertErrorCode(
+    coll,
+    [{$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: nDocs}}]}}}}],
+    [9191100, 12108702],
+);
 
 // Make sure a $sample which is eligible to be optimized into a random cursor is also rejected.
-assertErrorCode(coll, [{$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: 4}}]}}}}], 9191100);
+assertErrorCode(coll, [{$rankFusion: {input: {pipelines: {sampled: [{$sample: {size: 4}}]}}}}], [9191100, 12108702]);
 
 // Test that it is rejected in any position.
 assertErrorCode(
@@ -36,7 +40,7 @@ assertErrorCode(
             },
         },
     ],
-    9191100,
+    [9191100, 12108702],
 );
 
 // Test that it fails if only the second pipeline is a valid scored selection pipeline.
@@ -54,7 +58,7 @@ assertErrorCode(
             },
         },
     ],
-    9191100,
+    [9191100, 12108702],
 );
 
 // Test that it is allowed if there is an explicit $sort.

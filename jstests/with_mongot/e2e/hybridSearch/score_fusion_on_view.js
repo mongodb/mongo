@@ -358,6 +358,6 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
             pipeline: [{$scoreFusion: {input: {pipelines: {p: []}, normalization: "none"}}}],
             cursor: {},
         }),
-        9402503,
+        [9402503, 12108710],
     );
 })();
