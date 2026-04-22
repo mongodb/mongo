@@ -62,7 +62,8 @@ const bigStr = Array(1024 * 1024 + 1).toString(); // 1MB of ','
 for (let i = 0; i < memoryLimitMB + 1; i++)
     assert.commandWorked(coll.insert({_id: i, bigStr: i + bigStr, random: Math.random()}));
 
-assert.gt(coll.stats().size, memoryLimitMB * 1024 * 1024);
+const dataSize = assert.commandWorked(db.runCommand({dataSize: coll.getFullName()})).size;
+assert.gt(dataSize, memoryLimitMB * 1024 * 1024);
 
 function test({pipeline, expectedCodes, canSpillToDisk}) {
     // Test that 'allowDiskUse: false' does indeed prevent spilling to disk.

@@ -18,7 +18,8 @@ for (let i = 0; i < memoryLimitMB + 10; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.gt(coll.stats().size, memoryLimitMB * 1024 * 1024);
+const dataSize = assert.commandWorked(db.runCommand({dataSize: coll.getFullName()})).size;
+assert.gt(dataSize, memoryLimitMB * 1024 * 1024);
 
 // Test accumulating all values into one array. On debug builds we will spill to disk for $group and
 // so may hit the group error code before we hit ExceededMemoryLimit.

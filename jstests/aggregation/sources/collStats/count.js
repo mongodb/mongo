@@ -1,5 +1,10 @@
-// Test that count within a $collStats stage returns the correct number of documents.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+/** Test that count within a $collStats stage returns the correct number of documents.
+ * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   # TODO SERVER-124178: Revisit this test.
+ *   featureFlagReplicatedFastCount_incompatible,
+ *   ]
+ */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let testDB = db.getSiblingDB("aggregation_count_db");
