@@ -1878,20 +1878,41 @@ void ReshardingCoordinator::_generatePlacementChangeNotificationForChangeStreams
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    std::vector<ExecutorFuture<ReshardingCoordinatorDocument>> futures;
-    futures.emplace_back(
-        _reshardingCoordinatorObserver->awaitAllRecipientsDone().thenRunOn(**executor));
-    futures.emplace_back(
-        _reshardingCoordinatorObserver->awaitAllDonorsDone().thenRunOn(**executor));
+    auto coordinatorDocFuture = [&]() -> ExecutorFuture<ReshardingCoordinatorDocument> {
+        if (_coordinatorDoc.getAbortReason() &&
+            resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
+                resharding::getVersionContextOrDefault(_forwardableOpMetadata),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // Under featureFlagReshardingInitNoRefresh, all participants are guaranteed to be done
+            // at this point. AbortReshardCollection ensures that all initialized participants have
+            // completed, and since the command carries a higher txnNumber (via OSI), no new
+            // participants can initialize after it is sent. Therefore, it is safe to skip the
+            // observer wait.
+            LOGV2_DEBUG(9285700,
+                        1,
+                        "Skipping participant observer wait: command OSI ordering guarantees "
+                        "participants will self-abort.",
+                        "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+            return ExecutorFuture<ReshardingCoordinatorDocument>(**executor, _coordinatorDoc);
+        }
+
+        std::vector<ExecutorFuture<ReshardingCoordinatorDocument>> futures;
+        futures.emplace_back(
+            _reshardingCoordinatorObserver->awaitAllRecipientsDone().thenRunOn(**executor));
+        futures.emplace_back(
+            _reshardingCoordinatorObserver->awaitAllDonorsDone().thenRunOn(**executor));
+        return whenAllSucceed(std::move(futures)).thenRunOn(**executor).then([](const auto& docs) {
+            return docs[1];
+        });
+    }();
 
     // We only allow the stepdown token to cancel operations after progressing past
     // kCommitting.
-    return future_util::withCancellation(whenAllSucceed(std::move(futures)),
+    return future_util::withCancellation(std::move(coordinatorDocFuture),
                                          _ctHolder->getStepdownToken())
         .thenRunOn(**executor)
-        .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
+        .then([this, executor](const ReshardingCoordinatorDocument& coordinatorDoc) {
             auto opCtx = _makeOperationContext();
-            auto& coordinatorDoc = coordinatorDocsChangedOnDisk[1];
 
             boost::optional<Status> abortReason;
             if (coordinatorDoc.getAbortReason()) {

@@ -2766,5 +2766,40 @@ TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingInitNoRefreshSends
     runReshardingToCompletion();
 }
 
+TEST_F(ReshardingCoordinatorServiceTest,
+       FeatureFlagReshardingInitNoRefreshSkipsParticipantWaitOnAbort) {
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingInitNoRefresh", true);
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                      CoordinatorStateEnum::kPreparingToDonate};
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator();
+
+    // Wait until kPreparingToDonate is committed to ensure coordinator sends abort commands to
+    // participants.
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    {
+        auto coordDoc = getCoordinatorDoc(opCtx);
+        for (const auto& donor : coordDoc.getDonorShards()) {
+            ASSERT_EQ(donor.getMutableState().getState(), DonorStateEnum::kUnused);
+        }
+        for (const auto& recipient : coordDoc.getRecipientShards()) {
+            ASSERT_EQ(recipient.getMutableState().getState(), RecipientStateEnum::kUnused);
+        }
+    }
+
+    // Abort while all participants are still in kUnused. With featureFlagReshardingInitNoRefresh,
+    // coordinator completion will not hang on abort. See SERVER-92857.
+    coordinator->abort({resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
+
+    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
+              ErrorCodes::ReshardCollectionAborted);
+}
+
 }  // namespace
 }  // namespace mongo
