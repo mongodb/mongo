@@ -7,7 +7,6 @@
  *   uses_change_streams,
  * ]
  */
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {addShardToCluster} from "jstests/libs/query/change_stream_util.js";
 
@@ -33,14 +32,6 @@ function assertAllEventsObserved(changeStream, expectedDocs) {
         const nextEvent = changeStream.next();
         assert.docEq(expectedDoc, nextEvent.fullDocument, tojson(nextEvent));
     }
-}
-
-// Helper function to confirm that a change stream sees a collection drop event.
-function assertCollectionDropEventObserved(changeStream, dbName, collectionName) {
-    assert.soon(() => changeStream.hasNext());
-    const nextEvent = changeStream.next();
-    assert.eq(nextEvent.operationType, "drop", tojson(nextEvent));
-    assert.docEq({db: dbName, coll: collectionName}, nextEvent.ns, tojson(nextEvent));
 }
 
 // Open a whole-db change stream on the as yet non-existent database.

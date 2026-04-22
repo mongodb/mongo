@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_topology_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -129,6 +130,11 @@ GetNextResult ChangeStreamHandleTopologyChangeStage::doGetNext() {
         tassert(5549100, "Missing $mergeCursors stage", _mergeCursors);
         tassert(
             5549101, "Empty $changeStream command object", !_originalAggregateCommand.isEmpty());
+
+        const auto& spec = getContext()->getChangeStreamSpec();
+        tassert(12454000, "Missing change stream spec on ExpressionContext", spec);
+        _originalResumeTokenClusterTime =
+            change_stream::resolveResumeTokenFromSpec(getContext(), *spec).clusterTime;
     }
 
     auto childResult = pSource->getNext();
@@ -169,20 +175,18 @@ std::vector<RemoteCursor> ChangeStreamHandleTopologyChangeStage::establishShardC
         return {};
     }
 
-    // Start the new cursor at the max of (shardAddedTime + 1) and the current high water mark.
+    // Start the new cursor at max of (shardAddedTime + 1) and '_originalResumeTokenClusterTime'.
     // Without this, opening a stream at a future startAtOperationTime and then adding a shard would
     // open the new cursor at the shard-added time, causing the PBRT to regress and pre-future
     // events to leak through.
     const Timestamp shardAddedTime =
         newShardDetectedObj[DocumentSourceChangeStream::kClusterTimeField].getTimestamp();
-    const Timestamp highWaterMarkTime =
-        ResumeToken::parse(_mergeCursors->getHighWaterMark()).getClusterTime();
     const LogicalTime shardAddedLogicalTime{shardAddedTime};
+    const Timestamp shardAddedTimePlusOne = shardAddedLogicalTime.addTicks(1).asTimestamp();
     const Timestamp cursorStartTime =
-        std::max(shardAddedLogicalTime.addTicks(1).asTimestamp(), highWaterMarkTime);
-
+        std::max(shardAddedTimePlusOne, _originalResumeTokenClusterTime);
     auto cmdObj = change_stream::topology_helpers::createUpdatedCommandForNewShard(
-        pExpCtx, cursorStartTime, _originalAggregateCommand, boost::none /* changeStreamVersion */);
+        pExpCtx, cursorStartTime, _originalAggregateCommand, ChangeStreamReaderVersionEnum::kV1);
 
     const bool allowPartialResults = false;  // partial results are not allowed
     return establishCursors(

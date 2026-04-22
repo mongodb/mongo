@@ -69,5 +69,10 @@ private:
 
     boost::intrusive_ptr<MergeCursorsStage> _mergeCursors;
     BSONObj _originalAggregateCommand;
+
+    /**
+     * The cluster time at which the change stream has been opened.
+     */
+    Timestamp _originalResumeTokenClusterTime;
 };
 }  // namespace mongo::exec::agg
