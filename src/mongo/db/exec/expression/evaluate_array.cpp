@@ -28,13 +28,12 @@
  */
 
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
 
 #include <bit>
+#include <cstring>
 
 #include <boost/optional.hpp>
 
@@ -774,6 +773,19 @@ using convert_utils::BinDataVectorView;
 using convert_utils::dType;
 using convert_utils::parseBinDataVector;
 
+static_assert(std::endian::native == std::endian::little,
+              "Vector similarity BinData fast path assumes little-endian platform");
+
+/*
+ * Read a float from a potentially-unaligned byte pointer. All MongoDB target platforms are
+ * little-endian, matching BSON vector storage order, so no byte-swap is needed.
+ */
+inline float readFloat(const std::byte* p) {
+    float f;
+    std::memcpy(&f, p, sizeof(float));
+    return f;
+}
+
 /*
  * Apply the padding mask to the last byte of a PACKED_BIT vector.
  */
@@ -797,19 +809,20 @@ template <dType D>
 double calculateDotProductBinData(const BinDataVectorView& v1, const BinDataVectorView& v2) {
     double sum = 0;
     if constexpr (D == dType::FLOAT32) {
-        const char* p1 = reinterpret_cast<const char*>(v1.data);
-        const char* p2 = reinterpret_cast<const char*>(v2.data);
+        const std::byte* p1 = v1.data;
+        const std::byte* p2 = v2.data;
         for (size_t i = 0; i < v1.elementCount; ++i) {
-            double f1 = ConstDataView(p1 + i * sizeof(float)).read<LittleEndian<float>>();
-            double f2 = ConstDataView(p2 + i * sizeof(float)).read<LittleEndian<float>>();
-            sum += f1 * f2;
+            sum += static_cast<double>(readFloat(p1 + i * sizeof(float))) *
+                static_cast<double>(readFloat(p2 + i * sizeof(float)));
         }
     } else if constexpr (D == dType::INT8) {
         const int8_t* p1 = reinterpret_cast<const int8_t*>(v1.data);
         const int8_t* p2 = reinterpret_cast<const int8_t*>(v2.data);
+        int64_t isum = 0;
         for (size_t i = 0; i < v1.elementCount; ++i) {
-            sum += static_cast<double>(p1[i]) * static_cast<double>(p2[i]);
+            isum += int64_t{p1[i]} * int64_t{p2[i]};
         }
+        sum = static_cast<double>(isum);
     } else {
         static_assert(D == dType::PACKED_BIT);
         for (int i = 0; i < v1.dataLength; ++i) {
@@ -826,21 +839,22 @@ template <dType D>
 double calculateEuclideanDistanceBinData(const BinDataVectorView& v1, const BinDataVectorView& v2) {
     double sum = 0;
     if constexpr (D == dType::FLOAT32) {
-        const char* p1 = reinterpret_cast<const char*>(v1.data);
-        const char* p2 = reinterpret_cast<const char*>(v2.data);
+        const std::byte* p1 = v1.data;
+        const std::byte* p2 = v2.data;
         for (size_t i = 0; i < v1.elementCount; ++i) {
-            double f1 = ConstDataView(p1 + i * sizeof(float)).read<LittleEndian<float>>();
-            double f2 = ConstDataView(p2 + i * sizeof(float)).read<LittleEndian<float>>();
-            double diff = f1 - f2;
+            double diff = static_cast<double>(readFloat(p1 + i * sizeof(float))) -
+                static_cast<double>(readFloat(p2 + i * sizeof(float)));
             sum += diff * diff;
         }
     } else if constexpr (D == dType::INT8) {
         const int8_t* p1 = reinterpret_cast<const int8_t*>(v1.data);
         const int8_t* p2 = reinterpret_cast<const int8_t*>(v2.data);
+        int64_t isum = 0;
         for (size_t i = 0; i < v1.elementCount; ++i) {
-            double diff = static_cast<double>(p1[i]) - static_cast<double>(p2[i]);
-            sum += diff * diff;
+            int64_t diff = int64_t{p1[i]} - int64_t{p2[i]};
+            isum += diff * diff;
         }
+        sum = static_cast<double>(isum);
     } else {
         static_assert(D == dType::PACKED_BIT);
         for (int i = 0; i < v1.dataLength; ++i) {
@@ -858,11 +872,11 @@ template <dType D>
 double calculateCosineSimilarityBinData(const BinDataVectorView& v1, const BinDataVectorView& v2) {
     double dot = 0, mag1 = 0, mag2 = 0;
     if constexpr (D == dType::FLOAT32) {
-        const char* p1 = reinterpret_cast<const char*>(v1.data);
-        const char* p2 = reinterpret_cast<const char*>(v2.data);
+        const std::byte* p1 = v1.data;
+        const std::byte* p2 = v2.data;
         for (size_t i = 0; i < v1.elementCount; ++i) {
-            double f1 = ConstDataView(p1 + i * sizeof(float)).read<LittleEndian<float>>();
-            double f2 = ConstDataView(p2 + i * sizeof(float)).read<LittleEndian<float>>();
+            double f1 = static_cast<double>(readFloat(p1 + i * sizeof(float)));
+            double f2 = static_cast<double>(readFloat(p2 + i * sizeof(float)));
             dot += f1 * f2;
             mag1 += f1 * f1;
             mag2 += f2 * f2;
@@ -870,13 +884,17 @@ double calculateCosineSimilarityBinData(const BinDataVectorView& v1, const BinDa
     } else if constexpr (D == dType::INT8) {
         const int8_t* p1 = reinterpret_cast<const int8_t*>(v1.data);
         const int8_t* p2 = reinterpret_cast<const int8_t*>(v2.data);
+        int64_t idot = 0, imag1 = 0, imag2 = 0;
         for (size_t i = 0; i < v1.elementCount; ++i) {
-            double d1 = static_cast<double>(p1[i]);
-            double d2 = static_cast<double>(p2[i]);
-            dot += d1 * d2;
-            mag1 += d1 * d1;
-            mag2 += d2 * d2;
+            int64_t a{p1[i]};
+            int64_t b{p2[i]};
+            idot += a * b;
+            imag1 += a * a;
+            imag2 += b * b;
         }
+        dot = static_cast<double>(idot);
+        mag1 = static_cast<double>(imag1);
+        mag2 = static_cast<double>(imag2);
     } else {
         static_assert(D == dType::PACKED_BIT);
         for (int i = 0; i < v1.dataLength; ++i) {
@@ -909,9 +927,86 @@ double computeSimilarity(const BinDataVectorView& v1, const BinDataVectorView& v
 }
 
 /*
+ * Read a single element from a BinData vector as double, templated by dtype.
+ * Since D is a compile-time constant, the compiler fully inlines each specialization.
+ */
+template <dType D>
+inline double readElementAsDouble(const std::byte* data, size_t i);
+
+template <>
+inline double readElementAsDouble<dType::FLOAT32>(const std::byte* data, size_t i) {
+    return static_cast<double>(readFloat(data + i * sizeof(float)));
+}
+
+template <>
+inline double readElementAsDouble<dType::INT8>(const std::byte* data, size_t i) {
+    return static_cast<double>(static_cast<int8_t>(data[i]));
+}
+
+template <>
+inline double readElementAsDouble<dType::PACKED_BIT>(const std::byte* data, size_t i) {
+    // Per binData vector subtype spec, bits are packed 8 per byte, MSB-first.
+    auto byte = static_cast<uint8_t>(data[i / 8]);  // Which byte this bit lives in.
+    auto bitPosition = 7 - (i % 8);                 // MSB-first: bit 0 is position 7.
+    return static_cast<double>((byte >> bitPosition) & 1);
+}
+
+/*
+ * Compute similarity between two BinData vectors of different dtypes.
+ * D1 is the "wider" dtype (FLOAT32 > INT8 > PACKED_BIT). Both dtype template
+ * parameters are compile-time constants, so readElementAsDouble fully inlines.
+ */
+template <SimilarityAlgorithm Algo, dType D1, dType D2>
+double computeCrossDtypeSimilarity(const BinDataVectorView& v1, const BinDataVectorView& v2) {
+    if constexpr (Algo == SimilarityAlgorithm::DotProduct) {
+        double sum = 0;
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            sum += readElementAsDouble<D1>(v1.data, i) * readElementAsDouble<D2>(v2.data, i);
+        }
+        return sum;
+    } else if constexpr (Algo == SimilarityAlgorithm::Euclidean) {
+        double sum = 0;
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            double diff = readElementAsDouble<D1>(v1.data, i) - readElementAsDouble<D2>(v2.data, i);
+            sum += diff * diff;
+        }
+        return std::sqrt(sum);
+    } else if constexpr (Algo == SimilarityAlgorithm::Cosine) {
+        double dot = 0, mag1 = 0, mag2 = 0;
+        for (size_t i = 0; i < v1.elementCount; ++i) {
+            double e1 = readElementAsDouble<D1>(v1.data, i);
+            double e2 = readElementAsDouble<D2>(v2.data, i);
+            dot += e1 * e2;
+            mag1 += e1 * e1;
+            mag2 += e2 * e2;
+        }
+        double magnitudeProduct = std::sqrt(mag1) * std::sqrt(mag2);
+        return magnitudeProduct == 0 ? 0.0 : dot / magnitudeProduct;
+    }
+    MONGO_UNREACHABLE;
+}
+
+/*
+ * Convert a runtime dType to a compile-time dType template argument and invoke the callable.
+ * The callable receives a std::integral_constant<dType, D> whose ::value is constexpr.
+ */
+template <typename F>
+auto dispatchDtype(dType d, F&& f) {
+    switch (d) {
+        case dType::FLOAT32:
+            return f(std::integral_constant<dType, dType::FLOAT32>{});
+        case dType::INT8:
+            return f(std::integral_constant<dType, dType::INT8>{});
+        case dType::PACKED_BIT:
+            return f(std::integral_constant<dType, dType::PACKED_BIT>{});
+    }
+    MONGO_UNREACHABLE;
+}
+
+/*
  * Try to compute similarity directly on BinData vectors without conversion to Value arrays.
- * Returns boost::none if the fast path is not applicable (not both BinData vectors, or
- * different dtypes), signaling the caller to fall back to the existing conversion path.
+ * Handles both same-dtype and cross-dtype comparisons. Returns boost::none only if the inputs
+ * are not both BinData vectors, signaling the caller to fall back to the conversion path.
  */
 template <SimilarityAlgorithm Algo>
 boost::optional<double> tryBinDataSimilarity(const Value& val1,
@@ -943,11 +1038,6 @@ boost::optional<double> tryBinDataSimilarity(const Value& val1,
                                 << (view2 ? view2->elementCount : 0));
     }
 
-    // Different dtypes: fall back to conversion path.
-    if (view1->dtype != view2->dtype) {
-        return boost::none;
-    }
-
     uassert(12325705,
             str::stream() << "Arguments to " << opName
                           << " must be the same size, but the first is of size "
@@ -955,15 +1045,21 @@ boost::optional<double> tryBinDataSimilarity(const Value& val1,
                           << view2->elementCount,
             view1->elementCount == view2->elementCount);
 
-    switch (view1->dtype) {
-        case dType::FLOAT32:
-            return computeSimilarity<Algo, dType::FLOAT32>(*view1, *view2);
-        case dType::INT8:
-            return computeSimilarity<Algo, dType::INT8>(*view1, *view2);
-        case dType::PACKED_BIT:
-            return computeSimilarity<Algo, dType::PACKED_BIT>(*view1, *view2);
+    if (view1->dtype != view2->dtype) {
+        // Normalize: wider dtype first (FLOAT32=2 > INT8=1 > PACKED_BIT=0).
+        const auto& [wider, narrower] =
+            view1->dtype > view2->dtype ? std::tie(*view1, *view2) : std::tie(*view2, *view1);
+
+        return dispatchDtype(wider.dtype, [&](auto widerDtype) {
+            return dispatchDtype(narrower.dtype, [&](auto narrowerDtype) {
+                return computeCrossDtypeSimilarity<Algo, widerDtype.value, narrowerDtype.value>(
+                    wider, narrower);
+            });
+        });
     }
-    MONGO_UNREACHABLE;
+
+    return dispatchDtype(
+        view1->dtype, [&](auto dt) { return computeSimilarity<Algo, dt.value>(*view1, *view2); });
 }
 
 /*

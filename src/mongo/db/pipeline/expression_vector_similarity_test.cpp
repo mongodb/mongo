@@ -826,4 +826,203 @@ TEST_F(ExpressionVectorSimilarityTest, BinDataHeaderOnlyAndNonEmptyThrows) {
     ASSERT_THROWS_CODE(
         expr2->evaluate(Document{}, &expCtx->variables), AssertionException, 12325705);
 }
+
+// --- Cross-dtype tests: FLOAT32 vs INT8 ---
+
+TEST_F(ExpressionVectorSimilarityTest, CrossDtypeDotProductFloat32VsInt8) {
+    auto expCtx = getExpCtx();
+    auto vecFloat = createFloat32BinDataVector({1.0f, 2.0f, 3.0f});
+    auto vecInt = createInt8BinDataVector({4, 5, 6});
+
+    // Test FLOAT32 first, INT8 second.
+    auto expr1 =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecFloat << vecInt)),
+                                    expCtx->variablesParseState);
+    auto result1 = expr1->evaluate(Document{}, &expCtx->variables);
+    // 1*4 + 2*5 + 3*6 = 32
+    ASSERT_VALUE_EQ(result1, Value(32.0));
+
+    // Test commutativity: INT8 first, FLOAT32 second.
+    auto expr2 =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecInt << vecFloat)),
+                                    expCtx->variablesParseState);
+    auto result2 = expr2->evaluate(Document{}, &expCtx->variables);
+    ASSERT_VALUE_EQ(result2, Value(32.0));
+}
+
+TEST_F(ExpressionVectorSimilarityTest, CrossDtypeEuclideanFloat32VsInt8) {
+    auto expCtx = getExpCtx();
+    auto vecFloat = createFloat32BinDataVector({1.0f, 2.0f, 3.0f});
+    auto vecInt = createInt8BinDataVector({4, 5, 6});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityEuclidean" << BSON_ARRAY(vecFloat << vecInt)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // sqrt((1-4)^2 + (2-5)^2 + (3-6)^2) = sqrt(27)
+    ASSERT_APPROX_EQUAL(result.getDouble(), std::sqrt(27.0), 1e-10);
+
+    // Commutativity.
+    auto exprRev =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityEuclidean" << BSON_ARRAY(vecInt << vecFloat)),
+                                    expCtx->variablesParseState);
+    ASSERT_APPROX_EQUAL(
+        exprRev->evaluate(Document{}, &expCtx->variables).getDouble(), std::sqrt(27.0), 1e-10);
+}
+
+TEST_F(ExpressionVectorSimilarityTest, CrossDtypeCosineFloat32VsInt8) {
+    auto expCtx = getExpCtx();
+    auto vecFloat = createFloat32BinDataVector({1.0f, 0.0f});
+    auto vecInt = createInt8BinDataVector({1, 1});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityCosine" << BSON_ARRAY(vecFloat << vecInt)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // dot=1, mag1=1, mag2=sqrt(2) => 1/sqrt(2)
+    ASSERT_APPROX_EQUAL(result.getDouble(), 1.0 / std::sqrt(2.0), 1e-10);
+
+    // Commutativity.
+    auto exprRev =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityCosine" << BSON_ARRAY(vecInt << vecFloat)),
+                                    expCtx->variablesParseState);
+    ASSERT_APPROX_EQUAL(
+        exprRev->evaluate(Document{}, &expCtx->variables).getDouble(), 1.0 / std::sqrt(2.0), 1e-10);
+}
+
+// --- Cross-dtype tests: FLOAT32 vs PACKED_BIT ---
+
+TEST_F(ExpressionVectorSimilarityTest, CrossDtypeDotProductFloat32VsPackedBit) {
+    auto expCtx = getExpCtx();
+    auto vecFloat = createFloat32BinDataVector({2.0f, 3.0f, 4.0f, 5.0f});
+    auto vecBit = createPackedBitBinDataVector({true, false, true, true});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecFloat << vecBit)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // 2*1 + 3*0 + 4*1 + 5*1 = 11
+    ASSERT_VALUE_EQ(result, Value(11.0));
+
+    // Commutativity.
+    auto exprRev =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecBit << vecFloat)),
+                                    expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(exprRev->evaluate(Document{}, &expCtx->variables), Value(11.0));
+}
+
+// --- Cross-dtype tests: INT8 vs PACKED_BIT ---
+
+TEST_F(ExpressionVectorSimilarityTest, CrossDtypeDotProductInt8VsPackedBit) {
+    auto expCtx = getExpCtx();
+    auto vecInt = createInt8BinDataVector({10, 20, 30, 40});
+    auto vecBit = createPackedBitBinDataVector({true, false, true, false});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecInt << vecBit)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    // 10*1 + 20*0 + 30*1 + 40*0 = 40
+    ASSERT_VALUE_EQ(result, Value(40.0));
+}
+
+// --- Cross-dtype size mismatch ---
+
+TEST_F(ExpressionVectorSimilarityTest, CrossDtypeSizeMismatchThrows) {
+    auto expCtx = getExpCtx();
+    auto vecFloat = createFloat32BinDataVector({1.0f, 2.0f, 3.0f});
+    auto vecInt = createInt8BinDataVector({4, 5});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecFloat << vecInt)),
+                                    expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(
+        expr->evaluate(Document{}, &expCtx->variables), AssertionException, 12325705);
+}
+
+// --- Large-vector precision regression tests ---
+
+TEST_F(ExpressionVectorSimilarityTest, LargeFloat32DotProductPrecision) {
+    auto expCtx = getExpCtx();
+    // 1536 dimensions (common embedding size). Alternating values to stress accumulation.
+    std::vector<float> v1(1536), v2(1536);
+    for (size_t i = 0; i < 1536; ++i) {
+        v1[i] = static_cast<float>(i % 7) * 0.1f - 0.3f;  // Range: [-0.3, 0.3]
+        v2[i] = static_cast<float>(i % 5) * 0.2f - 0.4f;  // Range: [-0.4, 0.4]
+    }
+    auto vec1 = createFloat32BinDataVector(v1);
+    auto vec2 = createFloat32BinDataVector(v2);
+
+    // Compute expected result via double-precision reference.
+    double expected = 0;
+    for (size_t i = 0; i < 1536; ++i) {
+        expected += static_cast<double>(v1[i]) * static_cast<double>(v2[i]);
+    }
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_APPROX_EQUAL(result.getDouble(), expected, 1e-6);
+}
+
+TEST_F(ExpressionVectorSimilarityTest, LargeInt8DotProductPrecision) {
+    auto expCtx = getExpCtx();
+    std::vector<int8_t> v1(4096), v2(4096);
+    for (size_t i = 0; i < 4096; ++i) {
+        v1[i] = static_cast<int8_t>((i % 256) - 128);
+        v2[i] = static_cast<int8_t>(((i * 7) % 256) - 128);
+    }
+    auto vec1 = createInt8BinDataVector(v1);
+    auto vec2 = createInt8BinDataVector(v2);
+
+    // Compute expected result.
+    double expected = 0;
+    for (size_t i = 0; i < 4096; ++i) {
+        expected += static_cast<double>(v1[i]) * static_cast<double>(v2[i]);
+    }
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_VALUE_EQ(result, Value(expected));
+}
+
+TEST_F(ExpressionVectorSimilarityTest, LargeCrossDtypeFloat32VsInt8Precision) {
+    auto expCtx = getExpCtx();
+    std::vector<float> v1(512);
+    std::vector<int8_t> v2(512);
+    for (size_t i = 0; i < 512; ++i) {
+        v1[i] = static_cast<float>(i % 11) * 0.5f - 2.5f;
+        v2[i] = static_cast<int8_t>((i % 200) - 100);
+    }
+    auto vecFloat = createFloat32BinDataVector(v1);
+    auto vecInt = createInt8BinDataVector(v2);
+
+    // Compute expected result.
+    double expected = 0;
+    for (size_t i = 0; i < 512; ++i) {
+        expected += static_cast<double>(v1[i]) * static_cast<double>(v2[i]);
+    }
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vecFloat << vecInt)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_APPROX_EQUAL(result.getDouble(), expected, 1e-4);
+}
 }  // namespace mongo
