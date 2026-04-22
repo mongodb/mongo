@@ -31,6 +31,8 @@ selector:
     - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
     - jstests/core/query/sbe/from_plan_cache_flag.js
     - jstests/core/query/plan_cache/cached_plan_trial_does_not_discard_work.js
+
+    - jstests/core/query/force_plan.js
 executor:
   archive:
     hooks:
