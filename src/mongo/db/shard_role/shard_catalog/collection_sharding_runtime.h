@@ -181,6 +181,35 @@ public:
     boost::optional<CollectionMetadata> getCurrentMetadataIfKnown() const;
 
     /**
+     * Returns true when the CSS state is UNOWNED: the shard does not know whether the collection
+     * is tracked or untracked. The guaranteed invariants are:
+     *   - if the collection turns out to be untracked, this shard is not the DB primary,
+     *   - if the collection turns out to be tracked, this shard holds no chunks for it.
+     */
+    bool isUnowned() const {
+        return _metadataType == MetadataType::kUnowned;
+    }
+
+    /**
+     * When `newMetadata` carries no routing table, this selects how the CSS should be classified.
+     * Ignored when `newMetadata` has a routing table (the CSS is then classified as `kTracked`).
+     */
+    enum class NoRoutingTableAs {
+        // UNTRACKED: the caller knows the collection exists, is unsharded, and is not registered
+        // in the CSRS. This state is only reachable on the DB primary shard, since an unsharded
+        // collection resides exclusively there.
+        kUntracked,
+
+        // UNOWNED: the caller does not know whether the collection is tracked or untracked.
+        // The guaranteed invariants are:
+        //   - if the collection turns out to be untracked, this shard is not the DB primary,
+        //   - if the collection turns out to be tracked, this shard holds no chunks for it.
+        // In practice, this is installed during authoritative recovery on a non-DB-primary shard
+        // when the local shard catalog has no entry for the namespace.
+        kUnowned,
+    };
+
+    /**
      * Updates the collection's filtering metadata based on changes received from the config server
      * and also resolves the pending receives map in case some of these pending receives have
      * committed on the config server or have been abandoned by the donor shard.
@@ -191,7 +220,8 @@ public:
     void setFilteringMetadata_nonAuthoritative(OperationContext* opCtx,
                                                CollectionMetadata newMetadata);
     void setFilteringMetadata_authoritative(OperationContext* opCtx,
-                                            CollectionMetadata newMetadata);
+                                            CollectionMetadata newMetadata,
+                                            NoRoutingTableAs noRoutingTableAs);
 
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
@@ -368,8 +398,12 @@ private:
 
     /**
      * Auxiliary function used to implement the various setFilteringMetadata flavours.
+     * See `NoRoutingTableAs` for the semantics of `noRoutingTableAs` when `newMetadata` carries no
+     * routing table.
      */
-    void _setFilteringMetadata(OperationContext* opCtx, CollectionMetadata collMetatada);
+    void _setFilteringMetadata(OperationContext* opCtx,
+                               CollectionMetadata newMetadata,
+                               NoRoutingTableAs noRoutingTableAs);
 
     /**
      * This function cleans up some state associated with the current sharded metadata before it's
@@ -386,16 +420,18 @@ private:
     // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
 
-    // Track status of filtering metadata for a specific collection
+    // Track status of filtering metadata for a specific collection.
     enum class MetadataType {
         kUnknown,    // metadata is not known to this node
-        kUntracked,  // no metadata found in the sharding catalog
+        kUntracked,  // collection is unsharded, and is not registered in the CSRS
+        kUnowned,    // tracked-ness is not known locally: if untracked, this shard is not the
+                     // DB primary; if tracked, this shard holds no chunks for the collection
         kTracked     // metadata for this collection is registered in the sharding catalog
     } _metadataType;
 
     AuthoritativeState _authoritativeState = AuthoritativeState::kNonAuthoritative;
 
-    // If the collection state is known and is untracked, this will be nullptr.
+    // If the collection state is known and is untracked or unowned, this will be nullptr.
     //
     // If the collection state is known and is tracked, this will point to the metadata
     // associated with this collection.
@@ -406,15 +442,15 @@ private:
     // were known for the collection before the last invocation of clearFilteringMetadata().
     //
     // The following matrix enumerates the valid (Y) and invalid (X) scenarios.
-    //                          __________________________________
-    //                         | _metadataType (collection state) |
-    //                         |__________________________________|
-    //                         | UNKNOWN | UNTRACKED |  TRACKED   |
-    //  _______________________|_________|___________|____________|
-    // |_metadataManager unset |    Y    |     Y     |     X      |
-    // |_______________________|_________|___________|____________|
-    // |_metadataManager set   |    Y    |     X     |     Y      |
-    // |_______________________|_________|___________|____________|
+    //                          ______________________________________________
+    //                         |        _metadataType (collection state)      |
+    //                         |______________________________________________|
+    //                         | UNKNOWN | UNTRACKED | UNOWNED |   TRACKED    |
+    //  _______________________|_________|___________|_________|______________|
+    // |_metadataManager unset |    Y    |     Y     |    Y    |      X       |
+    // |_______________________|_________|___________|_________|______________|
+    // |_metadataManager set   |    Y    |     X     |    X    |      Y       |
+    // |_______________________|_________|___________|_________|______________|
     std::shared_ptr<MetadataManager> _metadataManager;
 
     // Used for testing to check the number of times a new MetadataManager has been installed.

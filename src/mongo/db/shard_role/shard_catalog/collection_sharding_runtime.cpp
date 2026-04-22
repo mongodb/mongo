@@ -377,7 +377,8 @@ boost::optional<CriticalSectionSignal> CollectionShardingRuntime::getCriticalSec
 }
 
 void CollectionShardingRuntime::_setFilteringMetadata(OperationContext* opCtx,
-                                                      CollectionMetadata newMetadata) {
+                                                      CollectionMetadata newMetadata,
+                                                      NoRoutingTableAs noRoutingTableAs) {
     tassert(7032302,
             str::stream() << "Namespace " << _nss.toStringForErrorMsg()
                           << " must never have a routing table.",
@@ -393,8 +394,16 @@ void CollectionShardingRuntime::_setFilteringMetadata(OperationContext* opCtx,
     }
 
     if (!newMetadata.hasRoutingTable()) {
-        LOGV2(7917801, "Marking collection as untracked", logAttrs(_nss));
-        _metadataType = MetadataType::kUntracked;
+        switch (noRoutingTableAs) {
+            case NoRoutingTableAs::kUntracked:
+                LOGV2(7917801, "Marking collection as untracked", logAttrs(_nss));
+                _metadataType = MetadataType::kUntracked;
+                break;
+            case NoRoutingTableAs::kUnowned:
+                LOGV2(12383200, "Marking collection as unowned", logAttrs(_nss));
+                _metadataType = MetadataType::kUnowned;
+                break;
+        }
     } else {
         _metadataType = MetadataType::kTracked;
     }
@@ -427,13 +436,16 @@ void CollectionShardingRuntime::_setFilteringMetadata(OperationContext* opCtx,
 
 void CollectionShardingRuntime::setFilteringMetadata_nonAuthoritative(
     OperationContext* opCtx, CollectionMetadata newMetadata) {
-    _setFilteringMetadata(opCtx, std::move(newMetadata));
+    // The non-authoritative path assumes "no routing table" means the collection is genuinely
+    // not tracked by the global catalog. kUnowned is reserved for the authoritative recovery
+    // flow, where a non-DB-primary shard can only say it holds nothing.
+    _setFilteringMetadata(opCtx, std::move(newMetadata), NoRoutingTableAs::kUntracked);
     _authoritativeState = AuthoritativeState::kNonAuthoritative;
 }
 
-void CollectionShardingRuntime::setFilteringMetadata_authoritative(OperationContext* opCtx,
-                                                                   CollectionMetadata newMetadata) {
-    _setFilteringMetadata(opCtx, std::move(newMetadata));
+void CollectionShardingRuntime::setFilteringMetadata_authoritative(
+    OperationContext* opCtx, CollectionMetadata newMetadata, NoRoutingTableAs noRoutingTableAs) {
+    _setFilteringMetadata(opCtx, std::move(newMetadata), noRoutingTableAs);
     _authoritativeState = AuthoritativeState::kAuthoritative;
 }
 
@@ -587,6 +599,7 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
         case MetadataType::kUnknown:
             return nullptr;
         case MetadataType::kUntracked:
+        case MetadataType::kUnowned:
         case MetadataType::kTracked:
             tassert(10016213, "MetadataManager must be initialized", _metadataManager);
             return _metadataManager->getActiveMetadata(atClusterTime, preserveRange);
@@ -680,8 +693,15 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     assertPlacementConflictTimePresentWhenRequired(
         opCtx, _nss, receivedShardVersion, placementConflictTime);
 
+    // UNOWNED means: this shard holds no chunks for this collection (we are not the DB primary,
+    // so we can't tell whether it is tracked elsewhere). Any received version that says "0 chunks
+    // on this shard" (UNTRACKED or {e,t,0,0}) is consistent with that local state, even if its
+    // collection generation differs from our UNTRACKED() placeholder.
+    const bool isUnownedWithNoChunksReceived =
+        _metadataType == MetadataType::kUnowned && !receivedPlacementVersion.isSet();
+
     if (wantedPlacementVersion.isWriteCompatibleWith(receivedPlacementVersion) ||
-        isPlacementVersionIgnored) {
+        isPlacementVersionIgnored || isUnownedWithNoChunksReceived) {
         const auto timeOfLastIncomingChunkMigration = currentMetadata.getShardMaxValidAfter();
 
         if (placementConflictTime &&

@@ -907,8 +907,8 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
         recoverer->onOplogEntry(opCtx, op.getTimestamp(), entry);
     } else {
-        // TODO (SERVER-123844): Switch to authoritative clear once the untracked version doesn't
-        // need to wait for configTime.
+        // TODO (SERVER-124360): Switch back to the authoritative clears once the CSS
+        // authoritative flag is safe to enable on shard-catalog-committing DDLs.
         if (entry.getForDroppedCollection()) {
             scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
         } else {

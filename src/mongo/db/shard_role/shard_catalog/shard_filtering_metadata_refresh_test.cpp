@@ -37,10 +37,12 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -938,7 +940,8 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
     auto externalMetadata = makeShardedMetadataInMemory(opCtx);
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
-        csr->setFilteringMetadata_authoritative(opCtx, externalMetadata);
+        csr->setFilteringMetadata_authoritative(
+            opCtx, externalMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
         csr->exitCriticalSection(opCtx, BSONObj());
     }
 
@@ -955,6 +958,99 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
     ASSERT_EQ(stats.getIntField("recoverersCreated"), 0);
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 0);
     ASSERT_EQ(stats.getIntField("versionResolvedBeforeRecovery"), 1);
+}
+
+TEST_F(AuthoritativeRefreshFixture, UnownedRecoveryAcceptsTrackedWithNoChunksVersion) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    const auto trackedZeroChunksVersion =
+        ChunkVersion({OID::gen(), Timestamp(50, 1)}, {0 /* major */, 0 /* minor */});
+
+    auto status = onShardVersionMismatch(opCtx, kTestNss, trackedZeroChunksVersion);
+    ASSERT_OK(status);
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_TRUE(csr->isUnowned())
+        << "Expected CSS state kUnowned after recovery of a collection with no on-disk entry "
+           "on a non-DB-primary shard";
+    auto metadataOpt = csr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadataOpt.has_value());
+    ASSERT_FALSE(metadataOpt->isSharded());
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+    ASSERT_EQ(stats.getIntField("versionResolvedAfterRecovery"), 1)
+        << "Expected the post-recovery compatibility check to accept UNOWNED + 0-chunks without "
+           "falling through to a configTime wait";
+    ASSERT_EQ(stats.getIntField("postRecoveryWaitResolvedByConfigTime"), 0);
+    ASSERT_EQ(stats.getIntField("postRecoveryWaitResolvedByVersionChange"), 0);
+}
+
+TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckAcceptsTrackedWithNoChunksVersion) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_TRUE(csr->isUnowned());
+    }
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+
+    const auto trackedZeroChunksVersion =
+        ChunkVersion({OID::gen(), Timestamp(50, 1)}, {0 /* major */, 0 /* minor */});
+    ASSERT_DOES_NOT_THROW(
+        csr->checkShardVersionOrThrow(opCtx, ShardVersionFactory::make(trackedZeroChunksVersion)));
+
+    ASSERT_DOES_NOT_THROW(
+        csr->checkShardVersionOrThrow(opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED())));
+}
+
+TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckRejectsTrackedVersionWithChunks) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_TRUE(csr->isUnowned());
+
+    const auto trackedWithChunksVersion =
+        ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1 /* major */, 0 /* minor */});
+    ASSERT_THROWS_CODE(
+        csr->checkShardVersionOrThrow(opCtx, ShardVersionFactory::make(trackedWithChunksVersion)),
+        DBException,
+        ErrorCodes::StaleConfig);
 }
 
 TEST_F(AuthoritativeRefreshFixture, TrackedCollectionWithNoChunksOnDiskRecoveredCorrectly) {
@@ -997,6 +1093,133 @@ TEST_F(AuthoritativeRefreshFixture, TrackedCollectionWithNoChunksOnDiskRecovered
     ASSERT_TRUE(metadataOpt.has_value());
     ASSERT_TRUE(metadataOpt->isSharded());
     ASSERT_FALSE(metadataOpt->getShardPlacementVersion().isSet());
+}
+
+// Runs recovery on a background thread and pauses it inside the Mode B attempt (Mode A's
+// failpoint hit is skipped), invokes `duringPauseFn` on the main thread, then resumes.
+template <typename Fn>
+void runRecoveryAndInjectInModeB(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 Fn&& duringPauseFn) {
+    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
+    const auto initialTimesEntered = fp->setMode(FailPoint::skip, 1);
+
+    stdx::thread recoveryThread([&] {
+        auto client = getGlobalServiceContext()->getService()->makeClient("recoveryThread");
+        auto threadOpCtx = client->makeOperationContext();
+        ASSERT_OK(FilteringMetadataCache::get(threadOpCtx.get())
+                      ->onCollectionPlacementVersionMismatch(
+                          threadOpCtx.get(), nss, boost::none /* receivedShardVersion */));
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+    duringPauseFn();
+    fp->setMode(FailPoint::off);
+    recoveryThread.join();
+}
+
+void setDbPrimaryShardForTest(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const ShardId& shardId,
+                              const Timestamp& timestamp) {
+    BypassDatabaseMetadataAccess bypass(opCtx,
+                                        BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, nss.dbName());
+    scopedDsr->setDbMetadata(opCtx, DatabaseType{nss.dbName(), shardId, {UUID::gen(), timestamp}});
+}
+
+// Non-primary shard, transient primary window (set+clear) keeps the primary at `boost::none` but
+// bumps the counter by two: only the counter catches the ABA. Converges to kUnowned after retry.
+TEST_F(AuthoritativeRefreshFixture, TransientPrimaryAbaForcesModeBRetry) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    runRecoveryAndInjectInModeB(opCtx, kTestNss, [&] {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTestNss.dbName());
+        scopedDsr->setDbMetadata(
+            opCtx, DatabaseType{kTestNss.dbName(), kMyShardName, {UUID::gen(), Timestamp(10, 1)}});
+        scopedDsr->clearDbMetadata(opCtx);
+    });
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_TRUE(csr->isUnowned());
+    ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("recoverersCreated"), 3);  // 1 Mode A + 2 Mode B (one retry).
+    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+}
+
+// Stable DB primary baseline: no mid-flight mutation, no retry. Converges to kUntracked with
+// exactly 1 Mode A + 1 Mode B recoverer.
+TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 1));
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_FALSE(csr->isUnowned());
+    ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("recoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
+    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+}
+
+// Non-ABA primary identity change: DSR starts empty, a movePrimary during the drain makes this
+// shard the new primary. Caught by the simple pre/post compare. Converges to kUntracked after
+// retry.
+TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
+                                                     true);
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    runRecoveryAndInjectInModeB(opCtx, kTestNss, [&] {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTestNss.dbName());
+        scopedDsr->setDbMetadata(
+            opCtx, DatabaseType{kTestNss.dbName(), kMyShardName, {UUID::gen(), Timestamp(40, 1)}});
+    });
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_FALSE(csr->isUnowned());
+    ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("recoverersCreated"), 3);
+    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
 }
 
 }  // namespace

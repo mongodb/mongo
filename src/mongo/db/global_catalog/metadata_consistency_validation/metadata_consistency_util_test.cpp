@@ -1294,7 +1294,10 @@ protected:
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
-        scopedCSR->setFilteringMetadata_authoritative(operationContext(), collectionMetadata);
+        scopedCSR->setFilteringMetadata_authoritative(
+            operationContext(),
+            collectionMetadata,
+            CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
     }
 
     void setShardCatalogMetadata(const UUID& uuid,
@@ -1381,7 +1384,10 @@ protected:
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
         auto metadata = scopedCSR->getCurrentMetadataIfKnown();
         if (metadata) {
-            scopedCSR->setFilteringMetadata_authoritative(operationContext(), *metadata);
+            scopedCSR->setFilteringMetadata_authoritative(
+                operationContext(),
+                *metadata,
+                CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
         } else {
             scopedCSR->clearFilteringMetadata_authoritative(operationContext());
         }

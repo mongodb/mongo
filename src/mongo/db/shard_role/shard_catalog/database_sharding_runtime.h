@@ -140,6 +140,10 @@ public:
         return _dbMetadataAccessor.getDbPrimaryShard(opCtx);
     }
 
+    uint64_t getNumMetadataMutations() const {
+        return _dbMetadataAccessor.getNumMetadataMutations();
+    }
+
     /**
      * Checks that the database is not currently in a critical section, which would indicate active
      * metadata changes (e.g. movePrimary).

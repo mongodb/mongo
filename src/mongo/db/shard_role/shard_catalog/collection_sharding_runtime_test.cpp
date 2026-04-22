@@ -1310,7 +1310,8 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
-        // TODO (SERVER-123844): Switch to authoritative state.
+        // TODO (SERVER-124360): Switch back to the authoritative state once the CSS
+        // authoritative flag is safe to enable on shard-catalog-committing DDLs.
         ASSERT_EQ(csr->getAuthoritativeState(),
                   CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
     }

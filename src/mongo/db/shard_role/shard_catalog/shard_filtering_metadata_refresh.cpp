@@ -973,6 +973,37 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
 void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext* opCtx,
                                                                 const NamespaceString& nss) {
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    const auto dbName = nss.dbName();
+
+    // Recovery runs in a retry loop. Each iteration goes through three sub-blocks, labeled
+    // below as Prepare / Drain / Install, and runs in one of two modes:
+    //
+    //   Mode A (collection-only): read the on-disk shard catalog for this collection without
+    //     touching the DatabaseShardingRuntime. If a routing table is found the collection is
+    //     kTracked regardless of which shard is the DB primary, so we commit the metadata and
+    //     stop.
+    //
+    //   Mode B (with DB serialization): if a previous attempt found no routing table we must
+    //     distinguish kUntracked (collection genuinely has no global catalog entry; DB primary
+    //     says so) from kUnowned (this shard just doesn't own chunks; another shard might).
+    //     In Mode B we also capture, under the DSR lock, whether this shard is the current DB
+    //     primary plus a monotonic DSR mutation counter, and re-verify both are unchanged after
+    //     draining the catalog.
+    //
+    // The final CSS state this function installs is a function of what is found on disk and, when
+    // relevant, whether this shard is the DB primary:
+    //
+    //   config.shard.catalog.collections | config.shard.catalog.chunks | isDbPrimary | CSS state
+    //   ---------------------------------+-----------------------------+-------------+-----------
+    //   entry exists                     | has chunks for this shard   |      -      | kTracked
+    //   entry exists                     | no chunks for this shard    |      -      | kTracked*
+    //   entry does NOT exist             | empty                       |     yes     | kUntracked
+    //   entry does NOT exist             | empty                       |     no      | kUnowned
+    //
+    //   (*) "Tracked-unowned": still kTracked internally, but the installed metadata carries
+    //       zero chunks on this shard.
+
+    bool needsDbPrimaryShardCheck = false;
     const int maxAttempts = maxShardMetadataDiskRecoveryAttempts.loadRelaxed();
     StringData lastRetryReason;
 
@@ -980,18 +1011,35 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
         std::shared_ptr<CollectionCacheRecoverer> recoverer;
         SharedPromise<void> promise;
         CancellationToken cancellationToken = CancellationToken::uncancelable();
+        // Populated only when this shard is the current DB primary.
+        boost::optional<ShardId> dbPrimaryShard;
+        // Snapshot of the DSR mutation counter. Used to detect ABA transitions.
+        uint64_t dbMetadataMutationsSnapshot = 0;
 
+        // Prepare: under the CSR exclusive lock, decide whether to recover and, if so, register a
+        // CollectionCacheRecoverer for this round. In Mode B also snapshot the DSR state we will
+        // re-verify after the drain.
         {
             auto scopedCsr =
                 boost::make_optional(CollectionShardingRuntime::acquireExclusive(opCtx, nss));
 
             if (joinPlacementVersionOperations(opCtx, &scopedCsr)) {
-                lastRetryReason = "ongoing critical section or concurrent refresh"_sd;
+                lastRetryReason = "ongoing collection critical section or concurrent refresh"_sd;
                 continue;
             }
 
-            // If we reached here, there were no ongoing critical sections or refresh running and we
-            // are holding the exclusive CSR lock.
+            if (needsDbPrimaryShardCheck) {
+                auto scopedDsr =
+                    boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
+
+                if (waitForCriticalSectionIfNeeded(opCtx, &scopedDsr)) {
+                    lastRetryReason = "ongoing database critical section"_sd;
+                    continue;
+                }
+
+                dbPrimaryShard = (*scopedDsr)->getDbPrimaryShard(opCtx);
+                dbMetadataMutationsSnapshot = (*scopedDsr)->getNumMetadataMutations();
+            }
 
             // If metadata is already known, skip re-reading the on-disk shard catalog (redundant
             // I/O when CSS already matches durable state). The placement-mismatch handler still
@@ -1033,10 +1081,9 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
             hangInRecoverRefreshThread.pauseWhileSet(opCtx);
         }
 
-        auto roundId = recoverer->start(opCtx, executor);
-        auto status = recoverer->waitForInitialPass(opCtx, roundId);
-
-        if (!status.isOK()) {
+        // Drain: read the shard catalog into the recoverer without holding the CSR lock.
+        const auto roundId = recoverer->start(opCtx, executor);
+        if (auto status = recoverer->waitForInitialPass(opCtx, roundId); !status.isOK()) {
             LOGV2_DEBUG(12307901,
                         2,
                         "Authoritative metadata recovery: disk recoverer initial pass failed",
@@ -1047,6 +1094,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
             continue;
         }
 
+        // Install: under the CSR exclusive lock, drain the last oplog entries, validate the
+        // metadata (Mode B re-verify) and install it.
         {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
@@ -1071,16 +1120,69 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
                     "retrying",
                     logAttrs(nss));
 
-                lastRetryReason = "critical section entered after drain"_sd;
+                lastRetryReason = "collection critical section entered after drain"_sd;
                 continue;
             }
+
+            // No collection metadata on disk yet: switch to Mode B and retry so the next attempt
+            // can decide between kUntracked and kUnowned by consulting the DB primary under the
+            // DSR.
+            if (!needsDbPrimaryShardCheck && !metadata->hasRoutingTable()) {
+                needsDbPrimaryShardCheck = true;
+                lastRetryReason =
+                    "no collection metadata found, switching to DB primary check mode"_sd;
+                continue;
+            }
+
+            // Mode B re-verify: compare the DB primary and the DSR mutation counter against the
+            // snapshot taken before draining the catalog. A mismatch means the database metadata
+            // shifted mid-recovery; retry against a consistent state.
+            boost::optional<DatabaseShardingRuntime::ScopedSharedDatabaseShardingRuntime> scopedDsr;
+            if (needsDbPrimaryShardCheck) {
+                scopedDsr.emplace(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
+
+                if ((*scopedDsr)
+                        ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
+                    lastRetryReason = "database critical section entered after drain"_sd;
+                    continue;
+                }
+
+                if (dbPrimaryShard != (*scopedDsr)->getDbPrimaryShard(opCtx) ||
+                    dbMetadataMutationsSnapshot != (*scopedDsr)->getNumMetadataMutations()) {
+                    LOGV2_DEBUG(12383201,
+                                2,
+                                "Authoritative metadata recovery: DSR changed during drain, "
+                                "retrying",
+                                logAttrs(nss),
+                                "snapshottedPrimary"_attr = dbPrimaryShard,
+                                "currentPrimary"_attr = (*scopedDsr)->getDbPrimaryShard(opCtx),
+                                "snapshottedMutations"_attr = dbMetadataMutationsSnapshot,
+                                "currentMutations"_attr = (*scopedDsr)->getNumMetadataMutations());
+                    lastRetryReason = "DB primary shard changed during drain"_sd;
+                    continue;
+                }
+            }
+
+            // `dbPrimaryShard` is only populated when we took the DSR snapshot above (Mode B),
+            // and even then only when this shard is the current DB primary shard. So:
+            //   * Mode A: `dbPrimaryShard` is empty, but `noRoutingTableAs` is irrelevant because
+            //     `metadata` has a routing table and the CSS will be classified as kTracked
+            //     regardless.
+            //   * Mode B and this shard is the DB primary: `dbPrimaryShard` has a value, so an
+            //     empty filtering entry authoritatively means the collection is not tracked.
+            //   * Mode B and this shard is not the DB primary: `dbPrimaryShard` is empty (under
+            //     authoritative DB metadata, the primary shard value is only set on the owning
+            //     shard), so the most we can say is that this node holds no chunks (kUnowned).
+            const auto noRoutingTableAs = dbPrimaryShard.has_value()
+                ? CollectionShardingRuntime::NoRoutingTableAs::kUntracked
+                : CollectionShardingRuntime::NoRoutingTableAs::kUnowned;
 
             // cancellationToken needs to be checked under the CSR lock before overwriting the
             // filtering metadata to serialize with other threads calling 'clearFilteringMetadata'.
             if (!cancellationToken.isCanceled() &&
                 scopedCsr->getAuthoritativeState() ==
                     CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-                scopedCsr->setFilteringMetadata_authoritative(opCtx, *metadata);
+                scopedCsr->setFilteringMetadata_authoritative(opCtx, *metadata, noRoutingTableAs);
                 ShardingStatistics::get(opCtx)
                     .authoritativeCollectionMetadataStatistics.registerDiskRecovery();
             }
@@ -1197,6 +1299,24 @@ bool FilteringMetadataCache::_isRecoveredShardVersionSufficient(
         }
 
         const auto wantedShardVersion = metadata->getShardPlacementVersion();
+
+        // UNOWNED means this shard holds nothing. Any router view also reporting 0 chunks is
+        // compatible even if the collection generations differ, because we cannot tell whether the
+        // collection is tracked elsewhere.
+        //
+        // A router targeting a shard with a "tracked + 0 chunks" version (`{e,t,0,0}`) does not
+        // really make sense in practice. If the router knows the shard owns nothing it should not
+        // route to it, but if it does happen, the two views are still consistent, so we accept.
+        if ((*scopedCsr)->isUnowned() && !receivedShardVersion.isSet()) {
+            LOGV2_DEBUG(12383202,
+                        3,
+                        "Authoritative metadata recovery: shard is UNOWNED and router also reports "
+                        "no chunks on this shard, versions are compatible",
+                        logAttrs(nss),
+                        "wantedShardVersion"_attr = wantedShardVersion,
+                        "receivedShardVersion"_attr = receivedShardVersion);
+            return true;
+        }
 
         // Both untracked: the shard is recovered. The database version check is handled separately
         // by the authoritative DB versioning protocol.

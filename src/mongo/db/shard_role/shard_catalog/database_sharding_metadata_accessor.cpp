@@ -111,6 +111,7 @@ void DatabaseShardingMetadataAccessor::setDbMetadata(OperationContext* opCtx,
     }
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
+    ++_numMetadataMutations;
     ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemorySet();
 }
 
@@ -131,6 +132,7 @@ void DatabaseShardingMetadataAccessor::clearDbMetadata(OperationContext* opCtx) 
     */
     _dbPrimaryShard = boost::none;
     _dbVersion = boost::none;
+    ++_numMetadataMutations;
     ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemoryClear();
 }
 
@@ -165,6 +167,7 @@ void DatabaseShardingMetadataAccessor::setDbMetadata_UNSAFE(OperationContext* op
 
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
+    ++_numMetadataMutations;
     ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemorySet();
 }
 

@@ -251,8 +251,8 @@ void updateShardCatalogCache(OperationContext* opCtx,
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    // TODO (SERVER-123844): Switch to authoritative set once the untracked version doesn't need
-    // to wait for configTime.
+    // TODO (SERVER-124360): Switch back to the authoritative setter once the CSS authoritative
+    // flag is safe to enable on shard-catalog-committing DDLs.
     scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, std::move(ownedMetadata));
 }
 
@@ -261,8 +261,8 @@ void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
                                                 const UUID& uuid) {
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    // TODO (SERVER-123844): Switch to authoritative clear once the untracked version doesn't need
-    // to wait for configTime.
+    // TODO (SERVER-124360): Switch back to the authoritative clear once the CSS authoritative
+    // flag is safe to enable on shard-catalog-committing DDLs.
     scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
 }
 

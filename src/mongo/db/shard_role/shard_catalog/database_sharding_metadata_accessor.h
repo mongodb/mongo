@@ -71,6 +71,14 @@ public:
     boost::optional<ShardId> getDbPrimaryShard(OperationContext* opCtx) const;
 
     /**
+     * Returns a monotonically increasing counter that is bumped on every mutation of the primary
+     * shard / db version.
+     */
+    uint64_t getNumMetadataMutations() const {
+        return _numMetadataMutations;
+    }
+
+    /**
      * Checks if a movePrimary operation is in progress.
      */
     bool isMovePrimaryInProgress() const;
@@ -127,6 +135,9 @@ private:
     boost::optional<ShardId> _dbPrimaryShard;
     boost::optional<DatabaseVersion> _dbVersion;
     bool _movePrimaryInProgress{false};
+
+    // Monotonically increasing counter bumped on every write to `_dbPrimaryShard` / `_dbVersion`.
+    uint64_t _numMetadataMutations{0};
 };
 
 /**
