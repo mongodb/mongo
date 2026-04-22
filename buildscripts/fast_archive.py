@@ -79,7 +79,7 @@ def main(output_file: str, patterns: list[str], display_name: str, expansions_fi
 
     expansions = read_config_file(expansions_file)
 
-    aws_access_key = expansions.get("aws_key", None)
+    aws_access_key = expansions.get("aws_key_new", None)
     aws_secret_key = expansions.get("aws_secret", None)
 
     if not aws_access_key or not aws_secret_key:
