@@ -6,6 +6,7 @@
 //   requires_timeseries,
 //   # The test requires the feature flag to be enabled to create viewless timeseries collections.
 //   featureFlagCreateViewlessTimeseriesCollections,
+//   featureFlagChangeStreamPreciseShardTargeting,
 // ]
 
 import "jstests/multiVersion/libs/verify_versions.js";
@@ -18,6 +19,8 @@ import {before, beforeEach, afterEach, after, describe, it} from "jstests/libs/m
 import {
     ChangeStreamTest,
     ChangeStreamWatchMode,
+    assertOpenCursors,
+    cursorCommentFilter,
     getClusterTime,
     getNextClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
@@ -27,6 +30,7 @@ import {
     FCVUpgradeCommand,
     FCVDowngradeCommand,
 } from "jstests/libs/util/change_stream/change_stream_timeseries_commands.js";
+import {CreateDatabaseCommand} from "jstests/libs/util/change_stream/change_stream_commands.js";
 import {crossProduct} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {assertCreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
@@ -40,61 +44,71 @@ function makeNss(dbName, collName) {
     return {db: dbName, coll: collName};
 }
 
-function withChangeStreamTest(db, fn) {
-    const cst = new ChangeStreamTest(db);
-    fn(cst);
-    cst.cleanUp();
+function createDbCmdOnShard(dbName, shard) {
+    return new CreateDatabaseCommand(dbName, null, null, null, shard);
 }
 
-function openChangeStreamCursor(
-    cst,
-    collName,
-    {showSystemEvents = false, rawData, startAtOperationTime, allowToRunOnSystemNS, watchMode} = {},
-) {
-    const spec = cst.getChangeStreamStage(watchMode);
-    if (showSystemEvents) spec.showSystemEvents = true;
-    if (startAtOperationTime) spec.startAtOperationTime = startAtOperationTime;
-    if (allowToRunOnSystemNS) spec.allowToRunOnSystemNS = true;
+function withChangeStreamTest(db, fn) {
+    const cst = new ChangeStreamTest(db);
+    try {
+        fn(cst);
+    } finally {
+        cst.cleanUp();
+    }
+}
 
+function openChangeStreamCursor(cst, collName, {watchMode, comment, rawData, version = "v2", ...spec}) {
+    if (watchMode === ChangeStreamWatchMode.kCluster) {
+        spec.allChangesForCluster = true;
+    }
+
+    if (version) {
+        spec.version = version;
+    }
+
+    const collection = watchMode === ChangeStreamWatchMode.kCollection ? collName : 1;
     const aggregateOptions = {};
     if (rawData !== undefined) aggregateOptions.rawData = rawData;
+    if (comment !== undefined) aggregateOptions.comment = comment;
 
     return cst.startWatchingChanges({
         pipeline: [{$changeStream: spec}, {$project: {"fullDocument._id": 0, documentKey: 0}}],
-        collection: collName,
+        collection,
         aggregateOptions,
     });
 }
 
 function runScenarioAndAssert({
+    testHelper,
     conn,
     dbForCstName,
-    scenario,
     phases,
     rawData,
-    openChangeStreamBeforeRunningScenario,
+    openChangeStreamAfterRunningAllCommands,
     makeCursorAndWatchCtx,
+    comment,
 }) {
-    if (!openChangeStreamBeforeRunningScenario) {
-        scenario.commands.forEach((cmd) => cmd.execute(conn));
+    // Execute commands from all phases, if change stream needs to be open after all cmd execution.
+    if (openChangeStreamAfterRunningAllCommands) {
+        phases.flatMap((phase) => phase.cmds).forEach((cmd) => cmd.execute(conn));
     }
 
     const dbForCst = conn.getDB(dbForCstName);
     withChangeStreamTest(dbForCst, (cst) => {
-        const {cursor, watchCtx} = makeCursorAndWatchCtx({cst, rawData});
+        const {cursor, watchCtx} = makeCursorAndWatchCtx({cst, rawData, comment});
+        for (const {cmds, unordered, assertCursors} of phases) {
+            // Execute commands of a given phase, if change stream has been open before processing each phase.
+            if (!openChangeStreamAfterRunningAllCommands) {
+                cmds.forEach((cmd) => cmd.execute(conn));
+            }
 
-        if (openChangeStreamBeforeRunningScenario) {
-            scenario.commands.forEach((cmd) => cmd.execute(conn));
-        }
-
-        for (const {cmds, unordered} of phases) {
             const expectedChanges = cmds.flatMap((cmd) => cmd.getChangeEvents(watchCtx));
             jsTest.log.info("Expected changes for phase", {expectedChanges, unordered});
 
-            if (unordered) {
-                cst.assertNextChangesEqualUnordered({cursor, expectedChanges});
-            } else {
-                cst.assertNextChangesEqual({cursor, expectedChanges});
+            cst.assertNextChangesEqual({cursor, expectedChanges, ignoreOrder: unordered});
+
+            if (testHelper.isShardedCluster() && assertCursors && expectedChanges.length > 0) {
+                assertCursors();
             }
         }
         cst.assertNoChange(cursor);
@@ -116,6 +130,10 @@ class ReplSetTestHelper {
         return this.rst.getPrimary();
     }
 
+    getShardingTest() {
+        return null;
+    }
+
     setClusterToVersion(version) {
         jsTest.log.info(`Setting entire set to ${version}`);
         this.rst.upgradeSet({binVersion: version});
@@ -126,6 +144,10 @@ class ReplSetTestHelper {
         return false;
     }
 
+    allShards() {
+        return [];
+    }
+
     toString() {
         return "replica set";
     }
@@ -133,7 +155,14 @@ class ReplSetTestHelper {
 
 class ShardedClusterTestHelper {
     setUp() {
-        this.st = new ShardingTest({shards: 1});
+        this.st = new ShardingTest({
+            shards: 2,
+            config: 1,
+            configShard: false,
+            rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
+            configOptions: {setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
+            other: {enableBalancer: false},
+        });
     }
 
     tearDown() {
@@ -142,6 +171,10 @@ class ShardedClusterTestHelper {
 
     getConn() {
         return this.st.s;
+    }
+
+    getShardingTest() {
+        return this.st;
     }
 
     setClusterToVersion(version) {
@@ -162,14 +195,21 @@ class ShardedClusterTestHelper {
         return true;
     }
 
+    allShards() {
+        return [this.st.shard0.shardName, this.st.shard1.shardName];
+    }
+
     toString() {
         return "sharded cluster";
     }
 }
 
 // Run multiversion tests for both replica set and sharded cluster configurations.
-for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper()]) {
-    describe(`$changeStream in ${testHelper.toString()}`, function () {
+for (const [downgradeFCV, testHelper] of crossProduct(
+    [lastLTSFCV, lastContinuousFCV],
+    [new ReplSetTestHelper(), new ShardedClusterTestHelper()],
+)) {
+    describe(`$changeStream in ${testHelper.toString()} in ${downgradeFCV} FCV`, function () {
         const testDB1Name = "db1";
         const testDB2Name = "db2";
         const ts1CollName = "tsColl1";
@@ -181,6 +221,10 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
         const date3 = ISODate(`2024-05-01T00:02:00Z`);
 
         let adminDB;
+        let st;
+
+        let db1PrimaryShard;
+        let db2PrimaryShard;
 
         function setUpVariables(conn) {
             adminDB = conn.getDB("admin");
@@ -202,13 +246,18 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
 
         before(function () {
             testHelper.setUp();
+
+            st = testHelper.getShardingTest();
+
+            db1PrimaryShard = testHelper.isShardedCluster() ? st.shard0.shardName : null;
+            db2PrimaryShard = testHelper.isShardedCluster() ? st.shard1.shardName : null;
         });
 
         beforeEach(function () {
             setUpVariables(testHelper.getConn());
 
-            // Reset to FCV 8.0 for each test case.
-            assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+            // Reset to 'downgradeFCV' for each test case.
+            new FCVDowngradeCommand({targetFCV: downgradeFCV}).execute(testHelper.getConn());
         });
 
         afterEach(function () {
@@ -220,6 +269,17 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
             testHelper.tearDown();
         });
 
+        const comment = "comment";
+        function assertOpenCursorsOnShards(shards, expectedConfigCursor) {
+            if (testHelper.isShardedCluster()) {
+                assertOpenCursors(st, shards, expectedConfigCursor, cursorCommentFilter(comment));
+            }
+        }
+
+        function assertOpenCursorsOnAllShards(expectedConfigCursor = true) {
+            assertOpenCursorsOnShards(testHelper.allShards(), expectedConfigCursor);
+        }
+
         describe("will emit timeseries change events on FCV upgrade", function () {
             function buildUpgradeTimeseriesScenario({db1Name, db2Name, coll1Name, coll2Name}) {
                 const ts1 = {
@@ -230,6 +290,16 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                     regularNss: makeNss(db2Name, coll2Name),
                     bucketsNss: makeNss(db2Name, `system.buckets.${coll2Name}`),
                 };
+
+                const createDbCmds = (() => {
+                    if (!testHelper.isShardedCluster()) {
+                        return [];
+                    }
+
+                    return db1Name == db2Name
+                        ? [createDbCmdOnShard(db1Name, db1PrimaryShard)]
+                        : [createDbCmdOnShard(db1Name, db1PrimaryShard), createDbCmdOnShard(db2Name, db2PrimaryShard)];
+                })();
 
                 const createTs1CollCmd = new CreateTimeseriesCollectionCommand({
                     dbName: ts1.regularNss.db,
@@ -303,143 +373,160 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                 });
 
                 const fcvUpgradeCmd = new FCVUpgradeCommand({
-                    toVersion: latestFCV,
                     timeseriesCollections: [ts1, ts2],
                 });
 
                 const phases = {
-                    preFCVUpgrade: [createTs1CollCmd, createTs2CollCmd, ts1PreInsertCmd, ts2PreInsertCmd],
+                    preFCVUpgrade: [
+                        ...createDbCmds,
+                        createTs1CollCmd,
+                        createTs2CollCmd,
+                        ts1PreInsertCmd,
+                        ts2PreInsertCmd,
+                    ],
                     fcvUpgrade: [fcvUpgradeCmd],
                     postFCVUpgrade: [ts1PostInsertCmd, ts2PostInsertCmd],
                 };
-                return {
-                    colls: {ts1, ts2},
-                    commands: [...phases.preFCVUpgrade, ...phases.fcvUpgrade, ...phases.postFCVUpgrade],
-                    phases,
-                };
+                return {colls: {ts1, ts2}, phases};
             }
 
-            const sameDbScenario = buildUpgradeTimeseriesScenario({
-                db1Name: testDB1Name,
-                db2Name: testDB1Name,
-                coll1Name: ts1CollName,
-                coll2Name: ts2CollName,
-            });
-            const differentDbsScenario = buildUpgradeTimeseriesScenario({
-                db1Name: testDB1Name,
-                db2Name: testDB2Name,
-                coll1Name: ts1CollName,
-                coll2Name: ts2CollName,
-            });
-
-            // As part of this test, we open a change stream over underlying system.buckets of the timeseries
             // collection and expect to see an insert, followed by rename and invalidation event due to FCV upgrade.
             //
             // We also open the change stream in 8.0 (last-lts) binary and ensure that we can safely open the change
             // stream that will be reading the oplog which contains an oplog entry it didn't know about
             // (upgradeDowngradeTimeseriesCollection). The change stream will ignore this oplog entry as it will be
             // filtered out by the change stream filter.
-            // TODO SERVER-120239: Fix this test targeting system.buckets directly while FCV is latest.
-            // it("while reading system.buckets collection until rename+invalidate", function () {
-            //     if (testHelper.isShardedCluster()) {
-            //         jsTest.log.info(
-            //             "Skipping test in sharded cluster because opening change stream over system.buckets collection is not allowed",
-            //         );
-            //         return;
-            //     }
+            // TODO: SERVER-124882 Revisit FCV upgrade/downgrade for change streams over timeseries collections.
+            it.skip("while reading system.buckets collection until rename+invalidate", function () {
+                if (testHelper.isShardedCluster()) {
+                    jsTest.log.info(
+                        "Skipping test in sharded cluster because opening change stream over system.buckets collection is not allowed",
+                    );
+                    return;
+                }
 
-            //     const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
-            //     const conn = getConn();
-            //     const scenario = sameDbScenario;
+                function withDowngradedBinary(fn) {
+                    downgrade();
+                    try {
+                        fn();
+                    } finally {
+                        upgrade();
+                    }
+                }
 
-            //     // Only care about ts1.buckets here; we stop at rename+invalidate.
-            //     runScenarioAndAssert({
-            //         conn,
-            //         dbForCstName: testDB1Name,
-            //         scenario,
-            //         phases: [
-            //             {cmds: scenario.phases.preFCVUpgrade, unordered: false},
-            //             {cmds: scenario.phases.fcvUpgrade, unordered: false},
-            //         ],
-            //         rawData: false, // rawData flag is redundant here as we stop at rename+invalidate events.
-            //         openChangeStreamBeforeRunningScenario: false,
-            //         makeCursorAndWatchCtx: ({cst, rawData}) => {
-            //             const watchCtx = {
-            //                 watchMode: ChangeStreamWatchMode.kCollection,
-            //                 watchedNss: scenario.colls.ts1.bucketsNss,
-            //                 showSystemEvents: true,
-            //                 rawData,
-            //             };
-            //             const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
-            //                 showSystemEvents: true,
-            //                 allowToRunOnSystemNS: true,
-            //                 startAtOperationTime: initClusterTime,
-            //                 rawData,
-            //                 watchMode: ChangeStreamWatchMode.kCollection,
-            //             });
-            //             return {cursor, watchCtx};
-            //         },
-            //     });
+                const watchMode = ChangeStreamWatchMode.kCollection;
+                const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
+                const conn = getConn();
+                const scenario = buildUpgradeTimeseriesScenario({
+                    db1Name: testDB1Name,
+                    db2Name: testDB1Name,
+                    coll1Name: ts1CollName,
+                    coll2Name: ts2CollName,
+                });
 
-            //     // Ensure that the newly introduced oplog entry: 'upgradeDowngradeTimeseriesCollection' is not causing change streams in v8.0 to crash.
-            //     {
-            //         assert.commandWorked(
-            //             adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-            //         );
-            //         downgrade();
+                // Only care about ts1.buckets here; we stop at rename+invalidate.
+                runScenarioAndAssert({
+                    testHelper,
+                    conn,
+                    dbForCstName: testDB1Name,
+                    phases: [
+                        {cmds: scenario.phases.preFCVUpgrade, unordered: false},
+                        {cmds: scenario.phases.fcvUpgrade, unordered: false},
+                    ],
+                    rawData: false, // rawData flag is redundant here as we stop at rename+invalidate events.
+                    openChangeStreamAfterRunningAllCommands: false,
+                    makeCursorAndWatchCtx: ({cst, rawData}) => {
+                        const watchCtx = {
+                            watchMode: ChangeStreamWatchMode.kCollection,
+                            watchedNss: scenario.colls.ts1.bucketsNss,
+                            showSystemEvents: true,
+                            rawData,
+                        };
+                        const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
+                            showSystemEvents: true,
+                            allowToRunOnSystemNS: true,
+                            startAtOperationTime: initClusterTime,
+                            rawData,
+                            watchMode: ChangeStreamWatchMode.kCollection,
+                        });
+                        return {cursor, watchCtx};
+                    },
+                });
 
-            //         runScenarioAndAssert({
-            //             conn: getConn(), // new primary after downgrade
-            //             dbForCstName: testDB1Name,
-            //             // The commands have already been executed during the first scenario run and assertion.
-            //             scenario: {commands: []},
-            //             // NOTE: we won't see rename/invalidate events because 'upgradeDowngradeTimeseriesCollection' is only handled in v9.0+.
-            //             // On older versions, this oplog entry will be ignored and we won't detect that the collection has been renamed.
-            //             phases: [{cmds: scenario.phases.preFCVUpgrade, unordered: false}],
-            //             openChangeStreamBeforeRunningScenario: false,
-            //             makeCursorAndWatchCtx: ({cst, rawData}) => {
-            //                 const watchCtx = {
-            //                     watchMode: ChangeStreamWatchMode.kCollection,
-            //                     watchedNss: scenario.colls.ts1.bucketsNss,
-            //                     showSystemEvents: true,
-            //                     rawData,
-            //                 };
-            //                 const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
-            //                     showSystemEvents: true,
-            //                     allowToRunOnSystemNS: true,
-            //                     startAtOperationTime: initClusterTime,
-            //                     rawData,
-            //                     watchMode: ChangeStreamWatchMode.kCollection,
-            //                 });
-            //                 return {cursor, watchCtx};
-            //             },
-            //         });
+                // Ensure that the newly introduced oplog entry: 'upgradeDowngradeTimeseriesCollection' is not causing change streams in v8.0 to crash.
+                {
+                    new FCVDowngradeCommand({targetFCV: downgradeFCV}).execute(conn);
+                    withDowngradedBinary(function () {
+                        const dbForCst = testHelper.getConn().getDB(testDB1Name);
+                        withChangeStreamTest(dbForCst, (cst) => {
+                            const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
+                                showSystemEvents: true,
+                                allowToRunOnSystemNS: true,
+                                startAtOperationTime: initClusterTime,
+                                watchMode: ChangeStreamWatchMode.kCollection,
+                                // NOTE: downgraded binary does not accept version field.
+                                version: null,
+                            });
 
-            //         upgrade();
-            //     }
-            // });
+                            const cmds = scenario.phases.preFCVUpgrade;
+                            const expectedChanges = cmds.flatMap((cmd) => cmd.getChangeEvents(watchMode));
+                            cst.assertNextChangesEqual({cursor, expectedChanges});
+                            cst.assertNoChange(cursor);
+                        });
+                    });
+                }
+            });
 
-            for (const [rawData, openBeforeRunningCmds] of crossProduct([true, false], [true, false])) {
+            for (const [rawData, openAfterRunningCmds] of crossProduct([true, false], [true, false])) {
                 // As part of this test, we open a change stream over a database that has timeseries collections
                 // and expect to see an insert, followed by rename and subsequent inserts after FCV upgrade
                 // (if change stream was opened with rawData: true).
-                it(`while reading database owning timeseries collections with rawData:${rawData} openChangeStreamBeforeRunningScenario:${openBeforeRunningCmds}`, function () {
+                it(`while reading database owning timeseries collections with rawData:${rawData} openChangeStreamAfterRunningAllCommands:${openAfterRunningCmds}`, function () {
                     const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
                     const conn = getConn();
-                    const scenario = sameDbScenario;
+                    const scenario = buildUpgradeTimeseriesScenario({
+                        db1Name: testDB1Name,
+                        db2Name: testDB1Name,
+                        coll1Name: ts1CollName,
+                        coll2Name: ts2CollName,
+                    });
+
+                    // If we open change stream before FCV upgrade, then we will open change stream in v2 and will target
+                    // all shards, including configsvr. If we open after FCV upgrade, even at the time before FCV upgrade
+                    // occurred, then we will target all shards, without configsvr.
+                    const expectedConfigCursor = !openAfterRunningCmds;
 
                     runScenarioAndAssert({
+                        testHelper,
                         conn,
                         dbForCstName: testDB1Name,
-                        scenario,
                         phases: [
-                            {cmds: scenario.phases.preFCVUpgrade, unordered: false},
-                            {cmds: scenario.phases.fcvUpgrade, unordered: true},
-                            {cmds: scenario.phases.postFCVUpgrade, unordered: false},
+                            {
+                                cmds: scenario.phases.preFCVUpgrade,
+                                unordered: false,
+                                assertCursors: () => assertOpenCursorsOnAllShards(expectedConfigCursor),
+                            },
+                            {
+                                cmds: scenario.phases.fcvUpgrade,
+                                unordered: true,
+                                assertCursors: () => assertOpenCursorsOnAllShards(expectedConfigCursor),
+                            },
+                            {
+                                cmds: scenario.phases.postFCVUpgrade,
+                                unordered: false,
+                                assertCursors: () => {
+                                    if (openAfterRunningCmds) {
+                                        assertOpenCursorsOnShards([db1PrimaryShard], false /* expectedConfigCursor */);
+                                    } else {
+                                        assertOpenCursorsOnAllShards(expectedConfigCursor);
+                                    }
+                                },
+                            },
                         ],
                         rawData: rawData,
-                        openChangeStreamBeforeRunningScenario: openBeforeRunningCmds,
-                        makeCursorAndWatchCtx: ({cst, rawData}) => {
+                        openChangeStreamAfterRunningAllCommands: openAfterRunningCmds,
+                        comment,
+                        makeCursorAndWatchCtx: ({cst, rawData, comment}) => {
                             const watchCtx = {
                                 watchMode: ChangeStreamWatchMode.kDb,
                                 watchedNss: {db: testDB1Name},
@@ -451,6 +538,7 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                                 allowToRunOnSystemNS: true,
                                 startAtOperationTime: initClusterTime,
                                 rawData,
+                                comment,
                                 watchMode: ChangeStreamWatchMode.kDb,
                             });
                             return {cursor, watchCtx};
@@ -462,23 +550,41 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                 // collections and expect to see an inserts, followed by reaname and subsequent inserts after FCV
                 // collections and expect to see an insert, followed by rename and subsequent inserts after FCV
                 // upgrade (if change stream was opened with rawData: true).
-                it(`while reading cluster owning timeseries collections with rawData:${rawData} openChangeStreamBeforeRunningScenario:${openBeforeRunningCmds}`, function () {
+                it(`while reading cluster owning timeseries collections with rawData:${rawData} openChangeStreamAfterRunningAllCommands:${openAfterRunningCmds}`, function () {
                     const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
                     const conn = getConn();
-                    const scenario = differentDbsScenario;
+                    const scenario = buildUpgradeTimeseriesScenario({
+                        db1Name: testDB1Name,
+                        db2Name: testDB2Name,
+                        coll1Name: ts1CollName,
+                        coll2Name: ts2CollName,
+                    });
 
                     runScenarioAndAssert({
+                        testHelper,
                         conn,
                         dbForCstName: "admin",
-                        scenario,
                         phases: [
-                            {cmds: scenario.phases.preFCVUpgrade, unordered: false},
-                            {cmds: scenario.phases.fcvUpgrade, unordered: true},
-                            {cmds: scenario.phases.postFCVUpgrade, unordered: false},
+                            {
+                                cmds: scenario.phases.preFCVUpgrade,
+                                unordered: false,
+                                assertCursors: () => assertOpenCursorsOnAllShards(true),
+                            },
+                            {
+                                cmds: scenario.phases.fcvUpgrade,
+                                unordered: true,
+                                assertCursors: () => assertOpenCursorsOnAllShards(true),
+                            },
+                            {
+                                cmds: scenario.phases.postFCVUpgrade,
+                                unordered: false,
+                                assertCursors: () => assertOpenCursorsOnAllShards(true),
+                            },
                         ],
                         rawData: rawData,
-                        openChangeStreamBeforeRunningScenario: openBeforeRunningCmds,
-                        makeCursorAndWatchCtx: ({cst, rawData}) => {
+                        openChangeStreamAfterRunningAllCommands: openAfterRunningCmds,
+                        comment,
+                        makeCursorAndWatchCtx: ({cst, rawData, comment}) => {
                             const watchCtx = {
                                 watchMode: ChangeStreamWatchMode.kCluster,
                                 watchedNss: {},
@@ -490,6 +596,7 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                                 allowToRunOnSystemNS: true,
                                 startAtOperationTime: initClusterTime,
                                 rawData,
+                                comment,
                                 watchMode: ChangeStreamWatchMode.kCluster,
                             });
                             return {cursor, watchCtx};
@@ -509,6 +616,16 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                     regularNss: makeNss(db2Name, coll2Name),
                     bucketsNss: makeNss(db2Name, `system.buckets.${coll2Name}`),
                 };
+
+                const createDbCmds = (() => {
+                    if (!testHelper.isShardedCluster()) {
+                        return [];
+                    }
+
+                    return db1Name == db2Name
+                        ? [createDbCmdOnShard(db1Name, db1PrimaryShard)]
+                        : [createDbCmdOnShard(db1Name, db1PrimaryShard), createDbCmdOnShard(db2Name, db2PrimaryShard)];
+                })();
 
                 const createTs1CollCmd = new CreateTimeseriesCollectionCommand({
                     dbName: ts1.regularNss.db,
@@ -583,61 +700,55 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                 });
 
                 const fcvDowngradeCmd = new FCVDowngradeCommand({
-                    toVersion: lastLTSFCV,
                     timeseriesCollections: [ts1, ts2],
+                    targetFCV: downgradeFCV,
                 });
 
                 const phases = {
-                    preFCVDowngrade: [createTs1CollCmd, createTs2CollCmd, ts1PreInsertCmd, ts2PreInsertCmd],
+                    preFCVDowngrade: [
+                        ...createDbCmds,
+                        createTs1CollCmd,
+                        createTs2CollCmd,
+                        ts1PreInsertCmd,
+                        ts2PreInsertCmd,
+                    ],
                     fcvDowngrade: [fcvDowngradeCmd],
                     postFCVDowngrade: [ts1PostInsertCmd, ts2PostInsertCmd],
                 };
-                return {
-                    colls: {ts1, ts2},
-                    commands: [...phases.preFCVDowngrade, ...phases.fcvDowngrade, ...phases.postFCVDowngrade],
-                    phases,
-                };
+                return {colls: {ts1, ts2}, phases};
             }
-
-            const sameDbScenario = buildDowngradeTimeseriesScenario({
-                db1Name: testDB1Name,
-                db2Name: testDB1Name,
-                coll1Name: ts1CollName,
-                coll2Name: ts2CollName,
-            });
-            const differentDbsScenario = buildDowngradeTimeseriesScenario({
-                db1Name: testDB1Name,
-                db2Name: testDB2Name,
-                coll1Name: ts1CollName,
-                coll2Name: ts2CollName,
-            });
 
             // As part of this test, we open a change stream over the viewless timeseries collection and expect to see insert,
             // followed by rename and invalidation event due to FCV downgrade.
             //
             // NOTE: Not running this test case in any other configuration because:
             // - we can not open change stream over the timeseries collection name in FCV 8.0, because it's a view
-            //   therefore running with openChangeStreamBeforeRunningScenario: true
+            //   therefore running with openChangeStreamAfterRunningAllCommands: false
             // - we can not open change stream over the timeseries collection name in FCV 9.0 without rawData.
             it("while reading timeseries collection until rename+invalidate", function () {
                 // Upgrade to latestFCV (9.0).
-                assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+                new FCVUpgradeCommand().execute(testHelper.getConn());
 
                 const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
                 const conn = getConn();
-                const scenario = sameDbScenario;
+                const scenario = buildDowngradeTimeseriesScenario({
+                    db1Name: testDB1Name,
+                    db2Name: testDB1Name,
+                    coll1Name: ts1CollName,
+                    coll2Name: ts2CollName,
+                });
 
                 runScenarioAndAssert({
+                    testHelper,
                     conn,
                     dbForCstName: testDB1Name,
-                    scenario,
                     phases: [
                         {cmds: scenario.phases.preFCVDowngrade, unordered: false},
                         {cmds: scenario.phases.fcvDowngrade, unordered: false},
                     ],
                     rawData: true,
-                    openChangeStreamBeforeRunningScenario: true,
-                    makeCursorAndWatchCtx: ({cst, rawData}) => {
+                    openChangeStreamAfterRunningAllCommands: false,
+                    makeCursorAndWatchCtx: ({cst, rawData, comment}) => {
                         const watchCtx = {
                             watchMode: ChangeStreamWatchMode.kCollection,
                             watchedNss: scenario.colls.ts1.regularNss,
@@ -649,14 +760,18 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                             allowToRunOnSystemNS: true,
                             startAtOperationTime: initClusterTime,
                             rawData,
+                            // TODO: SERVER-124882 Revisit FCV upgrade/downgrade for change streams over timeseries collections.
+                            version: "v1",
+                            comment,
                             watchMode: ChangeStreamWatchMode.kCollection,
                         });
                         return {cursor, watchCtx};
                     },
+                    comment,
                 });
             });
 
-            for (const [rawData, openBeforeRunningCmds, showSystemEvents] of crossProduct(
+            for (const [rawData, openAfterRunningCmds, showSystemEvents] of crossProduct(
                 [true, false],
                 [true, false],
                 [true, false],
@@ -664,28 +779,50 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                 // As part of this test, we open a change stream over a database that has timeseries collections
                 // and expect to see an insert, followed by rename and subsequent inserts after FCV downgrade
                 // (if change stream was opened with rawData: true and showSystemEvents: true).
-                it(`while reading database owning timeseries collections with rawData:${rawData} openChangeStreamBeforeRunningScenario:${openBeforeRunningCmds} showSystemEvents:${showSystemEvents}`, function () {
+                it(`while reading database owning timeseries collections with rawData:${rawData} openChangeStreamAfterRunningAllCommands:${openAfterRunningCmds} showSystemEvents:${showSystemEvents}`, function () {
                     // Upgrade to latestFCV (9.0).
-                    assert.commandWorked(
-                        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-                    );
+                    new FCVUpgradeCommand().execute(testHelper.getConn());
 
                     const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
                     const conn = getConn();
-                    const scenario = sameDbScenario;
+                    const scenario = buildDowngradeTimeseriesScenario({
+                        db1Name: testDB1Name,
+                        db2Name: testDB1Name,
+                        coll1Name: ts1CollName,
+                        coll2Name: ts2CollName,
+                    });
 
                     runScenarioAndAssert({
+                        testHelper,
                         conn,
                         dbForCstName: testDB1Name,
-                        scenario,
                         phases: [
-                            {cmds: scenario.phases.preFCVDowngrade, unordered: false},
-                            {cmds: scenario.phases.fcvDowngrade, unordered: true},
-                            {cmds: scenario.phases.postFCVDowngrade, unordered: false},
+                            {
+                                cmds: scenario.phases.preFCVDowngrade,
+                                unordered: false,
+                                assertCursors: () => {
+                                    if (openAfterRunningCmds) {
+                                        assertOpenCursorsOnAllShards();
+                                    } else {
+                                        assertOpenCursorsOnShards([db1PrimaryShard], false);
+                                    }
+                                },
+                            },
+                            {
+                                cmds: scenario.phases.fcvDowngrade,
+                                unordered: true,
+                                assertCursors: () => assertOpenCursorsOnAllShards(),
+                            },
+                            {
+                                cmds: scenario.phases.postFCVDowngrade,
+                                unordered: false,
+                                assertCursors: () => assertOpenCursorsOnAllShards(),
+                            },
                         ],
                         rawData,
-                        openChangeStreamBeforeRunningScenario: openBeforeRunningCmds,
-                        makeCursorAndWatchCtx: ({cst, rawData}) => {
+                        openChangeStreamAfterRunningAllCommands: openAfterRunningCmds,
+                        comment,
+                        makeCursorAndWatchCtx: ({cst, rawData, comment}) => {
                             const watchCtx = {
                                 watchMode: ChangeStreamWatchMode.kDb,
                                 watchedNss: {db: testDB1Name},
@@ -697,6 +834,7 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                                 allowToRunOnSystemNS: true,
                                 startAtOperationTime: initClusterTime,
                                 rawData,
+                                comment,
                                 watchMode: ChangeStreamWatchMode.kDb,
                             });
                             return {cursor, watchCtx};
@@ -707,28 +845,32 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                 // As part of this test, we open a change stream over the whole cluster that has timeseries
                 // collections and expect to see an insert, followed by rename and subsequent inserts after FCV
                 // downgrade (if change stream was opened with rawData: true and showSystemEvents: true).
-                it(`while reading database owning timeseries collections with rawData:${rawData} openChangeStreamBeforeRunningScenario:${openBeforeRunningCmds} showSystemEvents:${showSystemEvents}`, function () {
+                it(`while reading cluster owning timeseries collections with rawData:${rawData} openChangeStreamAfterRunningAllCommands:${openAfterRunningCmds} showSystemEvents:${showSystemEvents}`, function () {
                     // Upgrade to latestFCV (9.0).
-                    assert.commandWorked(
-                        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-                    );
+                    new FCVUpgradeCommand().execute(testHelper.getConn());
 
                     const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
                     const conn = getConn();
-                    const scenario = differentDbsScenario;
+                    const scenario = buildDowngradeTimeseriesScenario({
+                        db1Name: testDB1Name,
+                        db2Name: testDB2Name,
+                        coll1Name: ts1CollName,
+                        coll2Name: ts2CollName,
+                    });
 
                     runScenarioAndAssert({
+                        testHelper,
                         conn,
                         dbForCstName: "admin",
-                        scenario,
                         phases: [
                             {cmds: scenario.phases.preFCVDowngrade, unordered: false},
                             {cmds: scenario.phases.fcvDowngrade, unordered: true},
                             {cmds: scenario.phases.postFCVDowngrade, unordered: false},
                         ],
                         rawData,
-                        openChangeStreamBeforeRunningScenario: openBeforeRunningCmds,
-                        makeCursorAndWatchCtx: ({cst, rawData}) => {
+                        openChangeStreamAfterRunningAllCommands: openAfterRunningCmds,
+                        comment,
+                        makeCursorAndWatchCtx: ({cst, rawData, comment}) => {
                             const watchCtx = {
                                 watchMode: ChangeStreamWatchMode.kCluster,
                                 watchedNss: {},
@@ -740,6 +882,7 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                                 allowToRunOnSystemNS: true,
                                 startAtOperationTime: initClusterTime,
                                 rawData,
+                                comment,
                                 watchMode: ChangeStreamWatchMode.kCluster,
                             });
                             return {cursor, watchCtx};
@@ -774,9 +917,11 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                 });
 
                 insertData("preUpgrade");
-                assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+                new FCVUpgradeCommand({timeseriesCollections: [ts1]}).execute(testHelper.getConn());
                 insertData("postUpgrade/preDowngrade");
-                assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+                new FCVDowngradeCommand({timeseriesCollections: [ts1], targetFCV: downgradeFCV}).execute(
+                    testHelper.getConn(),
+                );
                 insertData("postDowngrade");
 
                 // Assert that no timeseries insert events were observed.
@@ -819,6 +964,15 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
         // viewless collections and corresponding oplog entries are marked with 'isTimeseries': true flag, which are filtered out
         // unless the change stream is opened with rawData: true.
         it("will no longer emit timeseries change events after FCV upgrade for change streams with $showSystemEvents=true", function () {
+            const st = testHelper.getShardingTest();
+            if (testHelper.isShardedCluster()) {
+                assert.commandWorked(
+                    adminDB.runCommand({enableSharding: testDB1Name, primaryShard: st.shard0.shardName}),
+                );
+            }
+
+            const watchMode = ChangeStreamWatchMode.kDb;
+            const watchedNss = {db: testDB1Name};
             const db = adminDB.getSiblingDB(testDB1Name);
             const nonTsCollNss = makeNss(testDB1Name, nonTsCollName);
             const nonTsColl = assertCreateCollection(db, nonTsCollName);
@@ -837,83 +991,117 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
             withChangeStreamTest(db, (cst) => {
                 const cursor = openChangeStreamCursor(cst, 1, {
                     showSystemEvents: true,
-                    watchMode: ChangeStreamWatchMode.kDb,
+                    watchMode,
+                    comment,
                 });
 
-                insertData(1, "preUpgrade", date1);
-                assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-                insertData(2, "postUpgrade/preDowngrade", date2);
-                assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-                insertData(3, "postDowngrade", date3);
+                {
+                    insertData(1, "preUpgrade", date1);
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: [
+                            {
+                                operationType: "insert",
+                                fullDocument: {
+                                    "control": {
+                                        "version": 2,
+                                        "min": {"_id": 1, "t": date1, "v": "preUpgrade"},
+                                        "max": {"_id": 1, "t": date1, "v": "preUpgrade"},
+                                        "count": 1,
+                                    },
+                                    "meta": "preUpgrade",
+                                    "data": {
+                                        "t": BinData(7, "CQAAcHMxjwEAAAA="),
+                                        "_id": BinData(7, "AQAAAAAAAADwPwA="),
+                                        "v": BinData(7, "AgALAAAAcHJlVXBncmFkZQAA"),
+                                    },
+                                },
+                                ns: ts1.bucketsNss,
+                            },
+                            {
+                                operationType: "insert",
+                                fullDocument: {marker: "preUpgrade"},
+                                ns: nonTsCollNss,
+                            },
+                        ],
+                    });
+                    assertOpenCursorsOnAllShards();
+                }
 
-                cst.assertNextChangesEqual({
-                    cursor: cursor,
-                    expectedChanges: [
-                        {
-                            operationType: "insert",
-                            fullDocument: {
-                                "control": {
-                                    "version": 2,
-                                    "min": {"_id": 1, "t": date1, "v": "preUpgrade"},
-                                    "max": {"_id": 1, "t": date1, "v": "preUpgrade"},
-                                    "count": 1,
-                                },
-                                "meta": "preUpgrade",
-                                "data": {
-                                    "t": BinData(7, "CQAAcHMxjwEAAAA="),
-                                    "_id": BinData(7, "AQAAAAAAAADwPwA="),
-                                    "v": BinData(7, "AgALAAAAcHJlVXBncmFkZQAA"),
-                                },
+                {
+                    // FCV upgrade.
+                    const upgradeCmd = new FCVUpgradeCommand({timeseriesCollections: [ts1]});
+                    upgradeCmd.execute(testHelper.getConn());
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: upgradeCmd.getChangeEvents({watchMode, watchedNss}),
+                    });
+                    assertOpenCursorsOnAllShards();
+                }
+
+                {
+                    insertData(2, "postUpgrade/preDowngrade", date2);
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: [
+                            // NOTE: no postUpgrade timeseries insert event is expected here because viewless timeseries
+                            // inserts are only observable with rawData:true.
+                            {
+                                operationType: "insert",
+                                fullDocument: {marker: "postUpgrade/preDowngrade"},
+                                ns: nonTsCollNss,
                             },
-                            ns: ts1.bucketsNss,
-                        },
-                        {
-                            operationType: "insert",
-                            fullDocument: {marker: "preUpgrade"},
-                            ns: nonTsCollNss,
-                        },
-                        {
-                            operationType: "rename",
-                            ns: ts1.bucketsNss,
-                            to: ts1.regularNss,
-                        },
-                        // NOTE: no postUpgrade timeseries insert event is expected here because viewless timeseries inserts are only observable with rawData:true.
-                        {
-                            operationType: "insert",
-                            fullDocument: {marker: "postUpgrade/preDowngrade"},
-                            ns: nonTsCollNss,
-                        },
-                        {
-                            operationType: "rename",
-                            ns: ts1.regularNss,
-                            to: ts1.bucketsNss,
-                        },
-                        {
-                            operationType: "insert",
-                            fullDocument: {
-                                "control": {
-                                    "version": 2,
-                                    "min": {"_id": 3, "t": date3, "v": "postDowngrade"},
-                                    "max": {"_id": 3, "t": date3, "v": "postDowngrade"},
-                                    "count": 1,
+                        ],
+                    });
+                    assertOpenCursorsOnAllShards();
+                }
+
+                {
+                    // FCV downgrade.
+                    const downgradeCmd = new FCVDowngradeCommand({
+                        timeseriesCollections: [ts1],
+                        targetFCV: downgradeFCV,
+                    });
+                    downgradeCmd.execute(testHelper.getConn());
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: downgradeCmd.getChangeEvents({watchMode, watchedNss}),
+                    });
+                    assertOpenCursorsOnAllShards();
+                }
+
+                {
+                    insertData(3, "postDowngrade", date3);
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: [
+                            {
+                                operationType: "insert",
+                                fullDocument: {
+                                    "control": {
+                                        "version": 2,
+                                        "min": {"_id": 3, "t": date3, "v": "postDowngrade"},
+                                        "max": {"_id": 3, "t": date3, "v": "postDowngrade"},
+                                        "count": 1,
+                                    },
+                                    "meta": "postDowngrade",
+                                    "data": {
+                                        "t": BinData(7, "CQDARHUxjwEAAAA="),
+                                        "_id": BinData(7, "AQAAAAAAAAAIQAA="),
+                                        "v": BinData(7, "AgAOAAAAcG9zdERvd25ncmFkZQAA"),
+                                    },
                                 },
-                                "meta": "postDowngrade",
-                                "data": {
-                                    "t": BinData(7, "CQDARHUxjwEAAAA="),
-                                    "_id": BinData(7, "AQAAAAAAAAAIQAA="),
-                                    "v": BinData(7, "AgAOAAAAcG9zdERvd25ncmFkZQAA"),
-                                },
+                                ns: ts1.bucketsNss,
                             },
-                            ns: ts1.bucketsNss,
-                        },
-                        {
-                            operationType: "insert",
-                            fullDocument: {marker: "postDowngrade"},
-                            ns: nonTsCollNss,
-                        },
-                    ],
-                });
-                cst.assertNoChange(cursor);
+                            {
+                                operationType: "insert",
+                                fullDocument: {marker: "postDowngrade"},
+                                ns: nonTsCollNss,
+                            },
+                        ],
+                    });
+                    assertOpenCursorsOnAllShards();
+                }
             });
         });
 
@@ -921,6 +1109,13 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
         // even for change streams opened with rawData: true. This is because in lastLTSFCV, timeseries collections are
         // written to system.buckets collection and therefore require showSystemEvents:true to be observed.
         it("will no longer emit time-series events after the downgrade, with rawData: true enabled before the downgrade", function () {
+            const st = testHelper.getShardingTest();
+            if (testHelper.isShardedCluster()) {
+                assert.commandWorked(adminDB.runCommand({enableSharding: testDB1Name, primaryShard: db1PrimaryShard}));
+            }
+
+            const watchMode = ChangeStreamWatchMode.kDb;
+            const watchedNss = {db: testDB1Name};
             const db = adminDB.getSiblingDB(testDB1Name);
             const nonTsCollNss = makeNss(testDB1Name, nonTsCollName);
             const nonTsColl = assertCreateCollection(db, nonTsCollName);
@@ -937,58 +1132,103 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
             }
 
             withChangeStreamTest(db, (cst) => {
-                assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+                new FCVUpgradeCommand().execute(testHelper.getConn());
 
                 const cursor = openChangeStreamCursor(cst, 1, {
                     showSystemEvents: false,
                     rawData: true,
-                    watchMode: ChangeStreamWatchMode.kDb,
+                    watchMode,
+                    comment,
                 });
+                const v2CursorId = cursor.id;
 
-                insertData(1, "preDowngrade", date1);
-                assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-                insertData(2, "postDowngrade", date2);
-
-                cst.assertNextChangesEqual({
-                    cursor: cursor,
-                    expectedChanges: [
-                        {
-                            operationType: "insert",
-                            fullDocument: {
-                                "control": {
-                                    "version": 2,
-                                    "min": {"_id": 1, "t": date1, "v": "preDowngrade"},
-                                    "max": {"_id": 1, "t": date1, "v": "preDowngrade"},
-                                    "count": 1,
+                // Pre FCV Downgrade.
+                {
+                    insertData(1, "preDowngrade", date1);
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: [
+                            {
+                                operationType: "insert",
+                                fullDocument: {
+                                    "control": {
+                                        "version": 2,
+                                        "min": {"_id": 1, "t": date1, "v": "preDowngrade"},
+                                        "max": {"_id": 1, "t": date1, "v": "preDowngrade"},
+                                        "count": 1,
+                                    },
+                                    "meta": "preDowngrade",
+                                    "data": {
+                                        "t": BinData(7, "CQAAcHMxjwEAAAA="),
+                                        "_id": BinData(7, "AQAAAAAAAADwPwA="),
+                                        "v": BinData(7, "AgANAAAAcHJlRG93bmdyYWRlAAA="),
+                                    },
                                 },
-                                "meta": "preDowngrade",
-                                "data": {
-                                    "t": BinData(7, "CQAAcHMxjwEAAAA="),
-                                    "_id": BinData(7, "AQAAAAAAAADwPwA="),
-                                    "v": BinData(7, "AgANAAAAcHJlRG93bmdyYWRlAAA="),
-                                },
+                                ns: ts1.regularNss,
                             },
-                            ns: ts1.regularNss,
-                        },
-                        {
-                            operationType: "insert",
-                            fullDocument: {marker: "preDowngrade"},
-                            ns: nonTsCollNss,
-                        },
-                        {
-                            operationType: "rename",
-                            ns: ts1.regularNss,
-                            to: ts1.bucketsNss,
-                        },
-                        // NOTE: no postDowngrade timeseries insert event is expected here because view"ful" timeseries inserts are only observable with showSystemEvents:true.
-                        {
-                            operationType: "insert",
-                            fullDocument: {marker: "postDowngrade"},
-                            ns: nonTsCollNss,
-                        },
-                    ],
-                });
+                            {
+                                operationType: "insert",
+                                fullDocument: {marker: "preDowngrade"},
+                                ns: nonTsCollNss,
+                            },
+                        ],
+                    });
+
+                    if (testHelper.isShardedCluster()) {
+                        assertOpenCursors(
+                            st,
+                            [st.shard0.shardName],
+                            /*expectedConfigCursor=*/ false,
+                            cursorCommentFilter(comment),
+                        );
+                    }
+                }
+
+                // Perform FCV downgrade.
+                {
+                    const downgradeCmd = new FCVDowngradeCommand({
+                        timeseriesCollections: [ts1],
+                        targetFCV: downgradeFCV,
+                    });
+                    downgradeCmd.execute(testHelper.getConn());
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: downgradeCmd.getChangeEvents({watchMode, watchedNss}),
+                    });
+                }
+
+                // Post FCV Downgrade.
+                {
+                    insertData(2, "postDowngrade", date2);
+                    cst.assertNextChangesEqual({
+                        cursor: cursor,
+                        expectedChanges: [
+                            // NOTE: no postDowngrade timeseries insert event is expected here because view"ful" timeseries
+                            // inserts are only observable with showSystemEvents:true.
+                            {
+                                operationType: "insert",
+                                fullDocument: {marker: "postDowngrade"},
+                                ns: nonTsCollNss,
+                            },
+                        ],
+                    });
+
+                    if (testHelper.isShardedCluster()) {
+                        assertOpenCursors(
+                            st,
+                            testHelper.allShards(),
+                            /*expectedConfigCursor=*/ true,
+                            cursorCommentFilter(comment),
+                        );
+                    }
+                }
                 cst.assertNoChange(cursor);
+
+                if (testHelper.isShardedCluster()) {
+                    // The stream was reopened as v1 after RetryChangeStream, so the cursor ID must differ.
+                    const v1CursorId = cursor.id;
+                    assert.neq(v1CursorId, v2CursorId, "cursor should have been reopened after FCV downgrade");
+                }
             });
         });
     });

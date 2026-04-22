@@ -52,6 +52,10 @@ export class CreateTimeseriesCollectionCommand extends Command {
 
         return [];
     }
+
+    toString() {
+        return "CreateTimeseriesCollectionCommand";
+    }
 }
 
 /**
@@ -127,18 +131,21 @@ export class TimeseriesInsertCommand extends Command {
 
         return [];
     }
+
+    toString() {
+        return "TimeseriesInsertCommand";
+    }
 }
 
 export class FCVUpgradeCommand extends Command {
-    constructor({toVersion, timeseriesCollections}) {
+    constructor({timeseriesCollections} = {}) {
         super(/* dbName */ null, /* collName */ null, /* shardSet */ null, /* collectionCtx */ {});
-        this.toVersion = toVersion;
         this.timeseriesCollections = timeseriesCollections;
     }
 
     execute(conn) {
         const adminDB = conn.getDB("admin");
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: this.toVersion, confirm: true}));
+        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     }
 
     getChangeEvents(ctx) {
@@ -170,18 +177,22 @@ export class FCVUpgradeCommand extends Command {
 
         return events;
     }
+
+    toString() {
+        return "FCVUpgradeCommand";
+    }
 }
 
 export class FCVDowngradeCommand extends Command {
-    constructor({toVersion, timeseriesCollections}) {
+    constructor({timeseriesCollections, targetFCV} = {}) {
         super(/* dbName */ null, /* collName */ null, /* shardSet */ null, /* collectionCtx */ {});
-        this.toVersion = toVersion;
         this.timeseriesCollections = timeseriesCollections;
+        this.targetFCV = targetFCV;
     }
 
     execute(conn) {
         const adminDB = conn.getDB("admin");
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: this.toVersion, confirm: true}));
+        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: this.targetFCV, confirm: true}));
     }
 
     getChangeEvents(ctx) {
@@ -212,5 +223,9 @@ export class FCVDowngradeCommand extends Command {
         }
 
         return events;
+    }
+
+    toString() {
+        return "FCVDowngradeCommand";
     }
 }

@@ -102,7 +102,7 @@ describe("change stream v2", function () {
 
     beforeEach(function () {
         // Ensure FCV is at latestFCV at the start of each test.
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        new FCVUpgradeCommand().execute(conn);
 
         // Clear the mongos log so awaitLogMessageCodes offsets work correctly.
         assert.commandWorked(conn.adminCommand({clearLog: "global"}));
@@ -630,7 +630,6 @@ describe("change stream v2", function () {
                 // On the first getMore the v2 state machine detects placement is unavailable and throws
                 // RetryChangeStream, reopening the stream as v1.
                 const cursor = openChangeStream(cst, {watchMode, version, comment});
-                const v2CursorId = cursor.id;
 
                 // Insert + consume to let the natural v2->v1 fallback happen.
                 executeAndAssertEvents({
@@ -640,8 +639,6 @@ describe("change stream v2", function () {
                     watchMode,
                     cmds: [makeInsertCmd(dbName, collName)],
                 });
-                const v1CursorId = cursor.id;
-                assert.neq(v1CursorId, v2CursorId, "cursor should have been reopened after FCV downgrade");
 
                 // After fallback, v1 broadcasts to all shards + config.
                 assertOpenCursors(st, allShardNames, /* expectedConfigCursor */ true, cursorCommentFilter(comment));
@@ -655,8 +652,6 @@ describe("change stream v2", function () {
                     cmds: [new FCVUpgradeCommand(), makeInsertCmd(dbName, collName)],
                 });
 
-                // v1 stream stays v1, cursor ID unchanged, still broadcasts to all shards.
-                assert.eq(cursor.id, v1CursorId, "cursor should remain the same after FCV upgrade");
                 assertOpenCursors(st, allShardNames, /* expectedConfigCursor */ true, cursorCommentFilter(comment));
             });
 

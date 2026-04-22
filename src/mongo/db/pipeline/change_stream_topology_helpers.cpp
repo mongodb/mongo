@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
 
@@ -111,6 +112,13 @@ BSONObj createUpdatedCommandForNewShard(
             str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
                           << expCtx->getNamespaceString().toStringForErrorMsg(),
             expCtx->getSerializationContext() != SerializationContext::stateDefault());
+
+
+    // TODO:SERVER-124941 Make rawData part of the cursor and restore it on getMore.
+    // Propagate rawData from the original aggregate command to the current opCtx,
+    // so that buildOplogMatchFilter correctly handles timeseries events.
+    isRawDataOperation(expCtx->getOperationContext()) =
+        originalAggregateCommand.getBoolField(GenericArguments::kRawDataFieldName);
 
     // Parse and optimize the pipeline. This will also insert all internal change stream stages into
     // the pipeline.
