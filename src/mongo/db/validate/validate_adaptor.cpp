@@ -1287,21 +1287,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                             // logged above.
 
                             // The following result cases are logged as warnings
-                            // TODO: SERVER-122124 change this to signal an error instead
-                            case TimeseriesValidationResult::kExtendedRangeMismatch:
-                                LOGV2_WARNING_OPTIONS(
-                                    11461400,
-                                    {logv2::LogTruncation::Disabled},
-                                    "Document is not compliant with time-series specifications",
-                                    logAttrs(coll->ns()),
-                                    "recordId"_attr = record->id,
-                                    "record"_attr = record->data.toBson(),
-                                    "reason"_attr = timeseriesValidationResult.reason);
-                                ++nNonCompliantDocuments;
-                                results->addWarning(_describeTimeseriesValidationResult(
-                                    timeseriesValidationResult.result));
-                                break;
-
                             case TimeseriesValidationResult::kV3WithOrderedTime:
                                 LOGV2_WARNING_OPTIONS(
                                     12351700,

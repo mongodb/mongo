@@ -1401,9 +1401,8 @@ TEST_F(TimeseriesCollectionValidationTest, ReportErrorsInExtendedRangeBookkeepin
         const AutoGetCollection coll(_opCtx, _nss, MODE_IS);
         EXPECT_FALSE(coll->getRequiresTimeseriesExtendedRangeSupport());
     }
-    // TODO: SERVER-122124 This validation should become an error.
     foregroundValidate(
-        _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1});
+        _nss, _opCtx, {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0});
 }
 
 TEST_F(TimeseriesCollectionValidationTest, ValidationOfDocumentJustPastEpochMax) {
