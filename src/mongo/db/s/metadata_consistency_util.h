@@ -86,7 +86,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& catalogClientCollections,
-    const std::vector<CollectionPtr>& localCollections);
+    const std::vector<CollectionPtr>& localCollections,
+    bool optionalCheckIndexes);
 
 /**
  * Check different types of inconsistencies from the chunks persisted in 'config.chunks' of the

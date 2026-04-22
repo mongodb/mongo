@@ -248,6 +248,7 @@ public:
                                       << " with namespace " << nss.toStringForErrorMsg());
                 }
             }();
+            const auto& optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
 
             auto inconsistencies = [&] {
                 auto collCatalogSnapshot = [&] {
@@ -297,11 +298,15 @@ public:
 
                 // Check consistency between local metadata and configsvr metadata
                 return metadata_consistency_util::checkCollectionMetadataInconsistencies(
-                    opCtx, shardId, primaryShardId, catalogClientCollections, localCollections);
+                    opCtx,
+                    shardId,
+                    primaryShardId,
+                    catalogClientCollections,
+                    localCollections,
+                    optionalCheckIndexes && *optionalCheckIndexes);
             }();
 
             // If this is the primary shard of the db coordinate index check across shards
-            const auto& optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
             if (shardId == primaryShardId && optionalCheckIndexes && *optionalCheckIndexes) {
                 auto indexInconsistencies =
                     checkIndexesInconsistencies(opCtx, catalogClientCollections);

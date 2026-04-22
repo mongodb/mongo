@@ -52,6 +52,7 @@ enums:
             kRoutingTableRangeGap: "RoutingTableRangeGap"
             kRoutingTableRangeOverlap: "RoutingTableRangeOverlap"
             kZonesRangeOverlap: "ZonesRangeOverlap"
+            kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -71,6 +72,7 @@ enums:
             kRoutingTableRangeGap: "Found a gap between two consecutive chunks"
             kRoutingTableRangeOverlap: "Found two overlapping consecutive chunks"
             kZonesRangeOverlap: "Found two overlapping zones"
+            kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
@@ -337,4 +339,22 @@ structs:
                               DDL operations on a database"
                 type: exactInt64
                 validator: { gte: 0, lte: 2147483647 } # [0, 2^31 - 1]
+                optional: true
+
+    UniqueIndexInconsistencyInfo:
+        description: "Details about unique index misconfiguration."
+        strict: false
+        fields:
+            index:
+                type: object
+                description: "Index with the issue."
+            shard:
+                type: shard_id
+                description: "Shard id where the issue was found."
+            issue:
+                type: string
+                description: "Uniqueness issue found."
+            shardKey:
+                type: object
+                description: "Collection shard key."
                 optional: true

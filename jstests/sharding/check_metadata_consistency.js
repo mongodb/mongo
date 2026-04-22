@@ -474,5 +474,112 @@ function assertCollectionOptionsMismatch(inconsistencies, expectedOptions) {
     assert.commandWorked(configDB.databases.deleteOne({_id: "admin"}));
 })();
 
+(function testUniqueIndexWithNonSimpleCollationOnShardKeyPrefix() {
+    jsTest.log("Executing testUniqueIndexWithNonSimpleCollationOnShardKeyPrefix");
+
+    if (jsTest.options().storageEngine === "inMemory") {
+        jsTest.log("Skipping test for in-memory storage engine");
+        return;
+    }
+
+    if (TestData.configShard) {
+        jsTest.log("Skipping test because it is not compatible with a cluster with a config shard");
+        return;
+    }
+
+    function generateCollationInconsistency(shardRS) {
+        shardRS.stopSet(
+            undefined, true /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+
+        for (let i = 0; i < shardRS.nodes.length; i++) {
+            delete shardRS.nodes[i].fullOptions.shardsvr;
+        }
+        shardRS.startSet({}, true /* forRestart */);
+        shardRS.waitForPrimary();
+
+        const shardPrimary = shardRS.getPrimary();
+        const shardDb = shardPrimary.getDB(db.getName());
+
+        assert.commandWorked(
+            shardDb.runCommand({
+                collMod: collName,
+                index: {name: "shardKey_extra_nonSimple_idx", prepareUnique: true},
+            }),
+        );
+        assert.commandWorked(
+            shardDb.runCommand({
+                collMod: collName,
+                index: {name: "shardKey_extra_nonSimple_idx", unique: true},
+            }),
+        );
+
+        shardRS.stopSet(
+            undefined, true /* forRestart */, {skipCheckDBHashes: true, skipValidation: true});
+
+        for (let i = 0; i < shardRS.nodes.length; i++) {
+            shardRS.nodes[i].fullOptions.shardsvr = "";
+        }
+        shardRS.startSet({}, true /* forRestart */);
+        shardRS.waitForPrimary();
+    }
+
+    const db = getNewDb();
+    const collName = "uniqueIdxCollationColl";
+    const ns = db.getName() + "." + collName;
+    const coll = db[collName];
+    const primaryShardRS = st.rs0;
+
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
+    assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {shardKey: 1}}));
+
+    assert.commandWorked(
+        coll.createIndex(
+            {shardKey: 1, extraField: 1},
+            {collation: {locale: "en_US", strength: 2}, name: "shardKey_extra_nonSimple_idx"},
+            ),
+    );
+
+    for (let i = 0; i < 10; i++) {
+        assert.commandWorked(coll.insert({shardKey: i, extraField: "value_" + i}));
+    }
+
+    let inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();
+    assert.eq(
+        0,
+        inconsistencies.length,
+        "Expected no inconsistencies before index modification: " + tojson(inconsistencies),
+    );
+
+    generateCollationInconsistency(primaryShardRS);
+
+    inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();
+    jsTest.log("Inconsistencies found: " + tojson(inconsistencies));
+
+    assert.eq(
+        inconsistencies.length,
+        1,
+        "Expected inconsistencies for unique index with non-simple collation on shard key prefix",
+    );
+
+    // Generate inconsistency in the other shard.
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {shardKey: 5}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {shardKey: 5}, to: st.shard1.shardName}));
+
+    generateCollationInconsistency(st.rs1);
+
+    inconsistencies = db.checkMetadataConsistency({"checkIndexes": 1}).toArray();
+    jsTest.log("Inconsistencies found: " + tojson(inconsistencies));
+    assert.eq(
+        inconsistencies.length,
+        2,
+        "Expected inconsistencies for unique index with non-simple collation on shard key prefix",
+    );
+
+    db.dropDatabase();
+})();
+
 st.stop();
 })();
