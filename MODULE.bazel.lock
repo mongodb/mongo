@@ -537,7 +537,7 @@
     },
     "@@aspect_rules_js~//npm:extensions.bzl%pnpm": {
       "general": {
-        "bzlTransitiveDigest": "FM0lxNWZPFw5ktWotCCf2WsD2AHJDANeh2GFH57DP3U=",
+        "bzlTransitiveDigest": "ZiETCAm3yu6gU5QC0R5OrRO0ZS2lrnh7hm9Bd17t1As=",
         "usagesDigest": "nreWOSoW3keGlKdHpT5drUTOjHwIzGpp1haLECAZ4dM=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -2002,7 +2002,7 @@
     },
     "@@rules_rust~//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "HTx857xqjW5LFsaeJYKJhecWUKP9B57NYPrM1DCnnas=",
+        "bzlTransitiveDigest": "L9rxpG84287VYpuRM8hACDZ7jT04aXbaoJAQWk6Gf+Q=",
         "usagesDigest": "jdsFFevZIrOcSfuuZxyovS/wXbhPLIa/eBqyNOiTP98=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

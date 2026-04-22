@@ -9,6 +9,16 @@
 REPO_ROOT=$(dirname $(dirname $(realpath "$0")))
 bazel_real="$BAZEL_REAL"
 
+# 90% of the time, prefer downloading from the direct URL before trying the
+# Remote Asset API (experimental_remote_downloader).  This lets us benefit
+# off of the added redundancy of the remote downloader while reducing traffic
+# that's transmitted through the (expensive) ELB.
+if [ -n "${CI:-}" ] && [ -z "${REVERSE_REMOTE_API_ATTEMPT_ORDER+x}" ]; then
+  if [ $(( RANDOM % 10 )) -ne 0 ]; then
+    export REVERSE_REMOTE_API_ATTEMPT_ORDER=1
+  fi
+fi
+
 
 
 # If disk space becomes an issue, this block can be used to clean up configs
