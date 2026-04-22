@@ -481,6 +481,13 @@ splitExprMatchExpression(std::unique_ptr<ExprMatchExpression> expr,
                          const StringMap<std::string>& renames,
                          expression::ShouldSplitExprFunc shouldSplit,
                          expression::Renameables& renameables) {
+    // If the RewriteResult still holds a MatchExpression, then the 'ExprMatchExpression' represents
+    // an intermediate rewritten state rather than just a $expr. We bail out of further analysis
+    // rather than trying to handle this case.
+    if (expr->getRewriteResult() && expr->getRewriteResult()->matchExpression()) {
+        return {nullptr, std::move(expr)};
+    }
+
     // Bail out of further analysis if any randomness is involved or there are any special
     // expressions that require the entire document.
     DepsTracker depsTracker{};
@@ -536,9 +543,31 @@ splitExprMatchExpression(std::unique_ptr<ExprMatchExpression> expr,
     auto independentPart = createAndExprMatchExpression(expCtx, std::move(independentChildren));
     auto dependentPart = createAndExprMatchExpression(expCtx, std::move(dependentChildren));
 
+    tassert(12497400,
+            "Either independent or dependent parts should be non-null",
+            dependentPart || independentPart);
+
     if (independentPartRequiresRename) {
         // The second part of the pair is not used for $expr.
         renameables.emplace_back(independentPart.get(), ""_sd);
+    }
+
+    // Make sure to extend the lifetime of the backing BSON held inside the 'RewriteResult' object.
+    // TODO SERVER-125010: Improve memory ownership approach to ensure correctness and avoid
+    // unnecessary overheads.
+    if (auto& rewriteResult = expr->getRewriteResult()) {
+        if (dependentPart && independentPart) {
+            // The backing BSON might be tied to either the dependent or the independent parts
+            // (or both). By cloning the 'RewriteResult' and attaching it to both the dependent
+            // and independent parts, we ensure that the backing BSON lives at least as long as
+            // both sub-trees.
+            dependentPart->setRewriteResult(rewriteResult->clone());
+            independentPart->setRewriteResult(std::move(rewriteResult));
+        } else if (dependentPart) {
+            dependentPart->setRewriteResult(std::move(rewriteResult));
+        } else {
+            independentPart->setRewriteResult(std::move(rewriteResult));
+        }
     }
 
     return {std::move(independentPart), std::move(dependentPart)};
