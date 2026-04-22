@@ -174,12 +174,12 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "encrypt",
-        "incompatible_with_bazel_remote_test",  # jstests/ssl_linear/ssl_with_system_ca.js requires `openssl` to be installed and on the path.
         "patch_build",
         "ssl",
     ],
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )
