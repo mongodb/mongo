@@ -56,6 +56,17 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "insert_cmd_shape",
+    srcs = ["insert_cmd_shape.cpp"],
+    hdrs = ["insert_cmd_shape.h"],
+    deps = [
+        ":query_shape_common",
+        "//src/mongo:base",
+        "//src/mongo/db/query/write_ops",
+    ],
+)
+
 idl_generator(
     name = "query_shape_hash_gen",
     src = "query_shape_hash.idl",
@@ -111,6 +122,7 @@ mongo_cc_unit_test(
         "count_cmd_shape_test.cpp",
         "distinct_cmd_shape_test.cpp",
         "find_cmd_shape_test.cpp",
+        "insert_cmd_shape_test.cpp",
         "let_shape_component_test.cpp",
         "serialization_options_test.cpp",
         "update_cmd_shape_test.cpp",
@@ -119,6 +131,7 @@ mongo_cc_unit_test(
         "mongo_unittest_sixth_group",
     ],
     deps = [
+        ":insert_cmd_shape",
         ":update_cmd_shape",
         "//src/mongo/db/pipeline:expression_context_for_test",
     ],

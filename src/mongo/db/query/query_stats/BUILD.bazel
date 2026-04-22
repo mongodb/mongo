@@ -64,6 +64,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "insert_key",
+    srcs = [
+        "insert_key.cpp",
+    ],
+    hdrs = [
+        "insert_key.h",
+    ],
+    deps = [
+        ":key",
+        "//src/mongo/db/query/query_shape:insert_cmd_shape",
+    ],
+)
+
 idl_generator(
     name = "transform_algorithm_gen",
     src = "transform_algorithm.idl",
@@ -86,6 +100,7 @@ mongo_cc_unit_test(
         "count_key_test.cpp",
         "distinct_key_test.cpp",
         "find_key_test.cpp",
+        "insert_key_test.cpp",
         "key_test.cpp",
         "query_stats_store_test.cpp",
         "query_stats_test.cpp",
@@ -95,6 +110,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
+        ":insert_key",
         ":query_stats",
         ":update_key",
         "//src/mongo/db:service_context_d_test_fixture",
