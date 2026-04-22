@@ -176,10 +176,12 @@ private:
     // The hosts map is only stored temporarily before the '_ars' member is instantiated. It will be
     // empty after the '_ars' member instantiation.
     AsyncRequestsSender::ShardHostMap _designatedHostsMap;
-    static logv2::SeveritySuppressor _logSeveritySuppressor;
 };
 
-logv2::SeveritySuppressor CursorEstablisher::_logSeveritySuppressor{
+// Rate-limits the "Unable to establish remote cursors" log to once per second at Info level,
+// falling back to Debug(2) within the same period. Defined at file scope so it can be reset
+// with a mock clock during tests.
+logv2::SeveritySuppressor gLogSeveritySuppressor{
     Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 
 void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
@@ -350,7 +352,7 @@ void CursorEstablisher::checkForFailedRequests() {
         // _logSeveritySuppressor().toInt(). This severity level is not restricted to DEBUG and can
         // be any defined level.
         LOGV2_DEBUG(4625501,
-                    _logSeveritySuppressor().toInt(),
+                    gLogSeveritySuppressor().toInt(),
                     "Unable to establish remote cursors",
                     "error"_attr = *_maybeFailure,
                     "nRemotes"_attr = _remotesToClean.size());
@@ -520,6 +522,13 @@ BSONObj appendReadPreferenceNearest(BSONObj cmdObj) {
 }
 
 }  // namespace
+
+// For testing only: resets the log severity suppressor to use the given clock source (pass
+// nullptr to restore the real system clock). This allows tests to advance time deterministically
+// instead of relying on real sleeps.
+void setCursorEstablisherSuppressorClockSource_forTest(ClockSource* cs) {
+    gLogSeveritySuppressor.resetWithClockSource_forTest(cs);
+}
 
 // Attach our OperationKey to a request. This will allow us to kill any outstanding
 // requests in case we're interrupted or one of the remotes returns an error. Note that although
