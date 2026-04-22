@@ -3,7 +3,6 @@ test_kind: js_test
 selector:
   roots:
     - src/mongo/db/modules/enterprise/jstests/streams/s3_local/s3_parallel_heavy.js
-    - src/mongo/db/modules/enterprise/jstests/streams/s3_local/s3_emit_benchmark_tpcc.js
 
 executor:
   fixture:
