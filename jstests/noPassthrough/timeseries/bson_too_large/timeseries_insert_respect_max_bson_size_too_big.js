@@ -8,19 +8,23 @@
  * @tags: [
  *   requires_timeseries,
  *   multiversion_incompatible,
- *   does_not_support_stepdowns,
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-let counter = 0;
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
+const primary = rst.getPrimary();
+const testDB = primary.getDB(jsTestName());
+const timeField = "t";
+const metaField = "m";
+
 TimeseriesTest.run((insert) => {
-    const testDB = db.getSiblingDB(jsTestName());
-    const coll = testDB["coll_" + counter++];
+    const coll = testDB["coll"];
     const timestamp = ISODate("2025-01-01T12:00:00Z");
-    const timeField = "t";
-    const metaField = "m";
 
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {"timeField": timeField, "metaField": metaField}}),
@@ -48,4 +52,8 @@ TimeseriesTest.run((insert) => {
 
     // This measurement is always too big due to total metric size being copied into control block.
     assert.commandFailedWithCode(insert(coll, measurement2), ErrorCodes.BSONObjectTooLarge);
+
+    coll.drop();
 });
+
+rst.stopSet();
