@@ -42,7 +42,6 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -88,32 +87,6 @@ Status _createInternalFastCountCollection(repl::StorageInterface* storageInterfa
         CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
 }
 
-Status _createInternalFastCountContainer(OperationContext* opCtx,
-                                         KVEngine* engine,
-                                         rss::PersistenceProvider& provider,
-                                         RecoveryUnit& ru,
-                                         StringData identName,
-                                         KeyFormat keyFormat) {
-    RecordStore::Options options;
-    options.keyFormat = keyFormat;
-    auto status = engine->createRecordStore(
-        provider, ru, NamespaceString::kAdminCommandNamespace, identName, options);
-    if (status.code() == ErrorCodes::ObjectAlreadyExists) {
-        LOGV2(12231502,
-              "Replicated fast count RecordStore ident already exists, skipping creation.",
-              "ident"_attr = identName);
-        return status;
-    }
-    massert(12231501,
-            fmt::format("Failed to create RecordStore for ident '{}' with error '{}' and code {}",
-                        identName,
-                        status.reason(),
-                        status.code()),
-            status.isOK());
-    LOGV2(12231500, "Created replicated fast count container.", "ident"_attr = identName);
-    return status;
-}
-
 void _createInternalFastCountCollections(repl::StorageInterface* storageInterface,
                                          OperationContext* opCtx) {
     const auto storeNss =
@@ -131,38 +104,16 @@ void _createInternalFastCountCollections(repl::StorageInterface* storageInterfac
                   timestampsNss);
 }
 
-void _createInternalFastCountContainers(OperationContext* opCtx) {
-    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    auto* engine = storageEngine->getEngine();
+void _writeInitReplicatedFastCountOplogEntry(OperationContext* opCtx) {
+    InitReplicatedFastCountO2 o2;
+    o2.setFastCountMetadataStoreIdent(std::string(ident::kFastCountMetadataStore));
+    o2.setFastCountMetadataStoreKeyFormat(static_cast<int>(KeyFormat::String));
+    o2.setFastCountMetadataStoreTimestampsIdent(
+        std::string(ident::kFastCountMetadataStoreTimestamps));
+    o2.setFastCountMetadataStoreTimestampsKeyFormat(static_cast<int>(KeyFormat::Long));
 
-    Lock::GlobalLock globalLock(opCtx, MODE_IX);
-    WriteUnitOfWork wuow(opCtx);
-
-    auto metadataStatus = _createInternalFastCountContainer(
-        opCtx, engine, provider, *ru, ident::kFastCountMetadataStore, KeyFormat::String);
-    auto timestampStatus = _createInternalFastCountContainer(
-        opCtx, engine, provider, *ru, ident::kFastCountMetadataStoreTimestamps, KeyFormat::Long);
-
-    // If either ident was created, we need to replicate this creation on the secondary.
-    // TODO SERVER-123094 This should be changed to and instead of or since we should only create
-    // both idents or neither ident.
-    if (metadataStatus.isOK() || timestampStatus.isOK()) {
-        // Write the initReplicatedFastCount oplog entry so secondaries create the same
-        // RecordStores.
-        InitReplicatedFastCountO2 o2;
-        o2.setFastCountMetadataStoreIdent(std::string(ident::kFastCountMetadataStore));
-        o2.setFastCountMetadataStoreKeyFormat(static_cast<int>(KeyFormat::String));
-        o2.setFastCountMetadataStoreTimestampsIdent(
-            std::string(ident::kFastCountMetadataStoreTimestamps));
-        o2.setFastCountMetadataStoreTimestampsKeyFormat(static_cast<int>(KeyFormat::Long));
-
-        repl::OpTime opTime;
-        opCtx->getServiceContext()->getOpObserver()->onInitReplicatedFastCount(opCtx, o2, opTime);
-    }
-
-    wuow.commit();
+    repl::OpTime opTime;
+    opCtx->getServiceContext()->getOpObserver()->onInitReplicatedFastCount(opCtx, o2, opTime);
 }
 }  // namespace
 
@@ -173,10 +124,169 @@ void setUpReplicatedFastCount(OperationContext* opCtx) {
     if (gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        _createInternalFastCountContainers(opCtx);
+        auto status = createInternalFastCountContainers(opCtx,
+                                                        NamespaceString::kAdminCommandNamespace,
+                                                        ident::kFastCountMetadataStore,
+                                                        KeyFormat::String,
+                                                        ident::kFastCountMetadataStoreTimestamps,
+                                                        KeyFormat::Long,
+                                                        /*writeToOplog=*/true);
+        if (status == ErrorCodes::ObjectAlreadyExists) {
+            LOGV2(12309403,
+                  "Replicated fast count idents already exist during stepup",
+                  "metadataIdent"_attr = ident::kFastCountMetadataStore,
+                  "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
+        } else {
+            massertStatusOK(status);
+        }
     }
 
     ReplicatedFastCountManager::get(opCtx->getServiceContext()).startup(opCtx);
+}
+
+namespace {
+Status _createInternalFastCountContainer(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         StringData ident,
+                                         KeyFormat keyFormat) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto* engine = storageEngine->getEngine();
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+
+    // Rolling back table creation performs a two-phase drop, so this ident may be pending drop. If
+    // it is we'll need to complete the drop before we can proceed. If it isn't, this is a no-op.
+    if (auto status = storageEngine->immediatelyCompletePendingDrop(opCtx, ident); !status.isOK()) {
+        LOGV2(12309404,
+              "Replicated fast count ident being created was drop-pending and could not be dropped "
+              "immediately",
+              "ident"_attr = ident,
+              "error"_attr = status);
+        return status;
+    }
+
+    RecordStore::Options options;
+    options.keyFormat = keyFormat;
+    auto status = engine->createRecordStore(provider, ru, nss, ident, options);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    ru.onRollback([ident = std::string(ident)](OperationContext* opCtx) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        storageEngine->addDropPendingIdent(StorageEngine::Immediate{},
+                                           std::make_shared<Ident>(ident));
+    });
+
+    return status;
+}
+}  // namespace
+
+std::pair<Status, std::string> handleExistingFastCountIdent(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            StringData existingIdent,
+                                                            KeyFormat existingIdentFormat,
+                                                            StringData nonExistentIdent) {
+    auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    RecordStore::Options existingIdentOptions{.keyFormat = existingIdentFormat};
+
+    bool empty = false;
+    try {
+        auto existingRs = engine->getRecordStore(opCtx,
+                                                 nss,
+                                                 existingIdent,
+                                                 existingIdentOptions,
+                                                 /*uuid=*/boost::none);
+        auto cursor = existingRs->getCursor(opCtx, ru);
+        empty = !cursor->next();
+    } catch (const DBException& ex) {
+        return {ex.toStatus(), ""};
+    }
+
+    if (!empty) {
+        return {Status(ErrorCodes::Error{12309402},
+                       fmt::format("The fast count ident {} already exists and was non-empty even "
+                                   "though the ident {} did not exist",
+                                   existingIdent,
+                                   nonExistentIdent)),
+                ""};
+    }
+
+    return {Status::OK(),
+            fmt::format("One replicated fast count ident already exists on disk after drop attempt "
+                        "but the other did not. {} can be re-used and {} was created",
+                        existingIdent,
+                        nonExistentIdent)};
+}
+
+Status createInternalFastCountContainers(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         StringData metadataIdent,
+                                         KeyFormat metadataKeyFormat,
+                                         StringData timestampsIdent,
+                                         KeyFormat timestampsKeyFormat,
+                                         bool writeToOplog) {
+    // During secondary oplog application we need to use local write intent since regular write
+    // intent is for writable primaries.
+    auto intent = writeToOplog ? rss::consensus::IntentRegistry::Intent::Write
+                               : rss::consensus::IntentRegistry::Intent::LocalWrite;
+    Lock::GlobalLock globalLock(opCtx, MODE_IX, Lock::GlobalLockOptions{.explicitIntent = intent});
+
+    // Try creating both containers. ObjectAlreadyExists tells us which idents exist.
+
+    WriteUnitOfWork wuow(opCtx);
+    auto metadataStatus =
+        _createInternalFastCountContainer(opCtx, nss, metadataIdent, metadataKeyFormat);
+    auto timestampsStatus =
+        _createInternalFastCountContainer(opCtx, nss, timestampsIdent, timestampsKeyFormat);
+
+    if (metadataStatus.isOK() && timestampsStatus.isOK()) {
+        if (writeToOplog) {
+            _writeInitReplicatedFastCountOplogEntry(opCtx);
+        }
+        wuow.commit();
+        return Status::OK();
+    }
+
+    if (metadataStatus == ErrorCodes::ObjectAlreadyExists &&
+        timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
+        // Handling for both idents existing differs between stepup initialization and oplog
+        // application.
+        return metadataStatus;
+    }
+
+    if ((!metadataStatus.isOK() && metadataStatus != ErrorCodes::ObjectAlreadyExists) ||
+        (!timestampsStatus.isOK() && timestampsStatus != ErrorCodes::ObjectAlreadyExists)) {
+        // Return any unexpected error. WUOW rollback will remove any ident that was newly created.
+        return !metadataStatus.isOK() ? metadataStatus : timestampsStatus;
+    }
+
+    // TODO SERVER-114575 Layered table drops can sometimes report OK but collide with subsequent
+    // table creations. We can re-use the colliding ident as long as it is empty.
+    Status existingIdentStatus = Status::OK();
+    std::string msg;
+    if (metadataStatus == ErrorCodes::ObjectAlreadyExists) {
+        std::tie(existingIdentStatus, msg) = handleExistingFastCountIdent(
+            opCtx, nss, metadataIdent, metadataKeyFormat, timestampsIdent);
+    } else if (timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
+        std::tie(existingIdentStatus, msg) = handleExistingFastCountIdent(
+            opCtx, nss, timestampsIdent, timestampsKeyFormat, metadataIdent);
+    } else {
+        // Success cases or unexpected errors should have already been handled.
+        MONGO_UNREACHABLE_TASSERT(12309405);
+    }
+
+    if (existingIdentStatus.isOK()) {
+        // The colliding ident was empty so we can treat it as newly created.
+        LOGV2(12309400, "Reusing empty ident", "details"_attr = msg);
+        if (writeToOplog) {
+            _writeInitReplicatedFastCountOplogEntry(opCtx);
+        }
+        wuow.commit();
+    }
+    return existingIdentStatus;
 }
 
 namespace replicated_fast_count {

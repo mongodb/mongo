@@ -87,6 +87,7 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -1489,47 +1490,79 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
           const auto parsedO2 = InitReplicatedFastCountO2::parse(*op->getObject2());
 
-          auto createContainerRecordStore = [&](StringData ident, int keyFormatInt) -> Status {
+          if (parsedO2.getFastCountMetadataStoreIdent() ==
+              parsedO2.getFastCountMetadataStoreTimestampsIdent()) {
+              return Status(ErrorCodes::BadValue,
+                            "initReplicatedFastCount metadata and timestamps idents must differ");
+          }
+
+          // KeyFormats are not validated in the RecordStore create path so we validate them here
+          // before attempting creation.
+          auto getKeyFormat = [](StringData ident, int keyFormatInt) -> StatusWith<KeyFormat> {
+              auto keyFormat = static_cast<KeyFormat>(keyFormatInt);
               if (keyFormatInt != static_cast<int>(KeyFormat::Long) &&
                   keyFormatInt != static_cast<int>(KeyFormat::String)) {
                   return Status(ErrorCodes::BadValue,
-                                fmt::format("Invalid keyFormat value: {}", keyFormatInt));
+                                fmt::format("Invalid keyFormat value: {} for ident: {}",
+                                            keyFormatInt,
+                                            ident));
               }
-
-              auto keyFormat = static_cast<KeyFormat>(keyFormatInt);
-              auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-              auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-              auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-
-              RecordStore::Options options;
-              options.keyFormat = keyFormat;
-              auto status = storageEngine->getEngine()->createRecordStore(
-                  provider, *ru, op->getNss(), ident, options);
-              // For now, this oplog entry is idempotent and allows the targeted idents to already
-              // exist rather than failing.
-              // TODO SERVER-123094 Refine these semantics once rollback on partial creation is
-              // implemented.
-              if (status.code() == ErrorCodes::ObjectAlreadyExists) {
-                  return Status::OK();
-              }
-              return status;
+              return keyFormat;
           };
 
-          WriteUnitOfWork wuow(opCtx);
-          auto status = createContainerRecordStore(parsedO2.getFastCountMetadataStoreIdent(),
-                                                   parsedO2.getFastCountMetadataStoreKeyFormat());
-          if (!status.isOK()) {
-              return status;
+          auto metadataKeyFormatWS = getKeyFormat(parsedO2.getFastCountMetadataStoreIdent(),
+                                                  parsedO2.getFastCountMetadataStoreKeyFormat());
+          if (!metadataKeyFormatWS.isOK()) {
+              return metadataKeyFormatWS.getStatus();
           }
-          status =
-              createContainerRecordStore(parsedO2.getFastCountMetadataStoreTimestampsIdent(),
-                                         parsedO2.getFastCountMetadataStoreTimestampsKeyFormat());
-          if (!status.isOK()) {
-              return status;
-          }
-          wuow.commit();
+          KeyFormat metadataKeyFormat = metadataKeyFormatWS.getValue();
 
-          return Status::OK();
+          auto timestampsKeyFormatWS =
+              getKeyFormat(parsedO2.getFastCountMetadataStoreTimestampsIdent(),
+                           parsedO2.getFastCountMetadataStoreTimestampsKeyFormat());
+          if (!timestampsKeyFormatWS.isOK()) {
+              return timestampsKeyFormatWS.getStatus();
+          }
+          KeyFormat timestampsKeyFormat = timestampsKeyFormatWS.getValue();
+
+          auto status =
+              createInternalFastCountContainers(opCtx,
+                                                op->getNss(),
+                                                parsedO2.getFastCountMetadataStoreIdent(),
+                                                metadataKeyFormat,
+                                                parsedO2.getFastCountMetadataStoreTimestampsIdent(),
+                                                timestampsKeyFormat,
+                                                /*writeToOplog=*/false);
+
+          // TODO SERVER-114575 Is this check still necessary if layered table drops can't leave
+          // dangling idents.
+          if (status == ErrorCodes::ObjectAlreadyExists) {
+              if (auto [metadataStatus, _] = handleExistingFastCountIdent(
+                      opCtx,
+                      op->getNss(),
+                      parsedO2.getFastCountMetadataStoreIdent(),
+                      metadataKeyFormat,
+                      parsedO2.getFastCountMetadataStoreTimestampsIdent());
+                  !metadataStatus.isOK()) {
+                  return metadataStatus;
+              }
+              if (auto [timestampsStatus, _] = handleExistingFastCountIdent(
+                      opCtx,
+                      op->getNss(),
+                      parsedO2.getFastCountMetadataStoreTimestampsIdent(),
+                      timestampsKeyFormat,
+                      parsedO2.getFastCountMetadataStoreIdent());
+                  !timestampsStatus.isOK()) {
+                  return timestampsStatus;
+              }
+
+              LOGV2(12309401,
+                    "Both replicated fast count idents stille exist on disk after drop attempts. "
+                    "They can be both be re-used");
+              return Status::OK();
+          }
+
+          return status;
       },
       {}}}};
 
