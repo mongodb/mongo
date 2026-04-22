@@ -87,6 +87,15 @@ def get_all_unreleased_ifr_feature_flags(idl_dirs: list[str] = DEFAULT_IDL_DIRS)
     ]
 
 
+def get_all_ifr_feature_flags(idl_dirs: list[str] = DEFAULT_IDL_DIRS):
+    """Generate a list of all IFR feature flags regardless of phase."""
+    all_flags = lib.get_all_feature_flags(idl_dirs)
+
+    return [
+        name for name, flag in all_flags.items() if binder.is_incremental_feature_rollout_flag(flag)
+    ]
+
+
 def write_feature_flags_to_file(flags: list[str], filename: str):
     """Helper function to write feature flags to a file."""
     with open(filename, "w") as output_file:

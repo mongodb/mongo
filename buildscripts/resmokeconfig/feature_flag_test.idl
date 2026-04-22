@@ -6,3 +6,14 @@ feature_flags:
         cpp_varname: gFeatureFlagToaster
         default: false
         fcv_gated: true
+    featureFlagTestIFR:
+        description: "IFR feature flag used by fixture builder unit tests"
+        cpp_varname: gFeatureFlagTestIFR
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+    featureFlagTestNonIFR:
+        description: "Non-IFR feature flag used by fixture builder unit tests"
+        cpp_varname: gFeatureFlagTestNonIFR
+        default: false
+        fcv_gated: false

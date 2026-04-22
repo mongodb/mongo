@@ -957,6 +957,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         mongos_executable=None,
         mongos_options=None,
         add_feature_flags=False,
+        exclude_ifr_flags=False,
         use_priority_port=False,
         uds_path_prefix=None,
     ):
@@ -976,7 +977,10 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         ).copy()
 
         if add_feature_flags:
+            ifr_flags = set(self.config.IFR_FEATURE_FLAGS or [])
             for ff in self.config.ENABLED_FEATURE_FLAGS:
+                if exclude_ifr_flags and ff in ifr_flags:
+                    continue
                 self.mongos_options["set_parameters"][ff] = "true"
 
         self.mongos = None

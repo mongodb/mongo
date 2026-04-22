@@ -103,6 +103,18 @@ feature_flags:
       serialize_on_outgoing_requests: true
       version: $ver_str(latest)
 
+    featureFlagTestIFR:
+      description: "IFR feature flag used by fixture builder unit tests"
+      cpp_varname: gFeatureFlagTestIFR
+      incremental_rollout_phase: in_development
+      fcv_gated: false
+
+    featureFlagTestNonIFR:
+      description: "Non-IFR feature flag used by fixture builder unit tests"
+      cpp_varname: gFeatureFlagTestNonIFR
+      default: false
+      fcv_gated: false
+
 server_parameters:
     spTestNeedsFeatureFlagToaster:
       description: "Server Parameter gated on featureFlagToaster"

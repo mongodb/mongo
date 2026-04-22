@@ -44,6 +44,7 @@ BASE_16_TO_INT = 16
 COLLECTOR_ENDPOINT = "otel-collector.prod.corp.mongodb.com:443"
 BAZEL_GENERATED_OFF_FEATURE_FLAGS = "bazel/resmoke/off_feature_flags.txt"
 BAZEL_GENERATED_UNRELEASED_IFR_FEATURE_FLAGS = "bazel/resmoke/unreleased_ifr_feature_flags.txt"
+BAZEL_GENERATED_ALL_IFR_FEATURE_FLAGS = "bazel/resmoke/all_ifr_flags.txt"
 EVERGREEN_EXPANSIONS_FILE = "../expansions.yml"
 
 
@@ -562,11 +563,17 @@ flags in common: {common_set}
             (default_disabled_set | disabled_feature_flags_set) - enabled_feature_flags_set
         )
 
+        if os.path.exists(BAZEL_GENERATED_ALL_IFR_FEATURE_FLAGS):
+            all_ifr_set = set(process_feature_flag_file(BAZEL_GENERATED_ALL_IFR_FEATURE_FLAGS))
+        else:
+            all_ifr_set = set(gen_all_feature_flag_list.get_all_ifr_feature_flags())
+
         return (
             list(enabled_feature_flags_set),
             list(disabled_feature_flags_set),
             default_disabled_feature_flags,
             off_feature_flags,
+            all_ifr_set,
         )
 
     _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
@@ -575,6 +582,7 @@ flags in common: {common_set}
     _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop("additional_feature_flags_file")
     _config.ENABLED_FEATURE_FLAGS = []
     _config.DISABLED_FEATURE_FLAGS = []
+    _config.IFR_FEATURE_FLAGS = None
     default_disabled_feature_flags = []
     off_feature_flags = []
     if values["command"] == "run":
@@ -583,6 +591,7 @@ flags in common: {common_set}
             _config.DISABLED_FEATURE_FLAGS,
             default_disabled_feature_flags,
             off_feature_flags,
+            _config.IFR_FEATURE_FLAGS,
         ) = set_up_feature_flags()
     else:
         # Explicitly ignore these run-related options.

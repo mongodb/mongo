@@ -1929,6 +1929,18 @@ def is_unreleased_incremental_rollout_feature_flag(feature_flag):
     )
 
 
+def is_incremental_feature_rollout_flag(feature_flag):
+    """Determine if an idl.FeatureFlag is an Incremental Feature Rollout (IFR) flag
+    in any phase (in_development, rollout, or released) without validating its syntax.
+    """
+    # type: (syntax.FeatureFlag) -> bool
+
+    if not feature_flag.incremental_rollout_phase:
+        return False
+    phase = ast.FeatureFlagRolloutPhase.bind(feature_flag.incremental_rollout_phase)
+    return phase is not None and phase != ast.FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT
+
+
 def bind(parsed_spec):
     # type: (syntax.IDLSpec) -> ast.IDLBoundSpec
     """Read an idl.syntax, create an idl.ast tree, and validate the final IDL Specification."""

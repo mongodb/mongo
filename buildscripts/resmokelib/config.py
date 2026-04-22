@@ -584,6 +584,10 @@ DISABLED_FEATURE_FLAGS = None
 # List of feature flags to enable.
 ENABLED_FEATURE_FLAGS = []
 
+# Set of all IFR (Incremental Feature Rollout) feature flag names, used to filter
+# IFR flags from injection in multiversion fixtures.
+IFR_FEATURE_FLAGS = None
+
 # The path to the mongo executable used by resmoke.py.
 MONGO_EXECUTABLE = None
 

@@ -160,3 +160,161 @@ class TestBuildShardedCluster(unittest.TestCase):
         self.assertNotIn(ff_name, sharded_cluster.shards[0].nodes[1].mongod_options[SET_PARAMS])
         self.assertNotIn(ff_name, sharded_cluster.shards[1].nodes[0].mongod_options[SET_PARAMS])
         self.assertNotIn(ff_name, sharded_cluster.mongos[0].mongos_options[SET_PARAMS])
+
+    def test_build_sharded_cluster_multiversion_excludes_ifr_flags(self):
+        """IFR flags should be excluded from new-binary nodes in multiversion mode.
+
+        Uses featureFlagTestIFR and featureFlagTestNonIFR defined in
+        buildscripts/resmokeconfig/feature_flag_test.idl. These are discovered
+        by the IDL scan in --runAllFeatureFlagTests.
+        """
+        ifr_flag = "featureFlagTestIFR"
+        non_ifr_flag = "featureFlagTestNonIFR"
+        parser.set_run_options("--runAllFeatureFlagTests", False)
+
+        self.assertIn(ifr_flag, config.IFR_FEATURE_FLAGS)
+        self.assertNotIn(non_ifr_flag, config.IFR_FEATURE_FLAGS)
+        self.assertIn(ifr_flag, config.ENABLED_FEATURE_FLAGS)
+        self.assertIn(non_ifr_flag, config.ENABLED_FEATURE_FLAGS)
+
+        fixture_config = {
+            "mongod_options": {SET_PARAMS: {"enableTestCommands": 1}},
+            "configsvr_options": {"num_nodes": 2},
+            "num_shards": 1,
+            "num_rs_nodes_per_shard": 2,
+            "mixed_bin_versions": "new_old",
+            "old_bin_version": "last_lts",
+        }
+        sharded_cluster = under_test.make_fixture(
+            self.fixture_class_name, self.mock_logger, self.job_num, **fixture_config
+        )
+
+        # Non-IFR flag IS set on new-binary configsvr nodes
+        self.assertIn(
+            non_ifr_flag,
+            sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS],
+        )
+        self.assertIn(
+            non_ifr_flag,
+            sharded_cluster.configsvr.nodes[1].mongod_options[SET_PARAMS],
+        )
+        # IFR flag is NOT set on new-binary configsvr nodes (multiversion)
+        self.assertNotIn(
+            ifr_flag,
+            sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS],
+        )
+        self.assertNotIn(
+            ifr_flag,
+            sharded_cluster.configsvr.nodes[1].mongod_options[SET_PARAMS],
+        )
+
+        # Non-IFR flag IS set on new-binary shard node
+        self.assertIn(
+            non_ifr_flag,
+            sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS],
+        )
+        # IFR flag is NOT set on new-binary shard node (multiversion)
+        self.assertNotIn(
+            ifr_flag,
+            sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS],
+        )
+        # Neither flag is on old-binary shard node
+        self.assertNotIn(
+            ifr_flag,
+            sharded_cluster.shards[0].nodes[1].mongod_options[SET_PARAMS],
+        )
+        self.assertNotIn(
+            non_ifr_flag,
+            sharded_cluster.shards[0].nodes[1].mongod_options[SET_PARAMS],
+        )
+
+        # Access the new mongos fixture inside the FixtureContainer (which starts
+        # with the old version in multiversion mode).
+        new_mongos = sharded_cluster.mongos[0]._fixtures[under_test.BinVersionEnum.NEW]
+        # IFR flag is NOT set on new-binary mongos (multiversion)
+        self.assertNotIn(ifr_flag, new_mongos.mongos_options[SET_PARAMS])
+        # Non-IFR flag IS set on new-binary mongos
+        self.assertIn(non_ifr_flag, new_mongos.mongos_options[SET_PARAMS])
+
+    def test_build_sharded_cluster_non_multiversion_keeps_ifr_flags(self):
+        """IFR flags should be included in non-multiversion mode."""
+        ifr_flag = "featureFlagTestIFR"
+        parser.set_run_options("--runAllFeatureFlagTests", False)
+
+        fixture_config = {"mongod_options": {SET_PARAMS: {"enableTestCommands": 1}}}
+        sharded_cluster = under_test.make_fixture(
+            self.fixture_class_name, self.mock_logger, self.job_num, **fixture_config
+        )
+
+        # IFR flag IS set when not in multiversion mode
+        self.assertIn(
+            ifr_flag,
+            sharded_cluster.configsvr.nodes[0].mongod_options[SET_PARAMS],
+        )
+        self.assertIn(
+            ifr_flag,
+            sharded_cluster.shards[0].nodes[0].mongod_options[SET_PARAMS],
+        )
+        self.assertIn(
+            ifr_flag,
+            sharded_cluster.mongos[0].mongos_options[SET_PARAMS],
+        )
+
+
+class TestMakeFixtureIFRExclusion(unittest.TestCase):
+    """Test that make_fixture correctly handles exclude_ifr_flags for MongoDFixture.
+
+    Uses featureFlagTestIFR and featureFlagTestNonIFR defined in
+    buildscripts/resmokeconfig/feature_flag_test.idl.
+    """
+
+    mock_logger = None
+    job_num = 0
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mock_logger = MagicMock(spec=logging.Logger)
+        logging.loggers._FIXTURE_LOGGER_REGISTRY[cls.job_num] = cls.mock_logger
+
+    def tearDown(self):
+        network.PortAllocator.reset()
+
+    def test_mongod_exclude_ifr_flags(self):
+        """MongoDFixture should exclude IFR flags when exclude_ifr_flags=True."""
+        ifr_flag = "featureFlagTestIFR"
+        non_ifr_flag = "featureFlagTestNonIFR"
+        parser.set_run_options("--runAllFeatureFlagTests", False)
+
+        mongod = under_test.make_fixture(
+            "MongoDFixture",
+            self.mock_logger,
+            self.job_num,
+            exclude_ifr_flags=True,
+        )
+        self.assertNotIn(ifr_flag, mongod.mongod_options[SET_PARAMS])
+        self.assertIn(non_ifr_flag, mongod.mongod_options[SET_PARAMS])
+
+    def test_mongod_include_ifr_flags_when_not_excluded(self):
+        """MongoDFixture should include IFR flags when exclude_ifr_flags=False (default)."""
+        ifr_flag = "featureFlagTestIFR"
+        parser.set_run_options("--runAllFeatureFlagTests", False)
+
+        mongod = under_test.make_fixture(
+            "MongoDFixture",
+            self.mock_logger,
+            self.job_num,
+        )
+        self.assertIn(ifr_flag, mongod.mongod_options[SET_PARAMS])
+
+    def test_mongod_no_flags_when_feature_flags_disabled(self):
+        """MongoDFixture should not inject any flags when enable_feature_flags=False."""
+        ifr_flag = "featureFlagTestIFR"
+        parser.set_run_options("--runAllFeatureFlagTests", False)
+
+        mongod = under_test.make_fixture(
+            "MongoDFixture",
+            self.mock_logger,
+            self.job_num,
+            enable_feature_flags=False,
+        )
+        self.assertNotIn(ifr_flag, mongod.mongod_options[SET_PARAMS])

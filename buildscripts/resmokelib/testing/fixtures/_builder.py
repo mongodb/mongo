@@ -25,7 +25,9 @@ RETRIEVE_LOCK = threading.Lock()
 _BUILDERS = {}  # type: ignore
 
 
-def make_fixture(class_name, logger, job_num, *args, enable_feature_flags=True, **kwargs):
+def make_fixture(
+    class_name, logger, job_num, *args, enable_feature_flags=True, exclude_ifr_flags=False, **kwargs
+):
     """Provide factory function for creating Fixture instances."""
 
     fixturelib = FixtureLib()
@@ -46,6 +48,7 @@ def make_fixture(class_name, logger, job_num, *args, enable_feature_flags=True, 
             fixturelib,
             *args,
             add_feature_flags=bool(config.ENABLED_FEATURE_FLAGS),
+            exclude_ifr_flags=exclude_ifr_flags,
             **kwargs,
         )
 
@@ -399,6 +402,7 @@ class ReplSetBuilder(FixtureBuilder):
             _class,
             mongod_logger,
             replset.job_num,
+            exclude_ifr_flags=is_multiversion,
             mongod_executable=executables[BinVersionEnum.NEW],
             mongod_options=new_fixture_mongod_options,
             preserve_dbpath=replset.preserve_dbpath,
@@ -750,6 +754,7 @@ class ShardedClusterBuilder(FixtureBuilder):
             _class,
             mongos_logger,
             sharded_cluster.job_num,
+            exclude_ifr_flags=is_multiversion,
             mongos_executable=executables[BinVersionEnum.NEW],
             **new_fixture_mongos_kwargs,
         )

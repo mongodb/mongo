@@ -36,6 +36,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         mongod_executable: Optional[str] = None,
         mongod_options: Optional[dict] = None,
         add_feature_flags: bool = False,
+        exclude_ifr_flags: bool = False,
         dbpath_prefix: Optional[str] = None,
         preserve_dbpath: bool = False,
         port: Optional[int] = None,
@@ -54,6 +55,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             mongod_executable (Optional[str], optional): Optional path to mongod executable. Defaults to None.
             mongod_options (Optional[dict], optional): Optional mongod startup options. Defaults to None.
             add_feature_flags (bool, optional): Sets all feature flags to true when set. Defaults to False.
+            exclude_ifr_flags (bool, optional): When True and add_feature_flags is True,
+                Incremental Feature Rollout (IFR) flags are excluded from injection (used in multiversion fixtures). Defaults to False.
             dbpath_prefix (Optional[str], optional): Sets the dbpath_prefix. Defaults to None.
             preserve_dbpath (bool, optional): preserve_dbpath. Defaults to False.
             port (Optional[int], optional): Port to use for mongod. Defaults to None.
@@ -103,7 +106,10 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.mongod_options["set_parameters"] = {}
 
         if add_feature_flags:
+            ifr_flags = set(self.config.IFR_FEATURE_FLAGS or [])
             for ff in self.config.ENABLED_FEATURE_FLAGS:
+                if exclude_ifr_flags and ff in ifr_flags:
+                    continue
                 self.mongod_options["set_parameters"][ff] = "true"
 
         if "dbpath" in self.mongod_options and dbpath_prefix is not None:

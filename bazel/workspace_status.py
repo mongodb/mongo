@@ -60,6 +60,13 @@ def print_feature_flag_status():
     ]
     print_stable_key("unreleased_ifr_flags", " ".join(unreleased_ifr_flags))
 
+    all_ifr_flags = [
+        name
+        for name, flag in all_flags.items()
+        if idl_binder.is_incremental_feature_rollout_flag(flag)
+    ]
+    print_stable_key("all_ifr_flags", " ".join(all_ifr_flags))
+
 
 def print_evergreen_expansions():
     for expansion in [

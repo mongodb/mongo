@@ -401,8 +401,36 @@ def mongo_shell_program(
     mongo_set_parameters = test_data.get("setParametersMongo", {}).copy()
 
     feature_flag_dict = {}
+    # In multiversion suites, exclude IFR (Incremental Feature Rollout) flags from
+    # TestData.setParameters. IFR flags are excluded from resmoke-managed multiversion
+    # fixtures by the Python fixture builders, but TestData.setParameters is consumed by
+    # JS test-created clusters (ShardingTest, ReplSetTest) which don't have the same
+    # filtering. Including IFR flags in multiversion suites causes them to leak into
+    # test-created clusters where they are incompatible — even latest-version nodes must
+    # not activate IFR-gated features when older nodes in the same cluster cannot handle
+    # the resulting commands. In non-multiversion suites all servers are latest-version,
+    # so IFR flags are safe to include.
+    #
+    # Multiversion can be signalled either via resmoke CLI flags (MIXED_BIN_VERSIONS,
+    # MULTIVERSION_BIN_VERSION) or via TestData variables set in suite YAML configs
+    # (useRandomBinVersionsWithinReplicaSet, mongosBinVersion). Both paths must be
+    # checked to catch suites like sharding_last_continuous where JS tests create
+    # their own mixed-version clusters using TestData.
+    is_multiversion = (
+        config.MIXED_BIN_VERSIONS is not None
+        or config.MULTIVERSION_BIN_VERSION is not None
+        or test_data.get("useRandomBinVersionsWithinReplicaSet") is not None
+        or test_data.get("mongosBinVersion") is not None
+    )
+    ifr_flags = set(config.IFR_FEATURE_FLAGS or [])
+
+    def include_flag(ff: str) -> bool:
+        if is_multiversion and ff in ifr_flags:
+            return False
+        return True
+
     if config.ENABLED_FEATURE_FLAGS is not None:
-        feature_flag_dict = {ff: "true" for ff in config.ENABLED_FEATURE_FLAGS}
+        feature_flag_dict = {ff: "true" for ff in config.ENABLED_FEATURE_FLAGS if include_flag(ff)}
 
     if config.DISABLED_FEATURE_FLAGS is not None:
         feature_flag_dict |= {ff: "false" for ff in config.DISABLED_FEATURE_FLAGS}

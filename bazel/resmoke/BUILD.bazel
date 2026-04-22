@@ -64,6 +64,17 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
+genrule(
+    name = "all_ifr_flags",
+    srcs = [],
+    outs = ["all_ifr_flags.txt"],
+    cmd = """
+    awk '/^STABLE_all_ifr_flags/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/stable-status.txt > $@
+    """,
+    stamp = True,
+    visibility = ["//visibility:public"],
+)
+
 # We want to use keys from volatile-status in the resmoke `py_test`, so this creates a file that
 # it can depend on.
 genrule(
