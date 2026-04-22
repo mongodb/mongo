@@ -3522,6 +3522,23 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "_shardsvrReshardDonorCriticalSectionStarted",
+            command: {
+                _shardsvrReshardDonorCriticalSectionStarted: UUID(),
+            },
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {__system: 1},
+                    privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                    expectFail: true,
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}},
+            ],
+        },
+        {
             testname: "_shardsvrReshardDonorRecipientsFinishedCloning",
             command: {
                 _shardsvrReshardDonorRecipientsFinishedCloning: UUID(),

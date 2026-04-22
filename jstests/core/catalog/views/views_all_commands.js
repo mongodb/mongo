@@ -18,6 +18,7 @@
 //   does_not_support_causal_consistency,
 //   uses_compact,
 //   creates_and_authenticates_user,
+//   resource_intensive,
 // ]
 
 /*
@@ -210,6 +211,7 @@ let viewsCommandTests = {
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
     _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
     _shardsvrReshardDonorInitialize: {skip: isAnInternalCommand},
+    _shardsvrReshardDonorCriticalSectionStarted: {skip: isAnInternalCommand},
     _shardsvrReshardDonorRecipientsFinishedCloning: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientInitialize: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientClone: {skip: isAnInternalCommand},

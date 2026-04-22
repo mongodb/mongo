@@ -136,6 +136,18 @@ commands:
                 type: ReshardingApproxCopySize
                 description: "Not meant to be used directly. Only use internal fields."
 
+    _shardsvrReshardDonorCriticalSectionStarted:
+        description:
+            "The internal command sent by the coordinator to donor shards to notify them that
+            the critical section has started."
+        command_name: _shardsvrReshardDonorCriticalSectionStarted
+        cpp_name: ShardsvrReshardDonorCriticalSectionStarted
+        type: uuid
+        strict: false
+        namespace: type
+        reply_type: OkReply
+        api_version: ""
+
     _shardsvrReshardDonorRecipientsFinishedCloning:
         description:
             "The internal command sent by the coordinator to donor shards to notify them that

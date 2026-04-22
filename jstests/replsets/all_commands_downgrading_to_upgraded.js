@@ -7,6 +7,7 @@
  *   multiversion_incompatible,
  *   # Cannot compact when using the in-memory storage engine.
  *   requires_persistence,
+ *   resource_intensive,
  * ]
  */
 
@@ -145,6 +146,7 @@ const allCommands = {
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
     _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
     _shardsvrReshardDonorInitialize: {skip: isAnInternalCommand},
+    _shardsvrReshardDonorCriticalSectionStarted: {skip: isAnInternalCommand},
     _shardsvrReshardDonorRecipientsFinishedCloning: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientInitialize: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientClone: {skip: isAnInternalCommand},

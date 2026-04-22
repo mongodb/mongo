@@ -744,6 +744,12 @@ const internalCommandsMap = {
             db.getSiblingDB("config").localReshardingOperations.donor.drop();
         },
     },
+    _shardsvrReshardDonorCriticalSectionStarted: {
+        testname: "_shardsvrReshardDonorCriticalSectionStarted",
+        command: {
+            _shardsvrReshardDonorCriticalSectionStarted: UUID(),
+        },
+    },
     _shardsvrReshardDonorRecipientsFinishedCloning: {
         testname: "_shardsvrReshardDonorRecipientsFinishedCloning",
         command: {
