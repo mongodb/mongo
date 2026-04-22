@@ -1174,6 +1174,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:timer_stats",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_options",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util/concurrency:thread_pool",
         "//src/mongo/util/net:network",
     ],

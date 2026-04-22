@@ -157,6 +157,9 @@ public:
     static constexpr MetricName kIndexBuildKeysGeneratedFromScan = {
         "index_builds.keys_generated_from_scan"};
 
+    // Replication Team Metrics
+    static constexpr MetricName kOplogApplyBytes = {"oplog.apply.bytes"};
+
     // Query Integration Team Metrics
 
     // Op Counters

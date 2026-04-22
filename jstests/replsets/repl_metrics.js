@@ -55,6 +55,7 @@ const expectedReplSection = {
         "attemptsToBecomeSecondary": 1,
         "batchSize": 0,
         "batches": {"num": 0, "totalMillis": 0},
+        "bytes": 0,
         "ops": 0,
     },
     "heartBeat": {"handleQueueSize": 0, "maxSeenHandleQueueSize": 0},
