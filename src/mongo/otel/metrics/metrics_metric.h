@@ -38,6 +38,13 @@
 
 namespace mongo::otel::metrics {
 
+/** Controls when a metric value is included in values() output. */
+enum class ReportingPolicy {
+    kIfEverNonZero,       // Report if the value has ever been non-zero.
+    kIfCurrentlyNonZero,  // Report if the value is non-zero.
+    kUnconditionally,     // Report regardless of the value.
+};
+
 /**
  * An abstract class for operations that are common among all metrics.
  */

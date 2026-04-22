@@ -48,8 +48,16 @@ using testing::UnorderedElementsAre;
 template <typename T>
 class CounterImplTest : public testing::Test {};
 
+template <typename T>
+using CounterImplTestValuesGlobal = CounterImplTest<T>;
+
+template <typename T>
+using CounterImplTestPerCombination = CounterImplTest<T>;
+
 using CounterTypes = testing::Types<int64_t, double>;
 TYPED_TEST_SUITE(CounterImplTest, CounterTypes);
+TYPED_TEST_SUITE(CounterImplTestValuesGlobal, CounterTypes);
+TYPED_TEST_SUITE(CounterImplTestPerCombination, CounterTypes);
 
 TYPED_TEST(CounterImplTest, Adds) {
     CounterImpl<TypeParam> counter;
@@ -194,18 +202,7 @@ TYPED_TEST(CounterImplTest, AddWithMultipleAttributes) {
 
 TYPED_TEST(CounterImplTest, ExceptionOnUndeclaredAttributes) {
     CounterImpl<TypeParam, int64_t> counter({.name = "size", .values = {1, 2}});
-
     ASSERT_THROWS_CODE(counter.add(1, {3}), DBException, ErrorCodes::BadValue);
-}
-
-TYPED_TEST(CounterImplTest, ValuesSkipsZeroAttributes) {
-    CounterImpl<TypeParam, bool> counter({.name = "is_cool", .values = {true, false}});
-
-    counter.add(5, {true});
-
-    EXPECT_THAT(counter.values(),
-                ElementsAre(IsAttributesAndValue(
-                    ElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true}), 5)));
 }
 
 TYPED_TEST(CounterImplTest, StringDataAttributeValueIsCopied) {
@@ -246,6 +243,127 @@ TYPED_TEST(CounterImplTest, SpanAttributeValueIsCopied) {
     std::vector<StringData> stringInput{"a"_sd, "b"_sd};
     counter.add(5, {std::span<int32_t>(intInput), std::span<StringData>(stringInput)});
     EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(_, 5)));
+}
+
+// Global ReportingPolicy tests
+
+TYPED_TEST(CounterImplTestValuesGlobal,
+           KIfCurrentlyNonZeroIsDefaultAndExcludesNeverIncrementedCombinations) {
+    CounterImpl<TypeParam, bool> counter({.name = "is_cool", .values = {true, false}});
+    counter.add(5, {true});
+    EXPECT_THAT(counter.values(),
+                ElementsAre(IsAttributesAndValue(
+                    ElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true}), 5)));
+}
+
+TYPED_TEST(CounterImplTestValuesGlobal, KUnconditionallyIncludesAllCombinations) {
+    CounterImpl<TypeParam, bool, int64_t> counter(ReportingPolicy::kUnconditionally,
+                                                  {.name = "is_cool", .values = {true, false}},
+                                                  {.name = "size", .values = {1, 2}});
+    counter.add(5, {true, 1});
+    EXPECT_THAT(
+        counter.values(),
+        UnorderedElementsAre(
+            IsAttributesAndValue(
+                UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true},
+                                     AttributeNameAndValue{.name = "size", .value = int64_t{1}}),
+                5),
+            IsAttributesAndValue(
+                UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true},
+                                     AttributeNameAndValue{.name = "size", .value = int64_t{2}}),
+                0),
+            IsAttributesAndValue(
+                UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = false},
+                                     AttributeNameAndValue{.name = "size", .value = int64_t{1}}),
+                0),
+            IsAttributesAndValue(
+                UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = false},
+                                     AttributeNameAndValue{.name = "size", .value = int64_t{2}}),
+                0)));
+}
+
+#ifdef MONGO_CONFIG_OTEL
+TYPED_TEST(CounterImplTestValuesGlobal, KIfCurrentlyNonZeroExcludesCombinationsAfterReset) {
+    CounterImpl<TypeParam, bool> counter(ReportingPolicy::kIfCurrentlyNonZero,
+                                         {.name = "is_cool", .values = {true, false}});
+    counter.add(5, {true});
+    counter.reset(nullptr);
+    EXPECT_THAT(counter.values(), IsEmpty());
+}
+#endif  // MONGO_CONFIG_OTEL
+
+TYPED_TEST(CounterImplTestValuesGlobal, KUnconditionallyIsDefaultForNoAttributeCounter) {
+    CounterImpl<TypeParam> counter;
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
+}
+
+TYPED_TEST(CounterImplTestValuesGlobal, KIfCurrentlyNonZeroExcludesZeroNoAttributeCounter) {
+    CounterImpl<TypeParam> counter(ReportingPolicy::kIfCurrentlyNonZero);
+    EXPECT_THAT(counter.values(), IsEmpty());
+    counter.add(5);
+    EXPECT_THAT(counter.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+}
+
+#ifdef MONGO_CONFIG_OTEL
+TYPED_TEST(CounterImplTestValuesGlobal,
+           KIfCurrentlyNonZeroExcludesZeroAfterResetNoAttributeCounter) {
+    CounterImpl<TypeParam> counter(ReportingPolicy::kIfCurrentlyNonZero);
+    counter.add(5);
+    counter.reset(nullptr);
+    EXPECT_THAT(counter.values(), IsEmpty());
+}
+#endif  // MONGO_CONFIG_OTEL
+
+// TODO SERVER-124075: Add tests for kIfEverNonZero once Gauge and UpDownCounter support
+// attributes.
+
+// Per-combination ReportingPolicy tests
+
+TYPED_TEST(CounterImplTestPerCombination, KUnconditionallyOverridesGlobalKIfCurrentlyNonZero) {
+    CounterImpl<TypeParam, bool> counter(ReportingPolicy::kIfCurrentlyNonZero,
+                                         {.name = "is_cool", .values = {true, false}});
+    counter.setReportingPolicy({true}, ReportingPolicy::kUnconditionally);
+    // - {true} uses per-combination kUnconditionally so it is reported even though it was never
+    //   incremented.
+    // - {false} uses global kIfCurrentlyNonZero and is zero, so it is not reported.
+    EXPECT_THAT(counter.values(),
+                ElementsAre(IsAttributesAndValue(
+                    ElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true}), 0)));
+}
+
+#ifdef MONGO_CONFIG_OTEL
+TYPED_TEST(CounterImplTestPerCombination, MultiplePoliciesAreIndependent) {
+    // 4 combinations: {true,1}, {true,2}, {false,1}, {false,2}
+    // - {true,1} uses per-combination kUnconditionally so it is reported even though it was never
+    //   incremented.
+    // - {true,2} uses per-combination kIfCurrentlyNonZero and is zero after reset, so it is not
+    //   reported.
+    // - {false,1} uses global kIfCurrentlyNonZero (default) and was never incremented, so it is
+    //   not reported.
+    // - {false,2} uses global kIfCurrentlyNonZero (default) and is zero after reset, so it is
+    //   not reported.
+    CounterImpl<TypeParam, bool, int64_t> counter({.name = "is_cool", .values = {true, false}},
+                                                  {.name = "size", .values = {1, 2}});
+    counter.setReportingPolicy({true, 1}, ReportingPolicy::kUnconditionally);
+    counter.setReportingPolicy({true, 2}, ReportingPolicy::kIfCurrentlyNonZero);
+    counter.add(5, {true, 2});
+    counter.add(3, {false, 2});
+    counter.reset(nullptr);
+
+    EXPECT_THAT(
+        counter.values(),
+        ElementsAre(IsAttributesAndValue(
+            UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true},
+                                 AttributeNameAndValue{.name = "size", .value = int64_t{1}}),
+            0)));
+}
+#endif  // MONGO_CONFIG_OTEL
+
+TYPED_TEST(CounterImplTestPerCombination, ThrowsOnUndeclaredCombination) {
+    CounterImpl<TypeParam, int64_t> counter({.name = "size", .values = {1, 2}});
+    ASSERT_THROWS_CODE(counter.setReportingPolicy({3}, ReportingPolicy::kUnconditionally),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(DoubleCounterImplTest, AddsFractionalValues) {

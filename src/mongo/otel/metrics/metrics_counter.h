@@ -56,6 +56,13 @@ public:
 
     /** T must be nonnegative. */
     virtual void add(T value, const Attributes& attributes) = 0;
+
+    /**
+     * Sets the reporting policy for a specific attribute combination, overriding the global
+     * reporting policy. Throws BadValue if the combination is not declared.
+     */
+    virtual void setReportingPolicy(const Attributes& attributes,
+                                    ReportingPolicy reportingPolicy) = 0;
 };
 
 /**
@@ -71,6 +78,8 @@ public:
     void add(T value) {
         add(value, {});
     }
+    virtual void setReportingPolicy(const Attributes& attributes,
+                                    ReportingPolicy reportingPolicy) = 0;
 };
 
 /**
@@ -100,10 +109,14 @@ public:
     using Attributes = Counter<T, AttributeTs...>::Attributes;
 
     explicit CounterImpl(const AttributeDefinition<AttributeTs>&... defs);
+    explicit CounterImpl(ReportingPolicy globalReportingPolicy,
+                         const AttributeDefinition<AttributeTs>&... defs);
 
     ~CounterImpl() override = default;
     void add(T value, const Attributes& attributes) override;
     using Counter<T, AttributeTs...>::add;
+
+    void setReportingPolicy(const Attributes& attributes, ReportingPolicy reportingPolicy) override;
 
 #ifdef MONGO_CONFIG_OTEL
     void reset(opentelemetry::metrics::Meter* meter) override;
@@ -113,9 +126,16 @@ public:
     BSONObj serializeToBson(const std::string& key) const override;
 
 private:
+    struct CounterData {
+        explicit CounterData(ReportingPolicy policy) : reportingPolicy{policy} {}
+        Atomic<T> value{0};
+        Atomic<ReportingPolicy> reportingPolicy;
+        Atomic<bool> everNonZero{false};
+    };
+
     std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
     OwnedAttributeValueLists<AttributeTs...> _ownedValueLists;
-    AttributesMap<Attributes, std::unique_ptr<Atomic<T>>> _counters;
+    AttributesMap<Attributes, std::unique_ptr<CounterData>> _counters;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -124,15 +144,33 @@ private:
 
 template <typename T, typename... AttributeTs>
 CounterImpl<T, AttributeTs...>::CounterImpl(const AttributeDefinition<AttributeTs>&... defs)
+    : CounterImpl(sizeof...(AttributeTs) == 0 ? ReportingPolicy::kUnconditionally
+                                              : ReportingPolicy::kIfCurrentlyNonZero,
+                  defs...) {}
+
+template <typename T, typename... AttributeTs>
+CounterImpl<T, AttributeTs...>::CounterImpl(ReportingPolicy globalReportingPolicy,
+                                            const AttributeDefinition<AttributeTs>&... defs)
     : _attributeNames{defs.name...}, _ownedValueLists(makeOwnedAttributeValueLists(defs...)) {
     // The Attributes tuples produced by safeMakeAttributeTuples contain view values (StringData,
     // span) that point into _ownedValueLists, so the keys inserted into _counters remain valid.
-    for (Attributes t : safeMakeAttributeTuples(_ownedValueLists))
-        _counters[t] = std::make_unique<Atomic<T>>(0);
+    for (Attributes t : safeMakeAttributeTuples(_ownedValueLists)) {
+        _counters[t] = std::make_unique<CounterData>(globalReportingPolicy);
+    }
 
     massert(ErrorCodes::BadValue,
             "Attribute names are duplicated",
             !containsDuplicates(_attributeNames));
+}
+
+template <typename T, typename... AttributeTs>
+void CounterImpl<T, AttributeTs...>::setReportingPolicy(const Attributes& attributes,
+                                                        ReportingPolicy reportingPolicy) {
+    auto it = _counters.find(attributes);
+    massert(ErrorCodes::BadValue,
+            "setReportingPolicy called with undeclared attribute combination",
+            it != _counters.end());
+    it->second->reportingPolicy.storeRelaxed(reportingPolicy);
 }
 
 template <typename T, typename... AttributeTs>
@@ -142,14 +180,17 @@ void CounterImpl<T, AttributeTs...>::add(T value, const Attributes& attributes) 
     massert(ErrorCodes::BadValue,
             "Called add using undeclared set of attributes",
             it != _counters.end());
-    it->second->fetchAndAddRelaxed(value);
+    it->second->value.fetchAndAddRelaxed(value);
+    if (value > 0) {
+        it->second->everNonZero.storeRelaxed(true);
+    }
 }
 
 template <typename T, typename... AttributeTs>
 BSONObj CounterImpl<T, AttributeTs...>::serializeToBson(const std::string& key) const {
     T total = 0;
-    for (const auto& [attributes, counter] : _counters) {
-        total += counter->loadRelaxed();
+    for (const auto& [attributes, data] : _counters) {
+        total += data->value.loadRelaxed();
     }
     return BSON(key << total);
 }
@@ -158,8 +199,9 @@ BSONObj CounterImpl<T, AttributeTs...>::serializeToBson(const std::string& key) 
 template <typename T, typename... AttributeTs>
 void CounterImpl<T, AttributeTs...>::reset(opentelemetry::metrics::Meter* meter) {
     invariant(!meter);
-    for (const auto& [attrs, counter] : _counters) {
-        counter->storeRelaxed(0);
+    for (const auto& [attrs, data] : _counters) {
+        data->value.storeRelaxed(0);
+        data->everNonZero.storeRelaxed(false);
     }
 }
 #endif  // MONGO_CONFIG_OTEL
@@ -167,14 +209,19 @@ void CounterImpl<T, AttributeTs...>::reset(opentelemetry::metrics::Meter* meter)
 template <typename T, typename... AttributeTs>
 AttributesAndValues<T> CounterImpl<T, AttributeTs...>::values() const {
     AttributesAndValues<T> attributesAndValues;
-    for (const auto& [attributes, counter] : _counters) {
-        T value = counter->loadRelaxed();
-        // If there is a large number of possible attribute combinations but most aren't typically
-        // incremented, including them would massively increase the size of the metrics output
-        // without adding any significant value. Always include if there's no attributes.
-        // TODO SERVER-124243: Add a way to include zero-valued metrics with attributes.
-        if (value == 0 && sizeof...(AttributeTs) > 0) {
-            continue;
+    for (const auto& [attributes, data] : _counters) {
+        T value = data->value.loadRelaxed();
+        if (value == 0) {
+            switch (data->reportingPolicy.loadRelaxed()) {
+                case ReportingPolicy::kIfCurrentlyNonZero:
+                    continue;
+                case ReportingPolicy::kUnconditionally:
+                    break;
+                case ReportingPolicy::kIfEverNonZero:
+                    if (!data->everNonZero.loadRelaxed())
+                        continue;
+                    break;
+            }
         }
         std::vector<AttributeNameAndValue> attrList;
         std::apply(
