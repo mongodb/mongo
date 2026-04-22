@@ -34,6 +34,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/transport/mock_session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
@@ -411,6 +413,28 @@ TEST_F(TaskTypeTest, SetFromMetadataSetsNonDeprioritizableTaskType) {
 
     ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kNormal);
     ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+}
+
+TEST_F(TaskTypeTest, SetFromMetadataSkipsInvariantForPriorityPortClient) {
+    // Simulate a priority port client using MockPrioritySession.
+    transport::TransportLayerMock transportLayer;
+    transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
+        return std::make_shared<transport::MockPrioritySession>(tl);
+    };
+    auto priorityClient = getServiceContext()->getService()->makeClient(
+        "priorityPortClient", transportLayer.createSession());
+    auto opCtx = priorityClient->makeOperationContext();
+
+    // The ClientObserver sets NonDeprioritizable at opCtx creation for priority port clients.
+    ASSERT_TRUE(opCtx->getClient()->isPriorityPortClient());
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+
+    // setFromMetadata with no metadata (the only case for priority port clients, since
+    // server-to-server commands never use the priority port) should not crash and should
+    // preserve NonDeprioritizable.
+    getAdmCtx(opCtx.get()).setFromMetadata(opCtx.get(), boost::none);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kNormal);
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD

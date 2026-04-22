@@ -73,6 +73,7 @@ mongo_cc_library(
         ":execution_control_stats",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
         "//src/mongo/db/admission/ticketing:admission_context",
     ],
 )
@@ -98,6 +99,7 @@ mongo_cc_unit_test(
     deps = [
         ":execution_admission_context",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
     ],
 )

@@ -30,8 +30,10 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 
 #include "mongo/db/admission/execution_control/execution_control_heuristic_parameters_gen.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -140,8 +142,21 @@ void ExecutionAdmissionContext::writeAsMetadata(OperationContext* opCtx, BSONObj
 void ExecutionAdmissionContext::setFromMetadata(
     OperationContext* opCtx,
     const boost::optional<admission::execution_control::ExecutionAdmissionTypeEnum>& type) {
-    invariant(getPriority() == AdmissionContext::Priority::kNormal);
-    invariant(getTaskType() == TaskType::Default);
+    tassert(12137305,
+            "Expected normal priority before applying metadata",
+            getPriority() == AdmissionContext::Priority::kNormal);
+
+    // priority port client operations are always set to TaskType::NonDeprioritizable
+    if (opCtx->getClient()->isPriorityPortClient()) {
+        tassert(12137306,
+                "Expected priority port client to have NonDeprioritizable task type",
+                getTaskType() == TaskType::NonDeprioritizable);
+        return;
+    }
+
+    tassert(12137307,
+            "Expected default task type for all other cases",
+            getTaskType() == TaskType::Default);
     if (!type) {
         return;
     }
@@ -376,5 +391,36 @@ admission::execution_control::ScopedTaskTypeBackground::ScopedTaskTypeBackground
 admission::execution_control::ScopedTaskTypeNonDeprioritizable::ScopedTaskTypeNonDeprioritizable(
     OperationContext* opCtx)
     : ScopedTaskTypeModifierBase(opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable) {}
+
+namespace {
+
+/**
+ * ClientObserver that marks opCtxs created by priority port clients as non-deprioritizable.
+ * This persists for the lifetime of the opCtx without using a scoped guard, so background
+ * operations (e.g., index builds) that create their own opCtx on a separate thread are
+ * unaffected.
+ */
+class ExecutionAdmissionContextClientObserver final : public ServiceContext::ClientObserver {
+public:
+    void onCreateClient(Client*) override {}
+    void onDestroyClient(Client*) override {}
+
+    void onCreateOperationContext(OperationContext* opCtx) override {
+        if (opCtx->getClient()->isPriorityPortClient()) {
+            ExecutionAdmissionContext::get(opCtx).setTaskType(
+                opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable);
+        }
+    }
+
+    void onDestroyOperationContext(OperationContext*) override {}
+};
+
+ServiceContext::ConstructorActionRegisterer registerExecutionAdmissionContextClientObserver{
+    "ExecutionAdmissionContextClientObserver", [](ServiceContext* service) {
+        service->registerClientObserver(
+            std::make_unique<ExecutionAdmissionContextClientObserver>());
+    }};
+
+}  // namespace
 
 }  // namespace mongo
