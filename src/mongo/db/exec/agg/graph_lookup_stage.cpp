@@ -594,9 +594,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
         // This exception returns the information we need to resolve a sharded view. Update
         // the pipeline with the resolved view definition, but don't optimize or attach the
         // cursor source yet.
-        pipeline_factory::MakePipelineOptions opts;
-        opts.optimize = false;
-        opts.attachCursorSource = false;
+        auto opts = pipeline_factory::kDesugarOnly;
         const std::vector<BSONObj>& resolvedPipe =
             (e->isTimeseries() && isRawDataOperation(pExpCtx->getOperationContext()))
             ? std::vector<BSONObj>{}

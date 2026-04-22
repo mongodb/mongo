@@ -320,9 +320,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     // We don't want to optimize or attach a cursor source here because we need to update
     // _sharedState->resolvedPipeline so we can reuse it on subsequent calls to getNext(), and we
     // may need to update _fieldMatchPipelineIdx as well in the case of a field join.
-    pipeline_factory::MakePipelineOptions opts;
-    opts.optimize = false;
-    opts.attachCursorSource = false;
+    auto opts = pipeline_factory::kDesugarOnly;
     opts.validator = mongo::lookupPipeValidator;
 
     // Store the original size before the view pipeline is prepended.
