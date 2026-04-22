@@ -173,7 +173,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     tassert(11051645, "Expecting working set member to have an Object", member->hasObj());
 
     // Ensure the document still exists and matches the predicate.
-    bool docStillMatches;
+    bool docStillMatches = false;
 
     const auto ret = handlePlanStageYield(
         expCtx(),
