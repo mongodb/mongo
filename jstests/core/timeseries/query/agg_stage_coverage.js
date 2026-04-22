@@ -26,6 +26,7 @@ const tsColl = db[jsTestName()];
 assertDropCollection(db, tsColl.getName());
 assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
 assert.commandWorked(tsColl.createIndex({"m.loc": "2dsphere"}));
+assert.commandWorked(tsColl.createIndex({"m.tag": 1}));
 // Insert 10 documents, so the aggregation stages will return some documents to confirm the aggregation stage worked.
 const startingTime = new Date();
 for (let i = 0; i < 10; i++) {
@@ -38,6 +39,10 @@ for (let i = 0; i < 10; i++) {
         }),
     );
 }
+// Ensure the plan cache deterministically contains at least one entry for $planCacheStats
+// (the query can be satisfied either by an _id scan based on timeField, or an index scan on m.tag).
+// This avoids flakiness across SBE and classic variants, which differ in plan cache behavior.
+assert.eq(9, tsColl.find({time: {$gt: startingTime}, "m.tag": "A"}).itcount());
 
 // Set up a 2nd collection for stages that need subpipelines.
 const otherColl = db[jsTestName() + "_other"];
@@ -179,7 +184,6 @@ const noUnpackTests = [
         stage: "$planCacheStats",
         pipeline: [{$planCacheStats: {}}],
         skipTest: !isViewlessTimeseriesOnlySuite(db),
-        zeroDocsReturned: true,
     },
     {
         stage: "$_unpackBucket",

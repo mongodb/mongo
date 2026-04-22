@@ -199,6 +199,11 @@ public:
                         str::stream() << "Analyze command is not supported on capped collections",
                         !isCapped);
 
+                uassert(ErrorCodes::CommandNotSupported,
+                        "Analyze command is not supported on timeseries collections",
+                        !collectionPtr->isTimeseriesCollection() ||
+                            !collectionPtr->isNewTimeseriesWithoutView());
+
                 // Namespace is normal or clustered collection
                 const bool isNormalColl = nss.isNormalCollection();
                 const bool isClusteredColl = collectionPtr->isClustered();

@@ -1,6 +1,8 @@
 /**
  * @tags: [featureFlagSbeFull]
  */
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -42,7 +44,10 @@ setup();
     const timeField = "tm";
     assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: timeField}}));
     res = db.runCommand({analyze: ts.getName()});
-    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupportedOnView);
+    assert.commandFailedWithCode(
+        res,
+        areViewlessTimeseriesEnabled(db) ? ErrorCodes.CommandNotSupported : ErrorCodes.CommandNotSupportedOnView,
+    );
 
     const capped = db.cqf_analyze_capped;
     capped.drop();
