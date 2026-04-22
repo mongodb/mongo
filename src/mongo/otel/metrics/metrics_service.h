@@ -238,7 +238,7 @@ public:
 #endif  // MONGO_CONFIG_OTEL
 
 private:
-    // Identifies metrics to help prevent conflicting registrations.
+    /** Identifies metrics to help prevent conflicting registrations. */
     struct MetricIdentifier {
         std::string description;
         MetricUnit unit;
@@ -246,6 +246,13 @@ private:
         std::type_index typeIndex = typeid(void);
         boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
         boost::optional<std::vector<double>> histogramBucketBoundaries = boost::none;
+        /**
+         * Names and formatted possible values for each attribute, in definition order.
+         * NOTE: This duplicates attribute values also held by the metric implementation. If needed,
+         * this could be removed by storing the attribute values in a centralized place and using
+         * them both here and in the metric implementation.
+         */
+        std::vector<ComparableAttributeDefinition> attributeDefinitions;
 
         auto operator<=>(const MetricIdentifier& other) const = default;
     };
@@ -398,7 +405,6 @@ template <typename ImplT, typename OwnedMetricT>
 ImplT* MetricsService::_getDuplicateMetric(WithLock,
                                            const std::string& name,
                                            MetricIdentifier identifier) {
-    // TODO: take into account attribute defs here.
     if (auto it = _metrics.find(name); it != _metrics.end()) {
         massert(ErrorCodes::ObjectAlreadyExists,
                 fmt::format("Tried to create a metric with the name: {} but different definition "
@@ -457,10 +463,12 @@ Counter<T, AttributeTs...>& MetricsService::_createCounter(
     MetricUnit unit,
     const AttributeDefinition<AttributeTs>&... defs,
     const CounterOptions& options) {
-    MetricIdentifier identifier{.description = description,
-                                .unit = unit,
-                                .serverStatusOptions = options.serverStatusOptions,
-                                .histogramBucketBoundaries = boost::none};
+    MetricIdentifier identifier{
+        .description = description,
+        .unit = unit,
+        .serverStatusOptions = options.serverStatusOptions,
+        .histogramBucketBoundaries = boost::none,
+        .attributeDefinitions = {makeComparableAttributeDefinition(defs)...}};
     CounterImpl<T, AttributeTs...>& base =
         _createMetric<CounterImpl<T, AttributeTs...>, ObservableCounter<T>, CounterOptions>(
             name,

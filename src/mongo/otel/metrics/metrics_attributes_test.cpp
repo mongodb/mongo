@@ -34,6 +34,7 @@
 
 #include <string>
 #include <tuple>
+#include <typeindex>
 #include <vector>
 
 #ifdef MONGO_CONFIG_OTEL
@@ -224,6 +225,55 @@ TEST(SafeMakeAttributeTuplesOwnedTest, ThrowsOnDuplicateValues) {
     OwnedAttributeValueLists<int32_t> owned =
         makeOwnedAttributeValueLists(AttributeDefinition<int32_t>{.name = "n", .values = {1, 1}});
     ASSERT_THROWS_CODE(safeMakeAttributeTuples(owned), DBException, ErrorCodes::BadValue);
+}
+
+TEST(MakeComparableAttributeDefinitionTest, BoolAttribute) {
+    auto result = makeComparableAttributeDefinition(
+        AttributeDefinition<bool>{.name = "flag", .values = {true, false}});
+    EXPECT_EQ(result.name, "flag");
+    EXPECT_EQ(result.typeIndex, std::type_index(typeid(bool)));
+    EXPECT_THAT(result.formattedValues, ElementsAre("true", "false"));
+}
+
+TEST(MakeComparableAttributeDefinitionTest, Int64Attribute) {
+    auto result = makeComparableAttributeDefinition(
+        AttributeDefinition<int64_t>{.name = "count", .values = {1, 2, 3}});
+    EXPECT_EQ(result.name, "count");
+    EXPECT_EQ(result.typeIndex, std::type_index(typeid(int64_t)));
+    EXPECT_THAT(result.formattedValues, ElementsAre("1", "2", "3"));
+}
+
+TEST(MakeComparableAttributeDefinitionTest, StringDataAttribute) {
+    auto result = makeComparableAttributeDefinition(
+        AttributeDefinition<StringData>{.name = "env", .values = {"prod"_sd, "staging"_sd}});
+    EXPECT_EQ(result.name, "env");
+    EXPECT_EQ(result.typeIndex, std::type_index(typeid(StringData)));
+    EXPECT_THAT(result.formattedValues, ElementsAre("prod", "staging"));
+}
+
+TEST(MakeComparableAttributeDefinitionTest, EqualWhenSameTypeAndValues) {
+    auto a = makeComparableAttributeDefinition(
+        AttributeDefinition<bool>{.name = "flag", .values = {true, false}});
+    auto b = makeComparableAttributeDefinition(
+        AttributeDefinition<bool>{.name = "flag", .values = {true, false}});
+    EXPECT_EQ(a, b);
+}
+
+TEST(MakeComparableAttributeDefinitionTest, NotEqualWhenSameNameDifferentType) {
+    // "true"/"false" format identically for bool and StringData, so only typeIndex distinguishes.
+    auto boolDef = makeComparableAttributeDefinition(
+        AttributeDefinition<bool>{.name = "flag", .values = {true, false}});
+    auto stringDef = makeComparableAttributeDefinition(
+        AttributeDefinition<StringData>{.name = "flag", .values = {"true"_sd, "false"_sd}});
+    EXPECT_NE(boolDef, stringDef);
+}
+
+TEST(MakeComparableAttributeDefinitionTest, NotEqualWhenSameNameSameTypeButDifferentValues) {
+    auto a = makeComparableAttributeDefinition(
+        AttributeDefinition<int64_t>{.name = "count", .values = {1, 2}});
+    auto b = makeComparableAttributeDefinition(
+        AttributeDefinition<int64_t>{.name = "count", .values = {1, 2, 3}});
+    EXPECT_NE(a, b);
 }
 
 TEST(ContainsDuplicates, ReturnsFalseOnEmpty) {

@@ -41,6 +41,7 @@
 #include <memory>
 #include <span>
 #include <tuple>
+#include <typeindex>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -283,6 +284,23 @@ std::vector<std::tuple<AttributeTs...>> safeMakeAttributeTuples(
  */
 bool containsDuplicates(std::span<const std::string> values);
 
+/**
+ * A type-erased, comparable description of a single attribute's name and all its possible values,
+ * stored as formatted strings. Used to detect conflicting metric registrations.
+ */
+struct ComparableAttributeDefinition {
+    std::string name;
+    std::type_index typeIndex;
+    std::vector<std::string> formattedValues;
+
+    bool operator==(const ComparableAttributeDefinition&) const = default;
+    std::strong_ordering operator<=>(const ComparableAttributeDefinition& other) const = default;
+};
+
+/** Builds an ComparableAttributeDefinition from an AttributeDefinition by formatting each value. */
+template <AttributeType T>
+ComparableAttributeDefinition makeComparableAttributeDefinition(const AttributeDefinition<T>& def);
+
 /* Returns true if two attribute values are logically equal. */
 template <AttributeType T>
 bool attributeValuesEqual(const T& a, const T& b);
@@ -414,6 +432,17 @@ std::vector<std::tuple<Ts...>> safeMakeAttributeTuples(const std::vector<Ts>&...
                     kMaxAttributeCombinationsPerMetric),
         result.size() <= kMaxAttributeCombinationsPerMetric);
     return result;
+}
+
+template <AttributeType T>
+ComparableAttributeDefinition makeComparableAttributeDefinition(const AttributeDefinition<T>& def) {
+    std::vector<std::string> formatted;
+    formatted.reserve(def.values.size());
+    for (const T& v : def.values)
+        formatted.push_back(formatAttributeValue(v));
+    return {.name = def.name,
+            .typeIndex = std::type_index(typeid(T)),
+            .formattedValues = std::move(formatted)};
 }
 
 /** Converts an owned attribute value back to its view type. */
