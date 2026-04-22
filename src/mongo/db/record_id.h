@@ -104,7 +104,7 @@ public:
         return RecordId(kMaxRepr);
     }
 
-    RecordId() : _format(Format::kNull) {}
+    RecordId() : _format(Format::kNull), _data{} {}
 
     ~RecordId() {
         if (_format == Format::kBigStr) {
