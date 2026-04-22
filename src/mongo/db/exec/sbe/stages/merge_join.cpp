@@ -35,7 +35,6 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 #include <tuple>
 
@@ -170,6 +169,9 @@ void MergeJoinStage::prepare(CompileCtx& ctx) {
                                                                    counter++));
         _outOuterAccessors[slot] = _outInnerProjectAccessors.back().get();
     }
+
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+        _opCtx, loadMemoryLimit(StageMemoryLimit::SBEMergeJoinStageMaxMemoryBytes));
 }
 
 value::SlotAccessor* MergeJoinStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -191,6 +193,7 @@ void MergeJoinStage::open(bool reOpen) {
     // Start with an initially empty buffer.
     _outerProjectsBuffer.clear();
     _outerProjectsBufferIt = 0;
+    _memoryTracker.value().set(0);
 
     _bufferKey.resize(0);
     _currentOuterKey.resize(0);
@@ -219,6 +222,10 @@ PlanState MergeJoinStage::getNext() {
 
                 if (_rowEq(_bufferKey, _currentOuterKey)) {
                     _outerProjectsBuffer.emplace_back(materializeCopyOfRow(_outerProjectAccessors));
+                    _memoryTracker.value().add(_outerProjectsBuffer.back().memUsageForSorter());
+                    uassert(12321800,
+                            "Exceeded memory limit for merge join",
+                            _memoryTracker.value().withinMemoryLimit());
                 } else {
                     break;
                 }
@@ -272,7 +279,7 @@ PlanState MergeJoinStage::getNext() {
                 // the loop.
                 _outerProjectsBuffer.clear();
                 _outerProjectsBufferIt = 0;
-
+                _memoryTracker.value().set(0);
                 break;
             }
         } while (true);
@@ -308,6 +315,11 @@ PlanState MergeJoinStage::getNext() {
     // Now that outer is equal to inner, before advancing need to make sure to populate the buffer
     // with the row from the outer.
     _outerProjectsBuffer.emplace_back(materializeCopyOfRow(_outerProjectAccessors));
+    _memoryTracker.value().add(_outerProjectsBuffer.back().memUsageForSorter());
+    // No memory limit check here. This stage is only used for AND_SORTED index intersection, where
+    // the join key is RecordId. Since RecordIds are unique per document, the buffer always holds
+    // exactly one row -- a stored BSON document coming from an index scan. The 16MB document size
+    // limit is enforced at write time, so the buffer can never meaningfully exceed that bound.
 
     // Now also need to fix the single row from inner.
     _currentInnerKey = materializeCopyOfRow(_innerKeyAccessors);
@@ -331,6 +343,8 @@ void MergeJoinStage::close() {
         _childrenOpened = false;
     }
     _outerProjectsBuffer.clear();
+    _memoryTracker.value().set(0);
+    _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
 }
 
 void MergeJoinStage::doSaveState() {
@@ -341,6 +355,7 @@ void MergeJoinStage::doSaveState() {
 
 std::unique_ptr<PlanStageStats> MergeJoinStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    ret->specific = std::make_unique<MergeJoinStats>(_specificStats);
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
@@ -349,6 +364,10 @@ std::unique_ptr<PlanStageStats> MergeJoinStage::getStats(bool includeDebugInfo) 
         bob.append("innerKeys", _innerKeys.begin(), _innerKeys.end());
         bob.append("innerProjects", _innerProjects.begin(), _innerProjects.end());
         bob.append("sortDirs", _dirs);
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
         ret->debugInfo = bob.obj();
     }
 
@@ -358,7 +377,7 @@ std::unique_ptr<PlanStageStats> MergeJoinStage::getStats(bool includeDebugInfo) 
 }
 
 const SpecificStats* MergeJoinStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 void MergeJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,

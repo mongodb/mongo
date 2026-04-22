@@ -255,6 +255,32 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalSlotBasedExecutionMergeJoinStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the SBE MergeJoin stages will cache
+            in-memory before failing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalSBEMergeJoinStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: std::numeric_limits<long long>::max()
+        validator:
+            gt: 0
+        redact: false
+
+    internalSlotBasedExecutionAndHashStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the hash table that the SBE AndHash stage will build
+            in-memory before failing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalSBEAndHashStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: std::numeric_limits<long long>::max()
+        validator:
+            gt: 0
+        redact: false
+
     internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill:
         description: >-
             The max size in bytes that the hash table in a HashJoin stage can be estimated to

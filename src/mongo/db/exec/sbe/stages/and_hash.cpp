@@ -33,6 +33,8 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -120,6 +122,9 @@ void AndHashStage::prepare(CompileCtx& ctx) {
     }
 
     _probeKey.resize(_inInnerKeyAccessors.size());
+
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+        _opCtx, loadMemoryLimit(StageMemoryLimit::SBEAndHashStageMaxMemoryBytes));
 }
 
 value::SlotAccessor* AndHashStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -145,6 +150,7 @@ void AndHashStage::open(bool reOpen) {
     }
 
     _commonStats.opens++;
+    _memoryTracker.value().set(0);
     _children[0]->open(reOpen);
     // Insert the outer side into the hash table.
     while (_children[0]->getNext() == PlanState::ADVANCED) {
@@ -163,7 +169,12 @@ void AndHashStage::open(bool reOpen) {
             project.reset(idx++, p->getCopyOfValue());
         }
 
+        auto memUsage = key.memUsageForSorter() + project.memUsageForSorter();
         _ht->emplace(std::move(key), std::move(project));
+        _memoryTracker.value().add(memUsage);
+        uassert(12321801,
+                "Exceeded memory limit for and_hash",
+                _memoryTracker.value().withinMemoryLimit());
     }
 
     _children[0]->close();
@@ -218,17 +229,30 @@ void AndHashStage::close() {
         _innerOpened = false;
     }
     _ht = boost::none;
+    _memoryTracker.value().set(0);
+    _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
 }
 
 std::unique_ptr<PlanStageStats> AndHashStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    ret->specific = std::make_unique<AndHashStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
+        ret->debugInfo = bob.obj();
+    }
+
     ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
     return ret;
 }
 
 const SpecificStats* AndHashStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 void AndHashStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,

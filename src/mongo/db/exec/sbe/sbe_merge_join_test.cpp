@@ -38,8 +38,11 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -259,5 +262,80 @@ TEST_F(MergeJoinStageTest, MergeJoinSortDirectionDescending) {
                                                                      << "c")));
 
     runTest(outerData, innerData, expectedData, value::SortDirection::Descending);
+}
+
+TEST_F(MergeJoinStageTest, MergeJoinMemoryLimitExceeded) {
+    // Set a 1-byte limit so any buffered row immediately exceeds it.
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalSlotBasedExecutionMergeJoinStageMaxMemoryBytes", 1);
+
+    // Two outer rows share the same key so the second emplace_back enters the loop and hits the
+    // memory check (12321800). A single outer row would not reach that path.
+    auto outerData =
+        BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1 << 1)) << BSON_ARRAY(1 << BSON_ARRAY(2 << 2)));
+    auto innerData = BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY("a" << "a")));
+
+    auto [resultAccessors, mergeJoinStage] =
+        makeMergeJoin(outerData, innerData, value::SortDirection::Ascending);
+
+    mergeJoinStage->open(false);
+
+    // First getNext() takes the initial-match path (no limit check) and returns a result.
+    ASSERT_EQ(mergeJoinStage->getNext(), PlanState::ADVANCED);
+    ASSERT_THROWS_CODE(mergeJoinStage->getNext(), DBException, 12321800);
+    mergeJoinStage->close();
+}
+
+TEST_F(MergeJoinStageTest, MergeJoinMemoryTracking) {
+    // Three outer rows all share key=1; they are all buffered together when the first match is
+    // found. Scalar project values (10, 20, 30 outer; 100, 200 inner) for easy verification.
+    auto outerData = BSON_ARRAY(BSON_ARRAY(1 << 10) << BSON_ARRAY(1 << 20) << BSON_ARRAY(1 << 30));
+    auto innerData = BSON_ARRAY(BSON_ARRAY(1 << 100) << BSON_ARRAY(1 << 200));
+
+    auto [resultAccessors, mergeJoinStage] =
+        makeMergeJoin(outerData, innerData, value::SortDirection::Ascending);
+
+    mergeJoinStage->open(false);
+
+    // After the first result the outer buffer holds all 3 outer rows with key=1.
+    ASSERT_EQ(mergeJoinStage->getNext(), PlanState::ADVANCED);
+    ASSERT_GT(mergeJoinStage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+
+    // Collect results. Start with the one already fetched, then drain the rest.
+    std::vector<std::pair<int32_t, int32_t>> results;
+    auto collectRow = [&] {
+        auto [outerKeyTag, outerKeyVal] = resultAccessors[0]->getViewOfValue();
+        ASSERT_EQ(outerKeyTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(outerKeyVal), 1);
+        auto [innerKeyTag, innerKeyVal] = resultAccessors[1]->getViewOfValue();
+        ASSERT_EQ(innerKeyTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(innerKeyVal), 1);
+        auto [outerProjTag, outerProjVal] = resultAccessors[2]->getViewOfValue();
+        ASSERT_EQ(outerProjTag, value::TypeTags::NumberInt32);
+        auto [innerProjTag, innerProjVal] = resultAccessors[3]->getViewOfValue();
+        ASSERT_EQ(innerProjTag, value::TypeTags::NumberInt32);
+        results.emplace_back(value::bitcastTo<int32_t>(outerProjVal),
+                             value::bitcastTo<int32_t>(innerProjVal));
+    };
+
+    collectRow();
+    while (mergeJoinStage->getNext() == PlanState::ADVANCED) {
+        collectRow();
+    }
+
+    // 3 outer rows x 2 inner rows = 6 results.
+    ASSERT_EQ(results.size(), 6u);
+    // Each outer project value {10, 20, 30} must appear paired with each inner {100, 200}.
+    std::sort(results.begin(), results.end());
+    ASSERT_EQ(results,
+              (std::vector<std::pair<int32_t, int32_t>>{
+                  {10, 100}, {10, 200}, {20, 100}, {20, 200}, {30, 100}, {30, 200}}));
+
+    mergeJoinStage->close();
+
+    // After close the buffer is cleared and the peak is captured in specific stats.
+    ASSERT_EQ(mergeJoinStage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+    auto* stats = static_cast<const MergeJoinStats*>(mergeJoinStage->getSpecificStats());
+    ASSERT_GT(stats->peakTrackedMemBytes, 0);
 }
 }  // namespace mongo::sbe

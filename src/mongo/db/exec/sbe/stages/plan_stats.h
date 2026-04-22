@@ -504,6 +504,48 @@ struct TsBucketToBlockStats final : public SpecificStats {
     size_t numCellBlocksProduced = 0;
 };
 
+struct MergeJoinStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<MergeJoinStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    // The maximum amount of memory that was used.
+    uint64_t peakTrackedMemBytes = 0u;
+};
+
+struct AndHashStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<AndHashStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    // The maximum amount of memory used by the hash table.
+    uint64_t peakTrackedMemBytes = 0u;
+};
+
 /**
  * Calculates the total number of physical reads in the given plan stats tree. If a stage can do
  * a physical read (e.g. COLLSCAN or IXSCAN), then its 'numReads' stats is added to the total.

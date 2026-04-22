@@ -145,5 +145,7 @@ private:
     boost::optional<TableType> _ht;
     TableType::iterator _htIt;
     TableType::iterator _htItEnd;
+
+    AndHashStats _specificStats;
 };
 }  // namespace mongo::sbe

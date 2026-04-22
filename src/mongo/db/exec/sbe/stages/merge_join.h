@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/row.h"
@@ -147,5 +146,7 @@ private:
 
     // For when need to EOF earlier after exhausting all of the rows from the outer side.
     bool _isOuterDone{false};
+
+    MergeJoinStats _specificStats;
 };
 }  // namespace mongo::sbe

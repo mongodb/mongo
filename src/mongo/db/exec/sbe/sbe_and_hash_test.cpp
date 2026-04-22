@@ -42,8 +42,10 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -210,6 +212,113 @@ TEST_F(AndHashStageTest, TestHashValueIsCopied) {
     ASSERT_EQ(andHashStage->getNext(), PlanState::IS_EOF);
 
     andHashStage->close();
+}
+
+TEST_F(AndHashStageTest, AndHashMemoryLimitExceeded) {
+    // Set a 1-byte limit so the first document inserted into the hash table exceeds it.
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalSlotBasedExecutionAndHashStageMaxMemoryBytes", 1);
+
+    // Outer side: one row with key=1 and projected value 1.
+    auto [outerTag, outerVal] =
+        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1))));
+    value::ValueGuard outerGuard{outerTag, outerVal};
+
+    // Inner side: one row with key=1.
+    auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY(1));
+    value::ValueGuard innerGuard{innerTag, innerVal};
+
+    auto ctx = makeCompileCtx();
+
+    outerGuard.reset();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    innerGuard.reset();
+    auto [innerKeySlot, innerStage] = generateVirtualScan(innerTag, innerVal);
+
+    auto andHashStage = makeS<AndHashStage>(std::move(outerStage),
+                                            std::move(innerStage),
+                                            makeSV(outerSlots[0]),
+                                            makeSV(outerSlots[1]),
+                                            makeSV(innerKeySlot),
+                                            makeSV(),
+                                            boost::none,
+                                            nullptr /* yieldPolicy */,
+                                            kEmptyPlanNodeId);
+
+    // prepareTree() calls open() internally; with a 1-byte limit the first row inserted into
+    // the hash table exceeds the limit and open() throws before returning.
+    ASSERT_THROWS_CODE(
+        prepareTree(ctx.get(), andHashStage.get(), makeSV(outerSlots[0])), DBException, 12321801);
+}
+
+TEST_F(AndHashStageTest, AndHashMemoryTracking) {
+    // Outer side: three rows, all with key=1 but different scalar projected values 10, 20, 30.
+    auto [outerTag, outerVal] = stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << 10) << BSON_ARRAY(1 << 20) << BSON_ARRAY(1 << 30)));
+    value::ValueGuard outerGuard{outerTag, outerVal};
+
+    // Inner side: two rows, both with key=1. Each inner probe matches all 3 outer rows,
+    // so the join produces 3 outer rows x 2 inner probes = 6 output rows total.
+    auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY(1 << 1));
+    value::ValueGuard innerGuard{innerTag, innerVal};
+
+    auto ctx = makeCompileCtx();
+
+    outerGuard.reset();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+
+    innerGuard.reset();
+    auto [innerKeySlot, innerStage] = generateVirtualScan(innerTag, innerVal);
+
+    auto andHashStage = makeS<AndHashStage>(std::move(outerStage),
+                                            std::move(innerStage),
+                                            makeSV(outerSlots[0]),
+                                            makeSV(outerSlots[1]),
+                                            makeSV(innerKeySlot),
+                                            makeSV(),
+                                            boost::none,
+                                            nullptr /* yieldPolicy */,
+                                            kEmptyPlanNodeId);
+
+    auto resultAccessors =
+        prepareTree(ctx.get(), andHashStage.get(), makeSV(outerSlots[0], outerSlots[1]));
+
+    andHashStage->open(false);
+
+    // After open() the hash table holds all outer rows; memory must be non-zero.
+    ASSERT_GT(andHashStage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+
+    // Collect all results and verify correctness.
+    int resultCount = 0;
+    std::vector<int32_t> projectedValues;
+    while (andHashStage->getNext() == PlanState::ADVANCED) {
+        ++resultCount;
+
+        // Key slot must be 1 for every result row.
+        auto [keyTag, keyVal] = resultAccessors[0]->getViewOfValue();
+        ASSERT_EQ(keyTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(keyVal), 1);
+
+        // Project slot is a scalar integer (10, 20, or 30); collect it.
+        auto [projTag, projVal] = resultAccessors[1]->getViewOfValue();
+        ASSERT_EQ(projTag, value::TypeTags::NumberInt32);
+        projectedValues.push_back(value::bitcastTo<int32_t>(projVal));
+    }
+
+    // 3 outer rows x 2 inner probes = 6 results.
+    ASSERT_EQ(resultCount, 6);
+    // Each projected value {10, 20, 30} must appear exactly twice (once per inner probe).
+    std::sort(projectedValues.begin(), projectedValues.end());
+    ASSERT_EQ(projectedValues, (std::vector<int32_t>{10, 10, 20, 20, 30, 30}));
+
+    andHashStage->close();
+
+    // After close() the hash table is freed and the tracker is reset.
+    ASSERT_EQ(andHashStage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+
+    // The peak from when the hash table was fully built must be captured in specific stats.
+    auto* stats = static_cast<const AndHashStats*>(andHashStage->getSpecificStats());
+    ASSERT_GT(stats->peakTrackedMemBytes, 0);
 }
 
 }  // namespace mongo::sbe
