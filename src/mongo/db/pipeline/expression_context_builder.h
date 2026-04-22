@@ -105,11 +105,9 @@ public:
     ExpressionContextBuilder& view(boost::optional<ViewInfo>);
     ExpressionContextBuilder& originalNs(NamespaceString);
     ExpressionContextBuilder& isHybridSearch(bool);
-    ExpressionContextBuilder& mainCollPathArrayness(
-        std::shared_ptr<const PathArrayness> mainCollPathArrayness);
-    ExpressionContextBuilder& secondaryCollsPathArrayness(
+    ExpressionContextBuilder& pathArraynessForNss(
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
-            secondaryCollsPathArrayness);
+            pathArraynessForNss);
     ExpressionContextBuilder& pathArraynessFrom(const ExpressionContext& other);
 
     /**

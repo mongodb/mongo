@@ -67,10 +67,12 @@ protected:
 
     void setPipeline(const std::string& array) {
         pipeline = parsePipeline(array);
-        pipeline->getContext()->setPathArrayness(pathArrayness);
+        pipeline->getContext()->setPathArraynessForNss(pipeline->getContext()->getNamespaceString(),
+                                                       pathArrayness);
         stages.assign(pipeline->getSources().begin(), pipeline->getSources().end());
         canPathBeArray = [this](StringData path) -> bool {
-            return pipeline->getContext()->canMainCollPathBeArray(FieldPath(path));
+            return pipeline->getContext()->canPathBeArrayForNss(
+                FieldPath(path), pipeline->getContext()->getNamespaceString());
         };
         graph = std::make_unique<DependencyGraph>(pipeline->getSources(), canPathBeArray);
     }

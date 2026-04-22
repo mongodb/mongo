@@ -386,16 +386,10 @@ ExpressionContextBuilder& ExpressionContextBuilder::tailableMode(TailableModeEnu
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::mainCollPathArrayness(
-    std::shared_ptr<const PathArrayness> mainCollPathArrayness) {
-    params.mainCollPathArrayness = mainCollPathArrayness;
-    return *this;
-}
-
-ExpressionContextBuilder& ExpressionContextBuilder::secondaryCollsPathArrayness(
+ExpressionContextBuilder& ExpressionContextBuilder::pathArraynessForNss(
     stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
-        secondaryCollsPathArrayness) {
-    params.secondaryCollsPathArrayness = std::move(secondaryCollsPathArrayness);
+        pathArraynessForNss) {
+    params.pathArraynessForNss = std::move(pathArraynessForNss);
     return *this;
 }
 
@@ -403,8 +397,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::pathArraynessFrom(
     const ExpressionContext& other) {
     // ExpressionContextBuilder is a friend of ExpressionContext,
     // so this can access other._params directly.
-    params.mainCollPathArrayness = other._params.mainCollPathArrayness;
-    params.secondaryCollsPathArrayness = other._params.secondaryCollsPathArrayness;
+    params.pathArraynessForNss = other._params.pathArraynessForNss;
     return *this;
 }
 

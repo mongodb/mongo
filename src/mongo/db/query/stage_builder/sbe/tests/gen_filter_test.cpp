@@ -390,15 +390,23 @@ public:
     void setUp() override {
         GoldenSbeExprBuilderTestFixture::setUp();
         _gctx->validateOnClose(true);
+
+        auto pathArrayness = std::make_shared<PathArrayness>();
+        pathArrayness->addPath(FieldPath("a.b"), MultikeyComponents{}, true /* isFullRebuild */);
+        _expCtx->setPathArraynessForNss(_expCtx->getNamespaceString(), std::move(pathArrayness));
     }
 
     void runTestWithPathArrayness(const MatchExpression* expr,
                                   boost::optional<SbSlot> rootSlot,
-                                  const PathArrayness& pathArrayness,
                                   bool expected,
                                   StringData test,
                                   PlanStageSlots slots = {}) {
-        auto sbExpr = generateFilter(*_state, expr, rootSlot, slots, pathArrayness);
+        auto sbExpr = generateFilter(*_state,
+                                     expr,
+                                     rootSlot,
+                                     slots,
+                                     /*isFilterOverIxscan*/ false,
+                                     /*canUsePathArrayness*/ true);
 
         auto [expectedTag, expectedVal] = sbe::value::makeValue(Value(expected));
         sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
@@ -417,32 +425,20 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFEli
                                          &_slotIdGenerator);
     auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
 
-    PathArrayness pathArrayness;
-    pathArrayness.addPath(FieldPath("a.b"), MultikeyComponents{}, true /* isFullRebuild */);
-
     {
         EqualityMatchExpression eqExpr("a.b"_sd, Value(1));
-        runTestWithPathArrayness(&eqExpr,
-                                 rootSlot,
-                                 pathArrayness,
-                                 true /* expected */,
-                                 "TraverseFElided_KnownNonArrayPath"_sd);
+        runTestWithPathArrayness(
+            &eqExpr, rootSlot, true /* expected */, "TraverseFElided_KnownNonArrayPath"_sd);
     }
     {
         EqualityMatchExpression eqExpr("c.d"_sd, Value(1));
-        runTestWithPathArrayness(&eqExpr,
-                                 rootSlot,
-                                 pathArrayness,
-                                 true /* expected */,
-                                 "TraverseFRetained_UnknownPath"_sd);
+        runTestWithPathArrayness(
+            &eqExpr, rootSlot, true /* expected */, "TraverseFRetained_UnknownPath"_sd);
     }
 }
 
 TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArrayness) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
-
-    PathArrayness pathArrayness;
-    pathArrayness.addPath(FieldPath("a.b"), MultikeyComponents{}, true /* isFullRebuild */);
 
     // Document with scalar intermediate: "a" is 42, so getField(42, "b") returns Nothing.
     // All null-matching predicates should return true (field path doesn't exist).
@@ -459,7 +455,6 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
             runTestWithPathArrayness(&eqExpr,
                                      rootSlot,
-                                     pathArrayness,
                                      true /* expected */,
                                      "NothingCheck_EqNull_ScalarIntermediate"_sd);
         }
@@ -467,7 +462,6 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             LTEMatchExpression lteExpr("a.b"_sd, Value(BSONNULL));
             runTestWithPathArrayness(&lteExpr,
                                      rootSlot,
-                                     pathArrayness,
                                      true /* expected */,
                                      "NothingCheck_LteNull_ScalarIntermediate"_sd);
         }
@@ -475,7 +469,6 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             GTEMatchExpression gteExpr("a.b"_sd, Value(BSONNULL));
             runTestWithPathArrayness(&gteExpr,
                                      rootSlot,
-                                     pathArrayness,
                                      true /* expected */,
                                      "NothingCheck_GteNull_ScalarIntermediate"_sd);
         }
@@ -485,7 +478,6 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
             runTestWithPathArrayness(&inExpr,
                                      rootSlot,
-                                     pathArrayness,
                                      true /* expected */,
                                      "NothingCheck_InNull_ScalarIntermediate"_sd);
         }
@@ -505,7 +497,6 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
             runTestWithPathArrayness(&eqExpr,
                                      rootSlot,
-                                     pathArrayness,
                                      false /* expected */,
                                      "NothingCheck_EqNull_ObjectIntermediate"_sd);
         }
@@ -523,11 +514,8 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
 
         {
             EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
-            runTestWithPathArrayness(&eqExpr,
-                                     rootSlot,
-                                     pathArrayness,
-                                     true /* expected */,
-                                     "NothingCheck_EqNull_MissingField"_sd);
+            runTestWithPathArrayness(
+                &eqExpr, rootSlot, true /* expected */, "NothingCheck_EqNull_MissingField"_sd);
         }
     }
 }

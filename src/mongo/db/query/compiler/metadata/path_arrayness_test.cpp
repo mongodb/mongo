@@ -484,15 +484,15 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
 class PathArraynessInvalidationTest : public unittest::Test {
 protected:
     PathArraynessInvalidationTest() {
-        _expCtx.setPathArrayness(_oldPathArrayness);
+        _expCtx.setPathArraynessForNss(_expCtx.getNamespaceString(), _oldPathArrayness);
     }
 
     void addOldPath(StringData path, MultikeyComponents mk = {}) {
         _oldPathArrayness->addPath(FieldPath(path), mk, true);
     }
 
-    bool canMainCollPathBeArray(StringData path) {
-        return _expCtx.canMainCollPathBeArray(FieldPath(path));
+    bool canPathBeArray(StringData path) {
+        return _expCtx.canPathBeArrayForNss(FieldPath(path), _expCtx.getNamespaceString());
     }
 
     void addCurrentPath(StringData path, MultikeyComponents mk = {}) {
@@ -500,7 +500,8 @@ protected:
     }
 
     bool hasInvalidatedPaths() {
-        return PathArrayness::hasInvalidatedPaths(_expCtx.mainCollNonArrayPaths(), _current);
+        return PathArrayness::hasInvalidatedPaths(
+            _expCtx.nonArrayPathsForNss(_expCtx.getNamespaceString()), _current);
     }
 
 private:
@@ -511,7 +512,7 @@ private:
 
 TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenTriesAreIdentical) {
     addOldPath("a.b");
-    ASSERT_FALSE(canMainCollPathBeArray("a.b"));
+    ASSERT_FALSE(canPathBeArray("a.b"));
 
     addCurrentPath("a.b");
     ASSERT_FALSE(hasInvalidatedPaths());
@@ -520,8 +521,8 @@ TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenTriesAreIdentical) {
 TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenPathComponentBecomesNonArray) {
     addOldPath("a.b");
     addOldPath("x.y", {0, 1});
-    ASSERT_FALSE(canMainCollPathBeArray("a.b"));
-    ASSERT_TRUE(canMainCollPathBeArray("x.y"));
+    ASSERT_FALSE(canPathBeArray("a.b"));
+    ASSERT_TRUE(canPathBeArray("x.y"));
 
     addCurrentPath("a.b");
     addCurrentPath("x.y", {0});
@@ -530,7 +531,7 @@ TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenPathComponentBecomesNonA
 
 TEST_F(PathArraynessInvalidationTest, InvalidationWhenNonArrayBecomesArray) {
     addOldPath("a.b");
-    ASSERT_FALSE(canMainCollPathBeArray("a.b"));
+    ASSERT_FALSE(canPathBeArray("a.b"));
 
     addCurrentPath("a.b", {1});
     ASSERT_TRUE(hasInvalidatedPaths());
@@ -538,7 +539,7 @@ TEST_F(PathArraynessInvalidationTest, InvalidationWhenNonArrayBecomesArray) {
 
 TEST_F(PathArraynessInvalidationTest, InvalidationWhenPathDisappears) {
     addOldPath("a.b");
-    ASSERT_FALSE(canMainCollPathBeArray("a.b"));
+    ASSERT_FALSE(canPathBeArray("a.b"));
 
     // current trie is empty — path is gone.
     ASSERT_TRUE(hasInvalidatedPaths());
@@ -546,7 +547,7 @@ TEST_F(PathArraynessInvalidationTest, InvalidationWhenPathDisappears) {
 
 TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenAllPathsWereAlreadyArray) {
     addOldPath("a.b", {0, 1});
-    ASSERT_TRUE(canMainCollPathBeArray("a.b"));
+    ASSERT_TRUE(canPathBeArray("a.b"));
 
     addCurrentPath("a.b.c", {0, 1, 2});
     ASSERT_FALSE(hasInvalidatedPaths());
@@ -554,7 +555,7 @@ TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenAllPathsWereAlreadyArray
 
 TEST_F(PathArraynessInvalidationTest, InvalidationOnPrefixOfDottedPath) {
     addOldPath("a.b.c", {2});
-    ASSERT_FALSE(canMainCollPathBeArray("a.b"));
+    ASSERT_FALSE(canPathBeArray("a.b"));
 
     addCurrentPath("a.b.c", {1, 2});
     ASSERT_TRUE(hasInvalidatedPaths());
@@ -562,7 +563,7 @@ TEST_F(PathArraynessInvalidationTest, InvalidationOnPrefixOfDottedPath) {
 
 TEST_F(PathArraynessInvalidationTest, InvalidationWhenLeafFlipsToArray) {
     addOldPath("a.b.c");
-    ASSERT_FALSE(canMainCollPathBeArray("a.b.c"));
+    ASSERT_FALSE(canPathBeArray("a.b.c"));
 
     addCurrentPath("a.b.c", {2});
     ASSERT_TRUE(hasInvalidatedPaths());
@@ -580,8 +581,8 @@ TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenBothEmpty) {
 TEST_F(PathArraynessInvalidationTest, MultiplePathsOneInvalidated) {
     addOldPath("a");
     addOldPath("b");
-    ASSERT_FALSE(canMainCollPathBeArray("a"));
-    ASSERT_FALSE(canMainCollPathBeArray("b"));
+    ASSERT_FALSE(canPathBeArray("a"));
+    ASSERT_FALSE(canPathBeArray("b"));
 
     addCurrentPath("a");
     addCurrentPath("b", {0});
@@ -592,7 +593,7 @@ TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenNonArrayPathInvalidatedB
     addOldPath("a");
     addOldPath("b");
     // Only query "a", not "b".
-    ASSERT_FALSE(canMainCollPathBeArray("a"));
+    ASSERT_FALSE(canPathBeArray("a"));
 
     addCurrentPath("a");
     addCurrentPath("b", {0});
@@ -602,7 +603,7 @@ TEST_F(PathArraynessInvalidationTest, NoInvalidationWhenNonArrayPathInvalidatedB
 
 TEST_F(PathArraynessInvalidationTest, DeepPathPrefixInvalidation) {
     addOldPath("a.b.c.d.e");
-    ASSERT_FALSE(canMainCollPathBeArray("a.b.c.d.e"));
+    ASSERT_FALSE(canPathBeArray("a.b.c.d.e"));
 
     addCurrentPath("a.b.c.d.e", {1});
     ASSERT_TRUE(hasInvalidatedPaths());
@@ -610,7 +611,7 @@ TEST_F(PathArraynessInvalidationTest, DeepPathPrefixInvalidation) {
 
 TEST_F(PathArraynessInvalidationTest, InvalidationWhenOldPathMissingFromCurrent) {
     addOldPath("x.y");
-    ASSERT_FALSE(canMainCollPathBeArray("x.y"));
+    ASSERT_FALSE(canPathBeArray("x.y"));
 
     addCurrentPath("a.b");
     ASSERT_TRUE(hasInvalidatedPaths());
@@ -619,7 +620,7 @@ TEST_F(PathArraynessInvalidationTest, InvalidationWhenOldPathMissingFromCurrent)
 TEST_F(PathArraynessInvalidationTest, OldPathArrayCurrentPathNonArray) {
     addOldPath("a", {0});
     // "a" is array, so it won't be recorded as non-array.
-    ASSERT_TRUE(canMainCollPathBeArray("a"));
+    ASSERT_TRUE(canPathBeArray("a"));
 
     addCurrentPath("a");
     ASSERT_FALSE(hasInvalidatedPaths());
@@ -637,24 +638,24 @@ TEST(PathArraynessInvalidation, SharedPathArraynessDoesNotLeakNonArrayPathsAcros
     auto sharedPA = std::shared_ptr<const PathArrayness>(std::move(pa));
 
     auto buildExpCtx = [&] {
+        stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>> map;
+        map.emplace(nss, sharedPA);
         return ExpressionContextBuilder{}
             .opCtx(opCtx.get())
             .ns(nss)
-            .mainCollPathArrayness(sharedPA)
+            .pathArraynessForNss(std::move(map))
             .build();
     };
     auto expCtx1 = buildExpCtx();
     auto expCtx2 = buildExpCtx();
-    ASSERT_EQ(expCtx1->getMainCollPathArrayness_forTest(),
-              expCtx2->getMainCollPathArrayness_forTest());
 
     // Query 1 uses "a", Query 2 uses "b".
-    ASSERT_FALSE(expCtx1->canMainCollPathBeArray(FieldPath("a")));
-    ASSERT_FALSE(expCtx2->canMainCollPathBeArray(FieldPath("b")));
+    ASSERT_FALSE(expCtx1->canPathBeArrayForNss(FieldPath("a"), nss));
+    ASSERT_FALSE(expCtx2->canPathBeArrayForNss(FieldPath("b"), nss));
 
     // Each ExpressionContext tracks non-array paths independently.
-    const auto& nonArrayPaths1 = expCtx1->mainCollNonArrayPaths();
-    const auto& nonArrayPaths2 = expCtx2->mainCollNonArrayPaths();
+    const auto& nonArrayPaths1 = expCtx1->nonArrayPathsForNss(nss);
+    const auto& nonArrayPaths2 = expCtx2->nonArrayPathsForNss(nss);
 
     int count1 = 0, count2 = 0;
     for (const auto& p : nonArrayPaths1) {
@@ -681,30 +682,73 @@ TEST(PathArraynessInvalidation, SharedPathArraynessDoesNotLeakNonArrayPathsAcros
 TEST(ExpressionContextFieldRefOverload, InvalidEmptyPath) {
     ExpressionContextForTest expCtx;
     auto pa = std::make_shared<PathArrayness>();
-    expCtx.setPathArrayness(pa);
-    ASSERT_TRUE(expCtx.canMainCollPathBeArray(FieldRef("")));
+    expCtx.setPathArraynessForNss(expCtx.getNamespaceString(), pa);
+    ASSERT_TRUE(expCtx.canPathBeArrayForNss(FieldRef(""), expCtx.getNamespaceString()));
 }
 
 TEST(ExpressionContextFieldRefOverload, InvalidTrailingDot) {
     ExpressionContextForTest expCtx;
     auto pa = std::make_shared<PathArrayness>();
-    expCtx.setPathArrayness(pa);
-    ASSERT_TRUE(expCtx.canMainCollPathBeArray(FieldRef("a.")));
+    expCtx.setPathArraynessForNss(expCtx.getNamespaceString(), pa);
+    ASSERT_TRUE(expCtx.canPathBeArrayForNss(FieldRef("a."), expCtx.getNamespaceString()));
 }
 
 TEST(ExpressionContextFieldRefOverload, InvalidDollarPrefixed) {
     ExpressionContextForTest expCtx;
     auto pa = std::make_shared<PathArrayness>();
-    expCtx.setPathArrayness(pa);
-    ASSERT_TRUE(expCtx.canMainCollPathBeArray(FieldRef("$foo")));
+    expCtx.setPathArraynessForNss(expCtx.getNamespaceString(), pa);
+    ASSERT_TRUE(expCtx.canPathBeArrayForNss(FieldRef("$foo"), expCtx.getNamespaceString()));
 }
 
 TEST(ExpressionContextFieldRefOverload, ValidPathDelegatesToFieldPathOverload) {
     ExpressionContextForTest expCtx;
     auto pa = std::make_shared<PathArrayness>();
     pa->addPath(FieldPath("a.b"), MultikeyComponents{}, true);
-    expCtx.setPathArrayness(pa);
-    ASSERT_FALSE(expCtx.canMainCollPathBeArray(FieldRef("a.b")));
+    expCtx.setPathArraynessForNss(expCtx.getNamespaceString(), pa);
+    ASSERT_FALSE(expCtx.canPathBeArrayForNss(FieldRef("a.b"), expCtx.getNamespaceString()));
+}
+
+TEST(CanPathBeArrayForNss, UnknownNssReturnsConservativeTrue) {
+    QueryTestServiceContext testServiceCtx;
+    auto opCtx = testServiceCtx.makeOperationContext();
+    auto mainNss = NamespaceString::createNamespaceString_forTest("test", "main_coll");
+    auto unknownNss = NamespaceString::createNamespaceString_forTest("test", "unknown_coll");
+
+    auto mainPA = std::make_shared<PathArrayness>();
+    mainPA->addPath(FieldPath("a"), MultikeyComponents{}, true);
+
+    stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>> map;
+    map.emplace(mainNss, std::shared_ptr<const PathArrayness>(std::move(mainPA)));
+
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(mainNss)
+                      .pathArraynessForNss(std::move(map))
+                      .build();
+
+    ASSERT_TRUE(expCtx->canPathBeArrayForNss(FieldPath("a"), unknownNss));
+}
+
+TEST(CanPathBeArrayForNss, FieldRefOverloadDelegatesToMainForMainNss) {
+    QueryTestServiceContext testServiceCtx;
+    auto opCtx = testServiceCtx.makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    auto mainPA = std::make_shared<PathArrayness>();
+    mainPA->addPath(FieldPath("a.b"), MultikeyComponents{}, true);
+
+    stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>> map;
+    map.emplace(nss, std::shared_ptr<const PathArrayness>(std::move(mainPA)));
+
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(nss)
+                      .pathArraynessForNss(std::move(map))
+                      .build();
+
+    ASSERT_FALSE(expCtx->canPathBeArrayForNss(FieldRef("a.b"), nss));
+    // Invalid FieldRef returns conservative true.
+    ASSERT_TRUE(expCtx->canPathBeArrayForNss(FieldRef(""), nss));
 }
 
 }  // namespace mongo

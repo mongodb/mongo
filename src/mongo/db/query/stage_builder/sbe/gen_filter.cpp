@@ -73,8 +73,6 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/bson_typemask.h"
-#include "mongo/db/query/compiler/metadata/path_arrayness.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
@@ -155,13 +153,13 @@ struct MatchExpressionVisitorContext {
                                   boost::optional<SbSlot> rootSlot,
                                   const MatchExpression* root,
                                   const PlanStageSlots* slots,
-                                  const PathArrayness& pathArrayness,
-                                  bool isFilterOverIxscan)
+                                  bool isFilterOverIxscan,
+                                  bool canUsePathArrayness)
         : state{state},
           rootSlot{rootSlot},
           slots{slots},
-          pathArrayness{pathArrayness},
-          isFilterOverIxscan{isFilterOverIxscan} {
+          isFilterOverIxscan{isFilterOverIxscan},
+          canUsePathArrayness{canUsePathArrayness} {
         tassert(
             7097201, "Expected 'rootSlot' or 'slots' to be defined", rootSlot || slots != nullptr);
 
@@ -212,8 +210,10 @@ struct MatchExpressionVisitorContext {
     // document ('rootSlot') or with the set of kField slots ('slots').
     boost::optional<SbSlot> rootSlot;
     const PlanStageSlots* slots = nullptr;
-    const PathArrayness& pathArrayness;
     bool isFilterOverIxscan = false;
+    // When true, the filter runs over raw documents from expCtx->getNamespaceString(), so
+    // PathArrayness data for that namespace may be consulted to elide traverseF.
+    bool canUsePathArrayness = false;
 };
 
 enum class LeafTraversalMode {
@@ -431,9 +431,9 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             "Expected either input expr or top-level field slot to be defined",
             !frame.inputExpr.isNull() || topLevelFieldSlot.has_value());
 
-    const bool canPathBeArray = feature_flags::gFeatureFlagPathArrayness.isEnabled()
-        ? context->pathArrayness.canPathBeArray(path, context->state.expCtx.get())
-        : true;
+    const bool canPathBeArray = !context->canUsePathArrayness ||
+        context->state.expCtx->canPathBeArrayForNss(path,
+                                                    context->state.expCtx->getNamespaceString());
 
     frame.pushExpr(generateTraverseF(frame.inputExpr.clone(),
                                      topLevelFieldSlot,
@@ -1295,17 +1295,8 @@ SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
                       boost::optional<SbSlot> rootSlot,
                       const PlanStageSlots& slots,
-                      bool isFilterOverIxscan) {
-    PathArrayness pathArrayness{};
-    return generateFilter(state, root, rootSlot, slots, pathArrayness, isFilterOverIxscan);
-}
-
-SbExpr generateFilter(StageBuilderState& state,
-                      const MatchExpression* root,
-                      boost::optional<SbSlot> rootSlot,
-                      const PlanStageSlots& slots,
-                      const PathArrayness& pathArrayness,
-                      bool isFilterOverIxscan) {
+                      bool isFilterOverIxscan,
+                      bool canUsePathArrayness) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
     if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
@@ -1313,7 +1304,7 @@ SbExpr generateFilter(StageBuilderState& state,
     }
 
     MatchExpressionVisitorContext context{
-        state, rootSlot, root, &slots, pathArrayness, isFilterOverIxscan};
+        state, rootSlot, root, &slots, isFilterOverIxscan, canUsePathArrayness};
 
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};

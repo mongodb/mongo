@@ -1194,10 +1194,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     // Do not invoke if it has been already initialized.
     // TODO SERVER-123955 Consider moving it to a different location
     const auto& collection = collections.getMainCollection();
+    const auto& nss = canonicalQuery->getExpCtx()->getNamespaceString();
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled() &&
-        !canonicalQuery->getExpCtx()->hasMainCollPathArrayness() && collection) {
-        canonicalQuery->getExpCtx()->setPathArrayness(
-            CollectionQueryInfo::get(collection).getPathArrayness());
+        !canonicalQuery->getExpCtx()->hasPathArraynessForNss(nss) && collection) {
+        canonicalQuery->getExpCtx()->setPathArraynessForNss(
+            nss, CollectionQueryInfo::get(collection).getPathArrayness());
     }
 
     bool useSbeEngine = chooseEngine(opCtx,

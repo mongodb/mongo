@@ -70,13 +70,13 @@ public:
      * Construct a dependency graph covering the entire container.
      */
     explicit DependencyGraph(const DocumentSourceContainer& container,
-                             CanPathBeArray canMainCollPathBeArray = defaultCanPathBeArray);
+                             CanPathBeArray canPathBeArray = defaultCanPathBeArray);
     /**
      * Construct a dependency graph covering the range [container.begin(), endIt).
      */
     DependencyGraph(const DocumentSourceContainer& container,
                     DocumentSourceContainer::const_iterator endIt,
-                    CanPathBeArray canMainCollPathBeArray = defaultCanPathBeArray);
+                    CanPathBeArray canPathBeArray = defaultCanPathBeArray);
     ~DependencyGraph();
     DependencyGraph(DependencyGraph&&) noexcept;
     DependencyGraph& operator=(DependencyGraph&&) noexcept;

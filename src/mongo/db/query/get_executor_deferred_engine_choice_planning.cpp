@@ -349,9 +349,9 @@ PlanRankingResult planRanking(OperationContext* opCtx,
     // Do not invoke if it has been already initialized.
     // TODO SERVER-123955 Consider moving it to a different location
     const auto& collection = collections.getMainCollection();
-    if (feature_flags::gFeatureFlagPathArrayness.isEnabled() &&
-        !canonicalQuery->getExpCtx()->hasMainCollPathArrayness() && collection) {
-        canonicalQuery->getExpCtx()->setPathArrayness(
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled() && collection) {
+        canonicalQuery->getExpCtx()->setPathArraynessForNss(
+            canonicalQuery->getExpCtx()->getNamespaceString(),
             CollectionQueryInfo::get(collection).getPathArrayness());
     }
 

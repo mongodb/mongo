@@ -800,6 +800,9 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
         uassertStatusOK(resolveInvolvedNamespaces(_aggExState.getOpCtx()));
     auto requiresExtendedRange = requiresExtendedRangeSupportForTimeseries(resolvedNamespaces);
 
+    const auto& mainNss = _aggExState.hasChangeStream() ? _aggExState.getOriginalNss()
+                                                        : _aggExState.getExecutionNss();
+
     ExpressionContextBuilder builder;
     builder
         .fromRequest(_aggExState.getOpCtx(), _aggExState.getRequest(), allowDiskUseByDefault.load())
@@ -807,8 +810,7 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
         .collUUID(getUUID())
         .mongoProcessInterface(MongoProcessInterface::create(_aggExState.getOpCtx()))
         .mayDbProfile(CurOp::get(_aggExState.getOpCtx())->dbProfileLevel() > 0)
-        .ns(_aggExState.hasChangeStream() ? _aggExState.getOriginalNss()
-                                          : _aggExState.getExecutionNss())
+        .ns(mainNss)
         .resolvedNamespace(std::move(resolvedNamespaces))
         .originalNs(_aggExState.getOriginalNss())
         .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
@@ -819,29 +821,34 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
         .ifrContext(_aggExState.getIfrContext());
 
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
-        // Get the mainCollection and all secondary collections so that we can access the
-        // PathArrayness info in each.
         const auto& mainColl = getCollections().getMainCollection();
         const auto& secondaryAcq = getCollections().getSecondaryCollectionAcquisitions();
 
-        // Fetch the PathArrayness map for any secondary collections.
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
-            secondaryCollsPathArrayness;
+            pathArraynessForNss;
+        // For change streams, the acquired main collection is the oplog, not the user-facing
+        // namespace in `mainNss`.
+        if (mainColl && !_aggExState.hasChangeStream()) {
+            tassert(12502301,
+                    str::stream() << "Main collection namespace '"
+                                  << mainColl->ns().toStringForErrorMsg()
+                                  << "' does not match ExpressionContext namespace '"
+                                  << mainNss.toStringForErrorMsg() << "'",
+                    mainColl->ns() == mainNss);
+            pathArraynessForNss.emplace(mainNss,
+                                        CollectionQueryInfo::get(mainColl).getPathArrayness());
+        }
         for (const auto& [nss, acq] : secondaryAcq) {
             const auto& coll = acq.getCollectionPtr();
             if (!coll) {
                 continue;
             }
-            secondaryCollsPathArrayness.emplace(nss,
-                                                CollectionQueryInfo::get(coll).getPathArrayness());
+            pathArraynessForNss.emplace(nss, CollectionQueryInfo::get(coll).getPathArrayness());
         }
 
         // TODO: SERVER-111384: When removing feature flag, we can collapse the builder into one
         // chained call.
-        builder
-            .mainCollPathArrayness(mainColl ? CollectionQueryInfo::get(mainColl).getPathArrayness()
-                                            : nullptr)
-            .secondaryCollsPathArrayness(std::move(secondaryCollsPathArrayness));
+        builder.pathArraynessForNss(std::move(pathArraynessForNss));
     }
 
     auto expCtx = builder.build();

@@ -1006,76 +1006,47 @@ public:
         return _featureFlagMqlJsEngineGap.get(VersionContext::getDecoration(getOperationContext()));
     }
 
-    void setPathArrayness(const std::shared_ptr<const PathArrayness> pathArrayness) {
-        this->_params.mainCollPathArrayness = pathArrayness;
+    void setPathArraynessForNss(const NamespaceString& nss,
+                                std::shared_ptr<const PathArrayness> pathArrayness) {
+        tassert(12502302, "PathArrayness must not be null", pathArrayness);
+        _params.pathArraynessForNss.emplace(nss, std::move(pathArrayness));
     }
 
-    bool hasMainCollPathArrayness() {
-        return (this->_params.mainCollPathArrayness != nullptr);
+    bool hasPathArraynessForNss(const NamespaceString& nss) const {
+        return _params.pathArraynessForNss.contains(nss);
     }
 
-    const PathArrayness& getMainCollPathArrayness() const {
-        return *_params.mainCollPathArrayness;
-    }
-
-    const PathArrayness* getMainCollPathArrayness_forTest() const {
-        return _params.mainCollPathArrayness.get();
-    }
-
-    bool canMainCollPathBeArray(const FieldPath& path) {
-        if (!_params.mainCollPathArrayness) {
-            // mainCollPathArrayness will be unset in cases where we do not do a collection
-            // acquisition, e.g. if running on a 'mongos'. In this case, denote all paths as arrays.
+    /**
+     * Returns whether a field path can be an array for the given namespace. Returns true
+     * (conservative) when PathArrayness information for 'nss' is unavailable (e.g. on mongos).
+     */
+    bool canPathBeArrayForNss(const FieldPath& path, const NamespaceString& nss) {
+        auto it = _params.pathArraynessForNss.find(nss);
+        if (it == _params.pathArraynessForNss.end()) {
             return true;
         }
-        bool result = _params.mainCollPathArrayness->canPathBeArray(path, this);
-        if (!result) {
-            _mainCollNonArrayPaths.insert(path);
-        }
-        return result;
-    }
-
-    bool canMainCollPathBeArray(const FieldRef& path) {
-        StatusWith<FieldPath> maybeFieldPath =
-            fieldPathWithValidationStatus(std::string(path.dottedField()));
-        if (!maybeFieldPath.isOK()) {
-            return true;
-        }
-        return canMainCollPathBeArray(maybeFieldPath.getValue());
-    }
-
-    const MonotonicallyIncreasingFieldPathSet& mainCollNonArrayPaths() const {
-        return _mainCollNonArrayPaths;
-    }
-
-    bool canSecondaryCollPathBeArray(const NamespaceString& nss, const FieldPath& path) {
-        auto it = _params.secondaryCollsPathArrayness.find(nss);
-        if (it == _params.secondaryCollsPathArrayness.end() || it->second == nullptr) {
-            // If we do not find a PathArrayness mapped to the secondary namespace we return a
-            // conservative guarantee. This could happen if running on a 'mongos'.
-            return true;
-        }
+        tassert(12502304, "PathArrayness entry must not be null", it->second);
         bool result = it->second->canPathBeArray(path, this);
         if (!result) {
-            _secondaryCollsNonArrayPaths[nss].insert(path);
+            _nonArrayPathsForNss[nss].insert(path);
         }
         return result;
     }
 
-    bool canSecondaryCollPathBeArray(const NamespaceString& nss, const FieldRef& path) {
+    bool canPathBeArrayForNss(const FieldRef& ref, const NamespaceString& nss) {
         StatusWith<FieldPath> maybeFieldPath =
-            fieldPathWithValidationStatus(std::string(path.dottedField()));
+            fieldPathWithValidationStatus(std::string(ref.dottedField()));
         if (!maybeFieldPath.isOK()) {
             return true;
         }
-        return canSecondaryCollPathBeArray(nss, maybeFieldPath.getValue());
+        return canPathBeArrayForNss(maybeFieldPath.getValue(), nss);
     }
 
-    const MonotonicallyIncreasingFieldPathSet& secondaryCollNonArrayPaths(
+    const MonotonicallyIncreasingFieldPathSet& nonArrayPathsForNss(
         const NamespaceString& nss) const {
         static const MonotonicallyIncreasingFieldPathSet kEmpty;
-        auto it = _secondaryCollsNonArrayPaths.find(nss);
-        return it != _secondaryCollsNonArrayPaths.end() ? it->second : kEmpty;
+        auto it = _nonArrayPathsForNss.find(nss);
+        return it != _nonArrayPathsForNss.end() ? it->second : kEmpty;
     }
 
 protected:
@@ -1223,18 +1194,16 @@ protected:
         // Indicates that the query is replanned after being rate-limited.
         bool wasRateLimited = false;
 
-        // The PathArrayness information for the main collection. This may remain unset if a
-        // collection acquisition is not possible, e.g. when running on mongos.
-        std::shared_ptr<const PathArrayness> mainCollPathArrayness = nullptr;
+        // PathArrayness information keyed by namespace, covering the main collection and any
+        // secondary collections involved in the query. An entry is absent if a collection
+        // acquisition is not possible, e.g. when running on mongos.
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
-            secondaryCollsPathArrayness;
+            pathArraynessForNss;
     };
 
     ExpressionContextParams _params;
 
-    MonotonicallyIncreasingFieldPathSet _mainCollNonArrayPaths;
-    stdx::unordered_map<NamespaceString, MonotonicallyIncreasingFieldPathSet>
-        _secondaryCollsNonArrayPaths;
+    stdx::unordered_map<NamespaceString, MonotonicallyIncreasingFieldPathSet> _nonArrayPathsForNss;
 
     /**
      * Construct an expression context using ExpressionContextParams. Consider using

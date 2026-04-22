@@ -522,8 +522,8 @@ class DependencyGraph::Impl {
 public:
     explicit Impl(const DocumentSourceContainer& container,
                   DocumentSourceContainer::const_iterator endIt,
-                  CanPathBeArray canMainCollPathBeArray = defaultCanPathBeArray)
-        : _container(container), _canMainCollPathBeArray(std::move(canMainCollPathBeArray)) {
+                  CanPathBeArray canPathBeArray = defaultCanPathBeArray)
+        : _container(container), _canPathBeArray(std::move(canPathBeArray)) {
         grow(endIt);
     }
 
@@ -584,7 +584,7 @@ public:
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.
-            return _canMainCollPathBeArray(path);
+            return _canPathBeArray(path);
         }
 
         auto scopeId = _stages[stageId].scope;
@@ -616,7 +616,7 @@ public:
                         return true;
                     }
                     auto suffix = skipPathComponents(path, prefix.size() + 1);
-                    return _canMainCollPathBeArray(buildDottedPath(*alias, suffix));
+                    return _canPathBeArray(buildDottedPath(*alias, suffix));
                 }
                 // TODO(SERVER-119392): If our field is shadowed by another, and we know the value
                 // for that shadowing field, we can determine if the result can be array. For
@@ -628,7 +628,7 @@ public:
                 // field is definitely absent and cannot be an array. Otherwise, it's unknown.
                 return !_fields[fieldId].metadata.knownToBeMissing;
             case FieldMatchType::kBaseDocument:
-                return _canMainCollPathBeArray(path);
+                return _canPathBeArray(path);
         }
 
         MONGO_UNREACHABLE_TASSERT(12266805);
@@ -954,7 +954,7 @@ private:
             ParsedPath fullCollectionPath(collectionPathPrefix.begin(), collectionPathPrefix.end());
             fullCollectionPath.push_back(fieldNameId);
             _fields[newBaseField].metadata.canFieldBeArray =
-                _canMainCollPathBeArray(buildDottedPath(fullCollectionPath));
+                _canPathBeArray(buildDottedPath(fullCollectionPath));
         }
     }
 
@@ -1158,8 +1158,8 @@ private:
                                     }
                                     if (!canPrefixContainArrays(prefix) &&
                                         !_fields[oldPathField].metadata.canFieldBeArray) {
-                                        metadata.canFieldBeArray = _canMainCollPathBeArray(
-                                            buildDottedPath(aliasCollectionPath));
+                                        metadata.canFieldBeArray =
+                                            _canPathBeArray(buildDottedPath(aliasCollectionPath));
                                     }
                                 }
                                 break;
@@ -1177,7 +1177,7 @@ private:
                     if (isBaseDocumentField) {
                         // We represent all collection field references as FieldId::none(), without
                         // distinguishing between them.
-                        metadata.canFieldBeArray = _canMainCollPathBeArray(p.getOldPath());
+                        metadata.canFieldBeArray = _canPathBeArray(p.getOldPath());
                         aliasCollectionPath.assign(parsedOldPath.begin(), parsedOldPath.end());
                     }
 
@@ -1492,18 +1492,18 @@ private:
 
     // Reference to the complete pipeline.
     const DocumentSourceContainer& _container;
-    // Callback to query the Path Arrayness API for the main collection.
-    const CanPathBeArray _canMainCollPathBeArray;
+    // Callback to query the Path Arrayness API for the ExpressionContext's resident namespace.
+    const CanPathBeArray _canPathBeArray;
 };
 
 DependencyGraph::DependencyGraph(const DocumentSourceContainer& container,
-                                 CanPathBeArray canMainCollPathBeArray)
-    : DependencyGraph(container, container.end(), std::move(canMainCollPathBeArray)) {}
+                                 CanPathBeArray canPathBeArray)
+    : DependencyGraph(container, container.end(), std::move(canPathBeArray)) {}
 
 DependencyGraph::DependencyGraph(const DocumentSourceContainer& container,
                                  DocumentSourceContainer::const_iterator endIt,
-                                 CanPathBeArray canMainCollPathBeArray)
-    : _impl(std::make_unique<Impl>(container, endIt, std::move(canMainCollPathBeArray))) {}
+                                 CanPathBeArray canPathBeArray)
+    : _impl(std::make_unique<Impl>(container, endIt, std::move(canPathBeArray))) {}
 
 DependencyGraph::~DependencyGraph() = default;
 DependencyGraph::DependencyGraph(DependencyGraph&&) noexcept = default;
@@ -1749,9 +1749,10 @@ DependencyGraphContext::DependencyGraphContext(ExpressionContext& expCtx,
 
 namespace {
 /// Wrapper for the PathArrayness API passed into the graph as CanPathBeArray.
-struct CanMainCollPathBeArray {
+/// Queries the ExpressionContext's own resident namespace (getNamespaceString()).
+struct CanPathBeArrayForExpCtxNss {
     bool operator()(StringData path) const {
-        return expCtx.canMainCollPathBeArray(FieldRef(path));
+        return expCtx.canPathBeArrayForNss(FieldRef(path), expCtx.getNamespaceString());
     }
     ExpressionContext& expCtx;
 };
@@ -1759,7 +1760,8 @@ struct CanMainCollPathBeArray {
 
 std::unique_ptr<DependencyGraph> DependencyGraphContext::createGraph(
     DocumentSourceContainer::const_iterator endIt) const {
-    return std::make_unique<DependencyGraph>(_container, endIt, CanMainCollPathBeArray{_expCtx});
+    return std::make_unique<DependencyGraph>(
+        _container, endIt, CanPathBeArrayForExpCtxNss{_expCtx});
 }
 
 const DependencyGraph& DependencyGraphContext::getGraph(

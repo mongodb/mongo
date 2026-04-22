@@ -34,7 +34,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/util/modules.h"
 
@@ -53,6 +52,12 @@ class PlanStageSlots;
  * correspond to the full paths needed by the filter. Typically 'isFilterOverIxscan' is false unless
  * we are generating a filter over an index scan.
  *
+ * The 'canUsePathArrayness' parameter indicates that the filter runs over raw documents from the
+ * ExpressionContext's main namespace, so PathArrayness info for that namespace may be used to
+ * elide traverseF. Only the fetch residual filter sets this to true; filters that run on
+ * computed/intermediate documents (e.g. non-leading $match after $group/$addFields) must leave
+ * it false.
+ *
  * This function returns an SbExpr. If 'root' is an AND with no children, this function will
  * return a null SbExpr to indicate that there is no filter condition.
  */
@@ -60,14 +65,8 @@ SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
                       boost::optional<SbSlot> inputSlot,
                       const PlanStageSlots& slots,
-                      bool isFilterOverIxscan = false);
-
-SbExpr generateFilter(StageBuilderState& state,
-                      const MatchExpression* root,
-                      boost::optional<SbSlot> inputSlot,
-                      const PlanStageSlots& slots,
-                      const PathArrayness& pathArrayness,
-                      bool isFilterOverIxscan = false);
+                      bool isFilterOverIxscan = false,
+                      bool canUsePathArrayness = false);
 
 /**
  * Converts the list of bit positions inside of any of the bit-test match expressions
