@@ -62,3 +62,6 @@ filters:
   - "bazel_burn_in.py":
     approvers:
       - 10gen/devprod-correctness
+  - "sbom_linter.py":
+    approvers:
+      - 10gen/code-review-team-ssdlc

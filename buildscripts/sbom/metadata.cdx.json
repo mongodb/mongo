@@ -63,6 +63,135 @@
   "components": [
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/ftdc-io@{{VERSION}}",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "group": "10gen",
+      "name": "ftdc-io (Full-Time Diagnostics Capture)",
+      "version": "{{VERSION}}",
+      "description": "FTDC (Full-Time Diagnostics Capture) IO",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "name": "Internal Use Only"
+          }
+        }
+      ],
+      "copyright": "MongoDB, Inc.",
+      "purl": "pkg:cargo/ftdc-io@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/10gen/mongo/tree/master/monguard/src/ftdc-io",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "monguard/src/ftdc-io"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:private",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/monguard@{{VERSION}}",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "group": "10gen",
+      "name": "monguard",
+      "version": "{{VERSION}}",
+      "description": "A pingora-based proxy for MongoDB, focusing on hardening against malicious pre-auth external clients.",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "name": "Internal Use Only"
+          }
+        }
+      ],
+      "copyright": "MongoDB, Inc.",
+      "purl": "pkg:cargo/monguard@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/10gen/mongo/tree/master/monguard",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "monguard/"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:private",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tracing-logv2@{{VERSION}}",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "group": "10gen",
+      "name": "tracing-logv2",
+      "version": "{{VERSION}}",
+      "description": "logV2 structured logging for monguard",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "name": "Internal Use Only"
+          }
+        }
+      ],
+      "copyright": "MongoDB, Inc.",
+      "purl": "pkg:cargo/tracing-logv2@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/10gen/mongo/tree/master/monguard/src/tracing-logv2",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "monguard/src/tracing-logv2"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:private",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:deb/debian/firefox-esr@{{VERSION}}-1?arch=source",
       "supplier": {
         "name": "Mozilla Corporation",
@@ -3271,6 +3400,49 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/com.mongodb.streams/aspio@{{VERSION}}",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "group": "com.mongodb.streams",
+      "name": "aspio (Mongostream External IO)",
+      "version": "{{VERSION}}",
+      "description": "The External IO module allows Mongostream to interact with external data sources and sinks through a standardized gRPC interface. It provides bidirectional streaming capabilities to transfer data between Mongostream and external systems.",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "name": "Internal Use Only"
+          }
+        }
+      ],
+      "copyright": "MongoDB, Inc.",
+      "purl": "pkg:maven/com.mongodb.streams/aspio@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/10gen/mongo/tree/master/src/mongo/db/modules/enterprise/src/streams/aspio",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/mongo/db/modules/enterprise/src/streams/aspio"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:private",
+          "value": "true"
         }
       ]
     },

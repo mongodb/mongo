@@ -819,7 +819,7 @@ def main() -> None:
                 )
             )
             logger.warning(
-                "VERSION MISMATCH: %s: Endor version %s; Import script version %s. 'priority_version_source' from metadata: %s",
+                "VERSION MISMATCH: %s: Endor %s; Import script %s. 'priority_version_source': %s",
                 component_key,
                 versions["endor"],
                 versions["import_script"],
@@ -878,13 +878,12 @@ def main() -> None:
                             try:
                                 jira_teams = owners.get_jira_team_from_codeowner(codeowner)
                             except KeyError:
-                                logger.warning(
+                                logger.debug(
                                     "CODEOWNER: %s could not determine JIRA teams for codeowner %s. Mapping may be missing from buildscripts/util/co_jira_map.yml",
                                     component_key,
                                     codeowner,
                                 )
                                 jira_teams = [codeowner]
-                                continue
                             for jira_team in jira_teams:
                                 add_component_property(
                                     component, "internal:team_responsible", jira_team
@@ -916,7 +915,7 @@ def main() -> None:
                             location,
                         )
                 else:
-                    logger.warning(
+                    logger.debug(
                         "THIRD_PARTY FOLDER: %s lists a location as '%s'. Ideally, all third-party components are located under 'src/third_party/'.",
                         component_key,
                         location,
@@ -961,12 +960,31 @@ def main() -> None:
     # region Parse unmatched Endor Labs components
 
     print_banner("New Endor Labs components")
+
+    # Build a set of stripped bom-refs from .metadata.component.components[] so that
+    # components Endor lists as first-party sub-packages are not also added as unmatched
+    # as-is third-party components, which would create duplicates in the final SBOM.
+    endor_metadata_sub_component_refs = {
+        c["bom-ref"].split("@")[0]
+        for c in endor_bom["metadata"]["component"].get("components", [])
+        if "bom-ref" in c
+    }
+
     if endor_components:
         logger.info(
             "ENDOR SBOM: There are %d unmatched components in the Endor Labs SBOM. Adding as-is. The applicable metadata should be added to the metadata SBOM for the next run.",
             len(endor_components),
         )
         for component in endor_components:
+            # Skip components that Endor also lists as first-party sub-packages in
+            # .metadata.component.components[]; adding them here would create duplicates.
+            if component in endor_metadata_sub_component_refs:
+                logger.info(
+                    "ENDOR SBOM: Skipping unmatched component '%s' — already listed in .metadata.component.components[]",
+                    component,
+                )
+                continue
+
             # set scope to excluded by default until the component is evaluated
             endor_components[component]["scope"] = "excluded"
 
@@ -980,17 +998,53 @@ def main() -> None:
             add_component_property(endor_components[component], "internal:as-is_component", "true")
             meta_bom["components"].append(endor_components[component])
 
-            meta_bom["dependencies"].extend(
-                [
-                    d
-                    for d in endor_bom["dependencies"]
-                    if d.get("ref") == endor_components[component]["bom-ref"]
-                ]
-            )
             if component.startswith(("pkg:github/", "pkg:generic/")):
                 logger.warning("SBOM AS-IS COMPONENT: Added %s", component)
 
     # endregion Parse unmatched Endor Labs components
+
+    # region Merge Endor Labs dependency data
+
+    print_banner("Merging Endor Labs dependency data")
+
+    # Build a lookup of current meta_bom dependency entries by ref.
+    # These may originate from metadata.cdx.json or from runtime add_component_dependsOn calls.
+    meta_deps_by_ref = {d["ref"]: d for d in meta_bom["dependencies"]}
+
+    # Only add/update dependency entries whose ref is actually present in the final SBOM
+    final_component_refs = {meta_bom["metadata"]["component"]["bom-ref"]} | {
+        c["bom-ref"] for c in meta_bom["components"]
+    }
+
+    merged_new = 0
+    merged_collisions = 0
+    for endor_dep in endor_bom["dependencies"]:
+        ref = endor_dep.get("ref")
+        if not ref or ref not in final_component_refs:
+            continue
+        if ref in meta_deps_by_ref:
+            existing = meta_deps_by_ref[ref]
+            if set(existing.get("dependsOn", [])) != set(endor_dep.get("dependsOn", [])):
+                logger.warning(
+                    "DEPENDENCIES: Collision on ref '%s': metadata dependsOn %s; Endor Labs dependsOn %s. Using Endor Labs data.",
+                    ref,
+                    existing.get("dependsOn", []),
+                    endor_dep.get("dependsOn", []),
+                )
+                existing["dependsOn"] = endor_dep["dependsOn"]
+                merged_collisions += 1
+        else:
+            meta_bom["dependencies"].append(endor_dep)
+            meta_deps_by_ref[ref] = endor_dep
+            merged_new += 1
+
+    logger.info(
+        "DEPENDENCIES: Added %d new dependency entries from Endor Labs; %d collision(s) resolved in favor of Endor Labs data.",
+        merged_new,
+        merged_collisions,
+    )
+
+    # endregion Merge Endor Labs dependency data
 
     # region Finalize SBOM
 
@@ -1078,7 +1132,49 @@ def main() -> None:
 
     write_sbom_json_file(meta_bom, sbom_out_internal_path)
 
+    # Load the previous public SBOM to track its serialNumber/version independently
+    if os.path.exists(sbom_out_public_path):
+        prev_public_bom = read_sbom_json_file(sbom_out_public_path)
+    else:
+        prev_public_bom = {
+            "serialNumber": None,
+            "version": 0,
+            "metadata": {"timestamp": meta_bom["metadata"]["timestamp"]},
+            "components": [],
+            "dependencies": [],
+        }
+
     convert_sbom_to_public(meta_bom)
+
+    # Determine if the public SBOM's components changed vs. the previous public SBOM
+    prev_public_components = sbom_components_to_dict(prev_public_bom, with_version=True)
+    new_public_components = sbom_components_to_dict(meta_bom, with_version=True)
+    public_components_changed = prev_public_components.keys() != new_public_components.keys()
+    logger.info(
+        "SBOM_DIFF: Public SBOM components changed: %s. Previous public SBOM has %d components; New public SBOM has %d components",
+        public_components_changed,
+        len(prev_public_components),
+        len(new_public_components),
+    )
+
+    # serialNumber and version for the public SBOM are tracked independently from the private SBOM
+    if sbom_app_version_changed or not prev_public_bom["serialNumber"]:
+        meta_bom["serialNumber"] = uuid.uuid4().urn
+        meta_bom["version"] = 1
+    else:
+        meta_bom["serialNumber"] = prev_public_bom["serialNumber"]
+        meta_bom["version"] = prev_public_bom["version"]
+        if public_components_changed:
+            meta_bom["version"] += 1
+
+    # Timestamp for the public SBOM is also tracked independently
+    if sbom_app_version_changed or public_components_changed:
+        meta_bom["metadata"]["timestamp"] = (
+            datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        )
+    else:
+        meta_bom["metadata"]["timestamp"] = prev_public_bom["metadata"]["timestamp"]
+
     write_sbom_json_file(meta_bom, sbom_out_public_path)
 
     # Access the collected warnings
