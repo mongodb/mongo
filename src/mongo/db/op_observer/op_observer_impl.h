@@ -170,7 +170,8 @@ public:
                              boost::optional<repl::OpTime> preImageOpTime,
                              boost::optional<repl::OpTime> postImageOpTime,
                              boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                             boost::optional<OplogSlot> slot) final;
+                             boost::optional<OplogSlot> slot,
+                             boost::optional<Date_t> wallClockTime = boost::none) final;
     /**
      * Enforces that 'createCollCatalogIdentifier' must be present to log the creation of a
      * replicated collection when 'featureFlagReplicateLocalCatalogIdentifier' is enabled.

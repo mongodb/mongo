@@ -36,8 +36,6 @@ executor:
           doesNotSupportGracefulStepdown: true
           # TODO(SERVER-113063): Remove.
           skipAwaitReplicationConfigVersionCheck: true
-          # TODO(SERVER-116413): Remove.
-          skipConsistencyCheckForNewPrimaryOpEntry: true
           # DSC doesn't support storing findAndModify pre/post-images in config.image_collection.
           doesNotSupportFindAndModifyImageCollection: true
   hooks:

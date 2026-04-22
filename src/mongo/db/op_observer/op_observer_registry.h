@@ -351,7 +351,8 @@ public:
                              const boost::optional<repl::OpTime> preImageOpTime,
                              const boost::optional<repl::OpTime> postImageOpTime,
                              const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                             const boost::optional<OplogSlot> slot) override {
+                             const boost::optional<OplogSlot> slot,
+                             boost::optional<Date_t> wallClockTime = boost::none) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onInternalOpMessage(opCtx,
@@ -362,7 +363,8 @@ public:
                                    preImageOpTime,
                                    postImageOpTime,
                                    prevWriteOpTimeInTransaction,
-                                   slot);
+                                   slot,
+                                   wallClockTime);
     }
 
     void onCreateCollection(

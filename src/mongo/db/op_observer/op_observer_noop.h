@@ -142,7 +142,8 @@ public:
                              const boost::optional<repl::OpTime> preImageOpTime,
                              const boost::optional<repl::OpTime> postImageOpTime,
                              const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                             const boost::optional<OplogSlot> slot) override {}
+                             const boost::optional<OplogSlot> slot,
+                             boost::optional<Date_t> wallClockTime = boost::none) override {}
 
     void onCreateCollection(
         OperationContext* opCtx,

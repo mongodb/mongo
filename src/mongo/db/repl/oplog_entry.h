@@ -500,7 +500,7 @@ struct DurableOplogEntryParams {
     boost::optional<bool> fromMigrate;
     boost::optional<bool> checkExistenceForDiffInsert;
     boost::optional<VersionContext> versionContext;
-    int version;
+    int64_t version;
     BSONObj oField;
     boost::optional<BSONObj> o2Field;
     OperationSessionInfo sessionInfo;
@@ -603,7 +603,7 @@ public:
                       const boost::optional<bool>& fromMigrate,
                       const boost::optional<bool>& checkExistenceForDiffInsert,
                       const boost::optional<VersionContext>& versionContext,
-                      int version,
+                      int64_t version,
                       const BSONObj& oField,
                       const boost::optional<BSONObj>& o2Field,
                       const OperationSessionInfo& sessionInfo,

@@ -340,7 +340,8 @@ public:
                                      boost::optional<repl::OpTime> preImageOpTime,
                                      boost::optional<repl::OpTime> postImageOpTime,
                                      boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                                     boost::optional<OplogSlot> slot) = 0;
+                                     boost::optional<OplogSlot> slot,
+                                     boost::optional<Date_t> wallClockTime = boost::none) = 0;
 
     /**
      * Logs a no-op with "msgObj" in the o field into oplog.

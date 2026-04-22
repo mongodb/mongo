@@ -140,7 +140,10 @@ repl::OpTime logOperation(OperationContext* opCtx,
                           bool assignCommonFields,
                           OperationLogger* operationLogger) {
     if (assignCommonFields) {
-        oplogEntry->setWallClockTime(getWallClockTimeForOpLog(opCtx));
+        // Respect a pre-set wall clock time. If not set, use the current time.
+        if (oplogEntry->getWallClockTime() == Date_t{}) {
+            oplogEntry->setWallClockTime(getWallClockTimeForOpLog(opCtx));
+        }
         if (oplogEntry->getOpType() != repl::OpTypeEnum::kNoop) {
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         }
@@ -1596,7 +1599,8 @@ void OpObserverImpl::onInternalOpMessage(
     const boost::optional<repl::OpTime> preImageOpTime,
     const boost::optional<repl::OpTime> postImageOpTime,
     const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-    const boost::optional<OplogSlot> slot) {
+    const boost::optional<OplogSlot> slot,
+    boost::optional<Date_t> wallClockTime) {
 
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
@@ -1615,6 +1619,9 @@ void OpObserverImpl::onInternalOpMessage(
     oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
     if (slot) {
         oplogEntry.setOpTime(*slot);
+    }
+    if (wallClockTime) {
+        oplogEntry.setWallClockTime(*wallClockTime);
     }
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
