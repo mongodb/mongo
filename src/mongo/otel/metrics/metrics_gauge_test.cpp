@@ -33,6 +33,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <vector>
 
 namespace mongo::otel::metrics {
@@ -49,25 +50,65 @@ TYPED_TEST_SUITE(GaugeImplTest, GaugeTypes);
 
 TYPED_TEST(GaugeImplTest, Sets) {
     GaugeImpl<TypeParam> gauge;
-    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{0})));
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
     gauge.set(1);
-    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{1})));
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 1)));
     gauge.set(10);
-    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{10})));
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
     gauge.set(-1);
-    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{-1})));
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), -1)));
+}
+
+TYPED_TEST(GaugeImplTest, SetIfLess) {
+    GaugeImpl<TypeParam> gauge{std::numeric_limits<TypeParam>::max()};
+    gauge.setIfLess(10);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
+    gauge.setIfLess(5);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+    gauge.setIfLess(10);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+    gauge.setIfLess(5);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+}
+
+TYPED_TEST(GaugeImplTest, SetIfGreater) {
+    GaugeImpl<TypeParam> gauge{std::numeric_limits<TypeParam>::lowest()};
+    gauge.setIfGreater(5);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+    gauge.setIfGreater(10);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
+    gauge.setIfGreater(5);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
+    gauge.setIfGreater(10);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
+}
+
+TYPED_TEST(GaugeImplTest, ResetRestoresInitialValue) {
+    GaugeImpl<TypeParam> minGauge{std::numeric_limits<TypeParam>::max()};
+    minGauge.setIfLess(5);
+    minGauge.reset(nullptr);
+    EXPECT_THAT(
+        minGauge.values(),
+        ElementsAre(IsAttributesAndValue(IsEmpty(), std::numeric_limits<TypeParam>::max())));
+
+    GaugeImpl<TypeParam> maxGauge{std::numeric_limits<TypeParam>::lowest()};
+    maxGauge.setIfGreater(5);
+    maxGauge.reset(nullptr);
+    EXPECT_THAT(
+        maxGauge.values(),
+        ElementsAre(IsAttributesAndValue(IsEmpty(), std::numeric_limits<TypeParam>::lowest())));
 }
 
 // Any issues with thread safety should be caught by tsan on this test.
 TYPED_TEST(GaugeImplTest, ConcurrentSets) {
     GaugeImpl<TypeParam> gauge;
-    constexpr int kNumThreads = 10;
-    constexpr int kIterationsPerThread = 1000;
+    const int kNumThreads = 10;
+    const int kNumIterationsPerThread = 1000;
 
     std::vector<stdx::thread> threads;
     for (int i = 0; i < kNumThreads; ++i) {
         threads.emplace_back([&gauge]() {
-            for (int j = 0; j < kIterationsPerThread; ++j) {
+            for (int j = 0; j < kNumIterationsPerThread; ++j) {
                 gauge.set(j);
             }
         });
@@ -78,7 +119,48 @@ TYPED_TEST(GaugeImplTest, ConcurrentSets) {
     }
 
     EXPECT_THAT(gauge.values(),
-                ElementsAre(IsAttributesAndValue(IsEmpty(), TypeParam{kIterationsPerThread - 1})));
+                ElementsAre(IsAttributesAndValue(IsEmpty(), kNumIterationsPerThread - 1)));
+}
+
+TYPED_TEST(GaugeImplTest, ConcurrentSetIfLess) {
+    GaugeImpl<TypeParam> gauge{std::numeric_limits<TypeParam>::max()};
+    const int kNumThreads = 10;
+    const int kNumIterationsPerThread = 1000;
+
+    std::vector<stdx::thread> threads;
+    for (int i = 0; i < kNumThreads; ++i) {
+        threads.emplace_back([&gauge]() {
+            for (int j = kNumIterationsPerThread - 1; j >= 0; --j) {
+                gauge.setIfLess(static_cast<TypeParam>(j));
+            }
+        });
+    }
+    for (stdx::thread& thread : threads) {
+        thread.join();
+    }
+
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 0)));
+}
+
+TYPED_TEST(GaugeImplTest, ConcurrentSetIfGreater) {
+    GaugeImpl<TypeParam> gauge{std::numeric_limits<TypeParam>::lowest()};
+    const int kNumThreads = 10;
+    const int kNumIterationsPerThread = 1000;
+
+    std::vector<stdx::thread> threads;
+    for (int i = 0; i < kNumThreads; ++i) {
+        threads.emplace_back([&gauge]() {
+            for (int j = 0; j < kNumIterationsPerThread; ++j) {
+                gauge.setIfGreater(static_cast<TypeParam>(j));
+            }
+        });
+    }
+    for (stdx::thread& thread : threads) {
+        thread.join();
+    }
+
+    EXPECT_THAT(gauge.values(),
+                ElementsAre(IsAttributesAndValue(IsEmpty(), kNumIterationsPerThread - 1)));
 }
 
 TEST(DoubleGaugeImplTest, SetsFractionalValues) {
@@ -87,6 +169,70 @@ TEST(DoubleGaugeImplTest, SetsFractionalValues) {
     EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(1.1))));
     gauge.set(-3.14);
     EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), DoubleEq(-3.14))));
+}
+
+template <typename T>
+class MinGaugeTest : public testing::Test {};
+
+TYPED_TEST_SUITE(MinGaugeTest, GaugeTypes);
+
+TYPED_TEST(MinGaugeTest, InitialValueIsSentinel) {
+    GaugeImpl<TypeParam> impl{std::numeric_limits<TypeParam>::max()};
+    MinGauge<TypeParam>& gauge = impl;
+    EXPECT_THAT(
+        gauge.values(),
+        ElementsAre(IsAttributesAndValue(IsEmpty(), std::numeric_limits<TypeParam>::max())));
+}
+
+TYPED_TEST(MinGaugeTest, SetIfLessThroughInterface) {
+    GaugeImpl<TypeParam> impl{std::numeric_limits<TypeParam>::max()};
+    MinGauge<TypeParam>& gauge = impl;
+    gauge.setIfLess(10);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
+    gauge.setIfLess(5);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+    gauge.setIfLess(20);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+}
+
+TYPED_TEST(MinGaugeTest, SetOverwritesUnconditionally) {
+    GaugeImpl<TypeParam> impl{std::numeric_limits<TypeParam>::max()};
+    MinGauge<TypeParam>& gauge = impl;
+    gauge.setIfLess(5);
+    gauge.set(100);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 100)));
+}
+
+template <typename T>
+class MaxGaugeTest : public testing::Test {};
+
+TYPED_TEST_SUITE(MaxGaugeTest, GaugeTypes);
+
+TYPED_TEST(MaxGaugeTest, InitialValueIsSentinel) {
+    GaugeImpl<TypeParam> impl{std::numeric_limits<TypeParam>::lowest()};
+    MaxGauge<TypeParam>& gauge = impl;
+    EXPECT_THAT(
+        gauge.values(),
+        ElementsAre(IsAttributesAndValue(IsEmpty(), std::numeric_limits<TypeParam>::lowest())));
+}
+
+TYPED_TEST(MaxGaugeTest, SetIfGreaterThroughInterface) {
+    GaugeImpl<TypeParam> impl{std::numeric_limits<TypeParam>::lowest()};
+    MaxGauge<TypeParam>& gauge = impl;
+    gauge.setIfGreater(5);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 5)));
+    gauge.setIfGreater(10);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
+    gauge.setIfGreater(3);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 10)));
+}
+
+TYPED_TEST(MaxGaugeTest, SetOverwritesUnconditionally) {
+    GaugeImpl<TypeParam> impl{std::numeric_limits<TypeParam>::lowest()};
+    MaxGauge<TypeParam>& gauge = impl;
+    gauge.setIfGreater(100);
+    gauge.set(1);
+    EXPECT_THAT(gauge.values(), ElementsAre(IsAttributesAndValue(IsEmpty(), 1)));
 }
 
 }  // namespace mongo::otel::metrics
