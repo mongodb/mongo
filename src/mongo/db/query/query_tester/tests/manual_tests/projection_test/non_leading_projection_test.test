@@ -1,0 +1,58 @@
+non_leading_projection_test
+test
+non_leading_projection_test.coll as coll
+non_leading_projection_test.coll as coll_lookup
+
+// ---------------------------------------------------------------
+// $project inclusion
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$project: {a: 1, b: 1}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $project inclusion nested
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$project: {"o.p": 1, "oo.o.p": 1}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $project exclusion
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$project: {a: 0, b: 0}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $project exclusion nested
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$project: {"o.p": 0, "oo.o.p": 0}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $project exclusion inclusion
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$project: {a: 0}}, {$project: {b: 1}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $project exclusion multiple
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$project: {a: 0}}, {$project: {b: 0}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $project expression
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$project: {d: {$add: ["$a", "$b", "$c"]}}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $addFields expression
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$addFields: {d: {$add: ["$a", "$b", "$c"]}}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// $replaceRoot
+// ---------------------------------------------------------------
+
+:sortFull {aggregate: "coll", pipeline: [{$lookup: {from: "coll_lookup", localField: "a", foreignField: "x", as: "unused"}}, {$unset: "unused"}, {$replaceRoot: {newRoot: "$o"}}], cursor: {}}
