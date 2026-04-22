@@ -7,6 +7,7 @@
  *   requires_timeseries,
  *   requires_persistence,
  *   requires_fcv_80,
+ *   featureFlagMarkTimeseriesEventsInOplog_incompatible,
  * ]
  */
 import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";

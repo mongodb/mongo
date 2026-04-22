@@ -2,6 +2,7 @@
  * Tests that it's not possible to shard or move a malformed timeseries collection where both
  * 'coll' and 'system.buckets.coll' exist as collections (see SERVER-90862).
  *
+ * @tags: [featureFlagMarkTimeseriesEventsInOplog_incompatible]
  */
 
 import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";

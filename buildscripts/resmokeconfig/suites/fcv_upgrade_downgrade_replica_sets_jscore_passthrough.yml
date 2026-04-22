@@ -22,6 +22,8 @@ selector:
     - featureFlagRankFusion
     # TODO: SERVER-86544 remove feature flag for SPM-3672
     - featureFlagMongotIndexedViews
+    # TODO: SERVER-101595 remove feature flag
+    - featureFlagCreateViewlessTimeseriesCollections
     # Transactions are aborted upon fcv upgrade or downgrade.
     - uses_transactions
     # Exclude tests that require a specific fcv.

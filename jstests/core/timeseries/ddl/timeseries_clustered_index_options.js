@@ -7,7 +7,6 @@
  *   does_not_support_stepdowns,
  *   incompatible_with_preimages_by_default,
  *   requires_timeseries,
- *   requires_fcv_90,
  *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
