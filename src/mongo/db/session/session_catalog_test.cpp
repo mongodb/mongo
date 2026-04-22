@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -1659,6 +1660,20 @@ TEST_F(SessionCatalogTest, CheckOutForKillTimeout) {
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
+
+// TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+#if !__has_feature(thread_sanitizer)
+TEST_F(SessionCatalogTest, MutexRegisteredWithObservableMutexRegistry) {
+    catalog()->size();
+
+    const BSONObj report = ObservableMutexRegistry::get().report(false);
+    const StringData name = "SessionCatalog::_mutex";
+    ASSERT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
+    const BSONObj exclusive =
+        report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);
+    ASSERT_GT(exclusive.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName), 0);
+}
+#endif
 
 }  // namespace
 }  // namespace mongo

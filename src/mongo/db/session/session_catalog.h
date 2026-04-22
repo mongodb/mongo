@@ -44,6 +44,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -99,7 +100,7 @@ public:
         LogicalSessionId lsidToKill;
     };
 
-    SessionCatalog() = default;
+    SessionCatalog();
     ~SessionCatalog();
 
     /**
@@ -281,7 +282,7 @@ private:
         _defaultMakeSessionWorkerFnForEagerReap;
 
     // Protects the state below
-    mutable std::mutex _mutex;
+    mutable ObservableMutex<std::mutex> _mutex;
 
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;

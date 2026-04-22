@@ -39,6 +39,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/scopeguard.h"
 
 #include <cstdint>
@@ -79,8 +80,12 @@ std::string provenanceToString(SessionCatalog::Provenance provenance) {
 
 }  // namespace
 
+SessionCatalog::SessionCatalog() {
+    ObservableMutexRegistry::get().add("SessionCatalog::_mutex", _mutex);
+}
+
 SessionCatalog::~SessionCatalog() {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
     for (const auto& [_, sri] : _sessions) {
         ObservableSession osession(lg, sri.get(), &sri->parentSession);
         invariant(!osession.hasCurrentOperation());
@@ -89,7 +94,7 @@ SessionCatalog::~SessionCatalog() {
 }
 
 void SessionCatalog::reset_forTest() {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
     _sessions.clear();
 }
 
@@ -113,7 +118,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
         dassert(opCtx->getLogicalSessionId() == lsid);
     }
 
-    std::unique_lock<std::mutex> ul(_mutex);
+    std::unique_lock ul(_mutex);
 
     auto sri = _getOrCreateSessionRuntimeInfo(ul, lsid);
     auto session = sri->getSession(ul, lsid);
@@ -180,7 +185,7 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
 void SessionCatalog::scanSession(const LogicalSessionId& lsid,
                                  const ScanSessionsCallbackFn& workerFn,
                                  ScanSessionCreateSession createSession) {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
 
     auto sri = (createSession == ScanSessionCreateSession::kYes)
         ? _getOrCreateSessionRuntimeInfo(lg, lsid)
@@ -198,7 +203,7 @@ void SessionCatalog::scanSession(const LogicalSessionId& lsid,
 
 void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
                                   const ScanSessionsCallbackFn& workerFn) {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
 
     LOGV2_DEBUG(21976, 2, "Scanning sessions", "sessionCount"_attr = _sessions.size());
 
@@ -220,7 +225,7 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
 }
 
 void SessionCatalog::scanParentSessions(const ScanSessionsCallbackFn& workerFn) {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
 
     LOGV2_DEBUG(6685000, 2, "Scanning sessions", "sessionCount"_attr = _sessions.size());
 
@@ -239,7 +244,7 @@ LogicalSessionIdSet SessionCatalog::scanSessionsForReap(
 
     std::unique_ptr<SessionRuntimeInfo> sriToReap;
     {
-        std::lock_guard<std::mutex> lg(_mutex);
+        std::lock_guard lg(_mutex);
 
         auto sriIt = _sessions.find(parentLsid);
         // The reaper should never try to reap a non-existent session id.
@@ -287,7 +292,7 @@ LogicalSessionIdSet SessionCatalog::scanSessionsForReap(
 
 SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& lsid,
                                                       ErrorCodes::Error reason) {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
 
     auto sri = _getSessionRuntimeInfo(lg, lsid);
     uassert(ErrorCodes::NoSuchSession, "Session not found", sri);
@@ -297,7 +302,7 @@ SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& ls
 }
 
 size_t SessionCatalog::size() const {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
     return _sessions.size();
 }
 
@@ -356,7 +361,7 @@ void SessionCatalog::_releaseSession(
     Session* session,
     boost::optional<KillToken> killToken,
     boost::optional<TxnNumberAndProvenance> clientTxnNumberStarted) {
-    std::unique_lock<std::mutex> ul(_mutex);
+    std::unique_lock ul(_mutex);
 
     // Make sure we have exactly the same session on the map and that it is still associated with an
     // operation context (meaning checked-out)
