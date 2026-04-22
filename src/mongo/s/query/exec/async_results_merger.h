@@ -706,6 +706,7 @@ private:
 
     /**
      * Cleans up if the remote cursor was killed while waiting for a response.
+     * Must only be called if '_lifecycleState' == 'kKillStarted'. Tasserts otherwise.
      */
     void _cleanUpKilledBatch(WithLock);
 

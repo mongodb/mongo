@@ -5006,5 +5006,81 @@ TEST_F(AsyncResultsMergerTest,
     }
 }
 
+// SERVER-123611: The getAsync retry callback called '_cleanUpKilledBatch()' unconditionally on any
+// non-alive or non-OK-status condition, but '_cleanUpKilledBatch()' tasserts if lifecycle is not
+// exactly 'kKillStarted'.
+//
+// Scenario: lifecycle is 'kAlive' but '_status' is non-OK.
+// Two remotes race: remote 0 gets a retryable error and schedules a baton retry; remote 1 gets a
+// non-retryable error, setting '_status' = non-OK while lifecycle remains 'kAlive'.
+// When the baton retry for remote 0 fires it sees '!_status.isOK()'. It then must not call
+// '_cleanUpKilledBatch()'.
+TEST_F(AsyncResultsMergerTest, DoesNotCallCleanUpKilledBatchWhenKillHasNotStarted) {
+    RAIIServerParameterControllerForTest maxAttemptsController("defaultClientMaxRetryAttempts", 3);
+
+    const BSONObj retryableError = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "retryable error", {ErrorLabel::kRetryableError});
+    const BSONObj nonRetryableError =
+        makeResponseObjWithErrorLabels(ErrorCodes::BadValue, "non-retryable error", {});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Remote 0 gets a retryable error: schedules a baton retry with zero delay.
+    scheduleNetworkResponseObjs({retryableError});
+
+    // Remote 1 gets a non-retryable error: sets _status non-OK, lifecycle stays kAlive.
+    scheduleNetworkResponseObjs({nonRetryableError});
+
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    // Firing the baton runs the retry callback for remote 0. It evaluates
+    // '_lifecycleState != kAlive || !_status.isOK())' as true (as status is non-OK) and must not
+    // call '_cleanUpKilledBatch()', which would otherwise tassert.
+    runScheduledTasks(operationContext());
+
+    ASSERT_EQ(ErrorCodes::BadValue, arm->nextReady().getStatus());
+}
+
+TEST_F(AsyncResultsMergerTest, CallsCleanUpKilledBatchWhenResponsesAreProcessedAfterKillStarted) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Remotes 0 and 1 both get regular responses.
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}")};
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(kTestNss, CursorId(1), batch1);
+    responses.emplace_back(kTestNss, CursorId(2), batch2);
+    scheduleNetworkResponses(std::move(responses));
+
+    auto killFuture = arm->kill(operationContext());
+
+    // Check that the ARM kills both batches.
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(1u).cmdObj, 2);
+
+    killFuture.wait();
+
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    runScheduledTasks(operationContext());
+
+    // Asking for more data is now an illegal operation.
+    ASSERT_EQ(ErrorCodes::IllegalOperation, arm->nextReady().getStatus());
+}
+
 }  // namespace
 }  // namespace mongo

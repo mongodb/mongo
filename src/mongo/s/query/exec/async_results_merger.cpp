@@ -1356,7 +1356,9 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     //  On shutdown, there is no need to process the response.
     if (_lifecycleState != kAlive) {
         _signalCurrentEventIfReady(lk);  // First, wake up anyone waiting on '_currentEvent'.
-        _cleanUpKilledBatch(lk);
+        if (_lifecycleState == kKillStarted) {
+            _cleanUpKilledBatch(lk);
+        }
         return;
     }
 
@@ -1403,7 +1405,9 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                         remote->outstandingRequest = false;
                         self->_signalCurrentEventIfReady(
                             lk);  // First, wake up anyone waiting on '_currentEvent'.
-                        self->_cleanUpKilledBatch(lk);
+                        if (self->_lifecycleState == kKillStarted) {
+                            self->_cleanUpKilledBatch(lk);
+                        }
                         return;
                     }
 
