@@ -326,11 +326,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrim(ArityType a
         return {false, value::TypeTags::Nothing, 0};
     }
 
+    std::vector<StringData> replacementChars;
     // Nullish 'chars' indicates that it was not provided and the default whitespace characters will
     // be used.
-    auto replacementChars = !value::isNullish(tagChars)
-        ? str_trim_utils::extractCodePointsFromChars(value::getStringView(tagChars, valChars))
-        : str_trim_utils::kDefaultTrimWhitespaceChars;
+    if (value::isNullish(tagChars)) {
+        replacementChars = str_trim_utils::kDefaultTrimWhitespaceChars;
+    } else {
+        auto charsStringData = value::getStringView(tagChars, valChars);
+        uassert(12066801,
+                str::stream() << "$trim/$ltrim/$rtrim requires 'chars' to be not greater than "
+                              << str_trim_utils::kMaximumAllowedTrimStringBytes << " bytes, got "
+                              << charsStringData.length() << " bytes instead.",
+                charsStringData.length() <= str_trim_utils::kMaximumAllowedTrimStringBytes);
+        replacementChars = str_trim_utils::extractCodePointsFromChars(charsStringData);
+    }
+
     auto inputString = value::getStringView(tagInput, valInput);
 
     auto [strTag, strValue] = sbe::value::makeNewString(

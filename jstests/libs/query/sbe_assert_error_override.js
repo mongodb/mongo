@@ -211,6 +211,7 @@ const equivalentErrorCodesList = [
     [5787903, 8178107, 8070607, 8155711],
     [5787902, 8178113, 8070609, 8070610, 8155720],
     [5787908, 8178108, 8070608, 8155708],
+    [12066800, 12066801],
 ];
 
 // This map is generated based on the contents of 'equivalentErrorCodesList'. This map should _not_
