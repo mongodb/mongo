@@ -50,8 +50,8 @@ constexpr auto kRedactionDefaultMask = "###"_sd;
 
 }  // namespace
 
-BSONObj redact(const BSONObj& objectToRedact) {
-    if (!logv2::shouldRedactLogs()) {
+BSONObj redact(const BSONObj& objectToRedact, bool forceRedaction) {
+    if (!logv2::shouldRedactLogs() && !forceRedaction) {
         if (!logv2::shouldRedactBinDataEncrypt()) {
             return objectToRedact.redact(BSONObj::RedactLevel::sensitiveOnly);
         }
@@ -61,8 +61,8 @@ BSONObj redact(const BSONObj& objectToRedact) {
     return objectToRedact.redact(BSONObj::RedactLevel::all);
 }
 
-StringData redact(StringData stringToRedact) {
-    if (!logv2::shouldRedactLogs()) {
+StringData redact(StringData stringToRedact, bool forceRedaction) {
+    if (!logv2::shouldRedactLogs() && !forceRedaction) {
         return stringToRedact;
     }
 
@@ -70,8 +70,8 @@ StringData redact(StringData stringToRedact) {
     return kRedactionDefaultMask;
 }
 
-std::string redact(const Status& statusToRedact) {
-    if (!logv2::shouldRedactLogs()) {
+std::string redact(const Status& statusToRedact, bool forceRedaction) {
+    if (!logv2::shouldRedactLogs() && !forceRedaction) {
         return statusToRedact.toString();
     }
 
@@ -83,8 +83,8 @@ std::string redact(const Status& statusToRedact) {
     return sb.str();
 }
 
-std::string redact(const DBException& exceptionToRedact) {
-    if (!logv2::shouldRedactLogs()) {
+std::string redact(const DBException& exceptionToRedact, bool forceRedaction) {
+    if (!logv2::shouldRedactLogs() && !forceRedaction) {
         return exceptionToRedact.toString();
     }
 

@@ -26,6 +26,7 @@ executor:
     tests:
       - jstests/noPassthrough/backup*.js
       - jstests/noPassthrough/oplog_writes_only_permitted_on_standalone.js
+      - jstests/noPassthrough/redact_sensitive_server_parameters.js
       - jstests/noPassthrough/wt_unclean_shutdown.js
       - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*.js
   config:
