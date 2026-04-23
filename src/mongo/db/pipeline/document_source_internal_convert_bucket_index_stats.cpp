@@ -181,7 +181,7 @@ DocumentSource::GetNextResult DocumentSourceInternalConvertBucketIndexStats::doG
         auto timeseriesStats = makeTimeseriesIndexStats(_timeseriesOptions, bucketStats);
         // Skip this index if the conversion failed.
         if (timeseriesStats.isEmpty()) {
-            return GetNextResult::makePauseExecution();
+            return doGetNext();
         }
         return Document(timeseriesStats);
     }
