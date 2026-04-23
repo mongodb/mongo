@@ -147,7 +147,7 @@ inline void createShapeAndRegisterQueryStats(const boost::intrusive_ptr<Expressi
             return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
         });
 
-    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         query_stats::registerRequest(opCtx, nss, [&]() {

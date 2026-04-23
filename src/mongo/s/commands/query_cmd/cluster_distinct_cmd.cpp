@@ -162,7 +162,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // We do not collect queryStats on explain for distinct.
-    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         !verbosity.has_value()) {
