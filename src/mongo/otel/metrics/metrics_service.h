@@ -194,6 +194,54 @@ public:
                                      const GaugeOptions& = {});
 
     /**
+     * Creates a min gauge that atomically tracks the minimum value observed via setIfLess(). The
+     * function will throw an exception if the gauge would collide with a different metric (i.e.,
+     * same name but different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    MinGauge<int64_t>& createInt64MinGauge(MetricName name,
+                                           std::string description,
+                                           MetricUnit unit,
+                                           const GaugeOptions& = {});
+
+    /**
+     * Creates a min gauge that atomically tracks the minimum value observed via setIfLess(). The
+     * function will throw an exception if the gauge would collide with a different metric (i.e.,
+     * same name but different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    MinGauge<double>& createDoubleMinGauge(MetricName name,
+                                           std::string description,
+                                           MetricUnit unit,
+                                           const GaugeOptions& = {});
+
+    /**
+     * Creates a max gauge that atomically tracks the maximum value observed via setIfGreater(). The
+     * function will throw an exception if the gauge would collide with a different metric (i.e.,
+     * same name but different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    MaxGauge<int64_t>& createInt64MaxGauge(MetricName name,
+                                           std::string description,
+                                           MetricUnit unit,
+                                           const GaugeOptions& = {});
+
+    /**
+     * Creates a max gauge that atomically tracks the maximum value observed via setIfGreater(). The
+     * function will throw an exception if the gauge would collide with a different metric (i.e.,
+     * same name but different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    MaxGauge<double>& createDoubleMaxGauge(MetricName name,
+                                           std::string description,
+                                           MetricUnit unit,
+                                           const GaugeOptions& = {});
+
+    /**
      * Creates an int64_t histogram with the provided parameters. The function will throw an
      * exception if the counter would collide with an existing metric (i.e., same name but different
      * type or other parameters). Metrics should be stashed once they are created to avoid taking a
@@ -302,6 +350,25 @@ private:
                           const GaugeOptions& options);
 
     template <typename T>
+    MinGauge<T>& createMinGauge(MetricName name,
+                                std::string description,
+                                MetricUnit unit,
+                                const GaugeOptions& options);
+
+    template <typename T>
+    MaxGauge<T>& createMaxGauge(MetricName name,
+                                std::string description,
+                                MetricUnit unit,
+                                const GaugeOptions& options);
+
+    template <template <typename> class GaugeTpl, typename T>
+    GaugeTpl<T>& createGaugeBase(MetricName name,
+                                 std::string description,
+                                 MetricUnit unit,
+                                 const GaugeOptions& options,
+                                 T initialValue);
+
+    template <typename T>
     Histogram<T>& createHistogram(MetricName name,
                                   std::string description,
                                   MetricUnit unit,
@@ -350,6 +417,10 @@ private:
                                      std::unique_ptr<UpDownCounter<double>>,
                                      std::unique_ptr<Gauge<int64_t>>,
                                      std::unique_ptr<Gauge<double>>,
+                                     std::unique_ptr<MinGauge<int64_t>>,
+                                     std::unique_ptr<MinGauge<double>>,
+                                     std::unique_ptr<MaxGauge<int64_t>>,
+                                     std::unique_ptr<MaxGauge<double>>,
                                      std::unique_ptr<Histogram<int64_t>>,
                                      std::unique_ptr<Histogram<double>>>;
 
@@ -373,6 +444,10 @@ private:
         void operator()(std::unique_ptr<UpDownCounter<double>>& upDownCounter);
         void operator()(std::unique_ptr<Gauge<int64_t>>& gauge);
         void operator()(std::unique_ptr<Gauge<double>>& gauge);
+        void operator()(std::unique_ptr<MinGauge<int64_t>>& gauge);
+        void operator()(std::unique_ptr<MinGauge<double>>& gauge);
+        void operator()(std::unique_ptr<MaxGauge<int64_t>>& gauge);
+        void operator()(std::unique_ptr<MaxGauge<double>>& gauge);
         void operator()(std::unique_ptr<Histogram<double>>& histogram);
         void operator()(std::unique_ptr<Histogram<int64_t>>& histogram);
     };
