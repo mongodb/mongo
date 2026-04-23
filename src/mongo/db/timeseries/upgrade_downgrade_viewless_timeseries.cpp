@@ -29,6 +29,7 @@
 
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 
+#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -125,6 +126,15 @@ Status canUpgradeToViewlessTimeseries(OperationContext* opCtx,
                                     << " does not have valid timeseries options");
     }
 
+    // We can not rename a collection with an index build in progress.
+    // Here we uassert to force a retry (rather than returning a non-OK code to the caller, which
+    // will tassert during commit). This is because in sharded clusters an index build can start
+    // at any time; even if the viewless timeseries upgrade/downgrade holds the DDL lock.
+    // Note however that this will hit SERVER-117624 (A rename that encounters a concurrent index
+    // build can loop in the DDL commit phase while holding the collection critical section,
+    // temporarily blocking CRUD on sharded clusters).
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(bucketsColl->uuid());
+
     // Check for metadata inconsistencies. Return an error so the coordinator can handle it.
     auto inconsistencies = checkBucketCollectionInconsistencies(
         opCtx,
@@ -198,6 +208,15 @@ Status canDowngradeFromViewlessTimeseries(OperationContext* opCtx,
                                     << mainNs.toStringForErrorMsg()
                                     << " is not a viewless timeseries collection");
     }
+
+    // We can not rename a collection with an index build in progress.
+    // Here we uassert to force a retry (rather than returning a non-OK code to the caller, which
+    // will tassert during commit). This is because in sharded clusters an index build can start
+    // at any time; even if the viewless timeseries upgrade/downgrade holds the DDL lock.
+    // Note however that this will hit SERVER-117624 (A rename that encounters a concurrent index
+    // build can loop in the DDL commit phase while holding the collection critical section,
+    // temporarily blocking CRUD on sharded clusters).
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(mainColl->uuid());
 
     // No conflicting buckets collection
     if (bucketsColl) {

@@ -83,7 +83,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         10778001,
         // Cannot downgrade FCV that requires a collMod command when index builds are concurrently
         // taking place.
-        12587,
+        ErrorCodes.BackgroundOperationInProgressForNamespace,
     ];
 
     // You might end up hitting a shard where the db might've moved.
