@@ -5,7 +5,7 @@
  * queries, especially those involving equality-to-object predicates.
  */
 
-import {show} from "jstests/libs/golden_test.js";
+import {show} from "jstests/libs/query_optimization/golden_test.js";
 
 const coll = db.field_renamed_to_dotted_path;
 coll.drop();

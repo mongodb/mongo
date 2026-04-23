@@ -1,4 +1,4 @@
-import {checkPauseAfterPopulate} from "jstests/libs/pause_after_populate.js";
+import {checkPauseAfterPopulate} from "jstests/libs/query_optimization/pause_after_populate.js";
 
 /**
  * For security reasons, the Math.random() function can not be seeded to provide

@@ -5,7 +5,7 @@
  *
  * Reproduces SERVER-71524.
  */
-import {show} from "jstests/libs/golden_test.js";
+import {show} from "jstests/libs/query_optimization/golden_test.js";
 
 const coll = db.query_golden_multiple_traverse_single_scan;
 coll.drop();

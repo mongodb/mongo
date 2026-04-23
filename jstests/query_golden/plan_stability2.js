@@ -30,7 +30,7 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {runPlanStabilityPipelines} from "jstests/query_golden/libs/plan_stability_utils.js";
 import {pipelines} from "jstests/query_golden/test_inputs/plan_stability_pipelines2.js";
 import {DataGenerator} from "jstests/libs/query/data_generator.js";
-import {checkPauseAfterPopulate} from "jstests/libs/pause_after_populate.js";
+import {checkPauseAfterPopulate} from "jstests/libs/query_optimization/pause_after_populate.js";
 
 if (checkSbeFullyEnabled(db)) {
     jsTest.log.info("Skipping the test because CBR only applies to the classic engine.");

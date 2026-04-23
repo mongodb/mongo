@@ -6,7 +6,7 @@
 //
 
 import {checkJoinOptimizationStatus} from "jstests/libs/query/sbe_util.js";
-import {checkPauseAfterPopulate} from "jstests/libs/pause_after_populate.js";
+import {checkPauseAfterPopulate} from "jstests/libs/query_optimization/pause_after_populate.js";
 
 const joinOptimizationStatus = checkJoinOptimizationStatus(typeof db === "undefined" ? null : db);
 if (!joinOptimizationStatus) {

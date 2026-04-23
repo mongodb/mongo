@@ -9,9 +9,6 @@ filters:
   - "shardingtest.js":
     approvers:
       - 10gen/server-cluster-scalability
-  - "*golden_test.js":
-    approvers:
-      - 10gen/query-optimization
   - "assert_schema_match.js":
     approvers:
       - 10gen/query-execution
@@ -48,18 +45,9 @@ filters:
   - "stats.js":
     approvers:
       - 10gen/query-integration-observability
-  - "shard_targeting_util.js":
-    approvers:
-      - 10gen/query-optimization
-  - "api_version_helpers.js":
-    approvers:
-      - 10gen/query-optimization
   - "mochalite.js":
     approvers:
       - 10gen/devprod-correctness
-  - "pause_after_populate.js":
-    approvers:
-      - 10gen/query-optimization
   - "check_shard_filtering_metadata_helpers.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

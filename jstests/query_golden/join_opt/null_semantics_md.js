@@ -7,7 +7,7 @@
  *   featureFlagPathArrayness
  * ]
  */
-import {normalizeArray} from "jstests/libs/golden_test.js";
+import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
 import {code, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {runJoinTestAndCompare} from "jstests/query_golden/libs/join_opt.js";
 import {joinOptUsed, joinTestWrapper} from "jstests/libs/query/join_utils.js";

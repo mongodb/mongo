@@ -2,7 +2,7 @@
  * Utility functions for Markdown golden testing.
  */
 
-import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
+import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/query_optimization/golden_test.js";
 import {code, codeOneLine, line, linebreak, subSection} from "jstests/libs/query/pretty_md.js";
 import {
     formatExplainRoot,

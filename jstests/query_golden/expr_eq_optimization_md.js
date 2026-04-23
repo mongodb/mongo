@@ -1,7 +1,7 @@
 // Test optimization of expressions of the form {$expr: {$eq: ["$a", 5]}}. When an index is available on the path "$a" and
 // the equality constant is not null, the original $expr is satisfied by the index scan and can be removed from the Fetch filter.
 
-import {tojsonMultiLineSortKeys, tojsonOnelineSortKeys} from "jstests/libs/golden_test.js";
+import {tojsonMultiLineSortKeys, tojsonOnelineSortKeys} from "jstests/libs/query_optimization/golden_test.js";
 import {code, line, linebreak, section} from "jstests/libs/query/pretty_md.js";
 import {formatExplainRoot} from "jstests/libs/query/analyze_plan.js";
 

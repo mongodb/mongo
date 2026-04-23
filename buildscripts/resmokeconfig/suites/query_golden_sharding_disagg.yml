@@ -12,7 +12,7 @@ executor:
       eval: |
         // enables disagg
         await import("src/mongo/db/modules/atlas/jstests/disagg_storage/libs/disagg_storage_override.js");
-        import {beginGoldenTest} from "jstests/libs/begin_golden_test.js";
+        import {beginGoldenTest} from "jstests/libs/query_optimization/begin_golden_test.js";
         await import("jstests/libs/override_methods/sharded_golden_overrides.js");
         beginGoldenTest("jstests/query_golden_sharding/expected_output", ".md");
         // Enforce plain log format until json format is the default.

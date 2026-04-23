@@ -2,7 +2,7 @@
  * Test a particular nested $and/$or query. This test was designed to reproduce SERVER-83091, a bug
  * in which this query could trigger an infinite loop during plan enumeration.
  */
-import {show} from "jstests/libs/golden_test.js";
+import {show} from "jstests/libs/query_optimization/golden_test.js";
 import {resetCollection} from "jstests/query_golden/libs/utils.js";
 
 // We test running the $and/$or query with both the boolean simplification module enabled and with

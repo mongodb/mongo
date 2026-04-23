@@ -2,7 +2,7 @@
  * Tests combinations of $lookup and $unwind.
  */
 
-import {normalizeArray} from "jstests/libs/golden_test.js";
+import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
 import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 
 const lookups = [{$lookup: {from: "cities", localField: "_id", foreignField: "countryId", as: "cities"}}];

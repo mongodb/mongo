@@ -1,4 +1,4 @@
-import {show} from "jstests/libs/golden_test.js";
+import {show} from "jstests/libs/query_optimization/golden_test.js";
 import {resetCollection} from "jstests/query_golden/libs/utils.js";
 
 /**

@@ -6,7 +6,7 @@
  * BinData mask). The golden output captures current semantics as the reference.
  */
 
-import {show} from "jstests/libs/golden_test.js";
+import {show} from "jstests/libs/query_optimization/golden_test.js";
 
 const coll = db.query_golden_bittest;
 coll.drop();

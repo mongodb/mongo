@@ -8,7 +8,7 @@
  * the appropriate base collections of the view.
  */
 
-import {normalizeArray} from "jstests/libs/golden_test.js";
+import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
 import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 
 try {

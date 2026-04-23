@@ -1,7 +1,7 @@
 /**
  * Test $match with $and/$or is supported and returns correct results.
  */
-import {show} from "jstests/libs/golden_test.js";
+import {show} from "jstests/libs/query_optimization/golden_test.js";
 import {resetCollection} from "jstests/query_golden/libs/utils.js";
 
 const coll = db.and_or_coll;

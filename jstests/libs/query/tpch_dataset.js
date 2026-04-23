@@ -1,5 +1,5 @@
 import {Mongorestore} from "jstests/libs/mongodb_database_tools.js";
-import {checkPauseAfterPopulate} from "jstests/libs/pause_after_populate.js";
+import {checkPauseAfterPopulate} from "jstests/libs/query_optimization/pause_after_populate.js";
 
 /**
  * Populate the TPCH dataset by restoring it from a mongorestore archive. This requires the following prerequisites:

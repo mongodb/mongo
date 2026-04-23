@@ -1,7 +1,7 @@
 /**
  * Common helpers used in join optimization end-to-end tests.
  */
-import {normalizeArray} from "jstests/libs/golden_test.js";
+import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
 import {assertArrayEq, arrayEq} from "jstests/aggregation/extras/utils.js";
 import {code, line, linebreak, subSection} from "jstests/libs/query/pretty_md.js";
 import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";

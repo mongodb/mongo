@@ -1,7 +1,7 @@
 /**
  * Test $match with $in is supported and returns correct results.
  */
-import {show} from "jstests/libs/golden_test.js";
+import {show} from "jstests/libs/query_optimization/golden_test.js";
 
 const coll = db.cqf_golden_match_with_in;
 coll.drop();

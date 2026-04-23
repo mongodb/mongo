@@ -9,7 +9,7 @@
  * ]
  */
 
-import {ShardTargetingTest} from "jstests/libs/shard_targeting_util.js";
+import {ShardTargetingTest} from "jstests/libs/query_optimization/shard_targeting_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDbName = "graph_lookup_targeting";

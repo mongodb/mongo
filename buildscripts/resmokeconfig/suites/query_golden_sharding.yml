@@ -21,7 +21,7 @@ executor:
       nodb: ""
       eval: |
         // Keep in sync with query_golden_*.yml.
-        import {beginGoldenTest} from "jstests/libs/begin_golden_test.js";
+        import {beginGoldenTest} from "jstests/libs/query_optimization/begin_golden_test.js";
         await import("jstests/libs/override_methods/sharded_golden_overrides.js");
         beginGoldenTest("jstests/query_golden_sharding/expected_output", ".md");
         // Enforce plain log format until json format is the default.

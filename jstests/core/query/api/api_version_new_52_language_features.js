@@ -9,7 +9,7 @@
  * ]
  */
 
-import {APIVersionHelpers} from "jstests/libs/api_version_helpers.js";
+import {APIVersionHelpers} from "jstests/libs/query_optimization/api_version_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_new_52_language_features";
