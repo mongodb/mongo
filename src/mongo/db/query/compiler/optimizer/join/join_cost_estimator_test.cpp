@@ -57,6 +57,28 @@ public:
         graph.addEdge(largeNodeId, unselectiveNodeId, {});
         graph.addEdge(smallNodeId, largeNodeId, {});
 
+        collCards = {
+            makeCard(1000),         // smallNode
+            makeCard(20'000),       // largeNode
+            makeCard(20'000),       // unselectiveNode
+            makeCard(1),            // extremelySmallNode
+            makeCard(100'000'000),  // selectiveNode
+        };
+
+        constexpr double docSizeBytes = 500;
+        catStats = {
+            .collStats = {
+                {smallNss,
+                 CollectionStats{collCards[smallNodeId].toDouble() * docSizeBytes,
+                                 collCards[smallNodeId].toDouble() * docSizeBytes}},
+                {largeNss,
+                 CollectionStats{collCards[largeNodeId].toDouble() * docSizeBytes,
+                                 collCards[largeNodeId].toDouble() * docSizeBytes}},
+                {extremelySmallNss,
+                 CollectionStats{collCards[extremelySmallNodeId].toDouble() * docSizeBytes,
+                                 collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
+            }};
+
         jCtx.emplace(makeContext());
 
         SubsetCardinalities subsetCards{
@@ -69,34 +91,12 @@ public:
             {makeNodeSet(smallNodeId, unselectiveNodeId), makeCard(1000)},
             {makeNodeSet(largeNodeId, unselectiveNodeId), makeCard(1000)},
         };
-        NodeCardinalities collCards{
-            makeCard(1000),         // smallNode
-            makeCard(20'000),       // largeNode
-            makeCard(20'000),       // unselectiveNode
-            makeCard(1),            // extremelySmallNode
-            makeCard(100'000'000),  // selectiveNode
-        };
         EdgeSelectivities edgeSel{
             makeSel(1000.0 / (1'000 * 20'000)),   // smallNode <--> unselectiveNode
             makeSel(1000.0 / (20'000 * 20'000)),  // largeNode <--> unselectiveNode
             makeSel(1.0 / (1000 * 20'000)),       // smallNode <--> largeId
         };
-        cardEstimator =
-            std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, edgeSel, collCards);
-
-        constexpr double docSizeBytes = 500;
-        jCtx->catStats = {
-            .collStats = {
-                {smallNss,
-                 CollectionStats{collCards[smallNodeId].toDouble() * docSizeBytes,
-                                 collCards[smallNodeId].toDouble() * docSizeBytes}},
-                {largeNss,
-                 CollectionStats{collCards[largeNodeId].toDouble() * docSizeBytes,
-                                 collCards[largeNodeId].toDouble() * docSizeBytes}},
-                {extremelySmallNss,
-                 CollectionStats{collCards[extremelySmallNodeId].toDouble() * docSizeBytes,
-                                 collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
-            }};
+        cardEstimator = std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, edgeSel);
 
         costEstimator = std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator);
         planEnumCtx = std::make_unique<PlanEnumeratorContext>(
@@ -270,16 +270,15 @@ public:
         auto* cqPtr = graph.getNode(nodeId).accessPath.get();
         cbrCqQsns.emplace(cqPtr, makeIndexScanFetchPlan(nss, IndexBounds{}, {"a"}));
 
+        collCards = {makeCard(collCardValue)};
+        catStats = {.collStats = {{nss,
+                                   CollectionStats{collCardValue * docSizeBytes,
+                                                   collCardValue * docSizeBytes}}}};
+
         jCtx.emplace(makeContext());
 
         SubsetCardinalities subsetCards{{makeNodeSet(nodeId), makeCard(numDocsOutputValue)}};
-        NodeCardinalities collCards{makeCard(collCardValue)};
-        cardEstimator =
-            std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, collCards);
-
-        jCtx->catStats = {.collStats = {{nss,
-                                         CollectionStats{collCardValue * docSizeBytes,
-                                                         collCardValue * docSizeBytes}}}};
+        cardEstimator = std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards);
 
         costEstimator = std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator);
     }

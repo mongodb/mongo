@@ -287,7 +287,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
     // Initialize base level of joinSubsets, representing single collections (no joins).
     for (size_t i = 0; i < numNodes; ++i) {
         const auto* cq = _ctx.joinGraph.getNode((NodeId)i).accessPath.get();
-        const auto* qsn = _ctx.cbrCqQsns.at(cq).get();
+        const auto* qsn = _ctx.singleTableAccess.cbrCqQsns.at(cq).get();
         _joinSubsets[kBaseLevel].push_back(JoinSubset(NodeSet{}.set(i)));
         _joinSubsets[kBaseLevel].back().plans = {_registry.registerBaseNode(
             (NodeId)i,

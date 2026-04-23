@@ -94,8 +94,7 @@ public:
             subsetCards,
             // Just assume all edges are 10% selective.
             EdgeSelectivities(jCtx.joinGraph.numEdges(),
-                              {SelectivityType{0.1}, EstimationSource::Code}),
-            collCards);
+                              {SelectivityType{0.1}, EstimationSource::Code}));
     }
 
     auto makeCoster(const JoinReorderingContext& jCtx, JoinCardinalityEstimator& ce) {

@@ -81,7 +81,7 @@ protected:
         // Ensure each solution has a different base node.
         std::set<NodeId> baseNodes;
         for (auto seed : seeds) {
-            auto clonedMap = cloneSolnMap(jCtx.cbrCqQsns);
+            auto clonedMap = cloneSolnMap(jCtx.singleTableAccess.cbrCqQsns);
             auto r = constructSolutionWithRandomOrder(
                 jCtx, nullptr, nullptr, seed, planShape, method, false /* No pruning. */, retries);
             // For tests expecting an error, we uassert.

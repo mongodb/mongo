@@ -169,37 +169,6 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     ASSERT_EQ(expectedSel, edgeSels[0]);
 }
 
-TEST_F(JoinPredicateEstimatorFixture, ExtractNodeCardinalities) {
-    auto aNss = NamespaceString::createNamespaceString_forTest("a");
-    auto bNss = NamespaceString::createNamespaceString_forTest("b");
-    auto aCQ = makeCanonicalQuery(aNss);
-    auto bCQ = makeCanonicalQuery(bNss);
-    auto aNodeId = *graph.addNode(aNss, std::move(aCQ), boost::none);
-    auto bNodeId = *graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
-
-    const auto inCE = CardinalityEstimate{CardinalityType{100}, EstimationSource::Sampling};
-    const auto aCE = CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling};
-    const auto bCE = CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling};
-
-    cost_based_ranker::EstimateMap estimates;
-    {
-        auto aPlan = makeCollScanPlan(aNss);
-        estimates[aPlan->root()] = std::make_unique<cost_based_ranker::QSNEstimate>(inCE, aCE);
-        cbrCqQsns[graph.getNode(aNodeId).accessPath.get()] = std::move(aPlan);
-    }
-    {
-        auto bPlan = makeCollScanPlan(bNss);
-        estimates[bPlan->root()] = std::make_unique<cost_based_ranker::QSNEstimate>(inCE, bCE);
-        cbrCqQsns[graph.getNode(bNodeId).accessPath.get()] = std::move(bPlan);
-    }
-
-    auto ctx = makeContext();
-    auto nodeCardinalities = JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates);
-    ASSERT_EQ(2U, nodeCardinalities.size());
-    ASSERT_EQ(aCE, nodeCardinalities[aNodeId]);
-    ASSERT_EQ(bCE, nodeCardinalities[bNodeId]);
-}
-
 namespace {
 void pushNNodes(MutableJoinGraph& graph, size_t n) {
     for (size_t i = 0; i < n; i++) {
@@ -239,8 +208,9 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinality) {
                                                                   EstimationSource::Sampling));
     }
 
+    nodeCards = nodeCEs;
     auto jCtx = makeContext();
-    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs, {});
+    JoinCardinalityEstimator jce(jCtx, edgeSels);
     {
         // Cardinality for subset of size 1 is pulled directly from the CE map.
         ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(makeNodeSet(1)));
@@ -306,8 +276,9 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalityAlmostCycle) {
                                                                   EstimationSource::Sampling));
     }
 
+    nodeCards = nodeCEs;
     auto jCtx = makeContext();
-    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs, {});
+    JoinCardinalityEstimator jce(jCtx, edgeSels);
     ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2 * 0.3,
               jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2, 3)));
 }
@@ -351,8 +322,9 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPre
         oneCE * 30,
     };
 
+    nodeCards = nodeCEs;
     auto jCtx = makeContext();
-    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs, {});
+    JoinCardinalityEstimator jce(jCtx, edgeSels);
 
     // Show that even though the namespace is the same for two of the nodes, we are able to
     // correctly associate CE with the particular filters associated with those nodes.
@@ -366,14 +338,6 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPre
 
     ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2,
               jce.getOrEstimateSubsetCardinality(makeNodeSet(0, 1, 2)));
-}
-
-TEST_F(JoinPredicateEstimatorFixture, GetCollectionCardinality) {
-    auto jCtx = makeContext();
-    JoinCardinalityEstimator jce(jCtx, {}, {}, {oneCE * 10, oneCE * 20, oneCE * 30});
-    ASSERT_EQ(oneCE * 10, jce.getCollCardinality(0));
-    ASSERT_EQ(oneCE * 20, jce.getCollCardinality(1));
-    ASSERT_EQ(oneCE * 30, jce.getCollCardinality(2));
 }
 
 TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {

@@ -37,7 +37,7 @@ JoinCostEstimatorImpl::JoinCostEstimatorImpl(const JoinReorderingContext& jCtx,
 
 JoinCostEstimate JoinCostEstimatorImpl::costCollScanFragment(NodeId nodeId) {
     // CollScan processes all documents in the collection
-    CardinalityEstimate numDocsProcessed = _cardinalityEstimator.getCollCardinality(nodeId);
+    CardinalityEstimate numDocsProcessed = _jCtx.singleTableAccess.collCardinalities[nodeId];
     // CollScan outputs documenst after applying single table predicates
     CardinalityEstimate numDocsOutput =
         _cardinalityEstimator.getOrEstimateSubsetCardinality(makeNodeSet(nodeId));
@@ -84,7 +84,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId) {
     // TODO SERVER-123532: extend this to multikey indexes once NDV estimation supports them.
     if (_jCtx.samplingEstimators) {
         const auto* cq = _jCtx.joinGraph.accessPathAt(nodeId);
-        const auto& qsn = _jCtx.cbrCqQsns.at(cq);
+        const auto& qsn = _jCtx.singleTableAccess.cbrCqQsns.at(cq);
 
         auto [ixScanNodePtr, _] = qsn->getFirstNodeByType(STAGE_IXSCAN);
         tassert(12291601, "expected plan fragment to contain IndexScan QSN", ixScanNodePtr);
@@ -96,7 +96,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId) {
             }
             const auto& samplingEstimator = _jCtx.samplingEstimators->at(nss);
             auto ndv = samplingEstimator->estimateNDV(fields);
-            double collCard = _cardinalityEstimator.getCollCardinality(nodeId).toDouble();
+            double collCard = _jCtx.singleTableAccess.collCardinalities[nodeId].toDouble();
             // Scale NDV by selectivity of the scan.
             // Guard against division by 0 and 0 NDV, in both cases fallback to estimating a random
             // IO per output document.
@@ -125,7 +125,7 @@ double JoinCostEstimatorImpl::estimateDocSize(NodeSet subset) const {
     for (auto nodeId : iterable(subset)) {
         auto& collStats =
             _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
-        auto collSize = _cardinalityEstimator.getCollCardinality(nodeId).toDouble();
+        auto collSize = _jCtx.singleTableAccess.collCardinalities[nodeId].toDouble();
         if (collSize == 0) {
             continue;
         }
@@ -219,7 +219,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
 
     // The cardinality of the outer side is the number of probes we will perform.
     double numProbes = leftDocs.toDouble();
-    double rightBaseCard = _cardinalityEstimator.getCollCardinality(right).toDouble();
+    double rightBaseCard = _jCtx.singleTableAccess.collCardinalities[right].toDouble();
     double joinPredSel = _cardinalityEstimator.getEdgeSelectivity(edgeId).toDouble();
     // The number of documents that the INLJ probes for:
     // numProbes * (rightBaseCard * joinPredSel)
@@ -277,8 +277,9 @@ JoinCostEstimate JoinCostEstimatorImpl::costNLJFragment(const JoinPlanNode& left
 JoinCostEstimate JoinCostEstimatorImpl::costBaseCollectionAccess(NodeId baseNode) {
     const auto* cq = _jCtx.joinGraph.accessPathAt(baseNode);
     tassert(11729100, "Expected an access path to exist", cq);
-    auto it = _jCtx.cbrCqQsns.find(cq);
-    tassert(11729101, "Expected a QSN to exist for this access path", it != _jCtx.cbrCqQsns.end());
+    const auto& cbrCqQsns = _jCtx.singleTableAccess.cbrCqQsns;
+    auto it = cbrCqQsns.find(cq);
+    tassert(11729101, "Expected a QSN to exist for this access path", it != cbrCqQsns.end());
     // TODO SERVER-117618: Stricter tree-shape validation.
     if (it->second->hasNode(STAGE_COLLSCAN)) {
         return costCollScanFragment(baseNode);

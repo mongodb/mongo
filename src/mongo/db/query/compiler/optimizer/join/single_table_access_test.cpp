@@ -51,7 +51,6 @@ void assertQuerySolutionHasEstimate(const QuerySolutionNode* qsn, const Estimate
     }
 }
 
-// Test estimate map is populated for each collection
 TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     auto opCtx = operationContext();
     auto nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
@@ -81,7 +80,7 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     auto mca = multipleCollectionAccessor(opCtx, {nss1, nss2});
 
     SamplingEstimatorMap estimators;
-    estimators[nss1] = samplingEstimator(mca, nss1);
+    estimators[nss1] = samplingEstimator(mca, nss1, 1.0);
     estimators[nss2] = samplingEstimator(mca, nss2);
 
     auto filter1 = fromjson("{a: 1, b: 1}");
@@ -98,16 +97,31 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     ASSERT_OK(swRes);
 
     auto& res = swRes.getValue();
-    ASSERT_EQ(2, res.solns.size());
+    ASSERT_EQ(2, res.cbrCqQsns.size());
 
     // There are no indexes on nss2, so the chosen access path must use a collection scan.
-    auto soln2 = res.solns.at(graph.accessPathAt(*node2)).get();
+    auto soln2 = res.cbrCqQsns.at(graph.accessPathAt(*node2)).get();
     ASSERT(soln2);
     ASSERT_EQ(soln2->getFirstNodeByType(STAGE_COLLSCAN).second, 1);
 
-    for (auto&& [_, soln] : res.solns) {
+    for (auto&& [_, soln] : res.cbrCqQsns) {
         assertQuerySolutionHasEstimate(soln->root(), res.estimate);
     }
+
+    ASSERT_EQ(graph.numNodes(), res.nodeCardinalities.size());
+    ASSERT_EQ(graph.numNodes(), res.nodeCBRCosts.size());
+    ASSERT_EQ(graph.numNodes(), res.collCardinalities.size());
+
+    // Illustrates the difference between the cardinalities before & after predicates
+    // are applied. The predicate only matches a single document.
+    ASSERT_EQ(10.0, res.collCardinalities[0].toDouble());
+    ASSERT_EQ(1.0, res.nodeCardinalities[0].toDouble());
+    ASSERT_GT(res.nodeCBRCosts[0].toDouble(), 0.0);
+
+    // Predicate matches every document so cardinalities are the same.
+    ASSERT_EQ(100.0, res.collCardinalities[1].toDouble());
+    ASSERT_EQ(100.0, res.nodeCardinalities[1].toDouble());
+    ASSERT_GT(res.nodeCBRCosts[1].toDouble(), 0.0);
 }
 
 }  // namespace mongo::join_ordering

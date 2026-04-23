@@ -84,13 +84,26 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     const JoinGraph& graph,
     const SamplingEstimatorMap& samplingEstimators,
     bool isExplain) {
+    const auto numNodes = graph.numNodes();
     QuerySolutionMap solns;
     cost_based_ranker::EstimateMap estimates;
 
-    const auto numNodes = graph.numNodes();
+    NodeCardinalities nodeCardinalities;
+    NodeCardinalities collCardinalities;
+    NodeCBRCosts nodeCBRCosts;
+
+    nodeCardinalities.reserve(numNodes);
+    collCardinalities.reserve(numNodes);
+    nodeCBRCosts.reserve(numNodes);
+
     for (size_t i = 0; i < numNodes; i++) {
         const auto& node = graph.getNode(i);
         auto& nss = node.accessPath->nss();
+
+        const auto& samplingEstimator = samplingEstimators.at(nss);
+        collCardinalities.push_back(cost_based_ranker::CardinalityEstimate{
+            cost_based_ranker::CardinalityType{samplingEstimator->getCollCard()},
+            cost_based_ranker::EstimationSource::Metadata});
 
         // Re-construct MultipleCollectionAccessor so that this collection is treated as the "main"
         // collection during query planning (and CE).
@@ -132,7 +145,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
             return swSolns.getStatus();
         }
         auto swCbrResult = QueryPlanner::planWithCostBasedRanking(params,
-                                                                  samplingEstimators.at(nss).get(),
+                                                                  samplingEstimator.get(),
                                                                   nullptr /*exactCardinality*/,
                                                                   std::move(swSolns.getValue()),
                                                                   isExplain);
@@ -146,11 +159,22 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
                 ErrorCodes::NoQueryExecutionPlans,
                 fmt::format("CBR failed to find best plan for nss: {}", nss.toStringForErrorMsg()));
         }
-        // Save solution and corresponding estimates for the best plan
-        solns[node.accessPath.get()] = std::move(cbrResult.solutions.front());
         tassert(11540201,
                 "Expected to have estimation data for single table access plan",
                 cbrResult.maybeExplainData.has_value());
+
+        // Save solution and corresponding estimates for the best plan
+        auto& winningSolution = cbrResult.solutions.front();
+        const auto* rootQsn = winningSolution->root();
+        solns[node.accessPath.get()] = std::move(winningSolution);
+
+        auto rootEstIt = cbrResult.maybeExplainData->estimates.find(rootQsn);
+        tassert(11514601,
+                "Missing estimate for winning single-table plan's root QSN",
+                rootEstIt != cbrResult.maybeExplainData->estimates.end());
+        nodeCardinalities.push_back(rootEstIt->second->outCE);
+        nodeCBRCosts.push_back(rootEstIt->second->cost);
+
         for (auto& [k, v] : cbrResult.maybeExplainData->estimates) {
             // Take care to use 'insert_or_assign' which will override existing entries in
             // estimates. It is possible that a QSN for a rejected plan of a previous table which
@@ -162,8 +186,11 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     }
 
     return SingleTableAccessPlansResult{
-        .solns = std::move(solns),
+        .cbrCqQsns = std::move(solns),
         .estimate = std::move(estimates),
+        .nodeCardinalities = std::move(nodeCardinalities),
+        .collCardinalities = std::move(collCardinalities),
+        .nodeCBRCosts = std::move(nodeCBRCosts),
     };
 }
 

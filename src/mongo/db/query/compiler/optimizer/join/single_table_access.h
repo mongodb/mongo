@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -38,14 +37,6 @@
 namespace mongo::join_ordering {
 
 /**
- * Struct containing results from 'singleTableAccessPlans()' function.
- */
-struct SingleTableAccessPlansResult {
-    QuerySolutionMap solns;
-    cost_based_ranker::EstimateMap estimate;
-};
-
-/**
  * Constructor for sampling estimators per collection access.
  */
 SamplingEstimatorMap makeSamplingEstimators(const MultipleCollectionAccessor& collections,
@@ -54,10 +45,12 @@ SamplingEstimatorMap makeSamplingEstimators(const MultipleCollectionAccessor& co
 
 /**
  * Given a JoinGraph 'model' where each node links to a CanonicalQuery and a map of
- * 'SamplingEstimators' keyed by namespace, for each query, this function invokes the plan
- * enumerator and uses cost-based ranking (CBR) with sampling-based cardinality estimation. This
- * function returns a QuerySolution representing the best plan for each query along with an
- * 'EstimateMap' which contains cardinality and cost estimates for every QSN.
+ * 'SamplingEstimators' keyed by namespace, for each query this function invokes the plan
+ * enumerator and uses cost-based ranking (CBR) with sampling-based cardinality estimation. It
+ * returns a 'SingleTableAccessPlansResult' containing the winning QuerySolution for each query,
+ * an 'EstimateMap' with cardinality and cost estimates for every QSN in the winning plans, and
+ * per-NodeId summaries of each winning plan (root output cardinality and CBR CPU cost) plus the
+ * catalog-reported cardinality of each base collection.
  */
 StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     OperationContext* opCtx,
