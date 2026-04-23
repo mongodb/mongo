@@ -2337,6 +2337,10 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
 
             // KeyString V0: anything fractional is a double
             if (version == Version::V0) {
+                keyStringAssert(8273008,
+                                "Integer part is too big to be a double.",
+                                integerPart < kMaxIntForDouble);
+
                 const uint64_t exponent = (64 - countLeadingZeros64(integerPart)) - 1;
                 const size_t fractionalBits = (52 - exponent);
                 const size_t fractionalBytes = (fractionalBits + 7) / 8;
