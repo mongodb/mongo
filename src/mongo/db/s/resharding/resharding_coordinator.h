@@ -514,6 +514,12 @@ private:
     void _tellAllRecipientsToClone(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
+     * Sends '_shardsvrReshardDonorRecipientsFinishedCloning' to all donor shards.
+     */
+    void _notifyDonorsCloningComplete(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
      * Sends '_flushReshardingStateChange' to all recipient shards.
      *
      * When the coordinator is in a state before 'kCommitting', refreshes the temporary
