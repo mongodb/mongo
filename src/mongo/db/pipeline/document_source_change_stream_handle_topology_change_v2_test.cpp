@@ -2085,7 +2085,7 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventShardTargeterReturnsD
     const BSONObj event =
         BSON("operationType" << "test1" << "foo" << "bar" << "clusterTime" << Timestamp(23, 2));
 
-    MutableDocument docBuilder(Document{event});
+    MutableDocument docBuilder(Document::fromBsonWithMetaData(event));
     docBuilder.metadata().setChangeStreamControlEvent();
     Document doc = docBuilder.freeze();
 
@@ -2415,11 +2415,11 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventControlEvent) {
                              << buildHighWaterMarkToken(Timestamp(24, 0)) << "$sortKey"
                              << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(24, 0))));
 
-    MutableDocument docBuilder(Document{event1});
+    MutableDocument docBuilder(Document::fromBsonWithMetaData(event1));
     docBuilder.metadata().setChangeStreamControlEvent();
     Document doc1 = docBuilder.freeze();
 
-    docBuilder.reset(Document{event2});
+    docBuilder.reset(Document::fromBsonWithMetaData(event2));
     docBuilder.metadata().setChangeStreamControlEvent();
     Document doc2 = docBuilder.freeze();
 
@@ -2518,7 +2518,7 @@ DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
                              << buildHighWaterMarkToken(Timestamp(23, 2)) << "$sortKey"
                              << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 2))));
 
-    MutableDocument docBuilder(Document{event});
+    MutableDocument docBuilder(Document::fromBsonWithMetaData(event));
     docBuilder.metadata().setChangeStreamControlEvent();
     Document doc = docBuilder.freeze();
 

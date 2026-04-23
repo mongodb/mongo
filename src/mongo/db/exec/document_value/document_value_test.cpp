@@ -49,10 +49,14 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <cmath>
@@ -1325,6 +1329,145 @@ TEST(DocumentTest, ValidateToBsonWithMetadataOnlySerializationSucceeds) {
     BSONObj combinedObj = combined.obj();
 
     ASSERT_BSONOBJ_EQ(combinedObj, document.toBsonWithMetaData());
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataStripsUserMetadataNamedFields) {
+    // A user field named "$textScore" (string) should be stripped by toBsonWithMetaData(),
+    // while real textScore metadata (double) should be preserved.
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("$textScore", Value("user_value"_sd));
+    md.addField("regular", Value("kept"_sd));
+    md.metadata().setTextScore(42.0);
+
+    Document doc = md.freeze();
+    BSONObj bsonWithMeta = doc.toBsonWithMetaData();
+
+    // Real metadata wins: $textScore should be the double from metadata, not the string.
+    ASSERT_EQ(bsonWithMeta["$textScore"].type(), BSONType::numberDouble);
+    ASSERT_EQ(bsonWithMeta["$textScore"].Double(), 42.0);
+
+    // Regular fields are preserved.
+    ASSERT_EQ(bsonWithMeta["_id"].Int(), 1);
+    ASSERT_EQ(bsonWithMeta["regular"].String(), "kept");
+
+    // Round-trip through fromBsonWithMetaData and verify.
+    Document roundTripped = Document::fromBsonWithMetaData(bsonWithMeta);
+    ASSERT_EQ(roundTripped.metadata().getTextScore(), 42.0);
+    ASSERT_EQ(roundTripped["_id"].getInt(), 1);
+    ASSERT_EQ(roundTripped["regular"].getString(), "kept");
+    // The user field "$textScore" should be absent from document fields.
+    ASSERT(roundTripped["$textScore"].missing());
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataStripsUserFieldWhenMetadataSetFirst) {
+    // Same as above but metadata is set before the user field is added.
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.metadata().setTextScore(42.0);
+    md.addField("regular", Value("kept"_sd));
+    md.addField("$textScore", Value("user_value"_sd));
+
+    Document doc = md.freeze();
+    BSONObj bsonWithMeta = doc.toBsonWithMetaData();
+
+    // Real metadata wins regardless of insertion order.
+    ASSERT_EQ(bsonWithMeta["$textScore"].type(), BSONType::numberDouble);
+    ASSERT_EQ(bsonWithMeta["$textScore"].Double(), 42.0);
+
+    ASSERT_EQ(bsonWithMeta["_id"].Int(), 1);
+    ASSERT_EQ(bsonWithMeta["regular"].String(), "kept");
+
+    Document roundTripped = Document::fromBsonWithMetaData(bsonWithMeta);
+    ASSERT_EQ(roundTripped.metadata().getTextScore(), 42.0);
+    ASSERT_EQ(roundTripped["_id"].getInt(), 1);
+    ASSERT_EQ(roundTripped["regular"].getString(), "kept");
+    ASSERT(roundTripped["$textScore"].missing());
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataStripsAllMetadataNamedUserFields) {
+    // Verify that all 17 metadata field names are stripped when present as user fields.
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("$textScore", Value("a"_sd));
+    md.addField("$randVal", Value("b"_sd));
+    md.addField("$sortKey", Value("c"_sd));
+    md.addField("$dis", Value("d"_sd));
+    md.addField("$pt", Value("e"_sd));
+    md.addField("$searchScore", Value("f"_sd));
+    md.addField("$searchHighlights", Value("g"_sd));
+    md.addField("$searchSortValues", Value("h"_sd));
+    md.addField("$indexKey", Value("i"_sd));
+    md.addField("$searchScoreDetails", Value("j"_sd));
+    md.addField("$searchRootDocumentId", Value("k"_sd));
+    md.addField("$vectorSearchScore", Value("l"_sd));
+    md.addField("$searchSequenceToken", Value("m"_sd));
+    md.addField("$score", Value("n"_sd));
+    md.addField("$scoreDetails", Value("o"_sd));
+    md.addField("$stream", Value("p"_sd));
+    md.addField("$changeStreamControlEvent", Value("q"_sd));
+
+    Document doc = md.freeze();
+    BSONObj bsonWithMeta = doc.toBsonWithMetaData();
+
+    // Only _id should remain; all metadata-named user fields should be stripped.
+    ASSERT_EQ(bsonWithMeta.nFields(), 1);
+    ASSERT_EQ(bsonWithMeta["_id"].Int(), 1);
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataLogsWarningWhenStrippingUserField) {
+    // Bump kQuery severity so log lines still reach the sink when the rate-limiter
+    // in toBsonStrippingMetadata() downgrades the emission to Debug(2).
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kQuery,
+                                                       logv2::LogSeverity::Debug(2)};
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("$sortKey", Value("user_value"_sd));
+
+    Document doc = md.freeze();
+
+    unittest::LogCaptureGuard logs;
+    doc.toBsonWithMetaData();
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12363300)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSON("fieldName" << "$sortKey"))), 1);
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataRedactsFieldNameWhenRedactionEnabled) {
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kQuery,
+                                                       logv2::LogSeverity::Debug(2)};
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("$sortKey", Value("user_value"_sd));
+
+    Document doc = md.freeze();
+
+    logv2::setShouldRedactLogs(true);
+    ON_BLOCK_EXIT([] { logv2::setShouldRedactLogs(false); });
+
+    unittest::LogCaptureGuard logs;
+    doc.toBsonWithMetaData();
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12363300)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSON("fieldName" << "###"))), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSON("fieldName" << "$sortKey"))), 0);
+}
+
+TEST(DocumentTest, ToBsonWithMetaDataDoesNotLogWhenNothingStripped) {
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("regular", Value("kept"_sd));
+    md.metadata().setTextScore(42.0);
+
+    Document doc = md.freeze();
+
+    unittest::LogCaptureGuard logs;
+    doc.toBsonWithMetaData();
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12363300)), 0);
 }
 
 TEST(DocumentTest, CreateDocumentWithMetadata) {
