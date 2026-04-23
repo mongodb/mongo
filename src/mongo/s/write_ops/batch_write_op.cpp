@@ -940,13 +940,19 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
                                   const write_ops::WriteError& error,
                                   const WriteConcernErrorDetail* wce,
                                   TrackedErrors* trackedErrors) {
-    // Treat errors to get a batch response as failures of the contained writes
-    BatchedCommandResponse emulatedResponse;
-    emulatedResponse.setStatus(Status::OK());
-    emulatedResponse.setN(0);
+    // Treat errors to get a batch response as failures of the contained writes.
+
+    // Create a new response object on the heap. This is necessary because 'noteBatchResponse()' may
+    // store the response pointer for later processing inside '_deferredResponses'. The response
+    // object must be kept alive until the deferred responses are processed, which it at some
+    // pointer after this function completes.
+    auto emulatedResponse = std::make_unique<BatchedCommandResponse>();
+
+    emulatedResponse->setStatus(Status::OK());
+    emulatedResponse->setN(0);
     if (wce) {
         auto wceCopy = std::make_unique<WriteConcernErrorDetail>(*wce);
-        emulatedResponse.setWriteConcernError(wceCopy.release());
+        emulatedResponse->setWriteConcernError(wceCopy.release());
     }
 
     const int numErrors = _clientRequest.getWriteCommandRequestBase().getOrdered()
@@ -956,10 +962,14 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
     for (int i = 0; i < numErrors; i++) {
         write_ops::WriteError errorClone = error;
         errorClone.setIndex(i);
-        emulatedResponse.addToErrDetails(std::move(errorClone));
+        emulatedResponse->addToErrDetails(std::move(errorClone));
     }
 
-    noteBatchResponse(targetedBatch, emulatedResponse, trackedErrors);
+    // Ensure the emulated response has a long-enough lifetime, by pushing it into a vector of
+    // emulated responses. This vector is cleared after the deferred responses are processed.
+    _emulatedErrorResponses.push_back(std::move(emulatedResponse));
+
+    noteBatchResponse(targetedBatch, *_emulatedErrorResponses.back(), trackedErrors);
 }
 
 void BatchWriteOp::abortBatch(const write_ops::WriteError& error) {
@@ -1119,7 +1129,7 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
         _numDeleted += response.getN();
     }
 
-    if (auto retriedStmtIds = response.getRetriedStmtIds(); !retriedStmtIds.empty()) {
+    if (const auto& retriedStmtIds = response.getRetriedStmtIds(); !retriedStmtIds.empty()) {
         _retriedStmtIds.insert(retriedStmtIds.begin(), retriedStmtIds.end());
     }
 }
@@ -1147,6 +1157,7 @@ void BatchWriteOp::handleDeferredResponses(bool hasAnyStaleShardResponse) {
     }
 
     for (unsigned long idx = 0; idx < _deferredResponses->size(); idx++) {
+        bool isReady = false;
         auto [targetedWriteBatch, response] = _deferredResponses->at(idx);
         for (auto& write : targetedWriteBatch->getWrites()) {
             WriteOp& writeOp = _writeOps[write->writeOpRef.first];
@@ -1154,16 +1165,19 @@ void BatchWriteOp::handleDeferredResponses(bool hasAnyStaleShardResponse) {
                 if (writeOp.getWriteState() != WriteOpState_Ready) {
                     writeOp.resetWriteToReady();
                 }
-            } else if (writeOp.getWriteState() != WriteOpState_Error) {
+            } else if (writeOp.getWriteState() != WriteOpState_Error &&
+                       writeOp.getWriteState() != WriteOpState_Ready) {
                 writeOp.noteWriteWithoutShardKeyWithIdResponse(
                     *write, response->getN(), targetedWriteBatch->getNumOps(), boost::none);
             }
+            isReady |= writeOp.getWriteState() == WriteOpState_Ready;
         }
-        if (!hasAnyStaleShardResponse) {
+        if (!hasAnyStaleShardResponse && !isReady) {
             _incBatchStats(*response);
         }
     }
     _deferredResponses = boost::none;
+    _emulatedErrorResponses.clear();
 }
 
 
