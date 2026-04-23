@@ -1051,6 +1051,36 @@ TEST(MetaFields, SearchScoreDetailsBasic) {
     ASSERT_BSONOBJ_EQ(doc2.metadata().getSearchScoreDetails(), otherDetails);
 }
 
+TEST(MetaFields, GetFieldHidesUserMetadataNamedFieldFromBsonWithMetadata) {
+    // When a BSON-backed document has metadata, user fields whose names collide with
+    // internal metadata names are not reachable via getField() — they are only accessible
+    // through the metadata API.
+    Document doc = Document::fromBsonWithMetaData(BSON("regular" << 1 << "$textScore" << 4.2));
+    ASSERT_TRUE(doc.metadata().hasTextScore());
+    ASSERT_EQ(doc.metadata().getTextScore(), 4.2);
+    ASSERT_EQ(doc.getField("regular").getInt(), 1);
+    ASSERT_TRUE(doc.getField("$textScore").missing());
+}
+
+TEST(MetaFields, ToBsonWithMetaDataStripsUserMetadataNamedField) {
+    // A user field named "$textScore" (string) should be stripped by toBsonWithMetaData(),
+    // while real textScore metadata (double) should be preserved.
+    MutableDocument md;
+    md.addField("_id", Value(1));
+    md.addField("$textScore", Value("user_value"_sd));
+    md.addField("regular", Value("kept"_sd));
+    md.metadata().setTextScore(42.0);
+
+    Document doc = md.freeze();
+    BSONObj bsonWithMeta = doc.toBsonWithMetaData();
+
+    // Real metadata wins.
+    ASSERT_EQ(bsonWithMeta["$textScore"].type(), BSONType::numberDouble);
+    ASSERT_EQ(bsonWithMeta["$textScore"].Double(), 42.0);
+    ASSERT_EQ(bsonWithMeta["_id"].Int(), 1);
+    ASSERT_EQ(bsonWithMeta["regular"].String(), "kept");
+}
+
 TEST(MetaFields, IndexKeyMetadataSerializesCorrectly) {
     Document doc{BSON("a" << 1)};
     MutableDocument mutableDoc{doc};
