@@ -911,35 +911,9 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
         //      moved the database elsewhere or dropped, meaning this node is no longer the primary
         //      shard for this database.
 
-        if (!dbVersion) {
-            // In the second case there are two solutions possible:
-            // * Either we return no wantedVersion and trigger a full refresh on the routing side
-            //   for the db entry
-            // * Or we return a "fake" version such that the causal cache can intelligently merge
-            //   the requests on the router side.
-            //
-            // Going for the first version causes a potential convoy of refreshes on the router if
-            // there are multiple requests with a stale version and each resolution triggers an
-            // invalidation. As such the second option is the only real possibility.
-            //
-            // The chosen "fake" version is the immediately following timestamp of the dbVersion
-            // received which will trigger the routing cache to advance its time in store and all
-            // subsequent requests will be merged onto a single cache lookup. This is safe because
-            // of two reasons:
-            //
-            // 1. This can only occur if the dbVersion timestamp has advanced to a time higher than
-            //    the one sent. Therefore the dbVersion wanted is at least the received timestamp
-            //    + 1.
-            // 2. If there is no actual entry (think a drop) on the CSRS the cache will handle this
-            //    gracefully. The cache just clears out the entry since nothing is present and the
-            //    time advancing will at most trigger a refresh which will anyway happen since there
-            //    is no entry present.
-            auto newVersion = receivedDbVersion;
-            newVersion.setTimestamp(newVersion.getTimestamp() + 1);
-            uasserted(StaleDbRoutingVersion(dbName, receivedDbVersion, newVersion),
-                      str::stream()
-                          << "No cached info for the database " << dbName.toStringForErrorMsg());
-        }
+        uassert(StaleDbRoutingVersion(dbName, receivedDbVersion, boost::none),
+                str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
+                dbVersion);
 
         const auto wantedVersion = *dbVersion;
 
