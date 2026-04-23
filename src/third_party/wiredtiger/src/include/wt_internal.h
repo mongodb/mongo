@@ -239,6 +239,8 @@ struct __wt_file_handle_posix;
 typedef struct __wt_file_handle_posix WT_FILE_HANDLE_POSIX;
 struct __wt_file_handle_win;
 typedef struct __wt_file_handle_win WT_FILE_HANDLE_WIN;
+struct __wt_fix_prepared_cookie;
+typedef struct __wt_fix_prepared_cookie WT_FIX_PREPARED_COOKIE;
 struct __wt_fstream;
 typedef struct __wt_fstream WT_FSTREAM;
 struct __wt_generation_cookie;

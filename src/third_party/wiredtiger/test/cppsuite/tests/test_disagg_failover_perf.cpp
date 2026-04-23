@@ -423,7 +423,7 @@ wt_disagg_pick_up_latest_checkpoint()
     testutil_check(conn->get_page_log(conn, "palite", &page_log));
 
     WT_ITEM metadata{};
-    uint64_t timestamp;
+    wt_timestamp_t timestamp;
     testutil_check(page_log->pl_get_complete_checkpoint_ext(
       page_log, session.get(), nullptr, nullptr, &timestamp, &metadata));
 
@@ -568,7 +568,7 @@ main(int argc, char *argv[])
         logger::log_msg(LOG_INFO, "Querying stable timestamp from existing database.");
         char timestamp[256];
         conn->query_timestamp(conn, timestamp, "get=stable");
-        uint64_t stable_timestamp = timestamp_manager::hex_to_decimal(std::string(timestamp));
+        wt_timestamp_t stable_timestamp = timestamp_manager::hex_to_decimal(std::string(timestamp));
         logger::log_msg(LOG_INFO, "Stable timestamp = " + std::to_string(stable_timestamp));
         ts = stable_timestamp + 1;
     }

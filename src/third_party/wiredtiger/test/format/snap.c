@@ -106,9 +106,9 @@ snap_clear(TINFO *tinfo)
  *     Initialize the repeatable operation tracking for each new operation.
  */
 void
-snap_op_init(TINFO *tinfo, uint64_t read_ts, bool repeatable_reads)
+snap_op_init(TINFO *tinfo, wt_timestamp_t read_ts, bool repeatable_reads)
 {
-    uint64_t stable_ts;
+    wt_timestamp_t stable_ts;
 
     ++tinfo->opid;
 

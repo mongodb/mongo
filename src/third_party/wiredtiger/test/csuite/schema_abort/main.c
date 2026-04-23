@@ -78,9 +78,9 @@ static const char *const ready_file = "child_ready";
 static bool aggressive_sweep, use_columns, use_lazyfs, use_ts, use_txn;
 static volatile bool stable_set;
 
-static uint32_t nth;                       /* Number of threads. */
-static volatile uint64_t stable_timestamp; /* stable timestamp. */
-static uint64_t stop_timestamp;            /* stop condition for threads. */
+static uint32_t nth;                             /* Number of threads. */
+static volatile wt_timestamp_t stable_timestamp; /* stable timestamp. */
+static wt_timestamp_t stop_timestamp;            /* stop condition for threads. */
 /*
  * We reserve timestamps for each thread for the entire run. The timestamp for the i-th key that a
  * thread writes is given by the macro below.
@@ -501,7 +501,7 @@ get_all_committed_ts(void)
  *     Return True if set_timestamp is required.
  */
 static bool
-is_set_timestamp_required(uint64_t last_ts, uint64_t oldest_ts)
+is_set_timestamp_required(wt_timestamp_t last_ts, wt_timestamp_t oldest_ts)
 {
     /*
      * The set_timestamp should be invoked only when current oldest timestamp is greater than last
@@ -520,11 +520,11 @@ thread_ts_run(void *arg)
 {
     THREAD_DATA *td;
     WT_SESSION *session;
-    uint64_t last_ts, oldest_ts;
+    wt_timestamp_t last_ts, oldest_ts;
     char tscfg[64];
 
     td = (THREAD_DATA *)arg;
-    last_ts = 0;
+    last_ts = WT_TS_NONE;
 
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     /*
@@ -535,7 +535,7 @@ thread_ts_run(void *arg)
         oldest_ts = get_all_committed_ts();
 
         /* Don't let the stable or oldest timestamp advance beyond the stop timestamp. */
-        if (oldest_ts != UINT64_MAX && stop_timestamp != 0 && oldest_ts > stop_timestamp)
+        if (oldest_ts != UINT64_MAX && stop_timestamp != WT_TS_NONE && oldest_ts > stop_timestamp)
             oldest_ts = stop_timestamp;
 
         if (is_set_timestamp_required(last_ts, oldest_ts)) {
@@ -568,9 +568,9 @@ thread_ckpt_run(void *arg)
     struct timespec now, start;
     THREAD_DATA *td;
     WT_SESSION *session;
-    uint64_t ts;
+    wt_timestamp_t ts;
     uint64_t sleep_time;
-    uint64_t stable_ts_copy;
+    wt_timestamp_t stable_ts_copy;
     int i;
     char ckpt_flush_config[128], ckpt_config[128];
     bool created_ready, flush_tier, ready_for_kill;
@@ -643,7 +643,7 @@ thread_ckpt_run(void *arg)
          * timestamp. If we don't have a stop timestamp, then we're ready to be killed after the
          * first checkpoint, or if tiered storage, after the first flush_tier has been initiated.
          */
-        if (stop_timestamp != 0) {
+        if (stop_timestamp != WT_TS_NONE) {
             if (stable_ts_copy >= stop_timestamp)
                 ready_for_kill = true;
         } else if (!opts->tiered_storage)
@@ -694,7 +694,8 @@ thread_run(void *arg)
     WT_DECL_RET;
     WT_ITEM data;
     WT_SESSION *oplog_session, *session;
-    uint64_t i, iter, reserved_ts, stable_ts;
+    uint64_t i, iter;
+    wt_timestamp_t reserved_ts, stable_ts;
     char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
     char kname[64], tscfg[64];
     bool use_prep;
@@ -745,7 +746,7 @@ thread_run(void *arg)
      * Write our portion of the key space until we're killed.
      */
     printf("Thread %" PRIu32 " starts at %" PRIu64 "\n", td->info, td->start);
-    stable_ts = 0;
+    stable_ts = WT_TS_NONE;
     for (i = td->start, iter = 0;; ++i, ++iter) {
         /* Give other threads a chance to run and move their timestamps forward. */
         if (use_ts && !stable_set && (iter + 1) % 100 == 0)
@@ -757,7 +758,7 @@ thread_run(void *arg)
          */
         reserved_ts = RESERVED_TIMESTAMP_FOR_ITERATION(td->info, iter);
 
-        if (stop_timestamp != 0 && reserved_ts > stop_timestamp) {
+        if (stop_timestamp != WT_TS_NONE && reserved_ts > stop_timestamp) {
             /*
              * At this point, we've run to the stop timestamp and have been asked to go no further.
              * Set our timestamp to the stop timestamp to indicate we are done. Just stay in the
@@ -1076,7 +1077,7 @@ main(int argc, char *argv[])
     WT_SESSION *session;
     pid_t pid;
     uint64_t absent_coll, absent_local, absent_oplog, count, key, last_key;
-    uint64_t stable_fp, stable_val;
+    wt_timestamp_t stable_fp, stable_val;
     uint32_t i, rand_value, timeout;
     int base, ch, status;
     char *end_number, *stop_arg;
@@ -1151,7 +1152,7 @@ main(int argc, char *argv[])
     argc -= __wt_optind;
     if (argc != 0)
         usage();
-    if (stop_timestamp != 0 && !rand_time) {
+    if (stop_timestamp != WT_TS_NONE && !rand_time) {
         fprintf(stderr, "%s: -s and -t cannot both be used.\n", progname);
         usage();
     }
@@ -1251,7 +1252,7 @@ main(int argc, char *argv[])
          */
         while (!testutil_exists(home, ready_file))
             testutil_sleep_wait(1, pid);
-        if (stop_timestamp == 0)
+        if (stop_timestamp == WT_TS_NONE)
             sleep(timeout);
 
         sa.sa_handler = SIG_DFL;
@@ -1305,7 +1306,7 @@ main(int argc, char *argv[])
     /*
      * Find the biggest stable timestamp value that was saved.
      */
-    stable_val = 0;
+    stable_val = WT_TS_NONE;
     if (use_ts) {
         testutil_check(conn->query_timestamp(conn, buf, "get=recovery"));
         sscanf(buf, "%" SCNx64, &stable_val);
@@ -1375,7 +1376,7 @@ main(int argc, char *argv[])
                  * If we don't find a record, the stable timestamp written to our file better be
                  * larger than the saved one.
                  */
-                if (!opts->inmem && stable_fp != 0 && stable_fp <= stable_val) {
+                if (!opts->inmem && stable_fp != WT_TS_NONE && stable_fp <= stable_val) {
                     printf("%s: COLLECTION no record with key %" PRIu64 " record ts %" PRIu64
                            " <= stable ts %" PRIu64 "\n",
                       fname, key, stable_fp, stable_val);
@@ -1391,7 +1392,7 @@ main(int argc, char *argv[])
                  */
                 c_rep[i].exist_key = key;
                 fatal = true;
-            } else if (!opts->inmem && stable_fp != 0 && stable_fp > stable_val) {
+            } else if (!opts->inmem && stable_fp != WT_TS_NONE && stable_fp > stable_val) {
                 /*
                  * If we found a record, the stable timestamp written to our file better be no
                  * larger than the checkpoint one.

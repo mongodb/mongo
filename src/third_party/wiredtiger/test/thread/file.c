@@ -90,23 +90,3 @@ load(const char *name)
 
     testutil_check(session->close(session, NULL));
 }
-
-/*
- * verify --
- *     TODO: Add a comment describing this function.
- */
-void
-verify(const char *name)
-{
-    WT_DECL_RET;
-    WT_SESSION *session;
-
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    while ((ret = session->verify(session, name, NULL)) == EBUSY)
-        testutil_check(session->checkpoint(session, NULL));
-
-    testutil_check(ret);
-
-    testutil_check(session->close(session, NULL));
-}

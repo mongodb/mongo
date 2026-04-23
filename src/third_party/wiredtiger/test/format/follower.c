@@ -86,11 +86,11 @@ err:
  */
 static bool
 follower_try_pickup_checkpoint(WT_SESSION *session, WT_CONNECTION *conn, WT_PAGE_LOG *page_log,
-  WT_ITEM *checkpoint_metadata, uint64_t checkpoint_ts)
+  WT_ITEM *checkpoint_metadata, wt_timestamp_t checkpoint_ts)
 {
     WT_DISAGG_METADATA metadata;
     WT_ITEM full_metadata;
-    uint64_t pinned_ts;
+    wt_timestamp_t pinned_ts;
     char config[1024];
     bool picked_up;
 
@@ -113,7 +113,7 @@ follower_try_pickup_checkpoint(WT_SESSION *session, WT_CONNECTION *conn, WT_PAGE
     testutil_check(__wt_disagg_parse_meta((WT_SESSION_IMPL *)session, &full_metadata, &metadata));
     testutil_assert(metadata.oldest_timestamp != WT_TS_NONE);
     testutil_check(timestamp_query("get=pinned", &pinned_ts));
-    if (pinned_ts != 0 && metadata.oldest_timestamp > pinned_ts) {
+    if (pinned_ts != WT_TS_NONE && metadata.oldest_timestamp > pinned_ts) {
         printf("--- [Follower] Skipping checkpoint pickup: oldest_timestamp(hex)=%" PRIx64
                " > pinned_timestamp(hex)=%" PRIx64 " ---\n",
           metadata.oldest_timestamp, pinned_ts);
@@ -123,7 +123,7 @@ follower_try_pickup_checkpoint(WT_SESSION *session, WT_CONNECTION *conn, WT_PAGE
     testutil_snprintf(config, sizeof(config), "disaggregated=(checkpoint_meta=\"%.*s\")",
       (int)checkpoint_metadata->size, (const char *)checkpoint_metadata->data);
     testutil_check(conn->reconfigure(conn, config));
-    printf("--- [Follower] Picked up checkpoint (metadata=[%.*s],timestamp(hex)=%" PRIx64 ") ---\n",
+    printf("--- [Follower] Picked up checkpoint (metadata=[%.*s],timestamp=%#" PRIx64 ") ---\n",
       (int)checkpoint_metadata->size, (const char *)checkpoint_metadata->data, checkpoint_ts);
     picked_up = true;
 
@@ -146,7 +146,7 @@ follower_read_latest_checkpoint(void)
     WT_PAGE_LOG *page_log;
     WT_SESSION *session;
     const char *disagg_page_log;
-    uint64_t checkpoint_ts;
+    wt_timestamp_t checkpoint_ts;
 
     conn = g.wts_conn;
     disagg_page_log = (char *)GVS(DISAGG_PAGE_LOG);
@@ -184,7 +184,7 @@ follower(void *arg)
     WT_SESSION *session;
     const char *disagg_page_log;
     u_int period;
-    uint64_t checkpoint_ts;
+    wt_timestamp_t checkpoint_ts;
 
     (void)(arg); /* Unused parameter */
     conn = g.wts_conn;

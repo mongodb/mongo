@@ -32,11 +32,11 @@
  * timestamp_minimum_committed --
  *     Return the timestamp lesser than the minimum of in-use committed timestamps.
  */
-uint64_t
+wt_timestamp_t
 timestamp_minimum_committed(void)
 {
     TINFO **tlp;
-    uint64_t commit_ts, ts;
+    wt_timestamp_t commit_ts, ts;
 
     if (GV(RUNS_PREDICTABLE_REPLAY))
         return replay_maximum_committed();
@@ -51,8 +51,8 @@ timestamp_minimum_committed(void)
              * last-used commit timestamp, that thread might be about to use a commit timestamp in
              * the range we'd return.
              */
-            if (commit_ts == 0)
-                return (0);
+            if (commit_ts == WT_TS_NONE)
+                return (WT_TS_NONE);
             if (commit_ts < ts)
                 ts = commit_ts;
         }
@@ -66,7 +66,7 @@ timestamp_minimum_committed(void)
  *     Query a timestamp.
  */
 int
-timestamp_query(const char *query, uint64_t *tsp)
+timestamp_query(const char *query, wt_timestamp_t *tsp)
 {
     WT_CONNECTION *conn;
     WT_DECL_RET;
@@ -88,7 +88,7 @@ void
 timestamp_init(void)
 {
     testutil_check(timestamp_query("get=recovery", &g.timestamp));
-    if (g.timestamp == 0)
+    if (g.timestamp == WT_TS_NONE)
         g.timestamp = MIN_TIMESTAMP;
 }
 
@@ -102,7 +102,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     static const char *oldest_timestamp_str = "oldest_timestamp=";
     static const char *stable_timestamp_str = "stable_timestamp=";
     WT_CONNECTION *conn;
-    uint64_t oldest_timestamp, stable_timestamp, stop_timestamp;
+    wt_timestamp_t oldest_timestamp, stable_timestamp, stop_timestamp;
     char buf[WT_TS_HEX_STRING_SIZE * 2 + 64];
 
     /* Ensure timestamps are used. */
@@ -113,7 +113,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
 
     /* Get the maximum not-in-use timestamp, noting that it may not be set. */
     oldest_timestamp = stable_timestamp = timestamp_minimum_committed();
-    if (oldest_timestamp == 0)
+    if (oldest_timestamp == WT_TS_NONE)
         return;
 
     if (GV(RUNS_PREDICTABLE_REPLAY)) {
@@ -122,7 +122,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
          * number of operations.
          */
         WT_ACQUIRE_READ_WITH_BARRIER(stop_timestamp, g.stop_timestamp);
-        if (stable_timestamp > stop_timestamp && stop_timestamp != 0)
+        if (stable_timestamp > stop_timestamp && stop_timestamp != WT_TS_NONE)
             stable_timestamp = stop_timestamp;
 
         /*

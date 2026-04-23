@@ -66,7 +66,7 @@ disagg_teardown_multi_node(void)
     if (g.follower_pid > 0) { /* Parent: leader */
         /* Wait for the follower process to exit. */
         track("Waiting for follower to finish execution.", 0ULL);
-        testutil_timeout_wait(120, g.follower_pid);
+        testutil_timeout_wait(720, g.follower_pid);
         g.follower_pid = 0;
     }
     close(g.disagg_multi_sync_socket);

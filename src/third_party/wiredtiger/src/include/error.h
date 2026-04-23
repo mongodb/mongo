@@ -281,20 +281,21 @@ __wt_tret_error_ok(int *pret, int a, int e)
  * TRIGGER_ABORT --
  *  Abort the program.
  *
- * When unit testing assertions we don't want to call __wt_abort, but we do want to track that we
- * should have done so.
+ * When unit testing assertions we don't want to abort, but we do want to track that we should have
+ * done so.
  */
 #ifdef HAVE_UNITTEST_ASSERTS
-#define TRIGGER_ABORT(session, exp, ...)                                                    \
-    do {                                                                                    \
-        if ((session) == NULL) {                                                            \
-            __wt_errx(                                                                      \
-              session, "A non-NULL session must be provided when unit testing assertions"); \
-            __wt_abort(session);                                                            \
-        }                                                                                   \
-        BUILD_ASSERTION_STRING(                                                             \
-          session, (session)->unittest_assert_msg, WT_ERR_MSG_BUF_LEN, exp, __VA_ARGS__);   \
-        (session)->unittest_assert_hit = true;                                              \
+#define TRIGGER_ABORT(session, exp, ...)                                                      \
+    do {                                                                                      \
+        WT_SESSION_IMPL *__session = (WT_SESSION_IMPL *)(session);                            \
+        if (__session == NULL) {                                                              \
+            __wt_errx(                                                                        \
+              __session, "A non-NULL session must be provided when unit testing assertions"); \
+            __wt_abort(__session);                                                            \
+        }                                                                                     \
+        BUILD_ASSERTION_STRING(                                                               \
+          __session, __session->unittest_assert_msg, WT_ERR_MSG_BUF_LEN, exp, __VA_ARGS__);   \
+        __session->unittest_assert_hit = true;                                                \
     } while (0)
 #else
 #define TRIGGER_ABORT(session, exp, ...)                                             \

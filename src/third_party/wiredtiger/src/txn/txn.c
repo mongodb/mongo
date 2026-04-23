@@ -1549,13 +1549,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     }
     __wt_txn_release_snapshot(session);
 
-    /*
-     * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each
-     * page within each file are done at the same time.
-     */
-    if (prepare)
-        __wt_qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
-
     /* Process updates. */
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
         switch (op->type) {
@@ -1964,7 +1957,15 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             ++prepared_updates;
 
             __txn_apply_prepare_state_update(session, upd, &session->txn->time_point, false);
-            op->u.op_upd = NULL;
+            /*
+             * After prepare, commit and rollback resolve prepared updates by walking the btree
+             * rather than following op->u.op_upd, so we clear the pointer to avoid a stale
+             * reference. Exception: on an ingest btree, the drain path during step-up walks the op
+             * list and uses op->u.op_upd to locate the update that must be redirected to the stable
+             * btree, so the pointer must remain set.
+             */
+            if (!F_ISSET(op->btree, WT_BTREE_GARBAGE_COLLECT))
+                op->u.op_upd = NULL;
 
             /*
              * If there are older updates to this key by the same transaction, set the repeated key
@@ -2000,6 +2001,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             break;
         }
     }
+
     WT_STAT_CONN_INCRV(session, txn_prepared_updates, prepared_updates);
     WT_STAT_CONN_INCRV(session, txn_prepared_updates_key_repeated, prepared_updates_key_repeated);
 #ifdef HAVE_DIAGNOSTIC
@@ -2015,6 +2017,12 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_ID))
         __txn_remove_from_global_table(session);
+
+    /*
+     * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each
+     * page within each file are done at the same time.
+     */
+    __wt_qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
 
     return (0);
 }
@@ -2064,13 +2072,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[], bool api_call)
      * transaction table at the end of the function.
      */
     __wt_txn_release_snapshot(session);
-
-    /*
-     * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each
-     * page within each file are done at the same time.
-     */
-    if (prepare)
-        __wt_qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
 
     /* Rollback and free updates. */
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {

@@ -39,7 +39,7 @@ static int real_checkpointer(THREAD_DATA *);
  *     Set the given timestamp as the stable timestamp.
  */
 static void
-set_stable(uint64_t stable_ts)
+set_stable(wt_timestamp_t stable_ts)
 {
     char buf[128];
 
@@ -128,7 +128,8 @@ clock_thread(void *arg)
     WT_SESSION *wt_session;
     WT_SESSION_IMPL *session;
     THREAD_DATA *td;
-    uint64_t delay, last_ts, oldest_ts;
+    uint64_t delay;
+    wt_timestamp_t last_ts, oldest_ts;
     char tid[128];
 
     testutil_check(__wt_thread_str(tid, sizeof(tid)));
@@ -136,7 +137,7 @@ clock_thread(void *arg)
     fflush(stdout);
 
     td = (THREAD_DATA *)arg;
-    last_ts = 0;
+    last_ts = WT_TS_NONE;
 
     testutil_check(g.conn->open_session(g.conn, NULL, NULL, &wt_session));
     session = (WT_SESSION_IMPL *)wt_session;
@@ -144,11 +145,11 @@ clock_thread(void *arg)
     while (g.opts.running) {
         if (g.predictable_replay) {
             oldest_ts = get_all_committed_ts();
-            if (oldest_ts != UINT64_MAX && oldest_ts - last_ts > PRED_REPLAY_STABLE_PERIOD) {
+            if (oldest_ts != WT_TS_MAX && oldest_ts - last_ts > PRED_REPLAY_STABLE_PERIOD) {
                 /*
                  * If we are doing a predictable rerun, don't go past the provided stop timestamp.
                  */
-                if (g.stop_ts > 0 && oldest_ts >= g.stop_ts) {
+                if (g.stop_ts != WT_TS_NONE && oldest_ts >= g.stop_ts) {
                     printf("Clock thread at %" PRIu64
                            " has reached the provided stop timestamp. "
                            "Stopping the clock.\n",
@@ -237,7 +238,8 @@ real_checkpointer(THREAD_DATA *td)
 {
     WT_SESSION *session;
     wt_timestamp_t stable_ts, oldest_ts, verify_ts;
-    uint64_t delay, tmp_ts;
+    wt_timestamp_t tmp_ts;
+    uint64_t delay;
     int ret;
     char buf[128], flush_tier_config[128], timestamp_buf[64];
     const char *checkpoint_config, *ts_config;
@@ -288,9 +290,9 @@ real_checkpointer(THREAD_DATA *td)
             if (g.predictable_replay) {
                 tmp_ts = WT_MIN(get_all_committed_ts(), stable_ts);
                 /* Update the oldest timestamp, but do not go past the provided stop timestamp. */
-                if (tmp_ts != UINT64_MAX && (g.stop_ts == 0 || tmp_ts <= g.stop_ts))
+                if (tmp_ts != WT_TS_MAX && (g.stop_ts == WT_TS_NONE || tmp_ts <= g.stop_ts))
                     g.ts_oldest = tmp_ts;
-                if (g.stop_ts > 0 && stable_ts >= g.stop_ts) {
+                if (g.stop_ts != WT_TS_NONE && stable_ts >= g.stop_ts) {
                     printf(
                       "The checkpoint thread has reached the stop timestamp of "
                       "%" PRIu64 ". Finish the test run.\n",
@@ -411,9 +413,9 @@ prepare_discover(WT_CONNECTION *conn, THREAD_DATA *td)
     /* Iterate through all prepared transactions and claim pending prepared transactions. */
     discover_count = 0;
     testutil_check(g.conn->query_timestamp(g.conn, timestamp_buf, "get=stable_timestamp"));
-    uint64_t current_stable = testutil_timestamp_parse(timestamp_buf);
+    wt_timestamp_t current_stable = testutil_timestamp_parse(timestamp_buf);
     while ((ret = cursor->next(cursor)) == 0) {
-        uint64_t commit_ts, durable_ts, rollback_ts;
+        wt_timestamp_t commit_ts, durable_ts, rollback_ts;
 
         ++discover_count;
         testutil_check(cursor->get_key(cursor, &prepared_id));

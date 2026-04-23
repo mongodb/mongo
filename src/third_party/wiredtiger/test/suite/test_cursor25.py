@@ -81,7 +81,7 @@ class test_cursor25(wttest.WiredTigerTestCase):
         self.assertEqual(values[0], WT_TXN_ABORTED)
         self.assertEqual(values[2], expected_rollback_ts)
         self.assertEqual(values[10], 3)  # WT_UPDATE_STANDARD
-        self.assertEqual(values[11], 1)  # prepared
+        self.assertEqual(values[11], 0)  # prepared rolled back
         self.assertEqual(values[13], 0)  # WT_CURVERSION_UPDATE_CHAIN
         self.assertEqual(values[14], expected_value)
 

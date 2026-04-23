@@ -50,4 +50,3 @@ extern int session_per_op; /* New session per operation */
 void load(const char *);
 void rw_start(u_int, u_int);
 void stats(void);
-void verify(const char *);

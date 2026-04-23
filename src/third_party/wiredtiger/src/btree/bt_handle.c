@@ -644,7 +644,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     if (ret == 0)
         btree->flush_most_recent_secs = (uint64_t)cval.val;
 
-    btree->flush_most_recent_ts = 0;
+    btree->flush_most_recent_ts = WT_TS_NONE;
     ret = __wt_config_gets(session, cfg, "flush_timestamp", &cval);
     WT_RET_NOTFOUND_OK(ret);
     if (ret == 0 && cval.len != 0)

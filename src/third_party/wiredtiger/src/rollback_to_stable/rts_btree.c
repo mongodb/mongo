@@ -494,7 +494,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
         WT_ASSERT(session,
           (hs_tw->start_ts == WT_TS_NONE || hs_tw->start_ts == hs_start_ts) &&
             (hs_tw->durable_start_ts == WT_TS_NONE || hs_tw->durable_start_ts == hs_durable_ts) &&
-            ((hs_tw->durable_stop_ts == 0 && hs_stop_durable_ts == WT_TS_MAX) ||
+            ((hs_tw->durable_stop_ts == WT_TS_NONE && hs_stop_durable_ts == WT_TS_MAX) ||
               hs_tw->durable_stop_ts == hs_stop_durable_ts));
 
         /*

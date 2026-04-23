@@ -42,6 +42,8 @@ FieldType.Add('uint32_id',
     'uint32_t', 'I', [ '%" PRIu32 "', '\\"0x%" PRIx32 "\\"' ], 'arg', [ '', '' ], True, False),
 FieldType.Add('uint64_t',
     'uint64_t', 'Q', '%" PRIu64 "', 'arg', [ '' ], False, False),
+FieldType.Add('wt_timestamp_t',
+    'wt_timestamp_t', 'Q', '%" PRIu64 "', 'arg', [ '' ], False, False),
 
 
 class Field:

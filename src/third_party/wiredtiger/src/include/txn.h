@@ -466,3 +466,14 @@ struct __wt_txn {
      */
     uint64_t __snapshot[];
 };
+
+/*
+ * WT_FIX_PREPARED_COOKIE --
+ *   State passed to find the prepared transaction to fix when draining the ingest btree.
+ */
+struct __wt_fix_prepared_cookie {
+    WT_BTREE *ingest_btree;
+    WT_BTREE *stable_btree;
+    WT_ITEM *key;
+    uint64_t txnid;
+};
