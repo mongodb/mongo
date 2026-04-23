@@ -124,10 +124,6 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
-    bool supportsRetryableWrite() const final {
-        return true;
-    }
 };
 MONGO_REGISTER_COMMAND(ShardsvrReshardDonorRecipientsFinishedCloningCommand).forShard();
 

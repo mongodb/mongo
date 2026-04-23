@@ -2,9 +2,8 @@
 // Validate that join optimization does not run on sharded collections.
 //
 // @tags: [
-//   requires_fcv_90,
-//   requires_sbe,
-//   featureFlagPathArrayness
+//   requires_fcv_83,
+//   requires_sbe
 // ]
 //
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
@@ -31,10 +30,10 @@ const db = sharded.getDB("test");
 sharded.shard0.getDB("test").setLogLevel(5, "query");
 sharded.shard1.getDB("test").setLogLevel(5, "query");
 const docs = [{f1: "aaa", f2: 123}, {f1: "bbb", f2: 0}, {f2: -1}, {f1: "zzz"}];
-for (const coll of ["coll1", "coll2", "coll3", "coll4"]) {
-    assert.commandWorked(db[coll].insertMany(docs));
-    assert.commandWorked(db[coll].createIndex({"dummy": 1, "f1": 1, "f2": -1}));
-}
+assert.commandWorked(db["coll1"].insertMany(docs));
+assert.commandWorked(db["coll2"].insertMany(docs));
+assert.commandWorked(db["coll3"].insertMany(docs));
+assert.commandWorked(db["coll4"].insertMany(docs));
 
 // Ensure join optimization is disabled.
 assert(sharded.shard0.getDB("test").adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));

@@ -2817,15 +2817,6 @@ TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingInitNoRefreshSends
     runReshardingToCompletion();
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, NoRefreshApplyingWithFeatureFlag) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", true);
-    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kApplying,
-                                               kTellAllDonorsToRefresh);
-
-    runReshardingToCompletion();
-}
-
 TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingInitNoRefreshSendsRecipientInitCmd) {
     RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", true);

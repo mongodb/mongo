@@ -509,14 +509,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kApplying) {
                            auto span = _startSpan(telemetryCtx,
                                                   "ReshardingCoordinator::_tellAllDonorsToRefresh");
-                           if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-                                   .isEnabled(VersionContext{},
-                                              serverGlobalParams.featureCompatibility
-                                                  .acquireFCVSnapshot())) {
-                               _notifyDonorsCloningComplete(executor);
-                           } else {
-                               _tellAllDonorsToRefresh(executor);
-                           }
+                           _tellAllDonorsToRefresh(executor);
                        }
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
@@ -2077,19 +2070,6 @@ void ReshardingCoordinator::_tellAllRecipientsToClone(
                                          _coordinatorDoc,
                                          _ctHolder->getStepdownToken(),
                                          executor);
-}
-
-void ReshardingCoordinator::_notifyDonorsCloningComplete(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _makeOperationContext();
-    ShardsvrReshardDonorRecipientsFinishedCloning cmd(_coordinatorDoc.getReshardingUUID());
-    resharding::sendReshardingCommand(
-        opCtx.get(),
-        _getNewSession(opCtx.get()),
-        cmd,
-        _ctHolder->getAbortToken(),
-        executor,
-        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards()));
 }
 
 void ReshardingCoordinator::_tellAllRecipientsToRefresh(

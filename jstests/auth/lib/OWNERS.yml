@@ -1,9 +1,0 @@
-version: 1.0.0
-filters:
-  - "*":
-    approvers:
-      - 10gen/server-security
-  - "truncate_range_base.js":
-    approvers:
-      - 10gen/query-execution
-      - 10gen/server-security
