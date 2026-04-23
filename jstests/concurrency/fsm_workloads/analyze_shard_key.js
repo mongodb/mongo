@@ -14,8 +14,6 @@
  *  incompatible_tsan,
  *  # TODO(SERVER-119777): Ensure test does not leak cursors.
  *  can_leak_idle_cursors,
- *  # TODO (SERVER-124153): Re-enable this test.
- *  featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
@@ -1077,6 +1075,13 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
     // The body of the workload.
 
     $config.setup = function setup(db, collName, cluster) {
+        // TODO (SERVER-124153): Remove the failpoint.
+        cluster.executeOnMongodNodes((adminDb) => {
+            assert.commandWorked(
+                adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
+            );
+        });
+
         // Look up the number of most common values and the number of ranges that the
         // analyzeShardKey command should return.
         cluster.executeOnMongodNodes((db) => {
@@ -1139,6 +1144,13 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
+        // TODO (SERVER-124153): Remove the failpoint.
+        cluster.executeOnMongodNodes((adminDb) => {
+            assert.commandWorked(
+                adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "off"}),
+            );
+        });
+
         if (cluster.isSharded) {
             cluster.executeOnMongosNodes((adminDb) => {
                 configureFailPoint(adminDb, "queryAnalysisSamplerFilterByComment", {}, "off");

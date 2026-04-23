@@ -7,12 +7,21 @@
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
  *   uses_api_parameters,
- *   # TODO(SERVER-124193): Remove this tag.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO (SERVER-124193): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+if (!isMultiversion) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+    });
+}
 
 // This test makes assertions about sessions on a particular node, which are not compatible with
 // random mongos dispatching.

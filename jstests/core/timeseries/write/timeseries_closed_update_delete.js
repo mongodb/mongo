@@ -101,6 +101,6 @@ TimeseriesTest.run((insert) => {
         ),
     );
     assert.eq(0, coll.find({"meta": "a"}).toArray().length);
-    assert.eq(0, coll.stats().timeseries.bucketCount);
+    assert.eq(0, getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec));
     assert.eq(0, coll.find({"meta": "b"}).toArray().length);
 });

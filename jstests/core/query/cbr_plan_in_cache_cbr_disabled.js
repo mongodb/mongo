@@ -20,14 +20,24 @@
  *   # moveCollection (used by random_migrations suites) recreates the collection on the destination
  *   # shard with an empty plan cache, which would cause plan cache assertions to fail mid-test.
  *   assumes_stable_collection_uuid,
- *   # TODO(SERVER-124265): Remove.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 
 import {getCachedPlanForQuery} from "jstests/libs/query/analyze_plan.js";
 import {getCBRConfig, setCBRConfigOnAllNonConfigNodes} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO (SERVER-124265): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+if (!isMultiversion) {
+    FixtureHelpers.runCommandOnAllShards({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+        primaryNodeOnly: false,
+    });
+}
 
 if (checkSbeFullyEnabled(db)) {
     jsTest.log.info("Skipping test because the SBE plan cache is enabled");

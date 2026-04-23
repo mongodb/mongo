@@ -12,10 +12,17 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const rangeDeleterBatchSize = 50;
 
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
+
 const st = new ShardingTest({
     other: {
         enableBalancer: false,
-        rsOptions: {setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}},
+        rsOptions: {setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize, ...failpointSetParameter}},
     },
 });
 

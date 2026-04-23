@@ -14,7 +14,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
-const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
+
+const st = new ShardingTest({shards: 2, other: {chunkSize: 1}, rsOptions: {setParameter: failpointSetParameter}});
 const configDB = st.s.getDB("config");
 
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic

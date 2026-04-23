@@ -10,8 +10,15 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {addShardToCluster} from "jstests/libs/query/change_stream_util.js";
 
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
+
 const rsNodeOptions = {
-    setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
+    setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1, ...failpointSetParameter},
 };
 const st = new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
 

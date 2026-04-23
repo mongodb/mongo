@@ -7,6 +7,15 @@
  *   uses_transactions
  * ]
  */
+
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO (SERVER-124153): Remove the failpoint.
+FixtureHelpers.runCommandOnEachPrimary({
+    db: db.getSiblingDB("admin"),
+    cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+});
+
 const dbName = "test";
 const collName = "default_read_concern";
 const testDB = db.getSiblingDB(dbName);

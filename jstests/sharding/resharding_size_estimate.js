@@ -36,6 +36,19 @@ const maxShardBytesWithoutDataField = 256;
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 reshardingTest.setup();
 
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+if (!isMultiversion) {
+    for (let i = 0; i < 2; i++) {
+        reshardingTest._st[`rs${i}`].nodes.forEach((node) => {
+            assert.commandWorked(
+                node.adminCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
+            );
+        });
+    }
+}
+
 const donorShardNames = reshardingTest.donorShardNames;
 const inputCollection = reshardingTest.createShardedCollection({
     ns: ns,

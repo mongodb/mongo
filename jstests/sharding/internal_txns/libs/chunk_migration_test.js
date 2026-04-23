@@ -626,6 +626,7 @@ export function InternalTransactionChunkMigrationTest() {
         jsTest.log("Finished retrying retryable internal transactions after migration1");
     }
 
+    this.st = st;
     this.InternalTxnType = kInternalTxnType;
 
     // Helpers for testing retryable internal transactions with chunk migration. Each helper defines

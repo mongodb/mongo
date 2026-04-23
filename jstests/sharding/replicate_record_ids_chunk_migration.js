@@ -153,7 +153,16 @@ function runMoveChunkReplicaRecordIDsTest(collName, keyDoc, useBounds, splitChun
     );
 }
 
-const st = new ShardingTest({mongos: 1, shards: 2});
+// TODO (SERVER-124153): Remove the failpoint.
+const st = new ShardingTest({
+    mongos: 1,
+    shards: 2,
+    rsOptions: {
+        setParameter: {
+            "failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"}),
+        },
+    },
+});
 const dbName = "test";
 
 const mongos = st.s0;

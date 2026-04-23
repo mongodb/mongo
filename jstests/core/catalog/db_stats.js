@@ -9,7 +9,17 @@
 //   does_not_support_causal_consistency,
 // ]
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO (SERVER-124148): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+if (!isMultiversion) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+    });
+}
 
 function serverIsMongos() {
     const res = db.runCommand("hello");
@@ -56,12 +66,9 @@ if (isMongoS) {
     assert.commandWorked(dbStats);
 }
 
-// TODO(SERVER-124148): Remove feature flag check.
-if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "featureFlagReplicatedFastCount")) {
-    assert.eq(1, dbStats.objects, tojson(dbStats));
-    assert.eq(dataSize, dbStats.avgObjSize, tojson(dbStats));
-    assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
-}
+assert.eq(1, dbStats.objects, tojson(dbStats));
+assert.eq(dataSize, dbStats.avgObjSize, tojson(dbStats));
+assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
 
 // Index count will vary on mongoS if an additional index is needed to support sharding.
 if (isMongoS) {

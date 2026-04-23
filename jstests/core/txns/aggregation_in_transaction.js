@@ -2,6 +2,13 @@
 // @tags: [uses_transactions, uses_snapshot_read_concern, references_foreign_collection]
 // TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js"; // For isSharded.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO (SERVER-124153): Remove the failpoint.
+FixtureHelpers.runCommandOnEachPrimary({
+    db: db.getSiblingDB("admin"),
+    cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+});
 
 const session = db.getMongo().startSession({causalConsistency: false});
 const testDB = session.getDatabase("test");
@@ -130,3 +137,8 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.throws(() => coll.aggregate({$indexStats: {}}).next());
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+
+FixtureHelpers.runCommandOnEachPrimary({
+    db: db.getSiblingDB("admin"),
+    cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "off"},
+});

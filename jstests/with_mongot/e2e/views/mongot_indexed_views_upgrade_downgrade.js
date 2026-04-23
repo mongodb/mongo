@@ -9,6 +9,12 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
+// TODO (SERVER-124153): Remove the failpoint.
+FixtureHelpers.runCommandOnEachPrimary({
+    db: db.getSiblingDB("admin"),
+    cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+});
+
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
 coll.drop();

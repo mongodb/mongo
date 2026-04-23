@@ -4,6 +4,13 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
+
 const chunkSizeMB = 1;
 let st = new ShardingTest({
     shards: 3,
@@ -11,6 +18,7 @@ let st = new ShardingTest({
         // Set global max chunk size to 1MB
         chunkSize: chunkSizeMB,
     },
+    rsOptions: {setParameter: failpointSetParameter},
 });
 
 function runBalancer() {

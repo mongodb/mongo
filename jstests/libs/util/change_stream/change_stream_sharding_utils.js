@@ -79,6 +79,8 @@ function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = f
             setParameter: {
                 writePeriodicNoops: true,
                 periodicNoopIntervalSecs: 1,
+                // TODO (SERVER-125025): remove the failpoint.
+                "failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"}),
             },
         },
         other: {

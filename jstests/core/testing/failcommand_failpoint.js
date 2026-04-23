@@ -14,6 +14,16 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+if (!isMultiversion) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+    });
+}
+
 // The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
 // Certain tasks (such as "sharding_jscore...") may use test fixtures with multiple mongos.
 // pinToSingleMongos due to configureFailPoint command.
@@ -131,9 +141,6 @@ assert.commandWorked(
 );
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
-
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 
 if (!isMultiversion) {
     // Test failpoint with errorMsg

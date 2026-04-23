@@ -11,6 +11,13 @@ import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
+
 const st = new ShardingTest({
     shards: 1,
     rs: {nodes: 2},
@@ -19,6 +26,7 @@ const st = new ShardingTest({
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
     initiateWithDefaultElectionTimeout: true,
+    rsOptions: {setParameter: failpointSetParameter},
 });
 
 const kDbName = "testDb";

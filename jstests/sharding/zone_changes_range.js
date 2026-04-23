@@ -12,7 +12,21 @@ import {
     updateZoneKeyRange,
 } from "jstests/sharding/libs/zone_changes_util.js";
 
-const st = new ShardingTest({shards: 3, other: {chunkSize: 1}});
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
+
+const st = new ShardingTest({
+    shards: 3,
+    other: {
+        chunkSize: 1,
+    },
+    rsOptions: {setParameter: failpointSetParameter},
+});
+
 let primaryShard = st.shard0;
 let dbName = "test";
 let testDB = st.s.getDB(dbName);

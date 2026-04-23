@@ -145,6 +145,9 @@ executor:
         analyzeShardKeyNumRanges: 10
         analyzeShardKeySplitPointExpirationSecs: 10
         ttlMonitorSleepSecs: 5
+        # TODO (SERVER-124153): Remove the failpoint.
+        failpoint.useInMemoryReplicatedSizeCount:
+          mode: alwaysOn
         logComponentVerbosity:
           verbosity: 0
           sharding: 2

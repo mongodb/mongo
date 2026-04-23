@@ -11,8 +11,6 @@
 //   requires_collstats,
 //   requires_fastcount,
 //   no_selinux,
-//   # TODO(SERVER-124153): Remove this tag.
-//   featureFlagReplicatedFastCount_incompatible,
 // ]
 
 // -------------------------
@@ -30,6 +28,16 @@
 //
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+if (!isMultiversion) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+    });
+}
 
 let assertChunkSizes = function (splitVec, numDocs, maxChunkSize, msg) {
     splitVec = [{x: -1}].concat(splitVec);

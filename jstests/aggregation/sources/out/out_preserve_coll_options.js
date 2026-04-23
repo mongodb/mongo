@@ -3,6 +3,13 @@
 //   does_not_support_transactions,
 // ]
 import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO (SERVER-124153): Remove the failpoint.
+FixtureHelpers.runCommandOnEachPrimary({
+    db: db.getSiblingDB("admin"),
+    cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+});
 
 // Setup and populate input collection.
 const inputName = "out_preserve_coll_options";
