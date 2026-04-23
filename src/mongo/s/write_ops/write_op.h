@@ -397,7 +397,7 @@ public:
 
     const std::vector<std::unique_ptr<TargetedWrite>>& getWrites() const {
         return _writes;
-    };
+    }
 
     size_t getNumOps() const {
         return _writes.size();

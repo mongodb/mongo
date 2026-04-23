@@ -223,7 +223,7 @@ private:
     // The incoming client request
     const BatchedCommandRequest& _clientRequest;
 
-    // Cached transaction number (if one is present on the operation contex)
+    // Cached transaction number (if one is present on the operation context)
     boost::optional<TxnNumber> _batchTxnNum;
 
     // Array of ops being processed from the client request
@@ -249,12 +249,20 @@ private:
     // that there is no retry of such writes is needed. This is necessary for responses that have
     // n > 0 in a given round because we do not want to increment the batch stats multiple times for
     // retried statements.
+    // The 'BatchedCommandResponse' pointers in here can either be pointers to stack-allocated
+    // responses or emulated error responses allocated on the heap by 'noteBatchError()' and kept
+    // alive via '_emulatedErrorResponses'.
     boost::optional<
         std::vector<std::pair<const TargetedWriteBatch*, const BatchedCommandResponse*>>>
         _deferredResponses;
 
     // Upserted ids for the whole write batch
     std::vector<std::unique_ptr<BatchedUpsertDetail>> _upsertedIds;
+
+    // Emulated error responses for command errors. These need to be kept alive temporarily, because
+    // their pointers can be stored inside '_deferredResponses' until the deferred responses have
+    // been processed.
+    std::vector<std::unique_ptr<BatchedCommandResponse>> _emulatedErrorResponses;
 
     // Statement ids for the ops that had already been executed, thus were not executed in this
     // batch write.
