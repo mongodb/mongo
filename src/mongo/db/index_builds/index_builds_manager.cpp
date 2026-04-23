@@ -42,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/allow_read_from_latest_on_secondary.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -177,6 +178,13 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     const char* curopMessage = "Index Build: scanning collection";
     ProgressMeterHolder progressMeter;
     {
+        // We use the number of records to track progress, so it should be fine to read from latest
+        // and get a potentially slightly incorrect value here. Without this block, we trip an
+        // assertion because we are performing a nested acquisition where the outer acquisition is a
+        // write acquisition and uses kNoTimestamp whereas the inner acquisition is a read and would
+        // require kLastApplied.
+        AllowReadFromLatestOnSecondaryBlock_UNSAFE AllowReadFromLatestOnSecondaryBlock_UNSAFE(
+            opCtx);
         std::unique_lock<Client> lk(*opCtx->getClient());
         progressMeter.set(lk,
                           CurOp::get(opCtx)->setProgress(
@@ -210,6 +218,14 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                                   "error"_attr = redact(validStatus));
                     rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id);
                     {
+                        // We use the number of records to track progress, so it should be fine to
+                        // read from latest and get a potentially slightly incorrect value here.
+                        // Without this block, we trip an assertion because we are performing a
+                        // nested acquisition where the outer acquisition is a write acquisition and
+                        // uses kNoTimestamp whereas the inner acquisition is a read and would
+                        // require kLastApplied.
+                        AllowReadFromLatestOnSecondaryBlock_UNSAFE
+                            AllowReadFromLatestOnSecondaryBlock_UNSAFE(opCtx);
                         std::unique_lock<Client> lk(*opCtx->getClient());
                         // Must reduce the progress meter's expected total after deleting an invalid
                         // document from the collection.

@@ -106,6 +106,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/shard_role/shard_catalog:allow_read_from_latest_on_secondary",
         "//src/mongo/db/shard_role/shard_catalog:catalog_control",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",

@@ -387,6 +387,7 @@ mongo_cc_library(
         "snapshot_helper.cpp",
     ],
     deps = [
+        "allow_read_from_latest_on_secondary",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/repl:repl_coordinator_interface",
     ],
@@ -676,5 +677,27 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "allow_read_from_latest_on_secondary",
+    srcs = [
+        "allow_read_from_latest_on_secondary.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "allow_read_from_latest_on_secondary_test",
+    srcs = [
+        "allow_read_from_latest_on_secondary_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "allow_read_from_latest_on_secondary",
+        "catalog_test_fixture",
     ],
 )

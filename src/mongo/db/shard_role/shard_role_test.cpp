@@ -51,6 +51,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
+#include "mongo/db/shard_role/shard_catalog/allow_read_from_latest_on_secondary.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
@@ -820,6 +821,43 @@ DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                            repl::ReadConcernArgs(),
                            AcquisitionPrerequisites::kRead},
                           MODE_IS);
+}
+
+TEST_F(ShardRoleTest, NestedAcquisitionWithAllowReadFromLatestOnSecondaryBlock_UNSAFE) {
+    createTestCollection(operationContext(), NamespaceString::kSystemReplSetNamespace);
+    ASSERT_FALSE(NamespaceString::kSystemReplSetNamespace.isReplicated());
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    const auto unreplicatedAcquisition = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::kLocal,
+                                     AcquisitionPrerequisites::kRead));
+
+    ASSERT_TRUE(unreplicatedAcquisition.exists());
+
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    {
+        AllowReadFromLatestOnSecondaryBlock_UNSAFE block(operationContext());
+        const auto replicatedAcquisition = acquireCollectionMaybeLockFree(
+            operationContext(),
+            CollectionAcquisitionRequest(
+                nssUnshardedCollection1,
+                PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
+                repl::ReadConcernArgs::kLocal,
+                AcquisitionPrerequisites::kRead));
+
+        ASSERT_TRUE(replicatedAcquisition.exists());
+
+        ASSERT_EQUALS(
+            RecoveryUnit::ReadSource::kNoTimestamp,
+            shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+    }
 }
 
 // ---------------------------------------------------------------------------
