@@ -15,3 +15,6 @@ filters:
   - "upgrade_downgrade_viewless_timeseries_sharded_cluster*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "viewless_timeseries_collection_creation_helpers*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl

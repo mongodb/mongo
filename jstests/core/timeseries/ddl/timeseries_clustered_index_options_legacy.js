@@ -13,6 +13,7 @@
  */
 
 import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 
 skipTestIfViewlessTimeseriesEnabled(db);
 
@@ -44,9 +45,30 @@ function roundTripTimeseriesToBucketsCreateOptions() {
 
     assert(tsColl.drop());
 
+    // Test that collection can be recreated using the output of listCollection
     assert.commandWorked(testDB.createCollection(bucketsCollName, options));
     res = assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: bucketsCollName}}));
     assert.eq(options, res.cursor.firstBatch[0].options);
+
+    // Idempotent creation of system.buckets collections is generally supported, but fails on pre-
+    // 9.0 binaries when the options contain internally-generated fields such as 'clusteredIndex'
+    // or 'validator'. In multiversion suites, a pre-9.0 binary can only be present while FCV is
+    // < 9.0, so we gate on FCV only when a mixed-version configuration is in play.
+    const isMultiversion =
+        TestData.useRandomBinVersionsWithinReplicaSet ||
+        TestData.mixedBinVersions ||
+        TestData.mongosBinVersion ||
+        TestData.multiversionBinVersion;
+    if (!isMultiversion || isFCVgte(testDB, "9.0")) {
+        assert.commandWorked(testDB.createCollection(bucketsCollName, options));
+        res = assert.commandWorked(
+            testDB.runCommand({
+                listCollections: 1,
+                filter: {name: bucketsCollName},
+            }),
+        );
+        assert.eq(options, res.cursor.firstBatch[0].options);
+    }
     assert.commandWorked(testDB.dropDatabase());
     return options;
 }

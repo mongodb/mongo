@@ -39,6 +39,13 @@ namespace mongo::timeseries {
 BSONObj generateTimeseriesValidator(int bucketVersion, StringData timeField);
 
 /**
+ * Validates that 'validator' matches one of the schemas that the server generates for the supported
+ * time-series bucket format versions on 'timeField'. Throws a user-facing error when no known
+ * version matches.
+ */
+void validateTimeseriesValidator(const BSONObj& validator, StringData timeField);
+
+/**
  * Generates the index on the metaField and timeField for time-series collections. This is used for
  * query-based reopening.
  */

@@ -217,6 +217,18 @@ Status validateCollectionOptions(OperationContext* opCtx,
             return clusteredIndexStatus;
         }
     }
+
+    // TODO SERVER-118970 remove this validation once 9.0 becomes last LTS and all timeseries
+    // collections are viewless.
+    if (collectionOptions.timeseries && !collectionOptions.validator.isEmpty()) {
+        try {
+            timeseries::validateTimeseriesValidator(collectionOptions.validator,
+                                                    collectionOptions.timeseries->getTimeField());
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }
+
     return Status::OK();
 }
 
@@ -603,6 +615,20 @@ void checkExistingCollectionIsCompatible(OperationContext* opCtx,
         // collection creation (i.e. were not specified by the user).
         uassertStatusOK(timeseries::validateAndSetBucketingParameters(
             normalizedRequestedOptions.timeseries.get()));
+
+        // The 'validator' and 'clusteredIndex' options are normally user-provided create options,
+        // but for timeseries collections they are auto-generated internally. Users are still
+        // allowed to pass them (and they get validated), but they must be stripped here before
+        // comparing against the existing collection's options: legacy timeseries collections store
+        // the auto-generated values, while viewless timeseries collections don't have them at all.
+        // Keeping them would cause the comparison to fail in both cases.
+
+        // TODO SERVER-118970 remove this 2 normalization once 9.0 becomes last LTS and all
+        // timeseries collections are viewless, by then specifying a validator or clusteredIndex
+        // for a timeseries collection will be always forbidden.
+        normalizedRequestedOptions.validator = BSONObj();
+        normalizedRequestedOptions.clusteredIndex = boost::none;
+
         existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
             false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
     }
@@ -972,6 +998,11 @@ Status _createCollection(
     const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none,
     boost::optional<bool> recordIdsReplicated = boost::none) {
 
+    auto status = validateCollectionOptions(opCtx, nss, collectionOptions, idIndex);
+    if (!status.isOK()) {
+        return status;
+    }
+
     return writeConflictRetry(opCtx, "create", nss, [&] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX /* database lock mode*/, boost::none);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
@@ -981,11 +1012,6 @@ Status _createCollection(
         // coming in, or commands that generated a WriteConflict must return a NamespaceExists
         // error here on conflict.
         auto status = _checkNamespaceOrTimeseriesBucketsAlreadyExists(opCtx, nss, isForApplyOps);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        status = validateCollectionOptions(opCtx, nss, collectionOptions, idIndex);
         if (!status.isOK()) {
             return status;
         }
