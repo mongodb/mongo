@@ -53,33 +53,33 @@ class Status;
 class DBException;
 
 /**
- *  In 'redact' mode replace all values with '###' and keep keys intact.
- *  In normal mode return objectToRedact.toString().
+ *  In 'redact' mode (or if forceRedaction is true) replace all values with '###' and keep keys
+ *  intact. In normal mode return objectToRedact.toString().
  */
-BSONObj redact(const BSONObj& objectToRedact);
+BSONObj redact(const BSONObj& objectToRedact, bool forceRedaction = false);
 
 /**
- *  In 'redact mode return '###'.
+ *  In 'redact' mode (or if forceRedaction is true) return '###'.
  *  In normal mode return stringToRedact.
  */
-StringData redact(StringData stringToRedact);
-inline StringData redact(const char* stringToRedact) {
-    return redact(StringData(stringToRedact));
+StringData redact(StringData stringToRedact, bool forceRedaction = false);
+inline StringData redact(const char* stringToRedact, bool forceRedaction = false) {
+    return redact(StringData(stringToRedact), forceRedaction);
 }
-inline StringData redact(const std::string& stringToRedact) {
-    return redact(StringData(stringToRedact));
+inline StringData redact(const std::string& stringToRedact, bool forceRedaction = false) {
+    return redact(StringData(stringToRedact), forceRedaction);
 }
 
 /**
- *  In 'redact' mode keep status code and replace reason with '###'.
+ *  In 'redact' mode (or if forceRedaction is true) keep status code and replace reason with '###'.
  *  In normal mode return statusToRedact.toString().
  */
-std::string redact(const Status& statusToRedact);
+std::string redact(const Status& statusToRedact, bool forceRedaction = false);
 
 /**
- * In 'redact' mode keep exception type and replace causedBy with '###'.
- * In normal mode return exceptionToRedact.toString().
+ * In 'redact' mode (or if forceRedaction is true) keep exception type and replace causedBy
+ * with '###'. In normal mode return exceptionToRedact.toString().
  */
-std::string redact(const DBException& exceptionToRedact);
+std::string redact(const DBException& exceptionToRedact, bool forceRedaction = false);
 
 }  // namespace mongo
