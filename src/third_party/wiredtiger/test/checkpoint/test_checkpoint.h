@@ -106,8 +106,7 @@ typedef struct {
 
     bool use_timestamps;     /* Use txn timestamps. Start clock thread */
     bool predictable_replay; /* Run such that a predictable replay is possible. */
-    wt_timestamp_t
-      stop_ts; /* Run a replay until the stable timestamp reaches this stop timestamp. */
+    uint64_t stop_ts; /* Run a replay until the stable timestamp reaches this stop timestamp. */
 
     COOKIE *cookies;               /* Per-table info */
     THREAD_DATA *td;               /* Per-thread info */

@@ -46,7 +46,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/transaction/transaction_operations.h"
-#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -89,10 +88,8 @@ public:
     }
 
     // Add 'observer' to the list of observers to call. Observers are called in registration order.
-    // Registration must be done while no calls to observers are made. Callers may optionally call
-    // seal() once registration is complete; any addObserver() after seal() will invariant.
+    // Registration must be done while no calls to observers are made.
     void addObserver(std::unique_ptr<OpObserver> observer) {
-        invariant(!_sealed.load(), "OpObserverRegistry::addObserver called after seal()");
         const auto& nsFilters = observer->getNamespaceFilters();
         _observers.push_back(std::move(observer));
 
@@ -136,14 +133,6 @@ public:
             default:
                 break;
         }
-    }
-
-    // Seal the registry against further observer registration. After this call, any subsequent
-    // addObserver() will invariant. Iteration methods are unaffected. Idempotent; safe to call
-    // multiple times. This enforces the documented invariant that all observers must be
-    // registered before any observer callback can fire.
-    void seal() {
-        _sealed.store(true);
     }
 
     void onCreateIndex(OperationContext* const opCtx,
@@ -771,9 +760,5 @@ private:
     std::vector<OpObserver*> _onDeleteSystemObservers;  // *.system.*
     std::vector<OpObserver*> _onDeleteUserObservers;    // not config nor system
                                                       // Will impact writes to all user collections.
-
-    // Set by seal() once registration is complete. Enforces the documented invariant that all
-    // observers must be registered before any callback fires.
-    Atomic<bool> _sealed{false};
 };
 }  // namespace MONGO_MOD_PUB mongo

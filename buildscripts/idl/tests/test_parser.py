@@ -1566,6 +1566,74 @@ class TestParser(testcase.IDLTestcase):
             idl.errors.ERROR_ID_IS_NODE_TYPE_SCALAR_OR_MAPPING,
         )
 
+    def test_server_parameter_annotations_positive(self):
+        # type: () -> None
+        """Positive server parameter annotations tests."""
+
+        # server parameter with annotations mapping.
+        self.assert_parse(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_varname: baz
+                annotations:
+                    query_knob:
+                        wire_name: fooWire
+                        applicability: queryShape
+            """)
+        )
+
+    def test_server_parameter_annotations_negative(self):
+        # type: () -> None
+        """Negative server parameter annotations tests."""
+
+        # annotations as a scalar should fail. Must be a mapping.
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_varname: baz
+                annotations: some_scalar_value
+            """),
+            idl.errors.ERROR_ID_IS_NODE_TYPE,
+        )
+
+        # annotations as a sequence should fail. Must be a mapping.
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_varname: baz
+                annotations:
+                    - item1
+                    - item2
+            """),
+            idl.errors.ERROR_ID_IS_NODE_TYPE,
+        )
+
+        # annotations as null should fail. Must be a mapping.
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_varname: baz
+                annotations: null
+            """),
+            idl.errors.ERROR_ID_IS_NODE_TYPE,
+        )
+
     def test_feature_flag(self):
         # type: () -> None
         """Test feature flag."""

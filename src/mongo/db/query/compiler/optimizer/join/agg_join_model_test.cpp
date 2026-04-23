@@ -65,7 +65,6 @@ TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForei
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
 
     // This pipeline's prefix is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
@@ -83,7 +82,6 @@ TEST_F(PipelineAnalyzerTest, PipelineEligibleForJoinReorderingSingleLookupUnwind
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
     // This pipeline is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -125,7 +123,6 @@ TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -145,7 +142,6 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -167,7 +163,6 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -192,7 +187,6 @@ TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     // We don't detect ineligibility here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
@@ -213,7 +207,6 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFields) {
     ])";
 
     auto pipeline = makePipeline(query, {"B", "C"});
-    markFieldsAsScalar(*pipeline, {"x"_sd, "a"_sd}, {{"B", {"y"_sd}}, {"C", {"z"_sd}}});
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
@@ -248,8 +241,6 @@ TEST_F(PipelineAnalyzerTest, ConflictingLocalFieldExprSyntax) {
     ])";
 
     auto pipeline = makePipeline(query, {"B", "A"});
-    markFieldsAsScalar(
-        *pipeline, {"x"_sd, "foo"_sd, "bar"_sd}, {{"B", {"y"_sd}}, {"A", {"foo"_sd, "bar"_sd}}});
     // We don't detect ineligibility of local path fields here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
@@ -265,7 +256,6 @@ TEST_F(PipelineAnalyzerTest, CompatibleAsFields) {
             {$unwind: "$x.z"}
         ])";
     auto pipeline = makePipeline(query, {"B", "C"});
-    markFieldsAsScalar(*pipeline, {"x.c"_sd}, {{"B", {"c"_sd, "d"_sd}}, {"C", {"d"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
@@ -283,7 +273,6 @@ TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
 
     // We don't detect ineligibility here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
@@ -306,7 +295,6 @@ TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -379,7 +367,6 @@ TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -452,7 +439,6 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -474,7 +460,6 @@ TEST_F(PipelineAnalyzerTest, PipelineInEligibleForSortStage) {
         ])";
 
     auto pipeline = makePipeline(sortPrefixQuery, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
     // This is not where we examine the pipeline for a $sort stage.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto status = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams).getStatus();
@@ -507,7 +492,6 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
         ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"a"_sd, "b"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -520,7 +504,6 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
 TEST_F(PipelineAnalyzerTest, tooManyNodes) {
     static constexpr size_t numJoins = 5;
     auto pipeline = makePipelineOfSize(numJoins);
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
     // Configure the buildParams that one $lookup/$unwind pair is forced to the suffix because the
     // maximum number of nodes is hit.
     AggModelBuildParams buildParams{
@@ -536,7 +519,6 @@ TEST_F(PipelineAnalyzerTest, tooManyNodes) {
 TEST_F(PipelineAnalyzerTest, tooManyEdges) {
     static constexpr size_t numJoins = 5;
     auto pipeline = makePipelineOfSize(numJoins);
-    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
     // Configure the buildParams that one $lookup/$unwind pair is forced to the suffix because the
     // maximum number of edges is hit.
     AggModelBuildParams buildParams{
@@ -575,7 +557,6 @@ TEST_F(PipelineAnalyzerTest, SingleJoinCompoundPredicate) {
     ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    markFieldsAsScalar(*pipeline, {"foo"_sd, "bar"_sd}, {{"A", {"foo"_sd, "bar"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -636,9 +617,6 @@ TEST_F(PipelineAnalyzerTest, CompoundJoinKeyWithLocalForeignSyntax) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline,
-                       {"foo"_sd, "bar"_sd},
-                       {{"A", {"foo"_sd, "bar"_sd}}, {"B", {"foo"_sd, "bar"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -698,8 +676,6 @@ TEST_F(PipelineAnalyzerTest, DuplicateExprEqAndEqEdges) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B", "C"});
-    markFieldsAsScalar(
-        *pipeline, {"bar"_sd}, {{"A", {"bar"_sd}}, {"B", {"bar"_sd}}, {"C", {"bar"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -745,7 +721,6 @@ TEST_F(PipelineAnalyzerTest, ExprOnlyImplicitEdges) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"bar"_sd}, {{"A", {"bar"_sd}}, {"B", {"bar"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -777,7 +752,6 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithCorrelatedNonJoinPredicate) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"foo"_sd}, {{"A", {"foo"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
@@ -807,7 +781,6 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithNonFieldPathVariable) {
     ])";
 
     auto pipeline = makePipeline(query, {"A", "B"});
-    markFieldsAsScalar(*pipeline, {"foo"_sd}, {{"A", {"foo"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 

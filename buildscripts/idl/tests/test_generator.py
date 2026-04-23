@@ -36,6 +36,7 @@ idl base directory:
 $ coverage run run_tests.py && coverage html
 """
 
+import datetime
 import io
 import os
 import unittest
@@ -474,6 +475,157 @@ class TestGenerator(testcase.IDLTestcase):
             'constexpr inline auto kTestServerParameterName = "testServerParameter"_sd;'
         )
         self.assertIn(expected, header)
+
+    def test_server_parameter_annotations_generates_set_call(self) -> None:
+        """Test generation of setAnnotations call for annotated server parameter."""
+        _, source = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
+        server_parameters:
+                testAnnotatedParam:
+                    description: "Test annotated parameter"
+                    set_at: ["startup", "runtime"]
+                    redact: false
+                    cpp_varname: testParameter
+                    annotations:
+                        query_knob:
+                            wire_name: testWire
+                            applicability: queryShape
+        """)
+        )
+
+        # Verify the BSON builder lambda is generated.
+        self.assertIn("kAnnotations", source)
+        self.assertIn("BSONObjBuilder builder", source)
+        self.assertIn('"query_knob"', source)
+        self.assertIn('"wire_name"', source)
+        self.assertIn('"testWire"', source)
+        self.assertIn('"applicability"', source)
+        self.assertIn('"queryShape"', source)
+
+        # Verify setAnnotations call.
+        self.assertIn("setAnnotations(kAnnotations)", source)
+
+    def test_server_parameter_no_annotations_no_set_call(self) -> None:
+        """Test that server parameter without annotations does not generate setAnnotations."""
+        _, source = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
+        server_parameters:
+                testUnannotatedParam:
+                    description: "Test unannotated parameter"
+                    set_at: ["startup", "runtime"]
+                    redact: false
+                    cpp_varname: testParameter
+        """)
+        )
+
+        self.assertNotIn("setAnnotations", source)
+        self.assertNotIn("kAnnotations", source)
+
+    def test_server_parameter_nested_annotations_bson(self) -> None:
+        """Test nested annotation values produce correct nested BSON output."""
+        _, source = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
+        server_parameters:
+                testNestedParam:
+                    description: "Test nested annotations"
+                    set_at: ["startup", "runtime"]
+                    redact: false
+                    cpp_varname: testParameter
+                    annotations:
+                        query_knob:
+                            wire_name: testNestedWire
+                            applicability: queryShape
+                            fcv:
+                                min: "9.0"
+        """)
+        )
+
+        # Verify nested BSON structure.
+        self.assertIn("kAnnotations", source)
+        self.assertIn("subobjStart", source)
+        self.assertIn('"fcv"', source)
+        self.assertIn('"min"', source)
+        self.assertIn('"9.0"', source)
+
+        # Verify setAnnotations call.
+        self.assertIn("setAnnotations(kAnnotations)", source)
+
+    def test_server_parameter_annotations_mixed_types_bson(self) -> None:
+        """Test annotation values of different YAML types produce correct BSON output."""
+        _, source = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
+        server_parameters:
+                testMixedParam:
+                    description: "Test mixed-type annotations"
+                    set_at: ["startup", "runtime"]
+                    redact: false
+                    cpp_varname: testParameter
+                    annotations:
+                        query_knob:
+                            wire_name: testMixedWire
+                            pqs_settable: true
+                            max_retries: 3
+                            applicability:
+                                - queryShape
+                                - opCtx
+        """)
+        )
+
+        # Verify string value.
+        self.assertIn('"testMixedWire"', source)
+
+        # Verify boolean value appended.
+        self.assertIn('append("pqs_settable", true)', source)
+
+        # Verify integer value appended.
+        self.assertIn('append("max_retries", 3)', source)
+
+        # Verify array value.
+        self.assertIn("subarrayStart", source)
+        self.assertIn('"queryShape"', source)
+        self.assertIn('"opCtx"', source)
+
+        # Verify setAnnotations call.
+        self.assertIn("setAnnotations(kAnnotations)", source)
+
+    def test_server_parameter_annotations_rejects_unquoted_date(self) -> None:
+        """YAML auto-coerces unquoted dates to datetime.date; the generator must reject them."""
+        with self.assertRaises(ValueError):
+            self.assert_generate(
+                self.view_test_common_types
+                + dedent("""
+            server_parameters:
+                    testDateParam:
+                        description: "Test param with unquoted date annotation"
+                        set_at: ["startup", "runtime"]
+                        redact: false
+                        cpp_varname: testParameter
+                        annotations:
+                            wire_name: 2026-04-14
+            """)
+            )
+
+    def test_server_parameter_annotations_accepts_quoted_date(self) -> None:
+        """A quoted date stays a string and flows through as a C++ string literal."""
+        _, source = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
+        server_parameters:
+                testQuotedDateParam:
+                    description: "Test param with quoted date annotation"
+                    set_at: ["startup", "runtime"]
+                    redact: false
+                    cpp_varname: testParameter
+                    annotations:
+                        wire_name: "2026-04-14"
+        """)
+        )
+        self.assertIn('"2026-04-14"', source)
+        self.assertIn("setAnnotations(kAnnotations)", source)
 
     def test_command_view_type_generates_anchor(self) -> None:
         """Test anchor generation on command with view parameter."""
@@ -1698,6 +1850,137 @@ class TestGenerator(testcase.IDLTestcase):
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
+
+
+class TestAnnotationsCodegen(testcase.IDLTestcase):
+    """Direct unit tests for the _gen_annotations_* helpers on _CppSourceFileWriter."""
+
+    def _emit(self, key, value, depth=0):
+        # type: (object, object, int) -> str
+        """Run _gen_annotations_elem on a fresh writer and return the generated text."""
+        stream = io.StringIO()
+        source_writer = idl.generator._CppSourceFileWriter(
+            idl.writer.IndentedTextWriter(stream), target_arch=""
+        )
+        source_writer._gen_annotations_elem("builder", key, value, depth=depth)
+        return stream.getvalue()
+
+    def test_scalar_string_keyed(self):
+        self.assertEqual(self._emit('"k"', "hello"), 'builder.append("k", "hello");\n')
+
+    def test_scalar_string_unkeyed(self):
+        self.assertEqual(self._emit(None, "hello"), 'builder.append("hello");\n')
+
+    def test_scalar_bool_true(self):
+        self.assertEqual(self._emit('"k"', True), 'builder.append("k", true);\n')
+
+    def test_scalar_bool_false(self):
+        self.assertEqual(self._emit('"k"', False), 'builder.append("k", false);\n')
+
+    def test_scalar_int(self):
+        self.assertEqual(self._emit('"k"', 3), 'builder.append("k", 3);\n')
+
+    def test_scalar_float(self):
+        self.assertEqual(self._emit('"k"', 3.25), 'builder.append("k", 3.25);\n')
+
+    def test_null_keyed(self):
+        self.assertEqual(self._emit('"k"', None), 'builder.appendNull("k");\n')
+
+    def test_null_unkeyed(self):
+        self.assertEqual(self._emit(None, None), "builder.appendNull();\n")
+
+    def test_empty_dict(self):
+        expected = dedent("""\
+            {
+                BSONObjBuilder sub0(builder.subobjStart("k"));
+            }
+            """)
+        self.assertEqual(self._emit('"k"', {}), expected)
+
+    def test_flat_dict(self):
+        expected = dedent("""\
+            {
+                BSONObjBuilder sub0(builder.subobjStart("k"));
+                sub0.append("a", 1);
+            }
+            """)
+        self.assertEqual(self._emit('"k"', {"a": 1}), expected)
+
+    def test_nested_dict_depth_counter(self):
+        # Depth increments so nested sub-builder names don't collide.
+        expected = dedent("""\
+            {
+                BSONObjBuilder sub0(builder.subobjStart("root"));
+                {
+                    BSONObjBuilder sub1(sub0.subobjStart("outer"));
+                    sub1.append("inner", 1);
+                }
+            }
+            """)
+        self.assertEqual(self._emit('"root"', {"outer": {"inner": 1}}), expected)
+
+    def test_empty_list(self):
+        expected = dedent("""\
+            {
+                BSONArrayBuilder arr0(builder.subarrayStart("k"));
+            }
+            """)
+        self.assertEqual(self._emit('"k"', []), expected)
+
+    def test_flat_list(self):
+        expected = dedent("""\
+            {
+                BSONArrayBuilder arr0(builder.subarrayStart("k"));
+                arr0.append(1);
+                arr0.append(2);
+            }
+            """)
+        self.assertEqual(self._emit('"k"', [1, 2]), expected)
+
+    def test_list_of_dicts(self):
+        # Items inside a list use the unkeyed subobjStart form and advance depth.
+        expected = dedent("""\
+            {
+                BSONArrayBuilder arr0(builder.subarrayStart("k"));
+                {
+                    BSONObjBuilder sub1(arr0.subobjStart());
+                    sub1.append("a", 1);
+                }
+                {
+                    BSONObjBuilder sub1(arr0.subobjStart());
+                    sub1.append("b", 2);
+                }
+            }
+            """)
+        self.assertEqual(self._emit('"k"', [{"a": 1}, {"b": 2}]), expected)
+
+    def test_scalar_rejects_date(self):
+        with self.assertRaises(ValueError):
+            self._emit('"k"', datetime.date(2026, 4, 14))
+
+    def test_scalar_rejects_datetime(self):
+        with self.assertRaises(ValueError):
+            self._emit('"k"', datetime.datetime(2026, 4, 14, 10, 30))
+
+    def test_scalar_rejects_nan(self):
+        with self.assertRaises(ValueError):
+            self._emit('"k"', float("nan"))
+
+    def test_scalar_rejects_positive_inf(self):
+        with self.assertRaises(ValueError):
+            self._emit('"k"', float("inf"))
+
+    def test_scalar_rejects_negative_inf(self):
+        with self.assertRaises(ValueError):
+            self._emit('"k"', float("-inf"))
+
+    def test_scalar_rejects_bytes(self):
+        with self.assertRaises(ValueError):
+            self._emit('"k"', b"hello")
+
+    def test_scalar_rejects_set(self):
+        with self.assertRaises(ValueError):
+            self._emit('"k"', {"a", "b"})
 
 
 if __name__ == "__main__":

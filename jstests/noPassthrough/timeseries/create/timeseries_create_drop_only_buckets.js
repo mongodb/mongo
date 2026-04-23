@@ -7,6 +7,7 @@
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_replication,
+ *     featureFlagMarkTimeseriesEventsInOplog_incompatible,
  * ]
  */
 import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";

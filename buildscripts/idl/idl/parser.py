@@ -917,6 +917,13 @@ def _parse_server_parameter_class(ctxt, node):
     return spc
 
 
+def _parse_annotations(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode) -> Dict[str, Any]
+    """Parse an annotations block as an opaque YAML mapping."""
+    constructor = yaml.constructor.SafeConstructor()
+    return constructor.construct_object(node, deep=True)
+
+
 def _parse_server_parameter(ctxt, spec, name, node):
     # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a server_parameters section in the IDL file."""
@@ -950,6 +957,7 @@ def _parse_server_parameter(ctxt, spec, name, node):
             "omit_in_ftdc": _RuleDesc("bool_scalar"),
             "cpp_class": _RuleDesc("scalar_or_mapping", mapping_parser_func=map_class),
             "is_deprecated": _RuleDesc("bool_scalar"),
+            "annotations": _RuleDesc("mapping", mapping_parser_func=_parse_annotations),
         },
     )
 

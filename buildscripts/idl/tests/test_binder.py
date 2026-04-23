@@ -2364,6 +2364,76 @@ class TestBinder(testcase.IDLTestcase):
             """)
         )
 
+    def test_server_parameter_annotations_positive(self):
+        # type: () -> None
+        """Positive server parameter annotations test cases."""
+
+        # server parameter with cpp_varname and simple annotations.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_varname: baz
+                annotations:
+                    query_knob:
+                        wire_name: fooWire
+                        applicability: queryShape
+            """)
+        )
+
+        # server parameter with cpp_class and annotations.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_class: baz
+                annotations:
+                    query_knob:
+                        wire_name: fooWire
+            """)
+        )
+
+        # annotations with nested mapping (fcv sub-block).
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_varname: baz
+                annotations:
+                    query_knob:
+                        wire_name: fooWire
+                        applicability: queryShape
+                        fcv:
+                            min: "9.0"
+            """)
+        )
+
+        # multiple annotation keys.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: false
+                cpp_varname: baz
+                annotations:
+                    query_knob:
+                        wire_name: fooWire
+                    security:
+                        audit: true
+            """)
+        )
+
     def test_server_parameter_negative(self):
         # type: () -> None
         """Negative server parameter test cases."""

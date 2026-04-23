@@ -508,18 +508,6 @@ public:
     bool shouldForceUpdateWithFullDocument() const override {
         return true;
     }
-
-    bool supportsAsyncOplogMarkerGeneration() const override {
-        return false;
-    }
-
-    bool supportsOplogSampling() const override {
-        return false;
-    }
-
-    bool supportsPersistentOplogCapMaintainerThread() const override {
-        return true;
-    }
 };
 
 TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequiresIt_Fails) {

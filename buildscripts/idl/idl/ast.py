@@ -492,6 +492,8 @@ class ServerParameter(common.SourceLocation):
 
         self.is_deprecated = False  # type: bool
 
+        self.annotations = None  # type: Dict[str, Any]
+
         super(ServerParameter, self).__init__(file_name, line, column)
 
 

@@ -461,7 +461,6 @@ CollectionTruncateMarkers::computeInitialCreationMethod(
     int64_t numRecords,
     int64_t dataSize,
     int64_t minBytesPerMarker,
-    bool forceScanning,
     boost::optional<int64_t> numberOfMarkersToKeepForOplog) {
     // Don't calculate markers if this is a new collection. This is to prevent standalones from
     // attempting to get a forward scanning cursor on an explicit create of the collection. These
@@ -471,8 +470,8 @@ CollectionTruncateMarkers::computeInitialCreationMethod(
         return MarkersCreationMethod::EmptyCollection;
     }
 
-    // Force scanning if the slow collection scanning flag is enabled or if required by the caller.
-    if (forceScanning || gUseSlowCollectionTruncateMarkerScanning) {
+    // Force scanning if the slow collection scanning flag is enabled.
+    if (gUseSlowCollectionTruncateMarkerScanning) {
         return MarkersCreationMethod::Scanning;
     }
 
@@ -501,7 +500,6 @@ CollectionTruncateMarkers::createFromCollectionIterator(
     OperationContext* opCtx,
     CollectionIterator& collectionIterator,
     int64_t minBytesPerMarker,
-    bool forceScanning,
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
     boost::optional<int64_t> numberOfMarkersToKeepForOplog) {
 
@@ -514,7 +512,7 @@ CollectionTruncateMarkers::createFromCollectionIterator(
           "dataSize"_attr = dataSize);
 
     auto creationMethod = CollectionTruncateMarkers::computeInitialCreationMethod(
-        numRecords, dataSize, minBytesPerMarker, forceScanning, numberOfMarkersToKeepForOplog);
+        numRecords, dataSize, minBytesPerMarker, numberOfMarkersToKeepForOplog);
 
     switch (creationMethod) {
         case MarkersCreationMethod::EmptyCollection:

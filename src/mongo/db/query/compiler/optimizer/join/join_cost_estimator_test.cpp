@@ -57,28 +57,6 @@ public:
         graph.addEdge(largeNodeId, unselectiveNodeId, {});
         graph.addEdge(smallNodeId, largeNodeId, {});
 
-        collCards = {
-            makeCard(1000),         // smallNode
-            makeCard(20'000),       // largeNode
-            makeCard(20'000),       // unselectiveNode
-            makeCard(1),            // extremelySmallNode
-            makeCard(100'000'000),  // selectiveNode
-        };
-
-        constexpr double docSizeBytes = 500;
-        catStats = {
-            .collStats = {
-                {smallNss,
-                 CollectionStats{collCards[smallNodeId].toDouble() * docSizeBytes,
-                                 collCards[smallNodeId].toDouble() * docSizeBytes}},
-                {largeNss,
-                 CollectionStats{collCards[largeNodeId].toDouble() * docSizeBytes,
-                                 collCards[largeNodeId].toDouble() * docSizeBytes}},
-                {extremelySmallNss,
-                 CollectionStats{collCards[extremelySmallNodeId].toDouble() * docSizeBytes,
-                                 collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
-            }};
-
         jCtx.emplace(makeContext());
 
         SubsetCardinalities subsetCards{
@@ -91,12 +69,34 @@ public:
             {makeNodeSet(smallNodeId, unselectiveNodeId), makeCard(1000)},
             {makeNodeSet(largeNodeId, unselectiveNodeId), makeCard(1000)},
         };
+        NodeCardinalities collCards{
+            makeCard(1000),         // smallNode
+            makeCard(20'000),       // largeNode
+            makeCard(20'000),       // unselectiveNode
+            makeCard(1),            // extremelySmallNode
+            makeCard(100'000'000),  // selectiveNode
+        };
         EdgeSelectivities edgeSel{
             makeSel(1000.0 / (1'000 * 20'000)),   // smallNode <--> unselectiveNode
             makeSel(1000.0 / (20'000 * 20'000)),  // largeNode <--> unselectiveNode
             makeSel(1.0 / (1000 * 20'000)),       // smallNode <--> largeId
         };
-        cardEstimator = std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, edgeSel);
+        cardEstimator =
+            std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, edgeSel, collCards);
+
+        constexpr double docSizeBytes = 500;
+        jCtx->catStats = {
+            .collStats = {
+                {smallNss,
+                 CollectionStats{collCards[smallNodeId].toDouble() * docSizeBytes,
+                                 collCards[smallNodeId].toDouble() * docSizeBytes}},
+                {largeNss,
+                 CollectionStats{collCards[largeNodeId].toDouble() * docSizeBytes,
+                                 collCards[largeNodeId].toDouble() * docSizeBytes}},
+                {extremelySmallNss,
+                 CollectionStats{collCards[extremelySmallNodeId].toDouble() * docSizeBytes,
+                                 collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
+            }};
 
         costEstimator = std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator);
         planEnumCtx = std::make_unique<PlanEnumeratorContext>(
@@ -135,51 +135,30 @@ public:
 };
 
 TEST_F(JoinCostEstimatorTest, LargerCollectionHasHigherCost) {
-    auto smallCost =
-        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId, zeroCost);
-    auto largeCost =
-        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(largeNodeId, zeroCost);
+    auto smallCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId);
+    auto largeCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(largeNodeId);
     ASSERT_GT(largeCost, smallCost);
 }
 
 TEST_F(JoinCostEstimatorTest, LargerIndexScanHasHigherCost) {
-    auto smallCost =
-        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId, zeroCost);
-    auto largeCost =
-        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(largeNodeId, zeroCost);
+    auto smallCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId);
+    auto largeCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(largeNodeId);
     ASSERT_GT(largeCost, smallCost);
 }
 
 TEST_F(JoinCostEstimatorTest, SelectiveIndexScanHasSmallerCostThanCollScan) {
-    auto collScanCost =
-        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(selectiveNodeId, zeroCost);
+    auto collScanCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(selectiveNodeId);
     auto indexScanCost =
-        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(selectiveNodeId, zeroCost);
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(selectiveNodeId);
     ASSERT_GT(collScanCost, indexScanCost);
 }
 
 TEST_F(JoinCostEstimatorTest, UnselectiveIndexScanHasLargerCostThanCollScan) {
     auto collScanCost =
-        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(unselectiveNodeId, zeroCost);
+        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(unselectiveNodeId);
     auto indexScanCost =
-        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(unselectiveNodeId, zeroCost);
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(unselectiveNodeId);
     ASSERT_GT(indexScanCost, collScanCost);
-}
-
-TEST_F(JoinCostEstimatorTest, CBRCostAddedDirectlyToCollScanCost) {
-    auto cbrCost = CostEstimate{CostType{5.0}, EstimationSource::Code};
-    auto withoutCBR =
-        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId, zeroCost);
-    auto withCBR = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId, cbrCost);
-    ASSERT_EQ(withCBR.getTotalCost(), withoutCBR.getTotalCost() + cbrCost);
-}
-
-TEST_F(JoinCostEstimatorTest, CBRCostAddedDirectlyToIndexScanCost) {
-    auto cbrCost = CostEstimate{CostType{10.0}, EstimationSource::Code};
-    auto withoutCBR =
-        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId, zeroCost);
-    auto withCBR = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId, cbrCost);
-    ASSERT_EQ(withCBR.getTotalCost(), withoutCBR.getTotalCost() + cbrCost);
 }
 
 const JoinSubset& getJoinSubsetForNodeId(const std::vector<JoinSubset>& subsets, NodeId nodeId) {
@@ -291,15 +270,16 @@ public:
         auto* cqPtr = graph.getNode(nodeId).accessPath.get();
         cbrCqQsns.emplace(cqPtr, makeIndexScanFetchPlan(nss, IndexBounds{}, {"a"}));
 
-        collCards = {makeCard(collCardValue)};
-        catStats = {.collStats = {{nss,
-                                   CollectionStats{collCardValue * docSizeBytes,
-                                                   collCardValue * docSizeBytes}}}};
-
         jCtx.emplace(makeContext());
 
         SubsetCardinalities subsetCards{{makeNodeSet(nodeId), makeCard(numDocsOutputValue)}};
-        cardEstimator = std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards);
+        NodeCardinalities collCards{makeCard(collCardValue)};
+        cardEstimator =
+            std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, collCards);
+
+        jCtx->catStats = {.collStats = {{nss,
+                                         CollectionStats{collCardValue * docSizeBytes,
+                                                         collCardValue * docSizeBytes}}}};
 
         costEstimator = std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator);
     }
@@ -315,7 +295,7 @@ public:
 // fewer distinct sort-sparse IO groups, so numLogicalPageRequests (= NDV * selectivity) is smaller.
 TEST_F(IndexScanNDVCostTest, LowNDVHasLowerCostThanHighNDV) {
     // Without sampling estimators the fallback is numLogicalPageRequests = numDocsOutput = 200.
-    auto costWithoutNDV = costEstimator->costIndexScanFragment(nodeId, zeroCost);
+    auto costWithoutNDV = costEstimator->costIndexScanFragment(nodeId);
 
     // With NDV = 50 (< numDocsOutput = 200):
     //   numLogicalPageRequests = 50 * 200 / 1000 = 10 → lower cost.
@@ -325,20 +305,9 @@ TEST_F(IndexScanNDVCostTest, LowNDVHasLowerCostThanHighNDV) {
     samplingEstimators.emplace(nss, std::move(fakeNdvEstimator));
     jCtx->samplingEstimators = &samplingEstimators;
 
-    auto costWithLowNDV = costEstimator->costIndexScanFragment(nodeId, zeroCost);
+    auto costWithLowNDV = costEstimator->costIndexScanFragment(nodeId);
 
     ASSERT_GT(costWithoutNDV, costWithLowNDV);
-}
-
-TEST(JoinEstimatesTest, NumDocsProcessedFromCpuCost) {
-    ASSERT_EQ(0.0, numDocsProcessedFromCpuCost(zeroCost).toDouble());
-
-    // The mapping is linear in the CPU cost: doubling the input exactly doubles the output.
-    const CostEstimate cpu{CostType{1.0}, EstimationSource::Code};
-    const double docsForCpu = numDocsProcessedFromCpuCost(cpu).toDouble();
-    const double docsFor2xCpu = numDocsProcessedFromCpuCost(cpu * 2.0).toDouble();
-    ASSERT_GT(docsForCpu, 0.0);
-    ASSERT_EQ(2.0 * docsForCpu, docsFor2xCpu);
 }
 
 TEST(MackertLohmanTest, CollectionFitsInCache) {

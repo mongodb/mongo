@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_mongobridge,
  *   requires_timeseries,
- *   requires_fcv_90,
  *   featureFlagCreateViewlessTimeseriesCollections,
  *   multiversion_incompatible,
  * ]

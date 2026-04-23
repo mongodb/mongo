@@ -155,50 +155,6 @@ struct MetricCreator<Gauge<double>> {
 };
 
 template <>
-struct MetricCreator<MinGauge<int64_t>> {
-    static MinGauge<int64_t>& create(MetricsService* svc,
-                                     MetricName name,
-                                     std::string desc,
-                                     MetricUnit unit,
-                                     const MetricOptions<MinGauge<int64_t>>& options = {}) {
-        return svc->createInt64MinGauge(name, std::move(desc), unit, options);
-    }
-};
-
-template <>
-struct MetricCreator<MinGauge<double>> {
-    static MinGauge<double>& create(MetricsService* svc,
-                                    MetricName name,
-                                    std::string desc,
-                                    MetricUnit unit,
-                                    const MetricOptions<MinGauge<double>>& options = {}) {
-        return svc->createDoubleMinGauge(name, std::move(desc), unit, options);
-    }
-};
-
-template <>
-struct MetricCreator<MaxGauge<int64_t>> {
-    static MaxGauge<int64_t>& create(MetricsService* svc,
-                                     MetricName name,
-                                     std::string desc,
-                                     MetricUnit unit,
-                                     const MetricOptions<MaxGauge<int64_t>>& options = {}) {
-        return svc->createInt64MaxGauge(name, std::move(desc), unit, options);
-    }
-};
-
-template <>
-struct MetricCreator<MaxGauge<double>> {
-    static MaxGauge<double>& create(MetricsService* svc,
-                                    MetricName name,
-                                    std::string desc,
-                                    MetricUnit unit,
-                                    const MetricOptions<MaxGauge<double>>& options = {}) {
-        return svc->createDoubleMaxGauge(name, std::move(desc), unit, options);
-    }
-};
-
-template <>
 struct MetricCreator<Histogram<int64_t>> {
     static Histogram<int64_t>& create(MetricsService* svc,
                                       MetricName name,
@@ -252,22 +208,6 @@ struct AlternativeScalarWidthMetricType<Gauge<double>> {
     using type = Gauge<int64_t>;
 };
 template <>
-struct AlternativeScalarWidthMetricType<MinGauge<int64_t>> {
-    using type = MinGauge<double>;
-};
-template <>
-struct AlternativeScalarWidthMetricType<MinGauge<double>> {
-    using type = MinGauge<int64_t>;
-};
-template <>
-struct AlternativeScalarWidthMetricType<MaxGauge<int64_t>> {
-    using type = MaxGauge<double>;
-};
-template <>
-struct AlternativeScalarWidthMetricType<MaxGauge<double>> {
-    using type = MaxGauge<int64_t>;
-};
-template <>
 struct AlternativeScalarWidthMetricType<Histogram<int64_t>> {
     using type = Histogram<double>;
 };
@@ -301,10 +241,6 @@ using MetricTypes = testing::Types<Counter<int64_t>,
                                    UpDownCounter<double>,
                                    Gauge<int64_t>,
                                    Gauge<double>,
-                                   MinGauge<int64_t>,
-                                   MinGauge<double>,
-                                   MaxGauge<int64_t>,
-                                   MaxGauge<double>,
                                    Histogram<int64_t>,
                                    Histogram<double>>;
 TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
@@ -1109,98 +1045,6 @@ TEST_F(CreateDoubleGaugeTest, RecordsValues) {
     gauge1.set(20.8);
     if (metricsCapturer.canReadMetrics()) {
         ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 20.8);
-    }
-}
-
-using CreateInt64MinGaugeTest = MetricsServiceTest;
-
-TEST_F(CreateInt64MinGaugeTest, RecordsMinimumValue) {
-    OtelMetricsCapturer metricsCapturer(*metricsService);
-    MinGauge<int64_t>& gauge = metricsService->createInt64MinGauge(
-        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-
-    gauge.setIfLess(10);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 10);
-    }
-
-    gauge.setIfLess(5);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 5);
-    }
-
-    gauge.setIfLess(20);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 5);
-    }
-}
-
-using CreateDoubleMinGaugeTest = MetricsServiceTest;
-
-TEST_F(CreateDoubleMinGaugeTest, RecordsMinimumValue) {
-    OtelMetricsCapturer metricsCapturer(*metricsService);
-    MinGauge<double>& gauge = metricsService->createDoubleMinGauge(
-        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-
-    gauge.setIfLess(10.5);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 10.5);
-    }
-
-    gauge.setIfLess(3.14);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 3.14);
-    }
-
-    gauge.setIfLess(20.0);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 3.14);
-    }
-}
-
-using CreateInt64MaxGaugeTest = MetricsServiceTest;
-
-TEST_F(CreateInt64MaxGaugeTest, RecordsMaximumValue) {
-    OtelMetricsCapturer metricsCapturer(*metricsService);
-    MaxGauge<int64_t>& gauge = metricsService->createInt64MaxGauge(
-        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-
-    gauge.setIfGreater(5);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 5);
-    }
-
-    gauge.setIfGreater(10);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 10);
-    }
-
-    gauge.setIfGreater(3);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 10);
-    }
-}
-
-using CreateDoubleMaxGaugeTest = MetricsServiceTest;
-
-TEST_F(CreateDoubleMaxGaugeTest, RecordsMaximumValue) {
-    OtelMetricsCapturer metricsCapturer(*metricsService);
-    MaxGauge<double>& gauge = metricsService->createDoubleMaxGauge(
-        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-
-    gauge.setIfGreater(3.14);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 3.14);
-    }
-
-    gauge.setIfGreater(10.5);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 10.5);
-    }
-
-    gauge.setIfGreater(2.0);
-    if (metricsCapturer.canReadMetrics()) {
-        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 10.5);
     }
 }
 

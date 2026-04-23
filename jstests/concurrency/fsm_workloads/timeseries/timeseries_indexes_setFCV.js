@@ -6,7 +6,7 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   # setFCV requires all nodes on the latest binary.
+ *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
  *   # TODO (SERVER-104171) Remove the 'assumes_balancer_off' tag
  *   assumes_balancer_off,
@@ -75,16 +75,6 @@ export const $config = (function () {
         assert.commandWorked(db[collName].insert({t: new Date(), temp: 42}));
     };
     const teardown = function (db, collName, cluster) {
-        // TODO(SERVER-114573): Remove once v9.0 is last LTS and viewless timeseries upgrade/downgrade doesn't happen.
-        // A downgrade may have been interrupted due to an index build (SERVER-119738), we must complete it before upgrading to latest.
-        assert.commandWorkedOrFailedWithCode(
-            db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-            // "10778001: Cannot downgrade featureCompatibilityVersion if a previous FCV upgrade stopped in the middle ..."
-            // This error indicates that setFCV was interrupted during an upgrade rather than downgrade.
-            // The next setFCV command will complete that upgrade and set the FCV to 'latest' for tests that run afterwards.
-            10778001,
-        );
-
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
 

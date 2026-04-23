@@ -30,7 +30,6 @@
 #include "mongo/db/storage/oplog_truncate_markers.h"
 
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
@@ -59,20 +58,15 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createEmptyOplogTrun
         0,
         Microseconds{0},
         CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
-        false /* initialSamplingFinished */,
         *rs.oplog());
 }
 
-OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarkerCreation(
-    OperationContext* opCtx, RecordStore& rs) {
-    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    bool asyncGenerationEnabled = provider.supportsAsyncOplogMarkerGeneration();
-    bool samplingEnabled = provider.supportsOplogSampling();
-
+std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(OperationContext* opCtx,
+                                                                            RecordStore& rs) {
     LOGV2(10621000,
           "Beginning initial marker creation.",
-          "Async generation"_attr = asyncGenerationEnabled,
-          "Sampling enabled"_attr = samplingEnabled);
+          "Asynchronous sampling:"_attr = gOplogSamplingAsyncEnabled);
+    // Sample
     long long maxSize = rs.oplog()->getMaxSize();
     invariant(maxSize > 0);
     invariant(rs.keyFormat() == KeyFormat::Long);
@@ -90,7 +84,7 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
     unsigned long long numTruncateMarkers = maxSize / oplogTruncateMarkerSize;
     size_t numTruncateMarkersToKeep = std::min(
         kMaxTruncateMarkersToKeep, std::max(kMinTruncateMarkersToKeep, numTruncateMarkers));
-    int64_t minBytesPerTruncateMarker = maxSize / numTruncateMarkersToKeep;
+    auto minBytesPerTruncateMarker = maxSize / numTruncateMarkersToKeep;
     uassert(7206300,
             fmt::format("Cannot create oplog of size less than {} bytes", numTruncateMarkersToKeep),
             minBytesPerTruncateMarker > 0);
@@ -98,7 +92,7 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
     // We need to read the whole oplog, override the recoveryUnit's oplogVisibleTimestamp.
     ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
         shard_role_details::getRecoveryUnit(opCtx), boost::none);
-    auto yieldInterval = asyncGenerationEnabled && gOplogSamplingAsyncYieldIntervalMs >= 0
+    auto yieldInterval = gOplogSamplingAsyncEnabled && gOplogSamplingAsyncYieldIntervalMs >= 0
         ? boost::optional<Milliseconds>(gOplogSamplingAsyncYieldIntervalMs)
         : boost::none;
     auto iterator = CollectionTruncateMarkers::makeIterator(
@@ -115,7 +109,6 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
         opCtx,
         *iterator,
         minBytesPerTruncateMarker,
-        !samplingEnabled,
         [](const Record& record) {
             BSONObj obj = record.data.toBson();
             auto wallTime = obj.hasField(repl::DurableOplogEntry::kWallClockTimeFieldName)
@@ -131,52 +124,41 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
     LOGV2(10621110, "Initial set of markers created.", "oplogSizeBytes"_attr = rs.dataSize());
 
-    return {std::move(initialSetOfMarkers),
-            minBytesPerTruncateMarker,
-            true /* initialSamplingFinished */};
+    // This value will eventually replace the empty OplogTruncateMarker object with this newly
+    // populated object now that initial sampling has finished.
+    auto otm = std::make_shared<OplogTruncateMarkers>(std::move(initialSetOfMarkers.markers),
+                                                      initialSetOfMarkers.leftoverRecordsCount,
+                                                      initialSetOfMarkers.leftoverRecordsBytes,
+                                                      minBytesPerTruncateMarker,
+                                                      initialSetOfMarkers.timeTaken,
+                                                      initialSetOfMarkers.methodUsed,
+                                                      *rs.oplog());
+    otm->initialSamplingFinished();
+    return otm;
 }
 
 std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateMarkers(
     OperationContext* opCtx, RecordStore& rs) {
-    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    if (!provider.supportsAsyncOplogMarkerGeneration()) {
-        // Synchronous path: build the full initial marker set before returning.
-        auto initialSetOfMarkers = beginMarkerCreation(opCtx, rs);
-        return std::make_shared<OplogTruncateMarkers>(std::move(initialSetOfMarkers), *rs.oplog());
+    if (!gOplogSamplingAsyncEnabled) {
+        return sampleAndUpdate(opCtx, rs);
     }
-    // Asynchronous path: return an empty placeholder. The cap maintainer thread will later call
-    // beginMarkerCreation() and replace this object's state with the populated marker set.
     return createEmptyOplogTruncateMarkers(rs);
 }
 
 OplogTruncateMarkers::OplogTruncateMarkers(
-    std::deque<CollectionTruncateMarkers::Marker>&& markers,
+    std::deque<CollectionTruncateMarkers::Marker> markers,
     int64_t partialMarkerRecords,
     int64_t partialMarkerBytes,
     int64_t minBytesPerMarker,
     Microseconds totalTimeSpentBuilding,
     CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
-    bool initialSamplingFinished,
     const RecordStore::Oplog& oplog)
     : CollectionTruncateMarkers(std::move(markers),
                                 partialMarkerRecords,
                                 partialMarkerBytes,
                                 minBytesPerMarker,
                                 totalTimeSpentBuilding,
-                                creationMethod,
-                                initialSamplingFinished),
-      _oplog(oplog) {}
-
-OplogTruncateMarkers::OplogTruncateMarkers(
-    OplogTruncateMarkers::InitialSetOfOplogMarkers&& initialSetOfMarkers,
-    const RecordStore::Oplog& oplog)
-    : CollectionTruncateMarkers(std::move(initialSetOfMarkers.markers),
-                                initialSetOfMarkers.leftoverRecordsCount,
-                                initialSetOfMarkers.leftoverRecordsBytes,
-                                initialSetOfMarkers.minBytesPerTruncateMarker,
-                                initialSetOfMarkers.timeTaken,
-                                initialSetOfMarkers.methodUsed,
-                                initialSetOfMarkers.initialSamplingFinished),
+                                creationMethod),
       _oplog(oplog) {}
 
 bool OplogTruncateMarkers::isDead() {

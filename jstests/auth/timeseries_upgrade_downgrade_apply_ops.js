@@ -6,7 +6,6 @@
  * supported anymore.
  *
  * @tags: [
- *   requires_fcv_90,
  *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */

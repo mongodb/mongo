@@ -8645,12 +8645,8 @@ export const authCommandsLib = {
             testcases: testcases_transformationOnly,
             skipTest: (conn) => {
                 // Can't run on mongos. Also, $_internalJoinHint requires join optimization which
-                // is unavailable when the classic engine is forced, or the path arrayness feature is disabled.
-                return (
-                    !isStandalone(conn) ||
-                    isForceClassicEngine(conn) ||
-                    !isFeatureEnabled(conn, "featureFlagPathArrayness")
-                );
+                // is unavailable when the classic engine is forced.
+                return !isStandalone(conn) || isForceClassicEngine(conn);
             },
             setup: function (db) {
                 // Only works with join optimization enabled.
@@ -8660,8 +8656,6 @@ export const authCommandsLib = {
                         internalEnableJoinOptimization: true,
                     }),
                 );
-                // Need an index for multikeyness info.
-                assert.commandWorked(db.foo.createIndex({dummy: -1, i: 1}));
                 // Add a document to collection "foo".
                 assert.commandWorked(db.foo.insertOne({_id: 0, i: 0}));
             },
@@ -8672,8 +8666,7 @@ export const authCommandsLib = {
                         internalEnableJoinOptimization: false,
                     }),
                 );
-                // Clean up doc & index.
-                assert.commandWorked(db.foo.dropIndex({dummy: -1, i: 1}));
+                // Clean up doc.
                 assert.commandWorked(db.foo.deleteOne({_id: 0, i: 0}));
             },
         },

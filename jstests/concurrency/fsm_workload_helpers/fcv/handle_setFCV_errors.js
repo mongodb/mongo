@@ -26,7 +26,7 @@ export function handleRandomSetFCVErrors(e, targetFCV) {
         );
         return true;
     }
-    if (e.code === ErrorCodes.BackgroundOperationInProgressForNamespace) {
+    if (e.code === 12587) {
         // Cannot downgrade FCV that requires a collMod command when index builds are
         // concurrently taking place.
         jsTestLog(

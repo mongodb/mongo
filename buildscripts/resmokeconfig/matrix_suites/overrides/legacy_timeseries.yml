@@ -18,7 +18,7 @@
   value:
     selector:
       exclude_with_any_tags:
-        - requires_fcv_90
+        - featureFlagCreateViewlessTimeseriesCollections
       exclude_files:
         # This test calls checkWriteConcernBehaviorForAllCommands() with limitToTimeseriesViews=true,
         # which internally runs setFeatureCompatibilityVersion to latestFCV. This is incompatible
@@ -31,7 +31,7 @@
         - assumes_standalone_mongod
         - assumes_against_mongod_not_mongos
         - requires_profiling
-        - requires_fcv_90
+        - featureFlagCreateViewlessTimeseriesCollections
 - name: all_jscore_timeseries_tests_selector
   value:
     selector:

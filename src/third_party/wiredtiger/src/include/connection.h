@@ -329,10 +329,10 @@ struct __wt_page_history_item {
     WT_PAGE_HISTORY_KEY key;
 
     uint64_t first_global_read_count;
-    wt_timestamp_t first_read_timestamp;
+    uint64_t first_read_timestamp;
 
     uint64_t last_global_read_count;
-    wt_timestamp_t last_read_timestamp;
+    uint64_t last_read_timestamp;
 
     uint32_t num_evicts;
     uint32_t num_reads;
@@ -780,9 +780,9 @@ struct __wt_connection_impl {
 
     WT_RWLOCK hot_backup_lock; /* Hot backup serialization */
     wt_shared uint64_t
-      hot_backup_start; /* Clock value of most recent checkpoint needed by hot backup */
-    wt_timestamp_t hot_backup_timestamp; /* Stable timestamp of checkpoint for the open backup */
-    char **hot_backup_list;              /* Hot backup file list */
+      hot_backup_start;            /* Clock value of most recent checkpoint needed by hot backup */
+    uint64_t hot_backup_timestamp; /* Stable timestamp of checkpoint for the open backup */
+    char **hot_backup_list;        /* Hot backup file list */
     uint32_t *partial_backup_remove_ids; /* Remove btree id list for partial backup */
 
     WT_CKPT_CONNECTION ckpt;

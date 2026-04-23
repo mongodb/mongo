@@ -1567,6 +1567,7 @@ def _bind_server_parameter(ctxt, param):
     ast_param.omit_in_ftdc = param.omit_in_ftdc
 
     ast_param.is_deprecated = param.is_deprecated
+    ast_param.annotations = param.annotations
 
     ast_param.set_at = _bind_server_parameter_set_at(ctxt, param)
     if ast_param.set_at is None:

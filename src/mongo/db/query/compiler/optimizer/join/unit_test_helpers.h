@@ -101,29 +101,10 @@ public:
      */
     JoinReorderingContext makeContext() {
         joinGraphStorage = JoinGraph(std::move(graph));
-        const auto numNodes = joinGraphStorage->numNodes();
-
-        NodeCardinalities collCardinalities = collCards.empty()
-            ? NodeCardinalities(numNodes, cost_based_ranker::oneCE)
-            : std::move(collCards);
-
-        NodeCardinalities nodeCardinalities =
-            nodeCards.empty() ? collCardinalities : std::move(nodeCards);
-
-        NodeCBRCosts costs = nodeCBRCosts.empty()
-            ? NodeCBRCosts(numNodes, cost_based_ranker::zeroCost)
-            : std::move(nodeCBRCosts);
-
-        SingleTableAccessPlansResult singleTableAccess{
-            .cbrCqQsns = std::move(cbrCqQsns),
-            .estimate = {},
-            .nodeCardinalities = std::move(nodeCardinalities),
-            .collCardinalities = std::move(collCardinalities),
-            .nodeCBRCosts = std::move(costs)};
 
         JoinReorderingContext jCtx{.joinGraph = joinGraphStorage.value(),
                                    .resolvedPaths = std::move(resolvedPaths),
-                                   .singleTableAccess = std::move(singleTableAccess),
+                                   .cbrCqQsns = std::move(cbrCqQsns),
                                    .perCollIdxs = std::move(perCollIdxs),
                                    .catStats = std::move(catStats)};
 
@@ -148,8 +129,6 @@ protected:
     AvailableIndexes perCollIdxs;
     SubsetCardinalities subsetCards;
     NodeCardinalities collCards;
-    NodeCardinalities nodeCards;
-    NodeCBRCosts nodeCBRCosts;
     CatalogStats catStats;
 
     std::vector<int> seeds;
@@ -249,7 +228,10 @@ public:
      */
     FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx)
         : JoinCardinalityEstimator(
-              jCtx, EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel)) {
+              jCtx,
+              EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel),
+              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::oneCE),
+              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::zeroCE)) {
         for (uint64_t i = 0; i < std::pow(2, jCtx.joinGraph.numNodes()); ++i) {
             _subsetCardinalities.emplace(
                 NodeSet::fromUIntBitSet(i),
@@ -260,13 +242,17 @@ public:
     }
 
     /**
-     * This constructor allows the caller to control the results of
-     * 'getOrEstimateSubsetCardinality()'. Per-node and collection cardinalities are read from
-     * 'jCtx.singleTableAccess', which tests can populate directly.
+     * This constuctor allows the caller to control the results of
+     * 'getOrEstimateSubsetCardinality()' and 'getCollCardinality()'.
      */
-    FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx, SubsetCardinalities subsetCards)
+    FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx,
+                                 SubsetCardinalities subsetCards,
+                                 NodeCardinalities collCards)
         : JoinCardinalityEstimator(
-              jCtx, EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel)) {
+              jCtx,
+              EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel),
+              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::oneCE),
+              std::move(collCards)) {
         _subsetCardinalities = std::move(subsetCards);
     }
 
@@ -275,8 +261,12 @@ public:
      */
     FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx,
                                  SubsetCardinalities subsetCards,
-                                 EdgeSelectivities edgeSels)
-        : JoinCardinalityEstimator(jCtx, std::move(edgeSels)) {
+                                 EdgeSelectivities edgeSels,
+                                 NodeCardinalities collCards)
+        : JoinCardinalityEstimator(jCtx,
+                                   EdgeSelectivities(std::move(edgeSels)),
+                                   NodeCardinalities(collCards),
+                                   collCards) {
         _subsetCardinalities = std::move(subsetCards);
     }
 };
