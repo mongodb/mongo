@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
+#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -59,5 +61,48 @@ TEST_F(InternalConvertBucketIndexStatsTest, QueryShapeAndRedaction) {
         })",
         redact(*stage));
 }
+
+TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextSkipsFailedConversionWithoutPausing) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto timeseriesOptions = TimeseriesConversionOptions{"t"};
+    auto convertIndexStatsStage =
+        std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
+
+    // First document has a key that cannot be converted to time-series format (will produce an
+    // empty result from makeTimeseriesIndexStats). Second document is a valid index stats entry.
+    auto source = DocumentSourceMock::createForTest(
+        {"{spec: {name: 'unconvertibleIndex', key: {a: 1}}}",
+         "{spec: {name: 'validIndex', key: {'control.min.t': 1, 'control.max.t': 1, "
+         "'control.min.metric': 1, 'control.max.metric': 1}}}"},
+        expCtx);
+    convertIndexStatsStage->setSource(source.get());
+
+    // The unconvertible document should be silently skipped (not returned as PauseExecution).
+    auto next = convertIndexStatsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.getDocument(),
+        Document(fromjson(
+            "{spec: {name: 'validIndex', key: {t: 1, metric: 1}}, key: {t: 1, metric: 1}}")));
+
+    // Should be EOF now.
+    ASSERT_TRUE(convertIndexStatsStage->getNext().isEOF());
+}
+
+TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextSkipsAllFailedConversions) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto timeseriesOptions = TimeseriesConversionOptions{"t"};
+    auto convertIndexStatsStage =
+        std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
+
+    // All documents fail conversion.
+    auto source = DocumentSourceMock::createForTest(
+        {"{spec: {name: 'idx1', key: {a: 1}}}", "{spec: {name: 'idx2', key: {b: 1}}}"}, expCtx);
+    convertIndexStatsStage->setSource(source.get());
+
+    // Should skip both unconvertible documents and return EOF.
+    ASSERT_TRUE(convertIndexStatsStage->getNext().isEOF());
+}
+
 }  // namespace
 }  // namespace mongo
