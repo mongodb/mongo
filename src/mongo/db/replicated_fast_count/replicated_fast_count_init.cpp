@@ -69,12 +69,8 @@ void _handleStatus(const Status& status, StringData collDescription, const Names
               "collDescription"_attr = collDescription,
               "ns"_attr = nss.toStringForErrorMsg());
     } else {
-        massert(11757500,
-                fmt::format("Failed to create the {} collection with error '{}' and code {}",
-                            collDescription,
-                            status.reason(),
-                            status.code()),
-                false);
+        massertStatusOK(
+            status.withContext(fmt::format("Failed to create the {} collection", collDescription)));
     }
 }
 
