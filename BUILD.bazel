@@ -601,8 +601,6 @@ py_binary(
     ],
 )
 
-# Unused for now due to instrumented mongod crashing on machines slightly different than the one
-# it gets built on
 bolt_instrument(
     name = "bolt_instrumented_mongod",
     binary_to_instrument = "//src/mongo/db:mongod",
@@ -611,7 +609,7 @@ bolt_instrument(
         "no-remote": "1",
         "local": "1",
     },
-    instrumentation_output_file = "/tmp/mongod_bolt/mongod.fdata",
+    instrumentation_output_file = "/tmp/mongod.fdata",
     target_compatible_with = select({
         "//bazel/config:bolt_profile_generate_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],

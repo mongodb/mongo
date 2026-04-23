@@ -59,25 +59,32 @@ def _setup_bolt_data(repository_ctx):
             repository_ctx.download(bolt_profile_urls_env, bolt_fdata_filename)
         else:
             url_num = 0
-            print("Downloading and extracting multiple bolt files.")
+            print("Downloading multiple bolt files.")
+            need_perf2bolt = False
             for url in bolt_urls:
-                print("Downloading and extracting: " + url)
-                repository_ctx.download_and_extract(url, str(url_num))
+                if url.endswith(".fdata"):
+                    print("Downloading fdata: " + url)
+                    repository_ctx.download(url, str(url_num) + "/bolt.fdata")
+                else:
+                    print("Downloading and extracting: " + url)
+                    repository_ctx.download_and_extract(url, str(url_num))
+                    need_perf2bolt = True
                 url_num += 1
-
-            # Download the mongod binary for perf2bolt
-            print("Download the mongo binaries from: " + bolt_binary_env)
-            repository_ctx.download_and_extract(bolt_binary_env, "binaries")
 
             files = get_all_files(repository_ctx.path("."), 20)
             data_files = [file for file in files if file.basename.endswith(".data")]
             fdata_files = [file for file in files if file.basename.endswith(".fdata")]
-            binary = [file for file in files if file.basename.endswith(bolt_binary_name)][0]
-
-            processed_fdata_files = 0
 
             # This is scenario 2, we need to turn these data files into fdata files using perf2bolt
-            if len(data_files) > 0:
+            if need_perf2bolt and len(data_files) > 0:
+                # Download the mongod binary for perf2bolt
+                print("Download the mongo binaries from: " + bolt_binary_env)
+                repository_ctx.download_and_extract(bolt_binary_env, "binaries")
+
+                files = get_all_files(repository_ctx.path("."), 20)
+                binary = [file for file in files if file.basename.endswith(bolt_binary_name)][0]
+
+                processed_fdata_files = 0
                 print("Found data files, turning them into fdata files with perf2bolt.")
                 for file in data_files:
                     fdata_file_name = "bolt" + str(processed_fdata_files) + ".fdata"
