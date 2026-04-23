@@ -6169,8 +6169,14 @@ Value ExpressionTrim::evaluate(const Document& root, Variables* variables) const
                           << typeName(unvalidatedUserChars.getType()) << ") instead.",
             unvalidatedUserChars.getType() == BSONType::String);
 
-    return Value(
-        doTrim(input, extractCodePointsFromChars(unvalidatedUserChars.getStringData(), _name)));
+    auto unvalidatedUserCharsStringData = unvalidatedUserChars.getStringData();
+    uassert(12066800,
+            str::stream() << _name << " requires 'chars' to be not greater than "
+                          << _kMaximumAllowedTrimStringBytes << " bytes, got "
+                          << unvalidatedUserCharsStringData.size() << " bytes instead.",
+            unvalidatedUserCharsStringData.size() <= _kMaximumAllowedTrimStringBytes);
+
+    return Value(doTrim(input, extractCodePointsFromChars(unvalidatedUserCharsStringData, _name)));
 }
 
 bool ExpressionTrim::codePointMatchesAtIndex(const StringData& input,
