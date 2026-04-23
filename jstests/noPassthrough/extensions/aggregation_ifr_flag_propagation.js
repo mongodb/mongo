@@ -2,7 +2,7 @@
  * Tests that IFR flags are correctly propagated from router (mongos) to shards during aggregation
  * commands, and that the correct flag values are honored in different scenarios.
  *
- * @tags: [featureFlagExtensionsAPI, requires_profiling]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch, requires_profiling]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
