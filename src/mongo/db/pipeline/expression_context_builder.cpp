@@ -436,12 +436,10 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     } else {
         if (collectionCollator) {
             collator(collectionCollator->clone());
-        } else {
-            // If there is no collection or request collator we call
-            // isIdHackEligibleQueryWithoutCollator() in order to evaluate if 'request' is an
-            // IDHACK query.
-            isIdHackQuery(isIdHackEligibleQueryWithoutCollator(request));
         }
+        // With no request collation the inherited collation always matches the collection's
+        // default, so IDHACK eligibility depends only on the query structure.
+        isIdHackQuery(isIdHackEligibleQueryWithoutCollator(request));
     }
 
     isFleQuery(request.getEncryptionInformation().has_value());

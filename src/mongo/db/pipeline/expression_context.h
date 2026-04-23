@@ -951,6 +951,19 @@ public:
     }
 
     /**
+     * Sets the IDHACK eligibility flag. Used when an aggregation pipeline is converted to a
+     * find-style canonical query, since the flag cannot be computed at aggregation ExpCtx build
+     * time (the collection is not yet available).
+     *
+     * The flag may not be cleared once set. Downstream code (express path, SBE selection,
+     * index-catalog skip) may have already branched on it.
+     */
+    inline void setIsIdHackQuery(bool v) {
+        tassert(12310000, "isIdHackQuery may not be cleared once set", !_params.isIdHackQuery || v);
+        _params.isIdHackQuery = v;
+    }
+
+    /**
      * Returns if query contains encryption information as part of the request.
      */
     inline bool isFleQuery() const {

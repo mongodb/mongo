@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -38,6 +39,10 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_factory_mock.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -375,6 +380,113 @@ TEST_F(ExpressionContextTest, IfrContextIsSharedWithSubPipeline) {
     // Verify that 'expCtx' and 'subExpCtx' share the same IFRContext.
     ASSERT_EQ(ifrContext.get(), subExpCtx->getIfrContext().get());
     ASSERT_EQ(expCtx->getIfrContext().get(), subExpCtx->getIfrContext().get());
+}
+
+// Tests for ExpressionContextBuilder::fromRequest(FindCommandRequest) IDHACK eligibility.
+// The key behavior: when there is no explicit request collation, isIdHackQuery is set based
+// purely on query structure, regardless of whether the collection has a default collator.
+// Before SERVER-123100 this was only done when the collection had no collator, which was a bug
+// because an inherited (no-request) collation always matches the collection's default.
+
+TEST_F(ExpressionContextTest, FindOnIdWithNoCollationSetsIsIdHackQuery) {
+    auto opCtx = makeOperationContext();
+    auto request = FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.coll"));
+    request.setFilter(fromjson("{_id: 1}"));
+
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), request, nullptr).build();
+    ASSERT_TRUE(expCtx->isIdHackQuery());
+}
+
+TEST_F(ExpressionContextTest, FindOnIdWithCollectionCollatorSetsIsIdHackQuery) {
+    // Regression test for SERVER-123100: before this fix, a find on _id against a collection with
+    // a custom collator (but no explicit request collation) would not set isIdHackQuery=true,
+    // causing the IDHACK/express fast path to be skipped.
+    auto opCtx = makeOperationContext();
+    auto request = FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.coll"));
+    request.setFilter(fromjson("{_id: 1}"));
+
+    CollatorInterfaceMock collectionCollator(CollatorInterfaceMock::MockType::kReverseString);
+    auto expCtx =
+        ExpressionContextBuilder{}.fromRequest(opCtx.get(), request, &collectionCollator).build();
+    ASSERT_TRUE(expCtx->isIdHackQuery());
+}
+
+TEST_F(ExpressionContextTest, FindOnNonIdFieldDoesNotSetIsIdHackQuery) {
+    auto opCtx = makeOperationContext();
+    auto request = FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.coll"));
+    request.setFilter(fromjson("{a: 1}"));
+
+    CollatorInterfaceMock collectionCollator(CollatorInterfaceMock::MockType::kReverseString);
+    auto expCtx =
+        ExpressionContextBuilder{}.fromRequest(opCtx.get(), request, &collectionCollator).build();
+    ASSERT_FALSE(expCtx->isIdHackQuery());
+}
+
+TEST_F(ExpressionContextTest, FindOnIdWithMismatchedCollationDoesNotSetIsIdHackQuery) {
+    // When the request carries an explicit collation that does not match the collection's default
+    // collator, the collatorsMatch() check returns false and isIdHackQuery must remain false.
+    // This exercises the 'else if (haveMatchingCollators)' branch in fromRequest.
+    auto opCtx = makeOperationContext();
+    CollatorFactoryInterface::set(opCtx->getServiceContext(),
+                                  std::make_unique<CollatorFactoryMock>());
+
+    auto request = FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.coll"));
+    request.setFilter(fromjson("{_id: 1}"));
+    // Any non-simple spec; CollatorFactoryMock always parses non-simple specs as kReverseString.
+    request.setCollation(BSON("locale" << "mock_always_equal"));
+
+    // Collection collator is kAlwaysEqual — its spec differs from kReverseString, so
+    // collatorsMatch returns false and isIdHackQuery must not be set.
+    CollatorInterfaceMock collectionCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto expCtx =
+        ExpressionContextBuilder{}.fromRequest(opCtx.get(), request, &collectionCollator).build();
+    ASSERT_FALSE(expCtx->isIdHackQuery());
+}
+
+TEST_F(ExpressionContextTest, FindOnIdWithMatchingExplicitCollationSetsIsIdHackQuery) {
+    // When the request carries an explicit collation that matches the collection's default
+    // collator, haveMatchingCollators is true and isIdHackQuery must be set based on the filter.
+    // CollatorFactoryMock always parses any non-simple spec as kReverseString, so both the
+    // request collator and the collection collator are kReverseString and their specs match.
+    auto opCtx = makeOperationContext();
+    CollatorFactoryInterface::set(opCtx->getServiceContext(),
+                                  std::make_unique<CollatorFactoryMock>());
+
+    auto request = FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.coll"));
+    request.setFilter(fromjson("{_id: 1}"));
+    request.setCollation(BSON("locale" << "mock_reverse"));
+
+    CollatorInterfaceMock collectionCollator(CollatorInterfaceMock::MockType::kReverseString);
+    auto expCtx =
+        ExpressionContextBuilder{}.fromRequest(opCtx.get(), request, &collectionCollator).build();
+    ASSERT_TRUE(expCtx->isIdHackQuery());
+}
+
+TEST_F(ExpressionContextTest, FindOnIdWithHintDoesNotSetIsIdHackQuery) {
+    // A hint disqualifies IDHACK: isIdHackEligibleQueryWithoutCollator() returns false whenever
+    // the hint is non-empty, regardless of the filter shape.
+    auto opCtx = makeOperationContext();
+    auto request = FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.coll"));
+    request.setFilter(fromjson("{_id: 1}"));
+    request.setHint(fromjson("{_id: 1}"));
+
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), request, nullptr).build();
+    ASSERT_FALSE(expCtx->isIdHackQuery());
+}
+
+TEST_F(ExpressionContextTest, SetIsIdHackQueryIsIdempotent) {
+    // setIsIdHackQuery(true) on an already-true flag must be a no-op, not a tassert failure.
+    // This exercises the monotone-upgrade invariant: false→true is allowed, true→true is
+    // also allowed, and true→false would fire the tassert.
+    auto opCtx = makeOperationContext();
+    auto request = FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.coll"));
+    request.setFilter(fromjson("{_id: 1}"));
+
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), request, nullptr).build();
+    ASSERT_TRUE(expCtx->isIdHackQuery());
+    // Calling setIsIdHackQuery(true) again must not throw or tassert.
+    expCtx->setIsIdHackQuery(true);
+    ASSERT_TRUE(expCtx->isIdHackQuery());
 }
 
 }  // namespace

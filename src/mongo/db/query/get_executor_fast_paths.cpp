@@ -49,6 +49,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/internal_plans.h"
@@ -161,7 +162,15 @@ std::unique_ptr<classic_runtime_planner::IdHackPlanner> tryIdHack(
     CanonicalQuery* cq,
     const std::function<PlannerData()>& makePlannerData) {
     const auto& mainCollection = collections.getMainCollection();
-    if (!isIdHackEligibleQuery(mainCollection, *cq)) {
+    // Use the authoritative live check rather than the pre-computed isIdHackQuery() flag,
+    // which can be stale when a sub-query inherits an outer ExpressionContext (e.g. from
+    // $graphLookup/$lookup at runtime) whose flag was set for the outer _id point query.
+    // IDHackStage's constructor casts getPrimaryMatchExpression() to
+    // ComparisonMatchExpressionBase and tasserts if it's null, so we must validate here.
+    if (!isIdHackEligibleQueryWithoutCollator(cq->getFindCommandRequest(),
+                                              cq->getPrimaryMatchExpression()) ||
+        !CollatorInterface::collatorsMatch(cq->getCollator(),
+                                           mainCollection->getDefaultCollator())) {
         return nullptr;
     }
 

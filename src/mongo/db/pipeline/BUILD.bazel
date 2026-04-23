@@ -1189,6 +1189,8 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/scripting:scripting_server",
         "//src/mongo/unittest",
     ],
@@ -1516,6 +1518,29 @@ mongo_cc_unit_test(
         ":aggregation_context_fixture",
         ":pipeline",
         "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipeline_d_test",
+    srcs = [
+        "pipeline_d_test.cpp",
+    ],
+    tags = [
+        # Requires access to /data/db/ for storage.
+        "code_coverage_quarantine",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        ":expression_context_for_test",
+        ":pipeline",
+        "//src/mongo/db:expression_context_builder",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/unittest",
     ],
 )
 
