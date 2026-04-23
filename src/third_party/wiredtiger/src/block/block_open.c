@@ -337,8 +337,7 @@ __wti_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 static bool
 __file_is_wt_internal(const char *name)
 {
-    return (strcmp(name, WT_METAFILE) == 0 || strcmp(name, WT_HS_FILE) == 0 ||
-      strcmp(name, WT_CC_METAFILE) == 0);
+    return (strcmp(name, WT_METAFILE) == 0 || strcmp(name, WT_HS_FILE) == 0);
 }
 
 /*

@@ -28,7 +28,6 @@ struct __wt_verbose_message_info {
     "WT_VERB_CHECKPOINT", \
     "WT_VERB_CHECKPOINT_CLEANUP", \
     "WT_VERB_CHECKPOINT_PROGRESS", \
-    "WT_VERB_CHUNKCACHE", \
     "WT_VERB_COMPACT", \
     "WT_VERB_COMPACT_PROGRESS", \
     "WT_VERB_CONFIGURATION", \
@@ -137,10 +136,12 @@ struct __wt_verbose_multi_category {
     ((WT_VERBOSE_MULTI_CATEGORY){.categories = (items), .cnt = WT_ELEMENTS(items)})
 
 /* Set the verbosity level for a given category. */
-#define WT_SET_VERBOSE_LEVEL(session, category, level) S2C(session)->verbose[category] = level;
+#define WT_SET_VERBOSE_LEVEL(session, category, level) \
+    __wt_atomic_store_enum_relaxed(&S2C(session)->verbose[category], level)
 
 /* Check if a given verbosity level satisfies the verbosity level of a category. */
-#define WT_VERBOSE_LEVEL_ISSET(session, category, level) (level <= S2C(session)->verbose[category])
+#define WT_VERBOSE_LEVEL_ISSET(session, category, level) \
+    ((level) <= __wt_atomic_load_enum_relaxed(&S2C(session)->verbose[category]))
 
 /*
  * Given this verbosity check is without an explicit verbosity level, the macro checks whether the
@@ -152,7 +153,8 @@ struct __wt_verbose_multi_category {
 /* Set the verbose level and save the previous value. */
 #define WT_VERBOSE_SET_AND_SAVE(session, verbose_orig_level, category, level) \
     do {                                                                      \
-        verbose_orig_level[category] = S2C(session)->verbose[category];       \
+        verbose_orig_level[category] =                                        \
+          __wt_atomic_load_enum_relaxed(&S2C(session)->verbose[category]);    \
         WT_SET_VERBOSE_LEVEL(session, category, level);                       \
     } while (0)
 

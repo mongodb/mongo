@@ -201,7 +201,7 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
     WT_STORAGE_SOURCE *storage_source;
     size_t len;
     char *tmp;
-    const char *cfg[2], *local_name, *obj_name, *sp_obj_name;
+    const char *cfg[2], *local_name, *obj_name;
 
     WT_ASSERT(session, (op == WT_TIERED_WORK_FLUSH || op == WT_TIERED_WORK_FLUSH_FINISH));
     dhandle = (WT_DATA_HANDLE *)tiered;
@@ -252,12 +252,6 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
         if (ret == ENOENT)
             ret = 0;
         else if (ret == 0) {
-            /* Cache the flushed content into chunk cache. */
-            WT_ERR(__wt_tiered_name(
-              session, &tiered->iface, 0, WT_TIERED_NAME_SKIP_PREFIX, &sp_obj_name));
-            WT_ERR_ERROR_OK(
-              __wt_chunkcache_ingest(session, local_name, sp_obj_name, id), ENOSPC, false);
-
             /* We can now release the local object. */
             WT_ERR(__tier_release_local_object(session, tiered, id));
 

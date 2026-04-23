@@ -14,7 +14,6 @@ test_checkpoint34.py
 test_checkpoint35.py
 test_checkpoint_snapshot03.py
 test_checkpoint_snapshot05.py
-test_chunkcache02.py
 test_compact02.py
 test_compact03.py
 test_compact04.py

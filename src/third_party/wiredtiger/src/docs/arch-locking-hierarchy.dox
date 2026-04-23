@@ -73,14 +73,6 @@ are covered with \c WT_ASSERT_SPINLOCK_OWNED statements which make the code easi
 @row{WRITE \c table_lock, &rarr;, WRITE \c dhandle_lock}
 </table>
 
-<table class=lock-hierarchy>
-@row{\c reconfig_lock, &rarr;, WRITE \c chunkcache->pinned_objects.array_lock}
-</table>
-
-<table class=lock-hierarchy>
-@row{\c reconfig_lock, &rarr;, \c chunkcache->hashtable[*].bucket_lock, &rarr;, READ \c chunkcache->pinned_objects.array_lock}
-</table>
-
 @section arch-locking-hierarchy-examples Examples
 
 @subsection arch-locking-hierarchy-examples-eviction0 Eviction (no queue lock)

@@ -651,18 +651,17 @@ struct __wt_connection_impl {
 
     const char *cfg; /* Connection configuration */
 
-    WT_SPINLOCK api_lock;                 /* Connection API spinlock */
-    WT_SPINLOCK checkpoint_lock;          /* Checkpoint spinlock */
-    WT_SPINLOCK chunkcache_metadata_lock; /* Chunk cache metadata spinlock */
-    WT_SPINLOCK fh_lock;                  /* File handle queue spinlock */
-    WT_SPINLOCK flush_tier_lock;          /* Flush tier spinlock */
-    WT_SPINLOCK metadata_lock;            /* Metadata update spinlock */
-    WT_SPINLOCK reconfig_lock;            /* Single thread reconfigure */
-    WT_SPINLOCK schema_lock;              /* Schema operation spinlock */
-    WT_RWLOCK table_lock;                 /* Table list lock */
-    WT_SPINLOCK tiered_lock;              /* Tiered work queue spinlock */
-    WT_SPINLOCK turtle_lock;              /* Turtle file spinlock */
-    WT_RWLOCK dhandle_lock;               /* Data handle list lock */
+    WT_SPINLOCK api_lock;        /* Connection API spinlock */
+    WT_SPINLOCK checkpoint_lock; /* Checkpoint spinlock */
+    WT_SPINLOCK fh_lock;         /* File handle queue spinlock */
+    WT_SPINLOCK flush_tier_lock; /* Flush tier spinlock */
+    WT_SPINLOCK metadata_lock;   /* Metadata update spinlock */
+    WT_SPINLOCK reconfig_lock;   /* Single thread reconfigure */
+    WT_SPINLOCK schema_lock;     /* Schema operation spinlock */
+    WT_RWLOCK table_lock;        /* Table list lock */
+    WT_SPINLOCK tiered_lock;     /* Tiered work queue spinlock */
+    WT_SPINLOCK turtle_lock;     /* Turtle file spinlock */
+    WT_RWLOCK dhandle_lock;      /* Data handle list lock */
 
     /* Connection queue */
     TAILQ_ENTRY(__wt_connection_impl) q;
@@ -714,11 +713,6 @@ struct __wt_connection_impl {
 
     WT_FH *lock_fh; /* Lock file handle */
 
-    /* Locked: chunk cache metadata work queue (and length counter). */
-    TAILQ_HEAD(__wt_chunkcache_metadata_qh, __wt_chunkcache_metadata_work_unit)
-    chunkcache_metadataqh;
-    int chunkcache_queue_len;
-
     /*
      * The connection keeps a cache of data handles. The set of handles can grow quite large so we
      * maintain both a simple list and a hash table of lists. The hash table key is based on a hash
@@ -742,7 +736,6 @@ struct __wt_connection_impl {
 
     WT_BLKCACHE blkcache;             /* Block cache */
     WT_CHECKPOINT_CLEANUP cc_cleanup; /* Checkpoint cleanup */
-    WT_CHUNKCACHE chunkcache;         /* Chunk cache */
 
     uint64_t *dh_bucket_count;                   /* Locked: handles in each bucket */
     wt_shared uint64_t dhandle_count;            /* Locked: handles in the queue */
@@ -899,11 +892,6 @@ struct __wt_connection_impl {
     uint64_t flush_most_recent;         /* Clock value of last flush_tier */
     uint32_t flush_state;               /* State of last flush tier */
     wt_timestamp_t flush_ts;            /* Timestamp of most recent flush_tier */
-
-    WT_SESSION_IMPL *chunkcache_metadata_session; /* Chunk cache metadata server thread session */
-    wt_thread_t chunkcache_metadata_tid;          /* Chunk cache metadata thread */
-    bool chunkcache_metadata_tid_set;             /* Chunk cache metadata thread set */
-    WT_CONDVAR *chunkcache_metadata_cond;         /* Chunk cache metadata wait mutex */
 
     WT_LOG_MANAGER log_mgr;
 
@@ -1093,19 +1081,18 @@ struct __wt_connection_impl {
  * Server subsystem flags.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CONN_SERVER_CAPACITY 0x0001u
-#define WT_CONN_SERVER_CHECKPOINT 0x0002u
-#define WT_CONN_SERVER_CHECKPOINT_CLEANUP 0x0004u
-#define WT_CONN_SERVER_CHUNKCACHE_METADATA 0x0008u
-#define WT_CONN_SERVER_COMPACT 0x0010u
-#define WT_CONN_SERVER_EVICTION 0x0020u
-#define WT_CONN_SERVER_LAYERED 0x0040u
-#define WT_CONN_SERVER_LOG 0x0080u
-#define WT_CONN_SERVER_PREFETCH 0x0100u
-#define WT_CONN_SERVER_RTS 0x0200u
-#define WT_CONN_SERVER_STATISTICS 0x0400u
-#define WT_CONN_SERVER_SWEEP 0x0800u
-#define WT_CONN_SERVER_TIERED 0x1000u
+#define WT_CONN_SERVER_CAPACITY 0x001u
+#define WT_CONN_SERVER_CHECKPOINT 0x002u
+#define WT_CONN_SERVER_CHECKPOINT_CLEANUP 0x004u
+#define WT_CONN_SERVER_COMPACT 0x008u
+#define WT_CONN_SERVER_EVICTION 0x010u
+#define WT_CONN_SERVER_LAYERED 0x020u
+#define WT_CONN_SERVER_LOG 0x040u
+#define WT_CONN_SERVER_PREFETCH 0x080u
+#define WT_CONN_SERVER_RTS 0x100u
+#define WT_CONN_SERVER_STATISTICS 0x200u
+#define WT_CONN_SERVER_SWEEP 0x400u
+#define WT_CONN_SERVER_TIERED 0x800u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 

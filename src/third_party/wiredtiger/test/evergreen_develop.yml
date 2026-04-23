@@ -21,7 +21,6 @@ variables:
     - ".checkpoint-perf"
     - ".evict-perf"
     - ".log-perf"
-    - ".chunk-cache-perf"
     - ".long-perf"
     - ".oplog-perf"
     - ".wt2853-perf"

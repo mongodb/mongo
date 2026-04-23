@@ -192,7 +192,6 @@ extern const char __WT_CONFIG_CHOICE_checkpoint_progress[];
 extern const char __WT_CONFIG_CHOICE_checkpoint_slow[];
 extern const char __WT_CONFIG_CHOICE_checkpoint_stop[];
 extern const char __WT_CONFIG_CHOICE_checkpoint_validate[];
-extern const char __WT_CONFIG_CHOICE_chunkcache[];
 extern const char __WT_CONFIG_CHOICE_clear[];
 extern const char __WT_CONFIG_CHOICE_cold[];
 extern const char __WT_CONFIG_CHOICE_commit[];

@@ -129,20 +129,6 @@ struct __wt_cell_unpack_kv;
 typedef struct __wt_cell_unpack_kv WT_CELL_UNPACK_KV;
 struct __wt_checkpoint_cleanup;
 typedef struct __wt_checkpoint_cleanup WT_CHECKPOINT_CLEANUP;
-struct __wt_chunkcache;
-typedef struct __wt_chunkcache WT_CHUNKCACHE;
-struct __wt_chunkcache_bucket;
-typedef struct __wt_chunkcache_bucket WT_CHUNKCACHE_BUCKET;
-struct __wt_chunkcache_chunk;
-typedef struct __wt_chunkcache_chunk WT_CHUNKCACHE_CHUNK;
-struct __wt_chunkcache_hashid;
-typedef struct __wt_chunkcache_hashid WT_CHUNKCACHE_HASHID;
-struct __wt_chunkcache_intermediate_hash;
-typedef struct __wt_chunkcache_intermediate_hash WT_CHUNKCACHE_INTERMEDIATE_HASH;
-struct __wt_chunkcache_metadata_work_unit;
-typedef struct __wt_chunkcache_metadata_work_unit WT_CHUNKCACHE_METADATA_WORK_UNIT;
-struct __wt_chunkcache_pinned_list;
-typedef struct __wt_chunkcache_pinned_list WT_CHUNKCACHE_PINNED_LIST;
 struct __wt_ckpt;
 typedef struct __wt_ckpt WT_CKPT;
 struct __wt_ckpt_block_mods;
@@ -586,7 +572,6 @@ typedef uint64_t wt_timestamp_t;
 #include "bitstring.h"
 #include "block.h"
 #include "block_cache.h"
-#include "block_chunkcache.h"
 #include "btmem.h"
 #include "btree.h"
 #include "cache.h"

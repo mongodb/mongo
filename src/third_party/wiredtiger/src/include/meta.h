@@ -38,7 +38,7 @@
 #define WT_HS_ID 1                                           /* ID for HS */
 #define WT_HS_ID_SHARED 2                                    /* ID for shared HS */
 
-#define WT_CC_METAFILE "WiredTigerCC.wt"          /* Chunk cache metadata table */
+/* Deprecated: chunk cache has been removed, kept for metadata cleanup during upgrade. */
 #define WT_CC_METAFILE_URI "file:WiredTigerCC.wt" /* Chunk cache metadata table URI */
 
 #define WT_DISAGG_METADATA_FILE "WiredTigerShared.wt_stable"     /* Shared metadata table */

@@ -392,30 +392,6 @@ configure_tiered_storage(const char *home, char **p, size_t max, char *ext_cfg, 
 }
 
 /*
- * configure_chunkcache --
- *     Configure chunk cache settings for opening a connection.
- */
-static void
-configure_chunkcache(char **p, size_t max)
-{
-    char chunkcache_ext_cfg[512];
-
-    if (GV(CHUNK_CACHE)) {
-        if (strcmp(GVS(CHUNK_CACHE_TYPE), "FILE") == 0)
-            testutil_snprintf(chunkcache_ext_cfg, sizeof(chunkcache_ext_cfg), "storage_path=%s,",
-              strcmp(GVS(CHUNK_CACHE_STORAGE_PATH), "off") != 0 ? GVS(CHUNK_CACHE_STORAGE_PATH) :
-                                                                  "WiredTigerChunkCache");
-        else
-            chunkcache_ext_cfg[0] = '\0';
-
-        CONFIG_APPEND(*p,
-          ",chunk_cache=(enabled=true,capacity=%" PRIu32 "MB,chunk_size=%" PRIu32 "MB,type=%s,%s)",
-          GV(CHUNK_CACHE_CAPACITY), GV(CHUNK_CACHE_CHUNK_SIZE), GVS(CHUNK_CACHE_TYPE),
-          chunkcache_ext_cfg);
-    }
-}
-
-/*
  * configure_prefetch --
  *     Configure prefetch settings for opening a connection. When enabled, this allows sessions to
  *     use the prefetch feature.
@@ -557,9 +533,6 @@ create_database(const char *home, WT_CONNECTION **connp)
 
     /* Optional tiered storage. */
     configure_tiered_storage(home, &p, max, tiered_ext_cfg, sizeof(tiered_ext_cfg));
-
-    /* Optional chunk cache. */
-    configure_chunkcache(&p, max);
 
     /* Optional prefetch. */
     configure_prefetch(&p, max);

@@ -3,8 +3,8 @@
     "modules": [
         # Modules in subdirectories of src/
         Module("block"),
-        Module("block_cache", fileAliases=["block_chunkcache"],
-               sourceAliases = ["blkcache", "bm", "chunkcache"]),
+        Module("block_cache",
+               sourceAliases = ["blkcache", "bm"]),
         Module("btree", fileAliases=["btmem", "btree_cmp", "dhandle", "modify", "ref", "serial"],
                sourceAliases = ["ref", "page", "dhandle", "btcur"]),
         Module("call_log"),

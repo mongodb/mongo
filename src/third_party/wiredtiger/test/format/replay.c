@@ -136,6 +136,14 @@ replay_maximum_committed(void)
         }
         if (ts == 0)
             ts = 1;
+        /*
+         * Only update the cached value when we've moved forward. A reclaimed lane's stale
+         * last_commit_ts can produce a lower minimum, but everything up to the previously cached
+         * value is already committed and safe to use as the stable timestamp.
+         */
+        if (ts < g.replay_cached_committed)
+            ts = g.replay_cached_committed;
+
         g.replay_cached_committed = ts;
         testutil_check(pthread_rwlock_unlock(&g.lane_lock));
     }

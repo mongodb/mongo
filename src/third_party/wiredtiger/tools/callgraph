@@ -633,7 +633,7 @@ our (%modules, %moduleDirs, %moduleAliasesFile, %moduleAliasesSrc);
 
 %modules = (
   block => {},
-  block_cache => {fileAliases=>["block_chunkcache"], sourceAliases=>["blkcache", "bm"]},
+  block_cache => {sourceAliases=>["blkcache", "bm"]},
   block_disagg => {},
   btree => {fileAliases=>["btmem", "btree_cmp", "dhandle", "modify", "ref", "serial"]},
   call_log => {},

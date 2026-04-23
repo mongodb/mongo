@@ -174,16 +174,12 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     WT_BLOCK_HEADER *blk, swap;
     size_t bufsize, check_size;
     uint64_t time_start, time_stop;
-    int failures, max_failures;
-    bool chunkcache_hit, full_checksum_mismatch;
+    bool full_checksum_mismatch;
 
     time_start = __wt_clock(session);
 
-    chunkcache_hit = full_checksum_mismatch = false;
-    check_size = 0;
-    failures = 0;
+    full_checksum_mismatch = false;
     bufsize = size;
-    max_failures = F_ISSET(&S2C(session)->chunkcache, WT_CHUNKCACHE_CONFIGURED) ? 2 : 1;
     __wt_verbose_debug2(session, WT_VERB_READ,
       "off %" PRIuMAX ", size %" PRIu32 ", checksum %#" PRIx32, (uintmax_t)offset, size, checksum);
 
@@ -202,75 +198,36 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     WT_RET(__wt_buf_init(session, buf, bufsize));
     buf->size = size;
 
-    while (failures < max_failures) {
-        full_checksum_mismatch = false;
-        if (F_ISSET(&S2C(session)->chunkcache, WT_CHUNKCACHE_CONFIGURED)) {
-            if (failures == 0) {
-                /*
-                 * Check if the chunk cache has the needed data. If there is a miss in the chunk
-                 * cache, it will read and cache the data. If the chunk cache has exceeded its
-                 * configured capacity and is unable to evict chunks quickly enough, it will return
-                 * the error code indicating that it is out of space. We do not propagate this error
-                 * up to our caller; we read the needed data ourselves instead.
-                 */
-                WT_RET_ERROR_OK(__wt_chunkcache_get(session, block, objectid, offset, size,
-                                  buf->mem, &chunkcache_hit),
-                  ENOSPC);
-            }
-        }
-        if (!chunkcache_hit || failures > 0) {
-            __wt_capacity_throttle(session, size, WT_THROTTLE_READ);
-            WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
-        }
+    __wt_capacity_throttle(session, size, WT_THROTTLE_READ);
+    WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 
+    /*
+     * We incrementally read through the structure before doing a checksum, do little- to big-endian
+     * handling early on, and then select from the original or swapped structure as needed.
+     */
+    blk = WT_BLOCK_HEADER_REF(buf->mem);
+    __wt_block_header_byteswap_copy(blk, &swap);
+    check_size = F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP;
+    if (swap.checksum == checksum) {
         /*
-         * We incrementally read through the structure before doing a checksum, do little- to
-         * big-endian handling early on, and then select from the original or swapped structure as
-         * needed.
+         * Set block header checksum to 0 to allow the checksum to be computed, as its calculation
+         * includes the block header. Not clearing it would result in the checksum being
+         * miscalculated. blk->checksum remains cleared, as it will not be revisited during a B-tree
+         * traversal.
          */
-        blk = WT_BLOCK_HEADER_REF(buf->mem);
-        __wt_block_header_byteswap_copy(blk, &swap);
-        check_size = F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP;
-        if (swap.checksum == checksum) {
+        blk->checksum = 0;
+        if (__wt_checksum_match(buf->mem, check_size, checksum)) {
+            time_stop = __wt_clock(session);
+            __wt_stat_msecs_hist_incr_bmread(session, WT_CLOCKDIFF_MS(time_stop, time_start));
+
             /*
-             * Set block header checksum to 0 to allow the checksum to be computed, as its
-             * calculation includes the block header. Not clearing it would result in the checksum
-             * being miscalculated. blk->checksum remains cleared, as it will not be revisited
-             * during a B-tree traversal.
+             * Swap the page-header as needed; this doesn't belong here, but it's the best place to
+             * catch all callers.
              */
-            blk->checksum = 0;
-            if (__wt_checksum_match(buf->mem, check_size, checksum)) {
-                time_stop = __wt_clock(session);
-                __wt_stat_msecs_hist_incr_bmread(session, WT_CLOCKDIFF_MS(time_stop, time_start));
-
-                /*
-                 * Swap the page-header as needed; this doesn't belong here, but it's the best place
-                 * to catch all callers.
-                 */
-                __wt_page_header_byteswap(buf->mem);
-                return (0);
-            }
-            full_checksum_mismatch = true;
+            __wt_page_header_byteswap(buf->mem);
+            return (0);
         }
-        failures++;
-
-        /*
-         * If chunk cache is configured we want to account for the race condition where the chunk
-         * cache could have stale content, and therefore a mismatched checksum. We can also have
-         * corrupted data in the chunk cache. For those scenarios, we do not want to fail
-         * immediately, so we will reload the data and retry one time.
-         */
-        if (failures < max_failures) {
-            __wt_verbose(session, WT_VERB_BLOCK,
-              "Reloading data due to checksum mismatch for block: %s" PRIu32 ", offset: %" PRIuMAX
-              ", size: %" PRIu32
-              " with possibly stale or corrupt chunk cache content for object id: %" PRIu32
-              ". Retrying once.",
-              block->name, (uintmax_t)offset, size, objectid);
-            WT_RET(__wt_chunkcache_free_external(session, block, objectid, offset, size));
-            WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
-            WT_STAT_CONN_INCR(session, chunkcache_retries_checksum_mismatch);
-        }
+        full_checksum_mismatch = true;
     }
 
     if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)) {

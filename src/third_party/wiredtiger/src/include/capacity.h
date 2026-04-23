@@ -9,11 +9,10 @@
 #pragma once
 
 typedef enum {
-    WT_THROTTLE_CHUNKCACHE, /* Chunk cache throttle */
-    WT_THROTTLE_CKPT,       /* Checkpoint throttle */
-    WT_THROTTLE_EVICT,      /* Eviction throttle */
-    WT_THROTTLE_LOG,        /* Logging throttle */
-    WT_THROTTLE_READ        /* Read throttle */
+    WT_THROTTLE_CKPT,  /* Checkpoint throttle */
+    WT_THROTTLE_EVICT, /* Eviction throttle */
+    WT_THROTTLE_LOG,   /* Logging throttle */
+    WT_THROTTLE_READ   /* Read throttle */
 } WT_THROTTLE_TYPE;
 
 #define WT_THROTTLE_MIN WT_MEGABYTE /* Config minimum size */
@@ -47,7 +46,6 @@ typedef enum {
 #define WT_CAP_READ 55
 
 struct __wt_capacity {
-    uint64_t chunkcache;      /* Bytes/sec chunk cache capacity */
     uint64_t ckpt;            /* Bytes/sec checkpoint capacity */
     uint64_t evict;           /* Bytes/sec eviction capacity */
     uint64_t log;             /* Bytes/sec logging capacity */
@@ -65,10 +63,9 @@ struct __wt_capacity {
      * that time; getting a reservation with a past time implies that the operation can be done
      * immediately.
      */
-    wt_shared uint64_t reservation_chunkcache; /* Atomic: next chunk cache write */
-    wt_shared uint64_t reservation_ckpt;       /* Atomic: next checkpoint write */
-    wt_shared uint64_t reservation_evict;      /* Atomic: next eviction write */
-    wt_shared uint64_t reservation_log;        /* Atomic: next logging write */
-    wt_shared uint64_t reservation_read;       /* Atomic: next read */
-    wt_shared uint64_t reservation_total;      /* Atomic: next operation of any kind */
+    wt_shared uint64_t reservation_ckpt;  /* Atomic: next checkpoint write */
+    wt_shared uint64_t reservation_evict; /* Atomic: next eviction write */
+    wt_shared uint64_t reservation_log;   /* Atomic: next logging write */
+    wt_shared uint64_t reservation_read;  /* Atomic: next read */
+    wt_shared uint64_t reservation_total; /* Atomic: next operation of any kind */
 };

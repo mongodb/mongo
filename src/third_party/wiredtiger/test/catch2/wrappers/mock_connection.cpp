@@ -23,7 +23,6 @@ mock_connection::~mock_connection()
         __wt_free(nullptr, _connection_impl->fhhash);
     if (_connection_impl->block_lock.initialized == 1)
         __wt_spin_destroy(nullptr, &_connection_impl->block_lock);
-    __wt_free(nullptr, _connection_impl->chunkcache.free_bitmap);
     /* setup_stats() used nullptr to allocate so use nullptr to free. */
     __wt_stat_connection_discard(nullptr, _connection_impl);
     __wt_free(nullptr, _connection_impl);
@@ -42,21 +41,6 @@ mock_connection::build_test_mock_connection(WT_SESSION_IMPL *session)
     mock_conn->setup_stats(session);
 
     return std::shared_ptr<mock_connection>(mock_conn);
-}
-
-int
-mock_connection::setup_chunk_cache(
-  WT_SESSION_IMPL *session, uint64_t capacity, size_t chunk_size, WT_CHUNKCACHE *&chunkcache)
-{
-    chunkcache = &_connection_impl->chunkcache;
-    memset(reinterpret_cast<void *>(chunkcache), 0, sizeof(WT_CHUNKCACHE));
-    chunkcache->capacity = capacity;
-    chunkcache->chunk_size = chunk_size;
-    WT_RET(
-      __wt_calloc(session, WT_CHUNKCACHE_BITMAP_SIZE(chunkcache->capacity, chunkcache->chunk_size),
-        sizeof(uint8_t), &chunkcache->free_bitmap));
-
-    return 0;
 }
 
 int

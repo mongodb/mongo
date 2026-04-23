@@ -361,7 +361,6 @@ indicates that WiredTiger should copy the completed file on disk
 to cloud storage.
 
 When the FLUSH completes, these actions occur:
-- tell the chunk cache to ingest the object before it is removed
 - update the metadata to reference the new object in the cloud
 - queue a FLUSH_FINISH operation
 - queue a REMOVE_LOCAL operation

@@ -151,16 +151,6 @@ CONFIG configuration_list[] = {
 
 {"checkpoint.wait", "seconds to wait if wiredtiger checkpoints configured", 0x0, 5, 100, 3600}
 
-{"chunk_cache", "enable chunk cache", C_BOOL | C_IGNORE, 0, 0, 0}
-
-{"chunk_cache.capacity", "maximum memory or storage to use for the chunk cache (MB)", 0x0, 100, 5120, 100 * 1024}
-
-{"chunk_cache.chunk_size", "size of cached chunks (MB)", 0x0, 1, 5, 100 * 1024}
-
-{"chunk_cache.storage_path", "the on-disk storage path for the chunk cache.", C_STRING | C_IGNORE, 0, 0, 0}
-
-{"chunk_cache.type", "cache location (DRAM | FILE)", C_STRING | C_IGNORE, 0, 0, 0}
-
 {"compact.free_space_target", "free space target for compaction (MB)", 0x0, 1, 100, UINT_MAX}
 
 {"debug.background_compact", "background compaction processes files more often", C_BOOL, 5, 0, 0}

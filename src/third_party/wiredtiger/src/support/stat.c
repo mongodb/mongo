@@ -2262,7 +2262,6 @@ static const char *const __stats_connection_desc[] = {
   "capacity: background fsync time (msecs)",
   "capacity: bytes read",
   "capacity: bytes written for checkpoint",
-  "capacity: bytes written for chunk cache",
   "capacity: bytes written for eviction",
   "capacity: bytes written for log",
   "capacity: bytes written total",
@@ -2272,7 +2271,6 @@ static const char *const __stats_connection_desc[] = {
   "capacity: time waiting during eviction (usecs)",
   "capacity: time waiting during logging (usecs)",
   "capacity: time waiting during read (usecs)",
-  "capacity: time waiting for chunk cache IO bandwidth (usecs)",
   "checkpoint-cleanup: most recent duration on all eligible files (usecs)",
   "checkpoint-cleanup: most recent handles processed",
   "checkpoint-cleanup: most recent in-memory pages visited",
@@ -2331,28 +2329,6 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: total time (msecs)",
   "checkpoint: total time (msecs) writing pages to stable storage during checkpoint reconciliation",
   "checkpoint: wait cycles while cache dirty level is decreasing",
-  "chunk-cache: aggregate number of spanned chunks on read",
-  "chunk-cache: chunks evicted",
-  "chunk-cache: could not allocate due to exceeding bitmap capacity",
-  "chunk-cache: could not allocate due to exceeding capacity",
-  "chunk-cache: lookups",
-  "chunk-cache: number of chunks loaded from flushed tables in chunk cache",
-  "chunk-cache: number of metadata entries inserted",
-  "chunk-cache: number of metadata entries removed",
-  "chunk-cache: number of metadata inserts/deletes dropped by the worker thread",
-  "chunk-cache: number of metadata inserts/deletes pushed to the worker thread",
-  "chunk-cache: number of metadata inserts/deletes read by the worker thread",
-  "chunk-cache: number of misses",
-  "chunk-cache: number of times a read from storage failed",
-  "chunk-cache: retried accessing a chunk while I/O was in progress",
-  "chunk-cache: retries from a chunk cache checksum mismatch",
-  "chunk-cache: timed out due to too many retries",
-  "chunk-cache: total bytes read from persistent content",
-  "chunk-cache: total bytes used by the cache",
-  "chunk-cache: total bytes used by the cache for pinned chunks",
-  "chunk-cache: total chunks held by the chunk cache",
-  "chunk-cache: total number of chunks inserted on startup from persisted metadata",
-  "chunk-cache: total pinned chunks held by the chunk cache",
   "connection: auto adjusting condition resets",
   "connection: auto adjusting condition wait calls",
   "connection: auto adjusting condition wait raced to update timeout and skipped updating",
@@ -3329,7 +3305,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing fsync_all_time */
     stats->capacity_bytes_read = 0;
     stats->capacity_bytes_ckpt = 0;
-    stats->capacity_bytes_chunkcache = 0;
     stats->capacity_bytes_evict = 0;
     stats->capacity_bytes_log = 0;
     stats->capacity_bytes_written = 0;
@@ -3339,7 +3314,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->capacity_time_evict = 0;
     stats->capacity_time_log = 0;
     stats->capacity_time_read = 0;
-    stats->capacity_time_chunkcache = 0;
     /* not clearing checkpoint_cleanup_duration */
     stats->checkpoint_cleanup_handle_processed = 0;
     stats->checkpoint_cleanup_inmem_pages_visited = 0;
@@ -3398,28 +3372,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing checkpoint_time_total */
     stats->checkpoint_rec_blkcache_write = 0;
     stats->checkpoint_wait_reduce_dirty = 0;
-    stats->chunkcache_spans_chunks_read = 0;
-    stats->chunkcache_chunks_evicted = 0;
-    stats->chunkcache_exceeded_bitmap_capacity = 0;
-    stats->chunkcache_exceeded_capacity = 0;
-    stats->chunkcache_lookups = 0;
-    stats->chunkcache_chunks_loaded_from_flushed_tables = 0;
-    stats->chunkcache_metadata_inserted = 0;
-    stats->chunkcache_metadata_removed = 0;
-    stats->chunkcache_metadata_work_units_dropped = 0;
-    stats->chunkcache_metadata_work_units_created = 0;
-    stats->chunkcache_metadata_work_units_dequeued = 0;
-    stats->chunkcache_misses = 0;
-    stats->chunkcache_io_failed = 0;
-    stats->chunkcache_retries = 0;
-    stats->chunkcache_retries_checksum_mismatch = 0;
-    stats->chunkcache_toomany_retries = 0;
-    stats->chunkcache_bytes_read_persistent = 0;
-    stats->chunkcache_bytes_inuse = 0;
-    stats->chunkcache_bytes_inuse_pinned = 0;
-    stats->chunkcache_chunks_inuse = 0;
-    stats->chunkcache_created_from_metadata = 0;
-    stats->chunkcache_chunks_pinned = 0;
     stats->cond_auto_wait_reset = 0;
     stats->cond_auto_wait = 0;
     stats->cond_auto_wait_skipped = 0;
@@ -4487,7 +4439,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->fsync_all_time += WT_STAT_CONN_READ(from, fsync_all_time);
     to->capacity_bytes_read += WT_STAT_CONN_READ(from, capacity_bytes_read);
     to->capacity_bytes_ckpt += WT_STAT_CONN_READ(from, capacity_bytes_ckpt);
-    to->capacity_bytes_chunkcache += WT_STAT_CONN_READ(from, capacity_bytes_chunkcache);
     to->capacity_bytes_evict += WT_STAT_CONN_READ(from, capacity_bytes_evict);
     to->capacity_bytes_log += WT_STAT_CONN_READ(from, capacity_bytes_log);
     to->capacity_bytes_written += WT_STAT_CONN_READ(from, capacity_bytes_written);
@@ -4497,7 +4448,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->capacity_time_evict += WT_STAT_CONN_READ(from, capacity_time_evict);
     to->capacity_time_log += WT_STAT_CONN_READ(from, capacity_time_log);
     to->capacity_time_read += WT_STAT_CONN_READ(from, capacity_time_read);
-    to->capacity_time_chunkcache += WT_STAT_CONN_READ(from, capacity_time_chunkcache);
     to->checkpoint_cleanup_duration += WT_STAT_CONN_READ(from, checkpoint_cleanup_duration);
     to->checkpoint_cleanup_handle_processed +=
       WT_STAT_CONN_READ(from, checkpoint_cleanup_handle_processed);
@@ -4568,36 +4518,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoint_time_total += WT_STAT_CONN_READ(from, checkpoint_time_total);
     to->checkpoint_rec_blkcache_write += WT_STAT_CONN_READ(from, checkpoint_rec_blkcache_write);
     to->checkpoint_wait_reduce_dirty += WT_STAT_CONN_READ(from, checkpoint_wait_reduce_dirty);
-    to->chunkcache_spans_chunks_read += WT_STAT_CONN_READ(from, chunkcache_spans_chunks_read);
-    to->chunkcache_chunks_evicted += WT_STAT_CONN_READ(from, chunkcache_chunks_evicted);
-    to->chunkcache_exceeded_bitmap_capacity +=
-      WT_STAT_CONN_READ(from, chunkcache_exceeded_bitmap_capacity);
-    to->chunkcache_exceeded_capacity += WT_STAT_CONN_READ(from, chunkcache_exceeded_capacity);
-    to->chunkcache_lookups += WT_STAT_CONN_READ(from, chunkcache_lookups);
-    to->chunkcache_chunks_loaded_from_flushed_tables +=
-      WT_STAT_CONN_READ(from, chunkcache_chunks_loaded_from_flushed_tables);
-    to->chunkcache_metadata_inserted += WT_STAT_CONN_READ(from, chunkcache_metadata_inserted);
-    to->chunkcache_metadata_removed += WT_STAT_CONN_READ(from, chunkcache_metadata_removed);
-    to->chunkcache_metadata_work_units_dropped +=
-      WT_STAT_CONN_READ(from, chunkcache_metadata_work_units_dropped);
-    to->chunkcache_metadata_work_units_created +=
-      WT_STAT_CONN_READ(from, chunkcache_metadata_work_units_created);
-    to->chunkcache_metadata_work_units_dequeued +=
-      WT_STAT_CONN_READ(from, chunkcache_metadata_work_units_dequeued);
-    to->chunkcache_misses += WT_STAT_CONN_READ(from, chunkcache_misses);
-    to->chunkcache_io_failed += WT_STAT_CONN_READ(from, chunkcache_io_failed);
-    to->chunkcache_retries += WT_STAT_CONN_READ(from, chunkcache_retries);
-    to->chunkcache_retries_checksum_mismatch +=
-      WT_STAT_CONN_READ(from, chunkcache_retries_checksum_mismatch);
-    to->chunkcache_toomany_retries += WT_STAT_CONN_READ(from, chunkcache_toomany_retries);
-    to->chunkcache_bytes_read_persistent +=
-      WT_STAT_CONN_READ(from, chunkcache_bytes_read_persistent);
-    to->chunkcache_bytes_inuse += WT_STAT_CONN_READ(from, chunkcache_bytes_inuse);
-    to->chunkcache_bytes_inuse_pinned += WT_STAT_CONN_READ(from, chunkcache_bytes_inuse_pinned);
-    to->chunkcache_chunks_inuse += WT_STAT_CONN_READ(from, chunkcache_chunks_inuse);
-    to->chunkcache_created_from_metadata +=
-      WT_STAT_CONN_READ(from, chunkcache_created_from_metadata);
-    to->chunkcache_chunks_pinned += WT_STAT_CONN_READ(from, chunkcache_chunks_pinned);
     to->cond_auto_wait_reset += WT_STAT_CONN_READ(from, cond_auto_wait_reset);
     to->cond_auto_wait += WT_STAT_CONN_READ(from, cond_auto_wait);
     to->cond_auto_wait_skipped += WT_STAT_CONN_READ(from, cond_auto_wait_skipped);

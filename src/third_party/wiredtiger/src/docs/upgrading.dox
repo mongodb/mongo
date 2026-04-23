@@ -2,6 +2,16 @@
 
 @section version_develop Upgrading to Version 12.0.0
 <dl>
+<dt>Chunk cache is deprecated</dt>
+<dd>
+The chunk cache feature has been deprecated and is no longer supported. Opening a connection with
+<code>chunk_cache=(enabled=true)</code> will now result in an error. If \c chunk_cache configuration is
+present but disabled, a deprecation warning will be issued and the configuration will be ignored.
+Existing databases that have chunk cache settings persisted in their \c WiredTiger.basecfg file
+will continue to open successfully as long as chunk cache is not enabled. The \c WiredTigerCC.wt
+metadata file, if present, will be automatically removed on startup.
+</dd>
+
 <dt>Fixed-length column-store is removed</dt>
 <dd>
 The storage format fixed-length column-store is no longer supported. This means that if you have a

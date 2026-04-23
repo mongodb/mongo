@@ -4,7 +4,6 @@ header_mappings = {
     "api.h": "conn",
     "bitstring_inline.h": "support",
     "bitstring.h": "support",
-    "block_chunkcache.h": "block_cache",
     "btmem.h": "btree",
     "btree_cmp_inline.h": "btree",
     "buf_inline.h": "include",
