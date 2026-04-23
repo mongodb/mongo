@@ -596,6 +596,15 @@ public:
         return nullptr;
     }
 
+    /**
+     * For stages that have sub-pipelines returns the ExpressionContext of the sub-pipeline.
+     * This is available even when the sub-pipeline is empty (has no stages). Returns nullptr
+     * for stages that do not have sub-pipelines.
+     */
+    virtual boost::intrusive_ptr<ExpressionContext> getSubpipelineExpCtx() const {
+        return nullptr;
+    }
+
     virtual void detachSourceFromOperationContext() {}
 
     virtual void reattachSourceToOperationContext(OperationContext* opCtx) {}
