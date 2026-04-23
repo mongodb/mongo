@@ -135,30 +135,51 @@ public:
 };
 
 TEST_F(JoinCostEstimatorTest, LargerCollectionHasHigherCost) {
-    auto smallCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId);
-    auto largeCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(largeNodeId);
+    auto smallCost =
+        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId, zeroCost);
+    auto largeCost =
+        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(largeNodeId, zeroCost);
     ASSERT_GT(largeCost, smallCost);
 }
 
 TEST_F(JoinCostEstimatorTest, LargerIndexScanHasHigherCost) {
-    auto smallCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId);
-    auto largeCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(largeNodeId);
+    auto smallCost =
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId, zeroCost);
+    auto largeCost =
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(largeNodeId, zeroCost);
     ASSERT_GT(largeCost, smallCost);
 }
 
 TEST_F(JoinCostEstimatorTest, SelectiveIndexScanHasSmallerCostThanCollScan) {
-    auto collScanCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(selectiveNodeId);
+    auto collScanCost =
+        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(selectiveNodeId, zeroCost);
     auto indexScanCost =
-        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(selectiveNodeId);
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(selectiveNodeId, zeroCost);
     ASSERT_GT(collScanCost, indexScanCost);
 }
 
 TEST_F(JoinCostEstimatorTest, UnselectiveIndexScanHasLargerCostThanCollScan) {
     auto collScanCost =
-        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(unselectiveNodeId);
+        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(unselectiveNodeId, zeroCost);
     auto indexScanCost =
-        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(unselectiveNodeId);
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(unselectiveNodeId, zeroCost);
     ASSERT_GT(indexScanCost, collScanCost);
+}
+
+TEST_F(JoinCostEstimatorTest, CBRCostAddedDirectlyToCollScanCost) {
+    auto cbrCost = CostEstimate{CostType{5.0}, EstimationSource::Code};
+    auto withoutCBR =
+        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId, zeroCost);
+    auto withCBR = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId, cbrCost);
+    ASSERT_EQ(withCBR.getTotalCost(), withoutCBR.getTotalCost() + cbrCost);
+}
+
+TEST_F(JoinCostEstimatorTest, CBRCostAddedDirectlyToIndexScanCost) {
+    auto cbrCost = CostEstimate{CostType{10.0}, EstimationSource::Code};
+    auto withoutCBR =
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId, zeroCost);
+    auto withCBR = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId, cbrCost);
+    ASSERT_EQ(withCBR.getTotalCost(), withoutCBR.getTotalCost() + cbrCost);
 }
 
 const JoinSubset& getJoinSubsetForNodeId(const std::vector<JoinSubset>& subsets, NodeId nodeId) {
@@ -294,7 +315,7 @@ public:
 // fewer distinct sort-sparse IO groups, so numLogicalPageRequests (= NDV * selectivity) is smaller.
 TEST_F(IndexScanNDVCostTest, LowNDVHasLowerCostThanHighNDV) {
     // Without sampling estimators the fallback is numLogicalPageRequests = numDocsOutput = 200.
-    auto costWithoutNDV = costEstimator->costIndexScanFragment(nodeId);
+    auto costWithoutNDV = costEstimator->costIndexScanFragment(nodeId, zeroCost);
 
     // With NDV = 50 (< numDocsOutput = 200):
     //   numLogicalPageRequests = 50 * 200 / 1000 = 10 → lower cost.
@@ -304,9 +325,20 @@ TEST_F(IndexScanNDVCostTest, LowNDVHasLowerCostThanHighNDV) {
     samplingEstimators.emplace(nss, std::move(fakeNdvEstimator));
     jCtx->samplingEstimators = &samplingEstimators;
 
-    auto costWithLowNDV = costEstimator->costIndexScanFragment(nodeId);
+    auto costWithLowNDV = costEstimator->costIndexScanFragment(nodeId, zeroCost);
 
     ASSERT_GT(costWithoutNDV, costWithLowNDV);
+}
+
+TEST(JoinEstimatesTest, NumDocsProcessedFromCpuCost) {
+    ASSERT_EQ(0.0, numDocsProcessedFromCpuCost(zeroCost).toDouble());
+
+    // The mapping is linear in the CPU cost: doubling the input exactly doubles the output.
+    const CostEstimate cpu{CostType{1.0}, EstimationSource::Code};
+    const double docsForCpu = numDocsProcessedFromCpuCost(cpu).toDouble();
+    const double docsFor2xCpu = numDocsProcessedFromCpuCost(cpu * 2.0).toDouble();
+    ASSERT_GT(docsForCpu, 0.0);
+    ASSERT_EQ(2.0 * docsForCpu, docsFor2xCpu);
 }
 
 TEST(MackertLohmanTest, CollectionFitsInCache) {

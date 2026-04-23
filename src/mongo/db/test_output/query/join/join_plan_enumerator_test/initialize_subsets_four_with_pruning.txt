@@ -10,31 +10,31 @@ Level 3:
 1111
 
 Output plans (best plan 1):
-0.(1.46806e+06)[1111] NLJ
+0.(1.09408e+06)[1111] NLJ
  -> left:
-    (132.659)[0111] HJ
+    (130.805)[0111] HJ
      -> left:
-        (3.03331)[0011] HJ
+        (2.40907)[0011] HJ
          -> left:
-            (0.0172335)[0001][test.nss0] COLLSCAN
+            (0.0111135)[0001][test.nss0] COLLSCAN
          -> right:
-            (1.77372)[0010][test.nss1] COLLSCAN
+            (1.1556)[0010][test.nss1] COLLSCAN
      -> right:
-        (3.5352)[0100][test.nss2] COLLSCAN
+        (2.30508)[0100][test.nss2] COLLSCAN
  -> right:
-    (5.20446)[1000][test.nss3] COLLSCAN
+    (3.36234)[1000][test.nss3] COLLSCAN
 
-1.(37660.8)[1111] HJ
+1.(37657.1)[1111] HJ
  -> left:
-    (5.20446)[1000][test.nss3] COLLSCAN
+    (3.36234)[1000][test.nss3] COLLSCAN
  -> right:
-    (132.659)[0111] HJ
+    (130.805)[0111] HJ
      -> left:
-        (3.03331)[0011] HJ
+        (2.40907)[0011] HJ
          -> left:
-            (0.0172335)[0001][test.nss0] COLLSCAN
+            (0.0111135)[0001][test.nss0] COLLSCAN
          -> right:
-            (1.77372)[0010][test.nss1] COLLSCAN
+            (1.1556)[0010][test.nss1] COLLSCAN
      -> right:
-        (3.5352)[0100][test.nss2] COLLSCAN
+        (2.30508)[0100][test.nss2] COLLSCAN
 

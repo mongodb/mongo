@@ -66,6 +66,12 @@ const CostCoefficient ioSeqIncremental{
 const CostCoefficient ioRandIncremental{
     CostCoefficientType{docProcessCpuIncremental.toDouble() * 1411.4}};
 
+CardinalityEstimate numDocsProcessedFromCpuCost(CostEstimate cpuCost) {
+    return CardinalityEstimate{
+        CardinalityType{cpuCost.toDouble() / docProcessCpuIncremental.toDouble()},
+        cpuCost.source()};
+}
+
 JoinCostEstimate::JoinCostEstimate(CardinalityEstimate numDocsProcessed,
                                    CardinalityEstimate numDocsOutput,
                                    CardinalityEstimate numSeqIOs,
