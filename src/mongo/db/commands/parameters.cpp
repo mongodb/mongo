@@ -44,6 +44,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -307,6 +308,32 @@ public:
         appendParameterNames(&h);
         return h;
     }
+
+    /**
+     * Masks sensitive values in the command body before the document reaches any
+     * log file.  By default, this function in class Command removes the field
+     * returned by sensitiveFieldName, but for the 'set parameter' command, it
+     * needs to remove all fields flagged with 'isRedact'.  It also redacts
+     * unrecognized parameters in case the user made a typo like
+     * "ldapQueryPasssword".
+     */
+    void snipForLogging(mutablebson::Document* cmdObj) const override {
+        BasicCommand::snipForLogging(cmdObj);
+        const ServerParameter::Map& parameterMap =
+            ServerParameterSet::getNodeParameterSet()->getMap();
+
+        for (auto elem = cmdObj->root().leftChild(); elem.ok(); elem = elem.rightSibling()) {
+            const auto name = elem.getFieldName();
+            if (name == "setParameter" || isGenericArgument(name))
+                continue;
+            auto it = parameterMap.find(name.toString());
+            if ((it != parameterMap.end() && it->second->isRedact()) ||
+                (it == parameterMap.end())) {
+                uassertStatusOK(elem.setValueString("###"));
+            }
+        }
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
@@ -365,13 +392,15 @@ public:
                     foundParameter->second->allowedToChangeAtRuntime());
 
             // Make sure we are only setting this parameter once
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "attempted to set parameter [" << parameterName
-                                  << "] twice in the same setParameter command, "
-                                  << "once to value: ["
-                                  << parametersToSet[parameterName].toString(false)
-                                  << "], and once to value: [" << parameter.toString(false) << "]",
-                    parametersToSet.count(parameterName) == 0);
+            const bool forceRedact = foundParameter->second->isRedact();
+            uassert(
+                ErrorCodes::InvalidOptions,
+                str::stream() << "attempted to set parameter [" << parameterName
+                              << "] twice in the same setParameter command, once to value: ["
+                              << redact(parametersToSet[parameterName].toString(false), forceRedact)
+                              << "], and once to value: ["
+                              << redact(parameter.toString(false), forceRedact) << "]",
+                parametersToSet.count(parameterName) == 0);
 
             parametersToSet[parameterName] = parameter;
         }
@@ -389,7 +418,7 @@ public:
 
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Parameter: " << parameterName << " that was "
-                                  << "avaliable during our first lookup in the registered "
+                                  << "available during our first lookup in the registered "
                                   << "parameters map is no longer available.",
                     foundParameter != parameterMap.end());
 
@@ -413,6 +442,10 @@ public:
                 result.append(oldValue);
             }
 
+            // Set 'forceRedact' to redact the string when a specific parameter,
+            // such as the LDAP bind password (ldapQueryPassword), should be redacted.
+            const bool forceRedact = foundParameter->second->isRedact();
+
             try {
                 uassertStatusOK(foundParameter->second->set(parameter, boost::none));
             } catch (const DBException& ex) {
@@ -420,8 +453,8 @@ public:
                       "Error setting parameter {parameterName} to {newValue} errMsg: {error}",
                       "Error setting parameter to new value",
                       "parameterName"_attr = parameterName,
-                      "newValue"_attr = redact(parameter.toString(false)),
-                      "error"_attr = redact(ex));
+                      "newValue"_attr = redact(parameter.toString(false), forceRedact),
+                      "error"_attr = redact(ex, forceRedact));
                 throw;
             }
 
@@ -440,14 +473,14 @@ public:
                       "{oldValue})",
                       "Successfully set parameter to new value",
                       "parameterName"_attr = parameterName,
-                      "newValue"_attr = redact(parameter.toString(false)),
-                      "oldValue"_attr = redact(oldValue.toString(false)));
+                      "newValue"_attr = redact(parameter.toString(false), forceRedact),
+                      "oldValue"_attr = redact(oldValue.toString(false), forceRedact));
             } else {
                 LOGV2(23436,
                       "Successfully set parameter {parameterName} to {newValue}",
                       "Successfully set parameter to new value",
                       "parameterName"_attr = parameterName,
-                      "newValue"_attr = redact(parameter.toString(false)));
+                      "newValue"_attr = redact(parameter.toString(false), forceRedact));
             }
 
             numSet++;
