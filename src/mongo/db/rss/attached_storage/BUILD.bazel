@@ -38,3 +38,16 @@ mongo_cc_library(
         "//src/mongo/db/rss:replicated_storage_service",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "attached_persistence_provider_oplog_test",
+    srcs = [
+        "attached_persistence_provider_oplog_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":attached_persistence_provider",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest",
+    ],
+)
