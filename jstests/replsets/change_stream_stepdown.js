@@ -13,6 +13,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {describe, it, before, after, beforeEach, afterEach} from "jstests/libs/mochalite.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 describe("change stream stepdown and readPreference enforcement", function () {
     let replTest;
@@ -31,6 +32,17 @@ describe("change stream stepdown and readPreference enforcement", function () {
         return replTest.stepUp(conn, {awaitReplicationBeforeStepUp: false});
     }
 
+    // Fetch one change event via raw getMore and assert its change event.
+    function assertNextChange(conn, cursorId, {operationType, fullDocument}, extraOpts = {}) {
+        const res = assert.commandWorked(
+            conn.runCommand({getMore: cursorId, collection: collName, batchSize: 1, ...extraOpts}),
+        );
+        const msg = () => `unexpected change stream event: ${tojson(res)}`;
+        assert.eq(res.cursor.nextBatch.length, 1, msg);
+        assert.eq(res.cursor.nextBatch[0].operationType, operationType, msg);
+        assert.eq(res.cursor.nextBatch[0].fullDocument, fullDocument, msg);
+    }
+
     before(function () {
         replTest = new ReplSetTest({name: dbName, nodes: [{}, {}]});
         replTest.startSet();
@@ -42,7 +54,10 @@ describe("change stream stepdown and readPreference enforcement", function () {
             csTest.cleanUp();
             csTest = null;
         }
-        replTest.getPrimary().getDB(dbName)[collName].drop();
+
+        // Drop the collection and ensure it is replicated to all the nodes.
+        assertDropCollection(replTest.getPrimary().getDB(dbName), collName);
+        replTest.awaitReplication();
     });
 
     after(function () {
@@ -76,12 +91,7 @@ describe("change stream stepdown and readPreference enforcement", function () {
 
             stepDown(primary);
 
-            const res = assert.commandWorked(
-                primaryDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
-            );
-            assert.eq(res.cursor.nextBatch.length, 1);
-            assert.eq(res.cursor.nextBatch[0].fullDocument, {_id: 1});
-            assert.eq(res.cursor.nextBatch[0].operationType, "insert");
+            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
 
             stepUp(primary);
         });
@@ -103,12 +113,7 @@ describe("change stream stepdown and readPreference enforcement", function () {
             // Step up the secondary — cursor was opened there, now it is the primary.
             stepUp(secondary);
 
-            const res = assert.commandWorked(
-                secondaryDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
-            );
-            assert.eq(res.cursor.nextBatch.length, 1);
-            assert.eq(res.cursor.nextBatch[0].fullDocument, {_id: 1});
-            assert.eq(res.cursor.nextBatch[0].operationType, "insert");
+            assertNextChange(secondaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
         });
 
         it("survives stepdown between two getMores", function () {
@@ -121,18 +126,13 @@ describe("change stream stepdown and readPreference enforcement", function () {
             replTest.awaitReplication();
 
             // First getMore: consume one event before the stepdown.
-            let res = assert.commandWorked(
-                primaryDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
-            );
-            assert.eq(res.cursor.nextBatch.length, 1);
+            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
 
             // Stepdown happens between the two getMores.
             stepDown(primary);
 
             // Second getMore: cursor should still work on the now-secondary node.
-            res = assert.commandWorked(primaryDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}));
-            assert.eq(res.cursor.nextBatch.length, 1);
-            assert.eq(res.cursor.nextBatch[0].fullDocument, {_id: 2});
+            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 2}});
 
             stepUp(primary);
         });
@@ -149,10 +149,7 @@ describe("change stream stepdown and readPreference enforcement", function () {
             replTest.awaitReplication();
 
             // Consume existing event via raw getMore.
-            let res = assert.commandWorked(
-                primaryDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
-            );
-            assert.eq(res.cursor.nextBatch.length, 1);
+            assertNextChange(primaryDb, cursor.id, {operationType: "insert", fullDocument: {_id: 1}});
 
             replTest.awaitReplication();
 
@@ -190,17 +187,15 @@ describe("change stream stepdown and readPreference enforcement", function () {
                 primary.port,
             );
 
-            res = assert.commandWorked(
-                primaryDb.runCommand({
-                    getMore: cursor.id,
-                    collection: collName,
-                    batchSize: 1,
-                    maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
-                }),
+            assertNextChange(
+                primaryDb,
+                cursor.id,
+                {
+                    operationType: "insert",
+                    fullDocument: {_id: 2},
+                },
+                {maxTimeMS: ReplSetTest.kDefaultTimeoutMS},
             );
-            assert.eq(res.cursor.nextBatch.length, 1);
-            assert.eq(res.cursor.nextBatch[0].fullDocument, {_id: 2});
-            assert.eq(res.cursor.nextBatch[0].operationType, "insert");
 
             waitForShell();
 
