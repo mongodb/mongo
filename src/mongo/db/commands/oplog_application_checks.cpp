@@ -68,7 +68,7 @@ namespace mongo {
 UUID OplogApplicationChecks::getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
     BSONElement uiElem = oplogEntry["ui"];
     return uassertStatusOK(UUID::parse(uiElem));
-};
+}
 
 Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opCtx,
                                                            const DatabaseName& dbName,
@@ -131,7 +131,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         }
 
         auto dbNameForAuthCheck = nss.dbName();
-        if (commandName == "renameCollection") {
+        if (commandName == "renameCollection"_sd) {
             // renameCollection commands must be run on the 'admin' database. Its arguments are
             // fully qualified namespaces. Catalog internals don't know the op produced by running
             // renameCollection was originally run on 'admin', so we must restore this.
@@ -183,7 +183,6 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                                             o, write_ops::UpdateModification::DiffOptions{}),
                                         upsert);
     } else if (opType == "d"_sd) {
-
         return auth::checkAuthForDelete(authSession, opCtx, nss, o);
     } else if (opType == "db"_sd) {
         // It seems that 'db' isn't used anymore. Require all actions to prevent casual use.
