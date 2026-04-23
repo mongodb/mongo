@@ -61,4 +61,11 @@ bool isReplicatedFastCountEligible(const NamespaceString& nss) {
     return nss != fastCountStoreNss && nss != fastCountTimestampsNss;
 }
 
+bool shouldPersistPreparedTxnSizeMetadata(OperationContext* opCtx) {
+    return isReplicatedFastCountEnabled(opCtx) &&
+        gFeatureFlagReplicatedFastCountDurability.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
 }  // namespace mongo

@@ -46,4 +46,12 @@ MONGO_MOD_PUBLIC bool isReplicatedFastCountEnabled(OperationContext* opCtx);
  * collection.
  */
 MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(const NamespaceString& nss);
+
+/**
+ * Returns true if size metadata should be computed and persisted for a prepared transaction's
+ * `SessionTxnRecord`. Requires enablement of both the basic replicated fast count feature flag and
+ * its durability flag.
+ */
+MONGO_MOD_PUBLIC bool shouldPersistPreparedTxnSizeMetadata(OperationContext* opCtx);
+
 }  // namespace mongo

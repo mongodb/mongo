@@ -55,6 +55,8 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -333,27 +335,17 @@ private:
 };
 }  // namespace
 
-void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
-                                      OplogEntry* op,
-                                      std::vector<OplogEntry*>* partialTxnList,
-                                      std::vector<std::vector<OplogEntry>>* derivedOps,
-                                      std::vector<std::vector<ApplierOperation>>* writerVectors,
-                                      CachedCollectionProperties* collPropertiesCache,
-                                      RetryImageRectifier* retryImageRectifier,
-                                      NamespaceHashSet* affectedNamespaces) {
-    auto [txnOps, shouldSerialize] =
-        readTransactionOperationsFromOplogChainAndCheckForCommands(opCtx, *op, *partialTxnList);
-
-    if (affectedNamespaces) {
-        std::for_each(txnOps.begin(), txnOps.end(), [&](const auto& op) {
-            affectedNamespaces->insert(op.getNss());
-        });
-    }
-
+// Common point for routing `txnOps` to writer vectors
+void _dispatchTxnOpsToWriterVectors(OperationContext* opCtx,
+                                    OplogEntry* op,
+                                    std::vector<OplogEntry> txnOps,
+                                    bool shouldSerialize,
+                                    std::vector<std::vector<OplogEntry>>* derivedOps,
+                                    std::vector<std::vector<ApplierOperation>>* writerVectors,
+                                    CachedCollectionProperties* collPropertiesCache,
+                                    RetryImageRectifier* retryImageRectifier) {
     auto& extractedOps = retryImageRectifier->storeExtractedOpsAndDeletes(
         std::move(txnOps), derivedOps, op->shouldPrepare());
-
-    partialTxnList->clear();
 
     if (op->shouldPrepare()) {
         OplogApplierUtils::addDerivedPrepares(
@@ -363,6 +355,74 @@ void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
 
     OplogApplierUtils::addDerivedOps(
         opCtx, &extractedOps, writerVectors, collPropertiesCache, shouldSerialize);
+}
+
+// For prepared transactions on secondaries: reads the oplog chain, computes
+// affectedNamespaces/sizeMetadata (when persistence is enabled), dispatches the ops to
+// writer vectors, and returns the derived fields for the config.transactions update.
+boost::optional<repl::PreparedTxnDerivedFields> _dispatchOpsFromPreparedTransactionToWriterVectors(
+    OperationContext* opCtx,
+    OplogEntry* op,
+    std::vector<OplogEntry*>* partialTxnList,
+    std::vector<std::vector<OplogEntry>>* derivedOps,
+    std::vector<std::vector<ApplierOperation>>* writerVectors,
+    CachedCollectionProperties* collPropertiesCache,
+    RetryImageRectifier* retryImageRectifier) {
+    auto [txnOps, shouldSerialize] =
+        readTransactionOperationsFromOplogChainAndCheckForCommands(opCtx, *op, *partialTxnList);
+    partialTxnList->clear();
+
+    const bool persistAffectedNamespaces = rss::ReplicatedStorageService::get(opCtx)
+                                               .getPersistenceProvider()
+                                               .supportsPreservingPreparedTxnInPreciseCheckpoints();
+    const bool persistSizeMetadata = shouldPersistPreparedTxnSizeMetadata(opCtx);
+
+    boost::optional<repl::PreparedTxnDerivedFields> preparedDerivedFields;
+    if (persistAffectedNamespaces || persistSizeMetadata) {
+        preparedDerivedFields.emplace();
+        if (persistAffectedNamespaces) {
+            preparedDerivedFields->affectedNamespaces.emplace();
+            for (const auto& txnOp : txnOps) {
+                preparedDerivedFields->affectedNamespaces->insert(txnOp.getNss());
+            }
+        }
+        if (persistSizeMetadata) {
+            preparedDerivedFields->sizeMetadata =
+                replicated_fast_count::aggregateMultiOpSizeMetadata(txnOps);
+        }
+    }
+
+    _dispatchTxnOpsToWriterVectors(opCtx,
+                                   op,
+                                   std::move(txnOps),
+                                   shouldSerialize,
+                                   derivedOps,
+                                   writerVectors,
+                                   collPropertiesCache,
+                                   retryImageRectifier);
+    return preparedDerivedFields;
+}
+
+// Reads the full oplog chain for a multi-entry transaction, clears partialTxnList, then
+// dispatches the resulting ops to writer vectors.
+void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
+                                      OplogEntry* op,
+                                      std::vector<OplogEntry*>* partialTxnList,
+                                      std::vector<std::vector<OplogEntry>>* derivedOps,
+                                      std::vector<std::vector<ApplierOperation>>* writerVectors,
+                                      CachedCollectionProperties* collPropertiesCache,
+                                      RetryImageRectifier* retryImageRectifier) {
+    auto [txnOps, shouldSerialize] =
+        readTransactionOperationsFromOplogChainAndCheckForCommands(opCtx, *op, *partialTxnList);
+    partialTxnList->clear();
+    _dispatchTxnOpsToWriterVectors(opCtx,
+                                   op,
+                                   std::move(txnOps),
+                                   shouldSerialize,
+                                   derivedOps,
+                                   writerVectors,
+                                   collPropertiesCache,
+                                   retryImageRectifier);
 }
 
 void _setOplogApplicationWorkerOpCtxStates(OperationContext* opCtx) {
@@ -928,48 +988,40 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
             continue;
         }
 
-        auto addSessionUpdateOps = [&](NamespaceHashSet* affectedNamespaces) {
-            if (auto newOplogWrites = sessionUpdateTracker->updateSession(op, affectedNamespaces)) {
-                derivedOps->emplace_back(std::move(*newOplogWrites));
-                OplogApplierUtils::addDerivedOps(opCtx,
-                                                 &derivedOps->back(),
-                                                 writerVectors,
-                                                 &collPropertiesCache,
-                                                 false /*serial*/);
-            }
-        };
+        auto addSessionUpdateOps =
+            [&](const boost::optional<repl::PreparedTxnDerivedFields>& preparedDerivedFields) {
+                if (auto newOplogWrites =
+                        sessionUpdateTracker->updateSession(op, preparedDerivedFields)) {
+                    derivedOps->emplace_back(std::move(*newOplogWrites));
+                    OplogApplierUtils::addDerivedOps(opCtx,
+                                                     &derivedOps->back(),
+                                                     writerVectors,
+                                                     &collPropertiesCache,
+                                                     false /*serial*/);
+                }
+            };
 
-        // Prepare entries in secondary mode do not come in their own batch, extract applyOps
-        // operations and fill writers with the extracted operations.
+        // Prepare entries in secondary mode don't come in their own batch: reads the oplog chain,
+        // aggregates `affectedNamespaces` and `sizeMetadata` across inner ops, fills the write
+        // vectors, and updates config.transactions.
         if (op.shouldPrepare() && (getOptions().mode == OplogApplication::Mode::kSecondary)) {
             // Sessions should always be updated on steady-state oplog application.
             invariant(sessionUpdateTracker);
-            // To set the affected namespaces for the transaction record from the prepared oplog,
-            // we must first parse the prepared oplog to obtain all individual operations to be able
-            // to parse each one.
-            auto affectedNamespaces = NamespaceHashSet();
-            auto affectedNamespacesPtr = rss::ReplicatedStorageService::get(opCtx)
-                                             .getPersistenceProvider()
-                                             .supportsPreservingPreparedTxnInPreciseCheckpoints()
-                ? &affectedNamespaces
-                : nullptr;
-            auto* partialTxnList = getPartialTxnList(op);
-            _addOplogChainOpsToWriterVectors(opCtx,
-                                             &op,
-                                             partialTxnList,
-                                             derivedOps,
-                                             writerVectors,
-                                             &collPropertiesCache,
-                                             &retryImageRectifier,
-                                             affectedNamespacesPtr);
-            addSessionUpdateOps(affectedNamespacesPtr);
+            addSessionUpdateOps(
+                _dispatchOpsFromPreparedTransactionToWriterVectors(opCtx,
+                                                                   &op,
+                                                                   getPartialTxnList(op),
+                                                                   derivedOps,
+                                                                   writerVectors,
+                                                                   &collPropertiesCache,
+                                                                   &retryImageRectifier));
             continue;
         }
 
         // We need to track all types of ops, including type 'n' (these are generated from chunk
         // migrations).
         if (sessionUpdateTracker) {
-            addSessionUpdateOps(nullptr /*affectedNamespaces*/);
+            addSessionUpdateOps(boost::none);
 
             // If this is a delete for a config.images_collection entry that will be written later
             // in this batch, skip it.  We only check this when there is a sessionUpdateTracker,
@@ -1027,8 +1079,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                                                  derivedOps,
                                                  writerVectors,
                                                  &collPropertiesCache,
-                                                 &retryImageRectifier,
-                                                 nullptr /*affectedNamespaces*/);
+                                                 &retryImageRectifier);
                 invariant(partialTxnList->empty(), op.toStringForLogging());
             } else {
                 // The applyOps entry was not generated as part of a transaction.
@@ -1062,8 +1113,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                                              derivedOps,
                                              writerVectors,
                                              &collPropertiesCache,
-                                             &retryImageRectifier,
-                                             nullptr /*affectedNamespaces*/);
+                                             &retryImageRectifier);
             invariant(partialTxnList->empty(), op.toStringForLogging());
             continue;
         }

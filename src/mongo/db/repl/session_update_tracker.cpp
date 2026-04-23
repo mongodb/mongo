@@ -150,7 +150,8 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateOrFlush(
 }
 
 boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
-    const OplogEntry& entry, NamespaceHashSet* affectedNamespaces) {
+    const OplogEntry& entry,
+    const boost::optional<PreparedTxnDerivedFields>& preparedDerivedFields) {
     if (!isTransactionEntry(entry)) {
         return _updateOrFlush(entry);
     }
@@ -164,7 +165,7 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
     // each entry originating from a multi-statement transaction. For this reason, we cannot defer
     // entries originating from multi-statement transactions.
     if (auto txnTableUpdate =
-            _createTransactionTableUpdateFromTransactionOp(entry, affectedNamespaces)) {
+            _createTransactionTableUpdateFromTransactionOp(entry, preparedDerivedFields)) {
         _sessionsToUpdate.erase(*entry.getOperationSessionInfo().getSessionId());
         return boost::optional<std::vector<OplogEntry>>({*txnTableUpdate});
     }
@@ -292,7 +293,8 @@ std::vector<OplogEntry> SessionUpdateTracker::_flushForQueryPredicate(
 }
 
 boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateFromTransactionOp(
-    const repl::OplogEntry& entry, NamespaceHashSet* affectedNamespaces) {
+    const repl::OplogEntry& entry,
+    const boost::optional<PreparedTxnDerivedFields>& preparedDerivedFields) {
     auto sessionInfo = entry.getOperationSessionInfo();
 
     // We only update the transaction table on the first partialTxn operation.
@@ -328,9 +330,14 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
             case repl::OplogEntry::CommandType::kApplyOps:
                 if (entry.shouldPrepare()) {
                     newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
-                    if (affectedNamespaces) {
-                        MongoDSessionCatalog::addCanonicalizedNamespacesToTxnEntry(
-                            *affectedNamespaces, newTxnRecord);
+                    if (preparedDerivedFields) {
+                        if (preparedDerivedFields->affectedNamespaces) {
+                            MongoDSessionCatalog::addCanonicalizedNamespacesToTxnEntry(
+                                *preparedDerivedFields->affectedNamespaces, newTxnRecord);
+                        }
+                        if (preparedDerivedFields->sizeMetadata) {
+                            newTxnRecord.setSizeMetadata(*preparedDerivedFields->sizeMetadata);
+                        }
                     }
                     if (entry.getPrevWriteOpTimeInTransaction()->isNull()) {
                         // The prepare oplog entry is the first operation of the transaction.

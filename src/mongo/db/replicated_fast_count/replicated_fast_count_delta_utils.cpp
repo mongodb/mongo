@@ -34,6 +34,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
+#include "mongo/db/replicated_fast_count/durable_size_metadata_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -44,11 +45,38 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+#include <algorithm>
+#include <concepts>
+
 #include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace replicated_fast_count {
 namespace {
+
+// Covers both `OplogEntry` and `ReplOperation` types.
+template <typename T>
+concept OpSizeCountExtractable = requires(const T& op) {
+    { op.getSizeMetadata() } -> std::same_as<const boost::optional<repl::OplogEntrySizeMetadata>&>;
+    { op.getNss() } -> std::same_as<const NamespaceString&>;
+    { op.getOpType() } -> std::same_as<repl::OpTypeEnum>;
+    { op.getUuid() } -> std::same_as<const boost::optional<UUID>&>;
+};
+BSONObj toBSONForLog(const repl::OplogEntry& op) {
+    return op.toBSONForLogging();
+}
+BSONObj toBSONForLog(const repl::ReplOperation& op) {
+    return op.toBSON();
+}
+// Ensures opTime remains visible in logs even if the oplog entry body is redacted.
+// `ReplOperation` has no opTime (pre-slot-assignment), so its overload returns "none".
+std::string opTimeStringForLog(const repl::OplogEntry& op) {
+    return op.getOpTime().toString();
+}
+std::string opTimeStringForLog(const repl::ReplOperation&) {
+    return "none";
+}
+
 bool isSupportedOpType(repl::OpTypeEnum opType) {
     switch (opType) {
         case repl::OpTypeEnum::kInsert:
@@ -119,6 +147,49 @@ void recordCollectionDrop(const UUID& uuid, SizeCountDeltas& sizeCountDeltasOut)
             it->second.state = DDLState::kDropped;
         }
     }
+}
+
+template <OpSizeCountExtractable T>
+boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op) {
+    const auto& sizeMd = op.getSizeMetadata();
+    if (!sizeMd) {
+        return boost::none;
+    }
+
+    const auto* perOpMd = std::get_if<SingleOpSizeMetadata>(&sizeMd.value());
+    if (!perOpMd) {
+        return boost::none;
+    }
+
+    if (!isReplicatedFastCountEligible(op.getNss())) {
+        LOGV2_DEBUG(1241400,
+                    3,
+                    "Skipping size/count delta for ineligible namespace",
+                    "ns"_attr = op.getNss().toStringForErrorMsg(),
+                    "opTime"_attr = opTimeStringForLog(op),
+                    "oplogEntry"_attr = redact(toBSONForLog(op)));
+        return boost::none;
+    }
+
+    const auto& opType = op.getOpType();
+    if (!isSupportedOpType(opType)) {
+        LOGV2_WARNING(1241401,
+                      "Unexpected input: Operation type incompatible with top level `m` field",
+                      "ns"_attr = op.getNss().toStringForErrorMsg(),
+                      "opTime"_attr = opTimeStringForLog(op),
+                      "oplogType"_attr = idl::serialize(opType),
+                      "oplogEntry"_attr = redact(toBSONForLog(op)));
+        return boost::none;
+    }
+
+    massert(12116001,
+            str::stream() << "Unexpected input: Missing `ui` field for "
+                          << op.getNss().toStringForErrorMsg()
+                          << " entry: " << redact(toBSONForLog(op))
+                          << ", entry opTime: " << opTimeStringForLog(op),
+            op.getUuid().has_value());
+
+    return CollectionSizeCount{.size = perOpMd->getSz(), .count = computeCountDeltaForOp(opType)};
 }
 
 // Returns true if all operations within the provided oplog entry are on the internal fast count
@@ -199,49 +270,42 @@ int processOplogEntry(const repl::OplogEntry& entry,
 
 boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
     const repl::OplogEntry& oplogEntry) {
-    const auto& sizeMd = oplogEntry.getSizeMetadata();
-    if (!sizeMd) {
-        return boost::none;
+    return extractSizeCountDeltaForOpImpl(oplogEntry);
+}
+
+template <OpSizeCountExtractable T>
+std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadataImpl(const std::vector<T>& ops) {
+    SizeCountDeltas deltas;
+    for (const auto& op : ops) {
+        if (auto delta = extractSizeCountDeltaForOpImpl(op)) {
+            recordCollectionSizeCountDelta(*op.getUuid(), *delta, deltas);
+        }
     }
 
-    // Only the `SingleOpSizeMetadata` form applies to CRUD operations where the count delta is
-    // inferred by the operation type.
-    const auto* perOpMd = std::get_if<SingleOpSizeMetadata>(&sizeMd.value());
-    if (!perOpMd) {
-        return boost::none;
+    std::vector<MultiOpSizeMetadata> result;
+    result.reserve(deltas.size());
+    for (const auto& [uuid, sizeCountDelta] : deltas) {
+        MultiOpSizeMetadata meta;
+        meta.setUuid(uuid);
+        meta.setSz(sizeCountDelta.sizeCount.size);
+        meta.setCt(sizeCountDelta.sizeCount.count);
+        result.push_back(std::move(meta));
     }
+    // Stable UUID order for deterministic serialization and persistence of the result.
+    std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+        return a.getUuid() < b.getUuid();
+    });
+    return result;
+}
 
-    if (!isReplicatedFastCountEligible(oplogEntry.getNss())) {
-        LOGV2_DEBUG(12369400,
-                    3,
-                    "Skipping size/count delta for ineligible namespace",
-                    "ns"_attr = oplogEntry.getNss().toStringForErrorMsg(),
-                    "entry"_attr = redact(oplogEntry.toBSONForLogging()));
-        return boost::none;
-    }
+std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
+    const std::vector<repl::ReplOperation>& ops) {
+    return aggregateMultiOpSizeMetadataImpl(ops);
+}
 
-    // The 'm' field in the oplog entry contains the replicated size delta.  The collection count
-    // delta must be inferred from the operation type. Log a warning if the operation type is not
-    // supported for size/count tracking.
-    const auto& opType = oplogEntry.getOpType();
-    if (!isSupportedOpType(opType)) {
-        LOGV2_WARNING(12115900,
-                      "Unexpected input: Operation type {oplogType} incompatible with top level "
-                      "'m' field for entry {oplogEntry}",
-                      "oplogType"_attr = idl::serialize(opType),
-                      "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
-        return boost::none;
-    }
-
-    massert(12116001,
-            str::stream() << "Unexpected input: Missing 'ui' field for operation '"
-                          << redact(oplogEntry.toBSONForLogging())
-                          << "' which tracks replicated size and count",
-            oplogEntry.getUuid().has_value());
-
-    const int32_t sizeDelta = perOpMd->getSz();
-    const int32_t countDelta = computeCountDeltaForOp(opType);
-    return CollectionSizeCount{.size = sizeDelta, .count = countDelta};
+std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
+    const std::vector<repl::OplogEntry>& ops) {
+    return aggregateMultiOpSizeMetadataImpl(ops);
 }
 
 int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,

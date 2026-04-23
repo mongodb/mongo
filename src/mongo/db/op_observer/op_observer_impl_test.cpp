@@ -2050,22 +2050,11 @@ protected:
                          boost::optional<DurableTxnStateEnum> txnState,
                          boost::optional<Timestamp> prepareTs = boost::none,
                          boost::optional<size_t> numAffectedNamespaces = boost::none) {
-        DBDirectClient client(opCtx());
-        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
-        findRequest.setFilter(BSON("_id" << session()->getSessionId().toBSON()));
-        auto cursor = client.find(std::move(findRequest));
-        ASSERT(cursor);
-        ASSERT(cursor->more());
-
-        auto txnRecordObj = cursor->next();
-        auto txnRecord =
-            SessionTxnRecord::parse(txnRecordObj, IDLParserContext("SessionEntryWritten"));
-        ASSERT(!cursor->more());
+        auto txnRecord = getTxnRecord();
         ASSERT_EQ(session()->getSessionId(), txnRecord.getSessionId());
         ASSERT_EQ(txnNum, txnRecord.getTxnNum());
         ASSERT(txnRecord.getState() == txnState);
-        ASSERT_EQ(txnState != boost::none,
-                  txnRecordObj.hasField(SessionTxnRecord::kStateFieldName));
+        ASSERT_EQ(txnState != boost::none, txnRecord.getState().has_value());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         if (!opTime.isNull()) {
@@ -2085,6 +2074,17 @@ protected:
         } else {
             ASSERT(!txnRecord.getAffectedNamespaces());
         }
+    }
+
+    SessionTxnRecord getTxnRecord() {
+        DBDirectClient client(opCtx());
+        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+        findRequest.setFilter(BSON("_id" << session()->getSessionId().toBSON()));
+        auto cursor = client.find(std::move(findRequest));
+        ASSERT(cursor && cursor->more());
+        auto record = SessionTxnRecord::parse(cursor->next(), IDLParserContext("getTxnRecord"));
+        ASSERT(!cursor->more());
+        return record;
     }
 
     void assertNoTxnRecord() {
@@ -2172,6 +2172,177 @@ TEST_F(OpObserverTransactionTest, TransactionOpsIncludeVersionContext) {
     auto innerOp = getInnerEntryFromApplyOpsOplogEntry(oplogEntry);
     ASSERT_EQ(expectedVCtx, innerOp.getVersionContext());
 }
+
+TEST_F(OpObserverTransactionTest, PrepareTransactionWritesSizeMetadataToSessionTxnRecord) {
+    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                                 true);
+    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
+                                                        true);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    const auto docA = BSON("_id" << 0 << "data" << "x");
+    const auto docB = BSON("_id" << 1 << "data" << "y");
+    const auto docC = BSON("_id" << 0 << "data" << "z");
+    {
+        std::vector<InsertStatement> inserts1 = {InsertStatement(0, docA),
+                                                 InsertStatement(1, docB)};
+        AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+        opObserver().onInserts(opCtx(),
+                               *autoColl1,
+                               inserts1.begin(),
+                               inserts1.end(),
+                               /*recordIds=*/{},
+                               /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
+                               /*defaultFromMigrate=*/false);
+    }
+    {
+        std::vector<InsertStatement> inserts2 = {InsertStatement(0, docC)};
+        AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+        opObserver().onInserts(opCtx(),
+                               *autoColl2,
+                               inserts2.begin(),
+                               inserts2.end(),
+                               /*recordIds=*/{},
+                               /*fromMigrate=*/std::vector<bool>(inserts2.size(), false),
+                               /*defaultFromMigrate=*/false);
+    }
+
+    prepareTransaction();
+    txnParticipant.stashTransactionResources(opCtx());
+
+    auto txnRecord = getTxnRecord();
+    ASSERT_TRUE(txnRecord.getSizeMetadata().has_value());
+    const auto& sizeMetadata = *txnRecord.getSizeMetadata();
+    ASSERT_EQ(sizeMetadata.size(), 2u);
+
+    // Map of expected entries.
+    std::unordered_map<UUID, const MultiOpSizeMetadata*, UUID::Hash> byUuid;
+    for (const auto& entry : sizeMetadata) {
+        byUuid[entry.getUuid()] = &entry;
+    }
+
+    ASSERT_TRUE(byUuid.count(uuid1));
+    EXPECT_EQ(byUuid[uuid1]->getSz(), docA.objsize() + docB.objsize());
+    EXPECT_EQ(byUuid[uuid1]->getCt(), 2);
+
+    ASSERT_TRUE(byUuid.count(uuid2));
+    ASSERT_EQ(byUuid[uuid2]->getSz(), docC.objsize());
+    ASSERT_EQ(byUuid[uuid2]->getCt(), 1);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+}
+
+TEST_F(OpObserverTransactionTest, PrepareTransactionWritesSizeMetadataForSplitLinkedApplyOps) {
+    RAIIServerParameterControllerForTest flagBase("featureFlagReplicatedFastCount", true);
+    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
+                                                        true);
+    // Force a split after every 2 ops, so 3 total ops yields 2 linked applyOps entries.
+    RAIIServerParameterControllerForTest maxOps(
+        "maxNumberOfTransactionOperationsInSingleOplogEntry", 2);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    const auto docA = BSON("_id" << 0 << "data" << "x");
+    const auto docB = BSON("_id" << 1 << "data" << "y");
+    const auto docC = BSON("_id" << 0 << "data" << "z");
+    {
+        std::vector<InsertStatement> inserts1 = {InsertStatement(0, docA),
+                                                 InsertStatement(1, docB)};
+        AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+        opObserver().onInserts(opCtx(),
+                               *autoColl1,
+                               inserts1.begin(),
+                               inserts1.end(),
+                               /*recordIds=*/{},
+                               /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
+                               /*defaultFromMigrate=*/false);
+    }
+    {
+        std::vector<InsertStatement> inserts2 = {InsertStatement(0, docC)};
+        AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+        opObserver().onInserts(opCtx(),
+                               *autoColl2,
+                               inserts2.begin(),
+                               inserts2.end(),
+                               /*recordIds=*/{},
+                               /*fromMigrate=*/std::vector<bool>(inserts2.size(), false),
+                               /*defaultFromMigrate=*/false);
+    }
+
+    prepareTransaction();
+    txnParticipant.stashTransactionResources(opCtx());
+
+    auto txnRecord = getTxnRecord();
+    ASSERT_TRUE(txnRecord.getSizeMetadata().has_value());
+    const auto& sizeMetadata = *txnRecord.getSizeMetadata();
+    ASSERT_EQ(sizeMetadata.size(), 2u);
+
+    std::unordered_map<UUID, const MultiOpSizeMetadata*, UUID::Hash> byUuid;
+    for (const auto& entry : sizeMetadata) {
+        byUuid[entry.getUuid()] = &entry;
+    }
+
+    ASSERT_TRUE(byUuid.count(uuid1));
+    EXPECT_EQ(byUuid[uuid1]->getSz(), docA.objsize() + docB.objsize());
+    EXPECT_EQ(byUuid[uuid1]->getCt(), 2);
+
+    ASSERT_TRUE(byUuid.count(uuid2));
+    EXPECT_EQ(byUuid[uuid2]->getSz(), docC.objsize());
+    EXPECT_EQ(byUuid[uuid2]->getCt(), 1);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+}
+
+struct SizeMetadataFlagParams {
+    // Whether `featureFlagReplicatedFastCount` is enabled.
+    bool baseFlagEnabled;
+    // Whether `featureFlagReplicatedFastCountDurability` is enabled.
+    bool durabilityFlagEnabled;
+};
+class OpObserverPreparedTxnSizeMetadataFlagTest
+    : public OpObserverTransactionTest,
+      public testing::WithParamInterface<SizeMetadataFlagParams> {};
+
+TEST_P(OpObserverPreparedTxnSizeMetadataFlagTest,
+       OmitsSizeMetadataFromConfigTransactionsUnlessBothFlagsEnabled) {
+    const auto [baseFlagEnabled, durabilityFlagEnabled] = GetParam();
+
+    RAIIServerParameterControllerForTest flagBase("featureFlagReplicatedFastCount",
+                                                  baseFlagEnabled);
+    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
+                                                        durabilityFlagEnabled);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    std::vector<InsertStatement> inserts = {InsertStatement(0, BSON("_id" << 0 << "data" << "x"))};
+    {
+        AutoGetCollection autoColl(opCtx(), nss1, MODE_IX);
+        opObserver().onInserts(opCtx(),
+                               *autoColl,
+                               inserts.begin(),
+                               inserts.end(),
+                               /*recordIds=*/{},
+                               /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                               /*defaultFromMigrate=*/false);
+    }
+
+    prepareTransaction();
+    txnParticipant.stashTransactionResources(opCtx());
+
+    ASSERT_FALSE(getTxnRecord().getSizeMetadata().has_value());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+}
+
+INSTANTIATE_TEST_SUITE_P(SizeMetadataFlagCombinations,
+                         OpObserverPreparedTxnSizeMetadataFlagTest,
+                         testing::Values(SizeMetadataFlagParams{false, false},
+                                         SizeMetadataFlagParams{true, false},
+                                         SizeMetadataFlagParams{false, true}));
 
 TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     auto txnParticipant = TransactionParticipant::get(opCtx());

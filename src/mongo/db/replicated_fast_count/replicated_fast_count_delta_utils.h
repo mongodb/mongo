@@ -35,7 +35,10 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
+
+#include <vector>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
@@ -65,6 +68,17 @@ using SizeCountDeltas = absl::flat_hash_map<UUID, SizeCountDelta>;
  * operations within the 'applyOps' array can and should be parsed separately.
  */
 boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::OplogEntry& oplogEntry);
+
+/**
+ * Aggregates per-collection size and count deltas across a list of operations. Returns one
+ * `MultiOpSizeMetadata` entry per collection UUID touched. Operations without size metadata
+ * (`m` field) are skipped.
+ */
+MONGO_MOD_PUBLIC std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
+    const std::vector<repl::ReplOperation>& ops);
+
+MONGO_MOD_PUBLIC std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadata(
+    const std::vector<repl::OplogEntry>& ops);
 
 /**
  * Accumulates cumulative size and count deltas for each uuid across the inner operations of the

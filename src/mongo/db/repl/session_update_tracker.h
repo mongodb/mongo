@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/replicated_fast_count/durable_size_metadata_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/modules.h"
 
@@ -41,6 +42,16 @@
 
 namespace MONGO_MOD_PUB mongo {
 namespace repl {
+
+/**
+ * Extra fields for the config.transactions record that are only relevant for prepared transactions
+ * applied on secondaries. All fields are derived from the transaction's inner operations after
+ * parsing the oplog chain; none are available from the outer prepare oplog entry alone.
+ */
+struct PreparedTxnDerivedFields {
+    boost::optional<NamespaceHashSet> affectedNamespaces;
+    boost::optional<std::vector<MultiOpSizeMetadata>> sizeMetadata;
+};
 
 /**
  * Keeps tracks of oplog operations that would require changes to the config.transactions and
@@ -65,11 +76,13 @@ public:
      * corresponding to the operation. Otherwise, inspect the entry to determine whether to buffer
      * or flush the stored transaction information as part of retryable writes.
      *
-     * If 'affectedNamespaces' is not null, then this is a prepared transaction oplog entry, and we
-     * need to store it as part of the transaction information in the transaction table.
+     * 'preparedDerivedFields' is non-empty only for prepared transaction oplog entries on
+     * secondaries, and carries fields that must be derived from the inner operations of the
+     * transaction chain rather than from the outer prepare entry itself.
      */
-    boost::optional<std::vector<OplogEntry>> updateSession(const OplogEntry& entry,
-                                                           NamespaceHashSet* affectedNamespaces);
+    boost::optional<std::vector<OplogEntry>> updateSession(
+        const OplogEntry& entry,
+        const boost::optional<PreparedTxnDerivedFields>& preparedDerivedFields);
 
     /**
      * Returns true if the oplog entry represents an operation in a transaction and false otherwise.
@@ -111,7 +124,8 @@ private:
      * transaction.
      */
     boost::optional<OplogEntry> _createTransactionTableUpdateFromTransactionOp(
-        const repl::OplogEntry& entry, NamespaceHashSet* affectedNamespaces);
+        const repl::OplogEntry& entry,
+        const boost::optional<PreparedTxnDerivedFields>& preparedDerivedFields);
 
     LogicalSessionIdMap<OplogEntry> _sessionsToUpdate;
 
