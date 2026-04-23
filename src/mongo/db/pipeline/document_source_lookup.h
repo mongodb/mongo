@@ -320,7 +320,7 @@ public:
      * Returns the expression context associated with foreign collection namespace and/or
      * sub-pipeline.
      */
-    boost::intrusive_ptr<ExpressionContext> getSubpipelineExpCtx() const final {
+    boost::intrusive_ptr<ExpressionContext> getSubpipelineExpCtx() {
         return _fromExpCtx;
     }
 
