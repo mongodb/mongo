@@ -70,20 +70,34 @@ namespace mongo::extension::host::rnp {
 
 namespace {
 struct RnpKeyHandle {
+    RnpKeyHandle() = default;
     ~RnpKeyHandle() {
         if (key) {
             rnp_key_handle_destroy(key);
         }
     }
+
+    RnpKeyHandle(const RnpKeyHandle&) = delete;
+    RnpKeyHandle& operator=(const RnpKeyHandle&) = delete;
+    RnpKeyHandle(RnpKeyHandle&&) noexcept = delete;
+    RnpKeyHandle& operator=(RnpKeyHandle&&) noexcept = delete;
+
     rnp_key_handle_t key = nullptr;
 };
 
 struct RnpBufferHandle {
+    RnpBufferHandle() = default;
     ~RnpBufferHandle() {
         if (buffer) {
             rnp_buffer_destroy(buffer);
         }
     }
+
+    RnpBufferHandle(const RnpBufferHandle&) = delete;
+    RnpBufferHandle& operator=(const RnpBufferHandle&) = delete;
+    RnpBufferHandle(RnpBufferHandle&&) noexcept = delete;
+    RnpBufferHandle& operator=(RnpBufferHandle&&) noexcept = delete;
+
     char* buffer = nullptr;
 };
 
@@ -97,6 +111,24 @@ public:
                 LOGV2_DEBUG(11528915, 4, "Failed to destroy RNP verify op!");
             }
         }
+    }
+
+    RnpVerificationContext(const RnpVerificationContext&) = delete;
+    RnpVerificationContext& operator=(const RnpVerificationContext&) = delete;
+
+    RnpVerificationContext(RnpVerificationContext&& other) noexcept : _verifyOp(other._verifyOp) {
+        other._verifyOp = nullptr;
+    }
+
+    RnpVerificationContext& operator=(RnpVerificationContext&& other) noexcept {
+        if (this != &other) {
+            if (_verifyOp && rnp_op_verify_destroy(_verifyOp) != RNP_SUCCESS) {
+                LOGV2_DEBUG(12440100, 4, "Failed to destroy RNP verify op!");
+            }
+            _verifyOp = other._verifyOp;
+            other._verifyOp = nullptr;
+        }
+        return *this;
     }
 
     static RnpVerificationContext createForDetachedSignature(const RnpContext& rnp,
@@ -142,6 +174,21 @@ RnpInput::~RnpInput() {
             LOGV2_DEBUG(11528914, 4, "Failed to destroy RNP input!");
         }
     }
+}
+
+RnpInput::RnpInput(RnpInput&& other) noexcept : _input(other._input) {
+    other._input = nullptr;
+}
+
+RnpInput& RnpInput::operator=(RnpInput&& other) noexcept {
+    if (this != &other) {
+        if (_input && rnp_input_destroy(_input) != RNP_SUCCESS) {
+            LOGV2_DEBUG(12440101, 4, "Failed to destroy RNP input!");
+        }
+        _input = other._input;
+        other._input = nullptr;
+    }
+    return *this;
 }
 
 RnpContext::~RnpContext() {

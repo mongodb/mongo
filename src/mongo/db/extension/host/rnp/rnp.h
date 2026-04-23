@@ -48,6 +48,11 @@ public:
     RnpInput() = default;
     ~RnpInput();
 
+    RnpInput(const RnpInput&) = delete;
+    RnpInput& operator=(const RnpInput&) = delete;
+    RnpInput(RnpInput&& other) noexcept;
+    RnpInput& operator=(RnpInput&& other) noexcept;
+
     rnp_input_t operator*() const {
         return _input;
     }
@@ -91,6 +96,12 @@ class RnpContext {
 public:
     RnpContext() = default;
     ~RnpContext();
+
+    RnpContext(const RnpContext&) = delete;
+    RnpContext& operator=(const RnpContext&) = delete;
+    RnpContext(RnpContext&&) noexcept = delete;
+    RnpContext& operator=(RnpContext&&) noexcept = delete;
+
     /**
      * initialize initializes the rnp_ffi_t, which we refer to as the RNP context/keyring. This
      * method must be called before any other operations can be performed on the RnpContext.
@@ -127,6 +138,11 @@ class RnpOutput {
 public:
     RnpOutput();
     ~RnpOutput();
+
+    RnpOutput(const RnpOutput&) = delete;
+    RnpOutput& operator=(const RnpOutput&) = delete;
+    RnpOutput(RnpOutput&&) noexcept = delete;
+    RnpOutput& operator=(RnpOutput&&) noexcept = delete;
 
     rnp_output_t operator*() const {
         return _output;
