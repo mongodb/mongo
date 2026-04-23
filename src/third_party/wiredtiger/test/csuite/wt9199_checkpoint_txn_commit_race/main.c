@@ -49,7 +49,7 @@ static const char conn_config[] =
 static const char table_config_row[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=Q,value_format=Q";
 static const char *const uri = "table:wt9199-checkpoint-txn-commit-race";
-static uint64_t global_stable_ts;
+static wt_timestamp_t global_stable_ts;
 
 static volatile bool inserted;
 
@@ -136,7 +136,7 @@ thread_func_checkpoint(void *arg)
 {
     struct thread_data *td;
     WT_SESSION *session;
-    uint64_t stable_ts;
+    wt_timestamp_t stable_ts;
     char ts_string[WT_TS_HEX_STRING_SIZE];
     char tscfg[64];
 

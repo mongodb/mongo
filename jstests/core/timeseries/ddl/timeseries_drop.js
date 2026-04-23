@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_timeseries,
  *   assumes_no_implicit_collection_creation_after_drop,
+ *   requires_fcv_90,
  *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */

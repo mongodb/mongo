@@ -123,7 +123,7 @@ typedef struct {
  * A more complete description of how this fits into predictable replay is in replay.c .
  */
 typedef struct {
-    uint64_t last_commit_ts;
+    wt_timestamp_t last_commit_ts;
     bool in_use;
 } LANE;
 #define LANE_NONE UINT32_MAX /* A lane number guaranteed to be illegal */
@@ -266,18 +266,18 @@ typedef struct {
     WT_RAND_STATE data_rnd;  /* Global RNG state for data operations */
     WT_RAND_STATE extra_rnd; /* Global RNG state for extra operations */
 
-    uint64_t timestamp;        /* Counter for timestamps */
-    uint64_t prepared_id;      /* Counter for prepared id */
-    uint64_t oldest_timestamp; /* Last timestamp used for oldest */
-    uint64_t stable_timestamp; /* Last timestamp used for stable */
+    wt_timestamp_t timestamp;        /* Counter for timestamps */
+    uint64_t prepared_id;            /* Counter for prepared id */
+    wt_timestamp_t oldest_timestamp; /* Last timestamp used for oldest */
+    wt_timestamp_t stable_timestamp; /* Last timestamp used for stable */
 
     uint64_t truncate_cnt; /* truncation operation counter */
 
-    uint64_t replay_cached_committed;    /* Our committed timestamp, cached */
-    uint32_t replay_calculate_committed; /* Times before recalculating cached committed */
-    uint64_t replay_start_timestamp;     /* Timestamp at the beginning of a run */
-    uint64_t stop_timestamp;             /* If non-zero, stop when stable reaches this */
-    uint64_t timestamp_copy;             /* A copy of the timestamp, for safety checks */
+    wt_timestamp_t replay_cached_committed; /* Our committed timestamp, cached */
+    uint32_t replay_calculate_committed;    /* Times before recalculating cached committed */
+    wt_timestamp_t replay_start_timestamp;  /* Timestamp at the beginning of a run */
+    wt_timestamp_t stop_timestamp;          /* If non-zero, stop when stable reaches this */
+    wt_timestamp_t timestamp_copy;          /* A copy of the timestamp, for safety checks */
 
     uint32_t operation_timeout_ms; /* Requested limit to complete operations in transaction */
 
@@ -410,14 +410,14 @@ typedef struct {
     uint64_t last; /* truncate range */
     WT_ITEM *lastkey, _lastkey;
 
-    bool ignore_prepare;   /* read with ignore_prepare */
-    bool repeatable_reads; /* if read ops repeatable */
-    bool repeatable_wrap;  /* if circular buffer wrapped */
-    uint64_t opid;         /* Operation ID */
-    uint64_t commit_ts;    /* commit timestamp */
-    uint64_t read_ts;      /* read timestamp */
-    uint64_t replay_ts;    /* allocated timestamp for predictable replay */
-    uint64_t stable_ts;    /* stable timestamp */
+    bool ignore_prepare;      /* read with ignore_prepare */
+    bool repeatable_reads;    /* if read ops repeatable */
+    bool repeatable_wrap;     /* if circular buffer wrapped */
+    uint64_t opid;            /* Operation ID */
+    wt_timestamp_t commit_ts; /* commit timestamp */
+    wt_timestamp_t read_ts;   /* read timestamp */
+    wt_timestamp_t replay_ts; /* allocated timestamp for predictable replay */
+    wt_timestamp_t stable_ts; /* stable timestamp */
     SNAP_STATE snap_states[2];
     SNAP_STATE *s; /* points to one of the snap_states */
 
@@ -483,7 +483,7 @@ void path_setup(const char *);
 void set_alarm(u_int);
 void set_core(bool);
 void snap_init(TINFO *);
-void snap_op_init(TINFO *, uint64_t, bool);
+void snap_op_init(TINFO *, wt_timestamp_t, bool);
 void snap_repeat_stable(WT_SESSION *, TINFO **, size_t);
 void snap_repeat_single(TINFO *);
 int snap_repeat_txn(TINFO *);
@@ -493,23 +493,23 @@ void snap_track(TINFO *, thread_op);
 void table_dump_page(WT_SESSION *, const char *, TABLE *, uint64_t, const char *);
 void table_verify(TABLE *, void *);
 void timestamp_init(void);
-uint64_t timestamp_minimum_committed(void);
+wt_timestamp_t timestamp_minimum_committed(void);
 void timestamp_once(WT_SESSION *, bool, bool);
 void replay_adjust_key(TINFO *, uint64_t);
-uint64_t replay_commit_ts(TINFO *);
-uint64_t replay_rollback_ts(TINFO *);
+wt_timestamp_t replay_commit_ts(TINFO *);
+wt_timestamp_t replay_rollback_ts(TINFO *);
 void replay_committed(TINFO *);
 void replay_end_timed_run(void);
 void replay_loop_begin(TINFO *, bool);
-uint64_t replay_maximum_committed(void);
+wt_timestamp_t replay_maximum_committed(void);
 bool replay_operation_enabled(thread_op);
 void replay_pause_after_rollback(TINFO *, uint32_t);
-uint64_t replay_prepare_ts(TINFO *);
-uint64_t replay_read_ts(TINFO *);
+wt_timestamp_t replay_prepare_ts(TINFO *);
+wt_timestamp_t replay_read_ts(TINFO *);
 void replay_rollback(TINFO *);
 void replay_run_begin(WT_SESSION *);
 void replay_run_end(WT_SESSION *);
-int timestamp_query(const char *, uint64_t *);
+int timestamp_query(const char *, wt_timestamp_t *);
 void timestamp_teardown(WT_SESSION *);
 void trace_config(const char *);
 void trace_init(void);

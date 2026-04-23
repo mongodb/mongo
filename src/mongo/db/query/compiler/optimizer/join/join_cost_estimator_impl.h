@@ -48,8 +48,8 @@ public:
     JoinCostEstimatorImpl(JoinCostEstimatorImpl&&) = delete;
     JoinCostEstimatorImpl& operator=(JoinCostEstimatorImpl&&) = delete;
 
-    JoinCostEstimate costCollScanFragment(NodeId nodeId) override;
-    JoinCostEstimate costIndexScanFragment(NodeId nodeId) override;
+    JoinCostEstimate costCollScanFragment(NodeId nodeId, CostEstimate singleTableCpuCost) override;
+    JoinCostEstimate costIndexScanFragment(NodeId nodeId, CostEstimate singleTableCpuCost) override;
     JoinCostEstimate costBaseCollectionAccess(NodeId nodeId) override;
     JoinCostEstimate costHashJoinFragment(const JoinPlanNode& left,
                                           const JoinPlanNode& right) override;

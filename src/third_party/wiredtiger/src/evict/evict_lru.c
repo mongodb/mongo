@@ -2143,14 +2143,15 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
         if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
             wt_timestamp_t prune_timestamp =
               __wt_atomic_load_uint64_relaxed(&btree->prune_timestamp);
-            if (newest_commit_timestamp > prune_timestamp) {
-                WT_STAT_CONN_INCR(session, eviction_server_skip_pages_prune_timestamp);
-                return (true);
-            }
-            if (prune_timestamp != WT_TS_NONE &&
-              page->modify->rec_prune_timestamp >= prune_timestamp) {
-                WT_STAT_CONN_INCR(session, eviction_server_skip_pages_prune_timestamp_not_move);
-                return (true);
+            if (prune_timestamp != WT_TS_NONE) {
+                if (newest_commit_timestamp > prune_timestamp) {
+                    WT_STAT_CONN_INCR(session, eviction_server_skip_pages_prune_timestamp);
+                    return (true);
+                }
+                if (page->modify->rec_prune_timestamp >= prune_timestamp) {
+                    WT_STAT_CONN_INCR(session, eviction_server_skip_pages_prune_timestamp_not_move);
+                    return (true);
+                }
             }
         } else {
             if (newest_commit_timestamp > __wt_txn_pinned_stable_timestamp(session)) {

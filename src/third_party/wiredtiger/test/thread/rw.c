@@ -53,6 +53,7 @@ void
 rw_start(u_int readers, u_int writers)
 {
     struct timeval start, stop;
+    WT_SESSION *session;
     wt_thread_t *tids;
     double seconds;
     u_int i, name_index, offset, total_nops;
@@ -123,7 +124,9 @@ rw_start(u_int readers, u_int writers)
 
     /* Verify the files. */
     for (i = 0; i < readers + writers; ++i) {
-        verify(run_info[i].name);
+        testutil_check(conn->open_session(conn, NULL, NULL, &session));
+        testutil_verify(session, run_info[i].name, NULL);
+        testutil_check(session->close(session, NULL));
         if (!multiple_files)
             break;
     }

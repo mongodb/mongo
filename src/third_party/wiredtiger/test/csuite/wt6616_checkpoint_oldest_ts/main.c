@@ -92,7 +92,7 @@ thread_ckpt_run(void *arg)
     WT_CONNECTION *conn;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
-    uint64_t stable;
+    wt_timestamp_t stable;
     uint32_t sleep_time;
     int i;
     char ts_string[WT_TS_HEX_STRING_SIZE];
@@ -137,7 +137,7 @@ thread_run(void *arg)
     WT_CURSOR *cursor;
     WT_ITEM data;
     WT_SESSION *session;
-    uint64_t oldest_ts, ts;
+    wt_timestamp_t oldest_ts, ts;
     char kname[64], tscfg[64];
 
     conn = (WT_CONNECTION *)arg;
@@ -148,7 +148,7 @@ thread_run(void *arg)
 
     /* Insert and then delete the keys until we're killed. */
     printf("Worker thread started.\n");
-    for (oldest_ts = 0, ts = 1;; ++ts) {
+    for (oldest_ts = WT_TS_NONE, ts = 1;; ++ts) {
         testutil_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts);
 
         /* Insert the same value for key and value. */
@@ -264,8 +264,8 @@ main(int argc, char *argv[])
     WT_DECL_RET;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
+    wt_timestamp_t oldest_ts, stable_ts, ts;
     pid_t pid;
-    uint64_t oldest_ts, stable_ts, ts;
     uint32_t timeout;
     int ch, status;
     char cwd_start[PATH_MAX];

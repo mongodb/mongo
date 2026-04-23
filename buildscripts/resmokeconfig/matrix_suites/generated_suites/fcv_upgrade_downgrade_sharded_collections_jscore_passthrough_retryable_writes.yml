@@ -233,7 +233,6 @@ selector:
     - featureFlagRankFusionBasic
     - featureFlagRankFusionFull
     - featureFlagSearchHybridScoringFull
-    - featureFlagCreateViewlessTimeseriesCollections
     - uses_transactions
     - requires_fcv_81
     - requires_fcv_82

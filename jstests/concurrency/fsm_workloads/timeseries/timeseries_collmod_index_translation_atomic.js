@@ -9,12 +9,13 @@
  * What we want to prevent is that a collMod over the {m: 1} index:
  * - Starts by considering the collection as timeseries, so it translates {m: 1} to {meta: 1}.
  * - Meanwhile the collection is re-created as a regular collection with a {meta: 1} index.
- * - Then, it succeeds targetting the {meta: 1} index on the regular collection.
+ * - Then, it succeeds targeting the {meta: 1} index on the regular collection.
  *
  * @tags: [
  *   requires_timeseries,
  *   # Only viewless timeseries collections can be renamed over.
  *   featureFlagCreateViewlessTimeseriesCollections,
+ *   requires_fcv_90,
  * ]
  */
 

@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -88,10 +89,14 @@ class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$graphLookup"_sd;
 
-    class LiteParsed : public LiteParsedDocumentSourceForeignCollection<LiteParsed> {
+    class LiteParsed : public LiteParsedDocumentSourceNestedPipelines<LiteParsed> {
     public:
+        // TODO SERVER-125119 $graphLookup does not yet accept a user-provided sub-pipeline, but it
+        // is modeled as a LiteParsedDocumentSourceNestedPipelines so that view definitions resolved
+        // from the foreign namespace can be attached as sub-pipelines during lite parsing.
         LiteParsed(const BSONElement& spec, NamespaceString foreignNss)
-            : LiteParsedDocumentSourceForeignCollection(spec, std::move(foreignNss)) {}
+            : LiteParsedDocumentSourceNestedPipelines(
+                  spec, std::move(foreignNss), std::vector<LiteParsedPipeline>{}) {}
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -100,8 +105,9 @@ public:
 
         Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                               bool inMultiDocumentTransaction) const override {
+            tassert(12509601, "Expected foreign namespace to be set for $graphLookup", _foreignNss);
             const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
-            if (!inMultiDocumentTransaction || _foreignNss != nss ||
+            if (!inMultiDocumentTransaction || *_foreignNss != nss ||
                 gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
                 return Status::OK();
             }
@@ -111,9 +117,13 @@ public:
                 "Sharded $graphLookup is not allowed within a multi-document transaction");
         }
 
+        // TODO SERVER-125119 Once $graphLookup populates `_pipelines` (e.g. via view definition
+        // resolution), this must also account for the privileges required by each pipeline in
+        // `_pipelines` in addition to `_foreignNss`.
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {Privilege(ResourcePattern::forExactNamespace(_foreignNss), ActionType::find)};
+            tassert(12509600, "Expected foreign namespace to be set for $graphLookup", _foreignNss);
+            return {Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find)};
         }
 
         std::unique_ptr<StageParams> getStageParams() const override {

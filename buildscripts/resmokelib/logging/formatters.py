@@ -17,9 +17,6 @@ class TimestampFormatter(logging.Formatter):
     produced by mongo{d,s} instances in case of 'json' log format but also to
     preserve the format used before this flag was introduced.
 
-    TODO SERVER-99797: keep only +00:00 timestamp format after moving to json
-    as the default --logFormat parameter.
-
     Note that +00:00 (UTC) time is used by default.
     """
 

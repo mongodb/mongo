@@ -36,6 +36,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/shard_role/shard_catalog/allow_read_from_latest_on_secondary.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
@@ -63,6 +64,7 @@ bool canReadAtLastApplied(OperationContext* opCtx) {
 constexpr StringData kReasonUnreplicatedCollection = "unreplicated collection"_sd;
 constexpr StringData kReasonPrimary = "primary"_sd;
 constexpr StringData kReasonNotPrimaryOrSecondary = "not primary or secondary"_sd;
+constexpr StringData kReasonAllowReadFromLatest = "allow read from latest on secondary block"_sd;
 
 bool shouldReadAtLastApplied(OperationContext* opCtx,
                              boost::optional<const NamespaceString&> nss,
@@ -107,6 +109,11 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
         repl::ReadConcernLevel::kLinearizableReadConcern) {
         uasserted(ErrorCodes::NotWritablePrimary,
                   "cannot satisfy linearizable read concern on non-primary node");
+    }
+
+    if (allowReadFromLatestOnSecondary(opCtx)) {
+        *reason = kReasonAllowReadFromLatest;
+        return false;
     }
 
     return true;

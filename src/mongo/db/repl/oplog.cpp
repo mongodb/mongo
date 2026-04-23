@@ -294,12 +294,14 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
             }
         }();
 
-        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(opCtx,
-                                                                totalLength,
-                                                                (*records)[nRecords - 1].id,
-                                                                wall,
-                                                                nRecords,
-                                                                gOplogSamplingAsyncEnabled);
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
+            opCtx,
+            totalLength,
+            (*records)[nRecords - 1].id,
+            wall,
+            nRecords,
+            provider.supportsAsyncOplogMarkerGeneration());
     }
 
     // We do not need to notify capped waiters, as we have not yet updated oplog visibility, so

@@ -3273,6 +3273,13 @@ __rec_write_err(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
       r->multi->block_meta->page_id == page->disagg_info->block_meta.page_id) {
         page->disagg_info->block_meta.page_id = WT_BLOCK_INVALID_PAGE_ID;
         WT_STAT_CONN_DSRC_INCR(session, rec_free_page_id_due_to_failed_replacement_reconciliation);
+        /*
+         * The discard above terminates the delta chain for this page id. ref->addr still carries a
+         * cookie with that now-dead page id; a later wrapup that tries to free it would produce a
+         * second discard in the chain and fail. Clear the stale reference so the next
+         * reconciliation's wrapup sees no address to free.
+         */
+        __wt_ref_addr_free(session, r->ref);
     }
 
     WT_TRET(__wti_ovfl_track_wrapup_err(session, page));

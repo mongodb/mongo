@@ -163,7 +163,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                  static_cast<long long>(
                      toCollection.getCollectionPtr()->getRecordStore()->storageSize(ru) * 2));
 
-    long long excessSize = fromCollection.getCollectionPtr()->dataSize(opCtx) - allocatedSpaceGuess;
+    long long excessSize =
+        fromCollection.getCollectionPtr()->latestSizeCount(opCtx).size - allocatedSpaceGuess;
 
     auto exec =
         InternalPlanner::collectionScan(opCtx,

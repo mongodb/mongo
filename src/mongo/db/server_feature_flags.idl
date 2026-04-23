@@ -70,9 +70,9 @@ feature_flags:
         description: >-
             Feature flag to enable oplog truncation based on size and time for disagg,
             instead of oplog truncation only based on time.
-        cpp_varname: feature_flags::gFeatureFlagSizeBasedOplogTruncationForDisagg
+        cpp_varname: gFeatureFlagSizeBasedOplogTruncationForDisagg
         default: false
-        fcv_gated: true
+        fcv_gated: false
     featureFlagEndOfTransactionChangeEvent:
         description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
@@ -150,7 +150,8 @@ feature_flags:
             When enabled, external operations directly targeting legacy timeseries
             system.buckets collections will fail with an error.
         cpp_varname: gFeatureFlagBlockDirectSystemBucketsAccess
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
     featureFlagCreateViewlessTimeseriesCollections:
         description: >-
@@ -158,7 +159,8 @@ feature_flags:
             Viewless timeseries collections have only one associated namespace,
             instead of a view namespace and a system.buckets namespace.
         cpp_varname: gFeatureFlagCreateViewlessTimeseriesCollections
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
         check_against_fcv: operation_fcv_only
     featureFlagMarkTimeseriesEventsInOplog:
@@ -167,7 +169,8 @@ feature_flags:
             Viewless timeseries collections have only one associated namespace,
             instead of a view namespace and a system.buckets namespace.
         cpp_varname: gFeatureFlagMarkTimeseriesEventsInOplog
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
     featureFlagMongodProxyProtocolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"

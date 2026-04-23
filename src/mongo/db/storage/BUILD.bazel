@@ -339,6 +339,7 @@ mongo_cc_library(
     ],
     deps = [
         ":record_store_base",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage/kv:kv_engine",
     ],
 )

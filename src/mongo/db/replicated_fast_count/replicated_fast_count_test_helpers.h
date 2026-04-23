@@ -110,6 +110,18 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
         return false;
     }
 
+    bool supportsPersistentOplogCapMaintainerThread() const override {
+        return false;
+    }
+
+    bool supportsAsyncOplogMarkerGeneration() const override {
+        return false;
+    }
+
+    bool supportsOplogSampling() const override {
+        return false;
+    }
+
     bool supportsWriteConcernOptions(const WriteConcernOptions&) const override {
         return true;
     }

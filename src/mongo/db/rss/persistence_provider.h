@@ -182,7 +182,20 @@ public:
     virtual bool supportsFindAndModifyImageCollection() const = 0;
 
     /**
-     * If true, the provider supports starting the oplog cap maintainer thread and oplog sampling.
+     * If true, the provider supports a persistent oplog cap maintainer thread that runs for the
+     * entirety of a node's runtime.
+     */
+    virtual bool supportsPersistentOplogCapMaintainerThread() const = 0;
+
+    /**
+     * If true, the provider supports generating initial oplog markers asynchronously on the cap
+     * maintainer thread. If false, initial oplog markers must be generated before starting the cap
+     * maintainer thread.
+     */
+    virtual bool supportsAsyncOplogMarkerGeneration() const = 0;
+
+    /**
+     * If true, the provider supports random sampling over the oplog collection.
      */
     virtual bool supportsOplogSampling() const = 0;
 

@@ -362,7 +362,7 @@ thread_ts_run(void *arg)
     printf("Timestamp thread started...\n");
     __wt_seconds((WT_SESSION_IMPL *)session, &last_reconfig);
     /* Update the oldest/stable timestamps every 1 millisecond. */
-    for (last_ts = 0;; __wt_sleep(0, WT_THOUSAND)) {
+    for (last_ts = WT_TS_NONE;; __wt_sleep(0, WT_THOUSAND)) {
         /* Get the last committed timestamp periodically in order to update the oldest
          * timestamp. */
         ts = maximum_stable_ts(active_timestamps, nth);
@@ -473,7 +473,7 @@ thread_ckpt_run(void *arg)
 {
     THREAD_DATA *td;
     WT_SESSION *session;
-    uint64_t stable;
+    wt_timestamp_t stable;
     uint32_t sleep_time;
     int i;
     char ckpt_config[128], ckpt_flush_config[128];
@@ -1150,7 +1150,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
     WT_SESSION *session;
     uint64_t absent_coll, absent_local, absent_oplog, absent_shadow, count, key, last_key;
-    uint64_t commit_fp, durable_fp, stable_val;
+    wt_timestamp_t commit_fp, durable_fp, stable_val;
     uint32_t i;
     int ret;
     char backup_dir[PATH_MAX], buf[PATH_MAX], fname[64], kname[64], verify_dir[PATH_MAX];
@@ -1217,7 +1217,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
     /*
      * Find the biggest stable timestamp value that was saved.
      */
-    stable_val = 0;
+    stable_val = WT_TS_NONE;
     if (use_ts) {
         testutil_check(conn->query_timestamp(conn, ts_string, "get=recovery"));
         testutil_assert(sscanf(ts_string, "%" SCNx64, &stable_val) == 1);
@@ -1302,7 +1302,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
                  * If we don't find a record, the durable timestamp written to our file better be
                  * larger than the saved one.
                  */
-                if (!opts->inmem && durable_fp != 0 && durable_fp <= stable_val) {
+                if (!opts->inmem && durable_fp != WT_TS_NONE && durable_fp <= stable_val) {
                     printf("%s: COLLECTION no record with key %" PRIu64
                            " record durable ts %" PRIu64 " <= stable ts %" PRIu64 "\n",
                       fname, key, durable_fp, stable_val);
@@ -1330,7 +1330,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
                  */
                 c_rep[i].exist_key = key;
                 fatal = true;
-            } else if (!opts->inmem && commit_fp != 0 && commit_fp > stable_val) {
+            } else if (!opts->inmem && commit_fp != WT_TS_NONE && commit_fp > stable_val) {
                 /*
                  * If we found a record, the commit timestamp written to our file better be no
                  * larger than the checkpoint one.

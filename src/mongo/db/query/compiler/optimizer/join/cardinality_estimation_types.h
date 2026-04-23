@@ -40,6 +40,12 @@ namespace mongo::join_ordering {
  * present multiple times in the graph and associated with different predicates/cardinalities.
  */
 using NodeCardinalities = std::vector<cost_based_ranker::CardinalityEstimate>;
+
+/**
+ * Tracks for each node ID the CBR cost of the winning single-table plan.
+ */
+using NodeCBRCosts = std::vector<cost_based_ranker::CostEstimate>;
+
 /**
  * Tracks for each edge ID the selectivity estimate.
  */

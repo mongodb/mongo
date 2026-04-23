@@ -29,6 +29,8 @@
 #pragma once
 
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
@@ -54,12 +56,29 @@ using SamplingEstimatorMap =
     stdx::unordered_map<NamespaceString, std::unique_ptr<ce::SamplingEstimator>>;
 
 /**
+ * Struct containing results from 'singleTableAccessPlans()' function.
+ */
+struct SingleTableAccessPlansResult {
+    QuerySolutionMap cbrCqQsns;
+    cost_based_ranker::EstimateMap estimate;
+
+    // Stores cardinality estimates for nodes after single-table predicates are applied.
+    NodeCardinalities nodeCardinalities;
+
+    // Stores cardinalities for the underlying collections as reported by the catalog.
+    NodeCardinalities collCardinalities;
+
+    // Per-node CBR costs for the winning single-table plans.
+    NodeCBRCosts nodeCBRCosts;
+};
+
+/**
  * A struct tracking all information needed to reorder joins and generate a join plan.
  */
 struct JoinReorderingContext {
     const JoinGraph& joinGraph;
     const std::vector<ResolvedPath>& resolvedPaths;
-    QuerySolutionMap cbrCqQsns;
+    SingleTableAccessPlansResult singleTableAccess;
     AvailableIndexes perCollIdxs;
     CatalogStats catStats;
 

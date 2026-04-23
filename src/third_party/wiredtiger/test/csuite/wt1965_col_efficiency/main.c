@@ -39,7 +39,7 @@
 #define NR_OBJECTS 100
 #define NR_THREADS 4
 
-static uint64_t g_ts = 0;
+static wt_timestamp_t g_ts = 0;
 
 /*
  * thread_func --

@@ -169,6 +169,6 @@ checkpoint(void *arg)
         secs = mmrand(&g.extra_rnd, 5, max_secs);
     }
 
-    wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
+    wt_wrap_close_session(session);
     return (WT_THREAD_RET_VALUE);
 }

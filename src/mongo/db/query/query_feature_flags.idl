@@ -484,3 +484,9 @@ feature_flags:
         cpp_varname: gFeatureFlagPqsQueryKnobs
         default: false
         fcv_gated: true
+
+    featureFlagPersistentStats:
+        description: "Feature flag to enable persistent statistics for cost estimation."
+        cpp_varname: gFeatureFlagPersistentStats
+        default: false
+        fcv_gated: true

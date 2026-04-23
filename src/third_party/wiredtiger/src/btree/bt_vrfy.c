@@ -1284,7 +1284,7 @@ __verify_key_hs(
      * transaction-ids are wiped out on start, we could possibly have a start txn-id of WT_TXN_NONE,
      * in which case we initialize our newest with the max txn-id.
      */
-    older_stop_ts = 0;
+    older_stop_ts = WT_TS_NONE;
 
     /*
      * Open a history store cursor positioned at the end of the data store key (the newest record)

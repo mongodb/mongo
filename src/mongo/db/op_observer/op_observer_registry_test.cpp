@@ -278,5 +278,30 @@ DEATH_TEST_F(OpObserverRegistryTestDeathTest,
     checkInconsistentOpTime(op);
 }
 
+TEST_F(OpObserverRegistryTest, SealIsIdempotent) {
+    registry.addObserver(std::move(unique1));
+    registry.seal();
+    registry.seal();
+}
+
+TEST_F(OpObserverRegistryTest, SealDoesNotAffectCallbacks) {
+    registry.addObserver(std::move(unique1));
+    registry.addObserver(std::move(unique2));
+    registry.seal();
+    registry.onDropDatabase(opCtx,
+                            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                            false /*markFromMigrate*/);
+    ASSERT_EQUALS(observer1->drops, 1);
+    ASSERT_EQUALS(observer2->drops, 1);
+}
+
+DEATH_TEST_F(OpObserverRegistryTestDeathTest,
+             AddObserverAfterSealInvariants,
+             "OpObserverRegistry::addObserver called after seal()") {
+    registry.addObserver(std::move(unique1));
+    registry.seal();
+    registry.addObserver(std::move(unique2));
+}
+
 }  // namespace
 }  // namespace mongo

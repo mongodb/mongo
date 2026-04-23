@@ -162,7 +162,7 @@ void startOplogCapMaintainerThread(ServiceContext* serviceContext,
 
     if (!rss::ReplicatedStorageService::get(serviceContext)
              .getPersistenceProvider()
-             .supportsOplogSampling()) {
+             .supportsPersistentOplogCapMaintainerThread()) {
         return;
     }
 
@@ -329,7 +329,7 @@ void OplogCapMaintainerThread::run() {
 
     // asynchronously regenerate truncation markers, if they are still needed when we get here.
     auto& provider = rss::ReplicatedStorageService::get(_uniqueCtx->get()).getPersistenceProvider();
-    if (gOplogSamplingAsyncEnabled && provider.supportsOplogSampling()) {
+    if (provider.supportsAsyncOplogMarkerGeneration()) {
         try {
             {
                 std::unique_lock<std::mutex> lk(_stateMutex);
@@ -358,9 +358,9 @@ void OplogCapMaintainerThread::run() {
                                                     rss::consensus::IntentRegistry::Intent::Read});
                 const auto& oplog = oplogRead->getCollection();
                 if (oplog) {
-                    // Initial sampling and marker creation.
-                    auto oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(
-                        _uniqueCtx->get(), *oplog->getRecordStore());
+                    // Initial marker creation.
+                    auto oplogTruncateMarkers =
+                        _createInitialMarkers(_uniqueCtx->get(), *oplog->getRecordStore());
                     invariant(oplogTruncateMarkers);
                     LocalOplogInfo::get(_uniqueCtx->get())
                         ->setTruncateMarkers(std::move(oplogTruncateMarkers));
@@ -400,7 +400,8 @@ void OplogCapMaintainerThread::run() {
 
     while (true) {
         // We need this check since the first check to _shuttingDown is guarded by
-        // gOplogSamplingAsyncEnabled and we will never check this value if async is disabled.
+        // provider.supportsAsyncOplogMarkerGeneration() and we will never check this value if async
+        // is disabled.
         {
             std::unique_lock<std::mutex> lk(_stateMutex);
             if (_shuttingDown) {
@@ -448,6 +449,13 @@ void OplogCapMaintainerThread::run() {
 
     MONGO_UNREACHABLE;
 }
+
+std::shared_ptr<OplogTruncateMarkers> OplogCapMaintainerThread::_createInitialMarkers(
+    OperationContext* opCtx, RecordStore& rs) const {
+    auto initialMarkers = OplogTruncateMarkers::beginMarkerCreation(opCtx, rs);
+    return std::make_shared<OplogTruncateMarkers>(std::move(initialMarkers), *rs.oplog());
+}
+
 
 void OplogCapMaintainerThread::shutdown(const Status& reason) {
     LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread", "reason"_attr = reason);

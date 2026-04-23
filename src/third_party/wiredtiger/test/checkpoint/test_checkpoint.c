@@ -96,7 +96,7 @@ main(int argc, char *argv[])
     g.home = dmalloc(512);
     g.nkeys = 10 * WT_THOUSAND;
     g.nops = 100 * WT_THOUSAND;
-    g.stop_ts = 0;
+    g.stop_ts = WT_TS_NONE;
     g.ntables = 3;
     g.nworkers = 1;
     g.evict_reposition_timing_stress = false;
@@ -267,12 +267,6 @@ main(int argc, char *argv[])
         if (strcmp(g.checkpoint_name, "WiredTigerCheckpoint") != 0) {
             fprintf(
               stderr, "disaggregated storage feature doesn't supports named checkpoints (-c)");
-            return (EXIT_FAILURE);
-        }
-        /* FIXME-WT-15795 Disagg is not support prepared operations yet. */
-        if (g.prepare == true) {
-            fprintf(
-              stderr, "disaggregated storage feature doesn't supports prepare operations (-p)");
             return (EXIT_FAILURE);
         }
         g.opts.disagg.page_log_home = g.home;

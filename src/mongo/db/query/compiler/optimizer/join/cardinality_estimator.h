@@ -33,7 +33,7 @@
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
-#include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
+#include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -46,14 +46,10 @@ using cost_based_ranker::SelectivityEstimate;
  */
 class JoinCardinalityEstimator {
 public:
-    JoinCardinalityEstimator(const JoinReorderingContext& ctx,
-                             EdgeSelectivities edgeSelectivities,
-                             NodeCardinalities nodeCardinalities,
-                             NodeCardinalities collCardinalities);
+    JoinCardinalityEstimator(const JoinReorderingContext& ctx, EdgeSelectivities edgeSelectivities);
     virtual ~JoinCardinalityEstimator() {};
 
     static JoinCardinalityEstimator make(const JoinReorderingContext& ctx,
-                                         const cost_based_ranker::EstimateMap& estimates,
                                          const SamplingEstimatorMap& samplingEstimators);
 
     /**
@@ -67,12 +63,6 @@ public:
     static EdgeSelectivities estimateEdgeSelectivities(
         const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators);
 
-    static NodeCardinalities extractNodeCardinalities(
-        const JoinReorderingContext& ctx, const cost_based_ranker::EstimateMap& estimates);
-
-    static NodeCardinalities extractCollCardinalities(
-        const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators);
-
     /**
      * Estimates the cardinality of a join plan over the given subset of nodes. This method
      * constructs a spanning tree from the edges in the graph induced by 'nodes', and combines the
@@ -82,12 +72,6 @@ public:
     virtual CardinalityEstimate getOrEstimateSubsetCardinality(const NodeSet& nodes);
 
     /**
-     * Returns the cardinality of the collection referenced by the given node. This ignores any
-     * single table predicates.
-     */
-    CardinalityEstimate getCollCardinality(NodeId node) const;
-
-    /**
      * Returns the selectivity of the given edge.
      */
     SelectivityEstimate getEdgeSelectivity(EdgeId edge) const;
@@ -95,10 +79,6 @@ public:
 protected:
     const JoinReorderingContext& _ctx;
     const EdgeSelectivities _edgeSelectivities;
-    // Stores cardinality estimates for nodes after single-table predicates are applied.
-    const NodeCardinalities _nodeCardinalities;
-    // Stores cardinalities for the underlying collections as reported by the catalog.
-    const NodeCardinalities _collCardinalities;
 
     GraphCycleBreaker _cycleBreaker;
 

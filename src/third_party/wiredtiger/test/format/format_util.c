@@ -33,7 +33,7 @@
  *     Return a one character descriptor of relative timestamp values.
  */
 static const char *
-track_ts_diff(uint64_t left_ts, uint64_t right_ts)
+track_ts_diff(wt_timestamp_t left_ts, wt_timestamp_t right_ts)
 {
     if (left_ts < right_ts)
         return "+";
@@ -83,10 +83,10 @@ track_write(char *msg, size_t len)
 void
 track_ops(TINFO *tinfo)
 {
-    static uint64_t last_cur, last_old, last_stable;
+    static wt_timestamp_t last_cur, last_old, last_stable;
     static u_int cur_dot_cnt, old_dot_cnt, stable_dot_cnt;
+    wt_timestamp_t cur_ts, old_ts, stable_ts;
     size_t len;
-    uint64_t cur_ts, old_ts, stable_ts;
     char msg[128], ts_msg[64];
 
     if (GV(QUIET))

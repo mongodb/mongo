@@ -51,18 +51,24 @@ public:
      * Estimate the cost of a single table collection scan plan fragment. This function assumes that
      * the given 'NodeId' corresponds to a node in the JoinGraph whose single table access path is a
      * collection scan; it is the caller's responsibility to ensure this is the case.
+     *
+     * The given cost is the CPU cost of the single-table plan from CBR; IO cost is modeled by the
+     * fragment method itself.
      */
-    virtual JoinCostEstimate costCollScanFragment(NodeId) = 0;
+    virtual JoinCostEstimate costCollScanFragment(NodeId id, CostEstimate singleTableCpuCost) = 0;
 
     /**
      * Estimate the cost of a single table index scan plan fragment. This function assumes that the
      * given 'NodeId' corresponds to a node in the JoinGraph whose single table access path is an
      * index scan followed by a fetch; it is caller's responsibility to ensure this is the case.
      *
+     * The given cost is the CPU cost of the single-table plan from CBR; IO cost is modeled by the
+     * fragment method itself.
+     *
      * TODO SERVER-117506: Once we support projections and start producing covered plans, we will
      * need to modify this function.
      */
-    virtual JoinCostEstimate costIndexScanFragment(NodeId) = 0;
+    virtual JoinCostEstimate costIndexScanFragment(NodeId id, CostEstimate singleTableCpuCost) = 0;
 
     /**
      * Estimate the cost of a hash join plan fragment.

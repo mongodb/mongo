@@ -47,12 +47,21 @@ namespace MONGO_MOD_PUBLIC mongo {
 // grows beyond its desired maximum size.
 class MONGO_MOD_OPEN OplogTruncateMarkers : public CollectionTruncateMarkers {
 public:
-    OplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker> markers,
+    OplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker>&& markers,
                          int64_t partialMarkerRecords,
                          int64_t partialMarkerBytes,
                          int64_t minBytesPerMarker,
                          Microseconds totalTimeSpentBuilding,
                          CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
+                         bool initialSamplingFinished,
+                         const RecordStore::Oplog& oplog);
+
+    struct InitialSetOfOplogMarkers : public CollectionTruncateMarkers::InitialSetOfMarkers {
+        int64_t minBytesPerTruncateMarker;
+        bool initialSamplingFinished;
+    };
+
+    OplogTruncateMarkers(InitialSetOfOplogMarkers&& initialMarkers,
                          const RecordStore::Oplog& oplog);
 
     /**
@@ -109,8 +118,11 @@ public:
 
     static std::shared_ptr<OplogTruncateMarkers> createEmptyOplogTruncateMarkers(RecordStore& rs);
 
-    static std::shared_ptr<OplogTruncateMarkers> sampleAndUpdate(OperationContext* opCtx,
-                                                                 RecordStore& rs);
+    /*
+     * Initialize truncation marker creation. This may either create all the truncation markers
+     * synchronously, or initialize async sampling, depending on what creation method is chosen.
+     */
+    static InitialSetOfOplogMarkers beginMarkerCreation(OperationContext* opCtx, RecordStore& rs);
 
     static std::shared_ptr<OplogTruncateMarkers> createOplogTruncateMarkers(OperationContext* opCtx,
                                                                             RecordStore& rs);

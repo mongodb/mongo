@@ -91,7 +91,7 @@ optypes = [
     #
     LogOperationType('txn_timestamp', 'txn_timestamp',
         [('uint64_t', 'time_sec'), ('uint64_t', 'time_nsec'),
-            ('uint64_t', 'commit_ts'), ('uint64_t', 'durable_ts'),
-            ('uint64_t', 'first_commit_ts'), ('uint64_t', 'prepare_ts'),
-            ('uint64_t', 'read_ts')]),
+            ('wt_timestamp_t', 'commit_ts'), ('wt_timestamp_t', 'durable_ts'),
+            ('wt_timestamp_t', 'first_commit_ts'), ('wt_timestamp_t', 'prepare_ts'),
+            ('wt_timestamp_t', 'read_ts')]),
 ]

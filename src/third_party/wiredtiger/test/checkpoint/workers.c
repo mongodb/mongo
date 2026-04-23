@@ -312,7 +312,8 @@ real_worker(THREAD_DATA *td)
 {
     WT_CURSOR **cursors;
     WT_SESSION *session;
-    uint64_t base_ts, prepared_id;
+    wt_timestamp_t base_ts;
+    uint64_t prepared_id;
     u_int i, keyno, next_rnd;
     int j, ret, t_ret;
     char buf[128];
@@ -359,7 +360,7 @@ real_worker(THREAD_DATA *td)
          * thread reaches a stable equal to the stop timestamp. Ignore the provided operation count
          * in such a case.
          */
-        if (g.stop_ts == 0 && i >= g.nops)
+        if (g.stop_ts == WT_TS_NONE && i >= g.nops)
             break;
 
         if (i > 0 && i % (5 * WT_THOUSAND) == 0)

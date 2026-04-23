@@ -159,8 +159,8 @@ timestamp_manager::get_valid_read_ts() const
      * Assert that our stable and oldest match if 0 or that the stable is greater than or equal to
      * the oldest. Ensuring that the oldest is never greater than the stable.
      */
-    testutil_assert(
-      (current_stable == 0 && current_oldest == 0) || current_stable >= current_oldest);
+    testutil_assert((current_stable == WT_TS_NONE && current_oldest == WT_TS_NONE) ||
+      current_stable >= current_oldest);
     /*
      * Its okay to return a timestamp less than a concurrently updated oldest timestamp as all
      * readers should be reading with timestamp rounding.

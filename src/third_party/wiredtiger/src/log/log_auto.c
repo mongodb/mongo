@@ -1702,8 +1702,9 @@ __wt_logop_backup_id_print(
  *     Calculate size of txn_timestamp struct.
  */
 static WT_INLINE size_t
-__wt_struct_size_txn_timestamp(uint64_t time_sec, uint64_t time_nsec, uint64_t commit_ts,
-  uint64_t durable_ts, uint64_t first_commit_ts, uint64_t prepare_ts, uint64_t read_ts)
+__wt_struct_size_txn_timestamp(uint64_t time_sec, uint64_t time_nsec, wt_timestamp_t commit_ts,
+  wt_timestamp_t durable_ts, wt_timestamp_t first_commit_ts, wt_timestamp_t prepare_ts,
+  wt_timestamp_t read_ts)
 {
     return (__wt_vsize_uint(time_sec) + __wt_vsize_uint(time_nsec) + __wt_vsize_uint(commit_ts) +
       __wt_vsize_uint(durable_ts) + __wt_vsize_uint(first_commit_ts) + __wt_vsize_uint(prepare_ts) +
@@ -1717,8 +1718,8 @@ __wt_struct_size_txn_timestamp(uint64_t time_sec, uint64_t time_nsec, uint64_t c
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
 static WT_INLINE int
 __wt_struct_pack_txn_timestamp(uint8_t **pp, uint8_t *end, uint64_t time_sec, uint64_t time_nsec,
-  uint64_t commit_ts, uint64_t durable_ts, uint64_t first_commit_ts, uint64_t prepare_ts,
-  uint64_t read_ts)
+  wt_timestamp_t commit_ts, wt_timestamp_t durable_ts, wt_timestamp_t first_commit_ts,
+  wt_timestamp_t prepare_ts, wt_timestamp_t read_ts)
 {
     WT_RET(__pack_encode_uintAny(pp, end, time_sec));
     WT_RET(__pack_encode_uintAny(pp, end, time_nsec));
@@ -1738,16 +1739,16 @@ __wt_struct_pack_txn_timestamp(uint8_t **pp, uint8_t *end, uint64_t time_sec, ui
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
 static WT_INLINE int
 __wt_struct_unpack_txn_timestamp(const uint8_t **pp, const uint8_t *end, uint64_t *time_secp,
-  uint64_t *time_nsecp, uint64_t *commit_tsp, uint64_t *durable_tsp, uint64_t *first_commit_tsp,
-  uint64_t *prepare_tsp, uint64_t *read_tsp)
+  uint64_t *time_nsecp, wt_timestamp_t *commit_tsp, wt_timestamp_t *durable_tsp,
+  wt_timestamp_t *first_commit_tsp, wt_timestamp_t *prepare_tsp, wt_timestamp_t *read_tsp)
 {
     __pack_decode_uintAny(pp, end, uint64_t, time_secp);
     __pack_decode_uintAny(pp, end, uint64_t, time_nsecp);
-    __pack_decode_uintAny(pp, end, uint64_t, commit_tsp);
-    __pack_decode_uintAny(pp, end, uint64_t, durable_tsp);
-    __pack_decode_uintAny(pp, end, uint64_t, first_commit_tsp);
-    __pack_decode_uintAny(pp, end, uint64_t, prepare_tsp);
-    __pack_decode_uintAny(pp, end, uint64_t, read_tsp);
+    __pack_decode_uintAny(pp, end, wt_timestamp_t, commit_tsp);
+    __pack_decode_uintAny(pp, end, wt_timestamp_t, durable_tsp);
+    __pack_decode_uintAny(pp, end, wt_timestamp_t, first_commit_tsp);
+    __pack_decode_uintAny(pp, end, wt_timestamp_t, prepare_tsp);
+    __pack_decode_uintAny(pp, end, wt_timestamp_t, read_tsp);
 
     return (0);
 }
@@ -1759,8 +1760,8 @@ __wt_struct_unpack_txn_timestamp(const uint8_t **pp, const uint8_t *end, uint64_
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
 int
 __wt_logop_txn_timestamp_pack(WT_SESSION_IMPL *session, WT_ITEM *logrec, uint64_t time_sec,
-  uint64_t time_nsec, uint64_t commit_ts, uint64_t durable_ts, uint64_t first_commit_ts,
-  uint64_t prepare_ts, uint64_t read_ts)
+  uint64_t time_nsec, wt_timestamp_t commit_ts, wt_timestamp_t durable_ts,
+  wt_timestamp_t first_commit_ts, wt_timestamp_t prepare_ts, wt_timestamp_t read_ts)
 {
     size_t size;
     uint8_t *buf, *end;
@@ -1787,8 +1788,9 @@ __wt_logop_txn_timestamp_pack(WT_SESSION_IMPL *session, WT_ITEM *logrec, uint64_
  */
 int
 __wt_logop_txn_timestamp_unpack(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-  uint64_t *time_secp, uint64_t *time_nsecp, uint64_t *commit_tsp, uint64_t *durable_tsp,
-  uint64_t *first_commit_tsp, uint64_t *prepare_tsp, uint64_t *read_tsp)
+  uint64_t *time_secp, uint64_t *time_nsecp, wt_timestamp_t *commit_tsp,
+  wt_timestamp_t *durable_tsp, wt_timestamp_t *first_commit_tsp, wt_timestamp_t *prepare_tsp,
+  wt_timestamp_t *read_tsp)
 {
     WT_DECL_RET;
     uint32_t optype, size;
@@ -1829,11 +1831,11 @@ __wt_logop_txn_timestamp_print(
 {
     uint64_t time_sec;
     uint64_t time_nsec;
-    uint64_t commit_ts;
-    uint64_t durable_ts;
-    uint64_t first_commit_ts;
-    uint64_t prepare_ts;
-    uint64_t read_ts;
+    wt_timestamp_t commit_ts;
+    wt_timestamp_t durable_ts;
+    wt_timestamp_t first_commit_ts;
+    wt_timestamp_t prepare_ts;
+    wt_timestamp_t read_ts;
 
     WT_RET(__wt_logop_txn_timestamp_unpack(session, pp, end, &time_sec, &time_nsec, &commit_ts,
       &durable_ts, &first_commit_ts, &prepare_ts, &read_ts));

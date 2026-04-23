@@ -523,7 +523,7 @@ wt_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, model::timestamp_t &che
     wiredtiger_session_guard wiredtiger_session_guard(session);
 
     WT_ITEM metadata{};
-    uint64_t timestamp;
+    wt_timestamp_t timestamp;
     ret = page_log->pl_get_complete_checkpoint_ext(
       page_log, session, nullptr, nullptr, &timestamp, &metadata);
 

@@ -42,13 +42,9 @@ namespace mongo::join_ordering {
 using namespace cost_based_ranker;
 
 JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& ctx,
-                                                   EdgeSelectivities edgeSelectivities,
-                                                   NodeCardinalities nodeCardinalities,
-                                                   NodeCardinalities collCardinalities)
+                                                   EdgeSelectivities edgeSelectivities)
     : _ctx(ctx),
       _edgeSelectivities(std::move(edgeSelectivities)),
-      _nodeCardinalities(std::move(nodeCardinalities)),
-      _collCardinalities(std::move(collCardinalities)),
       _cycleBreaker(
           GraphCycleBreaker(_ctx.joinGraph, _edgeSelectivities, _ctx.resolvedPaths.size())) {
     tassert(11514700,
@@ -56,18 +52,13 @@ JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& 
             _edgeSelectivities.size() == _ctx.joinGraph.numEdges());
     tassert(11514701,
             "Missing node cardinalities",
-            _nodeCardinalities.size() == _ctx.joinGraph.numNodes());
+            _ctx.singleTableAccess.nodeCardinalities.size() == _ctx.joinGraph.numNodes());
 }
 
 JoinCardinalityEstimator JoinCardinalityEstimator::make(
-    const JoinReorderingContext& ctx,
-    const cost_based_ranker::EstimateMap& estimates,
-    const SamplingEstimatorMap& samplingEstimators) {
+    const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators) {
     return JoinCardinalityEstimator(
-        ctx,
-        JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators),
-        JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates),
-        JoinCardinalityEstimator::extractCollCardinalities(ctx, samplingEstimators));
+        ctx, JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators));
 }
 
 EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
@@ -80,34 +71,6 @@ EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
             JoinCardinalityEstimator::joinPredicateSel(ctx, samplingEstimators, edge));
     }
     return edgeSelectivities;
-}
-
-NodeCardinalities JoinCardinalityEstimator::extractNodeCardinalities(
-    const JoinReorderingContext& ctx, const cost_based_ranker::EstimateMap& estimates) {
-    NodeCardinalities nodeCardinalities;
-    nodeCardinalities.reserve(ctx.joinGraph.numNodes());
-    for (size_t nodeId = 0; nodeId < ctx.joinGraph.numNodes(); nodeId++) {
-        auto* cq = ctx.joinGraph.accessPathAt(nodeId);
-        auto qsn = ctx.cbrCqQsns.find(cq);
-        tassert(11514600, "Missing QSN for CanonicalQuery", qsn != ctx.cbrCqQsns.end());
-        auto cbrRes = estimates.find(qsn->second->root());
-        tassert(11514601, "Missing estimate for QSN root", cbrRes != estimates.end());
-        nodeCardinalities.push_back(cbrRes->second->outCE);
-    }
-    return nodeCardinalities;
-}
-
-NodeCardinalities JoinCardinalityEstimator::extractCollCardinalities(
-    const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators) {
-    NodeCardinalities nodeCardinalities;
-    nodeCardinalities.reserve(ctx.joinGraph.numNodes());
-    for (size_t nodeId = 0; nodeId < ctx.joinGraph.numNodes(); nodeId++) {
-        auto nss = ctx.joinGraph.getNode(nodeId).collectionName;
-        auto samplingEstimator = samplingEstimators.at(nss).get();
-        nodeCardinalities.push_back(CardinalityEstimate{
-            CardinalityType{samplingEstimator->getCollCard()}, EstimationSource::Metadata});
-    }
-    return nodeCardinalities;
 }
 
 // This function makes a number of assumptions:
@@ -255,7 +218,7 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     // Finally, note that we have the pre-computed combination of (2) and (3) in '_nodeCEs'.
     cost_based_ranker::CardinalityEstimate ce = cost_based_ranker::oneCE;
     for (auto nodeIdx : iterable(nodes, _ctx.joinGraph.numNodes())) {
-        ce = ce * _nodeCardinalities[nodeIdx].toDouble();
+        ce = ce * _ctx.singleTableAccess.nodeCardinalities[nodeIdx].toDouble();
     }
 
     auto edges = _cycleBreaker.breakCycles(_ctx.joinGraph.getEdgesForSubgraph(nodes));
@@ -271,10 +234,6 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
 
     _subsetCardinalities.emplace(nodes, ce);
     return ce;
-}
-
-CardinalityEstimate JoinCardinalityEstimator::getCollCardinality(NodeId node) const {
-    return _collCardinalities[node];
 }
 
 SelectivityEstimate JoinCardinalityEstimator::getEdgeSelectivity(EdgeId edge) const {

@@ -159,7 +159,7 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
 
     WT_CLEAR(key);
     ds_cursor = hs_cursor = NULL;
-    hs_start_ts = 0;
+    hs_start_ts = WT_TS_NONE;
     hs_counter = 0;
     btree_id = WT_BTREE_ID_INVALID;
     uri_data = NULL;

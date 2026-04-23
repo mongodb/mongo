@@ -56,6 +56,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/allow_read_from_latest_on_secondary.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_yield_restore.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -618,11 +619,19 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
 
     const char* curopMessage = "Index Build: scanning collection";
-    const auto numRecords = collection->getCollectionPtr()->numRecords(opCtx);
     ProgressMeterHolder progress;
     {
+        // We use the number of records to track progress, so it should be fine to read from latest
+        // and get a potentially slightly incorrect value here. Without this block, we trip an
+        // assertion because we are performing a nested acquisition where the outer acquisition is a
+        // write acquisition and uses kNoTimestamp whereas the inner acquisition is a read and would
+        // require kLastApplied.
+        AllowReadFromLatestOnSecondaryBlock_UNSAFE allowReadFromLatest(opCtx);
         std::unique_lock<Client> lk(*opCtx->getClient());
-        progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, numRecords), opCtx);
+        progress.set(lk,
+                     CurOp::get(opCtx)->setProgress(
+                         lk, curopMessage, collection->getCollectionPtr()->numRecords(opCtx)),
+                     opCtx);
     }
 
     hangAfterSettingUpIndexBuild.executeIf(
@@ -752,6 +761,12 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         tassert(7683103, "Expected CollectionAcquisition to be initialized", collection);
         restartCollectionScan = false;
         {
+            // We use the number of records to track progress, so it should be fine to read from
+            // latest and get a potentially slightly incorrect value here. Without this block, we
+            // trip an assertion because we are performing a nested acquisition where the outer
+            // acquisition is a write acquisition and uses kNoTimestamp whereas the inner
+            // acquisition is a read and would require kLastApplied.
+            AllowReadFromLatestOnSecondaryBlock_UNSAFE allowReadFromLatest(opCtx);
             std::unique_lock<Client> lk(*opCtx->getClient());
             progress.get(lk)->reset(collection->getCollectionPtr()->numRecords(opCtx));
         }
@@ -913,6 +928,12 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         bulkDocsScannedCounter.add(1);
 
         {
+            // We use the number of records to track progress, so it should be fine to read from
+            // latest and get a potentially slightly incorrect value here. Without this block, we
+            // trip an assertion because we are performing a nested acquisition where the outer
+            // acquisition is a write acquisition and uses kNoTimestamp whereas the inner
+            // acquisition is a read and would require kLastApplied.
+            AllowReadFromLatestOnSecondaryBlock_UNSAFE allowReadFromLatest(opCtx);
             std::unique_lock<Client> lk(*opCtx->getClient());
             progress->get(lk)->setTotalWhileRunning(
                 collection.getCollectionPtr()->numRecords(opCtx));

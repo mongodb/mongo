@@ -108,11 +108,13 @@ public:
                               int64_t leftoverRecordsBytes,
                               int64_t minBytesPerMarker,
                               Microseconds totalTimeSpentBuilding,
-                              MarkersCreationMethod creationMethod)
+                              MarkersCreationMethod creationMethod,
+                              bool initialSamplingFinished)
         : _minBytesPerMarker(minBytesPerMarker),
           _currentRecords(leftoverRecordsCount),
           _currentBytes(leftoverRecordsBytes),
           _markers(std::move(markers)),
+          _initialSamplingFinished(initialSamplingFinished),
           _totalTimeProcessing(totalTimeSpentBuilding),
           _creationMethod(creationMethod) {}
 
@@ -180,21 +182,28 @@ public:
             : id(std::move(lastRecord)), wall(std::move(wallTime)) {}
     };
 
-    // Given the estimated collection 'dataSize' and 'numRecords', along with a target
-    // 'minBytesPerMarker' and the desired 'numRandomSamplesPerMarker' (if sampling is the chosen
-    // creation method), computes the initial creation method to try for the initialization.
-    //
-    // It's possible the initial creation method is not the actual creation method. However, it will
-    // be the first creation method tried. For example, if estimates of 'dataSize' and 'numRecords'
-    // are really far off, sampling may default back to scanning later on.
-    //
-    // 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
-    // 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
-    // reclaiming the oldest truncate markers.
+    /**
+     * Given the estimated collection 'dataSize' and 'numRecords', along with a target
+     * 'minBytesPerMarker' and the desired 'numRandomSamplesPerMarker' (if sampling is the chosen
+     * creation method), computes the initial creation method to try for the initialization.
+     *
+     * It's possible the initial creation method is not the actual creation method. However, it will
+     * be the first creation method tried. For example, if estimates of 'dataSize' and 'numRecords'
+     * are really far off, sampling may default back to scanning later on.
+     *
+     * 'forceScanning' picks 'Scanning' unconditionally, bypassing the size-based heuristic. This
+     * should be used in cases where random sampling is unsupported. The server parameter
+     * 'gUseSlowCollectionTruncateMarkerScanning' has the same effect for every call site.
+     *
+     * 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
+     * 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
+     * reclaiming the oldest truncate markers.
+     */
     static CollectionTruncateMarkers::MarkersCreationMethod computeInitialCreationMethod(
         int64_t numRecords,
         int64_t dataSize,
         int64_t minBytesPerMarker,
+        bool forceScanning,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
     /**
@@ -253,6 +262,7 @@ public:
         OperationContext* opCtx,
         CollectionIterator& collIterator,
         int64_t minBytesPerMarker,
+        bool forceScanning,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
@@ -433,7 +443,8 @@ public:
                                     leftoverRecordsBytes,
                                     minBytesPerMarker,
                                     totalTimeSpentBuilding,
-                                    creationMethod),
+                                    creationMethod,
+                                    false /* initialSamplingFinished */),
           _highestRecordId(std::move(highestRecordId)),
           _highestWallTime(highestWallTime) {}
 

@@ -92,7 +92,7 @@ __disagg_put_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64
  */
 int
 __wti_layered_get_disagg_checkpoint(WT_SESSION_IMPL *session, const char **cfg,
-  uint64_t *complete_checkpoint_lsn, uint64_t *complete_checkpoint_timestamp,
+  uint64_t *complete_checkpoint_lsn, wt_timestamp_t *complete_checkpoint_timestamp,
   WT_ITEM *complete_checkpoint_metadata)
 {
     WT_CONFIG_ITEM cval;
@@ -564,7 +564,7 @@ err:
  */
 int
 __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint_root,
-  size_t checkpoint_root_size, uint64_t checkpoint_timestamp)
+  size_t checkpoint_root_size, wt_timestamp_t checkpoint_timestamp)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(metadata_buf);

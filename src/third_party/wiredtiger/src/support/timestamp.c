@@ -89,7 +89,7 @@ __wt_timestamp_to_hex_string(wt_timestamp_t ts, char *hex_timestamp)
 {
     char *p, v;
 
-    if (ts == 0) {
+    if (ts == WT_TS_NONE) {
         hex_timestamp[0] = '0';
         hex_timestamp[1] = '\0';
         return;

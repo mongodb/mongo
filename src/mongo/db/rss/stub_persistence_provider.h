@@ -162,6 +162,18 @@ public:
                   "implemented");
     }
 
+    bool supportsPersistentOplogCapMaintainerThread() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::supportsPersistentOplogCapMaintainerThread() method "
+                  "not implemented");
+    }
+
+    bool supportsAsyncOplogMarkerGeneration() const override {
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::supportsAsyncOplogMarkerGeneration() method not implemented");
+    }
+
     bool supportsOplogSampling() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::supportsOplogSampling() method not implemented");

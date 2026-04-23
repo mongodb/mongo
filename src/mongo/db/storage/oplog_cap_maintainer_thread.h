@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/util/background.h"
 #include "mongo/util/modules.h"
 
@@ -82,6 +83,13 @@ private:
     virtual RecordId _reclaimOplog(OperationContext* opCtx,
                                    RecordStore& rs,
                                    RecordId mayTruncateUpTo);
+
+    /*
+     * Initialize truncation marker creation. This may use scanning or async sampling, depending on
+     * what marker creation method is chosen.
+     */
+    virtual std::shared_ptr<OplogTruncateMarkers> _createInitialMarkers(OperationContext* opCtx,
+                                                                        RecordStore& rs) const;
 
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
     mutable std::mutex _opCtxMutex;

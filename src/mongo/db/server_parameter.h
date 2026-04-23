@@ -387,14 +387,6 @@ public:
         return _isDeprecated;
     }
 
-    void setAnnotations(BSONObj annotations) {
-        _annotations = std::move(annotations);
-    }
-
-    BSONObj annotations() const {
-        return _annotations;
-    }
-
 protected:
     // Helper for translating setParameter values from BSON to string.
     StatusWith<std::string> _coerceToString(const BSONElement&);
@@ -418,7 +410,6 @@ private:
     bool _testOnly = false;
     bool _redact = false;
     bool _isOmittedInFTDC = false;
-    BSONObj _annotations;
     ParameterGatingFeatureFlag* _featureFlag = nullptr;
     boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV;
 

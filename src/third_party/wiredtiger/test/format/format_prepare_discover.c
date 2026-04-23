@@ -116,8 +116,8 @@ wts_prepare_discover(WT_CONNECTION *conn)
     }
     testutil_check(cursor->close(cursor));
 
-    const char *checkpoint_name = "WiredTigerCheckpoint";
     session->checkpoint(session, NULL);
-    wts_verify_mirrors(g.wts_conn, checkpoint_name, NULL);
+    /* FIXME-WT-15357 Checkpoint cursors are not compatible with disagg for now. */
+    wts_verify_mirrors(g.wts_conn, g.disagg_storage_config ? NULL : "WiredTigerCheckpoint", NULL);
     testutil_check(session->close(session, NULL));
 }

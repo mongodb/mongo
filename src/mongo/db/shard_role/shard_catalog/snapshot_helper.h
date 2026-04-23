@@ -64,8 +64,10 @@ NodeRole getNodeRole(OperationContext* opCtx);
  * Determines the read source that should be active for this operation based on replication
  * state and namespace. Pure query — does not modify the recovery unit.
  *
- * Returns kLastApplied if on a secondary, kNoTimestamp if on a primary / unreplicated,
- * or boost::none if the override doesn't apply (read concern is not local/available).
+ * Returns kLastApplied if on a secondary (unless reading from latest on secondaries is explicitly
+ * allowed, in which case it returns kNoTimestamp), kNoTimestamp if on a primary / unreplicated, or
+ * boost::none if the override doesn't apply (read concern is not local/available).
+ *
  */
 boost::optional<ReadSourceInfo> getReadSourceForSecondaryReadsIfNeeded(
     OperationContext* opCtx, boost::optional<const NamespaceString&> nss);

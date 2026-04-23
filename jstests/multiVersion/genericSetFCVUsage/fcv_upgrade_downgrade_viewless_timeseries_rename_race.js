@@ -6,6 +6,7 @@
  *
  * @tags: [
  *   requires_timeseries,
+ *   requires_fcv_90,
  *   featureFlagCreateViewlessTimeseriesCollections,
  *   uses_parallel_shell,
  * ]

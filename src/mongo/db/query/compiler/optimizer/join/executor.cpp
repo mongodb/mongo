@@ -188,10 +188,10 @@ bool indexIsValidForINLJ(const std::shared_ptr<const IndexCatalogEntry>& ice) {
  * Pre-process indexes to filter out those ineligible for conversion to INLJ, and output a map of
  * collection namespaces to indexes available.
  */
-AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& solns,
+AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& cbrCqQsns,
                                             const MultipleCollectionAccessor& mca) {
     AvailableIndexes perCollIdxs;
-    for (const auto& [cq, _] : solns) {
+    for (const auto& [cq, _] : cbrCqQsns) {
         const auto& ns = cq->nss();
         if (perCollIdxs.contains(ns)) {
             // We've already pre-processed this collection's indexes.
@@ -318,6 +318,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     if (!swAccessPlans.isOK()) {
         return swAccessPlans.getStatus();
     }
+    auto singleTableAccess = std::move(swAccessPlans.getValue());
 
     // Retrieve a copy of the hint if present.
     boost::optional<EnumerationStrategy> hintedStrat;
@@ -326,11 +327,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         hintedStrat = hintStage->getStrategy();
     }
 
-    auto& solns = swAccessPlans.getValue().solns;
     const auto qkc = expCtx->getQueryKnobConfiguration();
 
     // Pre-process indexes per collection to facilitate INLJ enumeration.
-    auto indexesPerColl = extractINLJEligibleIndexes(solns, mca);
+    auto indexesPerColl = extractINLJEligibleIndexes(singleTableAccess.cbrCqQsns, mca);
     PerCollUniqueFieldInfo uniqueFieldInfo;
     if (qkc.getEnableJoinOptimizationUseIndexUniqueness()) {
         uniqueFieldInfo = buildUniqueFieldInfo(indexesPerColl);
@@ -338,15 +338,14 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     JoinReorderingContext ctx{.joinGraph = model.graph,
                               .resolvedPaths = model.resolvedPaths,
-                              .cbrCqQsns = std::move(solns),
+                              .singleTableAccess = std::move(singleTableAccess),
                               .perCollIdxs = std::move(indexesPerColl),
                               .catStats = createCatalogStats(opCtx, mca),
                               .uniqueFieldInfo = std::move(uniqueFieldInfo),
                               .samplingEstimators = &samplingEstimators,
                               .explain = expCtx->getExplain().has_value()};
 
-    JoinCardinalityEstimator cardEstimator(
-        JoinCardinalityEstimator::make(ctx, swAccessPlans.getValue().estimate, samplingEstimators));
+    JoinCardinalityEstimator cardEstimator(JoinCardinalityEstimator::make(ctx, samplingEstimators));
     JoinCostEstimatorImpl costEstimator(ctx, cardEstimator);
 
     StatusWith<ReorderedJoinSolution> swReordered = [&]() {
@@ -441,7 +440,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the estimate
     // map from join-reordering 'reordered.estimates' can be combined with the estimate map from
-    // CBR 'swAccessPlans.getValue().estimate' before creating the executor below.
+    // CBR 'ctx.singleTableAccess.estimate' before creating the executor below.
     // We actually have several canonical queries, so we don't try to pass one in.
     auto exec = plan_executor_factory::make(opCtx,
                                             nullptr /* cq */,

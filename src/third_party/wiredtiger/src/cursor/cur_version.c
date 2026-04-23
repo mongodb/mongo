@@ -16,11 +16,11 @@
 #define WT_CURVERSION_METADATA_FORMAT WT_UNCHECKED_STRING(QQQQQQQQQQBBBB)
 
 /*
- * __curversion_is_prepare_rollback_value --
+ * __curversion_is_prepare_rollback_update --
  *     True if the update is a rolled-back prepared value update.
  */
 static WT_INLINE bool
-__curversion_is_prepare_rollback_value(WT_UPDATE *upd)
+__curversion_is_prepare_rollback_update(WT_UPDATE *upd)
 {
     uint8_t prepare_state;
 
@@ -203,7 +203,7 @@ __curversion_tombstone_next_upd(
     upd = tombstone->next;
 
     while (upd != NULL && upd->txnid == WT_TXN_ABORTED &&
-      (!show_prepared_rollback || !__curversion_is_prepare_rollback_value(upd)))
+      (!show_prepared_rollback || !__curversion_is_prepare_rollback_update(upd)))
         upd = upd->next;
 
     return (upd);
@@ -261,6 +261,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
             F_SET(version_cursor, WT_CURVERSION_UPDATE_EXHAUSTED);
         } else {
             if (version_cursor->start_timestamp != WT_TS_NONE &&
+              upd->upd_durable_ts != WT_TS_NONE &&
               upd->upd_durable_ts <= version_cursor->start_timestamp)
                 goto done;
 
@@ -273,8 +274,8 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                  * the last update in the update list, retrieve the ondisk value.
                  */
                 WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
-                version_prepared =
-                  prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED;
+                version_prepared = !__curversion_is_prepare_rollback_update(upd) &&
+                  (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED);
                 version_cursor->upd_stop_txnid = upd->txnid;
                 if (upd->txnid == WT_TXN_ABORTED) {
                     version_cursor->curversion_stop_rollback_ts = upd->upd_rollback_ts;
@@ -295,8 +296,8 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                 F_SET(version_cursor, WT_CURVERSION_UPDATE_EXHAUSTED);
             } else {
                 WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
-                version_prepared =
-                  prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED;
+                version_prepared = !__curversion_is_prepare_rollback_update(upd) &&
+                  (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED);
 
                 /*
                  * Copy the update value into the version cursor as we don't know the value format.
@@ -352,7 +353,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                     /* Skip aborted updates unless showing prepared rollbacks. */
                     if (next_upd->txnid == WT_TXN_ABORTED &&
                       (!F_ISSET(version_cursor, WT_CURVERSION_SHOW_PREPARED_ROLLBACK) ||
-                        !__curversion_is_prepare_rollback_value(next_upd)))
+                        !__curversion_is_prepare_rollback_update(next_upd)))
                         continue;
 
                     if (first_globally_visible != NULL) {
@@ -766,7 +767,7 @@ __curversion_skip_starting_updates(WT_SESSION_IMPL *session, WT_CURSOR_VERSION *
         /* Skip aborted updates unless showing prepared rollbacks. */
         if (upd->txnid == WT_TXN_ABORTED) {
             if (F_ISSET(version_cursor, WT_CURVERSION_SHOW_PREPARED_ROLLBACK) &&
-              __curversion_is_prepare_rollback_value(upd))
+              __curversion_is_prepare_rollback_update(upd))
                 break;
             continue;
         }

@@ -39,4 +39,3 @@ import idl.errors  # noqa: F401
 import idl.generator  # noqa: F401
 import idl.parser  # noqa: F401
 import idl.syntax  # noqa: F401
-import idl.writer  # noqa: F401

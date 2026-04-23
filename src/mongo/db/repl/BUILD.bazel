@@ -1949,16 +1949,8 @@ mongo_cc_unit_test(
         "multiapplier_test.cpp",
         "oplog_applier_impl_test.cpp",
         "oplog_applier_test.cpp",
-        "oplog_buffer_batched_queue_test.cpp",
-        "oplog_buffer_blocking_queue_test.cpp",
-        "oplog_buffer_collection_test.cpp",
-        "oplog_buffer_proxy_test.cpp",
         "oplog_entry_test.cpp",
-        "oplog_fetcher_test.cpp",
         "oplog_test.cpp",
-        "oplog_writer_batcher_test.cpp",
-        "oplog_writer_impl_test.cpp",
-        "oplog_writer_test.cpp",
     ],
     tags = [
         "mongo_unittest_fifth_group",
@@ -1990,6 +1982,73 @@ mongo_cc_unit_test(
         "//src/mongo/db:server_base",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "oplog_fetcher_test",
+    srcs = [
+        "oplog_fetcher_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":data_replicator_external_state_mock",
+        ":oplog",
+        ":oplog_entry",
+        ":oplog_fetcher",
+        ":repl_server_parameters",
+        ":task_executor_mock",
+        "//src/mongo/db:server_base",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "oplog_writer_test",
+    srcs = [
+        "oplog_writer_batcher_test.cpp",
+        "oplog_writer_impl_test.cpp",
+        "oplog_writer_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":oplog",
+        ":oplog_application_interface",
+        ":oplog_applier_batcher_test_fixture",
+        ":oplog_entry",
+        ":oplog_write",
+        ":repl_coordinator_impl",
+        ":repl_coordinator_test_fixture",
+        ":repl_server_parameters",
+        ":repl_writer_thread_pool_server_parameters",
+        ":storage_interface_impl",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:server_base",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "oplog_buffer_test",
+    srcs = [
+        "oplog_buffer_batched_queue_test.cpp",
+        "oplog_buffer_blocking_queue_test.cpp",
+        "oplog_buffer_collection_test.cpp",
+        "oplog_buffer_proxy_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":oplog",
+        ":oplog_applier_impl_test_fixture",
+        ":oplog_buffer_batched_queue",
+        ":oplog_buffer_collection",
+        ":oplog_buffer_proxy",
+        ":oplog_entry",
+        ":repl_coordinator_impl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/dbtests:mocklib",
     ],
 )
 

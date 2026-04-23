@@ -54,6 +54,7 @@ const kMetadataFieldNames = [
     "$sortKey",
     "$indexKey",
     "$searchScoreDetails",
+    "$searchRootDocumentId",
     "$searchSortValues",
     "$searchHighlights",
     "$searchSequenceToken",

@@ -56,6 +56,13 @@ enum class MackertLohmanCase {
 StringData toStringData(MackertLohmanCase c);
 
 /**
+ * Convert a CPU cost into an equivalent 'numDocsProcessed' cardinality based on the per-document
+ * processing coefficient used by the join cost model. Used for base table accesses where the CPU
+ * cost comes from CBR, allowing the result to be plugged into the 'numDocsProcessed' component.
+ */
+CardinalityEstimate numDocsProcessedFromCpuCost(CostEstimate cpuCost);
+
+/**
  * Represents the cost estimate for a single join operation. It stores all of its inputs for
  * debugging purposes, as it may be useful to see how individual components contribute to the cost
  * estimate. See `getTotalCost()` for the calculation of the cost of the operation.

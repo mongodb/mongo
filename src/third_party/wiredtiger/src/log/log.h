@@ -302,15 +302,15 @@ extern int __wt_logop_row_truncate_unpack(WT_SESSION_IMPL *session, const uint8_
   const uint8_t *end, uint32_t *fileidp, WT_ITEM *startp, WT_ITEM *stopp, uint32_t *modep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_txn_timestamp_pack(WT_SESSION_IMPL *session, WT_ITEM *logrec,
-  uint64_t time_sec, uint64_t time_nsec, uint64_t commit_ts, uint64_t durable_ts,
-  uint64_t first_commit_ts, uint64_t prepare_ts, uint64_t read_ts)
+  uint64_t time_sec, uint64_t time_nsec, wt_timestamp_t commit_ts, wt_timestamp_t durable_ts,
+  wt_timestamp_t first_commit_ts, wt_timestamp_t prepare_ts, wt_timestamp_t read_ts)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_txn_timestamp_print(WT_SESSION_IMPL *session, const uint8_t **pp,
   const uint8_t *end, WT_TXN_PRINTLOG_ARGS *args) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_txn_timestamp_unpack(WT_SESSION_IMPL *session, const uint8_t **pp,
-  const uint8_t *end, uint64_t *time_secp, uint64_t *time_nsecp, uint64_t *commit_tsp,
-  uint64_t *durable_tsp, uint64_t *first_commit_tsp, uint64_t *prepare_tsp, uint64_t *read_tsp)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  const uint8_t *end, uint64_t *time_secp, uint64_t *time_nsecp, wt_timestamp_t *commit_tsp,
+  wt_timestamp_t *durable_tsp, wt_timestamp_t *first_commit_tsp, wt_timestamp_t *prepare_tsp,
+  wt_timestamp_t *read_tsp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_unpack(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
   uint32_t *optypep, uint32_t *opsizep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_write(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end, uint32_t optype,

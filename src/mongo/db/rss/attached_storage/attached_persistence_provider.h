@@ -145,8 +145,18 @@ public:
      */
     bool supportsFindAndModifyImageCollection() const override;
 
-    /**
-     * We can support oplog cap maintainer thread and oplog sampling.
+    /*
+     * We support initializing the cap maintainer thread at startup.
+     */
+    bool supportsPersistentOplogCapMaintainerThread() const override;
+
+    /*
+     * Async oplog marker generation is supported if allowed by a feature flag.
+     */
+    bool supportsAsyncOplogMarkerGeneration() const override;
+
+    /*
+     * We can support oplog sampling.
      */
     bool supportsOplogSampling() const override;
 

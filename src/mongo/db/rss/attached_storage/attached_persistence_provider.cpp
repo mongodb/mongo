@@ -34,6 +34,7 @@
 #include "mongo/db/rss/snapshot_window_options_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 
 namespace mongo::rss {
 namespace {
@@ -153,10 +154,17 @@ bool AttachedPersistenceProvider::supportsFindAndModifyImageCollection() const {
     return !gFeatureFlagDisallowFindAndModifyImageCollection.checkEnabled();
 }
 
-bool AttachedPersistenceProvider::supportsOplogSampling() const {
+bool AttachedPersistenceProvider::supportsPersistentOplogCapMaintainerThread() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsAsyncOplogMarkerGeneration() const {
+    return gOplogSamplingAsyncEnabled;
+}
+
+bool AttachedPersistenceProvider::supportsOplogSampling() const {
+    return true;
+}
 
 bool AttachedPersistenceProvider::supportsWriteConcernOptions(
     const WriteConcernOptions& writeConcernOptions) const {

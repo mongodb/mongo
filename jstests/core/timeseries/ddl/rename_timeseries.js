@@ -12,6 +12,7 @@
  *  # Renaming a timeseries collection is only possible with viewless timeseries collections,
  *  # with legacy viewful timeseries collection it was not supported.
  *  featureFlagCreateViewlessTimeseriesCollections,
+ *  requires_fcv_90,
  * ]
  */
 

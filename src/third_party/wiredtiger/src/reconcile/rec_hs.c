@@ -74,8 +74,9 @@ __rec_hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor
     WT_DECL_RET;
     WT_ITEM hs_key, hs_value;
     WT_TIME_WINDOW hs_insert_tw, *twp;
+    wt_timestamp_t cache_hs_order_lose_durable_timestamp;
     wt_timestamp_t hs_durable_start_ts, hs_durable_stop_ts, hs_start_ts;
-    uint64_t cache_hs_order_lose_durable_timestamp, cache_hs_order_reinsert, cache_hs_order_remove;
+    uint64_t cache_hs_order_reinsert, cache_hs_order_remove;
     uint64_t hs_counter, hs_upd_type;
     uint32_t hs_btree_id;
 #ifdef HAVE_DIAGNOSTIC

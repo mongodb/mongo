@@ -122,15 +122,15 @@ struct __wt_tiered {
  *     this object and how to access it.
  */
 struct __wt_tiered_object {
-    const char *uri;      /* Data source for this object */
-    WT_TIERED_TREE *tree; /* Pointer to tree this object is part of */
-    uint64_t count;       /* Approximate count of records */
-    uint64_t size;        /* Final size of object */
-    uint64_t switch_txn;  /* Largest txn that can write to this object */
-    uint64_t switch_ts;   /* Timestamp for switching */
-    uint32_t id;          /* This object's id */
-    uint32_t generation;  /* Do we need this?? */
-    uint32_t refcnt;      /* Number of references */
+    const char *uri;          /* Data source for this object */
+    WT_TIERED_TREE *tree;     /* Pointer to tree this object is part of */
+    uint64_t count;           /* Approximate count of records */
+    uint64_t size;            /* Final size of object */
+    uint64_t switch_txn;      /* Largest txn that can write to this object */
+    wt_timestamp_t switch_ts; /* Timestamp for switching */
+    uint32_t id;              /* This object's id */
+    uint32_t generation;      /* Do we need this?? */
+    uint32_t refcnt;          /* Number of references */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_OBJ_LOCAL 0x1u /* Local resident also */

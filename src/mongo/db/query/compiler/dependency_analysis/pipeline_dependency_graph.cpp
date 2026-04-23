@@ -77,17 +77,17 @@ struct NodeContainer {
     using Id = TypedId<T>;
 
     T& operator[](Id id) {
-        if constexpr (kDebugBuild) {
-            invariant(id, str::stream() << "Invalid access, container size " << size());
-        }
-        return _nodes.at(id.value);
+        tassert(12503201,
+                fmt::format("Invalid access at {}, container size {}", id.value, size()),
+                static_cast<size_t>(id.value) < size());
+        return _nodes[id.value];
     }
 
     const T& operator[](Id id) const {
-        if constexpr (kDebugBuild) {
-            invariant(id, str::stream() << "Invalid access, container size " << size());
-        }
-        return _nodes.at(id.value);
+        tassert(12503202,
+                fmt::format("Invalid access at {}, container size {}", id.value, size()),
+                static_cast<size_t>(id.value) < size());
+        return _nodes[id.value];
     }
 
     bool empty() const {
@@ -1356,6 +1356,15 @@ private:
      */
     void verifyExactRange(DocumentSourceContainer::const_iterator startIt,
                           DocumentSourceContainer::const_iterator endIt) const {
+        auto rangeSize = std::distance(startIt, endIt);
+        tassert(12503203,
+                fmt::format("Graph size mismatch: range has {} stages but graph has {} "
+                            "(complete pipeline has {})",
+                            rangeSize,
+                            _stages.getNextId().value,
+                            _container.size()),
+                rangeSize == _stages.getNextId().value);
+
         int stageId = 0;
         for (auto it = startIt; it != endIt; ++it, ++stageId) {
             const auto* actualPtr = _stages[StageId(stageId)].documentSource.get();
@@ -1369,11 +1378,6 @@ private:
                                 fmt::ptr(expectedPtr)),
                     actualPtr == expectedPtr);
         }
-        tassert(12299002,
-                fmt::format("Expected to have reached the end of the graph ({} != {})",
-                            stageId,
-                            _stages.getNextId().value),
-                stageId == _stages.getNextId().value);
     }
 
     /**

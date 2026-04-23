@@ -230,7 +230,8 @@ public:
               0 /* leftoverRecordsBytes */,
               minBytesPerMarker,
               Microseconds(0),
-              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {};
+              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection,
+              true /* initialSamplingFinished */) {};
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override {
@@ -480,7 +481,7 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
         opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
 
     auto result = CollectionTruncateMarkers::createFromCollectionIterator(
-        opCtx.get(), *iterator, kMinBytesPerMarker, getIdAndWallTime);
+        opCtx.get(), *iterator, kMinBytesPerMarker, false /* forceScanning */, getIdAndWallTime);
 
     ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
     ASSERT_GTE(result.timeTaken, Microseconds(0));
@@ -499,6 +500,96 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
 
     ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
     ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
+}
+
+// Test that initial marker creation works as expected when forcing scanning to be used.
+// Uses same collection setup as SamplingMarkerCreation but with forceScanning=true.
+TEST_F(CollectionMarkersTest, ForceScanningMarkerCreation) {
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto [totalBytes, totalRecords] = createPopulatedCollection(collNs);
+
+    auto opCtx = getClient()->makeOperationContext();
+
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+
+    static constexpr auto kNumMarkers = 15;
+    auto kMinBytesPerMarker = totalBytes / kNumMarkers;
+
+    auto iteratorForce = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
+
+    auto result = CollectionTruncateMarkers::createFromCollectionIterator(opCtx.get(),
+                                                                          *iteratorForce,
+                                                                          kMinBytesPerMarker,
+                                                                          true /* forceScanning */,
+                                                                          getIdAndWallTime);
+
+    ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    ASSERT_GTE(result.timeTaken, Microseconds(0));
+
+    auto iteratorBaseline = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
+    auto baseline = CollectionTruncateMarkers::createMarkersByScanning(
+        opCtx.get(), *iteratorBaseline, kMinBytesPerMarker, getIdAndWallTime);
+
+    ASSERT_EQ(result.markers.size(), baseline.markers.size());
+    ASSERT_EQ(result.leftoverRecordsBytes, baseline.leftoverRecordsBytes);
+    ASSERT_EQ(result.leftoverRecordsCount, baseline.leftoverRecordsCount);
+    for (size_t i = 0; i < result.markers.size(); ++i) {
+        ASSERT_EQ(result.markers[i].bytes, baseline.markers[i].bytes);
+        ASSERT_EQ(result.markers[i].records, baseline.markers[i].records);
+        ASSERT_EQ(result.markers[i].lastRecord, baseline.markers[i].lastRecord);
+    }
+
+    int64_t markerBytesSum = 0;
+    int64_t markerRecordsSum = 0;
+    for (const auto& marker : result.markers) {
+        markerBytesSum += marker.bytes;
+        markerRecordsSum += marker.records;
+    }
+    ASSERT_EQ(markerBytesSum + result.leftoverRecordsBytes, totalBytes);
+    ASSERT_EQ(markerRecordsSum + result.leftoverRecordsCount, totalRecords);
+}
+
+// Test that initial marker creation works as expected when forcing scanning to be used.
+// Uses uniform record sizes so each marker spans three records and the tail is a two-record
+// partial.
+TEST_F(CollectionMarkersTest, ForceScanningMarkerCreationSpecificValues) {
+    static constexpr auto kRecordsPerMarker = 3;
+    static constexpr auto kElementSize = 24;
+    static constexpr auto kMinBytes = (kElementSize * kRecordsPerMarker) - 1;
+    static constexpr auto kNumElements = 35;
+
+    static constexpr auto kExpectedMarkers = kNumElements / kRecordsPerMarker;
+    static constexpr auto kLeftoverRecords = kNumElements % kRecordsPerMarker;
+    static constexpr auto kLeftoverBytes = kLeftoverRecords * kElementSize;
+
+    auto collNs =
+        NamespaceString::createNamespaceString_forTest("test", "coll_force_scan_specific");
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        createCollection(opCtx.get(), collNs);
+        insertElements(opCtx.get(), collNs, kElementSize, kNumElements, Timestamp(1, 0));
+    }
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
+
+    auto result = CollectionTruncateMarkers::createFromCollectionIterator(
+        opCtx.get(), *iterator, kMinBytes, true /* forceScanning */, getIdAndWallTime);
+
+    ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    ASSERT_GTE(result.timeTaken, Microseconds(0));
+    ASSERT_EQ(result.leftoverRecordsBytes, kLeftoverBytes);
+    ASSERT_EQ(result.leftoverRecordsCount, kLeftoverRecords);
+    ASSERT_EQ(result.markers.size(), kExpectedMarkers);
+    for (const auto& marker : result.markers) {
+        ASSERT_EQ(marker.bytes, kElementSize * kRecordsPerMarker);
+        ASSERT_EQ(marker.records, kRecordsPerMarker);
+    }
 }
 
 // Test that Oplog sampling progress is logged.

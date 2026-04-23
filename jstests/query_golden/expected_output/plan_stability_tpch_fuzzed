@@ -805,16 +805,16 @@
     "winningPlan": [
 "INLJ supplier.s_suppkey = ps_suppkey",
 "  -> [none] INLJ nation_s.n_nationkey = s_nationkey",
-"      -> [none] NLJ r_regionkey = n_regionkey",
-"          -> [region_s] FETCH: plan_stability_tpch_fuzzed.region ",
-"              -> IXSCAN: plan_stability_tpch_fuzzed.region r_regionkey_1 {'r_regionkey':['[4.0, 4.0]']}",
+"      -> [none] INLJ n_regionkey = r_regionkey",
 "          -> [nation_s] COLLSCAN: plan_stability_tpch_fuzzed.nation {'$nor':[{'n_name':{'$eq':'ALGERIA'}},{'n_regionkey':{'$eq':1}},{'n_name':{'$in':['EGYPT','INDONESIA']}},{'n_name':{'$not':{'$in':['CHINA','ROMANIA','SAUDI ARABIA']}}}]} ",
+"          -> [region_s] FETCH: plan_stability_tpch_fuzzed.region {'r_regionkey':{'$eq':4}} ",
+"              -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.region r_regionkey_1",
 "      -> [supplier] FETCH: plan_stability_tpch_fuzzed.supplier {'$nor':[{'s_nationkey':{'$eq':1}},{'s_nationkey':{'$eq':14}},{'s_acctbal':{'$gte':2060.13}}]} ",
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1",
 "  -> [none] FETCH: plan_stability_tpch_fuzzed.partsupp {'ps_comment':{'$regex':'^he'}} ",
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1"],
-    "keys" :       928,
-    "docs" :       953,
+    "keys" :       930,
+    "docs" :       955,
     "rows" :        11,
     "csum" : "dd2566c247c4e610"},
 
@@ -1923,17 +1923,16 @@
 {"$unwind":"$region_s"},
 {"$match":{"$nor":[{"nation_s.n_regionkey":1}]}}],"cursor":{},"idx":78},
     "winningPlan": [
-"INLJ partsupp.ps_partkey = p_partkey",
+"HJ partsupp.ps_partkey = p_partkey",
 "  -> [none] INLJ s_suppkey = ps_suppkey",
 "      -> [supplier] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'$and':[{'$or':[{'s_acctbal':{'$lte':-685.94}},{'s_nationkey':{'$in':[2,17]}}]},{'$nor':[{'s_nationkey':{'$eq':5}},{'s_acctbal':{'$gt':9166.95}},{'s_acctbal':{'$gt':9537.73}}]}]} ",
 "      -> [partsupp] FETCH: plan_stability_tpch_fuzzed.partsupp {'$and':[{'ps_supplycost':{'$lte':161.52}},{'ps_availqty':{'$lt':854}}]} ",
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1",
-"  -> [none] FETCH: plan_stability_tpch_fuzzed.part ",
-"      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.part p_partkey_1",
+"  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part ",
 "$lookup nation n_nationkey_1",
 "$lookup region r_regionkey_1"],
-    "keys" :      8003,
-    "docs" :      9003,
+    "keys" :      7892,
+    "docs" :     28892,
     "rows" :         6,
     "csum" : "d5151374bbc944dd"},
 
@@ -4137,19 +4136,18 @@
 {"$unwind":"$region_s"},
 {"$match":{"$or":[{"nation_s.n_name":"ALGERIA"},{"partsupp.ps_comment":{"$regex":{"$regex":"^ a","$options":""}}},{"p_mfgr":"Manufacturer#3"},{"supplier.s_acctbal":{"$eq":5322.35}}]}}],"cursor":{},"idx":173},
     "winningPlan": [
-"INLJ partsupp.ps_partkey = p_partkey",
+"HJ partsupp.ps_partkey = p_partkey",
 "  -> [none] INLJ supplier.s_suppkey = ps_suppkey",
 "      -> [none] HJ s_nationkey = n_nationkey",
 "          -> [supplier] COLLSCAN: plan_stability_tpch_fuzzed.supplier {'$and':[{'$or':[{'s_name':{'$eq':'Supplier#000000537'}},{'s_acctbal':{'$in':[1871.86,8924.02]}}]},{'s_acctbal':{'$lt':7627.85}},{'s_nationkey':{'$not':{'$eq':16}}}]} ",
 "          -> [nation_s] COLLSCAN: plan_stability_tpch_fuzzed.nation {'$or':[{'n_regionkey':{'$eq':4}},{'n_name':{'$not':{'$in':['ARGENTINA','INDONESIA']}}}]} ",
 "      -> [partsupp] FETCH: plan_stability_tpch_fuzzed.partsupp {'ps_availqty':{'$gt':3991}} ",
 "          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_suppkey_1",
-"  -> [none] FETCH: plan_stability_tpch_fuzzed.part ",
-"      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.part p_partkey_1",
+"  -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part ",
 "$match",
 "$lookup region r_regionkey_1"],
-    "keys" :       141,
-    "docs" :      1166,
+    "keys" :        89,
+    "docs" :     21114,
     "rows" :         9,
     "csum" : "4e49e200a7760e55"},
 
@@ -5107,14 +5105,14 @@
 {"$unwind":"$lineitem"},
 {"$match":{"$and":[{"p_container":{"$in":["JUMBO PKG","LG JAR","WRAP DRUM"]}}]}}],"cursor":{},"idx":218},
     "winningPlan": [
-"HJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey",
+"INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey",
 "  -> [none] HJ ps_partkey = p_partkey",
 "      -> [partsupp] COLLSCAN: plan_stability_tpch_fuzzed.partsupp {'ps_comment':{'$regex':'^pe'}} ",
 "      -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'p_container':{'$in':['JUMBO PKG','LG JAR','WRAP DRUM']}} ",
-"  -> [lineitem] FETCH: plan_stability_tpch_fuzzed.lineitem {'$and':[{'$nor':[{'l_commitdate':{'$lt':'1992-11-21T00:00:00.000Z'}},{'l_orderkey':{'$eq':232065}},{'l_quantity':{'$eq':35}},{'l_shipinstruct':{'$eq':'TAKE BACK RETURN'}},{'l_shipmode':{'$eq':'TRUCK'}},{'l_suppkey':{'$eq':543}}]},{'l_extendedprice':{'$gte':75749.12}},{'l_shipmode':{'$in':['FOB','MAIL','RAIL','REG AIR']}}]} ",
-"      -> IXSCAN: plan_stability_tpch_fuzzed.lineitem l_shipdate_1 {'l_shipdate':['[new Date(-9223372036854775808), new Date(737337600000))']}"],
-    "keys" :    108907,
-    "docs" :    208907,
+"  -> [lineitem] FETCH: plan_stability_tpch_fuzzed.lineitem {'$and':[{'l_shipdate':{'$lt':'1993-05-14T00:00:00.000Z'}},{'l_extendedprice':{'$gte':75749.12}},{'l_shipmode':{'$in':['FOB','MAIL','RAIL','REG AIR']}},{'$nor':[{'l_orderkey':{'$eq':232065}},{'l_quantity':{'$eq':35}},{'l_shipinstruct':{'$eq':'TAKE BACK RETURN'}},{'l_shipmode':{'$eq':'TRUCK'}},{'l_suppkey':{'$eq':543}},{'l_commitdate':{'$lt':'1992-11-21T00:00:00.000Z'}}]}]} ",
+"      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_partkey_1"],
+    "keys" :      1182,
+    "docs" :    101182,
     "rows" :         1,
     "csum" : "da15757b8d3a41c6"},
 
@@ -5324,7 +5322,7 @@
     "csum" : "ca7f0bfcb0e88d85"}
 
 ],
-">>>totals": {"commands": 222, "keys":   1526391, "docs":  14668159, "rows":     41006}
+">>>totals": {"commands": 222, "keys":   1418505, "docs":  14600273, "rows":     41006}
 }
 
 

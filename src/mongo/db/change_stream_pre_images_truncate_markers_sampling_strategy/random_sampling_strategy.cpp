@@ -116,7 +116,7 @@ bool RandomSamplingStrategy::performSampling(OperationContext* opCtx,
     // The first method to try when populating the 'markersMap'. Note: sampling can fall back to
     // scanning if the cached collection sizes aren't accurate.
     const auto initialCreationMethod = CollectionTruncateMarkers::computeInitialCreationMethod(
-        numRecords, dataSize, _minBytesPerMarker);
+        numRecords, dataSize, _minBytesPerMarker, false /* forceScanning */);
     LOGV2_INFO(7658604,
                "Decided on initial creation method for pre-images truncate markers initialization",
                "initialCreationMethod"_attr =

@@ -36,6 +36,8 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
+#include <limits>
+
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/meter.h>
 #endif
@@ -56,11 +58,39 @@ public:
     virtual AttributesAndValues<T> values() const = 0;
 };
 
-// A lock free Gauge and metadata about it.
+/**
+ * A gauge that only updates when the new value is less than the current value. To be used for
+ * tracking the minimum of an observed quantity over time.
+ */
 template <typename T>
-class GaugeImpl : public Gauge<T> {
+class MONGO_MOD_PUBLIC MinGauge : public virtual Gauge<T> {
 public:
+    virtual void setIfLess(T value) = 0;
+};
+
+/**
+ * A gauge that only updates when the new value is greater than the current value. To be used for
+ * tracking the maximum of an observed quantity over time.
+ */
+template <typename T>
+class MONGO_MOD_PUBLIC MaxGauge : public virtual Gauge<T> {
+public:
+    virtual void setIfGreater(T value) = 0;
+};
+
+// A single lock-free implementation used for Gauge, MinGauge, and MaxGauge. The initialValue
+// controls semantics: 0 for plain gauges, numeric_limits<T>::max() for min-tracking gauges, and
+// numeric_limits<T>::lowest() for max-tracking gauges.
+template <typename T>
+class GaugeImpl : public MinGauge<T>, public MaxGauge<T> {
+public:
+    explicit GaugeImpl(T initialValue = T{0}) : _initialValue(initialValue), _value(initialValue) {}
+
     void set(T value) override;
+
+    void setIfLess(T value) override;
+
+    void setIfGreater(T value) override;
 
     AttributesAndValues<T> values() const override;
 
@@ -71,6 +101,7 @@ public:
 #endif  // MONGO_CONFIG_OTEL
 
 private:
+    const T _initialValue;
     Atomic<T> _value;
 };
 
@@ -81,6 +112,20 @@ private:
 template <typename T>
 void GaugeImpl<T>::set(T value) {
     _value.storeRelaxed(value);
+}
+
+template <typename T>
+void GaugeImpl<T>::setIfLess(T value) {
+    T old = _value.load();
+    while (value < old && !_value.compareAndSwap(&old, value))
+        ;
+}
+
+template <typename T>
+void GaugeImpl<T>::setIfGreater(T value) {
+    T old = _value.load();
+    while (value > old && !_value.compareAndSwap(&old, value))
+        ;
 }
 
 template <typename T>
@@ -99,7 +144,8 @@ BSONObj GaugeImpl<T>::serializeToBson(const std::string& key) const {
 template <typename T>
 void GaugeImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
     invariant(!meter);
-    _value.store(0);
+    _value.store(_initialValue);
 }
 #endif  // MONGO_CONFIG_OTEL
+
 }  // namespace mongo::otel::metrics
