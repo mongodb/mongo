@@ -8,6 +8,9 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_dlq.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_compact_with_deletes.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_replace_compact.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_todo_cases.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_many_updates_same_key.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_hyphenated_bucket.js
 
 executor:
   fixture:

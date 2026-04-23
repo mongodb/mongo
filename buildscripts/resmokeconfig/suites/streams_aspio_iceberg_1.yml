@@ -5,6 +5,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_column_1.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_column_2.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_table_name.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_boundary_schema.js
 
 executor:
   fixture:

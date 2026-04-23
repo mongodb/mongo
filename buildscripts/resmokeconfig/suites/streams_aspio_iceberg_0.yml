@@ -6,6 +6,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_changestream.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_changestream2.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_latency.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_boundary_types.js
 
 executor:
   fixture:

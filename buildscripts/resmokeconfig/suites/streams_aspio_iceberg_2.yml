@@ -6,6 +6,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_db_name.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_id_field_name.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_randomops.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_boundary_partitions.js
 
 executor:
   fixture:
