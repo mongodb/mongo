@@ -51,59 +51,6 @@ function getRandomElement(arr) {
     return arr[getRandInteger(0, arr.length - 1)];
 }
 
-const kSecondariesToConnectDirectlyTo = [];
-if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
-    const hostColl = db.getSiblingDB("config").connectDirectlyToSecondaries.hosts;
-    hostColl.find().forEach((doc) => {
-        if (doc.isSecondary && !doc.isExcluded) {
-            kSecondariesToConnectDirectlyTo.push({host: doc.host, comment: doc.comment});
-        }
-    });
-
-    if (kSecondariesToConnectDirectlyTo.length == 0) {
-        // This is the first time this file is loaded. Choose the secondaries to connect
-        // directly to.
-        const helloRes = assert.commandWorked(db.adminCommand({hello: 1}));
-        if (!helloRes.hasOwnProperty("setName")) {
-            throw new Error(
-                "Cannot connect directly to a secondary since this is not a replica set. " +
-                    "Unrecognized topology format:" +
-                    tojson(helloRes),
-            );
-        }
-        assert.gt(helloRes.passives.length, 0, {
-            msg: "Cannot definitively determine which nodes are secondaries since all nodes " + "are electable",
-            helloRes,
-        });
-        assert.gt(helloRes.passives.length, 1, {
-            msg: "Cannot connect to only a subset of secondaries since there is only one secondary",
-            helloRes,
-        });
-
-        jsTest.log("Choosing secondaries to reads directly from");
-        assert.commandWorked(
-            hostColl.insert({
-                host: helloRes.primary,
-                isPrimary: true,
-            }),
-        );
-
-        const secondaryToExclude = helloRes.passives[getRandInteger(0, helloRes.passives.length - 1)];
-        helloRes.passives.forEach((host) => {
-            if (host == secondaryToExclude) {
-                assert.commandWorked(hostColl.insert({host, isSecondary: true, isExcluded: true}));
-            } else {
-                const comment = extractUUIDFromObject(UUID());
-                kSecondariesToConnectDirectlyTo.push({host, comment});
-                assert.commandWorked(hostColl.insert({host, isSecondary: true, comment}));
-            }
-        });
-    }
-}
-jsTest.log(
-    "Forcing reads to go directly to the following secondaries: " + tojsononeline(kSecondariesToConnectDirectlyTo),
-);
-
 function runCommandWithReadPreferenceSecondary(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
@@ -207,31 +154,6 @@ function runCommandWithReadPreferenceSecondary(conn, dbName, commandName, comman
             );
         } else if (!commandObj.hasOwnProperty("$readPreference")) {
             commandObj.$readPreference = kReadPreferenceToUse;
-        }
-        if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
-            const randomSecondary = getRandomElement(kSecondariesToConnectDirectlyTo);
-
-            const newConn = new Mongo("mongodb://" + randomSecondary.host + "/?directConnection=true");
-            if (conn.isAutoEncryptionEnabled()) {
-                const clientSideFLEOptions = conn.getAutoEncryptionOptions();
-                assert(newConn.setAutoEncryption(clientSideFLEOptions));
-                newConn.toggleAutoEncryption(true);
-            }
-
-            // To guarantee causal consistency, wait for the operationTime on the original
-            // connection.
-            const currentClusterTime = conn.getClusterTime();
-            assert.soon(() => {
-                const res = assert.commandWorked(newConn.adminCommand({"ping": 1}));
-                return timestampCmp(res.operationTime, currentClusterTime.clusterTime) >= 0;
-            });
-
-            if (!commandObj.hasOwnProperty("comment")) {
-                // If this command already has the "comment" field, do not overwrite it since that
-                // could cause the test to fail.
-                commandObj.comment = randomSecondary.comment;
-            }
-            conn = newConn;
         }
     }
 
