@@ -152,6 +152,14 @@ private:
      */
     void _prioritizeFailures(Status newError, bool isInterruption);
 
+    /**
+     * Returns true if a failure has been handled that has been a retargeting error, i.e. one of
+     * - ErrorCategory::StaleShardVersionError
+     * - ErrorCodes::StaleDbVersion
+     * - ErrorCodes::CommandOnShardedViewNotSupportedOnMongod
+     */
+    bool _currentErrorIsRetargetingError() const;
+
     OperationContext* const _opCtx;
     RoutingContext* _routingCtx;
     const std::shared_ptr<executor::TaskExecutor> _executor;
@@ -379,6 +387,15 @@ void CursorEstablisher::checkForFailedRequests() {
     uassertStatusOK(*_maybeFailure);
 }
 
+bool CursorEstablisher::_currentErrorIsRetargetingError() const {
+    if (!_maybeFailure) {
+        return false;
+    }
+    return _maybeFailure->isA<ErrorCategory::StaleShardVersionError>() ||
+        _maybeFailure->code() == ErrorCodes::StaleDbVersion ||
+        _maybeFailure->code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
+}
+
 void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption) {
     tassert(11052339, "Expected error", !newError.isOK());
     tassert(11052340, "Expected failure", !_maybeFailure->isOK());
@@ -388,15 +405,17 @@ void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption
         return;
     }
     if (isInterruption) {
+        if (newError.code() == ErrorCodes::CallbackCanceled && !_currentErrorIsRetargetingError()) {
+            // Do not clobber an already existing error with a 'CallbackCanceled' error.
+            return;
+        }
         _wasInterrupted = true;
         _maybeFailure = newError;
         return;
     }
 
     // Prefer other non-retargeting related errors that could be operation-fatal.
-    if (_maybeFailure->isA<ErrorCategory::StaleShardVersionError>() ||
-        _maybeFailure->code() == ErrorCodes::StaleDbVersion ||
-        _maybeFailure->code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+    if (_currentErrorIsRetargetingError()) {
         _maybeFailure = std::move(newError);
         return;
     }
@@ -405,7 +424,9 @@ void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption
         return;
     }
 
+    // 'newError' is a CollectionUUIDMismatch error.
     if (_maybeFailure->code() != ErrorCodes::CollectionUUIDMismatch) {
+        // Clobber already stored error in favor of the new CollectionUUIDMismatch error.
         _maybeFailure = std::move(newError);
         return;
     }
