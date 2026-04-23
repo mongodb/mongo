@@ -316,6 +316,9 @@ const animalsDocs = [
 assert.commandWorked(locations.insertMany(locationsDocs));
 assert.commandWorked(animals.insertMany(animalsDocs));
 
+// Dummy indexes used for multikeyness info by join opt.
+assert.commandWorked(animals.createIndex({"dummy": -1, "locationName": -1}));
+assert.commandWorked(locations.createIndex({"dummy": 1, "name": -1}));
 outputPipelineAndSlowQueryLog(
     animals,
     [

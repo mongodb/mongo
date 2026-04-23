@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -54,7 +56,41 @@ public:
 
     std::unique_ptr<Pipeline> makePipelineOfSize(size_t numJoins);
 
+    /**
+     * Marks the given fields as non-array (scalar) in the pipeline's ExpressionContext.
+     * 'mainCollFields' are fields on the main collection; 'secondaryCollFieldMap' maps secondary
+     * collection names to their fields.
+     */
+    static void markFieldsAsScalar(
+        Pipeline& pipeline,
+        const std::vector<StringData>& mainCollFields,
+        const StringMap<std::vector<StringData>>& secondaryCollFieldMap) {
+        auto expCtx = pipeline.getContext();
+
+        auto mainPathArrayness = std::make_shared<PathArrayness>();
+        for (const auto& field : mainCollFields) {
+            mainPathArrayness->addPath(
+                FieldPath(field), MultikeyComponents{}, /*isFullRebuild=*/true);
+        }
+        expCtx->setPathArraynessForNss(expCtx->getNamespaceString(), std::move(mainPathArrayness));
+
+        for (const auto& [collName, fields] : secondaryCollFieldMap) {
+            auto pathArrayness = std::make_shared<PathArrayness>();
+            for (const auto& field : fields) {
+                pathArrayness->addPath(
+                    FieldPath(field), MultikeyComponents{}, /*isFullRebuild=*/true);
+            }
+            expCtx->setPathArraynessForNss(
+                NamespaceString::createNamespaceString_forTest("test", collName),
+                std::move(pathArrayness));
+        }
+    }
+
     const AggModelBuildParams defaultBuildParams{.maxNumberNodesConsideredForImplicitEdges =
                                                      kMaxNumberNodesConsideredForImplicitEdges};
+
+private:
+    // Ensure path arrayness is enabled for all tests.
+    RAIIServerParameterControllerForTest queryKnobController{"featureFlagPathArrayness", true};
 };
 }  // namespace mongo::join_ordering

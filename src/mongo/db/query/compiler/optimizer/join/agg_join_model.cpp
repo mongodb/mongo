@@ -34,10 +34,10 @@
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 #include "mongo/db/query/compiler/optimizer/join/predicate_extractor.h"
 #include "mongo/db/query/util/disjoint_set.h"
@@ -222,6 +222,67 @@ Status addExprJoinPredicates(MutableJoinGraph& graph,
     return Status::OK();
 }
 
+/**
+ * Helper function to determine the arrayness of a field that may have been modified by the pipeline
+ * while tracking "as" path arrayness. Note: 'expCtx' must be non-const since the arrayness check
+ * updates state that provides a non-multikey guarantee for any field we check the arrayness of.
+ *
+ * TODO SERVER-123929: replace this function once dependency analysis supports tracking arrayness of
+ * lookup "as" fields.
+ */
+bool canPipelinePathBeArray(const pipeline::dependency_graph::DependencyGraph& pipelineBaseCollDeps,
+                            ExpressionContext* expCtx,
+                            DocumentSource* ds,
+                            const FieldPath& fp) {
+    auto path = fp.fullPath();
+    auto* declStage = pipelineBaseCollDeps.getDeclaringStage(ds, path).get();
+    tassert(11371801, "Expected stage to differ", declStage != ds);
+    if (auto* originLookup = dynamic_cast<DocumentSourceLookUp*>(declStage); originLookup) {
+        // The "as" field produced by a previous $lookup cannot be an array, since any previous
+        // $lookup must have an $unwind + be eligible for join-optimization (i.e. be part of the
+        // prefix).
+        auto asField = originLookup->getAsField();
+        if (fp == asField) {
+            return false;
+        }
+
+        if (asField.isPrefixOf(fp)) {
+            // This is a sub-field of the $lookup's "as" field- we need to look at the secondary
+            // collection to learn about its arrayness.
+            // TODO SERVER-123953: We will need to actually look at a dependency graph here the
+            // second we support any subpipeline more complex than a single $match stage.
+            return expCtx->canPathBeArrayForNss(fp.subtractPrefix(asField.getPathLength()),
+                                                originLookup->getFromNs());
+        }
+
+        tassert(11371800,
+                "It should not be possible for a $lookup to modify a field unrelated to its "
+                "'as' field",
+                fp.isPrefixOf(asField));
+        // We're in a scenario where our "as" field is something like "a.b", vs the join predicate
+        // field we're looking at is in fact field "a". We should verify the arrayness of field "a"
+        // at the point when it was last modified.
+        return canPipelinePathBeArray(pipelineBaseCollDeps, expCtx, declStage, fp);
+    }
+
+    // If this path doesn't originate from a $lookup, we can just check the base coll deps.
+    return pipelineBaseCollDeps.canPathBeArray(ds, path);
+};
+
+/**
+ * Validates that neither field in the join predicate can include arrays.
+ * TODO SERVER-123953: Use a dependency graph instead of directly accessing foreign path arrayness.
+ */
+bool canJoinPredicateIncludeArrays(const pipeline::dependency_graph::DependencyGraph& baseCollDeps,
+                                   ExpressionContext* expCtx,
+                                   DocumentSource* ds,
+                                   const FieldPath& localField,
+                                   const NamespaceString& foreignNs,
+                                   const FieldPath& foreignField) {
+    return canPipelinePathBeArray(baseCollDeps, expCtx, ds, localField) ||
+        expCtx->canPathBeArrayForNss(foreignField, foreignNs);
+}
+
 }  // namespace
 
 bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
@@ -256,6 +317,15 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         // Remove hint stage from pipeline if present.
         hint = suffix->popFront();
     }
+
+    // Initialize deps after popping the $hint stage, but BEFORE we try to push a pipeline prefix
+    // into our base collection CQ. This is important so we don't miss (for instance) $projects at
+    // the start of the pipeline that might rename fields.
+    auto canMainCollPathBeArray = [clonedExpCtx, &nss](StringData path) {
+        return clonedExpCtx->canPathBeArrayForNss(FieldRef(path), nss);
+    };
+    pipeline::dependency_graph::DependencyGraph mainCollDeps(suffix->getSources(),
+                                                             canMainCollPathBeArray);
 
     ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
     expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
@@ -307,6 +377,18 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 break;
             }
 
+            // Ensure that neither local nor foreign field can include arrays (if present).
+            if (lookup->hasLocalFieldForeignFieldJoin() &&
+                canJoinPredicateIncludeArrays(mainCollDeps,
+                                              clonedExpCtx.get(),
+                                              lookup,
+                                              *lookup->getLocalField(),
+                                              lookup->getFromNs(),
+                                              *lookup->getForeignField())) {
+                // End prefix here, this join predicate might include arrays.
+                break;
+            }
+
             // Attempt to extract join predicates and single table predicates from the $lookup
             // expressed as $expr in $match stage. If there is no subpipeline, this returns no join
             // predicates and a CanonicalQuery with empty predicate. If this returns a bad status,
@@ -315,10 +397,30 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             if (!swPreds.isOK()) {
                 break;
             }
+            auto preds = std::move(swPreds.getValue());
 
-            auto foreignNodeId = graph.addNode(lookup->getFromNs(),
-                                               std::move(swPreds.getValue().canonicalQuery),
-                                               lookup->getAsField());
+            // Similar check as above, but now for predicates extracted from the sub-pipeline.
+            if (std::any_of(
+                    preds.joinPredicates.begin(), preds.joinPredicates.end(), [&](auto&& jp) {
+                        return canJoinPredicateIncludeArrays(mainCollDeps,
+                                                             clonedExpCtx.get(),
+                                                             lookup,
+                                                             jp.localField(),
+                                                             lookup->getFromNs(),
+                                                             jp.foreignField());
+                    })) {
+                // Some field in a join predicate introduced by a $expr $match in a sub-pipeline
+                // might have array values. End prefix here.
+                break;
+            }
+
+            // If we get here, it means we're ready to modify the join graph to include this
+            // $lookup. Once the join graph has been modified, any failure case should cause us to
+            // bail out of join optimization completely, rather than just ending the prefix here
+            // (since we've already partially incorporated the current join).
+
+            auto foreignNodeId = graph.addNode(
+                lookup->getFromNs(), std::move(preds.canonicalQuery), lookup->getAsField());
 
             if (!foreignNodeId) {
                 return Status(ErrorCodes::BadValue, "Graph is too big: too many nodes");
@@ -351,7 +453,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
 
             // Add join predicates expressed as $expr in subpipelines to join graph.
             auto status = addExprJoinPredicates(
-                graph, swPreds.getValue().joinPredicates, pathResolver, *foreignNodeId);
+                graph, std::move(preds.joinPredicates), pathResolver, *foreignNodeId);
             if (!status.isOK()) {
                 return status;
             }
