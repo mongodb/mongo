@@ -537,7 +537,7 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool s
                 // constant, we can evaluate it now.
                 if (!TypeSignature::kNothingType.isSubset(argTypes[0])) {
                     swapAndUpdate(n, abt::Constant::boolean(true));
-                } else if (saveInference && op.nodes()[0].cast<abt::Variable>()) {
+                } else if (saveInference && op.nodes()[0].is<abt::Variable>()) {
                     // If this 'exists' is testing a variable and is part of an And, add a mask
                     // excluding Nothing from the type information of the variable.
                     auto& varName = op.nodes()[0].cast<abt::Variable>()->name();
