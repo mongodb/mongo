@@ -367,6 +367,9 @@ TEST_F(TimeseriesCatalogHelperTest, acquireViewThroughBucketsNss) {
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutTsOptionsThroughBucketsNss) {
     auto opCtx = operationContext();
 
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
     {
         // Create backing collection.
         FailPointEnableBlock fp("skipCreateTimeseriesBucketsWithoutOptionsCheck");
@@ -389,6 +392,9 @@ TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutTsOptionsThroughBuc
 
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutTsOptionsThroughMainNss) {
     auto opCtx = operationContext();
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
 
     {
         // Create backing collection.

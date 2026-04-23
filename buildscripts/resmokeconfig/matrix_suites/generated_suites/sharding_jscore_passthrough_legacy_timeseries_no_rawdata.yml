@@ -50,7 +50,7 @@ selector:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
     - requires_profiling
-    - featureFlagCreateViewlessTimeseriesCollections
+    - requires_fcv_90
   roots:
     - jstests/core/timeseries/**/*.js
 test_kind: js_test

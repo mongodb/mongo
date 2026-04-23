@@ -510,6 +510,9 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
     // Create viewless timeseries at main namespace
     createViewlessTimeseriesCollection(nss1);
 
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
     {
         // Create a conflicting viewless timeseries at the buckets namespace.
         // This simulates an inconsistent state where both foo and system.buckets.foo have
@@ -523,8 +526,6 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
             operationContext(), bucketsNss.dbName(), boost::none /*UUID*/, cmd.toBSON(), false));
     }
 
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
               ErrorCodes::NamespaceExists);
