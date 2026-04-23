@@ -409,6 +409,12 @@ public:
     virtual long long numRecords() const = 0;
 
     /**
+     * Adopt `source`'s size-tracking state so this RecordStore and `source` share counters. Both
+     * must refer to the same ident. Test-only: only valid when the testing proctor is enabled.
+     */
+    MONGO_MOD_PUBLIC virtual void adoptSharedSizeState_forTest(const RecordStore& source) {}
+
+    /**
      * Override the size of the collection (number of records and data size), required when
      * creating a collection from pre-existing data.
      */

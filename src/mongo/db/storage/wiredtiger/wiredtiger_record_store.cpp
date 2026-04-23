@@ -716,6 +716,18 @@ long long WiredTigerRecordStore::numRecords() const {
     return numRecords > 0 ? numRecords : 0;
 }
 
+void WiredTigerRecordStore::adoptSharedSizeState_forTest(const RecordStore& source) {
+    invariant(TestingProctor::instance().isEnabled());
+    const auto* wtSource = dynamic_cast<const WiredTigerRecordStore*>(&source);
+    if (!wtSource) {
+        return;
+    }
+    uassert(12509800,
+            "adoptSharedSizeState_forTest requires both record stores to refer to the same URI",
+            getURI() == wtSource->getURI());
+    _sizeInfo = wtSource->_sizeInfo;
+}
+
 int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel) const {

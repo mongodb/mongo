@@ -819,6 +819,48 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     ASSERT_EQ(0, memcmp(dataUpdated, rd.data(), strlen(dataUpdated)));
 }
 
+TEST(WiredTigerRecordStoreTest, AdoptSharedSizeState) {
+    const std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    auto& wtHarness = *checked_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
+    auto* engine = static_cast<WiredTigerKVEngine*>(wtHarness.getEngine());
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const RecordStore::Options options;
+    const auto uuid = UUID::gen();
+    const std::string ident = "collection-adoptSharedSizeState";
+
+    // newRecordStore uses its own internal OperationContext; create ours after it returns.
+    auto sourceRs = wtHarness.newRecordStore(nss, ident, options, uuid);
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    auto adopterRs = engine->getRecordStore(opCtx.get(), nss, ident, options, uuid);
+    auto& source = *checked_cast<WiredTigerRecordStore*>(sourceRs.get());
+    auto& adopter = *checked_cast<WiredTigerRecordStore*>(adopterRs.get());
+
+    source.setSize(10, 100);
+    ASSERT_EQ(adopter.numRecords(), 0);
+
+    adopter.adoptSharedSizeState_forTest(source);
+    ASSERT_EQ(adopter.numRecords(), 10);
+    ASSERT_EQ(adopter.dataSize(), 100);
+
+    source.setSize(42, 420);
+    ASSERT_EQ(adopter.numRecords(), 42);
+    ASSERT_EQ(adopter.dataSize(), 420);
+}
+
+TEST(WiredTigerRecordStoreTest, AdoptSharedSizeStateRejectsMismatchedUri) {
+    const std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    auto& wtHarness = *checked_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const RecordStore::Options options;
+
+    auto aRs = wtHarness.newRecordStore(nss, "collection-adoptA", options, UUID::gen());
+    auto bRs = wtHarness.newRecordStore(nss, "collection-adoptB", options, UUID::gen());
+    auto& a = *checked_cast<WiredTigerRecordStore*>(aRs.get());
+    auto& b = *checked_cast<WiredTigerRecordStore*>(bRs.get());
+
+    ASSERT_THROWS_CODE(b.adoptSharedSizeState_forTest(a), DBException, 12509800);
+}
+
 // Make sure numRecords and dataSize are accurate after a delete rolls back and some other
 // transaction deletes the same rows before we have a chance of patching up the metadata.
 TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {

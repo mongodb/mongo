@@ -191,6 +191,8 @@ public:
 
     long long numRecords() const override;
 
+    void adoptSharedSizeState_forTest(const RecordStore& source) override;
+
     int64_t storageSize(RecoveryUnit&,
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;
