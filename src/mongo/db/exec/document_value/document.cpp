@@ -44,7 +44,12 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 using boost::intrusive_ptr;
@@ -147,8 +152,7 @@ bool DocumentStorageIterator::shouldSkipDeleted() {
 
         // If we strip the metadata see if a field name matches the known list. All metadata fields
         // start with '$' so optimize for a quick bailout.
-        if (_storage->bsonHasMetadata() && fieldName.starts_with('$') &&
-            Document::allMetadataFieldNames.contains(fieldName)) {
+        if (_storage->bsonHasMetadata() && Document::isMetadataFieldName(fieldName)) {
             return true;
         }
         // Check if the field is in the cache and if so then check if it has been deleted (i.e. the
@@ -213,6 +217,11 @@ template Position DocumentStorage::findFieldInCache<HashedFieldName>(HashedField
 
 template <typename T>
 Position DocumentStorage::findField(T field, LookupPolicy policy) const {
+    // Hide metadata-named fields so they are only accessible through the metadata API.
+    if (_bsonHasMetadata && Document::isMetadataFieldName(field)) {
+        return Position();
+    }
+
     if (auto pos = findFieldInCache(field); pos.found() || policy == LookupPolicy::kCacheOnly) {
         return pos;
     }
@@ -469,6 +478,12 @@ void DocumentStorage::loadLazyMetadata() const {
         return;
     }
 
+    // Skip metadata loading for BSON that does not contain system-injected metadata.
+    if (!_bsonHasMetadata) {
+        _haveLazyLoadedMetadata = true;
+        return;
+    }
+
     bool oldModified = _metadataFields.isModified();
 
     BSONObjIterator it(_bson);
@@ -594,8 +609,48 @@ constexpr StringData Document::metaFieldSearchSortValues;
 constexpr StringData Document::metaFieldVectorSearchScore;
 constexpr StringData Document::metaFieldScore;
 
+void Document::toBsonStrippingMetadata(BSONObjBuilder* builder) const {
+    // Only strips metadata-named fields at the top level, not in nested sub-objects.
+    constexpr size_t recursionLevel = 1;
+    auto warnStripped = [](StringData fieldName) {
+        static StaticImmortal<logv2::SeveritySuppressor> logSeverity{
+            Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+        LOGV2_DEBUG(12363300,
+                    (*logSeverity)().toInt(),
+                    "Stripping user-defined field that collides with a reserved metadata "
+                    "name during cross-shard merge serialization; see "
+                    "https://www.mongodb.com/docs/manual/core/dot-dollar-considerations/ "
+                    "for restricted top-level field names",
+                    "fieldName"_attr = redact(fieldName));
+    };
+    // $sortKey is excluded from the strip here because the legacy resharding cloner
+    // (makeRawPipeline, selected when featureFlagReshardingImprovements is off at FCV < 7.2)
+    // deliberately injects it as a user field so the recipient's AsyncResultsMerger can
+    // sort-merge donor batches. Mongos's RouterStageRemoveMetadataFields still strips $sortKey
+    // from user-visible output.
+    auto shouldStrip = [](StringData fieldName) {
+        return isMetadataFieldName(fieldName) && fieldName != Document::metaFieldSortKey;
+    };
+    for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+        if (auto cached = it.cachedValue()) {
+            if (shouldStrip(cached->nameSD())) {
+                warnStripped(cached->nameSD());
+                continue;
+            }
+            cached->val.addToBsonObj(builder, cached->nameSD(), recursionLevel);
+        } else {
+            auto fieldName = (*it.bsonIter()).fieldNameStringData();
+            if (shouldStrip(fieldName)) {
+                warnStripped(fieldName);
+                continue;
+            }
+            builder->append(*it.bsonIter());
+        }
+    }
+}
+
 void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
-    toBson(builder);
+    toBsonStrippingMetadata(builder);
     if (!metadata()) {
         return;
     }
