@@ -42,13 +42,16 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -794,6 +797,67 @@ TEST(AggregationRequestTest, ShouldRejectRequestResumeTokenIfOplogNss) {
         "cursor: {}}");
     const BSONObj oplogNss = fromjson("{aggregate: 'oplog.rs', $db: 'local'}");
     aggregationRequestParseFailureHelper(validRequest, oplogNss, ErrorCodes::FailedToParse);
+}
+
+class ScopedFCV {
+public:
+    explicit ScopedFCV(multiversion::FeatureCompatibilityVersion version)
+        : _prev(serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()) {
+        serverGlobalParams.mutableFCV.setVersion(version);
+    }
+    ~ScopedFCV() {
+        serverGlobalParams.mutableFCV.setVersion(_prev);
+    }
+
+private:
+    multiversion::FeatureCompatibilityVersion _prev;
+};
+
+TEST(AggregationRequestTest, AddIfrFlagsSerializesOutgoingIfrFlagsAtLatestFCV) {
+    // (Generic FCV reference): test usage
+    ScopedFCV fcv(multiversion::GenericFCV::kLatest);
+    RAIIServerParameterControllerForTest hybridFlag("featureFlagExtensionsInsideHybridSearch",
+                                                    true);
+    RAIIServerParameterControllerForTest vectorFlag("featureFlagVectorSearchExtension", true);
+
+    const auto flagsForWire = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
+    ASSERT_FALSE(flagsForWire.empty());
+
+    auto ifr = std::make_shared<IncrementalFeatureRolloutContext>();
+    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
+        fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, $db: 'test'}")));
+
+    aggregation_request_helper::addIfrFlagsToRequest(request, ifr);
+
+    const auto ifrFlags = request.getIfrFlags();
+    ASSERT_TRUE(ifrFlags.has_value());
+    ASSERT_EQ(ifrFlags->size(), flagsForWire.size());
+    std::map<std::string, bool> observed;
+    for (const auto& doc : *ifrFlags) {
+        observed[doc["name"].String()] = doc["value"].Bool();
+    }
+    for (auto* flag : flagsForWire) {
+        ASSERT_EQ(observed[flag->getName()], ifr->getSavedFlagValue(*flag))
+            << "IFR flag " << flag->getName();
+    }
+}
+
+TEST(AggregationRequestTest, AddIfrFlagsOmitsIfrFlagsAtLastLTSFCV) {
+    // (Generic FCV reference): test usage
+    ScopedFCV fcv(multiversion::GenericFCV::kLastLTS);
+    RAIIServerParameterControllerForTest hybridFlag("featureFlagExtensionsInsideHybridSearch",
+                                                    true);
+    RAIIServerParameterControllerForTest vectorFlag("featureFlagVectorSearchExtension", true);
+
+    ASSERT_TRUE(IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests().empty());
+
+    auto ifr = std::make_shared<IncrementalFeatureRolloutContext>();
+    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
+        fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, $db: 'test'}")));
+
+    aggregation_request_helper::addIfrFlagsToRequest(request, ifr);
+
+    ASSERT_FALSE(request.getIfrFlags().has_value());
 }
 
 }  // namespace

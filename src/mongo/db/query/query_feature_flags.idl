@@ -472,6 +472,8 @@ feature_flags:
         default: false
         fcv_gated: false
         incremental_rollout_phase: in_development
+        serialize_on_outgoing_requests: true
+        version: 9.0
 
     featureFlagExtensionsOptimizations:
         description: "Feature flag to enable new extension stage optimizations."
