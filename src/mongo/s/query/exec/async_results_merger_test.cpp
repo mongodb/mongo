@@ -5082,5 +5082,65 @@ TEST_F(AsyncResultsMergerTest, CallsCleanUpKilledBatchWhenResponsesAreProcessedA
     ASSERT_EQ(ErrorCodes::IllegalOperation, arm->nextReady().getStatus());
 }
 
+// Regression test for SERVER-123666: when a retryable error arrives while the ARM is detached
+// (cursor stashed in ClusterCursorManager), the old code would schedule a retry on the dead
+// SubBaton, which resolves immediately and fires its callback inline while '_mutex' is already
+// held on the same thread. The fix detects the detached state ('!_opCtx') and leaves the remote in
+// a retryable state instead, deferring the retry to '_scheduleGetMores()' on reattach.
+TEST_F(AsyncResultsMergerTest, RetryableErrorWhileDetachedDoesNotDeadlockAndRetriesOnReattach) {
+    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
+                                                                3 /* maxAttempts */);
+
+    const BSONObj retryableErrorResponse = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "dummy msg", {ErrorLabel::kRetryableError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Detach the ARM, simulating the cursor being stashed between client getMore calls. The
+    // SubBaton is now dead.
+    arm->detachFromOperationContext();
+
+    // Deliver a retryable error response while the ARM is detached. Without the fix this deadlocks
+    // because _handleBatchResponse tries to schedule a retry on the dead SubBaton, which fires the
+    // retry callback inline on the same thread that holds _mutex.
+    scheduleNetworkResponseObjs({retryableErrorResponse});
+
+    // With the fix the ARM signals the event (no outstanding requests) and leaves the remote in a
+    // retryable state. Waiting on the event must not hang.
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    // No results and no error: the ARM is not ready, but the remote is still open.
+    ASSERT_FALSE(arm->ready());
+
+    // Reattach to get a fresh SubBaton. _scheduleGetMores (called via nextEvent) will re-send the
+    // getMore for the remote that has no outstanding request and no buffered results.
+    arm->reattachToOperationContext(operationContext());
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // The retry getMore is now scheduled directly (no baton delay). Respond with success.
+    {
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        responses.emplace_back(kTestNss, CursorId(0), batch);
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+}
+
 }  // namespace
 }  // namespace mongo
