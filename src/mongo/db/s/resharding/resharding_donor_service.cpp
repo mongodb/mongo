@@ -742,6 +742,11 @@ void ReshardingDonorService::DonorStateMachine::notifyAllRecipientsDoneCloning()
     ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
 }
 
+void ReshardingDonorService::DonorStateMachine::notifyAllRecipientsDoneApplying() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
+}
+
 SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalSectionAcquired() {
     return _critSecWasAcquired.getFuture();
 }

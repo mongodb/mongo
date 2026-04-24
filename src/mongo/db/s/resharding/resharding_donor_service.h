@@ -144,6 +144,8 @@ public:
 
     void notifyAllRecipientsDoneCloning();
 
+    void notifyAllRecipientsDoneApplying();
+
     SharedSemiFuture<void> awaitCriticalSectionAcquired();
 
     SharedSemiFuture<void> awaitCriticalSectionPromoted();

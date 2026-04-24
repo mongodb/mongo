@@ -392,7 +392,13 @@ public:
     void notifyToStartBlockingWritesNoWait(OperationContext* opCtx,
                                            DonorStateMachine& donor,
                                            const ReshardingDonorDocument& donorDoc) {
-        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kBlockingWrites);
+        if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
+                .isEnabledAndIgnoreFCVUnsafe()) {
+            donor.notifyAllRecipientsDoneApplying();
+        } else {
+            _onReshardingFieldsChanges(
+                opCtx, donor, donorDoc, CoordinatorStateEnum::kBlockingWrites);
+        }
     }
 
     void awaitChangeStreamsMonitorCompleted(OperationContext* opCtx,

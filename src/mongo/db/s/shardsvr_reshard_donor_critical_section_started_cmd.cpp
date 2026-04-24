@@ -78,6 +78,9 @@ public:
             LOGV2(12425400,
                   "Resharding donor received criticalSectionStarted command",
                   "reshardingUUID"_attr = uuid());
+
+            (*machine)->notifyAllRecipientsDoneApplying();
+            (*machine)->awaitCriticalSectionAcquired().get();
         }
 
     private:
