@@ -196,6 +196,8 @@ describe("query stats sharded cluster", function () {
                     client: {application: {name: "MongoDB Shell"}},
                     readConcern: {level: "local", provenance: "implicitDefault"},
                     collectionType: "collection",
+                    // only verify originalQueryShapeHash is present in `confirmAllExpectedFieldsPresent`.
+                    originalQueryShapeHash: "placeholder",
                 };
 
                 if (config.expectedOnShard0 && config.expectedOnShard1) {
@@ -222,6 +224,7 @@ describe("query stats sharded cluster", function () {
                     readConcern: {level: "local", provenance: "implicitDefault"},
                     collectionType: "collection",
                     cursor: {batchSize: "?number"},
+                    originalQueryShapeHash: "placeholder",
                 };
 
                 // This will be added by mongos for tracked collections.
@@ -253,6 +256,7 @@ describe("query stats sharded cluster", function () {
                     client: {application: {name: "MongoDB Shell"}},
                     readConcern: {level: "local", provenance: "implicitDefault"},
                     collectionType: "collection",
+                    originalQueryShapeHash: "placeholder",
                 };
                 testCommand({
                     commandName: "count",
@@ -276,6 +280,7 @@ describe("query stats sharded cluster", function () {
                     client: {application: {name: "MongoDB Shell"}},
                     readConcern: {level: "local", provenance: "implicitDefault"},
                     collectionType: "collection",
+                    originalQueryShapeHash: "placeholder",
                 };
                 testCommand({
                     commandName: "distinct",
@@ -299,6 +304,7 @@ describe("query stats sharded cluster", function () {
                     $readPreference: {"mode": "nearest"},
                     collectionType: "collection",
                     cursor: {batchSize: "?number"},
+                    originalQueryShapeHash: "placeholder",
                 };
                 // This will be added by mongos for tracked collections.
                 if (configName != "unsharded") {

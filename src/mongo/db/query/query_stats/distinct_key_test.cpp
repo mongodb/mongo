@@ -34,10 +34,13 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/distinct_command_gen.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+
+#include <absl/hash/hash.h>
 
 namespace mongo::query_stats {
 
@@ -198,6 +201,49 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctQueryDebugString) {
         key->toBson(expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
 
     ASSERT_BSONOBJ_EQ(keyBSON, expectedKey);
+}
+
+TEST_F(DistinctKeyTest, OriginalQueryShapeHashAppearsInKey) {
+    boost::intrusive_ptr<ExpressionContext> expCtx = make_intrusive<ExpressionContextForTest>();
+    SerializationOptions opts =
+        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    const auto hash = query_shape::QueryShapeHash::fromHexString(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+    auto dcr = std::make_unique<DistinctCommandRequest>(kDefaultTestNss);
+    dcr->setKey("name");
+    dcr->setOriginalQueryShapeHash(hash);
+    auto parsedDistinct =
+        parsed_distinct_command::parse(expCtx, std::move(dcr), ExtensionsCallbackNoop(), {});
+    auto distinctShape = std::make_unique<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
+    auto key = std::make_unique<DistinctKey>(
+        expCtx, *parsedDistinct->distinctCommandRequest, std::move(distinctShape), collectionType);
+
+    const auto keyBson = key->toBson(expCtx->getOperationContext(), opts, {});
+    ASSERT_EQ(keyBson["originalQueryShapeHash"].str(),
+              "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+}
+
+TEST_F(DistinctKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
+    auto makeKeyWithHash = [](StringData hexHash) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto dcr = std::make_unique<DistinctCommandRequest>(kDefaultTestNss);
+        dcr->setKey("name");
+        dcr->setOriginalQueryShapeHash(query_shape::QueryShapeHash::fromHexString(hexHash));
+        auto parsedDistinct =
+            parsed_distinct_command::parse(expCtx, std::move(dcr), ExtensionsCallbackNoop(), {});
+        auto distinctShape =
+            std::make_unique<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
+        return std::make_unique<DistinctKey>(expCtx,
+                                             *parsedDistinct->distinctCommandRequest,
+                                             std::move(distinctShape),
+                                             collectionType);
+    };
+
+    auto keyA = makeKeyWithHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    auto keyB = makeKeyWithHash("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+
+    ASSERT_NE(absl::HashOf(*keyA), absl::HashOf(*keyB));
 }
 
 }  // namespace

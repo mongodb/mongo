@@ -35,10 +35,12 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <absl/hash/hash.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_stats {
@@ -239,5 +241,51 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutReadConcern) {
 
     ASSERT_LT(keyWithoutReadConcern->size(), keyWithReadConcern->size());
 }
+
+TEST_F(AggKeyTest, OriginalQueryShapeHashAppearsInKey) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+    auto rawPipeline = {fromjson(R"({ $match: { x: 1 } })")};
+    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    acr.setPipeline(rawPipeline);
+    const auto hash = query_shape::QueryShapeHash::fromHexString(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    acr.setOriginalQueryShapeHash(hash);
+
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+        acr, kDefaultTestNss.nss(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+    auto key = std::make_unique<AggKey>(
+        expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
+
+    const auto keyBson = key->toBson(
+        expCtx->getOperationContext(),
+        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        {});
+    ASSERT_EQ(keyBson["originalQueryShapeHash"].str(),
+              "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+}
+
+TEST_F(AggKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
+    auto makeKeyWithHash = [](StringData hexHash) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+        auto rawPipeline = {fromjson(R"({ $match: { x: 1 } })")};
+        AggregateCommandRequest acr(kDefaultTestNss.nss());
+        acr.setPipeline(rawPipeline);
+        acr.setOriginalQueryShapeHash(query_shape::QueryShapeHash::fromHexString(hexHash));
+        auto pipeline =
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+        auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+            acr, kDefaultTestNss.nss(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+        return std::make_unique<AggKey>(
+            expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
+    };
+
+    auto keyA = makeKeyWithHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    auto keyB = makeKeyWithHash("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+
+    ASSERT_NE(absl::HashOf(*keyA), absl::HashOf(*keyB));
+}
+
 }  // namespace
 }  // namespace mongo::query_stats

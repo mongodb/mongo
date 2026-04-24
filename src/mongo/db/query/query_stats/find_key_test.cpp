@@ -33,8 +33,11 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <absl/hash/hash.h>
 
 namespace mongo::query_stats {
 
@@ -145,6 +148,57 @@ TEST_F(FindKeyTest, SizeOfFindKeyWithAndWithoutReadConcern) {
     ASSERT_LT(keyWithoutReadConcern->size(), keyWithReadConcern->size());
 }
 
+
+TEST_F(FindKeyTest, OriginalQueryShapeHashAppearsInKey) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setFilter(BSON("x" << 1));
+    const auto hash = query_shape::QueryShapeHash::fromHexString(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    fcr->setOriginalQueryShapeHash(hash);
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+    auto key =
+        std::make_unique<FindKey>(expCtx,
+                                  *parsedFind->findCommandRequest,
+                                  std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx),
+                                  collectionType);
+
+    const auto keyBson = key->toBson(
+        expCtx->getOperationContext(),
+        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        {});
+    ASSERT_EQ(keyBson["originalQueryShapeHash"].str(),
+              "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+}
+
+TEST_F(FindKeyTest, OriginalQueryShapeHashAbsentWhenNotSet) {
+    const auto key = makeFindKeyFromQuery(BSON("x" << 1));
+    const auto keyBson = key->toBson(
+        make_intrusive<ExpressionContextForTest>()->getOperationContext(),
+        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        {});
+    ASSERT_TRUE(keyBson["originalQueryShapeHash"].eoo());
+}
+
+TEST_F(FindKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
+    auto makeKeyWithHash = [](StringData hexHash) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(BSON("x" << 1));
+        fcr->setOriginalQueryShapeHash(query_shape::QueryShapeHash::fromHexString(hexHash));
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        return std::make_unique<FindKey>(
+            expCtx,
+            *parsedFind->findCommandRequest,
+            std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx),
+            collectionType);
+    };
+
+    auto keyA = makeKeyWithHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    auto keyB = makeKeyWithHash("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+
+    ASSERT_NE(absl::HashOf(*keyA), absl::HashOf(*keyB));
+}
 
 }  // namespace
 }  // namespace mongo::query_stats

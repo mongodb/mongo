@@ -35,6 +35,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
@@ -60,16 +61,18 @@ namespace mongo::query_stats {
  * class's member variables.
  */
 struct UniversalKeyComponents {
-    UniversalKeyComponents(std::unique_ptr<query_shape::Shape> queryShape,
-                           const ClientMetadata* clientMetadata,
-                           boost::optional<BSONObj> commentObj,
-                           boost::optional<BSONObj> hint,
-                           boost::optional<BSONObj> readPreference,
-                           boost::optional<BSONObj> writeConcern,
-                           boost::optional<BSONObj> readConcern,
-                           std::unique_ptr<APIParameters> apiParams,
-                           query_shape::CollectionType collectionType,
-                           bool maxTimeMS);
+    UniversalKeyComponents(
+        std::unique_ptr<query_shape::Shape> queryShape,
+        const ClientMetadata* clientMetadata,
+        boost::optional<BSONObj> commentObj,
+        boost::optional<BSONObj> hint,
+        boost::optional<BSONObj> readPreference,
+        boost::optional<BSONObj> writeConcern,
+        boost::optional<BSONObj> readConcern,
+        std::unique_ptr<APIParameters> apiParams,
+        query_shape::CollectionType collectionType,
+        bool maxTimeMS,
+        boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash = boost::none);
     /**
      * Returns a copy of the read concern object. If there is an "afterClusterTime" or
      * "atClusterTime" component, the timestamp is shapified according to 'opts'.
@@ -117,6 +120,11 @@ struct UniversalKeyComponents {
     // set.
     const TenantId _tenantId;
 
+    // The query shape hash of the original query that entered the query system on the router, if
+    // this command was sent by a router to a shard. Set when '_hasField.originalQueryShapeHash' is
+    // true.
+    query_shape::QueryShapeHash _originalQueryShapeHash;
+
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
     // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
     struct HasField {
@@ -128,6 +136,7 @@ struct UniversalKeyComponents {
         bool readConcern : 1 = false;
         bool maxTimeMS : 1 = false;
         bool tenantId : 1 = false;
+        bool originalQueryShapeHash : 1 = false;
     } _hasField;
 };
 
@@ -165,18 +174,27 @@ H AbslHashValue(H state, const SpecificKeyComponents& value) {
 
 template <typename H>
 H AbslHashValue(H h, const UniversalKeyComponents& components) {
-    return H::combine(std::move(h),
-                      *components._queryShape,
-                      components._clientMetaDataHash,
-                      // Note we use the comment's type in the hash function.
-                      components._comment.type(),
-                      simpleHash(components._hintObj),
-                      simpleHash(components._shapifiedReadPreference),
-                      simpleHash(components._writeConcern),
-                      simpleHash(components._shapifiedReadConcern),
-                      components._apiParams ? APIParameters::Hash{}(*components._apiParams) : 0,
-                      components._collectionType,
-                      components._hasField);
+    h = H::combine(std::move(h),
+                   *components._queryShape,
+                   components._clientMetaDataHash,
+                   // Note we use the comment's type in the hash function.
+                   components._comment.type(),
+                   simpleHash(components._hintObj),
+                   simpleHash(components._shapifiedReadPreference),
+                   simpleHash(components._writeConcern),
+                   simpleHash(components._shapifiedReadConcern),
+                   components._apiParams ? APIParameters::Hash{}(*components._apiParams) : 0,
+                   components._collectionType,
+                   components._hasField);
+    if (components._hasField.originalQueryShapeHash) {
+        // QueryShapeHash is var-length block (32 bytes). Use `combine_contiguous` instead of
+        // `combine` which is for fixed-length.
+        h = H::combine_contiguous(
+            std::move(h),
+            reinterpret_cast<const char*>(components._originalQueryShapeHash.data()),
+            query_shape::QueryShapeHash::kHashLength);
+    }
+    return h;
 }
 
 template <typename H>
@@ -189,7 +207,8 @@ H AbslHashValue(H h, const UniversalKeyComponents::HasField& hasField) {
                       hasField.writeConcern,
                       hasField.readConcern,
                       hasField.maxTimeMS,
-                      hasField.tenantId);
+                      hasField.tenantId,
+                      hasField.originalQueryShapeHash);
 }
 
 
@@ -198,7 +217,7 @@ H AbslHashValue(H h, const UniversalKeyComponents::HasField& hasField) {
 static_assert(
     sizeof(UniversalKeyComponents) <= sizeof(query_shape::Shape) + 6 * sizeof(BSONObj) +
             sizeof(BSONElement) + sizeof(std::unique_ptr<APIParameters>) +
-            sizeof(query_shape::CollectionType) + sizeof(query_shape::QueryShapeHash) +
+            sizeof(query_shape::CollectionType) + 2 * sizeof(query_shape::QueryShapeHash) +
             sizeof(int64_t),
     "Size of Key is too large! "
     "Make sure that the struct has been align- and padding-optimized. "
@@ -304,7 +323,8 @@ protected:
         const boost::optional<BSONObj>& hint,
         const boost::optional<repl::ReadConcernArgs>& readConcern,
         bool hasMaxTimeMS,
-        query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
+        query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown,
+        boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash = boost::none);
 
     /**
      * With a given BSONObjBuilder, append the command-specific components of the query stats key.

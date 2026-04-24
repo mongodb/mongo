@@ -85,16 +85,18 @@ boost::optional<TenantId> getTenantId(const query_shape::Shape* queryShape) {
 static const TenantId kNotSetTenantId{OID{}};
 }  // namespace
 
-UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shape> queryShape,
-                                               const ClientMetadata* clientMetadata,
-                                               boost::optional<BSONObj> commentObj,
-                                               boost::optional<BSONObj> hint,
-                                               boost::optional<BSONObj> readPreference,
-                                               boost::optional<BSONObj> writeConcern,
-                                               boost::optional<BSONObj> readConcern,
-                                               std::unique_ptr<APIParameters> apiParams,
-                                               query_shape::CollectionType collectionType,
-                                               bool maxTimeMS)
+UniversalKeyComponents::UniversalKeyComponents(
+    std::unique_ptr<query_shape::Shape> queryShape,
+    const ClientMetadata* clientMetadata,
+    boost::optional<BSONObj> commentObj,
+    boost::optional<BSONObj> hint,
+    boost::optional<BSONObj> readPreference,
+    boost::optional<BSONObj> writeConcern,
+    boost::optional<BSONObj> readConcern,
+    std::unique_ptr<APIParameters> apiParams,
+    query_shape::CollectionType collectionType,
+    bool maxTimeMS,
+    boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash)
     : _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
@@ -108,6 +110,7 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
                                          : simpleHash(BSONObj())),
       _collectionType(collectionType),
       _tenantId{getTenantId(_queryShape.get()).value_or(kNotSetTenantId)},
+      _originalQueryShapeHash(originalQueryShapeHash.value_or(query_shape::QueryShapeHash{})),
       _hasField{
           .clientMetaData = bool(clientMetadata),
           .comment = bool(commentObj),
@@ -117,6 +120,7 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
           .readConcern = bool(readConcern),
           .maxTimeMS = maxTimeMS,
           .tenantId = getTenantId(_queryShape.get()).has_value(),
+          .originalQueryShapeHash = bool(originalQueryShapeHash),
       } {
     tassert(7973600, "shape must not be null", _queryShape);
 }
@@ -206,13 +210,17 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOp
     if (_hasField.maxTimeMS) {
         opts.appendLiteral(&bob, "maxTimeMS", 0ll);
     }
+    if (_hasField.originalQueryShapeHash) {
+        bob.append("originalQueryShapeHash", _originalQueryShapeHash.toHexString());
+    }
 }
 Key::Key(OperationContext* opCtx,
          std::unique_ptr<query_shape::Shape> queryShape,
          const boost::optional<BSONObj>& hint,
          const boost::optional<repl::ReadConcernArgs>& readConcern,
          bool hasMaxTimeMS,
-         query_shape::CollectionType collectionType)
+         query_shape::CollectionType collectionType,
+         boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash)
     : _universalComponents(
           std::move(queryShape),
           ClientMetadata::get(opCtx->getClient()),
@@ -227,7 +235,8 @@ Key::Key(OperationContext* opCtx,
           readConcern ? boost::make_optional(readConcern->toBSONInner()) : boost::none,
           std::make_unique<APIParameters>(APIParameters::get(opCtx)),
           collectionType,
-          hasMaxTimeMS) {}
+          hasMaxTimeMS,
+          originalQueryShapeHash) {}
 
 BSONObj Key::toBson(OperationContext* opCtx,
                     const SerializationOptions& opts,

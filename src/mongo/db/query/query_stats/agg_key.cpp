@@ -161,7 +161,8 @@ AggKey::AggKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
           request.getHint(),
           request.getReadConcern(),
           request.getMaxTimeMS().has_value(),
-          collectionType),
+          collectionType,
+          request.getOriginalQueryShapeHash()),
       _components(request, std::move(involvedNamespaces), expCtx->getExplain()) {}
 
 }  // namespace mongo::query_stats

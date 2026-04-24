@@ -344,6 +344,16 @@ export function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
             assert(!resultingKey.client.hasOwnProperty("mongos"), resultingKey.client);
             continue;
         }
+        if (field === "originalQueryShapeHash") {
+            // The exact hash value is not known in advance; just verify it is present and is a
+            // non-empty string. Callers that expect this field should include it in expectedKey
+            // with any placeholder value to keep the field count consistent.
+            assert(
+                typeof resultingKey[field] === "string" && resultingKey[field].length > 0,
+                "originalQueryShapeHash should be a non-empty string",
+            );
+            continue;
+        }
         if (!expectedKey.hasOwnProperty(field)) {
             jsTest.log.info("Field present in actual object but missing from expected: " + field);
             jsTest.log.info("Expected", {expectedKey});

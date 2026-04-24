@@ -52,7 +52,8 @@ public:
               request.getHint(),
               request.getReadConcern(),
               request.getMaxTimeMS().has_value(),
-              collectionType) {}
+              collectionType,
+              request.getOriginalQueryShapeHash()) {}
 
     // The default implementation of hashing for smart pointers is not a good one for our purposes.
     // Here we overload them to actually take the hash of the object, rather than hashing the
