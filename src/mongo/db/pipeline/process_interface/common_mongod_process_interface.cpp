@@ -1429,4 +1429,38 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocumentLoca
     return Document(document).getOwned();
 }
 
+boost::optional<ScopedSetShardRole> CommonMongodProcessInterface::setLocalRouting(
+    OperationContext* opCtx, const NamespaceString& subPipelineNss) {
+    boost::optional<ScopedSetShardRole> result;
+
+    auto* grid = Grid::get(opCtx->getServiceContext());
+    if (!grid->isInitialized() || !grid->isShardingInitialized() ||
+        !OperationShardingState::isShardingAware(opCtx)) {
+        return result;
+    }
+
+    auto placementConflictTime = [&] {
+        const auto txnRouter = TransactionRouter::get(opCtx);
+        return txnRouter && opCtx->inMultiDocumentTransaction()
+            ? txnRouter.getPlacementConflictTime()
+            : boost::none;
+    }();
+
+    sharding::router::CollectionRouter router(opCtx, subPipelineNss);
+    router.route("setLocalRouting", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+        shard_role_loop::withStaleShardRetry(opCtx, [&]() {
+            stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
+            criMap.emplace(subPipelineNss, cri);
+            auto scopedShardRoles = createScopedShardRoles(
+                opCtx, criMap, {subPipelineNss}, placementConflictTime, subPipelineNss);
+            tassert(
+                12410400, "Expected exactly one scoped shard role", scopedShardRoles.size() == 1);
+            // ScopedSetShardRole has no move-assignment operator; use emplace to avoid a
+            // boost::optional move-assign that would try to call it.
+            result.emplace(std::move(scopedShardRoles[0]));
+        });
+    });
+    return result;
+}
+
 }  // namespace mongo

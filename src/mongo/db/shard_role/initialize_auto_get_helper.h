@@ -43,7 +43,7 @@ namespace mongo {
  * Function which produces an vector of 'ScopedShardRole' objects for the namespaces in 'nssList'
  * using the routing information in 'criMap'.
  */
-MONGO_MOD_PRIVATE
+MONGO_MOD_PUBLIC
 std::vector<ScopedSetShardRole> createScopedShardRoles(
     OperationContext* opCtx,
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap,

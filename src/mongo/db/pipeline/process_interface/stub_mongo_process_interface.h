@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -343,6 +344,11 @@ public:
         const NamespaceString& nss,
         const Document& documentKey) override {
         MONGO_UNREACHABLE_TASSERT(6148002);
+    }
+
+    boost::optional<ScopedSetShardRole> setLocalRouting(
+        OperationContext* opCtx, const NamespaceString& subPipelineNss) override {
+        return boost::none;
     }
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,

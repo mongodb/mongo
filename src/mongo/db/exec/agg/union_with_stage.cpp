@@ -33,7 +33,10 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 
@@ -188,6 +191,32 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
             pipeline_optimization::optimizeAndValidatePipeline);
     logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
 
+    // If the local-read shortcut left a cursorless stage ($collStats, $listCatalog, ...) at the
+    // front of the prepared sub-pipeline, the catalog acquisition that runs as part of getNext()
+    // needs a placement version for the secondary nss so it doesn't trip the no-router-role
+    // assertion. Acquire the scoped shard role once and hold it for the lifetime of the
+    // sub-pipeline iteration. Versions are only required if sharding is initialized.
+    auto* opCtx = pExpCtx->getOperationContext();
+    auto* grid = Grid::get(opCtx->getServiceContext());
+    if (grid->isInitialized() && grid->isShardingInitialized() &&
+        OperationShardingState::isShardingAware(opCtx)) {
+        const auto& resultSources = _sharedState->_pipeline->getSources();
+        const bool isMergePipeline =
+            !resultSources.empty() && resultSources.front()->getSourceName() == "$mergeCursors"_sd;
+        if (!isMergePipeline) {
+            const bool isCursorlessAtFront = resultSources.empty() ||
+                resultSources.front()->getSourceName() != DocumentSourceCursor::kStageName;
+            const auto& subPipelineNss =
+                _sharedState->_pipeline->getContext()->getNamespaceString();
+            if (isCursorlessAtFront && subPipelineNss != pExpCtx->getNamespaceString()) {
+                if (auto role = pExpCtx->getMongoProcessInterface()->setLocalRouting(
+                        opCtx, subPipelineNss)) {
+                    _scopedShardRole.emplace(std::move(*role));
+                }
+            }
+        }
+    }
+
     _sharedState->_executionState = UnionWithSharedState::ExecutionProgress::kIteratingSubPipeline;
 
     // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
@@ -233,6 +262,8 @@ void UnionWithStage::detachFromOperationContext() {
     if (_sharedState->_pipeline) {
         _sharedState->_pipeline->detachFromOperationContext();
     }
+    // Reset the scoped shard role for cursorless sub-pipelines.
+    _scopedShardRole.reset();
 }
 
 void UnionWithStage::reattachToOperationContext(OperationContext* opCtx) {

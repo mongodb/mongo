@@ -143,4 +143,86 @@ shardNames.forEach(function (shardName) {
     );
     checkResults(resObj, resSet);
 });
+
+// Verify cursorless stages ($collStats, $listCatalog) succeed inside $unionWith sub-pipelines for
+// mixed sharded/unsharded topologies.
+// The unionWith stage sets the shard version for secondary nss only in case a cursor is required for the local read shortcut.
+// Cursorless stages will run versionless, this is fine since they do not require to be strong against migration.
+// Those stages must run and pass the version validation when accessing the catalog.
+jsTestLog("Testing $unionWith with cursorless sub-pipeline stages for local read shortcut");
+
+// Co-locate shardedCollOne on the primary shard (shard0) so the $unionWith sub-pipeline targets
+// the same shard as the outer pipeline. Without this, the sub-pipeline always dispatches remotely
+// (to shard0 for unshardedCollOne, or shard1 for shardedCollOne), which creates a new operation
+// with proper shard versions and never exercises the local-read path.
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: shardedCollOne.getFullName(), find: {_id: 0}, to: st.shard0.shardName}),
+);
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [
+            {$match: {_id: -1}},
+            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$collStats: {count: {}, storageStats: {}}}]}},
+        ],
+        cursor: {},
+    }),
+);
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [{$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}}],
+        cursor: {},
+    }),
+);
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [
+            {$match: {_id: -1}},
+            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$collStats: {count: {}, storageStats: {}}}]}},
+        ],
+        cursor: {},
+    }),
+);
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [{$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}}],
+        cursor: {},
+    }),
+);
+
+// Change the db primary so the unsharded sub-pipeline namespace (unshardedCollOne) moves to a
+// different shard, invalidating cached routing for that namespace. Re-running the same cursorless
+// sub-pipeline queries exercises a stale local read which should invalidate the query and retry,
+// this time remotely with success.
+jsTestLog("Re-running $unionWith with cursorless sub-pipelines after a movePrimary");
+
+assert.commandWorked(testDB.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+assert.commandWorked(testDB.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [
+            {$match: {_id: -1}},
+            {$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$collStats: {count: {}, storageStats: {}}}]}},
+        ],
+        cursor: {},
+    }),
+);
+
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: shardedCollOne.getName(),
+        pipeline: [{$unionWith: {coll: unshardedCollOne.getName(), pipeline: [{$listCatalog: {}}]}}],
+        cursor: {},
+    }),
+);
+
 st.stop();

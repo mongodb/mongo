@@ -291,6 +291,11 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocumentLocally(
     MONGO_UNREACHABLE_TASSERT(6148001);
 }
 
+boost::optional<ScopedSetShardRole> MongosProcessInterface::setLocalRouting(
+    OperationContext* opCtx, const NamespaceString& subPipelineNss) {
+    MONGO_UNREACHABLE;
+}
+
 std::vector<DatabaseName> MongosProcessInterface::getAllDatabases(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     return _getAllDatabasesOnAShardedCluster(opCtx, tenantId);

@@ -56,6 +56,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_role/resource_yielder.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_store.h"
@@ -108,6 +109,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey) final;
+
+    boost::optional<ScopedSetShardRole> setLocalRouting(
+        OperationContext* opCtx, const NamespaceString& subPipelineNss) final;
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;

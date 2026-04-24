@@ -101,6 +101,7 @@ class Pipeline;
 class RoutingContext;
 class CatalogResourceHandle;
 class MultipleCollectionAccessor;
+class ScopedSetShardRole;
 class TransactionHistoryIteratorBase;
 
 /**
@@ -797,6 +798,17 @@ public:
      */
     virtual void truncateSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     SpillTable& spillTable) const = 0;
+
+    /**
+     * Acquires a scoped shard role for 'subPipelineNss' to provide placement versioning during
+     * local execution of a $unionWith sub-pipeline that begins with a cursorless stage (e.g.
+     * $collStats, $listCatalog). Returns boost::none when no scoped role is required (operation
+     * is not sharding-aware, sharding is not initialized, or the sub-pipeline namespace matches
+     * the main namespace). The returned scope is intended to be held across all getNext() calls
+     * on the sub-pipeline.
+     */
+    virtual boost::optional<ScopedSetShardRole> setLocalRouting(
+        OperationContext* opCtx, const NamespaceString& subPipelineNss) = 0;
 
 private:
     /**

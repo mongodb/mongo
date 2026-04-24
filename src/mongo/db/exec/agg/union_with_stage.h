@@ -88,6 +88,11 @@ private:
     UnionWithStats _stats;
     // The original, unresolved namespace to union.
     const NamespaceString _userNss;
+
+    // Set once in prepareSubPipeline when the sub-pipeline runs locally and the operation is
+    // sharding-aware so the catalog acquisition for cursorless stages ($collStats, $listCatalog)
+    // sees a placement version.
+    boost::optional<ScopedSetShardRole> _scopedShardRole;
 };
 
 
