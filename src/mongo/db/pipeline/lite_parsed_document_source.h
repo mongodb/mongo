@@ -824,40 +824,6 @@ public:
 };
 
 /**
- * CRTP template for document sources that hold a foreign namespace. Implementers must define
- * getStageParams(), parse(), and requiredPrivileges() functions. Note that this requires the
- * privilege on 'internal' actions. This should still be used with caution. Make sure your stage
- * doesn't need to communicate any special behavior before registering a DocumentSource using this
- * parser.
- *
- * Example usage:
- *   class MyLiteParsed final : public LiteParsedDocumentSourceForeignCollection<MyLiteParsed> { ...
- * };
- */
-template <typename Derived>
-class LiteParsedDocumentSourceForeignCollection : public LiteParsedDocumentSourceDefault<Derived> {
-public:
-    LiteParsedDocumentSourceForeignCollection(const BSONElement& originalBson,
-                                              NamespaceString foreignNss)
-        : LiteParsedDocumentSourceDefault<Derived>(originalBson),
-          _foreignNss(std::move(foreignNss)) {}
-
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
-        return {_foreignNss};
-    }
-
-    PrivilegeVector requiredPrivileges(bool isMongos,
-                                       bool bypassDocumentValidation) const override = 0;
-
-    bool requiresAuthzChecks() const override {
-        return true;
-    }
-
-protected:
-    NamespaceString _foreignNss;
-};
-
-/**
  * Macros to register the LiteParsedDocumentSource parser.
  *
  * Example usage pattern for default stages:
