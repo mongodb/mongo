@@ -1,7 +1,9 @@
 //
 // Test that the cardinality estimates for two-table joins approximate reality
 // @tags: [
-//   requires_sbe
+//   requires_sbe,
+//   featureFlagPathArrayness,
+//   requires_fcv_90
 // ]
 //
 
@@ -33,6 +35,7 @@ function populate() {
         });
     }
 
+    db.many_rows.drop();
     db.many_rows.insertMany(documents);
     db.many_rows.createIndex({i_idx: 1});
     db.many_rows.createIndex({i_idx_offset: 1});
@@ -40,16 +43,23 @@ function populate() {
     db.many_rows.createIndex({c_idx: 1});
     db.many_rows.createIndex({d_idx: 1});
     db.many_rows.createIndex({n_idx: 1});
+    // Not used in planning, but needed for multikeyness info.
+    db.many_rows.createIndex({dummy: 1, i_noidx: -1, missing_field: 1});
 
     // An empty collection
+    db.no_rows.drop();
     db.no_rows.createIndex({i_idx: 1});
+    // Not used in planning, but needed for multikeyness info.
+    db.no_rows.createIndex({dummy: 1, i_idx_offset: -1});
 
     // Collection with a single row
+    db.one_row.drop();
     db.one_row.insert({i_idx: 1});
     db.one_row.createIndex({i_idx: 1});
 
     // Collection with 1 non-null document
     const nullDocuments = [];
+    db.mostly_nulls.drop();
     db.mostly_nulls.insert({i_idx: 1});
     for (let i = 0; i < collSize; i++) {
         nullDocuments.push({

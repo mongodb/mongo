@@ -84,12 +84,14 @@ TEST_F(AggJoinModelGoldenTest, longPrefix) {
             {$unwind: "$fromB"}
         ])";
     auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "longPrefix");
     ASSERT_OK(joinModel);
 }
 
 TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
     auto pipeline = makePipelineOfSize(/*numJoins*/ kHardMaxNodesInJoin + 3);
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "veryLargePipeline");
     ASSERT_OK(joinModel);
 }
@@ -106,6 +108,7 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_OneImplictEdge) {
             {$unwind: "$fromB"}
         ])";
     auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_OneImplictEdge");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
@@ -126,6 +129,7 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_MultipleImplictEdges) {
             {$unwind: "$fromC"}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"a"_sd}}, {"B", {"b"_sd}}, {"C", {"c"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_MultipleImplictEdges");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 4);
@@ -154,6 +158,13 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_TwoConnectedComponents) {
             {$unwind: "$fromE"}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C", "D", "E"});
+    markFieldsAsScalar(*pipeline,
+                       {"a"_sd},
+                       {{"A", {"a"_sd}},
+                        {"B", {"b"_sd}},
+                        {"C", {"c"_sd, "d"_sd}},
+                        {"D", {"d"_sd}},
+                        {"E", {"e"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_TwoConnectedComponents");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 6);
@@ -179,6 +190,13 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_NoImplicitEdges) {
             {$unwind: "$fromE"}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C", "D", "E"});
+    markFieldsAsScalar(*pipeline,
+                       {"a"_sd},
+                       {{"A", {"a"_sd, "b"_sd}},
+                        {"B", {"b"_sd, "c"_sd}},
+                        {"C", {"c"_sd, "d"_sd}},
+                        {"D", {"d"_sd, "e"_sd}},
+                        {"E", {"e"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_NoImplicitEdges");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 6);
@@ -209,6 +227,9 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEnd) {
             }
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
+                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesAtEnd");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
@@ -236,6 +257,9 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetween) {
             {$match: {$expr: {$eq: ["$fromD.d", "$fromA.d"]}}}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
+                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesInBetween");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
@@ -265,6 +289,9 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEnd) {
             {$unwind: "$fromD"}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
+                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEnd");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
@@ -294,6 +321,12 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdge) {
             {$match: {$expr: {$eq: ["$fromB.b", "$fromC.c"]}}}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"a"_sd},
+                       {{"A", {"a"_sd, "b"_sd}},
+                        {"B", {"b"_sd, "s"_sd}},
+                        {"C", {"s"_sd, "c"_sd}},
+                        {"D", {"d"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_addImplicitEdge");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
@@ -336,6 +369,12 @@ TEST_F(AggJoinModelGoldenTest, subPipelineEdge_addImplicitEdge) {
             {$unwind: "$fromD"}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"a"_sd},
+                       {{"A", {"a"_sd, "b"_sd}},
+                        {"B", {"b"_sd, "s"_sd}},
+                        {"C", {"s"_sd, "c"_sd}},
+                        {"D", {"d"_sd, "a"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "subPipelineEdge_addImplicitEdge");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
@@ -369,6 +408,10 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_subPipelineEdge_addImplicitEdge)
             {$match: {$expr: {$eq: ["$fromA.a", "$fromB.a"]}}}
         ])";
     auto pipeline = makePipeline(query, {"A", "B", "C"});
+    markFieldsAsScalar(
+        *pipeline,
+        {"a"_sd},
+        {{"A", {"a"_sd, "b"_sd}}, {"B", {"b"_sd, "c"_sd, "a"_sd}}, {"C", {"c"_sd, "a"_sd}}});
     auto joinModel =
         runVariation(std::move(pipeline), "addEdgesFromExpr_subPipelineEdge_addImplicitEdge");
     ASSERT_OK(joinModel);

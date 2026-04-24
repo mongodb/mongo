@@ -37,7 +37,7 @@ const thirdColl = db[jsTestName() + "_third"];
 thirdColl.drop();
 assert.commandWorked(thirdColl.insertMany(testDocs));
 // Add index for multikeyness info for path arrayness.
-assert.commandWorked(thirdColl.createIndex({dummy: 1, "key.foo": 1}));
+assert.commandWorked(thirdColl.createIndex({dummy: 1, "foo": 1, "key.foo": 1}));
 
 const testCases = [
     {
