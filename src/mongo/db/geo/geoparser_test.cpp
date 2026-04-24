@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/unittest/assert.h"
@@ -464,5 +465,51 @@ TEST(GeoParser, parseGeometryCollection) {
         ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
         ASSERT_TRUE(gc.supportsContains());
     }
+    // A strict-winding polygon inside a GeometryCollection parses successfully; the CRS is
+    // preserved on the PolygonWithCRS so callers can detect and reject it before use.
+    {
+        string strictCRS = "crs:{ type: 'name', properties:{name:'" + CRS_STRICT_WINDING + "'}}";
+        BSONObj obj = fromjson(
+            "{ 'type': 'GeometryCollection', 'geometries': ["
+            "{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]," +
+            strictCRS +
+            "}"
+            "]}");
+        mongo::GeometryCollection gc;
+        ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
+        ASSERT_EQ(gc.polygons[0]->crs, STRICT_SPHERE);
+    }
+
+    {
+        string strictCRS = "crs:{ type: 'name', properties:{name:'" + CRS_STRICT_WINDING + "'}}";
+        BSONObj obj = fromjson(
+            "{ 'type': 'GeometryCollection', 'geometries': ["
+            "{ 'type': 'Point','coordinates': [100.0,0.0]},"
+            "{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]," +
+            strictCRS +
+            "}"
+            "]}");
+        mongo::GeometryCollection gc;
+        ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
+        ASSERT_EQ(gc.polygons[0]->crs, STRICT_SPHERE);
+    }
+}
+
+// A GeometryCollection containing a strict-winding polygon parses successfully, but getNativeCRS()
+// returns STRICT_SPHERE. The existing guards in S2GetKeysForElement (index path) and geoContains
+// (non-index path) both check getNativeCRS() == STRICT_SPHERE and return early before any null
+// s2Polygon is dereferenced.
+TEST(GeoParser, strictPolygonInGeometryCollectionReportsCRS) {
+    string strictCRS = "crs:{ type: 'name', properties:{name:'" + CRS_STRICT_WINDING + "'}}";
+
+    BSONObj storedDoc = fromjson(
+        "{'type':'GeometryCollection','geometries':["
+        "{'type':'Polygon','coordinates':[[[0,0],[5,0],[5,5],[0,5],[0,0]]]," +
+        strictCRS +
+        "}"
+        "]}");
+    GeometryContainer storedGeom;
+    ASSERT_OK(storedGeom.parseFromStorage(BSON("geo" << storedDoc)["geo"]));
+    ASSERT_EQ(storedGeom.getNativeCRS(), STRICT_SPHERE);
 }
 }  // namespace
