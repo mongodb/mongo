@@ -70,6 +70,17 @@ protected:
     std::unique_ptr<ReplicatedFastCountManager> manager;
 };
 
+using ReplicatedFastCountManagerIdempotenceTest = ReplicatedFastCountManagerTest;
+
+TEST_F(ReplicatedFastCountManagerIdempotenceTest, IdempotentStartupAndShutdown) {
+    // Both startup() and shutdown() should be able to be called successively without failure.
+    manager->startup(operationContext());
+    manager->startup(operationContext());
+
+    manager->shutdown(operationContext());
+    manager->shutdown(operationContext());
+}
+
 using ReplicatedFastCountManagerFindLatestTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestCombinesStoredValuesWithOplogDeltas) {
