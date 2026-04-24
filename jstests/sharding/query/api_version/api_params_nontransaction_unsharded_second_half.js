@@ -3,6 +3,10 @@
  *
  * @tags: [
  *   multiversion_incompatible,
+ *   requires_scripting,
+ *   # TODO SERVER-116053: Add support for mapReduce.
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 import {MongosAPIParametersUtil} from "jstests/sharding/libs/mongos_api_params_util.js";

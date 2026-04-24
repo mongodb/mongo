@@ -1,7 +1,10 @@
 /**
  * Tests where/function can be interrupted through maxTimeMS and query knob.
  * @tags: [
- *   requires_scripting
+ *   requires_scripting,
+ *   # TODO SERVER-116052: Add support for $function.
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 const mongodOptions = {};

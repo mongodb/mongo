@@ -11,6 +11,9 @@
 //   # Uses $where operator
 //   requires_scripting,
 //   requires_getmore,
+//   # TODO SERVER-116052: Add support for $function.
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
 // ]
 // Note: It's important to use our own database here to avoid sharing a javascript execution context
 // (Scope) with other tests which could pollute the global scope. This context is cached and shared

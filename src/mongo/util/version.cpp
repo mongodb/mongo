@@ -156,6 +156,7 @@ void VersionInfoInterface::logBuildInfo(std::ostream* os) const {
 #endif
     bob.append("modules", modules());
     bob.append("allocator", allocator());
+    bob.append("javascriptEngine", jsEngine());
     {
         auto envObj = BSONObjBuilder(bob.subobjStart("environment"));
         for (auto&& bi : buildInfo())

@@ -83,6 +83,8 @@ public:
 
     boost::optional<std::string> getErrorMessage() const;
 
+    const BSONObj& getQuery() const;
+
     /**
      * Compute the normalized version of the input set.
      */

@@ -9,6 +9,8 @@
  *   requires_fcv_63,
  *   requires_scripting,
  *   requires_getmore,
+ *   # TODO SERVER-116052: Add support for $function.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 /**

@@ -33,6 +33,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -80,9 +81,11 @@ public:
 
     std::string generateFailureReport() const;
     const std::vector<CollectionSpec>& getCollectionsNeeded() const;
+    const std::filesystem::path& getFilePath() const;
     size_t getFailedQueryCount() const;
     size_t getTestsRun() const;
     const std::string& getQuery(size_t testNum) const;
+    const std::vector<Test>& getTests() const;
 
     /**
      * Loads or drops then loads the collections needed for the test files depending on the passed
@@ -126,6 +129,7 @@ public:
     void printFailedQueries(const std::set<size_t>& failedTestNums) const;
 
     bool readInEntireFile(ModeOption, size_t = kMinTestNum, size_t = kMaxTestNum);
+
     void runTestFile(DBClientConnection*, ModeOption);
 
     /**

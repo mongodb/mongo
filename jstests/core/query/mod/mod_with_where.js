@@ -3,6 +3,8 @@
 //   assumes_balancer_off,
 //   # Uses $where operator
 //   requires_scripting,
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
 //   assumes_read_concern_local,
 //   requires_getmore,
 //   # TODO(SERVER-84158): Try to include this test(s).

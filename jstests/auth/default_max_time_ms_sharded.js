@@ -10,6 +10,8 @@
  *   requires_sharding,
  *   uses_transactions,
  *   requires_scripting,
+ *   # TODO SERVER-116052: Add support for $function.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 

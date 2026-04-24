@@ -1,6 +1,11 @@
 // Tests that planSummary is not duplicated in an active getmore currentOp entry.
 // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
 // the cursor establishing command.
+//
+// @tags: [
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
+// ]
 TestData.disableImplicitSessions = true;
 
 const collName = "currentop_plan_summary_no_dup";

@@ -15,7 +15,9 @@
  *   does_not_support_stepdowns,
  *   # TODO (SERVER-91002): server side javascript execution is deprecated, and the balancer is not
  *   # compatible with it, once the incompatibility is taken care off we can re-enable this test
- *   assumes_balancer_off
+ *   assumes_balancer_off,
+ *   # TODO SERVER-116053: Add support for mapReduce.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

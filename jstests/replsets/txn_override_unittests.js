@@ -25,7 +25,13 @@
  * us to keep more tests running now. That said, these should ideally all throw so we do not rely on
  * the test itself calling assert.commandWorked.
  *
- * @tags: [requires_replication, uses_transactions, requires_scripting]
+ * @tags: [
+ *   requires_replication,
+ *   uses_transactions,
+ *   requires_scripting,
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

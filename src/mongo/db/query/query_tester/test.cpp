@@ -135,6 +135,10 @@ boost::optional<std::string> Test::getErrorMessage() const {
     return _errorMessage;
 }
 
+const BSONObj& Test::getQuery() const {
+    return _query;
+}
+
 std::vector<std::string> Test::normalize(const std::vector<BSONObj>& objs,
                                          const NormalizationOptsSet opts) {
     const auto numResults = objs.size();

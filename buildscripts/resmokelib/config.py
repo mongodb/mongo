@@ -496,6 +496,10 @@ EVERGREEN_REQUESTER = None
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
 
+# If set, the listed file paths will be excluded from the suite(s) regardless of tags.
+# Populated at startup (e.g. to exclude MozJS-containing jstestfuzz files on mozjs-wasm servers).
+EXCLUDE_FILES = None
+
 # Allow test files passed as positional args to run even if they are excluded on the suite config.
 FORCE_EXCLUDED_TESTS = None
 
@@ -900,6 +904,11 @@ REQUIRES_WORKLOAD_CONTAINER_SETUP = False
 
 # Config fuzzer encryption options, this is only set when the fuzzer is run
 CONFIG_FUZZER_ENCRYPTION_OPTS = None
+
+# Indicates which JavaScript engine the tested binary was built with. Corresponds to the
+# "javascriptEngine" field returned by the buildInfo command (or --version). When set to
+# "mozjs-wasm", tests tagged with "mozjs_wasm_unsupported" will be excluded.
+JS_ENGINE = None
 
 # If resmoke is running on a build variant that specifies a mongo_mozjs_opts,
 # we need a way to provide the JS_GC_ZEAL setting provided as part of the mongo_mozjs_opts

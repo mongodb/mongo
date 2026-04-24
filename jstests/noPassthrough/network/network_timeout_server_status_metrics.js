@@ -1,5 +1,9 @@
 /**
- *  @tags: [requires_fcv_63]
+ * @tags: [
+ *   requires_fcv_63,
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
+ * ]
  *
  * Tests that metrics related to connection acquisition timeout are reported correctly
  * in serverStatus.

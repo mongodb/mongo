@@ -12,7 +12,13 @@
 // due to client disconnect, and the number of completed operations that couldn't return data
 // due to client disconnect.
 //
-// @tags: [requires_sharding, requires_scripting, grpc_incompatible]
+// @tags: [
+//   requires_sharding,
+//   requires_scripting,
+//   grpc_incompatible,
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
+// ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

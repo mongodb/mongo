@@ -11,6 +11,8 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 //   multiversion_incompatible,
+//   # TODO SERVER-116053: Add support for mapReduce.
+//   mozjs_wasm_unsupported,
 // ]
 
 /**

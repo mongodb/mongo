@@ -11,6 +11,8 @@
 //   requires_scripting,
 //   # Time-series collections are views which don't support map-reduce
 //   exclude_from_timeseries_crud_passthrough,
+//   # TODO SERVER-116053: Add support for mapReduce.
+//   mozjs_wasm_unsupported,
 // ]
 
 // Takes a list of constructors and returns a new list with an extra entry for each constructor with

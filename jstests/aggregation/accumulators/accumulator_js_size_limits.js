@@ -2,6 +2,8 @@
 // @tags: [
 //   requires_scripting,
 //   resource_intensive,
+//   # TODO SERVER-116055: Add support for $accumulate.
+//   mozjs_wasm_unsupported,
 // ]
 const coll = db.accumulator_js_size_limits;
 

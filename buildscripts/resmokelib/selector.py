@@ -512,7 +512,9 @@ class _SelectorConfig(object):
         self.roots = roots
         self.tag_file = tag_file
         self.include_files = utils.default_if_none(include_files, [])
-        self.exclude_files = utils.default_if_none(exclude_files, [])
+        self.exclude_files = list(
+            set(utils.default_if_none(exclude_files, [])) | set(config.EXCLUDE_FILES or [])
+        )
         include_with_any_tags = self.__merge_lists(
             include_with_any_tags, config.INCLUDE_WITH_ANY_TAGS
         )

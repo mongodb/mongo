@@ -20,6 +20,8 @@
  *   requires_scripting,
  *   # Tests currentOp behavior that is different between 8.1 and previous verions.
  *   requires_fcv_81,
+ *   # TODO SERVER-116052: Add support for $function.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 

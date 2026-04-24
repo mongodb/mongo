@@ -19,6 +19,8 @@
 //   # Time series collections (as views) generate different profiling/plan
 //   # summary entries (e.g. distinct from underlying bucket collection).
 //   exclude_from_timeseries_crud_passthrough,
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
 // ]
 
 let coll = db.count10;

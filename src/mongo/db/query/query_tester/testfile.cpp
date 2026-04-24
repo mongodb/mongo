@@ -277,6 +277,10 @@ const std::vector<CollectionSpec>& QueryFile::getCollectionsNeeded() const {
     return _collectionsNeeded;
 }
 
+const std::filesystem::path& QueryFile::getFilePath() const {
+    return _filePath;
+}
+
 size_t QueryFile::getFailedQueryCount() const {
     return _failedQueryCount;
 }
@@ -287,6 +291,10 @@ size_t QueryFile::getTestsRun() const {
 
 const std::string& QueryFile::getQuery(const size_t testNum) const {
     return _testNumToQuery.at(testNum);
+}
+
+const std::vector<Test>& QueryFile::getTests() const {
+    return _tests;
 }
 
 void QueryFile::loadCollections(DBClientConnection* const conn,

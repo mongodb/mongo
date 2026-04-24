@@ -1,4 +1,9 @@
-// @tags: [requires_fast_memory]
+// @tags: [
+//   requires_fast_memory,
+//   requires_scripting,
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
+// ]
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "unable to start mongod");
 const db = conn.getDB("memory_test");

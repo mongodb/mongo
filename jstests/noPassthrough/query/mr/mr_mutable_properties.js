@@ -1,7 +1,11 @@
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated
 // in Map, Reduce and Finalize functions
-// @tags: [requires_scripting]
+// @tags: [
+//   requires_scripting,
+//   # TODO SERVER-116053: Add support for mapReduce.
+//   mozjs_wasm_unsupported,
+// ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
