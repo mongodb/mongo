@@ -7,8 +7,6 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_stats.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_error_precreated_table.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_modify_partitioned_by.js
-  exclude_files:
-    # TODO(SERVER-117494): Re-enable once evg configuration is resolved.
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/gwproxy/iceberg_gwproxy.js
 
 executor:
