@@ -11,6 +11,13 @@ from pathlib import Path
 
 import gdb
 
+# When we run under gdb, both this file and mongo_printers.py are sourced and run in one global
+# namespace, so we don't want to import mongo_printers here. A real import would trigger Python
+# to load mongo_printers.py a second time as a module with its own namespace, which in turn
+# triggers a second load of this file and clobbers the gdb Command registrations made when this
+# file was first sourced into __main__. The guarded import is kept only to satisfy linters that
+# would otherwise flag the names used from mongo_printers as undefined.
+# TODO SERVER-125403 factor out shared functionality to avoid the guarded import.
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
     from buildscripts.gdb.mongo_printers import absl_get_nodes, get_bytes, get_unique_ptr

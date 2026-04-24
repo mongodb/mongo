@@ -515,13 +515,9 @@ class GDBDumper(Dumper):
             "set interactive-mode off",
             "set print thread-events off",  # Suppress GDB messages of threads starting/finishing.
             add_venv_sys_path,
-            # TODO(SERVER-123717): Manually load .gdbinit, exclude pretty printing until all printers are fixed.
-            # "source .gdbinit",
-            "set python print-stack full",
-            "source buildscripts/gdb/mongo.py",
-            "source buildscripts/gdb/mongo_lock.py",
-            "source buildscripts/gdb/wt_dump_table.py",
-            "source src/third_party/immer/dist/tools/gdb_pretty_printers/autoload.py",
+            "source .gdbinit",
+            # TODO(SERVER-123717): Disable mongo pretty printers until they are fixed.
+            "disable pretty-printer global mongo",
         ]
         return cmds
 
@@ -540,7 +536,7 @@ class GDBDumper(Dumper):
         ]
         if pname == "mongo":
             jsscope_debug_file = f"jsscope_debug_{pid}.yml"
-            # TODO(Ignore linting): Figure out how to get this to support multiple js stack traces from a single process
+            # TODO: Figure out how to get this to support multiple js stack traces from a single process
             if os.path.exists(jsscope_debug_file):
                 logger.info(
                     f"Found JSScope debug file {jsscope_debug_file}, attempting to print stacktraces for JSScope instances."

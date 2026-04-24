@@ -17,6 +17,12 @@ from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import (
     ListIter as ImmerListIter,
 )
 
+# When we run under gdb, both this file and mongo.py are sourced and run in one global namespace,
+# so we don't want to import mongo here. A real import would trigger Python to load mongo.py a
+# second time as a module with its own namespace, clobbering the gdb Command registrations made
+# when mongo.py was first sourced into __main__. The guarded import is kept only to satisfy
+# linters that would otherwise flag the names used from mongo as undefined.
+# TODO SERVER-125403 factor out shared functionality to avoid the guarded import.
 if not gdb:
     from buildscripts.gdb.mongo import (
         get_boost_optional,
@@ -25,8 +31,6 @@ if not gdb:
         lookup_type,
     )
     from buildscripts.gdb.optimizer_printers import register_optimizer_printers
-else:
-    from buildscripts.gdb.mongo import lookup_type
 
 try:
     import collections
