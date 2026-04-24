@@ -60,9 +60,23 @@ coll.drop();
 //
 // Index build should succeed for valid values of "2dsphereIndexVersion".
 //
-
-res = coll.createIndex({geo: "2dsphere"});
+// The default 2dsphere index version should match what the feature flag determines.
+// Avoid allowing default version in background fcv upgrade/downgrade tests.
+//
+const options = {
+    name: "geo_2dsphere",
+};
+// TODO SERVER-118561 Remove this when 9.0 is last LTS.
+const k2dSphereIndexVersion = get2dsphereIndexVersion();
+if (!isStableFCVSuite()) {
+    options["2dsphereIndexVersion"] = k2dSphereIndexVersion;
+}
+res = coll.createIndex({geo: "2dsphere"}, options);
 assert.commandWorked(res);
+let specObj = coll.getIndexes().filter(function (z) {
+    return z.name == "geo_2dsphere";
+})[0];
+assert.eq(k2dSphereIndexVersion, specObj["2dsphereIndexVersion"]);
 coll.drop();
 
 res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
@@ -101,9 +115,7 @@ res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(3)
 assert.commandWorked(res);
 coll.drop();
 
-const kDefault2dSphereIndexVersion = get2dsphereIndexVersion();
-
-if (kDefault2dSphereIndexVersion == 4) {
+if (k2dSphereIndexVersion == 4) {
     res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 4});
     assert.commandWorked(res);
     coll.drop();
@@ -116,25 +128,6 @@ if (kDefault2dSphereIndexVersion == 4) {
     assert.commandWorked(res);
     coll.drop();
 }
-
-//
-// The default 2dsphere index version should match what the feature flag determines.
-// Avoid allowing default version in background fcv upgrade/downgrade tests.
-//
-const options = {
-    name: "geo_2dsphere",
-};
-// TODO SERVER-118561 Remove this when 9.0 is last LTS.
-if (!isStableFCVSuite()) {
-    options["2dsphereIndexVersion"] = get2dsphereIndexVersion(); // Note this will always be v3.
-}
-res = coll.createIndex({geo: "2dsphere"}, options);
-assert.commandWorked(res);
-let specObj = coll.getIndexes().filter(function (z) {
-    return z.name == "geo_2dsphere";
-})[0];
-assert.eq(kDefault2dSphereIndexVersion, specObj["2dsphereIndexVersion"]);
-coll.drop();
 
 //
 // Two index specs are considered equivalent if they differ only in '2dsphereIndexVersion', and
