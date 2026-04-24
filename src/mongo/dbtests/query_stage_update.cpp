@@ -594,9 +594,9 @@ public:
 };
 
 /**
- * Test that a multi-update reports a positive peakTrackedMemBytes in its stats. The
- * _updatedRecordIds deduplicator is always allocated for multi-updates, so its overhead is
- * visible in the peak even when no index is affected.
+ * Test that a multi-update reports a positive peakTrackedMemBytes in its stats. An index on 'x'
+ * ensures that $inc on 'x' sets indexesAffected=true, so record IDs are inserted into the
+ * deduplicator and memory usage is tracked.
  */
 class QueryStageUpdateMemoryTracking : public QueryStageUpdateBase {
 public:
@@ -605,6 +605,8 @@ public:
             insert(BSON("_id" << i << "x" << i));
         }
         ASSERT_EQUALS(10U, count(BSONObj()));
+
+        ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("x" << 1)));
 
         const auto collection = acquireCollection(
             &_opCtx,

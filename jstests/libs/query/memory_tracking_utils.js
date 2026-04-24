@@ -528,6 +528,8 @@ export function runMemoryStatsTest({
         skipStageCheck: skipExplainStageCheck,
         subpipelinePath: explainStageSubpipelinePath,
     });
+
+    db.setProfilingLevel(0);
 }
 
 /**
@@ -702,4 +704,6 @@ export function runMemoryStatsTestForTimeseriesUpdateCommand({db, collName, comm
             );
         }
     }
+
+    db.setProfilingLevel(0);
 }

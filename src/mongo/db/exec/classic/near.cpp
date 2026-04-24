@@ -187,18 +187,27 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     //
 
     WorkingSetMember nextMember = _workingSet->extract(nextMemberID);
+    uint64_t dedupBytesBefore = nextMember.hasRecordId() ? _seenDocuments.getApproximateSize() : 0;
 
     // The child stage may not dedup so we must dedup them ourselves.
     if (nextMember.hasRecordId()) {
         if (!_seenDocuments.insert(nextMember.recordId)) {
             return PlanStage::NEED_TIME;
         }
+        uint64_t dedupBytesAfter = _seenDocuments.getApproximateSize();
+        _memoryTracker.add(static_cast<int64_t>(dedupBytesAfter) -
+                           static_cast<int64_t>(dedupBytesBefore));
+        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+        dedupBytesBefore = dedupBytesAfter;
     }
 
     auto memberDistance = computeDistance(&nextMember);
     if (memberDistance < _nextInterval->minDistance) {
         if (nextMember.hasRecordId()) {
             _seenDocuments.freeMemory(nextMember.recordId);
+            _memoryTracker.add(static_cast<int64_t>(_seenDocuments.getApproximateSize()) -
+                               static_cast<int64_t>(dedupBytesBefore));
+            _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         }
         return PlanStage::NEED_TIME;
     }
@@ -207,12 +216,13 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
 
     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
     nextMember.makeObjOwnedIfNeeded();
+    uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
     _resultBuffer.add(SorterKey{memberDistance}, std::move(nextMember));
-
-    _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
+    _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
+                       static_cast<int64_t>(bufferBytesBefore));
     if (!_memoryTracker.withinMemoryLimit() &&
         feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
-        spill(_memoryTracker.maxAllowedMemoryUsageBytes());
+        spill();
     }
     _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
     uassert(12227900, "Near stage exceeded memory limit", _memoryTracker.withinMemoryLimit());
@@ -228,11 +238,18 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     // Check if the next member is in the search interval and that the buffer isn't empty
     WorkingSetID resultID = WorkingSet::INVALID_ID;
     if (_resultBuffer.getState() == ResultBufferSorter::State::kReady) {
+        // _resultBuffer.next() removes an element from the buffer.
+        uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
         auto [memberDistance, member] = _resultBuffer.next();
-        // _resultBuffer.next() removes an element from the buffer. Update memory tracking.
-        _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
+        _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
+                           static_cast<int64_t>(bufferBytesBefore));
+        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         if (member->hasRecordId()) {
+            uint64_t dedupBytesBefore = _seenDocuments.getApproximateSize();
             _seenDocuments.freeMemory(member->recordId);
+            _memoryTracker.add(static_cast<int64_t>(_seenDocuments.getApproximateSize()) -
+                               static_cast<int64_t>(dedupBytesBefore));
+            _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         }
 
         const bool inInterval = _nextInterval->isLastInterval
@@ -281,19 +298,17 @@ void NearStage::updateSpillingStats() {
         1, additionalSpilledBytes, additionalSpilledRecords, spilledDataStorageIncrease);
 }
 
-void NearStage::spill(uint64_t maxMemoryBytes) {
-    uint64_t totalMemoryUsage =
-        _seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage();
-    if (totalMemoryUsage <= maxMemoryBytes) {
-        return;
-    }
+void NearStage::spill() {
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             str::stream() << _commonStats.stageTypeStr
                           << " stage exceeded memory limit and can't spill to disk. Set "
                              "allowDiskUse: true to allow spilling",
             expCtx()->getAllowDiskUse());
+    uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
     _resultBuffer.forceSpill();
-    _memoryTracker.set(_seenDocuments.getApproximateSize() + _resultBuffer.stats().memUsage());
+    _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
+                       static_cast<int64_t>(bufferBytesBefore));
+    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
     updateSpillingStats();
 }
 

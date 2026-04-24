@@ -173,11 +173,13 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     }
 
     if (_shouldDedup) {
+        const uint64_t dedupBytesBefore = _recordIdDeduplicator.getApproximateSize();
         if (!_recordIdDeduplicator.insert(entry->loc)) {
             // *loc has been returned already
             return PlanStage::NEED_TIME;
         }
-        _memoryTracker.set(_recordIdDeduplicator.getApproximateSize());
+        _memoryTracker.add(static_cast<int64_t>(_recordIdDeduplicator.getApproximateSize()) -
+                           static_cast<int64_t>(dedupBytesBefore));
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         uassert(
             12227901, "CountScan stage exceeded memory limit", _memoryTracker.withinMemoryLimit());

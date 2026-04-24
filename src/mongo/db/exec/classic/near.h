@@ -157,7 +157,7 @@ private:
     SortOptions makeSortOptions();
     void updateSpillingStats();
 
-    void spill(uint64_t maxMemoryBytes);
+    void spill();
 
     //
     // Generic state for progressive near search

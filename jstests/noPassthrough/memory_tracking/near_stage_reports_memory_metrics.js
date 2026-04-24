@@ -61,6 +61,33 @@ runMemoryStatsTest({
     checkInUseTrackedMemBytesResets: false,
 });
 
+// Test that in-use memory decreases as buffered documents are returned across batches.
+{
+    db.system.profile.drop();
+    db.setProfilingLevel(2, {slowms: -1});
+
+    const cursor = coll.aggregate(pipeline, {
+        comment: "near stage in-use decrease test",
+        cursor: {batchSize: kBatchSize},
+        allowDiskUse: false,
+    });
+    while (cursor.hasNext()) {
+        cursor.next();
+    }
+
+    const inUseValues = db.system.profile
+        .find({"command.comment": "near stage in-use decrease test"})
+        .sort({ts: 1})
+        .toArray()
+        .filter((e) => e.hasOwnProperty("inUseTrackedMemBytes"))
+        .map((e) => e.inUseTrackedMemBytes);
+
+    assert.gt(inUseValues.length, 1, "Expected multiple profiler entries with inUseTrackedMemBytes");
+    const foundDecrease = inUseValues.some((val, i) => i > 0 && val < inUseValues[i - 1]);
+    assert(foundDecrease, "Expected in-use memory to decrease between consecutive batches: " + tojson(inUseValues));
+    db.setProfilingLevel(0);
+}
+
 // Clean up.
 coll.drop();
 MongoRunner.stopMongod(conn);

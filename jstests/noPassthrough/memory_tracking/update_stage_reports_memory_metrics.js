@@ -55,7 +55,8 @@ if (featureFlagEnabled) {
         updateStage.hasOwnProperty("peakTrackedMemBytes"),
         "Expected peakTrackedMemBytes in UPDATE stage: " + tojson(explainExecStats),
     );
-    assert.gt(updateStage.peakTrackedMemBytes, 0, "Expected positive peakTrackedMemBytes: " + tojson(explainExecStats));
+    // In explain there is no actual update performed. So,  peakTrackedMemBytes is always 0.
+    assert.eq(updateStage.peakTrackedMemBytes, 0, "Expected zero peakTrackedMemBytes: " + tojson(explainExecStats));
 } else {
     assert(
         !updateStage.hasOwnProperty("peakTrackedMemBytes"),

@@ -297,6 +297,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         bool docWasModified;
 
         try {
+            const uint64_t dedupBytesBefore =
+                _updatedRecordIds ? _updatedRecordIds->getApproximateSize() : 0;
             const auto updateRet = handlePlanStageYield(
                 expCtx(),
                 "UpdateStage update",
@@ -335,7 +337,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             }
 
             if (_updatedRecordIds) {
-                _memoryTracker.set(_updatedRecordIds->getApproximateSize());
+                _memoryTracker.add(static_cast<int64_t>(_updatedRecordIds->getApproximateSize()) -
+                                   static_cast<int64_t>(dedupBytesBefore));
                 _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
                 uassert(12227902,
                         "UpdateStage exceeded memory limit",
