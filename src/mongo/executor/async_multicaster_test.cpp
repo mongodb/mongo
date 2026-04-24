@@ -111,14 +111,14 @@ protected:
 
     Milliseconds advanceUntilReadyRequest() const {
         using namespace std::literals;
-        stdx::this_thread::sleep_for(1ms);
+        std::this_thread::sleep_for(1ms);
         auto totalWaited = Milliseconds{0};
         auto _ = executor::NetworkInterfaceMock::InNetworkGuard{_net};
         while (!_net->hasReadyRequests()) {
             auto advance = Milliseconds{10};
             _net->advanceTime(_net->now() + advance);
             totalWaited += advance;
-            stdx::this_thread::sleep_for(100us);
+            std::this_thread::sleep_for(100us);
         }
         return totalWaited;
     }
@@ -183,7 +183,7 @@ void AsyncMulticasterTest::processAllNetworkRequests(
     using namespace std::literals;
     for (const auto& response : responses) {
         while (!networkHasReadyRequests()) {
-            stdx::this_thread::sleep_for(100us);
+            std::this_thread::sleep_for(100us);
         }
         processNetworkRequest(response);
     }
@@ -356,7 +356,7 @@ TEST_F(AsyncMulticasterTest, MulticastWithTimeout) {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
         while (net->getNumReadyRequests() < 2) {
-            stdx::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
         // Advance time beyond the timeout

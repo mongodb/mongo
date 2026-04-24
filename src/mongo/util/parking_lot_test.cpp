@@ -29,13 +29,13 @@
 
 #include "mongo/util/parking_lot.h"
 
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
 #include <memory>
+#include <thread>
 
 namespace mongo {
 namespace {
@@ -54,7 +54,7 @@ public:
     // Simulate work until Notifiable has been notified.
     void run() {
         while (!notified.load()) {
-            stdx::this_thread::yield();
+            std::this_thread::yield();
         }
     }
 

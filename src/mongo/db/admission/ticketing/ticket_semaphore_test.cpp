@@ -96,7 +96,7 @@ public:
     void waitUntilBlocked(TicketSemaphore* sem, int expectedWaiters) {
         _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
             while (sem->waiters() < expectedWaiters) {
-                stdx::this_thread::yield();
+                std::this_thread::yield();
             }
         });
     }
@@ -693,7 +693,7 @@ TEST_P(TicketSemaphoreTest, ResizeWakesExactlyNOfMWaiters) {
 
     _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
         while (rawSem->waiters() > 2)
-            stdx::this_thread::yield();
+            std::this_thread::yield();
     });
     ASSERT_EQ(rawSem->waiters(), 2);
     ASSERT_EQ(rawSem->available(), 0);

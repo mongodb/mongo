@@ -30,7 +30,6 @@
 #include "mongo/util/concurrency/lock_free_read_list.h"
 
 #include "mongo/platform/atomic.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/time_support.h"
@@ -39,6 +38,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include <benchmark/benchmark.h>
 
@@ -177,7 +177,7 @@ public:
         for (auto _ : state) {
             auto it = _controller.add(_counter.fetchAndAdd(1));
             state.PauseTiming();
-            stdx::this_thread::yield();
+            std::this_thread::yield();
             state.ResumeTiming();
             _controller.remove(it);
             updates += 2;

@@ -245,7 +245,7 @@ Locker::~Locker() {
 }
 
 void Locker::updateThreadIdToCurrentThread() {
-    _threadId = stdx::this_thread::get_id();
+    _threadId = std::this_thread::get_id();
 }
 
 void Locker::unsetThreadId() {

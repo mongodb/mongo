@@ -115,7 +115,7 @@ private:
     /** Does not enforce the non-empty range invariant. */
     ChunkRange() = default;
 
-    friend ChunkRange idlPreparsedValue(stdx::type_identity<ChunkRange>) {
+    friend ChunkRange idlPreparsedValue(std::type_identity<ChunkRange>) {
         return {};
     }
 };

@@ -476,7 +476,7 @@ public:
     static void handlerPreamble(int sig) {
         LOGV2(23387,
               "Thread caught signal!",
-              "tid"_attr = ostr(stdx::this_thread::get_id()),
+              "tid"_attr = ostr(std::this_thread::get_id()),
               "sig"_attr = sig);
         char storage;
         LOGV2(23388,
@@ -495,7 +495,7 @@ public:
               "size"_attr = fmt::format("{:X}", buf->size()),
               "data"_attr = fmt::format("{:X}", reinterpret_cast<uintptr_t>(buf->data())));
         stdx::thread thr([&] {
-            LOGV2(23389, "Thread running", "tid"_attr = ostr(stdx::this_thread::get_id()));
+            LOGV2(23389, "Thread running", "tid"_attr = ostr(std::this_thread::get_id()));
             {
                 stack_t ss;
                 ss.ss_sp = buf->data();

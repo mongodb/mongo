@@ -35,9 +35,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/stats/collection_statistics.h"
 #include "mongo/db/query/compiler/stats/stats_cache_loader.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
+
+#include <thread>
 
 
 namespace mongo::stats {

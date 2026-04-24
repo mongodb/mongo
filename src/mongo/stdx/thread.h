@@ -216,13 +216,6 @@ inline void swap(thread& lhs, thread& rhs) noexcept {
     lhs.swap(rhs);
 }
 
-namespace this_thread {
-using std::this_thread::get_id;       // NOLINT
-using std::this_thread::sleep_for;    // NOLINT
-using std::this_thread::sleep_until;  // NOLINT
-using std::this_thread::yield;        // NOLINT
-}  // namespace this_thread
-
 }  // namespace stdx
 
 static_assert(std::is_move_constructible_v<stdx::thread>);

@@ -58,7 +58,7 @@ bool runTest(bool oflow, F f, A a, B b, T r = {}) {
 
 // Expect `f(a,b) == r`.
 template <typename T, typename F, typename A, typename B>
-auto test(F f, A a, B b, stdx::type_identity_t<T> r) {
+auto test(F f, A a, B b, std::type_identity_t<T> r) {
     return runTest<T>(false, f, a, b, r);
 };
 

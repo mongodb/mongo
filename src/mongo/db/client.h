@@ -44,7 +44,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/spin_lock.h"
@@ -58,6 +57,7 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>

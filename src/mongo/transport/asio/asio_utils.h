@@ -275,11 +275,11 @@ template <typename... ArgsFromAsio>
 class UseFuture::Adapter {
 private:
     template <typename Dum, typename... Ts>
-    struct ArgPack : stdx::type_identity<std::tuple<Ts...>> {};
+    struct ArgPack : std::type_identity<std::tuple<Ts...>> {};
     template <typename Dum>
-    struct ArgPack<Dum> : stdx::type_identity<void> {};
+    struct ArgPack<Dum> : std::type_identity<void> {};
     template <typename Dum, typename T>
-    struct ArgPack<Dum, T> : stdx::type_identity<T> {};
+    struct ArgPack<Dum, T> : std::type_identity<T> {};
 
     /**
      * If an Asio callback takes a leading error_code, it's stripped from

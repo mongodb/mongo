@@ -499,14 +499,14 @@ PRODUCER_CONSUMER_QUEUE_TEST(pushWouldOverPush, runPermutations<true, false>) {
                                     [&](OperationContext* opCtx) { pcq.push(MoveOnly(1), opCtx); });
 
     while (pcq.getStats().waitingProducers < 1) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     }
 
     auto threadB = helper.runThread("ProducerB",
                                     [&](OperationContext* opCtx) { pcq.push(MoveOnly(1), opCtx); });
 
     while (pcq.getStats().waitingProducers < 2) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     }
 
     helper
@@ -749,7 +749,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerSingleConsumer, runPermutations<true, 
         std::lock_guard<std::mutex> lk(mutex);
         if (success == 1)
             break;
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     }
     pcq.closeConsumerEnd();
 
@@ -773,14 +773,14 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducersDontLineSkip, runPermutations<true, f
         "ProducerBig", [&](OperationContext* opCtx) { pcq.push(MoveOnly(2), opCtx); });
 
     while (pcq.getStats().waitingProducers < 1ul) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     }
 
     auto smallProducer = helper.runThread(
         "ProducerSmall", [&](OperationContext* opCtx) { pcq.push(MoveOnly(1), opCtx); });
 
     while (pcq.getStats().waitingProducers < 2ul) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     }
 
     ASSERT_EQUALS(pcq.getStats().waitingProducers, 2ul);
@@ -810,7 +810,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
                                     [&](OperationContext* opCtx) { pcq.push(MoveOnly(1), opCtx); });
 
     while (pcq.getStats().waitingProducers < 1ul) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     };
 
     auto threadB = helper.runThread("ProducerB", [&](OperationContext* opCtx) {
@@ -827,7 +827,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
     });
 
     while (pcq.getStats().waitingProducers < 2ul) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     };
 
     {
@@ -839,7 +839,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
                                     [&](OperationContext* opCtx) { pcq.push(MoveOnly(3), opCtx); });
 
     while (pcq.getStats().waitingProducers < 3ul) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     };
 
     {

@@ -192,7 +192,7 @@ private:
 };
 
 /** Allow IDL-generated parsers to define uninitialized UUID objects. */
-inline auto idlPreparsedValue(stdx::type_identity<UUID>) {
+inline auto idlPreparsedValue(std::type_identity<UUID>) {
     return UUID::fromCDR(std::array<unsigned char, 16>{});
 }
 

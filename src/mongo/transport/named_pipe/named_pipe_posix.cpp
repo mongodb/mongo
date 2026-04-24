@@ -35,7 +35,6 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/named_pipe/io_error_message.h"
 #include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/util/assert_util.h"
@@ -45,6 +44,7 @@
 #include <cstdio>
 #include <fstream>  // IWYU pragma: keep
 #include <string>
+#include <thread>
 
 #include <fmt/format.h>
 #include <sys/stat.h>
@@ -164,7 +164,7 @@ void NamedPipeInput::doOpen() {
                     fmt::format("error = {}",
                                 getLastSystemErrorMessageFormatted("open", _pipeAbsolutePath)),
                     errno == ENOENT);
-            stdx::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
             ++retries;
             if (retries % 1000 == 0) {
                 sleepMs *= 2;

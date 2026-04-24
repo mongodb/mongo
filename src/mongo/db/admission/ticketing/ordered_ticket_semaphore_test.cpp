@@ -100,7 +100,7 @@ public:
         auto deadline = Date_t::now() + kTestWaitTimeout;
         while (condition()) {
             ASSERT_LT(Date_t::now(), deadline) << "Timed out waiting for condition";
-            stdx::this_thread::yield();
+            std::this_thread::yield();
         }
     }
 

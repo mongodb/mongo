@@ -290,7 +290,7 @@ void MozJSImplScope::registerOperation(OperationContext* opCtx) {
         return;
 
     _opCtx = opCtx;
-    _opCtxThreadId = stdx::this_thread::get_id();
+    _opCtxThreadId = std::this_thread::get_id();
 
     _engine->registerOperation(opCtx, this);
 }
@@ -308,7 +308,7 @@ void MozJSImplScope::kill() {
 
         // If we are on the right thread, in the middle of an operation, and we have a
         // registered opCtx, then we should check the opCtx for interrupts.
-        if (_opCtxThreadId == stdx::this_thread::get_id() && _inOp > 0 && _opCtx) {
+        if (_opCtxThreadId == std::this_thread::get_id() && _inOp > 0 && _opCtx) {
             _killStatus = _opCtx->checkForInterruptNoAssert();
         }
 

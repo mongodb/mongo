@@ -172,7 +172,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepUp) {
     // Write Intent while the interruption is ongoing.
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::StepUp, opCtx.get(), timeout_sec);
-    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
     kill.get();
 
     // Assert no operations were killed and no intents were deregistered.
@@ -260,13 +260,13 @@ DEATH_TEST_F(IntentRegistryTestDeathTest,
         IntentRegistry::InterruptionType::Shutdown, opCtx.get(), timeout_sec);
 
     // total deregister time 2.1s > 2s
-    stdx::this_thread::sleep_for(5s);
+    std::this_thread::sleep_for(5s);
     // Deregister Write
     guards[0]->reset();
-    stdx::this_thread::sleep_for(4s);
+    std::this_thread::sleep_for(4s);
     // Deregister Read
     guards[2]->reset();
-    stdx::this_thread::sleep_for(1.5s);
+    std::this_thread::sleep_for(1.5s);
     // Deregister LocalWrite
     guards[1]->reset();
     kill.get();
@@ -344,7 +344,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsBackToBack) {
                 guard->reset();
             }
         }
-        stdx::this_thread::sleep_for(1s);
+        std::this_thread::sleep_for(1s);
         auto sdguard = killsd.get();
         sdguard.release();
     });
@@ -425,7 +425,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsShutdown) {
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::Shutdown, opCtx.get(), timeout_sec);
 
-    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Shutdown interruption should throw an
     // exception.
@@ -506,7 +506,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsSameOpCtxCanDeclareIntents) 
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::Shutdown, opCtx.get(), timeout_sec);
 
-    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Since we are using the same opCtx we should be able to register any intent.
     {
@@ -573,7 +573,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsRollback) {
     auto opCtx = client->makeOperationContext();
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::Rollback, opCtx.get(), timeout_sec);
-    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Rollback interruption should throw an
     // exception.
@@ -658,7 +658,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
     auto opCtx = client->makeOperationContext();
     auto kill = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::StepDown, opCtx.get(), timeout_sec);
-    stdx::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
     {
         auto clientWritePrepared =
             serviceContext->getService()->makeClient("testClientWritePrepared");

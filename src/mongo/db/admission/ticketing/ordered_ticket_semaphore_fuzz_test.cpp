@@ -89,12 +89,12 @@ public:
         }
 
         while (sem.waiters() < n)
-            stdx::this_thread::yield();
+            std::this_thread::yield();
 
         for (int i = 0; i < n; ++i) {
             sem.resize(1);
             while (wakeOrder.load() < i + 1)
-                stdx::this_thread::yield();
+                std::this_thread::yield();
         }
 
         for (auto& t : threads)
@@ -123,7 +123,7 @@ public:
         }
 
         while (sem.waiters() < numWaiters)
-            stdx::this_thread::yield();
+            std::this_thread::yield();
 
         Atomic<int> tryAcquireSuccesses{0};
         Atomic<bool> stopTrying{false};
@@ -137,7 +137,7 @@ public:
                         tryAcquireSuccesses.fetchAndAdd(1);
                         sem.release();  // Return the permit so it can go to a waiter
                     }
-                    stdx::this_thread::yield();
+                    std::this_thread::yield();
                 }
             });
         }
@@ -145,7 +145,7 @@ public:
         for (int i = 0; i < numWaiters; ++i) {
             sem.resize(1);
             while (waitersAcquired.load() < i + 1)
-                stdx::this_thread::yield();
+                std::this_thread::yield();
         }
 
         stopTrying.store(true);

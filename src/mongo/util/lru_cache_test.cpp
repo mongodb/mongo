@@ -88,9 +88,9 @@ template <typename T, typename = void>
 struct hasOstreamOperator : std::false_type {};
 
 template <typename T>
-struct hasOstreamOperator<
-    T,
-    stdx::void_t<decltype(std::declval<std::ostream&>() << std::declval<T>())>> : std::true_type {};
+struct hasOstreamOperator<T,
+                          std::void_t<decltype(std::declval<std::ostream&>() << std::declval<T>())>>
+    : std::true_type {};
 
 // sanity check
 static_assert(hasOstreamOperator<int>::value, "ERROR: int should have an ostream operator");

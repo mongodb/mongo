@@ -247,7 +247,7 @@ void TrafficRecorder::Recording::start() {
             recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
             recordingFile += ".bin";
             while (boost::filesystem::exists(recordingFile)) {
-                stdx::this_thread::sleep_for(std::chrono::milliseconds(5));
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 recordingFile = boost::filesystem::absolute(_path);
                 recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
                 recordingFile += ".bin";

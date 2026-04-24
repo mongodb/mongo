@@ -37,22 +37,6 @@
 namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
-#if __cplusplus < 201703
-
-template <typename T>
-constexpr typename std::add_const<T>::type& as_const(T& t) noexcept {
-    return t;
-}
-
-template <typename T>
-void as_const(T&&) = delete;
-
-#else
-
-using std::as_const;
-
-#endif
-
 /** https://en.cppreference.com/w/cpp/utility/to_underlying */
 template <typename E>
 constexpr auto to_underlying(E e) noexcept {

@@ -149,7 +149,7 @@ public:
 void sleepalittle() {
     Timer t;
     while (1) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
         if (t.micros() > 8)
             break;
     }

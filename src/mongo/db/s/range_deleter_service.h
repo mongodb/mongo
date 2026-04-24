@@ -46,7 +46,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -59,6 +58,7 @@
 #include <queue>
 #include <set>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>

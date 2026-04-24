@@ -292,8 +292,8 @@ struct SecureAllocatorDomain {
         template <
             typename Arg,
             typename... Args,
-            stdx::enable_if_t<!std::is_same<SecureHandle<T>, typename std::decay<Arg>::type>::value,
-                              int> = 0>
+            std::enable_if_t<!std::is_same<SecureHandle<T>, typename std::decay<Arg>::type>::value,
+                             int> = 0>
         SecureHandle(Arg&& arg, Args&&... args)
             : _t(_new(std::forward<Arg>(arg), std::forward<Args>(args)...)) {}
 

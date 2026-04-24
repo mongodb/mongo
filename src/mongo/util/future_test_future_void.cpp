@@ -31,7 +31,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -141,11 +140,11 @@ TEST(Future_Void, Fail_getAsync) {
 
 TEST(Future_Void, Success_isReady) {
     runTests([](auto&& fut) {
-        const auto id = stdx::this_thread::get_id();
+        const auto id = std::this_thread::get_id();
         while (!fut.isReady()) {
         }
         std::move(fut).getAsync([&](Status status) {
-            ASSERT_EQ(stdx::this_thread::get_id(), id);
+            ASSERT_EQ(std::this_thread::get_id(), id);
             ASSERT_OK(status);
         });
     });
@@ -153,11 +152,11 @@ TEST(Future_Void, Success_isReady) {
 
 TEST(Future_Void, Fail_isReady) {
     runFailureTests([](auto&& fut) {
-        const auto id = stdx::this_thread::get_id();
+        const auto id = std::this_thread::get_id();
         while (!fut.isReady()) {
         }
         std::move(fut).getAsync([&](Status status) {
-            ASSERT_EQ(stdx::this_thread::get_id(), id);
+            ASSERT_EQ(std::this_thread::get_id(), id);
             ASSERT_NOT_OK(status);
         });
     });

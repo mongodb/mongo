@@ -114,7 +114,7 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
             invariant(globalInShutdownDeprecated());
 
             // Re-entrant calls to shutdown are not allowed.
-            invariant(shutdownTasksThreadId != stdx::this_thread::get_id());
+            invariant(shutdownTasksThreadId != std::this_thread::get_id());
 
             ExitCode originallyRequestedCode = shutdownExitCode.value();
             if (code != originallyRequestedCode) {
@@ -134,7 +134,7 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
         setShutdownFlag();
         shutdownExitCode.emplace(code);
         shutdownTasksInProgress = true;
-        shutdownTasksThreadId = stdx::this_thread::get_id();
+        shutdownTasksThreadId = std::this_thread::get_id();
 
         localTasks.swap(shutdownTasks);
     }
@@ -162,7 +162,7 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
 
         setShutdownFlag();
         shutdownTasksInProgress = true;
-        shutdownTasksThreadId = stdx::this_thread::get_id();
+        shutdownTasksThreadId = std::this_thread::get_id();
 
         localTasks.swap(shutdownTasks);
     }

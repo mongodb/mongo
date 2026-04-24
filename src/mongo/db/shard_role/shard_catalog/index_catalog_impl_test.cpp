@@ -34,9 +34,10 @@
 #include "mongo/db/shard_role/ddl/list_indexes_allowed_fields.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/util/time_support.h"
+
+#include <thread>
 
 namespace mongo {
 namespace {

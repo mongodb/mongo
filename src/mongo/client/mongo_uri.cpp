@@ -249,8 +249,8 @@ MongoURI::OptionsMap addTXTOptions(MongoURI::OptionsMap options,
     if (!std::includes(
             begin(permittedTXTOptions),
             end(permittedTXTOptions),
-            begin(stdx::as_const(txtOptions)),
-            end(stdx::as_const(txtOptions)),
+            begin(std::as_const(txtOptions)),
+            end(std::as_const(txtOptions)),
             [](const auto& lhs, const auto& rhs) { return std::get<0>(lhs) < std::get<0>(rhs); })) {
         uasserted(ErrorCodes::FailedToParse, "Encountered invalid options in TXT record.");
     }

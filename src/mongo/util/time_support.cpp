@@ -40,7 +40,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
@@ -49,6 +48,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <thread>
 
 #if defined(_WIN32)
 #include "mongo/util/system_tick_source.h"
@@ -526,14 +526,14 @@ time_t Date_t::toTimeT() const {
 }
 
 void sleepsecs(int s) {
-    stdx::this_thread::sleep_for(Seconds(s).toSystemDuration());
+    std::this_thread::sleep_for(Seconds(s).toSystemDuration());
 }
 
 void sleepmillis(long long s) {
-    stdx::this_thread::sleep_for(Milliseconds(s).toSystemDuration());
+    std::this_thread::sleep_for(Milliseconds(s).toSystemDuration());
 }
 void sleepmicros(long long s) {
-    stdx::this_thread::sleep_for(Microseconds(s).toSystemDuration());
+    std::this_thread::sleep_for(Microseconds(s).toSystemDuration());
 }
 
 Milliseconds Backoff::nextSleep() {

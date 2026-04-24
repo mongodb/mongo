@@ -751,14 +751,14 @@ int mongo_main(int argc, char* argv[]) {
 
             if (usingPassword && parsedURI.getPassword().empty()) {
                 if (!shellGlobalParams.password.empty()) {
-                    parsedURI.setPassword(stdx::as_const(shellGlobalParams.password));
+                    parsedURI.setPassword(std::as_const(shellGlobalParams.password));
                 } else {
                     parsedURI.setPassword(mongo::askPassword());
                 }
             }
 
             if (parsedURI.getUser().empty() && !shellGlobalParams.username.empty()) {
-                parsedURI.setUser(stdx::as_const(shellGlobalParams.username));
+                parsedURI.setUser(std::as_const(shellGlobalParams.username));
             }
 
             std::stringstream ss;

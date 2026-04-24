@@ -514,7 +514,7 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Status makeStatus(int code, StringLike&& 
 
 template <typename ErrorDetail,
           typename StringLike,
-          typename = stdx::enable_if_t<
+          typename = std::enable_if_t<
               std::is_base_of<ErrorExtraInfo, std::remove_reference_t<ErrorDetail>>::value>>
 MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS Status makeStatus(ErrorDetail&& detail,
                                                          StringLike&& message) {

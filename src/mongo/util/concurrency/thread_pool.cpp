@@ -38,6 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -553,7 +554,7 @@ void ThreadPool::Impl::_consumeTasks(const std::string& threadName) {
 
     // This thread is ending because it was idle for too long, or we were over maxThreads.
     // Move self from _threads to _retiredThreads.
-    auto selfId = stdx::this_thread::get_id();
+    auto selfId = std::this_thread::get_id();
     auto pos = std::find_if(
         _threads.begin(), _threads.end(), [&](auto&& t) { return t.get_id() == selfId; });
     if (pos == _threads.end()) {

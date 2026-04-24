@@ -255,8 +255,8 @@ public:
      */
     template <
         typename Rep2,
-        stdx::enable_if_t<std::is_convertible<Rep2, rep>::value && std::is_integral<Rep2>::value,
-                          int> = 0>
+        std::enable_if_t<std::is_convertible<Rep2, rep>::value && std::is_integral<Rep2>::value,
+                         int> = 0>
     constexpr explicit Duration(const Rep2& r) : _count(r) {
         MONGO_STATIC_ASSERT_MSG(
             std::is_signed<Rep2>::value || sizeof(Rep2) < sizeof(rep),

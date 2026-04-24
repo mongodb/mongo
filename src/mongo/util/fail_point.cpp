@@ -41,7 +41,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_server_parameter_gen.h"
 
@@ -81,12 +80,12 @@ void spinWait(const Pred& pred) {
     for (int n = 0; n < 100; ++n) {
         if (pred())
             return;
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     }
     while (true) {
         if (pred())
             return;
-        stdx::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 

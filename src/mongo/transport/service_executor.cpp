@@ -31,7 +31,6 @@
 #include "mongo/transport/service_executor.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
@@ -202,7 +201,7 @@ void ServiceExecutor::yieldIfAppropriate() const {
      */
     static const auto cores = ProcessInfo::getNumAvailableCores();
     if (getRunningThreads() > cores) {
-        stdx::this_thread::yield();
+        std::this_thread::yield();
     }
 }
 

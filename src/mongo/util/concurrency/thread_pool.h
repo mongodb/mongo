@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -40,6 +39,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <thread>
 
 namespace MONGO_MOD_PUB mongo {
 

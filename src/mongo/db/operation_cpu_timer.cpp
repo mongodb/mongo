@@ -103,7 +103,7 @@ private:
     void _onTimerStop() override;
 
     bool _isAttachedToCurrentThread() const {
-        return _threadId && *_threadId == stdx::this_thread::get_id();
+        return _threadId && *_threadId == std::this_thread::get_id();
     }
 
     Nanoseconds _getThreadTime() const {
@@ -160,7 +160,7 @@ void PosixOperationCPUTimers::onThreadAttach() {
     }
 
     invariant(!_threadId, "PosixOperationCPUTimers has already been attached");
-    _threadId = stdx::this_thread::get_id();
+    _threadId = std::this_thread::get_id();
     _threadTimeAdjustment -= _getThreadTime();
 
     hangCPUTimerAfterOnThreadAttach.pauseWhileSet();
@@ -187,7 +187,7 @@ Nanoseconds PosixOperationCPUTimers::_getOperationThreadTime() const {
 
 void PosixOperationCPUTimers::_onTimerStart() {
     if (!_runningCount) {
-        _threadId = stdx::this_thread::get_id();
+        _threadId = std::this_thread::get_id();
     }
     ++_runningCount;
 }

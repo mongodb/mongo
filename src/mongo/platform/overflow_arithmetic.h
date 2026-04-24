@@ -58,7 +58,7 @@ namespace overflow {
 // GCC, Clang: The __builtin_*_overflow functions return true on overflow.
 
 template <typename T>
-constexpr bool mul(stdx::type_identity_t<T> a, stdx::type_identity_t<T> b, T* r) {
+constexpr bool mul(std::type_identity_t<T> a, std::type_identity_t<T> b, T* r) {
 #ifdef _MSC_VER
     return !SafeMultiply(a, b, *r);
 #else
@@ -67,7 +67,7 @@ constexpr bool mul(stdx::type_identity_t<T> a, stdx::type_identity_t<T> b, T* r)
 }
 
 template <typename T>
-constexpr bool add(stdx::type_identity_t<T> a, stdx::type_identity_t<T> b, T* r) {
+constexpr bool add(std::type_identity_t<T> a, std::type_identity_t<T> b, T* r) {
 #ifdef _MSC_VER
     return !SafeAdd(a, b, *r);
 #else
@@ -76,7 +76,7 @@ constexpr bool add(stdx::type_identity_t<T> a, stdx::type_identity_t<T> b, T* r)
 }
 
 template <typename T>
-constexpr bool sub(stdx::type_identity_t<T> a, stdx::type_identity_t<T> b, T* r) {
+constexpr bool sub(std::type_identity_t<T> a, std::type_identity_t<T> b, T* r) {
 #ifdef _MSC_VER
     return !SafeSubtract(a, b, *r);
 #else

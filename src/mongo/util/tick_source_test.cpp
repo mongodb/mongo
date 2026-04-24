@@ -30,7 +30,6 @@
 #include "mongo/util/tick_source.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"
@@ -43,6 +42,7 @@
 #include <ratio>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <fmt/chrono.h>  // IWYU pragma: keep
@@ -94,7 +94,7 @@ TEST(SystemTickSourceTest, GetTicks) {
     for (int i = 0; i != 5; ++i) {
         auto delay = 1000ms + 50ms * i;
         auto n0 = ts->getTicks();
-        stdx::this_thread::sleep_for(delay);
+        std::this_thread::sleep_for(delay);
         auto n1 = ts->getTicks();
         auto dt = (n1 - n0) * tTick;
         double err = (dt - delay) / delay;

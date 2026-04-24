@@ -29,12 +29,12 @@
 
 #ifdef _WIN32
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/named_pipe/io_error_message.h"
 #include "mongo/util/errno_util.h"
 
 #include <string>
 #include <system_error>
+#include <thread>
 
 #include "named_pipe.h"
 
@@ -147,7 +147,7 @@ void NamedPipeInput::doOpen() {
         _pipe = CreateFileA(
             _pipeAbsolutePath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
         if (_pipe == INVALID_HANDLE_VALUE) {
-            stdx::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
             ++retries;
             if (retries % 1000 == 0) {
                 sleepMs *= 2;

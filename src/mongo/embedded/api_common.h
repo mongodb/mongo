@@ -102,7 +102,7 @@ private:
 template <typename ErrorEnum>
 std::nullptr_t handleException(StatusForAPI<ErrorEnum>& status) noexcept {
     try {
-        status = translateException(stdx::type_identity<StatusForAPI<ErrorEnum>>());
+        status = translateException(std::type_identity<StatusForAPI<ErrorEnum>>());
     } catch (...) {
         try {
             translateExceptionFallback(status);

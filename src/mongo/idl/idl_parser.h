@@ -149,7 +149,7 @@ namespace preparsed_value_adl_barrier {
  * with a forwarded argument list in the usual way.
  */
 template <typename T, typename... A>
-auto idlPreparsedValue(stdx::type_identity<T>, A&&... a) {
+auto idlPreparsedValue(std::type_identity<T>, A&&... a) {
     return T(std::forward<A>(a)...);
 }
 
@@ -158,7 +158,7 @@ auto idlPreparsedValue(stdx::type_identity<T>, A&&... a) {
  * The integral type `bool` is exempt from this convention, however.
  */
 template <typename T, std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<bool, T>, int> = 0>
-auto idlPreparsedValue(stdx::type_identity<T>) {
+auto idlPreparsedValue(std::type_identity<T>) {
     return static_cast<T>(-1);
 }
 
@@ -168,7 +168,7 @@ auto idlPreparsedValue(stdx::type_identity<T>) {
  * TODO(SERVER-50101): Remove 'FeatureCompatibility::Version' once IDL supports
  * a command cpp_type of C++ enum.
  */
-inline auto idlPreparsedValue(stdx::type_identity<multiversion::FeatureCompatibilityVersion>) {
+inline auto idlPreparsedValue(std::type_identity<multiversion::FeatureCompatibilityVersion>) {
     return multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior;
 }
 
@@ -197,7 +197,7 @@ inline auto idlPreparsedValue(stdx::type_identity<multiversion::FeatureCompatibi
 template <typename T, typename... A>
 MONGO_MOD_NEEDS_REPLACEMENT T preparsedValue(A&&... args) {
     using preparsed_value_adl_barrier::idlPreparsedValue;
-    return idlPreparsedValue(stdx::type_identity<T>{}, std::forward<A>(args)...);
+    return idlPreparsedValue(std::type_identity<T>{}, std::forward<A>(args)...);
 }
 
 /**

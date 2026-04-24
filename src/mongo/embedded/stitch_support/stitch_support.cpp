@@ -94,8 +94,7 @@ const NamespaceString kDummyNamespaceStr = NamespaceString::kEmpty;
  * C interfaces that use enterCXX() must provide a translateException() function that converts any
  * possible exception into a StatusForAPI<> object.
  */
-static StitchSupportStatusImpl translateException(
-    stdx::type_identity<StitchSupportStatusImpl>) try {
+static StitchSupportStatusImpl translateException(std::type_identity<StitchSupportStatusImpl>) try {
     throw;
 } catch (const ExceptionFor<ErrorCodes::ReentrancyNotAllowed>& ex) {
     return {STITCH_SUPPORT_V1_ERROR_REENTRANCY_NOT_ALLOWED, ex.code(), ex.what()};

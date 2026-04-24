@@ -58,10 +58,10 @@
 #include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/ttl/ttl_monitor.h"
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1069,13 +1069,13 @@ TEST_F(TTLTest, TTLRunMonitorThread) {
     TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
     ttlMonitor->go();
     ASSERT_OK(ttlMonitor->onUpdateTTLMonitorSleepSeconds(0));
-    stdx::this_thread::sleep_for(Milliseconds(1000).toSystemDuration());
+    std::this_thread::sleep_for(Milliseconds(1000).toSystemDuration());
 
     // Shut down the monitor, we need to wait for the _shuttingDown
     // flag to be processed.
     shutdownTTLMonitor(getGlobalServiceContext());
     ASSERT_OK(ttlMonitor->onUpdateTTLMonitorSleepSeconds(0));
-    stdx::this_thread::sleep_for(Milliseconds(1000).toSystemDuration());
+    std::this_thread::sleep_for(Milliseconds(1000).toSystemDuration());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);

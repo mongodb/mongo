@@ -37,7 +37,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -49,6 +48,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include <boost/optional.hpp>
 

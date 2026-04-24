@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
@@ -43,6 +42,7 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <thread>
 
 #include <fmt/format.h>
 

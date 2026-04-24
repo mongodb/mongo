@@ -190,14 +190,14 @@ public:
         using namespace std::literals;
         auto net = getNetworkInterfaceMock();
 
-        stdx::this_thread::sleep_for(1ms);
+        std::this_thread::sleep_for(1ms);
         auto totalWaited = Milliseconds{0};
         auto _ = executor::NetworkInterfaceMock::InNetworkGuard{net};
         while (!net->hasReadyRequests()) {
             auto advance = Milliseconds{10};
             net->advanceTime(net->now() + advance);
             totalWaited += advance;
-            stdx::this_thread::sleep_for(100us);
+            std::this_thread::sleep_for(100us);
         }
         return totalWaited;
     }

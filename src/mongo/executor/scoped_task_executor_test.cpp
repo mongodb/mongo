@@ -330,10 +330,10 @@ TEST_F(ScopedTaskExecutorTest, scheduleLoseRaceWithShutdownOfUnderlyingAlt) {
 
     stdx::thread scheduler([&] {
         // schedule() runs the callback inline when we're in shutdown
-        auto self_id = stdx::this_thread::get_id();
+        auto self_id = std::this_thread::get_id();
         bool did_run = false;
         getExecutor()->schedule([&](Status status) {
-            invariant(stdx::this_thread::get_id() == self_id);
+            invariant(std::this_thread::get_id() == self_id);
             did_run = true;
         });
         invariant(did_run);

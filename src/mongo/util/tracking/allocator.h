@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <new>
+#include <thread>
 #include <type_traits>
 
 namespace MONGO_MOD_PUB mongo {
@@ -79,11 +79,11 @@ public:
 
 private:
     size_t _getDeallocSlot() const {
-        return std::hash<std::thread::id>{}(stdx::this_thread::get_id()) % (_numPartitions / 2);
+        return std::hash<std::thread::id>{}(std::this_thread::get_id()) % (_numPartitions / 2);
     }
 
     size_t _getAllocSlot() const {
-        return std::hash<std::thread::id>{}(stdx::this_thread::get_id()) % (_numPartitions / 2) +
+        return std::hash<std::thread::id>{}(std::this_thread::get_id()) % (_numPartitions / 2) +
             _numPartitions / 2;
     }
 

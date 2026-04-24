@@ -68,7 +68,7 @@ public:
     /** Implicitly convertible from any `f` callable with signature `RetType f(Args...)`. */
     template <typename F>
     requires(std::is_invocable_r_v<RetType, F&, Args...> &&
-             !std::is_same_v<stdx::remove_cvref_t<F>, function_ref>)
+             !std::is_same_v<std::remove_cvref_t<F>, function_ref>)
     function_ref(F&& f) noexcept {
         // removing then re-adding pointer ensures that (language-level) function references and
         // function pointer are treated the same.
@@ -284,13 +284,13 @@ namespace MONGO_MOD_FILE_PRIVATE functional_details {
 template <typename>
 struct UFDeductionHelper {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...)> : stdx::type_identity<Ret(Args...)> {};
+struct UFDeductionHelper<Ret (Class::*)(Args...)> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...) &> : stdx::type_identity<Ret(Args...)> {};
+struct UFDeductionHelper<Ret (Class::*)(Args...) &> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...) const> : stdx::type_identity<Ret(Args...)> {};
+struct UFDeductionHelper<Ret (Class::*)(Args...) const> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : stdx::type_identity<Ret(Args...)> {};
+struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : std::type_identity<Ret(Args...)> {};
 }  // namespace MONGO_MOD_FILE_PRIVATE functional_details
 
 /**

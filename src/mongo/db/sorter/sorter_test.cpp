@@ -33,7 +33,6 @@
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/db/sorter/typed_sorter_test_utils.h"
-#include "mongo/stdx/thread.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -43,6 +42,7 @@
 #include <fstream>  // IWYU pragma: keep
 #include <memory>
 #include <string>
+#include <thread>  // IWYU pragma: keep
 #include <type_traits>
 #include <utility>
 #include <vector>

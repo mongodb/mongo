@@ -986,7 +986,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
         stdx::thread shutdownThread([&]() { engine->cleanShutdown(kMemLeakAllowed); });
         ASSERT_EQ(engine->getActiveStatsReaders(), 1);
         while (engine->isWtConnReadyForStatsCollection_UNSAFE()) {
-            stdx::this_thread::yield();
+            std::this_thread::yield();
         }
 
         // Ensure that releasing the permit unblocks the shutdown

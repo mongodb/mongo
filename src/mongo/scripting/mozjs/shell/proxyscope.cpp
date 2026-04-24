@@ -291,7 +291,7 @@ void MozJSProxyScope::run(Closure&& closure) {
     // methods on it from there. If we're on the same thread, it's safe to
     // simply call back in, so let's do that.
 
-    if (_thread.get_id() == stdx::this_thread::get_id()) {
+    if (_thread.get_id() == std::this_thread::get_id()) {
         return closure();
     }
 

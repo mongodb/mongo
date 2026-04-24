@@ -31,12 +31,13 @@
 #include "mongo/util/net/sock.h"
 
 #include "mongo/db/server_options.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/sock_test_utils.h"
 #include "mongo/util/net/socket_exception.h"
+
+#include <thread>
 
 namespace {
 

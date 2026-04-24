@@ -588,7 +588,7 @@ TEST_F(TicketHolderTest, HighlyConcurrentAcquireReleaseTicket) {
                 // to simulate holding a ticket during an operation's execution.
                 Timer t;
                 while (1) {
-                    stdx::this_thread::yield();
+                    std::this_thread::yield();
                     if (t.micros() > 4)
                         break;
                 }
@@ -1097,7 +1097,7 @@ TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
     });
 
     // We wait for 50 millisecond so that totalTimeQueuedMicros gets increased
-    stdx::this_thread::sleep_for(50'000us);
+    std::this_thread::sleep_for(50'000us);
 
     // After waiting, we let the ticket through.
     holder->resize(_opCtx.get(), 1);

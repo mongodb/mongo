@@ -137,10 +137,10 @@ TEST_F(ClientOutOfLineExecutorTest, DestructorExecutesLeftovers) {
         for (auto i = 0; i < kDummiesCount; i++) {
             DummyInstance dummy(this);
             handle.schedule([dummy = std::move(dummy),
-                             threadId = stdx::this_thread::get_id()](const Status& status) {
+                             threadId = std::this_thread::get_id()](const Status& status) {
                 ASSERT(status == ErrorCodes::ClientDisconnect);
                 // Avoid using `getThreadName()` here as it'll cause read-after-delete errors.
-                ASSERT_EQ(threadId, stdx::this_thread::get_id());
+                ASSERT_EQ(threadId, std::this_thread::get_id());
             });
         }
 

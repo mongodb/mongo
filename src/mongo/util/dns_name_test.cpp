@@ -275,11 +275,11 @@ TEST(DNSNameTest, ForceQualification) {
 
     for (const auto& test : tests) {
         ::mongo::dns::HostName domain(test.domain);
-        ASSERT(stdx::as_const(domain).isFQDN() == test.startedFQDN);
+        ASSERT(std::as_const(domain).isFQDN() == test.startedFQDN);
         domain.forceQualification(test.forced);
-        ASSERT(stdx::as_const(domain).isFQDN() == test.becameFQDN);
+        ASSERT(std::as_const(domain).isFQDN() == test.becameFQDN);
 
-        ASSERT_EQ(stdx::as_const(domain).canonicalName(), test.becameCanonical);
+        ASSERT_EQ(std::as_const(domain).canonicalName(), test.becameCanonical);
     }
 }
 }  // namespace

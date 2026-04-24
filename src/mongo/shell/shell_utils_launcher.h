@@ -31,14 +31,15 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
+#include <csignal>
 #include <map>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 

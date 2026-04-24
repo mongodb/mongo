@@ -116,7 +116,6 @@
 #include "mongo/s/query/shard_targeting_helpers.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -135,6 +134,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -427,7 +427,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                 // Reveal the MaxTimeMSExpired error.
                 opCtx->checkForInterrupt();
             }
-            stdx::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 

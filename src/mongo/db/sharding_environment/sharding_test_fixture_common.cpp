@@ -157,7 +157,7 @@ Milliseconds ShardingTestFixtureCommon::advanceUntilReadyRequest() const {
     using namespace std::literals;
     const auto opCtx = operationContext();
 
-    stdx::this_thread::sleep_for(1ms);
+    std::this_thread::sleep_for(1ms);
     auto totalWaited = Milliseconds{0};
 
     // We must release the InNetworkGuard on each iteration to allow the executor
@@ -175,7 +175,7 @@ Milliseconds ShardingTestFixtureCommon::advanceUntilReadyRequest() const {
             totalWaited += advance;
         }  // Guard released here, allowing executor thread to run callbacks
 
-        stdx::this_thread::sleep_for(100us);
+        std::this_thread::sleep_for(100us);
     }
 }
 

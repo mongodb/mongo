@@ -325,7 +325,7 @@ private:
             std::unique_ptr<CallbackFn> work;
             CallbackFn&& moveFrom;
             std::unique_lock<std::mutex>& lk;
-            std::thread::id tid{stdx::this_thread::get_id()};
+            std::thread::id tid{std::this_thread::get_id()};
         };
         std::variant<RemoteCommandCallbackFn, MoveState> state;
         CallbackFn* moveTo = nullptr;
@@ -354,7 +354,7 @@ private:
                     // check for inline execution, tid check must be first
                     const MoveState& mstate = std::get<MoveState>(state);
                     CallbackFn& moveTo = *(mstate.work.get());
-                    if (mstate.tid == stdx::this_thread::get_id() && !moveTo) {
+                    if (mstate.tid == std::this_thread::get_id() && !moveTo) {
                         // we're inline, do the move and borrow the lock
                         moveTo = std::move(mstate.moveFrom);
                         useLock = &mstate.lk;

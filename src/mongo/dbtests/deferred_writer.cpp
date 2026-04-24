@@ -389,7 +389,7 @@ public:
 
         // Spin-wait for one minute or until something has been added to the collection.
         while (std::chrono::system_clock::now() - start < 1min && readCollection().size() == 0) {
-            stdx::this_thread::yield();
+            std::this_thread::yield();
         }
 
         // Buffer should have flushed by now.

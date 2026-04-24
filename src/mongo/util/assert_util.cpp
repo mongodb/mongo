@@ -39,6 +39,7 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 
+#include <csignal>
 #include <exception>
 #include <ostream>
 

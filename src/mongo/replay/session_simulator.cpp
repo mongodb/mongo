@@ -197,7 +197,7 @@ std::chrono::steady_clock::time_point SessionSimulator::now() const {
 }
 
 void SessionSimulator::sleepFor(std::chrono::steady_clock::duration duration) const {
-    stdx::this_thread::sleep_for(duration);
+    std::this_thread::sleep_for(duration);
 }
 
 void SessionSimulator::waitIfNeeded(Microseconds recordingOffset) const {

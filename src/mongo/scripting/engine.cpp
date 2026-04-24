@@ -46,7 +46,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/mongo_path_util.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -60,6 +59,7 @@
 #include <cstring>
 #include <deque>
 #include <mutex>
+#include <thread>
 
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -302,7 +302,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
              *  where the js misses the interrupt and throw an exception instead of
              *  being interrupted
              */
-            stdx::this_thread::sleep_for(std::chrono::seconds(1));
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
         try {

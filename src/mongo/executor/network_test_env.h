@@ -35,7 +35,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -45,6 +44,7 @@
 #include <chrono>
 #include <functional>
 #include <future>
+#include <thread>
 #include <tuple>
 #include <type_traits>
 #include <utility>

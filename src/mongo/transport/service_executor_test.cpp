@@ -159,7 +159,7 @@ stdx::thread::id doBasicTaskRunTest(ServiceExecutor* executor) {
     auto runner = executor->makeTaskRunner();
     PromiseAndFuture<void> pf;
     runner->schedule([&](Status st) {
-        taskid = stdx::this_thread::get_id();
+        taskid = std::this_thread::get_id();
         pf.promise.setFrom(st);
     });
     ASSERT_DOES_NOT_THROW(pf.future.get());
@@ -169,14 +169,14 @@ stdx::thread::id doBasicTaskRunTest(ServiceExecutor* executor) {
 }
 
 TEST_F(ServiceExecutorSynchronousTest, BasicTaskRuns) {
-    auto callerid = stdx::this_thread::get_id();
+    auto callerid = std::this_thread::get_id();
     auto taskid = doBasicTaskRunTest(&executor);
     // Task runs on different thread than caller.
     ASSERT(callerid != taskid);
 }
 
 TEST_F(ServiceExecutorInlineTest, BasicTaskRuns) {
-    auto callerid = stdx::this_thread::get_id();
+    auto callerid = std::this_thread::get_id();
     auto taskid = doBasicTaskRunTest(&executor);
     // Task runs on same thread as caller.
     ASSERT(callerid == taskid);

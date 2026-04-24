@@ -1295,11 +1295,11 @@ private:
 
         return generalImpl(
             [&](T&& val) {
-                success(std::forward<Callback>(cb), stdx::as_const(val));
+                success(std::forward<Callback>(cb), std::as_const(val));
                 return FutureImpl<T>::makeReady(std::move(val));
             },
             [&](Status&& status) {
-                fail(std::forward<Callback>(cb), stdx::as_const(status));
+                fail(std::forward<Callback>(cb), std::as_const(status));
                 return FutureImpl<T>::makeReady(std::move(status));
             },
             [&] {
@@ -1307,9 +1307,9 @@ private:
                     [success, fail, cb = std::forward<Callback>(cb)](
                         SharedState<T>* input, SharedState<T>* output) mutable noexcept {
                         if (input->status.isOK()) {
-                            success(std::forward<Callback>(cb), stdx::as_const(*input->data));
+                            success(std::forward<Callback>(cb), std::as_const(*input->data));
                         } else {
-                            fail(std::forward<Callback>(cb), stdx::as_const(input->status));
+                            fail(std::forward<Callback>(cb), std::as_const(input->status));
                         }
 
                         output->fillFromMove(std::move(*input));
