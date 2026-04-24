@@ -1389,6 +1389,8 @@ mongo_cc_unit_test(
         ":auto_get_rstl_for_stepup_stepdown",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/db/transaction",
     ],
 )
 

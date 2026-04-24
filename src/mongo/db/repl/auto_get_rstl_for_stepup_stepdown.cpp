@@ -71,8 +71,12 @@ AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
     // Start the killOpThread with a deadline, since checking out/killing sessions is
     // uninterruptible, it can hang and stall the RSTL acquisition. Since we need to kill
     // all operations in order to proceed with step down, we allow the thread to take up to
-    // rstlTimeout seconds.
-    Date_t killOpThreadDeadline = Date_t::now() + Seconds(rstlTimeout);
+    // rstlTimeout seconds. If rstlTimeout = 0, then the timeout is disabled, so we pass
+    // Date_t::max() so there is effectively no deadline.
+    Date_t killOpThreadDeadline{Date_t::max()};
+    if (rstlTimeout > 0) {
+        killOpThreadDeadline = Date_t::now() + Seconds(rstlTimeout);
+    };
     _startKillOpThread(killOpThreadDeadline);
 
     // Wait for RSTL to be acquired.

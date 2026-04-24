@@ -31,9 +31,12 @@
 
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -346,6 +349,61 @@ TEST_F(OpsAndSessionsKillerTest, killConflictingOps_OpsRunningIsReset) {
     ASSERT_EQ(killer->getTotalOpsKilled(), 1);
     ASSERT_EQ(killer->getTotalOpsRunning(), 0);
     ASSERT_TRUE(toBeKilledOpCtx->isKillPending());
+}
+
+class MockStepUpStepDownCoordinator : public StepUpStepDownCoordinator {
+public:
+    MOCK_METHOD(void, autoGetRstlEnterStepDown, (), (override));
+    MOCK_METHOD(void, autoGetRstlExitStepDown, (), (override));
+    MOCK_METHOD(void,
+                updateAndLogStateTransitionMetrics,
+                (ReplicationCoordinator::OpsKillingStateTransitionEnum, size_t, size_t),
+                (const, override));
+};
+
+// Verifies that when fassertOnLockTimeoutForStepUpDown=0 (rstlTimeout disabled) the kill
+// op thread has no deadline (Date_t::max()), so it will not time out/crash after indefinite
+// block in killSessions.
+TEST_F(OpsAndSessionsKillerTest, ZeroRSTLTimeoutGivesMaxDeadlineToKillOpThread) {
+    fassertOnLockTimeoutForStepUpDown.store(0);
+
+    // Internal thread counter to synchronize the blocking thread with the main thread.
+    unittest::Barrier sessionCheckedOutBarrier(2);
+
+    // Hold a session with an in-progress transaction for 5 seconds to block the kill op thread.
+    stdx::thread blockingThread([&] {
+        auto lsid = makeLogicalSessionIdForTest();
+        auto [client, opCtx] = makeClientAndOpCtx("sessionBlocker");
+        opCtx->setLogicalSessionId(lsid);
+        OperationContextSession ocs(opCtx.get());
+        auto txnParticipant = TransactionParticipant::get(opCtx.get());
+        txnParticipant.transitionToInProgressForTest();
+        // startMetricsTimer initializes _startTime so abortTransaction's setEndTime invariant
+        // (_startTime > 0) passes when the kill op thread processes this session.
+        txnParticipant.startMetricsTimer(
+            opCtx.get(), getServiceContext()->getTickSource(), Date_t::now(), Date_t::max());
+
+        // Decrement the barrier to signal to main thread that we have checked out the session.
+        sessionCheckedOutBarrier.countDownAndWait();
+
+        sleepFor(Seconds(5));
+    });
+
+    // This will wait here until blocking thread has signaled that it has checked out the session.
+    sessionCheckedOutBarrier.countDownAndWait();
+
+    testing::NiceMock<MockStepUpStepDownCoordinator> coord;
+    auto* opCtx = makeOpCtx("stepUpOpCtx");
+
+    // Ensure constructor does not time out and crash after stall during session checkout in
+    // kill op thread execution.
+    AutoGetRstlForStepUpStepDown autoGet(
+        &coord,
+        opCtx,
+        ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp,
+        Date_t::max());
+
+    blockingThread.join();
 }
 
 }  // namespace repl
