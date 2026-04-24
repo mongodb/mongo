@@ -785,7 +785,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
     // If we're recovering from a stable checkpoint (except the special startupRecoveryForRestore
     // mode, which discards history before the top of oplog), we aren't doing new checkpoints during
     // recovery so there is no point in advancing the consistency marker and we cannot advance
-    // "oldest" becaue it would be later than "stable".
+    // "oldest" because it would be later than "stable".
     const bool inRestore = startupRecoveryForRestore || storageGlobalParams.magicRestore;
     const bool advanceTimestampsEachBatch = (inRestore || _duringInitialSync) &&
         (recoveryMode == RecoveryMode::kStartupFromStableTimestamp ||
