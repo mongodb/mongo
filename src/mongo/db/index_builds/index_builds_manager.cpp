@@ -131,7 +131,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     }
 
     builder->setIndexBuildMethod(options.method);
-    builder->setContainerWriteBehavior(options.method == IndexBuildMethodEnum::kPrimaryDriven
+    builder->setContainerWriteBehavior(options.method == IndexBuildMethodEnum::kPrimaryDriven &&
+                                               options.protocol != IndexBuildProtocol::kSinglePhase
                                            ? ContainerWriteBehavior::kReplicate
                                            : ContainerWriteBehavior::kDoNotReplicate);
 
