@@ -502,6 +502,7 @@ public:
     void setConsistentDataAvailable(OperationContext* opCtx, bool isDataMajorityCommitted) override;
     bool isDataConsistent() const override;
     void clearSyncSource() override;
+    void addAppliedOpTimeObserver(std::unique_ptr<OpTimeObserver>) override {}
 
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,

@@ -438,6 +438,8 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
         return;
     }
 
+    _appliedOpTimeDispatcher.notify(lk, opTime.getTimestamp());
+
     // Advance the stable timestamp if necessary. Stable timestamps are used to determine the latest
     // timestamp that it is safe to revert the database to, in the event of a rollback via the
     // 'recover to timestamp' method.

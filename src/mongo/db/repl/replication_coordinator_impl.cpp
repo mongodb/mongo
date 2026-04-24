@@ -1262,6 +1262,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
                                        shutdownTimeElapsedBuilder);
         _replExecutor->join();
     }
+    _appliedOpTimeDispatcher.shutdown();
 }
 
 const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {
@@ -5900,6 +5901,11 @@ SplitPrepareSessionManager* ReplicationCoordinatorImpl::getSplitPrepareSessionMa
 void ReplicationCoordinatorImpl::clearSyncSource() {
     std::lock_guard lk(_mutex);
     _topCoord->clearSyncSource();
+}
+
+void ReplicationCoordinatorImpl::addAppliedOpTimeObserver(
+    std::unique_ptr<OpTimeObserver> observer) {
+    _appliedOpTimeDispatcher.addObserver(std::move(observer));
 }
 
 bool ReplicationCoordinatorImpl::isRetryableWrite(OperationContext* opCtx) const {

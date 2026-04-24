@@ -410,6 +410,7 @@ public:
                                     bool isDataMajorityCommitted) override {}
     bool isDataConsistent() const override;
     void clearSyncSource() override;
+    void addAppliedOpTimeObserver(std::unique_ptr<OpTimeObserver>) override {}
 
 private:
     ServiceContext* const _service;

@@ -54,6 +54,7 @@
 #include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/optime_observer_dispatcher.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -532,6 +533,7 @@ public:
     SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
     void clearSyncSource() override;
+    void addAppliedOpTimeObserver(std::unique_ptr<OpTimeObserver> observer) override;
 
     // ==================== Private API ===================
     // Called by AutoGetRstlForStepUpStepDown before taking RSTL when making stepdown transitions
@@ -1848,6 +1850,10 @@ private:
 
     // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
     std::unique_ptr<ReplicationCoordinatorExternalState> _externalState;  // (PS)
+
+    // Dispatches onOpTime notifications to registered observers whenever lastAppliedOpTime
+    // advances. notify() must be called under _mutex; other methods are self-synchronizing.
+    OpTimeObserverDispatcher _appliedOpTimeDispatcher;  // (I)
 
     // list of information about clients waiting on replication or lastDurable opTime.
     // Waiters in this list are checked and notified on remote nodes' opTime updates and self's

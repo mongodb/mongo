@@ -44,6 +44,7 @@
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/optime_observer.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -1292,6 +1293,12 @@ public:
      * Clear this node's sync source.
      */
     virtual void clearSyncSource() = 0;
+
+    /**
+     * Registers an observer that will be notified whenever lastAppliedOpTime advances to a new
+     * non-null value. The dispatcher thread calls `onOpTime` outside of any replication lock.
+     */
+    virtual void addAppliedOpTimeObserver(std::unique_ptr<OpTimeObserver> observer) = 0;
 
     /**
      * Returns true if the node undergoes initial sync or rollback.
