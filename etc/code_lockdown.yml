@@ -7,21 +7,21 @@ notifications:
     thresholds:
       overall:
         hot:
-          count: 35
+          count: 80
           grace_period_days: 5
         cold:
-          count: 50
+          count: 80
           grace_period_days: 5
       group:
         hot:
-          count: 8
+          count: 16
           grace_period_days: 5
         cold:
           count: 16
           grace_period_days: 5
       team:
         hot:
-          count: 4
+          count: 5
           grace_period_days: 2
         cold:
           count: 6
