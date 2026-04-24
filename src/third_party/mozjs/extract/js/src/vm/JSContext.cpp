@@ -279,7 +279,16 @@ void JSContext::onOutOfMemory() {
 
   // If we OOM early in process startup, this may be unavailable so just return
   // instead of crashing unexpectedly.
-  if (MOZ_UNLIKELY(!runtime()->hasInitializedSelfHosting())) {
+  //
+  // MONGODB MODIFICATION: `hasInitializedSelfHosting()` returns true as soon as
+  // `initSelfHostingStencil` completes, but `commonNames` (and therefore the
+  // `out_of_memory_` atom dereferenced below via `names()`) is not set up until
+  // partway through `initializeAtoms`, which runs next. Any OOM during that
+  // window would dereference a null `commonNames` here and take the process
+  // down. Also short-circuit on !commonNames so startup-path OOMs surface as a
+  // clean allocation failure instead of a segfault.
+  if (MOZ_UNLIKELY(!runtime()->hasInitializedSelfHosting() ||
+                   !runtime()->commonNames)) {
     return;
   }
 
