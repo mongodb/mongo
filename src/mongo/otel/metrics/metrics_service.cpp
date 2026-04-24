@@ -465,6 +465,20 @@ Histogram<int64_t>& MetricsService::createInt64Histogram(MetricName name,
     return createHistogram<int64_t>(name, description, unit, options);
 }
 
+std::vector<std::string> MetricsService::getAttributeNamesForTests(MetricName name) const {
+    std::lock_guard lock(_mutex);
+    const std::string nameStr(name.getName());
+    auto it = _metrics.find(nameStr);
+    massert(ErrorCodes::KeyNotFound,
+            fmt::format("No metric with name {} exists", nameStr),
+            it != _metrics.end());
+    std::vector<std::string> names;
+    for (const ComparableAttributeDefinition& def : it->second.identifier.attributeDefinitions) {
+        names.push_back(def.name);
+    }
+    return names;
+}
+
 void MetricsService::clearForTests() {
     std::lock_guard lock(_mutex);
 #ifdef MONGO_CONFIG_OTEL

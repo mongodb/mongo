@@ -32,17 +32,15 @@
 #include "mongo/otel/metrics/metrics_service.h"
 
 namespace mongo::otel::metrics {
-#ifndef MONGO_CONFIG_OTEL
-namespace {
-constexpr StringData kUsingOtelOnWindows =
-    "You're trying to read metrics in an environment that doesn't have otel enabled (likely "
-    "Windows). In tests this can be avoided by checking OtelMetricsCapturer::canReadMetrics()";
-}
-#endif  // not MONGO_CONFIG_OTEL
+
+#ifdef MONGO_CONFIG_OTEL
+using test_util_detail::getMetricData;
+#endif  // MONGO_CONFIG_OTEL
 
 OtelMetricsCapturer::OtelMetricsCapturer() : OtelMetricsCapturer(MetricsService::instance()) {}
 
-OtelMetricsCapturer::OtelMetricsCapturer(MetricsService& metricsService) {
+OtelMetricsCapturer::OtelMetricsCapturer(MetricsService& metricsService)
+    : _metricsService(metricsService) {
 #ifdef MONGO_CONFIG_OTEL
     invariant(isNoopMeterProvider(opentelemetry::metrics::Provider::GetMeterProvider().get()));
 
@@ -68,68 +66,25 @@ OtelMetricsCapturer::OtelMetricsCapturer(MetricsService& metricsService) {
 }
 
 int64_t OtelMetricsCapturer::readInt64Counter(MetricName name) {
-#ifdef MONGO_CONFIG_OTEL
-    auto data = getMetricData<opentelemetry::sdk::metrics::SumPointData>(name);
-
-    massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} does not have matching value type", name.getName()),
-            std::holds_alternative<int64_t>(data.value_));
-
-    return std::get<int64_t>(data.value_);
-#else
-    invariant(false, kUsingOtelOnWindows);
-    return {};
-#endif  // MONGO_CONFIG_OTEL
+    return readInt64Counter(name, /*attributes=*/{});
 }
 
 double OtelMetricsCapturer::readDoubleCounter(MetricName name) {
-#ifdef MONGO_CONFIG_OTEL
-    auto data = getMetricData<opentelemetry::sdk::metrics::SumPointData>(name);
-
-    massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} does not have matching value type", name.getName()),
-            std::holds_alternative<double>(data.value_));
-
-    return std::get<double>(data.value_);
-#else
-    invariant(false, kUsingOtelOnWindows);
-    return {};
-#endif  // MONGO_CONFIG_OTEL
+    return readDoubleCounter(name, /*attributes=*/{});
 }
 
 int64_t OtelMetricsCapturer::readInt64Gauge(MetricName name) {
-#ifdef MONGO_CONFIG_OTEL
-    auto data = getMetricData<opentelemetry::sdk::metrics::LastValuePointData>(name);
-
-    massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} does not have matching value type", name.getName()),
-            std::holds_alternative<int64_t>(data.value_));
-
-    return std::get<int64_t>(data.value_);
-#else
-    invariant(false, kUsingOtelOnWindows);
-    return {};
-#endif  // MONGO_CONFIG_OTEL
+    return readInt64Gauge(name, /*attributes=*/{});
 }
 
 double OtelMetricsCapturer::readDoubleGauge(MetricName name) {
-#ifdef MONGO_CONFIG_OTEL
-    auto data = getMetricData<opentelemetry::sdk::metrics::LastValuePointData>(name);
-
-    massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} does not have matching value type", name.getName()),
-            std::holds_alternative<double>(data.value_));
-
-    return std::get<double>(data.value_);
-#else
-    invariant(false, kUsingOtelOnWindows);
-    return {};
-#endif  // MONGO_CONFIG_OTEL
+    return readDoubleGauge(name, /*attributes=*/{});
 }
 
 HistogramData<int64_t> OtelMetricsCapturer::readInt64Histogram(MetricName name) {
 #ifdef MONGO_CONFIG_OTEL
-    return getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(name);
+    return getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(
+        *_metrics, *_reader, _metricsService, name, /*attributes=*/{});
 #else
     invariant(false, kUsingOtelOnWindows);
     return {};
@@ -138,7 +93,8 @@ HistogramData<int64_t> OtelMetricsCapturer::readInt64Histogram(MetricName name) 
 
 HistogramData<double> OtelMetricsCapturer::readDoubleHistogram(MetricName name) {
 #ifdef MONGO_CONFIG_OTEL
-    return getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(name);
+    return getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(
+        *_metrics, *_reader, _metricsService, name, /*attributes=*/{});
 #else
     invariant(false, kUsingOtelOnWindows);
     return {};

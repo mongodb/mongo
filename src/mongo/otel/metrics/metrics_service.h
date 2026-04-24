@@ -273,6 +273,9 @@ public:
      */
     void clearForTests();
 
+    /** Returns the attribute names for a metric in definition order. Exposed for testing only. */
+    MONGO_MOD_PRIVATE std::vector<std::string> getAttributeNamesForTests(MetricName name) const;
+
 #ifdef MONGO_CONFIG_OTEL
     /**
      * Initializes the metrics service by registering metrics created before initialization with the

@@ -309,8 +309,6 @@ using MetricTypes = testing::Types<Counter<int64_t>,
                                    Histogram<double>>;
 TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
 
-// TODO SERVER-124302: Add tests for metrics with attributes once OtelMetricsCapturer is updated.
-
 TYPED_TEST(MetricCreationTest, CreateRejectsInvalidOtelMetricName) {
     ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
                                                         MetricNames::kTestInvalid,
@@ -960,6 +958,49 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     }
 }
 
+TEST_F(CreateInt64CounterTest, RecordsValuesWithAttributes) {
+    Counter<int64_t, bool>& counter1 = metricsService->createInt64Counter<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+
+    Counter<int64_t, bool, StringData>& counter2 =
+        metricsService->createInt64Counter<bool, StringData>(
+            MetricNames::kTest2,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "cool", .values = {true, false}},
+            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    counter1.add(5, {true});
+    counter1.add(3, {false});
+    counter1.add(2, {true});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{true}), 7);
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{false}), 3);
+    }
+
+    counter2.add(10, {true, "foo"_sd});
+    counter2.add(5, {false, "bar"_sd});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "foo"_sd}),
+                  10);
+        EXPECT_EQ(
+            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{false, "bar"_sd}), 5);
+        // Combinations that were never incremented are filtered from the export (value() skips
+        // zeros when attributes are present), so reading them throws KeyNotFound.
+        ASSERT_THROWS_CODE(
+            metricsCapturer.readInt64Counter(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            DBException,
+            ErrorCodes::KeyNotFound);
+    }
+}
+
 using CreateDoubleCounterTest = MetricsServiceTest;
 
 TEST_F(CreateDoubleCounterTest, RecordsValues) {
@@ -988,6 +1029,52 @@ TEST_F(CreateDoubleCounterTest, RecordsValues) {
     }
 }
 
+TEST_F(CreateDoubleCounterTest, RecordsValuesWithAttributes) {
+    Counter<double, bool>& counter1 = metricsService->createDoubleCounter<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+
+    Counter<double, bool, StringData>& counter2 =
+        metricsService->createDoubleCounter<bool, StringData>(
+            MetricNames::kTest2,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "cool", .values = {true, false}},
+            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    counter1.add(5.0, {true});
+    counter1.add(3.0, {false});
+    counter1.add(2.0, {true});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1, std::tuple{true}),
+                         7.0);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1, std::tuple{false}),
+                         3.0);
+    }
+
+    counter2.add(10.5, {true, "foo"_sd});
+    counter2.add(5.5, {false, "bar"_sd});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "foo"_sd}),
+            10.5);
+        EXPECT_DOUBLE_EQ(
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{false, "bar"_sd}),
+            5.5);
+        // Combinations that were never incremented are filtered from the export (value() skips
+        // zeros when attributes are present), so reading them throws KeyNotFound.
+        ASSERT_THROWS_CODE(
+            metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            DBException,
+            ErrorCodes::KeyNotFound);
+    }
+}
 
 using CreateInt64UpDownCounterTest = MetricsServiceTest;
 
@@ -1349,6 +1436,41 @@ TEST_F(CreateHistogramTest, RecordsDoubleValuesExplicitBoundaries) {
         EXPECT_EQ(data2.count, 1);
     }
 }
+
+using GetAttributeNamesForTestingTest = MetricsServiceTest;
+
+TEST_F(GetAttributeNamesForTestingTest, ThrowsKeyNotFoundForNonExistentMetric) {
+    ASSERT_THROWS_CODE(metricsService->getAttributeNamesForTests(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::KeyNotFound);
+}
+
+TEST_F(GetAttributeNamesForTestingTest, ReturnsEmptyForMetricWithNoAttributes) {
+    metricsService->createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    EXPECT_THAT(metricsService->getAttributeNamesForTests(MetricNames::kTest1), ElementsAre());
+}
+
+TEST_F(GetAttributeNamesForTestingTest, ReturnsSingleAttributeName) {
+    metricsService->createInt64Counter<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+    EXPECT_THAT(metricsService->getAttributeNamesForTests(MetricNames::kTest1),
+                ElementsAre("cool"));
+}
+
+TEST_F(GetAttributeNamesForTestingTest, ReturnsMultipleAttributeNamesInDefinitionOrder) {
+    metricsService->createInt64Counter<bool, StringData>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "first", .values = {true, false}},
+        AttributeDefinition<StringData>{.name = "second", .values = {"foo", "bar"}});
+    EXPECT_THAT(metricsService->getAttributeNamesForTests(MetricNames::kTest1),
+                ElementsAre("first", "second"));
+}
+
 using ClearForTestsTest = MetricsServiceTest;
 
 TEST_F(ClearForTestsTest, RemovesFromBothMetricsServiceAndServerStatusTree) {

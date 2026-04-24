@@ -98,6 +98,46 @@ TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
                        ErrorCodes::TypeMismatch);
 }
 
+TEST_F(OtelMetricsCapturerTest, CounterReadWithWrongAttributeCountThrowsException) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    Counter<int64_t, bool, StringData>& int64Counter =
+        metricsService->createInt64Counter<bool, StringData>(
+            MetricNames::kTest1,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "a", .values = {true, false}},
+            AttributeDefinition<StringData>{.name = "b", .values = {"x", "y"}});
+    int64Counter.add(1, {true, "x"_sd});
+
+    Counter<double, bool, StringData>& doubleCounter =
+        metricsService->createDoubleCounter<bool, StringData>(
+            MetricNames::kTest2,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "a", .values = {true, false}},
+            AttributeDefinition<StringData>{.name = "b", .values = {"x", "y"}});
+    doubleCounter.add(1.0, {true, "x"_sd});
+
+    // Too few attributes (1 instead of 2).
+    ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{true}),
+                       DBException,
+                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest2, std::tuple{true}),
+                       DBException,
+                       ErrorCodes::BadValue);
+
+    // Too many attributes (3 instead of 2).
+    ASSERT_THROWS_CODE(
+        metricsCapturer.readInt64Counter(MetricNames::kTest1, std::tuple{true, "x"_sd, "extra"_sd}),
+        DBException,
+        ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest2,
+                                                         std::tuple{true, "x"_sd, "extra"_sd}),
+                       DBException,
+                       ErrorCodes::BadValue);
+}
+
 TEST_F(OtelMetricsCapturerTest, UpDownCounterWrongValueTypeThrowsException) {
     OtelMetricsCapturer metricsCapturer(*metricsService);
     metricsService->createInt64UpDownCounter(
