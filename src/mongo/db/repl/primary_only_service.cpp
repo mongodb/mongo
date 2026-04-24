@@ -441,10 +441,13 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
                 "Waiting on first write of the new term to be majority committed",
                 "service"_attr = getServiceName(),
                 "stepUpOpTime"_attr = stepUpOpTime);
+    // Capture this term's token so the continuation doesn't re-read `_source` on the
+    // executor thread; a subsequent `onStepUp` can reassign `_source` concurrently.
+    auto sourceToken = _source.token();
     WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajorityForWrite(stepUpOpTime, _source.token())
+        .waitUntilMajorityForWrite(stepUpOpTime, sourceToken)
         .thenRunOn(**newScopedExecutor)
-        .then([this, newScopedExecutor, newTerm] {
+        .then([this, newScopedExecutor, newTerm, sourceToken] {
             // Note that checking both the state and the term are optimizations and are
             // not strictly necessary. This is also true in the later continuation.
             {
@@ -458,7 +461,7 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
                 return ExecutorFuture<void>(**newScopedExecutor, Status::OK());
             }
 
-            return _rebuildService(newScopedExecutor, _source.token());
+            return _rebuildService(newScopedExecutor, sourceToken);
         })
         .then([this, newScopedExecutor, newTerm] {
             {
