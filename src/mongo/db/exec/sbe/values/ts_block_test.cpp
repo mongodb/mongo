@@ -549,7 +549,9 @@ TEST_F(TsSbeValueTest, TsBlockHasArray) {
 TEST_F(TsSbeValueTest, TsBlockFillEmpty) {
     {
         auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "_id");
-        // Already dense fields should return nullptr when fillEmpty'd.
+        // v1 bucket, non-time dense field: tryDense() returns false via the
+        // heuristic, so fillEmpty() deblocks and delegates. The deblocked block
+        // is itself dense and returns nullptr.
         ASSERT(tsBlock->fillEmpty(value::TypeTags::Null, 0) == nullptr);
     }
 
@@ -568,6 +570,21 @@ TEST_F(TsSbeValueTest, TsBlockFillEmpty) {
                           extracted[2].value,
                           value::TypeTags::NumberDouble,
                           value::bitcastFrom<double>(9));
+    }
+
+    {
+        auto compressedBucketOpt =
+            timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+                .compressedBucket;
+        ASSERT(compressedBucketOpt);
+        auto compressedBucket = *compressedBucketOpt;
+
+        // _id is dense and is not the time field. fillEmpty() must return nullptr
+        // WITHOUT deblocking the column.
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+        ASSERT(tsBlock->fillEmpty(value::TypeTags::Null, 0) == nullptr);
+        ASSERT(tsBlock->decompressedBlock_forTest() == nullptr)
+            << "fillEmpty() on a dense column must not trigger deblocking";
     }
 }
 
@@ -801,6 +818,61 @@ TEST_F(TsSbeValueTest, VerifyDecompressedBlockType) {
         ASSERT(decompressedInternalBlock);
         std::cout << "ian: " << typeid(*decompressedInternalBlock).name() << std::endl;
         ASSERT(dynamic_cast<value::Int32Block*>(decompressedInternalBlock));
+    }
+}
+
+TEST_F(TsSbeValueTest, TsBlockTryDenseFastPath) {
+    // --- v2 (compressed) bucket cases ---
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
+    auto compressedBucket = *compressedBucketOpt;
+
+    {
+        // The time field is always dense.
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "time");
+        ASSERT_EQ(tsBlock->tryDense(), boost::optional<bool>(true));
+    }
+
+    {
+        // _id is dense but is not the time field; tryDense() must detect this via
+        // bsoncolumn::dense(), not the _isTimeField heuristic.
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+        ASSERT_EQ(tsBlock->tryDense(), boost::optional<bool>(true));
+    }
+
+    {
+        // "sometimesMissing" has positions 0 and 2 populated but position 1 missing,
+        // so it is genuinely sparse. Call twice to verify the cache also holds
+        // the "false" branch.
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "sometimesMissing");
+        ASSERT_EQ(tsBlock->tryDense(), boost::optional<bool>(false));
+        ASSERT_EQ(tsBlock->tryDense(), boost::optional<bool>(false));
+    }
+
+    // --- v1 (uncompressed BSONObject) bucket cases: heuristic fallback ---
+    {
+        // Time field in v1 — still reported dense via _isTimeField.
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "time");
+        ASSERT_EQ(tsBlock->tryDense(), boost::optional<bool>(true));
+    }
+
+    {
+        // Non-time dense field in v1 — heuristic says not dense (preserved behavior).
+        // Call twice to verify the v1 cache branch also holds its value.
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "_id");
+        ASSERT_EQ(tsBlock->tryDense(), boost::optional<bool>(false));
+        ASSERT_EQ(tsBlock->tryDense(), boost::optional<bool>(false));
+    }
+
+    // --- caching sanity check ---
+    {
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+        auto first = tsBlock->tryDense();
+        auto second = tsBlock->tryDense();
+        ASSERT_EQ(first, second);
+        ASSERT_EQ(first, boost::optional<bool>(true));
     }
 }
 }  // namespace mongo::sbe

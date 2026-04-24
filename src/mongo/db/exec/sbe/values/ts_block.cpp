@@ -31,6 +31,7 @@
 
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn_expressions.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
@@ -608,6 +609,7 @@ std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
     if (_decompressedBlock) {
         cpy->_decompressedBlock = _decompressedBlock->clone();
     }
+    cpy->_densenessCache = _densenessCache;
 
     return cpy;
 }
@@ -693,6 +695,21 @@ bool TsBlock::isTimeFieldSorted() const {
     return _bucketVersion == timeseries::kTimeseriesControlCompressedSortedVersion;
 }
 
+boost::optional<bool> TsBlock::tryDense() const {
+    if (_densenessCache) {
+        return _densenessCache;
+    }
+    if (_block.tag() == TypeTags::bsonObject) {
+        // v1 (BSONObject) buckets: fall back to the _isTimeField heuristic.
+        _densenessCache = _isTimeField;
+    } else {
+        // BSONColumn-backed block: short-circuit on the time field, otherwise use the
+        // SWAR-based bsoncolumn::dense() primitive.
+        _densenessCache = _isTimeField || mongo::bsoncolumn::dense(getBinData());
+    }
+    return _densenessCache;
+}
+
 boost::optional<bool> TsBlock::tryHasArray() const {
     if (hasNoObjsOrArrays()) {
         return false;
@@ -704,6 +721,9 @@ boost::optional<bool> TsBlock::tryHasArray() const {
 }
 
 std::unique_ptr<ValueBlock> TsBlock::fillEmpty(TypeTags fillTag, Value fillVal) {
+    if (tryDense().get_value_or(false)) {
+        return nullptr;
+    }
     ensureDeblocked();
     return _decompressedBlock->fillEmpty(fillTag, fillVal);
 }

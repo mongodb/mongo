@@ -16,6 +16,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getSbePlanStages, getQueryInfoAtTopLevelOrFirstStage} from "jstests/libs/query/sbe_explain_helpers.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
@@ -873,6 +874,69 @@ TimeseriesTest.run((insert) => {
         assert.eq(res.length, coll.count(), res);
         for (let doc of res) {
             assert.eq(doc, {}, res);
+        }
+    }
+
+    {
+        // End-to-end correctness guards for TsBlock::tryDense() / TsBlock::fillEmpty()
+        // when lowered to SBE. TsBlock::fillEmpty() short-circuits and returns nullptr
+        // (meaning "input has no Nothings, reuse as-is") whenever tryDense() reports
+        // the block is dense. Two kinds of bugs in tryDense() would corrupt results:
+        //
+        //   1. False positive (sparse block reported as dense): fillEmpty() wrongly
+        //      short-circuits on a block containing Nothings, so Nothings leak
+        //      downstream instead of being replaced by the $ifNull fallback.
+        //   2. False negative (dense block reported as sparse): fillEmpty() takes
+        //      the slow path on a dense input. This is a perf regression, not a
+        //      correctness bug on its own, but we still want coverage that the
+        //      fast path produces correct results when it does fire.
+        //
+        // The two sub-pipelines below cover both directions. Unit-level coverage
+        // of the fast path lives in ts_block_test.cpp (TsBlockTryDenseFastPath,
+        // TsBlockFillEmpty).
+        const coll2 = db[jsTestName() + "_dense"];
+        coll2.drop();
+        assert.commandWorked(
+            db.createCollection(coll2.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        );
+
+        // Single bucket with:
+        //   - "c": dense non-time scalar (always present)
+        //   - "d": sparse scalar (missing on doc 2)
+        insert(coll2, {[timeFieldName]: new Date(), [metaFieldName]: "cpu", c: 1, d: 10});
+        insert(coll2, {[timeFieldName]: new Date(), [metaFieldName]: "cpu", c: 2});
+        insert(coll2, {[timeFieldName]: new Date(), [metaFieldName]: "cpu", c: 3, d: 30});
+
+        // Case 1: $ifNull over the dense column "c". tryDense() must return true so
+        // fillEmpty() takes the short-circuit path; the fallback is never consulted.
+        // Expected sum of x: 1 + 2 + 3 = 6.
+        const densePipeline = [{$addFields: {x: {$ifNull: ["$c", -999]}}}, {$group: {_id: null, total: {$sum: "$x"}}}];
+        let results = coll2.aggregate(densePipeline).toArray();
+        assert.eq(results.length, 1, () => tojson(results));
+        assert.eq(results[0].total, 6, () => tojson(results));
+
+        // Case 2: $ifNull over the sparse column "d". tryDense() must return false
+        // so fillEmpty() actually replaces the Nothing on doc 2 with the fallback.
+        // A false positive in tryDense() would leak the Nothing, which $sum would
+        // skip, giving 40 instead of 140.
+        const sparsePipeline = [{$addFields: {x: {$ifNull: ["$d", 100]}}}, {$group: {_id: null, total: {$sum: "$x"}}}];
+        results = coll2.aggregate(sparsePipeline).toArray();
+        assert.eq(results.length, 1, () => tojson(results));
+        assert.eq(results[0].total, 140, () => tojson(results));
+
+        // If the pipeline was actually lowered to SBE block processing on this
+        // variant, sanity check that it went through ts_bucket_to_cellblock so
+        // the correctness checks above exercised the fast path rather than a
+        // classic-agg fallback. We detect SBE lowering via explainVersion "2"
+        // — on variants where the pipeline falls back to classic (e.g. because
+        // $group isn't lowered), explainVersion is "1" and we skip the check.
+        for (const pipeline of [densePipeline, sparsePipeline]) {
+            const explain = coll2.explain("executionStats").aggregate(pipeline);
+            const queryInfo = getQueryInfoAtTopLevelOrFirstStage(explain);
+            if (queryInfo.explainVersion === "2") {
+                const bucketStages = getSbePlanStages(explain, "ts_bucket_to_cellblock");
+                assert.eq(bucketStages.length, 1, () => "Expected one bucket stage " + tojson(explain));
+            }
         }
     }
 });

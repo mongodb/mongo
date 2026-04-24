@@ -173,9 +173,7 @@ public:
     TagValueView tryMin() const override;
     TagValueView tryMax() const override;
 
-    boost::optional<bool> tryDense() const override {
-        return _isTimeField;
-    }
+    boost::optional<bool> tryDense() const override;
     boost::optional<bool> tryHasArray() const override;
 
     // Whether this TS block was decompressed. This is not a method on the block API.
@@ -255,6 +253,10 @@ private:
     // A HeterogeneousBlock or HomogeneousBlock that stores the decompressed values of the original
     // TsBlock.
     std::unique_ptr<ValueBlock> _decompressedBlock;
+
+    // Cached result of tryDense(). Populated lazily on first call. Mutable because tryDense()
+    // is const.
+    mutable boost::optional<bool> _densenessCache;
 };
 
 /**

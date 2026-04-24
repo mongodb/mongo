@@ -265,8 +265,10 @@ struct ValueBlock {
     }
 
     /**
-     * Returns true if every value in the block is guaranteed to be non-nothing, false otherwise. If
-     * this can't be determined in O(1) time, return boost::none.
+     * Returns true if every value in the block is guaranteed to be non-nothing, false otherwise.
+     * Implementations must be substantially cheaper than a full decode of the block — typically
+     * O(1), or sub-linear in the logical row count (e.g. scanning only the compressed
+     * representation). If the answer can't be produced that cheaply, return boost::none.
      */
     virtual boost::optional<bool> tryDense() const {
         return boost::none;
