@@ -203,7 +203,18 @@ StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEv
 }
 
 void BlockingResultsMerger::kill(OperationContext* opCtx) {
-    _arm->kill(opCtx).wait();
+    auto future = _arm->kill(opCtx);
+
+    // Wait via the opCtx rather than a plain '.wait()'. The opCtx-based wait polls
+    // the baton, which is required because AsioNetworkingBaton::waitUntil schedules
+    // timer cancellation via '.thenRunOn(baton)'. If the ARM has a pending retry
+    // delay, the baton must be run for _cancellationSource.cancel() to actually
+    // cancel the timer and allow the retry callback to fire and complete the kill.
+    // Use 'runWithoutInterruptionExceptAtGlobalShutdown()' because 'kill()' is called
+    // from destructors where the opCtx may already be interrupted — a plain
+    // '.get(opCtx)' would throw before polling the baton, and throwing from a
+    // destructor would terminate the process.
+    opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { future.get(opCtx); });
 }
 
 }  // namespace mongo
