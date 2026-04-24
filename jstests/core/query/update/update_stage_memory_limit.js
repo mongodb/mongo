@@ -23,7 +23,7 @@
  */
 
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
-import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db.update_stage_memory_limit;
 coll.drop();
@@ -56,13 +56,9 @@ if (getPlanStage(explainRes.queryPlanner.winningPlan, "UPDATE") === null) {
 assert.commandWorked(coll.updateMany(kFilter, kUpdateIndexed));
 assert.commandWorked(coll.updateMany(kFilter, kUpdateIndexed, {upsert: true}));
 
-const originalLimit = assert.commandWorked(db.adminCommand({getParameter: 1, internalUpdateStageMaxMemoryBytes: 1}));
-
 // A small limit forces the memory check to fail once enough record ids are inserted into
 // the deduplicator.
-try {
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalUpdateStageMaxMemoryBytes", 1000);
-
+runWithParamsAllNonConfigNodes(db, {internalUpdateStageMaxMemoryBytes: 1000}, () => {
     // Multi-update that modifies an indexed field (x): _updatedRecordIds grows, memory check
     // fires.
     assert.throwsWithCode(
@@ -83,10 +79,4 @@ try {
         [] /*params*/,
         () => explainRes,
     );
-} finally {
-    setParameterOnAllNonConfigNodes(
-        db.getMongo(),
-        "internalUpdateStageMaxMemoryBytes",
-        originalLimit.internalUpdateStageMaxMemoryBytes,
-    );
-}
+});

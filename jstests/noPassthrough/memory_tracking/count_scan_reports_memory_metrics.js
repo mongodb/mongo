@@ -22,6 +22,8 @@ import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -36,15 +38,9 @@ assert.commandWorked(coll.createIndex({a: 1}));
 // Use $match + $count aggregate which optimizes to a COUNT_SCAN when the classic engine is used.
 const pipeline = [{$match: {a: {$gte: 0}}}, {$count: "n"}];
 
-// Check if the query uses COUNT_SCAN. This stage is only used by the classic engine.
 const preliminaryExplain = coll.explain("executionStats").aggregate(pipeline);
 const countScanStages = getAggPlanStages(preliminaryExplain, "COUNT_SCAN");
-if (countScanStages.length === 0) {
-    jsTest.log.info("Skipping test: query did not use COUNT_SCAN. " + "This stage is only used by the classic engine.");
-    coll.drop();
-    MongoRunner.stopMongod(conn);
-    quit();
-}
+assert.gt(countScanStages.length, 0, "Expected query to use COUNT_SCAN stage with forceClassicEngine");
 
 runMemoryStatsTest({
     db,

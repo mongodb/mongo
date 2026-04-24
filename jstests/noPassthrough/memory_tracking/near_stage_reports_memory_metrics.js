@@ -22,6 +22,8 @@ import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -38,18 +40,9 @@ assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
 const pipeline = [{$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: "dist"}}];
 
-// Check if the query uses GEO_NEAR_2DSPHERE before proceeding. This stage is only used by the
-// classic engine.
 const preliminaryExplain = coll.explain("executionStats").aggregate(pipeline);
 const nearStages = getAggPlanStages(preliminaryExplain, "GEO_NEAR_2DSPHERE");
-if (nearStages.length === 0) {
-    jsTest.log.info(
-        "Skipping test: query did not use GEO_NEAR_2DSPHERE stage. This stage is only used by the classic engine.",
-    );
-    coll.drop();
-    MongoRunner.stopMongod(conn);
-    quit();
-}
+assert.gt(nearStages.length, 0, "Expected query to use GEO_NEAR_2DSPHERE stage with forceClassicEngine");
 
 const kBatchSize = 10;
 runMemoryStatsTest({

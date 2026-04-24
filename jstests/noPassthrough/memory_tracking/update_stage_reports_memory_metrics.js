@@ -23,6 +23,8 @@ import {runPipelineAndGetDiagnostics} from "jstests/libs/query/memory_tracking_u
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -43,15 +45,7 @@ const updateCommand = {
 const explainExecStats = assert.commandWorked(db.runCommand({explain: updateCommand, verbosity: "executionStats"}));
 const updateStage = getPlanStage(explainExecStats.executionStats.executionStages, "UPDATE");
 
-if (updateStage === null) {
-    jsTest.log.info(
-        "Skipping test: query did not use the classic UPDATE stage. " +
-            "This stage is only used by the classic engine.",
-    );
-    coll.drop();
-    MongoRunner.stopMongod(conn);
-    quit();
-}
+assert.neq(null, updateStage, "Expected classic UPDATE stage with forceClassicEngine");
 
 const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
 

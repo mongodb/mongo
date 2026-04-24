@@ -18,7 +18,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db.near_memory_limit;
 coll.drop();
@@ -57,16 +57,10 @@ const peakMem = nearStages[0].peakTrackedMemBytes;
 assert.gt(peakMem, 0, "Expected peakTrackedMemBytes in GEO_NEAR_2DSPHERE stage: " + tojson(explainRes));
 const spillingLimit = Math.floor(peakMem / 2);
 
-const originalNearStageMemory = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalNearStageMaxMemoryBytes: 1}),
-);
-
 const isSpillingEnabled = FeatureFlagUtil.isEnabled(db, "ExtendedAutoSpilling");
 
 // A small limit forces the memory check to fire once enough documents are buffered.
-try {
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalNearStageMaxMemoryBytes", spillingLimit);
-
+runWithParamsAllNonConfigNodes(db, {internalNearStageMaxMemoryBytes: spillingLimit}, () => {
     if (isSpillingEnabled) {
         // The result buffer is spilled to disk. After each spill, only _seenDocuments remains
         // in memory. Since spillingLimit > _seenDocuments, the query succeeds.
@@ -76,27 +70,14 @@ try {
             12227900,
         ]);
     }
-} finally {
-    setParameterOnAllNonConfigNodes(
-        db.getMongo(),
-        "internalNearStageMaxMemoryBytes",
-        originalNearStageMemory.internalNearStageMaxMemoryBytes,
-    );
-}
+});
 
 if (isSpillingEnabled) {
     // With an extremely low limit, even after spilling the result buffer, _seenDocuments
     // alone (which cannot be spilled) exceeds the limit and the query fails.
-    try {
-        setParameterOnAllNonConfigNodes(db.getMongo(), "internalNearStageMaxMemoryBytes", 1000);
+    runWithParamsAllNonConfigNodes(db, {internalNearStageMaxMemoryBytes: 1000}, () => {
         assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), [
             12227900,
         ]);
-    } finally {
-        setParameterOnAllNonConfigNodes(
-            db.getMongo(),
-            "internalNearStageMaxMemoryBytes",
-            originalNearStageMemory.internalNearStageMaxMemoryBytes,
-        );
-    }
+    });
 }

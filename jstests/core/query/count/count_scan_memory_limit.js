@@ -24,7 +24,7 @@
  */
 
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
-import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db.count_scan_memory_limit;
 coll.drop();
@@ -56,13 +56,9 @@ if (getPlanStage(explainRes.queryPlanner.winningPlan, "COUNT_SCAN") === null) {
 assert.eq(kDocCount, coll.find(kFilterA).count());
 assert.eq(kDocCount, coll.find(kFilterB).count());
 
-const originalLimit = assert.commandWorked(db.adminCommand({getParameter: 1, internalCountScanStageMaxMemoryBytes: 1}));
-
 // A small limit forces the memory check to fail once enough record ids are inserted into
 // the duplicate tracker.
-try {
-    setParameterOnAllNonConfigNodes(db.getMongo(), "internalCountScanStageMaxMemoryBytes", 1000);
-
+runWithParamsAllNonConfigNodes(db, {internalCountScanStageMaxMemoryBytes: 1000}, () => {
     // Multikey index on 'a': duplicate removal is enabled, tracker grows, memory check fires.
     assert.throwsWithCode(
         () => coll.find(kFilterA).count(),
@@ -73,10 +69,4 @@ try {
 
     // Non-multikey index on 'b': duplicate removal is disabled.
     assert.eq(kDocCount, coll.find(kFilterB).count());
-} finally {
-    setParameterOnAllNonConfigNodes(
-        db.getMongo(),
-        "internalCountScanStageMaxMemoryBytes",
-        originalLimit.internalCountScanStageMaxMemoryBytes,
-    );
-}
+});
