@@ -1,7 +1,23 @@
 /**
  * Utilities for testing the analyzeShardKey command.
  */
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
+
 export var AnalyzeShardKeyUtil = {
+    /**
+     * Returns the write concern to use when inserting documents into test collections that need
+     * to be replicated to all nodes. Storage engines that do not support local collections must
+     * fall back to "majority" since {w: numNodesPerRS} is not valid across all persistence providers.
+     */
+    getReplicationWriteConcern(conn, numNodesPerRS) {
+        const supportsLocalCollections = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+            conn,
+            "supportsLocalCollections",
+            true,
+        );
+        return {w: supportsLocalCollections ? numNodesPerRS : "majority"};
+    },
+
     /**
      * Returns true if the given key pattern contains a hashed key.
      */

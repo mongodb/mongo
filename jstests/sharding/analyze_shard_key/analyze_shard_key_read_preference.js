@@ -1,7 +1,7 @@
 /**
  * Tests that the analyzeShardKey command respects the read preference specified by the client.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [requires_fcv_70, requires_profiling]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -55,7 +55,8 @@ function setUpCollection() {
     }
     // Waiting for the documents to get replicated to all nodes is necessary since the test later
     // runs the analyzeShardKey commands on secondaries.
-    assert.commandWorked(coll.insert(docs, {writeConcern: {w: 3}}));
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, 3);
+    assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     return {dbName, collName};
 }

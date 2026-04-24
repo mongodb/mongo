@@ -7,14 +7,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const numNodesPerRS = 2;
-// The write concern to use when inserting documents into test collections. Waiting for the
-// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
-// command with readPreference "secondaryPreferred".
-const writeConcern = {
-    w: numNodesPerRS,
-};
 
 function runTest(conn) {
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(conn, numNodesPerRS);
     const dbName = "testDb";
     const collName = "testColl";
     const numDocs = 10000;

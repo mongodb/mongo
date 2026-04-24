@@ -12,14 +12,7 @@ import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analy
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
 
-// The write concern to use when inserting documents into test collections. Waiting for the
-// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
-// command with readPreference "secondaryPreferred".
-const writeConcern = {
-    w: numNodesPerRS,
-};
-
-function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
+function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, metrics}) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -45,8 +38,8 @@ function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
     }
 }
 
-function runTest(conn) {
-    testAnalyzeShardKey(conn, {
+function runTest(conn, writeConcern) {
+    testAnalyzeShardKey(conn, writeConcern, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [
             {
@@ -72,7 +65,7 @@ function runTest(conn) {
         },
     });
 
-    testAnalyzeShardKey(conn, {
+    testAnalyzeShardKey(conn, writeConcern, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [
             {
@@ -98,7 +91,7 @@ function runTest(conn) {
         },
     });
 
-    testAnalyzeShardKey(conn, {
+    testAnalyzeShardKey(conn, writeConcern, {
         docs: [
             {x: -1, y: -1},
             {x: 1, y: 1},
@@ -127,7 +120,7 @@ function runTest(conn) {
         },
     });
 
-    testAnalyzeShardKey(conn, {
+    testAnalyzeShardKey(conn, writeConcern, {
         docs: [
             {x: -1, y: -1, z: -1},
             {x: 1, y: 1, z: 1},
@@ -168,7 +161,8 @@ const setParameterOpts = {
 {
     const st = new ShardingTest({shards: 1, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
-    runTest(st.s);
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
+    runTest(st.s, writeConcern);
 
     st.stop();
 }
@@ -180,7 +174,8 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
     rst.initiate();
     const primary = rst.getPrimary();
 
-    runTest(primary);
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(primary, numNodesPerRS);
+    runTest(primary, writeConcern);
 
     rst.stopSet();
 }

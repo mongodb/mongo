@@ -12,10 +12,6 @@ import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analy
 // documents to get replicated to all nodes is necessary since the test later runs the
 // analyzeShardKey command with readPreference "secondary".
 const numNodesPerRS = 2;
-const writeConcern = {
-    w: numNodesPerRS,
-};
-
 const numMostCommonValues = 5;
 const st = new ShardingTest({
     mongos: 2,
@@ -26,7 +22,7 @@ const st = new ShardingTest({
     },
 });
 
-function runTest(readPreference) {
+function runTest(readPreference, writeConcern) {
     const dbName = "testDb" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -96,7 +92,8 @@ function runTest(readPreference) {
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2.keyCharacteristics, expectedMetrics);
 }
 
-runTest({mode: "primary"});
-runTest({mode: "secondary"});
+const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s0, numNodesPerRS);
+runTest({mode: "primary"}, writeConcern);
+runTest({mode: "secondary"}, writeConcern);
 
 st.stop();
