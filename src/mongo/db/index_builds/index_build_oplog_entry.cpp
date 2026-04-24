@@ -192,6 +192,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
     auto collUUID = entry.getUuid();
     invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
+    boost::optional<std::string> indexBuildIdent;
     if (auto o2 = entry.getObject2(); o2 && parseO2) {
         auto parsedO2 =
             repl::IndexBuildOplogEntryO2::parse(*o2, IDLParserContext("indexBuildOplogEntryO2"));
@@ -222,15 +223,10 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
             }
         }
 
-        // Acquire one FCV snapshot so the two feature-flag checks below see the same FCV value,
-        // even if a downgrade lands mid-call.
         const auto vCtx = VersionContext::getDecoration(opCtx);
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         const bool pdibEnabled = feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
                                      .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
-        const bool resumablePdibEnabled =
-            feature_flags::gResumablePrimaryDrivenIndexBuilds
-                .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
 
         if (o2HasInternalIdents && !pdibEnabled) {
             return {ErrorCodes::BadValue,
@@ -240,6 +236,18 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
 
         if (o2HasInternalIdents) {
             indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
+        }
+
+        if (const auto& parsedIdent = parsedO2.getIndexBuildIdent()) {
+            if (!pdibEnabled) {
+                return {ErrorCodes::BadValue,
+                        "'indexBuildIdent' may only appear when primary-driven index builds are "
+                        "enabled"};
+            }
+            if (auto status = validateInternalIdent(*parsedIdent); !status.isOK()) {
+                return status;
+            }
+            indexBuildIdent = std::string{*parsedIdent};
         }
 
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -266,16 +274,6 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                             "constraintViolationsIdent is required for unique and _id "
                             "indexes"};
                 }
-                if (const auto& indexBuildIdent = internalIdents.getIndexBuildIdent()) {
-                    if (!resumablePdibEnabled) {
-                        return {ErrorCodes::BadValue,
-                                "'indexBuildIdent' may only appear when resumable "
-                                "primary-driven index builds are enabled"};
-                    }
-                    if (auto status = validateInternalIdent(*indexBuildIdent); !status.isOK()) {
-                        return status;
-                    }
-                }
                 indexesVec[i].setInternalIdents(
                     std::string{internalIdents.getSorterIdent()},
                     std::string{internalIdents.getSideWritesIdent()},
@@ -283,9 +281,6 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                     internalIdents.getConstraintViolationsIdent()
                         ? boost::make_optional(
                               std::string{*internalIdents.getConstraintViolationsIdent()})
-                        : boost::none,
-                    internalIdents.getIndexBuildIdent()
-                        ? boost::make_optional(std::string{*internalIdents.getIndexBuildIdent()})
                         : boost::none);
             }
 
@@ -309,6 +304,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                                 std::move(indexesVec),
                                 std::move(multikey),
                                 cause,
-                                entry.getOpTime()};
+                                entry.getOpTime(),
+                                std::move(indexBuildIdent)};
 }
 }  // namespace mongo

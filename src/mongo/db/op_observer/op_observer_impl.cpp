@@ -81,6 +81,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/container.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -324,19 +325,11 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
  */
 std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
                                                      const std::vector<IndexBuildInfo>& indexes,
-                                                     const NamespaceString& nss) {
+                                                     const NamespaceString& nss,
+                                                     bool pdibEnabled) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     std::vector<repl::IndexIdents> o2Indexes;
     o2Indexes.reserve(indexes.size());
-    // Acquire one FCV snapshot so the two feature-flag checks below see the same FCV value.
-    const auto vCtx = VersionContext::getDecoration(opCtx);
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool pdibEnabled =
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            vCtx, fcvSnapshot);
-    const bool resumablePdibEnabled =
-        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            vCtx, fcvSnapshot);
     for (const auto& indexBuildInfo : indexes) {
         auto indexIdentUniqueTag =
             storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
@@ -351,7 +344,6 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
                 !(indexBuildInfo.spec["unique"].trueValue() ||
                   IndexDescriptor::isIdIndexPattern(indexBuildInfo.spec.getObjectField("key"))) ||
                 indexBuildInfo.constraintViolationsIdent);
-            invariant(indexBuildInfo.indexBuildIdent.has_value() == resumablePdibEnabled);
 
             repl::InternalIdents internalIdents;
             internalIdents.setSorterIdent(*indexBuildInfo.sorterIdent);
@@ -360,9 +352,6 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
             if (indexBuildInfo.constraintViolationsIdent) {
                 internalIdents.setConstraintViolationsIdent(
                     *indexBuildInfo.constraintViolationsIdent);
-            }
-            if (indexBuildInfo.indexBuildIdent) {
-                internalIdents.setIndexBuildIdent(*indexBuildInfo.indexBuildIdent);
             }
             indexIdents.setInternalIdents(std::move(internalIdents));
         }
@@ -373,15 +362,28 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
 }
 
 /**
- * Populates the o2 field of oplogEntry with index idents (plus internal idents when
- * primary-driven builds are active).
+ * Populates the o2 field of oplogEntry with index idents.
  */
 void setIndexBuildO2(OperationContext* opCtx,
                      MutableOplogEntry& oplogEntry,
+                     const UUID& indexBuildUUID,
                      const std::vector<IndexBuildInfo>& indexes,
                      const NamespaceString& nss) {
+    // Acquire one FCV snapshot so the two feature-flag checks see the same FCV value.
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool pdibEnabled =
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot);
+    const bool resumablePdibEnabled =
+        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot);
+
     repl::IndexBuildOplogEntryO2 o2;
-    o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss));
+    o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss, pdibEnabled));
+    if (pdibEnabled && resumablePdibEnabled) {
+        o2.setIndexBuildIdent(ident::generateNewIndexBuildIdent(indexBuildUUID));
+    }
     oplogEntry.setObject2(o2.toBSON());
 }
 
@@ -532,7 +534,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
-        setIndexBuildO2(opCtx, oplogEntry, indexes, nss);
+        setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
@@ -612,7 +614,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
-        setIndexBuildO2(opCtx, oplogEntry, indexes, nss);
+        setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
@@ -664,7 +666,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
-        setIndexBuildO2(opCtx, oplogEntry, indexes, nss);
+        setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());

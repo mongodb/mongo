@@ -32,6 +32,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/database_name_util.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -266,6 +267,10 @@ std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData 
     }
     buf << kInternalIdentStem << '-' << identStem << '-' << parsed->uniqueTag;
     return buf.str();
+}
+
+std::string generateNewIndexBuildIdent(const UUID& buildUUID) {
+    return fmt::format("{}-{}-{}", kInternalIdentStem, kIndexBuildIdentStem, buildUUID.toString());
 }
 
 StringData getCollectionIdentUniqueTag(StringData ident,

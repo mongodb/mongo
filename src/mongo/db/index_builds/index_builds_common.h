@@ -52,19 +52,13 @@ struct IndexBuildInfo {
      * Creates an IndexBuildInfo with the given index spec and index ident, and generates the
      * internal idents.
      */
-    IndexBuildInfo(BSONObj specObj,
-                   StringData idxIdent,
-                   StorageEngine& storageEngine,
-                   bool generateIndexBuildIdent = false);
+    IndexBuildInfo(BSONObj specObj, StringData idxIdent, StorageEngine& storageEngine);
 
     /**
      * Creates an IndexBuildInfo with the index spec and generates both the index ident and the
      * internal idents.
      */
-    IndexBuildInfo(BSONObj specObj,
-                   StorageEngine& storageEngine,
-                   const DatabaseName& dbName,
-                   bool generateIndexBuildIdent = false);
+    IndexBuildInfo(BSONObj specObj, StorageEngine& storageEngine, const DatabaseName& dbName);
 
     /**
      * Extracts index name from the spec and returns it.
@@ -72,19 +66,18 @@ struct IndexBuildInfo {
     StringData getIndexName() const;
 
     /**
-     * Generates new idents and initializes all member fields tracking idents of temporary tables.
-     * 'indexBuildIdent' is only generated when 'generateIndexBuildIdent' is true.
+     * Generates new idents and initializes all member fields tracking idents of internal tables.
      */
-    void setInternalIdents(StorageEngine& storageEngine, bool generateIndexBuildIdent = false);
+    void setInternalIdents(StorageEngine& storageEngine);
 
     /**
-     * Initializes all member fields tracking idents of temporary tables with the given idents.
+     * Initializes all member fields tracking idents of temporary tables with the given
+     * idents.
      */
     void setInternalIdents(boost::optional<std::string> sorterIdent,
                            boost::optional<std::string> sideWritesIdent,
                            boost::optional<std::string> skippedRecordsIdent,
-                           boost::optional<std::string> constraintViolationsIdent,
-                           boost::optional<std::string> indexBuildIdent = boost::none);
+                           boost::optional<std::string> constraintViolationsIdent);
 
     BSONObj toBSON() const;
 
@@ -97,7 +90,6 @@ struct IndexBuildInfo {
     boost::optional<std::string> sideWritesIdent;
     boost::optional<std::string> skippedRecordsIdent;
     boost::optional<std::string> constraintViolationsIdent;
-    boost::optional<std::string> indexBuildIdent;
 };
 
 /**
@@ -105,8 +97,7 @@ struct IndexBuildInfo {
  */
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
                                                 StorageEngine& storageEngine,
-                                                const DatabaseName& dbName,
-                                                bool generateIndexBuildIdent = false);
+                                                const DatabaseName& dbName);
 
 /**
  * Same as above, but does not populate the ident fields in the IndexBuildInfo instances.

@@ -1338,19 +1338,10 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            // new idents or if we need to do something more complicated for catalog
                            // consistency.
                            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-                           // Reuse the FCV snapshot acquired above so the two feature-flag checks
-                           // see the same FCV value.
-                           const auto vCtx = VersionContext::getDecoration(opCtx.get());
-                           const bool generateIndexBuildIdent =
-                               feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-                                   .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot) &&
-                               feature_flags::gResumablePrimaryDrivenIndexBuilds
-                                   .isEnabledUseLastLTSFCVWhenUninitialized(vCtx, fcvSnapshot);
                            auto indexes =
                                toIndexBuildInfoVec(indexSpecs,
                                                    *storageEngine,
-                                                   _metadata.getTempReshardingNss().dbName(),
-                                                   generateIndexBuildIdent);
+                                                   _metadata.getTempReshardingNss().dbName());
                            auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
                            auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
                                opCtx.get(),

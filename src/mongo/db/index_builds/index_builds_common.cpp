@@ -50,27 +50,23 @@ bool usesConstraintViolationsTracker(const BSONObj& spec) {
 IndexBuildInfo::IndexBuildInfo(BSONObj specObj, boost::optional<std::string> idxIdent)
     : spec(std::move(specObj)), indexIdent(idxIdent.value_or("")) {}
 
-IndexBuildInfo::IndexBuildInfo(BSONObj specObj,
-                               StringData idxIdent,
-                               StorageEngine& storageEngine,
-                               bool generateIndexBuildIdent)
+IndexBuildInfo::IndexBuildInfo(BSONObj specObj, StringData idxIdent, StorageEngine& storageEngine)
     : spec(std::move(specObj)), indexIdent(idxIdent) {
-    setInternalIdents(storageEngine, generateIndexBuildIdent);
+    setInternalIdents(storageEngine);
 }
 
 IndexBuildInfo::IndexBuildInfo(BSONObj specObj,
                                StorageEngine& storageEngine,
-                               const DatabaseName& dbName,
-                               bool generateIndexBuildIdent)
+                               const DatabaseName& dbName)
     : spec(std::move(specObj)), indexIdent(storageEngine.generateNewIndexIdent(dbName)) {
-    setInternalIdents(storageEngine, generateIndexBuildIdent);
+    setInternalIdents(storageEngine);
 }
 
 StringData IndexBuildInfo::getIndexName() const {
     return spec.getStringField(kIndexNameFieldName);
 }
 
-void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine, bool generateIndexBuildIdent) {
+void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine) {
     setInternalIdents(
         storageEngine.generateNewInternalIndexBuildIdent("sorter", indexIdent),
         storageEngine.generateNewInternalIndexBuildIdent("sideWrites", indexIdent),
@@ -78,23 +74,17 @@ void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine, bool genera
         usesConstraintViolationsTracker(spec)
             ? boost::make_optional(storageEngine.generateNewInternalIndexBuildIdent(
                   "constraintViolations", indexIdent))
-            : boost::none,
-        generateIndexBuildIdent
-            ? boost::make_optional(
-                  storageEngine.generateNewInternalIndexBuildIdent("indexBuild", indexIdent))
             : boost::none);
 }
 
 void IndexBuildInfo::setInternalIdents(boost::optional<std::string> sorterIdent,
                                        boost::optional<std::string> sideWritesIdent,
                                        boost::optional<std::string> skippedRecordsIdent,
-                                       boost::optional<std::string> constraintViolationsIdent,
-                                       boost::optional<std::string> indexBuildIdent) {
+                                       boost::optional<std::string> constraintViolationsIdent) {
     this->sorterIdent = std::move(sorterIdent);
     this->sideWritesIdent = std::move(sideWritesIdent);
     this->skippedRecordsIdent = std::move(skippedRecordsIdent);
     this->constraintViolationsIdent = std::move(constraintViolationsIdent);
-    this->indexBuildIdent = std::move(indexBuildIdent);
 }
 
 BSONObj IndexBuildInfo::toBSON() const {
@@ -115,9 +105,6 @@ BSONObj IndexBuildInfo::toBSON() const {
     if (constraintViolationsIdent) {
         bsonObjBuilder.append("constraintViolationsIdent", *constraintViolationsIdent);
     }
-    if (indexBuildIdent) {
-        bsonObjBuilder.append("indexBuildIdent", *indexBuildIdent);
-    }
     return bsonObjBuilder.obj();
 }
 
@@ -132,12 +119,11 @@ std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& spec
 
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
                                                 StorageEngine& storageEngine,
-                                                const DatabaseName& dbName,
-                                                bool generateIndexBuildIdent) {
+                                                const DatabaseName& dbName) {
     std::vector<IndexBuildInfo> indexes;
     indexes.reserve(specs.size());
     for (const auto& spec : specs) {
-        indexes.emplace_back(spec, storageEngine, dbName, generateIndexBuildIdent);
+        indexes.emplace_back(spec, storageEngine, dbName);
     }
     return indexes;
 }

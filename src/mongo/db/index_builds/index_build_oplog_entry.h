@@ -63,6 +63,7 @@ public:
     std::vector<boost::optional<MultikeyPaths>> multikey;
     boost::optional<Status> cause;
     repl::OpTime opTime;
+    boost::optional<std::string> indexBuildIdent;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

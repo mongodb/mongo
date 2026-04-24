@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
 
 #include <string>
 
@@ -112,6 +113,12 @@ std::string generateNewInternalIdent(StringData identStem = ""_sd);
  * '<db>/internal-<identStem>-<indexUniqueTag>' when 'indexIdent' contains a db component.
  */
 std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent);
+
+/**
+ * Returns the ident for the tracking table of a resumable primary-driven index build.
+ * Format: 'internal-indexBuild-<buildUUID>'.
+ */
+std::string generateNewIndexBuildIdent(const UUID& buildUUID);
 
 /**
  * Assumes 'ident' is a well-formed ident for a collection, returns the unique identifier component

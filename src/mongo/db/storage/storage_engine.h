@@ -73,6 +73,7 @@ struct StorageGlobalParams;
 // StorageEngine constants
 const NamespaceString kCatalogInfoNamespace = NamespaceString(DatabaseName::kMdbCatalog);
 const auto kResumableIndexIdentStem = "resumable-index-build-"_sd;
+const auto kIndexBuildIdentStem = "indexBuild"_sd;
 
 /**
  * The StorageEngine class is the top level interface for creating a new storage engine. All
