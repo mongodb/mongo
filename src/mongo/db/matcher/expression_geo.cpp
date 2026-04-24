@@ -144,7 +144,9 @@ Status GeoExpression::parseFrom(const BSONObj& obj) {
     // into STRICT_SPHERE CRS.
     if (STRICT_SPHERE == geoContainer->getNativeCRS()) {
         if (!geoContainer->supportsProject(SPHERE)) {
-            return Status(ErrorCodes::BadValue, "only polygon supported with strict winding order");
+            return Status(ErrorCodes::BadValue,
+                          "strict winding order CRS is only supported for a standalone Polygon "
+                          "query geometry");
         }
         geoContainer->projectInto(SPHERE);
     }
