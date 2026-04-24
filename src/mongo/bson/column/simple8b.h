@@ -388,6 +388,12 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t visitAll(const char* buffer,
 MONGO_MOD_PUBLIC inline size_t count(const char* buffer, size_t size);
 
 /**
+ * Returns true if the Simple8b blocks contain no missing values. Assumes that if the buffer begins
+ * with an RLE block, that the previous value was not missing.
+ */
+inline bool dense(const char* buffer, size_t size);
+
+/**
  * Returns the last value (can be missing) over multiple Simple8b blocks. If called with unsigned T
  * it returns the encoded value in this slot. If called with signed T it returns the decoded value.
  */

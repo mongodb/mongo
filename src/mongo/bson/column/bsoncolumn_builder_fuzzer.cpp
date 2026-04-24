@@ -139,6 +139,17 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                                 << ". Column: " << base64::encode(diff.data(), diff.size()));
     }
 
+    // Verify dense: should be true iff no generated elements are EOO (skip).
+    {
+        bool hasMissing = std::any_of(generatedElements.begin(),
+                                      generatedElements.end(),
+                                      [](const BSONElement& e) { return e.eoo(); });
+        bool result = bsoncolumn::dense(diff.data(), diff.size());
+        invariant(result != hasMissing,
+                  str::stream() << "dense() returned " << result << " but hasMissing=" << hasMissing
+                                << ". Column: " << base64::encode(diff.data(), diff.size()));
+    }
+
     // Verify binary reopen gives identical state as intermediate
     BSONColumnBuilder reopen(diff.data(), diff.size());
     invariant(builder.isInternalStateIdentical(reopen),

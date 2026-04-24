@@ -133,6 +133,35 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         }
     }
 
+    // Verify simple8b::dense agrees with iterator-based missing detection.
+    {
+        auto iteratorHasMissing = [&]() -> boost::optional<bool> {
+            try {
+                Simple8b<uint128_t> s8b(Data, bufferSize);
+                for (auto&& val : s8b) {
+                    if (!val)
+                        return true;
+                }
+                return false;
+            } catch (const DBException&) {
+                return boost::none;
+            }
+        }();
+
+        auto blockDense = [&]() -> boost::optional<bool> {
+            try {
+                return simple8b::dense(Data, bufferSize);
+            } catch (const DBException&) {
+                return boost::none;
+            }
+        }();
+
+        invariant(iteratorHasMissing.has_value() == blockDense.has_value());
+
+        if (iteratorHasMissing && blockDense) {
+            invariant(*blockDense != *iteratorHasMissing);
+        }
+    }
 
     return 0;
 }

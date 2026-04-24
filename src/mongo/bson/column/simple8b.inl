@@ -116,6 +116,16 @@ struct SimpleDecoder {
             return kMissing;
         return encoded;
     }
+
+    // Returns true if no slots contain a missing value.
+    static bool dense(uint64_t encoded) {
+        for (int i = iters; i; --i) {
+            if ((encoded & mask) == mask)
+                return false;
+            encoded >>= bits;
+        }
+        return true;
+    }
 };
 
 // Table-based decoder that uses a lookup table for decoding unsigned integers into signed. Suitable
@@ -235,6 +245,47 @@ struct TableDecoder {
             return kMissing;
         }
         return encoded;
+    }
+
+    // Returns true if no slots contain a missing value.
+    //
+    // A missing value is encoded as all-1s in a slot. This uses SWAR (SIMD Within A Register) to
+    // detect that pattern across all slots in parallel, without loops or branches per slot.
+    //
+    // The idea: AND all positions of each slot together. If a slot is all-1s (missing), the LSB of
+    // that slow will be 1; otherwise it will be 0. We mask out the non-LSB positions of each slot
+    // to check the result.
+    //
+    // Example with four 3-bit slots (bits=3, iters=4):
+    //                          V
+    //   encoded:        101  111  010  110
+    //   encoded >> 1:   010  111  101  011
+    //   encoded >> 2:   001  011  110  101
+    //   -------------   ---  ---  ---  ---
+    //   allSet (AND):   000  011  000  000
+    //
+    //   lsbMask:        001  001  001  001
+    //   allSet & mask:  000  001  000  000  => non-zero, so not dense
+    //                          ^
+    static bool dense(uint64_t encoded) {
+        // AND together shifts of the encoded value such that the LSB of each slot will contain the
+        // ANDed value of all the bits in the slot. There may be 1s in more significant bits, but
+        // we mask them out below.
+        uint64_t allSet = encoded;
+        for (int b = 1; b < bits; ++b) {
+            allSet &= (encoded >> b);
+        }
+
+        // Create a bit mask that has the LSB set to 1 for each slot.
+        constexpr uint64_t lsbMask = [] {
+            uint64_t m = 0;
+            for (int i = 0; i < iters; ++i)
+                m |= 1ull << (i * bits);
+            return m;
+        }();
+
+        // If there are any 1s in the LSB for any slot, there were missing values.
+        return (allSet & lsbMask) == 0;
     }
 };
 
@@ -422,6 +473,12 @@ struct OneDecoder {
         }
         return 0;
     }
+
+    // Returns true if no slots contain a missing value.
+    // In the 1-bit encoding, 0=zero and 1=missing, so dense iff all payload bits are clear.
+    bool dense(uint64_t encoded) const {
+        return encoded == 0;
+    }
 };
 
 // Special Simple8b decoder for decoding the extended selectors where the slot bits are split up in
@@ -558,6 +615,24 @@ struct ExtendedDecoder {
         }
 
         return value << numZeroes;
+    }
+
+    // Returns true if no slots contain a missing value.
+    //
+    // Uses the same SWAR technique as TableDecoder::dense(). See there for a detailed explanation.
+    bool dense(uint64_t encoded) const {
+        constexpr uint64_t lsbMask = [] {
+            uint64_t m = 0;
+            for (int i = 0; i < iters; ++i)
+                m |= 1ull << (i * bits);
+            return m;
+        }();
+
+        uint64_t allSet = encoded;
+        for (int b = 1; b < bits; ++b) {
+            allSet &= (encoded >> b);
+        }
+        return (allSet & lsbMask) == 0;
     }
 };
 
@@ -926,6 +1001,111 @@ T lastEncoded(uint64_t encoded) {
             break;
     }
     return 0;
+}
+
+// Returns true if no slots in simple8b block contain a missing value.
+MONGO_COMPILER_ALWAYS_INLINE inline bool decodeDense(uint64_t encoded) {
+    auto selector = encoded & simple8b_internal::kBaseSelectorMask;
+    encoded >>= 4;
+    switch (selector) {
+        case 1:
+            return decoder1.dense(encoded);
+        case 2:
+            return decoder2.dense(encoded);
+        case 3:
+            return decoder3.dense(encoded);
+        case 4:
+            return decoder4.dense(encoded);
+        case 5:
+            return decoder5.dense(encoded);
+        case 6:
+            return decoder6.dense(encoded);
+        case 7: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder7.dense(encoded);
+                case 1:
+                    return decoderExtended7_1.dense(encoded);
+                case 2:
+                    return decoderExtended7_2.dense(encoded);
+                case 3:
+                    return decoderExtended7_3.dense(encoded);
+                case 4:
+                    return decoderExtended7_4.dense(encoded);
+                case 5:
+                    return decoderExtended7_5.dense(encoded);
+                case 6:
+                    return decoderExtended7_6.dense(encoded);
+                case 7:
+                    return decoderExtended7_7.dense(encoded);
+                case 8:
+                    return decoderExtended7_8.dense(encoded);
+                case 9:
+                    return decoderExtended7_9.dense(encoded);
+                default:
+                    uasserted(ErrorCodes::InvalidBSONColumn,
+                              "Bad extended selector during decodeDense for selector 7");
+            }
+        }
+        case 8: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder8.dense(encoded);
+                case 1:
+                    return decoderExtended8_1.dense(encoded);
+                case 2:
+                    return decoderExtended8_2.dense(encoded);
+                case 3:
+                    return decoderExtended8_3.dense(encoded);
+                case 4:
+                    return decoderExtended8_4.dense(encoded);
+                case 5:
+                    return decoderExtended8_5.dense(encoded);
+                case 6:
+                    return decoderExtended8_6.dense(encoded);
+                case 7:
+                    return decoderExtended8_7.dense(encoded);
+                case 8:
+                    return decoderExtended8_8.dense(encoded);
+                case 9:
+                    return decoderExtended8_9.dense(encoded);
+                case 10:
+                    return decoderExtended8_10.dense(encoded);
+                case 11:
+                    return decoderExtended8_11.dense(encoded);
+                case 12:
+                    return decoderExtended8_12.dense(encoded);
+                case 13:
+                    return decoderExtended8_13.dense(encoded);
+                default:
+                    uasserted(ErrorCodes::InvalidBSONColumn,
+                              "Bad extended selector during decodeDense for selector 8");
+            }
+        }
+        case 9:
+            return decoder10.dense(encoded);
+        case 10:
+            return decoder12.dense(encoded);
+        case 11:
+            return decoder15.dense(encoded);
+        case 12:
+            return decoder20.dense(encoded);
+        case 13:
+            return decoder30.dense(encoded);
+        case 14:
+            return decoder60.dense(encoded);
+        case simple8b_internal::kRleSelector:
+            // If the last value in the previous non-RLE block was missing, we would have returned
+            // early, so if we arrive here we are still dense.
+            return true;
+        default:
+            uasserted(ErrorCodes::InvalidBSONColumn, "Bad selector during decodeDense");
+    }
+    MONGO_UNREACHABLE;
 }
 
 // Decodes and visits all slots in simple8b block.
@@ -1372,6 +1552,19 @@ inline size_t count(const char* buffer, size_t size) {
         buffer += sizeof(uint64_t);
     }
     return numElements;
+}
+
+inline bool dense(const char* buffer, size_t size) {
+    invariant(size % 8 == 0);
+    const char* end = buffer + size;
+
+    while (buffer != end) {
+        uint64_t currentBlock = ConstDataView(buffer).read<LittleEndian<uint64_t>>();
+        if (!decodeDense(currentBlock))
+            return false;
+        buffer += sizeof(uint64_t);
+    }
+    return true;
 }
 
 template <typename T>

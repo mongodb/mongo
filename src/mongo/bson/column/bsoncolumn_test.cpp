@@ -1078,6 +1078,11 @@ public:
             auto minmaxElems = minmax<BSONElementMaterializer>(columnBinary, allocator);
             ASSERT_TRUE(minmaxElems.first.binaryEqualValues(actualMin));
             ASSERT_TRUE(minmaxElems.second.binaryEqualValues(actualMax));
+
+            // dense() is true iff no element in the decompressed stream is missing (EOO).
+            bool expectedDense = std::none_of(
+                expected.begin(), expected.end(), [](const BSONElement& e) { return e.eoo(); });
+            ASSERT_EQ(dense(columnBinary), expectedDense);
         }
 
         // Verify we can decompress the entire column using the block-based API using the
@@ -9979,6 +9984,308 @@ TEST_F(BSONColumnTest, TestCollector) {
     ASSERT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
 }
 
+
+TEST(DenseTest, EmptyColumn) {
+    BSONColumnBuilder<> cb;
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, SingleValue) {
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("" << 42).firstElement());
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, SingleSkip) {
+    BSONColumnBuilder<> cb;
+    cb.skip();
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, MultipleValues) {
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 100; ++i) {
+        cb.append(BSON("" << i).firstElement());
+    }
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, SkipAmongValues) {
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 10; ++i) {
+        cb.append(BSON("" << i).firstElement());
+    }
+    cb.skip();
+    for (int i = 10; i < 20; ++i) {
+        cb.append(BSON("" << i).firstElement());
+    }
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedObjects) {
+    // Interleaved mode (objects) is treated as dense.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 2));
+    cb.append(BSON("a" << 3 << "b" << 4));
+    cb.append(BSON("a" << 5 << "b" << 6));
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedWithMissingSubFields) {
+    // Objects with different schemas produce missing values in interleaved sub-streams, but no
+    // logical row is entirely missing — so the column is dense.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 2));
+    cb.append(BSON("a" << 3));
+    cb.append(BSON("b" << 5));
+    cb.append(BSON("a" << 6 << "b" << 7));
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedOneDenseStream) {
+    // Sub-stream "b" has missings but "a" is present at every row, so no row is fully missing
+    // and the column is dense.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 2));
+    cb.append(BSON("a" << 3));
+    cb.append(BSON("a" << 5));
+    cb.append(BSON("a" << 6 << "b" << 7));
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedWithTrueMissing) {
+    // An outer-level skip among interleaved objects causes every sub-stream to be missing at
+    // that row. missCounts reaches numStreams at that row and dense is cleared.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 2));
+    cb.append(BSON("a" << 5));
+    cb.skip();
+    cb.append(BSON("a" << 6 << "b" << 7));
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, RLEValues) {
+    // Encode a long run of the same value (exercises RLE blocks).
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 300; ++i) {
+        cb.append(BSON("" << 7).firstElement());
+    }
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, LeadingRLEBlock) {
+    // Hand-craft a BSONColumn whose simple8b group starts with an RLE block and no preceding
+    // literal. Exercises the pre-literal simple8b guard at stream start: without a baseline
+    // value, any simple8b block decodes as missings.
+    BufBuilder buf;
+    // Control byte: upper nibble 0x8 (int32 deltas), lower nibble 0x0 (1 block).
+    buf.appendChar(char(0x80));
+    // RLE block with selector extension 0 -> 120 repeated values. With no preceding literal,
+    // the repeated value is missing.
+    buf.appendNum(static_cast<uint64_t>(simple8b_internal::kRleSelector));
+    // End sentinel.
+    buf.appendChar(char(0x00));
+    ASSERT_FALSE(dense(buf.buf(), buf.len()));
+}
+
+TEST(DenseTest, RLEMissingValues) {
+    // Encode a run of skips (exercises RLE with missing previous value).
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 300; ++i) {
+        cb.skip();
+    }
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, Doubles) {
+    // Doubles use 128-bit simple8b encoding; verify they are handled correctly.
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 50; ++i) {
+        cb.append(BSON("" << (double)i).firstElement());
+    }
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, DoublesWithSkip) {
+    // A skip among doubles should be detected as non-dense.
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 25; ++i) {
+        cb.append(BSON("" << (double)i).firstElement());
+    }
+    cb.skip();
+    for (int i = 25; i < 50; ++i) {
+        cb.append(BSON("" << (double)i).firstElement());
+    }
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedThenDenseScalars) {
+    // After exiting interleaved mode, seenLiteral is reset. Scalar values with no skips that
+    // follow should still result in a dense column.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 2));
+    cb.append(BSON("a" << 3 << "b" << 4));
+    cb.append(BSON("" << 5).firstElement());
+    cb.append(BSON("" << 6).firstElement());
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedThenScalarSkip) {
+    // After exiting interleaved mode, seenLiteral is reset. A skip in the scalar tail should be
+    // detected as non-dense.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 2));
+    cb.append(BSON("a" << 3 << "b" << 4));
+    cb.append(BSON("" << 5).firstElement());
+    cb.skip();
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, RLEBlockAfterInterleaved) {
+    // Hand-craft a BSONColumn with an interleaved section followed by an RLE block. The decoder
+    // carries the last interleaved row forward as baseline (see _exitInterleavedMode), and the
+    // trailing simple8b run starts with a fresh prevNonRLE = kSingleZero. The RLE word therefore
+    // repeats a zero delta against that baseline — not a missing — and the column is dense.
+    BufBuilder buf;
+
+    // Interleaved start (0xF1) + reference object.
+    BSONObj refObj = BSON("a" << int32_t(1));
+    buf.appendChar(char(0xF1));
+    buf.appendBuf(refObj.objdata(), refObj.objsize());
+
+    // Inner stream: a literal for the "a" field value, then a simple8b block with a zero delta.
+    // Literal: int32 type byte + null field name + int32 value.
+    buf.appendChar(char(stdx::to_underlying(BSONType::numberInt)));
+    buf.appendChar(char('\0'));
+    buf.appendNum(int32_t(1));
+
+    // Simple8b control (1 block) + block with a single zero delta.
+    buf.appendChar(char(0x80));
+    buf.appendNum(simple8b::kSingleZero);
+
+    // Interleaved end sentinel.
+    buf.appendChar(char(0x00));
+
+    // After interleaved: simple8b control with an RLE block, no preceding literal.
+    buf.appendChar(char(0x80));
+    buf.appendNum(static_cast<uint64_t>(simple8b_internal::kRleSelector));
+
+    // BSONColumn end sentinel.
+    buf.appendChar(char(0x00));
+
+    ASSERT_TRUE(dense(buf.buf(), buf.len()));
+
+    // Verify the hand-crafted binary is structurally valid by decoding it. If this throws, the
+    // binary is malformed and dense() may be returning the wrong answer for the wrong reason.
+    BSONColumn column(buf.buf(), buf.len());
+    for (auto&& elem : column) {
+        // Just iterating is enough to validate the structure.
+        (void)elem;
+    }
+}
+
+TEST(DenseTest, InterleavedManySkips) {
+    // A long run of outer skips inside interleaved mode makes every sub-stream missing at
+    // those rows; missCounts reaches numStreams and dense is cleared.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 2));
+    cb.append(BSON("a" << 3 << "b" << 4));
+    for (int i = 0; i < 300; ++i) {
+        cb.skip();
+    }
+    cb.append(BSON("a" << 5 << "b" << 6));
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedMisalignedMissingsThreeStreams) {
+    // Three sub-streams, each with a missing at a different row. No row has all three missing,
+    // so the column is dense. Pre-exact detection, dense() returned false here because no
+    // stream was individually dense.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 1 << "c" << 1));
+    cb.append(BSON("b" << 2 << "c" << 2));  // a missing
+    cb.append(BSON("a" << 3 << "c" << 3));  // b missing
+    cb.append(BSON("a" << 4 << "b" << 4));  // c missing
+    cb.append(BSON("a" << 5 << "b" << 5 << "c" << 5));
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedAllStreamsMissAtRow) {
+    // Three sub-streams, one outer skip. Every sub-stream is missing at the skip row; missCounts
+    // reaches numStreams and dense is cleared.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 1 << "c" << 1));
+    cb.append(BSON("a" << 2 << "b" << 2 << "c" << 2));
+    cb.skip();
+    cb.append(BSON("a" << 3 << "b" << 3 << "c" << 3));
+    auto bin = cb.finalize();
+    ASSERT_FALSE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedLargeSection) {
+    // Two streams, 1200 rows. Stream "a" is missing at row 1050 — past the 1024-row inline
+    // capacity of missCounts — forcing a resize inside the visitMissing lambda's grow path.
+    // Stream "b" is present at every row, so no row is all-missing and the column is dense.
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 1200; ++i) {
+        if (i == 1050) {
+            cb.append(BSON("b" << (i * 2)));  // "a" missing at row 1050
+        } else {
+            cb.append(BSON("a" << i << "b" << (i * 2)));
+        }
+    }
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedLargeJumpToFirstMiss) {
+    // Two streams, 5000 rows, with stream "a" first missing at row 4000 — well past the
+    // 1024-row initial capacity and also past 2 * 1024. On the first miss, missCounts.size()
+    // is still 1024, so the doubling arm (size() * 2 = 2048) is smaller than row + 1 = 4001;
+    // the std::max in the resize is what prevents an out-of-bounds write. Stream "b" is
+    // present at every row, so the column is dense.
+    BSONColumnBuilder<> cb;
+    for (int i = 0; i < 5000; ++i) {
+        if (i == 4000) {
+            cb.append(BSON("b" << (i * 2)));  // "a" missing at row 4000
+        } else {
+            cb.append(BSON("a" << i << "b" << (i * 2)));
+        }
+    }
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
+
+TEST(DenseTest, InterleavedBackToBackSections) {
+    // Two object groups separated by scalar literals: if the builder emits two interleaved
+    // sections this exercises the between-sections reset of missCounts and the heap.
+    BSONColumnBuilder<> cb;
+    cb.append(BSON("a" << 1 << "b" << 1));
+    cb.append(BSON("a" << 2 << "b" << 2));
+    cb.append(BSON("" << 100).firstElement());
+    cb.append(BSON("" << 101).firstElement());
+    cb.append(BSON("x" << 10 << "y" << 20));
+    cb.append(BSON("x" << 30 << "y" << 40));
+    auto bin = cb.finalize();
+    ASSERT_TRUE(dense(bin));
+}
 
 }  // namespace
 }  // namespace mongo::bsoncolumn

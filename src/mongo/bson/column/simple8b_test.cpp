@@ -1562,3 +1562,165 @@ TEST(Simple8b, ResetRLEAfterLargeValue) {
     ASSERT_TRUE((blocks[1] & simple8b_internal::kBaseSelectorMask) ==
                 simple8b_internal::kRleSelector);
 }
+
+// Helper: build a simple8b buffer from a sequence of values and return dense() on it.
+template <typename T>
+bool denseForValues(const std::vector<boost::optional<T>>& values) {
+    auto [buffer, size] = buildSimple8b(values);
+    return simple8b::dense(buffer.get(), size);
+}
+
+TEST(Simple8b, IsDenseEmpty) {
+    // An empty buffer has no missing values.
+    const char dummy = 0;
+    ASSERT_TRUE(simple8b::dense(&dummy, 0));
+}
+
+TEST(Simple8b, IsDenseSingleValue) {
+    ASSERT_TRUE(denseForValues<uint64_t>({1}));
+}
+
+TEST(Simple8b, IsDenseSingleMissing) {
+    ASSERT_FALSE(denseForValues<uint64_t>({boost::none}));
+}
+
+// --- Selector 1 (OneDecoder): 1-bit slots where 0=value, 1=missing ---
+
+TEST(Simple8b, IsDenseSelector1AllZeros) {
+    // Appending only zeros forces selector 1 (OneDecoder) since 0 fits in 1 bit.
+    std::vector<boost::optional<uint64_t>> zeros(60, uint64_t{0});
+    ASSERT_TRUE(denseForValues(zeros));
+}
+
+TEST(Simple8b, IsDenseSelector1WithMissing) {
+    std::vector<boost::optional<uint64_t>> vals(60, uint64_t{0});
+    vals[30] = boost::none;
+    ASSERT_FALSE(denseForValues(vals));
+}
+
+// --- Selectors 2-6 (TableDecoder, small bit widths) ---
+
+TEST(Simple8b, IsDenseSmallValuesDense) {
+    // Values 1 and 2 force selectors in the 2-3 bit range (TableDecoder).
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 60; ++i)
+        vals.push_back(static_cast<uint64_t>((i % 2) + 1));
+    ASSERT_TRUE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseSmallValuesWithMissing) {
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 60; ++i)
+        vals.push_back(uint64_t{1});
+    vals[15] = boost::none;
+    ASSERT_FALSE(denseForValues(vals));
+}
+
+// --- Selector 9 (TableDecoder<10>) and selectors 10-14 (SimpleDecoder) ---
+
+TEST(Simple8b, IsDenseMediumValuesDense) {
+    // Values around 2^9 force TableDecoder<10> (selector 9).
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 20; ++i)
+        vals.push_back(static_cast<uint64_t>(500 + i));
+    ASSERT_TRUE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseMediumValuesWithMissing) {
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 20; ++i)
+        vals.push_back(static_cast<uint64_t>(500 + i));
+    vals[10] = boost::none;
+    ASSERT_FALSE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseLargeValuesDense) {
+    // Values requiring many bits force SimpleDecoder selectors (10-14).
+    // Append 24-bit numbers to force two 30-bit slots per block.
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 10; ++i)
+        vals.push_back(uint64_t{0x00FF'FFFF});
+    ASSERT_TRUE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseLargeValuesWithMissing) {
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 10; ++i)
+        vals.push_back(uint64_t{0x00FF'FFFF});
+    vals[4] = boost::none;
+    ASSERT_FALSE(denseForValues(vals));
+}
+
+// --- Extended selectors 7.x and 8.x (ExtendedDecoder) ---
+
+TEST(Simple8b, IsDenseExtendedSelectorDense) {
+    // 0xC000'0000'0000'0000 can only be stored in an extended selector (trailing-zero encoding).
+    std::vector<boost::optional<uint64_t>> vals(7, uint64_t{0xC000'0000'0000'0000});
+    ASSERT_TRUE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseExtendedSelectorWithMissing) {
+    std::vector<boost::optional<uint64_t>> vals(7, uint64_t{0xC000'0000'0000'0000});
+    vals[3] = boost::none;
+    ASSERT_FALSE(denseForValues(vals));
+}
+
+// --- RLE blocks ---
+
+TEST(Simple8b, IsDenseRLENonMissing) {
+    // Enough identical values to produce an RLE block; the RLE value is non-missing.
+    std::vector<boost::optional<uint64_t>> vals(simple8b_internal::kRleMultiplier * 2, uint64_t{5});
+    ASSERT_TRUE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseRLENonMissingCraftedBinary) {
+    // Crafted binary: kSingleZero (prevNonRLE=zero) followed by an RLE block.
+    // The RLE block repeats zero, which is not missing → dense.
+    BufBuilder buf;
+    buf.appendNum(simple8b::kSingleZero);
+    // Append an RLE block with kRleMultiplier repeated zeroes.
+    buf.appendNum(static_cast<uint64_t>(simple8b_internal::kRleSelector));
+    auto size = buf.len();
+    auto data = buf.release();
+    ASSERT_TRUE(simple8b::dense(data.get(), size));
+}
+
+TEST(Simple8b, IsDenseRLEMissing) {
+    // Crafted binary: kSingleSkip (prevNonRLE=missing) followed by an RLE block.
+    // The RLE block repeats the missing value → not dense.
+    BufBuilder buf;
+    buf.appendNum(simple8b::kSingleSkip);
+    // Append an RLE block with kRleMultiplier repeated missing values.
+    buf.appendNum(static_cast<uint64_t>(simple8b_internal::kRleSelector));
+    auto size = buf.len();
+    auto data = buf.release();
+    ASSERT_FALSE(simple8b::dense(data.get(), size));
+}
+
+// --- Multiple blocks ---
+
+TEST(Simple8b, IsDenseMultipleBlocksDense) {
+    // Many values across multiple blocks, none missing.
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 200; ++i)
+        vals.push_back(static_cast<uint64_t>(i % 100 + 1));
+    ASSERT_TRUE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseMultipleBlocksMissingAtEnd) {
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 200; ++i)
+        vals.push_back(static_cast<uint64_t>(i % 100 + 1));
+    vals.push_back(boost::none);
+    ASSERT_FALSE(denseForValues(vals));
+}
+
+TEST(Simple8b, IsDenseMultipleBlocksMissingInMiddle) {
+    std::vector<boost::optional<uint64_t>> vals;
+    for (int i = 0; i < 100; ++i)
+        vals.push_back(static_cast<uint64_t>(i % 50 + 1));
+    vals.push_back(boost::none);
+    for (int i = 0; i < 100; ++i)
+        vals.push_back(static_cast<uint64_t>(i % 50 + 1));
+    ASSERT_FALSE(denseForValues(vals));
+}

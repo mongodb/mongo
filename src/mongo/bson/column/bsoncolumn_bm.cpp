@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/bson_element_storage.h"
+#include "mongo/bson/column/bsoncolumn_expressions.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -107,6 +108,32 @@ std::vector<BSONObj> generateObjects(int numObjects, int numElements) {
         for (int i = 0; i < numElements; ++i) {
             int32_t value = std::lround(d(gen));
             builderInner.append("x" + std::to_string(i), value);
+        }
+        builderOuter.appendElements(builderInner.obj());
+        objs.push_back(builderOuter.obj());
+    }
+
+    return objs;
+}
+
+// Like generateObjects, but inserts a whole-row skip (empty BSONObj → all interleaved streams
+// missing) at 'skipAt'. Pass skipAt < 0 or >= numObjects to produce a fully dense column.
+std::vector<BSONObj> generateObjectsWithSkip(int numObjects, int numElements, int skipAt) {
+    std::mt19937 gen(seedGen());
+    std::normal_distribution<> d(100, 10);
+
+    std::vector<BSONObj> objs;
+
+    for (int i = 0; i < numObjects; ++i) {
+        if (i == skipAt) {
+            objs.push_back(BSONObj{});
+            continue;
+        }
+        BSONObjBuilder builderOuter;
+        BSONObjBuilder builderInner;
+        for (int j = 0; j < numElements; ++j) {
+            int32_t value = std::lround(d(gen));
+            builderInner.append("x" + std::to_string(j), value);
         }
         builderOuter.appendElements(builderInner.obj());
         objs.push_back(builderOuter.obj());
@@ -453,6 +480,23 @@ void benchmarkCompression(benchmark::State& state,
                     100.0 * (1 - ((double)compressedElement.valuesize() / uncompressedSize))));
 }
 
+void benchmarkDense(benchmark::State& state, const BSONElement& compressedElement) {
+    int size = 0;
+    const char* binary = compressedElement.binData(size);
+    BSONBinData bin(binary, size, Column);
+
+    uint64_t totalBytes = 0;
+    uint64_t totalCalls = 0;
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(bsoncolumn::dense(bin));
+        totalBytes += size;
+        ++totalCalls;
+    }
+    state.SetItemsProcessed(totalCalls);
+    state.SetBytesProcessed(totalBytes);
+}
+
 void benchmarkReopen(benchmark::State& state, const BSONElement& compressedElement, int skipSize) {
     int size;
     const char* binary = compressedElement.binData(size);
@@ -693,6 +737,12 @@ void BM_compressStrings(benchmark::State& state,
 void BM_compressUUIDs(benchmark::State& state, int skipPercentage) {
     BSONObj compressed = buildCompressed(generateUUIDs(10000, skipPercentage, true));
     benchmarkCompression(state, compressed.firstElement(), 0);
+}
+
+void BM_denseInterleaved(benchmark::State& state, int numObjects, int numElements, int skipAt) {
+    BSONObj compressed =
+        buildCompressedWithObjs(generateObjectsWithSkip(numObjects, numElements, skipAt));
+    benchmarkDense(state, compressed.firstElement());
 }
 
 void BM_reopenIntegers(benchmark::State& state, int skipPercentage, int num) {
@@ -974,6 +1024,15 @@ BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 99 % / Num = 1000, 99, 1000);
 BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 0 % / Num = 10000, 0, 10000);
 BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 50 % / Num = 10000, 50, 10000);
 BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 99 % / Num = 10000, 99, 10000);
+
+// Dense-check benchmarks on interleaved columns. The "Dense" case has no skips (walks the whole
+// binary, returns true). The "Skip at X%" cases insert a single whole-row skip at the given
+// position, forcing dense=false at that point; the amount of binary walked after dense=false is
+// reached is where early-exit would save work.
+BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Dense, 10000, 10, -1);
+BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Skip at 1 %, 10000, 10, 100);
+BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Skip at 50 %, 10000, 10, 5000);
+BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Skip at 99 %, 10000, 10, 9900);
 
 }  // namespace
 }  // namespace mongo

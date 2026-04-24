@@ -143,5 +143,17 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                                 << ". minmax().second returned: " << minmaxMax.toString()
                                 << " but expected: " << expectedMax.toString());
     }
+
+    // Verify dense: should be true iff no decompressed elements are EOO (missing).
+    {
+        bool hasMissing = std::any_of(iteratorElems.begin(),
+                                      iteratorElems.end(),
+                                      [](const BSONElement& e) { return e.eoo(); });
+        bool result = bsoncolumn::dense(Data, Size);
+        invariant(result != hasMissing,
+                  str::stream() << "dense() returned " << result << " but hasMissing=" << hasMissing
+                                << ". Column: " << base64::encode(StringData(Data, Size)));
+    }
+
     return 0;
 }

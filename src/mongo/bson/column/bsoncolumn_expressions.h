@@ -45,6 +45,15 @@ size_t count(const char* buffer, size_t size);
 size_t count(BSONBinData bin);
 
 /**
+ * Returns true if the BSONColumn contains no missing values. For interleaved sections this is
+ * computed exactly: a row is a "missing" iff every interleaved sub-stream is missing at that row.
+ *
+ * Throws for invalid BSONColumn binaries, but may not throw for all types of invalid BSON.
+ */
+bool dense(const char* buffer, size_t size);
+bool dense(BSONBinData bin);
+
+/**
  * Return first non-missing element stored in this BSONColumn
  */
 template <class CMaterializer>

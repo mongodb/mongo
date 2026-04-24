@@ -38,6 +38,7 @@
 #include <cstdint>
 #include <iterator>
 #include <random>
+#include <vector>
 
 #include <benchmark/benchmark.h>
 #include <boost/cstdint.hpp>
@@ -283,6 +284,82 @@ void BM_prefixSumUnoptimized(benchmark::State& state) {
     state.SetBytesProcessed(totalBytes);
 }
 
+BufBuilder generateDenseIntegers() {
+    std::mt19937_64 seedGen(1337);
+    std::mt19937 gen(seedGen());
+    std::normal_distribution<> d(100, 10);
+
+    BufBuilder buffer;
+    auto writeFn = [&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
+
+    for (int i = 0; i < 10000; ++i) {
+        s8bBuilder.append(std::lround(d(gen)), writeFn);
+    }
+
+    s8bBuilder.flush(writeFn);
+    return buffer;
+}
+
+BufBuilder generateSparseIntegers() {
+    std::mt19937_64 seedGen(1337);
+    std::mt19937 gen(seedGen());
+    std::normal_distribution<> d(100, 10);
+    std::uniform_int_distribution skip(1, 100);
+
+    BufBuilder buffer;
+    auto writeFn = [&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
+
+    for (int i = 0; i < 10000; ++i) {
+        // 5% chance for missing
+        if (skip(gen) <= 5) {
+            s8bBuilder.skip(writeFn);
+        } else {
+            s8bBuilder.append(std::lround(d(gen)), writeFn);
+        }
+    }
+
+    s8bBuilder.flush(writeFn);
+    return buffer;
+}
+
+void BM_denseDense(benchmark::State& state) {
+    BufBuilder buffer = generateDenseIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    size_t totalBytes = 0;
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(simple8b::dense(buf.get(), size));
+        totalBytes += size;
+    }
+
+    state.SetBytesProcessed(totalBytes);
+}
+
+void BM_denseSparse(benchmark::State& state) {
+    BufBuilder buffer = generateSparseIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    size_t totalBytes = 0;
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(simple8b::dense(buf.get(), size));
+        totalBytes += size;
+    }
+
+    state.SetBytesProcessed(totalBytes);
+}
+
 BENCHMARK(BM_increasingValues)->Arg(100);
 BENCHMARK(BM_rle)->Arg(100);
 BENCHMARK(BM_changingSmallValues)->Arg(100);
@@ -293,5 +370,235 @@ BENCHMARK(BM_sum);
 BENCHMARK(BM_sumUnoptimized);
 BENCHMARK(BM_prefixSum);
 BENCHMARK(BM_prefixSumUnoptimized);
+// Block-level benchmark: calls decodeDense() on each block from dense data, accumulating the
+// result rather than early-returning. Isolates the per-block decoder cost.
+void BM_decodeDenseDense(benchmark::State& state) {
+    BufBuilder buffer = generateDenseIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    // Extract all blocks into a vector so we're not measuring ConstDataView overhead.
+    std::vector<uint64_t> blocks;
+    const char* ptr = buf.get();
+    const char* end = ptr + size;
+    while (ptr != end) {
+        blocks.push_back(ConstDataView(ptr).read<LittleEndian<uint64_t>>());
+        ptr += sizeof(uint64_t);
+    }
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        bool dense = true;
+        for (auto block : blocks) {
+            dense &= simple8b::decodeDense(block);
+        }
+        benchmark::DoNotOptimize(dense);
+        totalBytes += size;
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+// Same as above but with sparse data (contains missing values).
+void BM_decodeDenseSparse(benchmark::State& state) {
+    BufBuilder buffer = generateSparseIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    std::vector<uint64_t> blocks;
+    const char* ptr = buf.get();
+    const char* end = ptr + size;
+    while (ptr != end) {
+        blocks.push_back(ConstDataView(ptr).read<LittleEndian<uint64_t>>());
+        ptr += sizeof(uint64_t);
+    }
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        bool dense = true;
+        for (auto block : blocks) {
+            dense &= simple8b::decodeDense(block);
+        }
+        benchmark::DoNotOptimize(dense);
+        totalBytes += size;
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+// Generate dense integers with large values that require 12+ bits to encode (hits SimpleDecoder
+// selectors 10-14, which use 12/15/20/30/60-bit slots).
+BufBuilder generateDenseLargeIntegers() {
+    std::mt19937_64 seedGen(1337);
+    std::mt19937 gen(seedGen());
+    // Values around 1500 → zigzag ~3000 → needs ~12 bits → selector 10 (SimpleDecoder<12>)
+    std::normal_distribution<> d(1500, 100);
+
+    BufBuilder buffer;
+    auto writeFn = [&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
+
+    for (int i = 0; i < 10000; ++i) {
+        s8bBuilder.append(std::lround(d(gen)), writeFn);
+    }
+
+    s8bBuilder.flush(writeFn);
+    return buffer;
+}
+
+// Generate sparse integers with large values (5% missing).
+BufBuilder generateSparseLargeIntegers() {
+    std::mt19937_64 seedGen(1337);
+    std::mt19937 gen(seedGen());
+    std::normal_distribution<> d(1500, 100);
+    std::uniform_int_distribution skip(1, 100);
+
+    BufBuilder buffer;
+    auto writeFn = [&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
+
+    for (int i = 0; i < 10000; ++i) {
+        if (skip(gen) <= 5) {
+            s8bBuilder.skip(writeFn);
+        } else {
+            s8bBuilder.append(std::lround(d(gen)), writeFn);
+        }
+    }
+
+    s8bBuilder.flush(writeFn);
+    return buffer;
+}
+
+// End-to-end dense check on large-value dense data (exercises SimpleDecoder paths).
+void BM_denseDenseLarge(benchmark::State& state) {
+    BufBuilder buffer = generateDenseLargeIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(simple8b::dense(buf.get(), size));
+        totalBytes += size;
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+// End-to-end dense check on large-value sparse data.
+void BM_denseSparseLarge(benchmark::State& state) {
+    BufBuilder buffer = generateSparseLargeIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(simple8b::dense(buf.get(), size));
+        totalBytes += size;
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+// Block-level benchmark on large-value dense data.
+void BM_decodeDenseDenseLarge(benchmark::State& state) {
+    BufBuilder buffer = generateDenseLargeIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    std::vector<uint64_t> blocks;
+    const char* ptr = buf.get();
+    const char* end = ptr + size;
+    while (ptr != end) {
+        blocks.push_back(ConstDataView(ptr).read<LittleEndian<uint64_t>>());
+        ptr += sizeof(uint64_t);
+    }
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        bool dense = true;
+        for (auto block : blocks) {
+            dense &= simple8b::decodeDense(block);
+        }
+        benchmark::DoNotOptimize(dense);
+        totalBytes += size;
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+// Generate dense data that hits extended selectors (7.x / 8.x). Values are small bases shifted
+// left by varying amounts, producing trailing zeros that the encoder represents with extended
+// selectors.
+BufBuilder generateDenseExtendedIntegers() {
+    std::mt19937_64 seedGen(1337);
+    std::mt19937 gen(seedGen());
+    std::uniform_int_distribution<uint64_t> base(1, 3);
+    std::uniform_int_distribution<int> shift(8, 16);
+
+    BufBuilder buffer;
+    auto writeFn = [&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
+
+    for (int i = 0; i < 10000; ++i) {
+        s8bBuilder.append(base(gen) << shift(gen), writeFn);
+    }
+
+    s8bBuilder.flush(writeFn);
+    return buffer;
+}
+
+// End-to-end dense check on extended-selector data.
+void BM_denseDenseExtended(benchmark::State& state) {
+    BufBuilder buffer = generateDenseExtendedIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(simple8b::dense(buf.get(), size));
+        totalBytes += size;
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+// Block-level dense check on extended-selector data.
+void BM_decodeDenseDenseExtended(benchmark::State& state) {
+    BufBuilder buffer = generateDenseExtendedIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    std::vector<uint64_t> blocks;
+    const char* ptr = buf.get();
+    const char* end = ptr + size;
+    while (ptr != end) {
+        blocks.push_back(ConstDataView(ptr).read<LittleEndian<uint64_t>>());
+        ptr += sizeof(uint64_t);
+    }
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        bool dense = true;
+        for (auto block : blocks) {
+            dense &= simple8b::decodeDense(block);
+        }
+        benchmark::DoNotOptimize(dense);
+        totalBytes += size;
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+BENCHMARK(BM_denseDense);
+BENCHMARK(BM_denseSparse);
+BENCHMARK(BM_decodeDenseDense);
+BENCHMARK(BM_decodeDenseSparse);
+BENCHMARK(BM_denseDenseLarge);
+BENCHMARK(BM_denseSparseLarge);
+BENCHMARK(BM_decodeDenseDenseLarge);
+BENCHMARK(BM_denseDenseExtended);
+BENCHMARK(BM_decodeDenseDenseExtended);
 
 }  // namespace mongo
