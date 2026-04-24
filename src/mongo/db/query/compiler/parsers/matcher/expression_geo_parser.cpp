@@ -277,7 +277,9 @@ Status parseGeoExpressionFromBSON(const BSONObj& obj, GeoExpression& expr) {
     // into STRICT_SPHERE CRS.
     if (STRICT_SPHERE == expr.getGeometry().getNativeCRS()) {
         if (!expr.getGeometry().supportsProject(SPHERE)) {
-            return Status(ErrorCodes::BadValue, "only polygon supported with strict winding order");
+            return Status(ErrorCodes::BadValue,
+                          "strict winding order CRS is only supported for a standalone Polygon "
+                          "query geometry");
         }
         expr.getGeometryPtr()->projectInto(SPHERE);
     }

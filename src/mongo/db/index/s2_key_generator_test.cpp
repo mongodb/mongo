@@ -717,4 +717,38 @@ TEST_F(S2KeyGeneratorTest, VerifyS2RoundingBehavior) {
     ASSERT_EQ(944920918, MathUtil::FastIntRound(point));
     ASSERT_EQ(944920918LL, MathUtil::FastInt64Round(point));
 }
+
+// A GeometryCollection containing a strict-winding polygon must not crash the server during
+// 2dsphere index key generation. getNativeCRS() returns STRICT_SPHERE for such a collection, which
+// triggers the "don't index big polygon" guard in S2GetKeysForElement before any null s2Polygon is
+// dereferenced.
+TEST_F(S2KeyGeneratorTest, StrictWindingPolygonInGeometryCollectionRejectsGracefully) {
+    BSONObj keyPattern = fromjson("{geo: '2dsphere'}");
+    BSONObj infoObj = fromjson("{key: {geo: '2dsphere'}, '2dsphereIndexVersion': 3}");
+    S2IndexingParams params;
+    const CollatorInterface* collator = nullptr;
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
+
+    BSONObj doc = fromjson(
+        "{geo: {type: 'GeometryCollection', geometries: ["
+        "  {type: 'Polygon', coordinates: [[[0,0],[5,0],[5,5],[0,5],[0,0]]],"
+        "   crs: {type: 'name', properties:"
+        "         {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}}}"
+        "]}}");
+
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+    ASSERT_THROWS_CODE(
+        index2dsphere::getS2Keys(allocator,
+                                 doc,
+                                 keyPattern,
+                                 params,
+                                 &keys,
+                                 &multikeyPaths,
+                                 key_string::Version::kLatestVersion,
+                                 SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                                 Ordering::make(BSONObj())),
+        DBException,
+        16755);
+}
 }  // namespace
