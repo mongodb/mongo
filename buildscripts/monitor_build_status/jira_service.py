@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, NamedTuple, Optional
 
@@ -14,12 +14,13 @@ UNASSIGNED_LABEL = "~ Unassigned"
 
 class JiraCustomFieldId(str, Enum):
     ASSIGNED_TEAMS = "customfield_12751"
+    TEAM_ASSIGNMENT_DURATION = "customfield_28251"
 
 
 class IssueTuple(NamedTuple):
     key: str
     assigned_team: str
-    created_time: datetime
+    team_assignment_duration_hours: int
 
     @classmethod
     def from_jira_issue(cls, issue: Issue) -> IssueTuple:
@@ -32,11 +33,17 @@ class IssueTuple(NamedTuple):
         assigned_team = (
             cls._get_first_value(issue, JiraCustomFieldId.ASSIGNED_TEAMS) or UNASSIGNED_LABEL
         )
+        raw_duration = getattr(issue.fields, JiraCustomFieldId.TEAM_ASSIGNMENT_DURATION, None)
+        if raw_duration is not None:
+            duration_hours = int(raw_duration)
+        else:
+            created_time = dateutil.parser.parse(issue.fields.created)
+            duration_hours = int((datetime.now(timezone.utc) - created_time).total_seconds() / 3600)
 
         return cls(
             key=issue.key,
             assigned_team=assigned_team,
-            created_time=dateutil.parser.parse(issue.fields.created),
+            team_assignment_duration_hours=duration_hours,
         )
 
     @staticmethod

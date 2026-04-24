@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable, NamedTuple, Optional
 
@@ -75,21 +74,23 @@ class IssueReport(NamedTuple):
     def get_issue_count(
         self,
         category: IssueCategory,
-        include_items_older_than_time: Optional[datetime] = None,
+        min_team_assignment_duration_hours: Optional[int] = None,
         assigned_teams: Optional[list[str]] = None,
     ) -> int:
         """
         Calculate Issue count for a given criteria.
 
         :param category: Issue category.
-        :param include_items_older_than_time: Count Items that have created date older than provided time.
+        :param min_team_assignment_duration_hours: Only count issues where the team assignment
+            duration (customfield_28250) is at least this many hours. Issues below this
+            threshold are still within the grace period and are excluded.
         :param assigned_teams: List of Assigned teams criterion, all teams if None.
         :return: Item count.
         """
         total_issue_count = 0
 
-        if include_items_older_than_time is None:
-            include_items_older_than_time = datetime.now(timezone.utc)
+        if min_team_assignment_duration_hours is None:
+            min_team_assignment_duration_hours = 0
 
         team_reports = self.team_reports.values()
         if assigned_teams is not None:
@@ -104,7 +105,11 @@ class IssueReport(NamedTuple):
             if category == IssueCategory.COLD:
                 issues = team_report.cold
             total_issue_count += len(
-                [item for item in issues if item.created_time < include_items_older_than_time]
+                [
+                    item
+                    for item in issues
+                    if item.team_assignment_duration_hours >= min_team_assignment_duration_hours
+                ]
             )
 
         return total_issue_count

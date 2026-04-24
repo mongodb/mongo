@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import requests
@@ -138,7 +137,6 @@ class MonitorBuildStatusOrchestrator:
     def _get_issue_counts_status(
         self, scope_name: str, issue_report: IssueReport, notification_config: NotificationsConfig
     ) -> tuple[str, dict[str, list[float]], set[str]]:
-        now = datetime.now(timezone.utc)
         percentages: dict[str, list[float]] = {}
         zero_quota_labels: set[str] = set()
 
@@ -208,11 +206,11 @@ class MonitorBuildStatusOrchestrator:
             ORG_OVERALL,
             issue_report.get_issue_count(
                 IssueCategory.HOT,
-                now - timedelta(days=overall_thresholds.hot.grace_period_days),
+                overall_thresholds.hot.grace_period_days * 24,
             ),
             issue_report.get_issue_count(
                 IssueCategory.COLD,
-                now - timedelta(days=overall_thresholds.cold.grace_period_days),
+                overall_thresholds.cold.grace_period_days * 24,
             ),
             overall_thresholds,
             overall_slack_tags,
@@ -226,12 +224,12 @@ class MonitorBuildStatusOrchestrator:
                 f"[Group] {group_name}",
                 issue_report.get_issue_count(
                     IssueCategory.HOT,
-                    now - timedelta(days=group_thresholds.hot.grace_period_days),
+                    group_thresholds.hot.grace_period_days * 24,
                     group_teams,
                 ),
                 issue_report.get_issue_count(
                     IssueCategory.COLD,
-                    now - timedelta(days=group_thresholds.cold.grace_period_days),
+                    group_thresholds.cold.grace_period_days * 24,
                     group_teams,
                 ),
                 group_thresholds,
@@ -247,12 +245,12 @@ class MonitorBuildStatusOrchestrator:
                 f"[Team] {assigned_team}",
                 issue_report.get_issue_count(
                     IssueCategory.HOT,
-                    now - timedelta(days=team_thresholds.hot.grace_period_days),
+                    team_thresholds.hot.grace_period_days * 24,
                     [assigned_team],
                 ),
                 issue_report.get_issue_count(
                     IssueCategory.COLD,
-                    now - timedelta(days=team_thresholds.cold.grace_period_days),
+                    team_thresholds.cold.grace_period_days * 24,
                     [assigned_team],
                 ),
                 team_thresholds,
