@@ -16,6 +16,17 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {executeReshardCollection} from "jstests/concurrency/reshard_collection_util/reshard_collection_util.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_base.js";
 
+// QueryPlanKilled expected when resharding commits and drops the old collection UUID
+// while concurrent reads are still in-flight.
+const ignoreQueryPlanKilled = (fn) =>
+    function (db, collName, connCache) {
+        try {
+            fn.apply(this, arguments);
+        } catch (e) {
+            if (e.code !== ErrorCodes.QueryPlanKilled) throw e;
+        }
+    };
+
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.startState = "init";
     $config.data.partitionSize = 100;
@@ -60,6 +71,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         return shouldSkip;
     };
+
+    $config.states.deleteOne = ignoreQueryPlanKilled($super.states.deleteOne);
+    $config.states.deleteOneWithId = ignoreQueryPlanKilled($super.states.deleteOneWithId);
+    $config.states.findAndModify = ignoreQueryPlanKilled($super.states.findAndModify);
 
     $config.states.reshardCollection = function reshardCollection(db, collName, connCache) {
         executeReshardCollection(this, db, collName, connCache, false /*sameKeyResharding*/);
