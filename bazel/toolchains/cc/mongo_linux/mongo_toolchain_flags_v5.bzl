@@ -4,6 +4,8 @@ COMMON_LINK_FLAGS = [
     "external/mongo_toolchain_v5/v5/lib64",
 ]
 
+CLANG_MAJOR_VERSION = "22"
+
 COMMON_BUILTIN_INCLUDE_DIRECTORIES = [
     "/usr/include/openssl",
     "/usr/include/{arch}-mongodb-linux",
@@ -29,7 +31,7 @@ GCC_INCLUDE_DIRS = [
 
 CLANG_INCLUDE_DIRS = [
     "external/mongo_toolchain_v5/stow/gcc-v5/include/c++/14.2.0/backward",
-    "external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",
+    "external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/%s/include" % CLANG_MAJOR_VERSION,
 ]
 
-CLANG_RESOURCE_DIR = "external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/"
+CLANG_RESOURCE_DIR = "external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/%s/" % CLANG_MAJOR_VERSION
