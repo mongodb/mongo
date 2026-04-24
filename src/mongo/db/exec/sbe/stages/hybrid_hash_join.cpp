@@ -110,8 +110,14 @@ public:
     }
 
     void saveState() override {
-        _probeKey.makeOwned();
-        _probeProject.makeOwned();
+        // _probeKey/_probeProject are views that may dangle across
+        // a yield. Own them if the cursor has pending matches (upstream reads them
+        // back via MatchResult); skip otherwise — they'll be overwritten before
+        // any next read, and dereferencing dangling views would crash.
+        if (_htIt != _htItEnd) {
+            _probeKey.makeOwned();
+            _probeProject.makeOwned();
+        }
     }
 
 private:
