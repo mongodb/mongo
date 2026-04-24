@@ -32,6 +32,7 @@
 #include "mongo/scripting/deadline_monitor.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 
 #include <vector>
@@ -77,11 +78,11 @@ public:
     }
     void interrupt() {}
     bool isKillPending() {
-        return killPending;
+        return killPending.load();
     }
     TaskGroup* _group;
     uint64_t _killed;
-    bool killPending = false;
+    Atomic<bool> killPending{false};
 };
 
 // single task expires before stopping the deadline
@@ -187,7 +188,7 @@ TEST(DeadlineMonitor, IsKillPendingKills) {
     TaskGroup group;
     Task task(&group);
     dm.startDeadline(&task, -1);
-    task.killPending = true;
+    task.killPending.store(true);
     group.waitForKillCount(1);
     ASSERT(task._killed);
 }
