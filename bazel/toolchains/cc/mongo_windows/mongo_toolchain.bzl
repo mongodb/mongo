@@ -147,6 +147,7 @@ def _impl_gen_windows_toolchain_build_file(ctx):
 generate_windows_toolchain_build_file = repository_rule(
     environ = [
         "BAZEL_VC_FULL_VERSION",  # Force re-compute if the user changed the version of MS compiler.
+        "BAZEL_WINSDK_FULL_VERSION",  # Recompute if the Windows SDK pin is overridden.
     ],
     implementation = _impl_gen_windows_toolchain_build_file,
     attrs = {
