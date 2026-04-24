@@ -769,10 +769,10 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
     if (BEHIND == orientation) {
         // Tell the caller to move forward to the start of the current interval.
         out->keyPrefix = key.getOwned();
-        out->prefixLen = firstNonContainedField;
+        out->prefixLen = static_cast<int>(firstNonContainedField);
         out->firstExclusive = -1;
 
-        for (int j = _curInterval.size() - 1; j >= out->prefixLen; --j) {
+        for (int j = static_cast<int>(_curInterval.size()) - 1; j >= out->prefixLen; --j) {
             const OrderedIntervalList& oil = _bounds->fields[j];
             out->keySuffix[j] = oil.intervals[_curInterval[j]].start;
             if (!oil.intervals[_curInterval[j]].startInclusive) {
