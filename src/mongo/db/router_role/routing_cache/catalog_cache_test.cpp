@@ -319,7 +319,6 @@ TEST_F(CatalogCacheTest, AdvanceTimeInStoreForSingleCollectionOnShardRemoval) {
 }
 
 TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
-    // onStaleDatabaseVesrsion must invalidate the database entry if invoked with no version
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
 

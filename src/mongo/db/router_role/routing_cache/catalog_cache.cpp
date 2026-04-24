@@ -562,18 +562,16 @@ StatusWith<CurrentChunkManager> CatalogCache::getCollectionPlacementInfoWithRefr
 
 void CatalogCache::onStaleDatabaseVersion(const DatabaseName& dbName,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
-    if (databaseVersion) {
-        const auto version =
-            ComparableDatabaseVersion::makeComparableDatabaseVersion(databaseVersion.value());
-        LOGV2_FOR_CATALOG_REFRESH(4899101,
-                                  2,
-                                  "Registering new database version",
-                                  "db"_attr = dbName,
-                                  "version"_attr = version);
-        _databaseCache.advanceTimeInStore(dbName, version);
-    } else {
-        _databaseCache.invalidateKey(dbName);
-    }
+    const auto newDbVersion = databaseVersion
+        ? ComparableDatabaseVersion::makeComparableDatabaseVersion(*databaseVersion)
+        : ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh();
+    LOGV2_FOR_CATALOG_REFRESH(4899101,
+                              2,
+                              "Registering new database version",
+                              "db"_attr = dbName,
+                              "version"_attr = newDbVersion);
+
+    _databaseCache.advanceTimeInStore(dbName, newDbVersion);
 }
 
 void CatalogCache::onStaleCollectionVersion(const NamespaceString& nss,
