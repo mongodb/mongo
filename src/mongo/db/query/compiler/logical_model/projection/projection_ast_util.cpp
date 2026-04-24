@@ -184,8 +184,21 @@ public:
 
     void visit(const MatchExpressionASTNode* node) override {
         if (_context->data().underElemMatch) {
-            static_cast<const MatchExpressionASTNode*>(node)->matchExpression()->serialize(
-                &_builders.top(), _options);
+            const auto& me = node->matchExpression();
+
+            // When a projection's $elemMatch starts with a "$", PathMatchExpression::serialize
+            // wraps the $-prefixed path in "$_internalPath", producing a shape that is not valid
+            // projection syntax and cannot be re-parsed for querystats. Therefore we have to
+            // construct a re-parseable projection: "{$<path>: {$elemMatch: <rhs of equality>}}".
+            const StringData path = me->path();
+            if (path.starts_with('$') && _options.isSerializingForQueryStats()) {
+                BSONObjBuilder fieldSub(
+                    _builders.top().subobjStart(_options.serializeFieldPathFromString(path)));
+                BSONObjBuilder elemMatchSub(fieldSub.subobjStart("$elemMatch"));
+                me->serialize(&elemMatchSub, _options, /*includePath*/ false);
+            } else {
+                me->serialize(&_builders.top(), _options);
+            }
         }
     }
 };
