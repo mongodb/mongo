@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_test_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -92,9 +93,14 @@ public:
 
         // This is required to be able to run prepared transactions.
         setGlobalReplSettings(replicationCoordinator()->getSettings());
+
+        // Required by the awaitData wait path the monitor's getMore now engages.
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
     }
 
     void tearDown() override {
+        WaitForMajorityService::get(getServiceContext()).shutDown();
+
         tearDownExecutors({executor, cleanupExecutor, markKilledExecutor});
 
         ShardServerTestFixtureWithCatalogCacheMock::tearDown();
@@ -556,6 +562,40 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
 
     // Verify that the cursor got killed.
     ASSERT_FALSE(hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID)));
+    awaitCompletion.get();
+}
+
+TEST_F(ReshardingChangeStreamsMonitorTest, ExitsPromptlyWhenChangeStreamInvalidates) {
+    // Short batchTimeLimit so a busy loop would be visibly slow.
+    RAIIServerParameterControllerForTest batchTimeOverride{
+        "reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds", 3};
+
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 0 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);
+    auto awaitCompletion =
+        monitor->startMonitoring(executor, cleanupExecutor, cancelSource.token(), factory);
+
+    // Wait for the monitor to open its cursor.
+    resharding_test_util::assertSoon(opCtx, [&] {
+        return hasOpenCursor(tempNss, monitor->makeAggregateComment(reshardingUUID));
+    });
+
+    // Drop the watched collection to invalidate the change stream.
+    const auto invalidateStart = Date_t::now();
+    DBDirectClient client(opCtx);
+    client.dropCollection(tempNss);
+
+    auto status = monitor->awaitFinalChangeEvent().getNoThrow();
+    const auto exitLatency = Date_t::now() - invalidateStart;
+
+    ASSERT_EQ(status.code(), ErrorCodes::CursorNotFound) << "Unexpected status: " << status;
+    // Exit should be well under batchTimeLimit (3s) - no busy loop.
+    ASSERT_LT(exitLatency, Milliseconds{1500}) << exitLatency.toString();
+
+    monitor->awaitCleanup().get();
     awaitCompletion.get();
 }
 

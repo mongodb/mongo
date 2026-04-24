@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -355,15 +356,25 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
                auto cursor = _makeDBClientCursor(&client);
 
                while (!batch.shouldDispose()) {
+                   // The mongod getMore handler skips setting the awaitData deadline on the
+                   // DBDirectClient path, so set it here.
+                   const Milliseconds getMoreMaxTime{
+                       resharding::gReshardingVerificationChangeStreamsGetMoreMaxTimeMS.load()};
+                   setAwaitDataDeadline(opCtx.get(),
+                                        opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                            getMoreMaxTime);
+
                    if (cursor->more()) {
                        auto doc = cursor->next();
                        batch.add(doc);
-                   } else {
-                       // TODO (SERVER-101189): Make each getMore command in
-                       // ReshardingChangeStreamsMonitor wait longer for change events.
-                       opCtx->sleepFor(Milliseconds(
-                           resharding::gReshardingVerificationChangeStreamsSleepMS.load()));
+                       continue;
                    }
+
+                   // A dead cursor makes more() return false without issuing a getMore; fail fast
+                   // instead of busy looping until the batch time limit.
+                   uassert(ErrorCodes::CursorNotFound,
+                           "Change streams monitor cursor is no longer open on the server",
+                           !cursor->isDead());
                }
 
                // If there are remaining events in the last getMore batch, process all of them

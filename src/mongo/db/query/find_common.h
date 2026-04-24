@@ -61,6 +61,11 @@ struct AwaitDataState {
 
 extern const OperationContext::Decoration<AwaitDataState> awaitDataState;
 
+/**
+ * Sets the deadline by which the server-side awaitData wait on 'opCtx' must complete.
+ */
+MONGO_MOD_PUBLIC void setAwaitDataDeadline(OperationContext* opCtx, Date_t deadline);
+
 class CanonicalQuery;
 class FindCommandRequest;
 

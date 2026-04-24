@@ -443,6 +443,22 @@ server_parameters:
             gte: 0
         redact: false
 
+    reshardingVerificationChangeStreamsGetMoreMaxTimeMS:
+        description: >-
+            The maximum time, in milliseconds, that the ReshardingChangeStreamsMonitor's
+            change-stream getMore command waits for new events before returning an empty
+            batch. Implemented by setting the awaitData deadline on the monitor's operation
+            context; the server-side awaitData wait exits on deadline or on operation-context
+            interrupt, whichever comes first.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationChangeStreamsGetMoreMaxTimeMS
+        default:
+            expr: 1000
+        validator:
+            gte: 1
+        redact: false
+
     reshardingWaitForReplicationIntervalMilliseconds:
         description: >-
             The amount of time to wait before retrying after a failed replication lag wait.

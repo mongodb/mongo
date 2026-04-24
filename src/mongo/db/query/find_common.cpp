@@ -65,6 +65,10 @@ MONGO_FAIL_POINT_DEFINE(failGetMoreAfterCursorCheckout);
 const OperationContext::Decoration<AwaitDataState> awaitDataState =
     OperationContext::declareDecoration<AwaitDataState>();
 
+void setAwaitDataDeadline(OperationContext* opCtx, Date_t deadline) {
+    awaitDataState(opCtx).waitForInsertsDeadline = deadline;
+}
+
 const size_t FindCommon::kMaxBytesToReturnToClientAtOnce = BSONObjMaxUserSize;
 const size_t FindCommon::kTailableGetMoreReplyBufferSize = BSONObjMaxUserSize / 2 - 1024;
 const size_t FindCommon::kMinDocSizeForGetMorePreAllocation = 1024;
