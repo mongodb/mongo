@@ -124,7 +124,7 @@ Status start(OperationContext* opCtx,
         opCtx, coll.nss(), collectionUUID, buildUUID, indexes, /*fromMigrate=*/false);
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [dbName = std::move(dbName), collectionUUID, buildUUID, indexes = std::move(indexes)](
-            OperationContext* opCtx, boost::optional<Timestamp>) {
+            OperationContext* opCtx, boost::optional<Timestamp>) mutable {
             _registry(opCtx->getServiceContext())
                 .add(buildUUID, std::move(dbName), collectionUUID, std::move(indexes));
         });
