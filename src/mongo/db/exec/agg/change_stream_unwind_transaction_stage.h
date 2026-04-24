@@ -47,6 +47,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <stack>
 #include <vector>
@@ -111,6 +112,8 @@ private:
             // 'txnOpIndex' points to the _next_ transaction index, so we must subtract one to get
             // the index of the entry being examined right now.
             invariant(_txnOpIndex >= 1);
+            invariant(_txnOpIndex - 1 <=
+                      static_cast<size_t>(std::numeric_limits<long long>::max()));
             return _txnOpIndex - 1;
         }
 
@@ -118,6 +121,8 @@ private:
             // 'currentApplyOpsIndex' points to the _next_ 'applyOps' index, so we must subtract one
             // to get the index of the entry being examined right now.
             invariant(_currentApplyOpsIndex >= 1);
+            invariant(_currentApplyOpsIndex - 1 <=
+                      static_cast<size_t>(std::numeric_limits<long long>::max()));
             return _currentApplyOpsIndex - 1;
         }
 
