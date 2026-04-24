@@ -3585,6 +3585,18 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
             "Collection contains the 'rangePreview' query type which is deprecated. Please "
             "recreate the collection with the 'range' query type.",
             !hasQueryType(efc, QueryTypeEnum::RangePreviewDeprecated));
+    if (gFeatureFlagQEPrefixSuffixSearch.isEnabledUseLastLTSFCVWhenUninitialized(
+            kVersionContextIgnored_UNSAFE,
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        uassert(12341602,
+                "Collection contains the 'prefixPreview' query type which is deprecated. Please "
+                "recreate the collection with the 'prefix' query type.",
+                !hasQueryType(efc, QueryTypeEnum::PrefixPreviewDeprecated));
+        uassert(12341603,
+                "Collection contains the 'suffixPreview' query type which is deprecated. Please "
+                "recreate the collection with the 'suffix' query type.",
+                !hasQueryType(efc, QueryTypeEnum::SuffixPreviewDeprecated));
+    }
     return efc;
 }
 

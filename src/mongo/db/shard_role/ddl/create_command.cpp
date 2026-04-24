@@ -252,6 +252,17 @@ public:
                             "Cannot create a collection with an encrypted field with query type "
                             "suffix unless featureFlagQEPrefixSuffixSearch is enabled",
                             !hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Suffix));
+                } else {
+                    uassert(12341600,
+                            "Cannot create a collection with an encrypted field with query "
+                            "type prefixPreview, as it is deprecated",
+                            !hasQueryType(cmd.getEncryptedFields().get(),
+                                          QueryTypeEnum::PrefixPreviewDeprecated));
+                    uassert(12341601,
+                            "Cannot create a collection with an encrypted field with query "
+                            "type suffixPreview, as it is deprecated",
+                            !hasQueryType(cmd.getEncryptedFields().get(),
+                                          QueryTypeEnum::SuffixPreviewDeprecated));
                 }
             }
 

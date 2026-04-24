@@ -1,24 +1,21 @@
 /**
- * Test downgrade to incompatible versions is blocked if substringPreview,
- * suffixPreview, or prefixPreview query types are being used in a FLE2 collection.
+ * Test downgrade to incompatible versions is blocked if "suffix" or "prefix" query types
+ * are being used in a FLE2 collection.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
-import {PrefixField, SubstringField, SuffixAndPrefixField, SuffixField} from "jstests/fle2/libs/qe_text_search_util.js";
+import {PrefixField, SuffixAndPrefixField, SuffixField} from "jstests/fle2/libs/qe_text_search_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const dbName = "qe_text_downgrade_test";
-const forcePreview = true;
-const substrField = new SubstringField(20, 2, 10, false, false, 1, forcePreview);
-const suffixField = new SuffixField(2, 5, true, false, 1, forcePreview);
-const prefixField = new PrefixField(2, 5, false, true, 1, forcePreview);
-const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1, forcePreview);
+const dbName = "qe_prefix_suffix_downgrade_test";
+const suffixField = new SuffixField(2, 5, true, false, 1);
+const prefixField = new PrefixField(2, 5, false, true, 1);
+const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1);
 
 function testBinaryDowngrade(queryTypeConfig) {
     jsTest.log.info("Testing downgrade from latest to last-lts");
-    const rst = new ReplSetTest({nodes: 2});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: {featureFlagQEPrefixSuffixSearch: true}}});
     rst.startSet();
     rst.initiate();
 
@@ -41,29 +38,6 @@ function testBinaryDowngrade(queryTypeConfig) {
             },
         }),
     );
-
-    // if featureFlagQEPrefixSuffixSearch is enabled, assert we can't create suffix or prefix
-    // preview types
-    // TODO: SERVER-118594 update this once featureFlagQEPrefixSuffixSearch is default-enabled
-    if (FeatureFlagUtil.isPresentAndEnabled(edb.getMongo(), "QEPrefixSuffixSearch")) {
-        if (!(queryTypeConfig instanceof SubstringField)) {
-            assert.commandFailed(
-                client.getDB().createCollection("basic_text", {
-                    encryptedFields: {
-                        "fields": [
-                            {
-                                path: "first",
-                                bsonType: "string",
-                                queries: queryTypeConfig.createQueryTypeDescriptor(),
-                            },
-                        ],
-                    },
-                }),
-            );
-            rst.stopSet();
-            return;
-        }
-    }
 
     assert.commandWorked(
         client.createEncryptionCollection("basic_text", {
@@ -93,14 +67,13 @@ function testBinaryDowngrade(queryTypeConfig) {
     );
 
     // Downgrade should now succeed
-    jsTestLog("Starting binary downgrade to last LTS");
+    jsTest.log.info("Starting binary downgrade to last LTS");
     rst.upgradeSet({binVersion: "last-lts", setParameter: {}});
-    jsTestLog("Finished binary downgrade to last LTS");
+    jsTest.log.info("Finished binary downgrade to last LTS");
 
     rst.stopSet();
 }
 
-testBinaryDowngrade(substrField);
 testBinaryDowngrade(suffixField);
 testBinaryDowngrade(prefixField);
 testBinaryDowngrade(comboField);
