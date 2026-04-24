@@ -625,29 +625,24 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
 
     // We may not have an up-to-date bucket for this RecordId. Fetch it and ensure that it still
     // exists and matches our bucket-level predicate if it is not believed to be up-to-date.
-    bool docStillMatches;
-
-    const auto status = handlePlanStageYield(
+    return handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage:: ensureStillMatches",
         [&] {
-            docStillMatches = write_stage_common::ensureStillMatches(collectionPtr(),
-                                                                     opCtx(),
-                                                                     _ws,
-                                                                     id,
-                                                                     _params.canonicalQuery,
-                                                                     _specificStats.docsFetched);
-            return PlanStage::NEED_TIME;
+            return write_stage_common::ensureStillMatches(collectionPtr(),
+                                                          opCtx(),
+                                                          _ws,
+                                                          id,
+                                                          _params.canonicalQuery,
+                                                          _specificStats.docsFetched)
+                ? PlanStage::ADVANCED
+                : PlanStage::NEED_TIME;
         },
         [&] {
             // yieldHandler
             // There was a problem trying to detect if the document still exists, so retry.
             _retryBucket(id);
         });
-    if (status != PlanStage::NEED_TIME) {
-        return status;
-    }
-    return docStillMatches ? PlanStage::ADVANCED : PlanStage::NEED_TIME;
 }
 
 void TimeseriesModifyStage::_retryBucket(WorkingSetID bucketId) {
