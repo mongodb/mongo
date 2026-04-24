@@ -41,7 +41,6 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/benchmark_util.h"
-#include "mongo/util/processinfo.h"
 
 #include <memory>
 #include <type_traits>
@@ -121,8 +120,11 @@ private:
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
 const auto kCommandBMMaxThreads = 1;
 #else
-/** 2x to benchmark the case of more threads than cores for curiosity's sake. */
-const auto kCommandBMMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
+/**
+ * Benchmark multithreaded case to try catch interesting contention behaviour.
+ * For example, spinlock contention.
+ */
+const auto kCommandBMMaxThreads = 16;
 #endif
 
 

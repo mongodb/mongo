@@ -50,7 +50,8 @@ BENCHMARK_DEFINE_F(ServiceEntryPointRouterRoleBenchmarkFixture, BM_SEP_PING)
 }
 
 BENCHMARK_REGISTER_F(ServiceEntryPointRouterRoleBenchmarkFixture, BM_SEP_PING)
-    ->ThreadRange(1, kCommandBMMaxThreads);
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
 
 // Needed in the initializers chain, but we don't need its behavior. Make it no-op.
 MONGO_INITIALIZER_GENERAL(CoreOptions_Store,

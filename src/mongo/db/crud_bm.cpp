@@ -255,8 +255,10 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT)(benchmark::State& state) {
     runBenchmark(state, [cmd] { return cmd; });
 }
 
-BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->ThreadRange(1, kCommandBMMaxThreads);
-BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_UPDATE_ONE)->ThreadRange(1, kCommandBMMaxThreads);
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->Threads(1)->Threads(kCommandBMMaxThreads);
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
 
 static constexpr unsigned long long minDocsToInsert{1};
 static constexpr unsigned long long maxDocsToInsert{4096};
