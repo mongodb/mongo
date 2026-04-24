@@ -298,6 +298,43 @@ TEST(IDLServerParameterWithStorage, exportedDefaults) {
     ASSERT_EQ(test::kUgly_complicated_name_spDefault, true);
 }
 
+TEST(IDLServerParameterWithStorage, annotationsAccessible) {
+    auto* sp = getNodeServerParameter("storageIntAnnotated");
+    ASSERT_BSONOBJ_EQ(
+        sp->annotations(),
+        BSON("query_knob" << BSON("wire_name" << "intAnnotatedWire"
+                                              << "applicability" << BSON_ARRAY("queryShape")
+                                              << "fcv" << BSON("min" << "9.0"))));
+}
+
+TEST(IDLServerParameterWithStorage, noAnnotationsReturnsEmpty) {
+    auto* sp = getNodeServerParameter("stdIntDeclared");
+    ASSERT_TRUE(sp->annotations().isEmpty());
+}
+
+TEST(IDLServerParameterWithStorage, annotationsArrayOfObjects) {
+    auto* sp = getNodeServerParameter("storageIntArrayOfObjects");
+    ASSERT_BSONOBJ_EQ(sp->annotations(),
+                      BSON("items" << BSON_ARRAY(BSON("name" << "first" << "value" << 1)
+                                                 << BSON("name" << "second" << "value" << 2))));
+}
+
+TEST(IDLServerParameterWithStorage, annotationsNestedArrays) {
+    auto* sp = getNodeServerParameter("storageIntNestedArrays");
+    ASSERT_BSONOBJ_EQ(sp->annotations(),
+                      BSON("matrix" << BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(3 << 4))));
+}
+
+TEST(IDLServerParameterWithStorage, annotationsEmptyArray) {
+    auto* sp = getNodeServerParameter("storageIntEmptyArray");
+    ASSERT_BSONOBJ_EQ(sp->annotations(), BSON("tags" << BSONArray()));
+}
+
+TEST(IDLServerParameterWithStorage, annotationsOnClusterParameter) {
+    auto* sp = getClusterServerParameter("testClusterServerParameter");
+    ASSERT_BSONOBJ_EQ(sp->annotations(), BSON("cluster_meta" << BSON("scope" << "global")));
+}
+
 // Test that the RAIIServerParameterControllerForTest works correctly on IDL-generated types.
 TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     // Test int

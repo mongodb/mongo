@@ -30,6 +30,7 @@
 import hashlib
 import io
 import itertools
+import math
 import os
 import re
 import sys
@@ -3171,6 +3172,86 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     f'{{"{entry.name}", {"true" if entry.generic_field_info.get_should_forward() else "false"} }},'
                 )
 
+    def _gen_annotations_elem(self, builder, key, value, depth=0):
+        # type: (str, Optional[str], Any, int) -> None
+        """Dispatch an annotation value to the appropriate generator."""
+        if value is None:
+            self._gen_annotations_null(builder, key)
+        elif isinstance(value, dict):
+            self._gen_annotations_obj(builder, key, value, depth)
+        elif isinstance(value, list):
+            self._gen_annotations_arr(builder, key, value, depth)
+        else:
+            self._gen_annotations_scalar(builder, key, value)
+
+    def _gen_annotations_obj(self, builder, key, obj, depth):
+        # type: (str, Optional[str], Dict[str, Any], int) -> None
+        """Emit a BSONObjBuilder sub-object for a dict."""
+        sub = "sub%d" % depth
+        start = "%s.subobjStart(%s)" % (builder, key) if key else "%s.subobjStart()" % builder
+        with self._block("{", "}"):
+            self._writer.write_line("BSONObjBuilder %s(%s);" % (sub, start))
+            for k, v in obj.items():
+                self._gen_annotations_elem(sub, _encaps(k), v, depth + 1)
+
+    def _gen_annotations_arr(self, builder, key, items, depth):
+        # type: (str, Optional[str], List[Any], int) -> None
+        """Emit a BSONArrayBuilder sub-array for a list."""
+        arr = "arr%d" % depth
+        start = "%s.subarrayStart(%s)" % (builder, key) if key else "%s.subarrayStart()" % builder
+        with self._block("{", "}"):
+            self._writer.write_line("BSONArrayBuilder %s(%s);" % (arr, start))
+            for item in items:
+                self._gen_annotations_elem(arr, None, item, depth + 1)
+
+    def _gen_annotations_null(self, builder, key):
+        # type: (str, Optional[str]) -> None
+        """Emit an appendNull call."""
+        if key:
+            self._writer.write_line("%s.appendNull(%s);" % (builder, key))
+        else:
+            self._writer.write_line("%s.appendNull();" % builder)
+
+    def _gen_annotations_scalar(self, builder, key, value):
+        # type: (str, Optional[str], Any) -> None
+        """Emit an append call for a scalar value."""
+        if isinstance(value, bool):
+            literal = "true" if value else "false"
+        elif isinstance(value, int):
+            literal = str(value)
+        elif isinstance(value, float):
+            if not math.isfinite(value):
+                raise ValueError(
+                    f"Unsupported annotation value {value!r} for key {key!r}: "
+                    f"NaN and infinity are not valid C++ literals."
+                )
+            literal = str(value)
+        elif isinstance(value, str):
+            literal = _encaps(value)
+        else:
+            raise ValueError(
+                f"Unsupported annotation type {type(value).__name__} for {key}: "
+                f"expected bool, int, float, or str."
+            )
+
+        if key:
+            self._writer.write_line("%s.append(%s, %s);" % (builder, key, literal))
+        else:
+            self._writer.write_line("%s.append(%s);" % (builder, literal))
+
+    def _gen_server_parameter_annotations(self, var_name, param):
+        # type: (str, ast.ServerParameter) -> None
+        """Generate setAnnotations call if the parameter has annotations."""
+        if param.annotations:
+            with self.get_initializer_lambda(
+                "static const auto kAnnotations", return_type="BSONObj"
+            ):
+                self._writer.write_line("BSONObjBuilder builder;")
+                for k, v in param.annotations.items():
+                    self._gen_annotations_elem("builder", _encaps(k), v)
+                self._writer.write_line("return builder.obj();")
+            self._writer.write_line("%s->setAnnotations(kAnnotations);" % var_name)
+
     def _gen_server_parameter_specialized(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a specialized ServerParameter."""
@@ -3186,6 +3267,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if param.is_deprecated:
             self._writer.write_line("sp->setIsDeprecated(true);")
+
+        self._gen_server_parameter_annotations("sp", param)
 
         self._writer.write_line("return std::move(sp);")
 
@@ -3260,6 +3343,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if param.is_deprecated:
             self._writer.write_line("ret->setIsDeprecated(true);")
+
+        self._gen_server_parameter_annotations("ret", param)
 
         if param.default and not (param.cpp_vartype and param.cpp_varname):
             # Only need to call setDefault() if we haven't in-place initialized the declared var.

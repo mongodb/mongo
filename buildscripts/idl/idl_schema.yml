@@ -690,6 +690,11 @@ properties:
             description: >
               Marks the server parameter as deprecated. Warns users if the server parameter
               is ever used. Defaults to false.
+          annotations:
+            type: object
+            description: >
+              Opaque metadata block attached to the server parameter. Parsed as-is and
+              exposed at runtime via ServerParameter::annotations() as a BSONObj.
           on_update:
             type: string
             description: >

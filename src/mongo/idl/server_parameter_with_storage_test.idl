@@ -108,6 +108,9 @@ server_parameters:
         on_update: "onUpdateTestClusterServerParameter"
         redact: false
         omit_in_ftdc: false
+        annotations:
+            cluster_meta:
+                scope: global
 
     storageIntDeprecated:
         set_at: [startup, runtime]
@@ -120,3 +123,55 @@ server_parameters:
             lt: 1000
         redact: false
         is_deprecated: true
+
+    storageIntAnnotated:
+        set_at: [startup, runtime]
+        description: "Server parameter with annotations."
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gIntAnnotated
+        default: 7
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: intAnnotatedWire
+                applicability: [queryShape]
+                fcv:
+                    min: "9.0"
+
+    storageIntArrayOfObjects:
+        set_at: [startup, runtime]
+        description: "Parameter with array-of-objects annotations."
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gIntArrayOfObjects
+        default: 1
+        redact: false
+        annotations:
+            items:
+                - name: first
+                  value: 1
+                - name: second
+                  value: 2
+
+    storageIntNestedArrays:
+        set_at: [startup, runtime]
+        description: "Parameter with nested array annotations."
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gIntNestedArrays
+        default: 1
+        redact: false
+        annotations:
+            matrix:
+                - - 1
+                  - 2
+                - - 3
+                  - 4
+
+    storageIntEmptyArray:
+        set_at: [startup, runtime]
+        description: "Parameter with empty array annotation."
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gIntEmptyArray
+        default: 1
+        redact: false
+        annotations:
+            tags: []
