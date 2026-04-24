@@ -106,7 +106,7 @@ ConsistentCollection LockedCollectionYieldRestore::operator()(OperationContext* 
     auto readSourceInfo = SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(opCtx, _nss);
     if (readSourceInfo) {
         SnapshotHelper::updateReadSourceTimestampForSecondaryReadsIfPossible(
-            opCtx, _nss, readSourceInfo->readSource, readSourceInfo->reason);
+            opCtx, _nss, *readSourceInfo);
     }
 
     return ConsistentCollection{opCtx, collection};

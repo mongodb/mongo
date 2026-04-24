@@ -42,21 +42,43 @@ namespace mongo {
 namespace SnapshotHelper {
 
 /**
- * The role of the node when the read source was determined (primary or secondary).
+ * Whether the node was primary or not when the read source was determined.
+ * kNotPrimary covers every non-primary replication state (SECONDARY, ROLLBACK, RECOVERING,
+ * STARTUP, STARTUP2, REMOVED, ARBITER, UNKNOWN).
  */
-enum class NodeRole { kPrimary, kSecondary };
+enum class NodeRole { kPrimary, kNotPrimary };
 
 /**
- * The result of determining the appropriate read source for secondary reads.
+ * Diagnostic label for why a particular read source was chosen. Intended for logging / debugging;
+ * does not drive control flow.
+ */
+enum class ReadSourceReason {
+    kUnspecified,
+    kSecondaryReadingReplicatedCollection,
+    kUnreplicatedCollection,
+    kPrimary,
+    kNotPrimaryOrSecondary,
+    kPinned,
+    kSecondaryReadChangeNotNeeded,
+    kAllowReadFromLatest,
+};
+
+StringData toString(ReadSourceReason reason);
+
+/**
+ * Captured state of the replication-driven read-source decision: the chosen ReadSource, the
+ * write-acceptance role of the node at decision time, and a diagnostic reason. All three fields are
+ * produced by the same probe of replication state and must be consumed together — never re-derive
+ * any field independently.
  */
 struct ReadSourceInfo {
     RecoveryUnit::ReadSource readSource;
     NodeRole nodeRole;
-    StringData reason;
+    ReadSourceReason reason = ReadSourceReason::kUnspecified;
 };
 
 /**
- * Returns the node's current role as kPrimary or kSecondary based on replication state.
+ * Returns the node's current role as kPrimary or kNotPrimary based on replication state.
  */
 NodeRole getNodeRole(OperationContext* opCtx);
 
@@ -73,15 +95,15 @@ boost::optional<ReadSourceInfo> getReadSourceForSecondaryReadsIfNeeded(
     OperationContext* opCtx, boost::optional<const NamespaceString&> nss);
 
 /**
- * Applies the desired read source to the recovery unit. If a snapshot is already open,
- * validates that the desired read source is compatible with the current one and throws
- * if they conflict.
+ * Attempts to apply the requested read source to the recovery unit and returns the ReadSourceInfo
+ * actually in effect afterwards. The returned tuple may differ from `requested` when a
+ * concurrent state change forces a downgrade (kLastApplied → kNoTimestamp) or when the
+ * read source is pinned.
  */
-void updateReadSourceTimestampForSecondaryReadsIfPossible(
+ReadSourceInfo updateReadSourceTimestampForSecondaryReadsIfPossible(
     OperationContext* opCtx,
     boost::optional<const NamespaceString&> nss,
-    RecoveryUnit::ReadSource desired,
-    StringData reason);
+    const ReadSourceInfo& requested);
 
 }  // namespace SnapshotHelper
 }  // namespace mongo

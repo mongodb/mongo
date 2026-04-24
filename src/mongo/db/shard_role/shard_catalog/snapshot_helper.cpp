@@ -61,39 +61,58 @@ bool canReadAtLastApplied(OperationContext* opCtx) {
          readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern);
 }
 
-constexpr StringData kReasonUnreplicatedCollection = "unreplicated collection"_sd;
-constexpr StringData kReasonPrimary = "primary"_sd;
-constexpr StringData kReasonNotPrimaryOrSecondary = "not primary or secondary"_sd;
-constexpr StringData kReasonAllowReadFromLatest = "allow read from latest on secondary block"_sd;
+struct ReadAtLastAppliedDecision {
+    bool readAtLastApplied = false;
+    SnapshotHelper::NodeRole nodeRole = SnapshotHelper::NodeRole::kNotPrimary;
+    SnapshotHelper::ReadSourceReason reason = SnapshotHelper::ReadSourceReason::kUnspecified;
+};
 
-bool shouldReadAtLastApplied(OperationContext* opCtx,
-                             boost::optional<const NamespaceString&> nss,
-                             StringData* reason) {
+/**
+ * Decides the read-source policy for a single acquisition on `nss` and returns the captured
+ * replication state that the decision was made against.
+ *
+ * readAtLastApplied:
+ *   - true  => the caller should open a timestamped snapshot at lastApplied (safe against
+ *              concurrent secondary oplog-batch application).
+ *   - false => the caller should read without a timestamp (primary, unreplicated collection,
+ *              or a non-primary/non-secondary state where lastApplied is not trustworthy).
+ *
+ * nodeRole / reason:
+ *   Diagnostic context for the decision. Derived from the same single probe of replication state
+ * used to make the readAtLastApplied decision. Callers MUST treat the returned tuple as atomic — do
+ * not re-probe getMemberState() or canAcceptWritesForDatabase() to "refine" any field. Re-probing
+ * is a non-atomic second read that can race with stepdown and produce an inconsistent policy.
+ *
+ * May uassert with NotWritablePrimary on linearizable reads against a non-writable node.
+ */
+ReadAtLastAppliedDecision shouldReadAtLastApplied(OperationContext* opCtx,
+                                                  boost::optional<const NamespaceString&> nss) {
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool canAcceptWrites = replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
+    const auto nodeRole = canAcceptWrites ? SnapshotHelper::NodeRole::kPrimary
+                                          : SnapshotHelper::NodeRole::kNotPrimary;
+
     // Non-replicated collections do not need to read at lastApplied, as those collections are not
     // written by the replication system. However, the oplog is special, as it *is* written by the
     // replication system.
     if (nss && !nss->isReplicated() && !nss->isOplog()) {
-        *reason = kReasonUnreplicatedCollection;
-        return false;
+        return {false, nodeRole, SnapshotHelper::ReadSourceReason::kUnreplicatedCollection};
     }
 
     // If this node can accept writes (i.e. primary), then no conflicting replication batches are
     // being applied and we can read from the default snapshot. If we are in a replication state
     // (like secondary or primary catch-up) where we are not accepting writes, we should read at
     // lastApplied.
-    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-            opCtx, DatabaseName::kAdmin)) {
-        *reason = kReasonPrimary;
-        return false;
+    if (canAcceptWrites) {
+        return {false, nodeRole, SnapshotHelper::ReadSourceReason::kPrimary};
     }
 
     // If we are not secondary, then we should not attempt to read at lastApplied because it may not
     // be available or valid. Any operations reading outside of the primary or secondary states must
     // be internal. We give these operations the benefit of the doubt rather than attempting to read
     // at a lastApplied timestamp that is not valid.
-    if (!repl::ReplicationCoordinator::get(opCtx)->isInPrimaryOrSecondaryState(opCtx)) {
-        *reason = kReasonNotPrimaryOrSecondary;
-        return false;
+    if (!replCoord->isInPrimaryOrSecondaryState(opCtx)) {
+        return {false, nodeRole, SnapshotHelper::ReadSourceReason::kNotPrimaryOrSecondary};
     }
 
     // Linearizable read concern should never be read at lastApplied, they must always read from
@@ -112,21 +131,43 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
     }
 
     if (allowReadFromLatestOnSecondary(opCtx)) {
-        *reason = kReasonAllowReadFromLatest;
-        return false;
+        return {false, nodeRole, SnapshotHelper::ReadSourceReason::kAllowReadFromLatest};
     }
 
-    return true;
+    return {
+        true, nodeRole, SnapshotHelper::ReadSourceReason::kSecondaryReadingReplicatedCollection};
 }
 
 }  // namespace
 
 namespace SnapshotHelper {
 
+StringData toString(ReadSourceReason reason) {
+    switch (reason) {
+        case ReadSourceReason::kUnspecified:
+            return "unspecified"_sd;
+        case ReadSourceReason::kSecondaryReadingReplicatedCollection:
+            return "secondary reading replicated collection"_sd;
+        case ReadSourceReason::kUnreplicatedCollection:
+            return "unreplicated collection"_sd;
+        case ReadSourceReason::kPrimary:
+            return "primary"_sd;
+        case ReadSourceReason::kNotPrimaryOrSecondary:
+            return "not primary or secondary"_sd;
+        case ReadSourceReason::kPinned:
+            return "pinned read source"_sd;
+        case ReadSourceReason::kSecondaryReadChangeNotNeeded:
+            return "secondary read source change not needed"_sd;
+        case ReadSourceReason::kAllowReadFromLatest:
+            return "allow read from latest on secondary block"_sd;
+    }
+    MONGO_UNREACHABLE;
+}
+
 NodeRole getNodeRole(OperationContext* opCtx) {
     return repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary()
         ? NodeRole::kPrimary
-        : NodeRole::kSecondary;
+        : NodeRole::kNotPrimary;
 }
 
 boost::optional<ReadSourceInfo> getReadSourceForSecondaryReadsIfNeeded(
@@ -144,46 +185,42 @@ boost::optional<ReadSourceInfo> getReadSourceForSecondaryReadsIfNeeded(
         return boost::none;
     }
 
-    StringData reason;
-    if (shouldReadAtLastApplied(opCtx, nss, &reason)) {
-        return ReadSourceInfo{RecoveryUnit::ReadSource::kLastApplied, NodeRole::kSecondary, reason};
-    }
-    return ReadSourceInfo{RecoveryUnit::ReadSource::kNoTimestamp, getNodeRole(opCtx), reason};
+    const auto decision = shouldReadAtLastApplied(opCtx, nss);
+    const auto readSource = decision.readAtLastApplied ? RecoveryUnit::ReadSource::kLastApplied
+                                                       : RecoveryUnit::ReadSource::kNoTimestamp;
+    return ReadSourceInfo{readSource, decision.nodeRole, decision.reason};
 }
 
-void updateReadSourceTimestampForSecondaryReadsIfPossible(
+ReadSourceInfo updateReadSourceTimestampForSecondaryReadsIfPossible(
     OperationContext* opCtx,
     boost::optional<const NamespaceString&> nss,
-    RecoveryUnit::ReadSource desired,
-    StringData reason) {
+    const ReadSourceInfo& requested) {
     auto ru = shard_role_details::getRecoveryUnit(opCtx);
     const auto originalReadSource = ru->getTimestampReadSource();
-
-    bool readAtLastApplied = (desired == RecoveryUnit::ReadSource::kLastApplied);
 
     if (ru->isReadSourcePinned()) {
         LOGV2_DEBUG(5863601,
                     2,
                     "Not changing readSource as it is pinned",
                     "current"_attr = RecoveryUnit::toString(originalReadSource),
-                    "rejected"_attr = readAtLastApplied
-                        ? RecoveryUnit::toString(RecoveryUnit::ReadSource::kLastApplied)
-                        : RecoveryUnit::toString(RecoveryUnit::ReadSource::kNoTimestamp));
-        return;
+                    "rejected"_attr = RecoveryUnit::toString(requested.readSource));
+        return {originalReadSource, requested.nodeRole, ReadSourceReason::kPinned};
     }
 
+    ReadSourceInfo effective = requested;
+    const auto setReadSource =
+        [&](RecoveryUnit::ReadSource readSource, NodeRole nodeRole, ReadSourceReason reason) {
+            ru->setTimestampReadSource(readSource);
+            effective.readSource = readSource;
+            effective.nodeRole = nodeRole;
+            effective.reason = reason;
+        };
 
-    // Helper to set read source to the recovery unit and remember our current setting
-    auto currentReadSource = originalReadSource;
-    auto setReadSource = [&](RecoveryUnit::ReadSource readSource) {
-        ru->setTimestampReadSource(readSource);
-        currentReadSource = readSource;
-    };
-
-    // Set read source based on current setting and readAtLastApplied decision.
-    if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied && !readAtLastApplied) {
-        setReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-    } else if (readAtLastApplied) {
+    const bool wantLastApplied = (requested.readSource == RecoveryUnit::ReadSource::kLastApplied);
+    // Set read source based on current setting and the requested decision.
+    if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied && !wantLastApplied) {
+        setReadSource(RecoveryUnit::ReadSource::kNoTimestamp, requested.nodeRole, requested.reason);
+    } else if (wantLastApplied) {
         // Shifting from reading without a timestamp to reading with a timestamp can be
         // dangerous because writes will appear to vanish.
         //
@@ -197,7 +234,7 @@ void updateReadSourceTimestampForSecondaryReadsIfPossible(
         //
         // If we already had kLastApplied as our read source then this call will refresh the
         // timestamp.
-        setReadSource(RecoveryUnit::ReadSource::kLastApplied);
+        setReadSource(RecoveryUnit::ReadSource::kLastApplied, requested.nodeRole, requested.reason);
 
         // We need to make sure the decision if we need to read at last applied is not changing
         // concurrently with setting the read source with its read timestamp to the recovery unit.
@@ -214,37 +251,43 @@ void updateReadSourceTimestampForSecondaryReadsIfPossible(
         //
         // The above mainly applies for Lock-free reads that is not holding the RSTL which protects
         // against state changes.
-        if (!shouldReadAtLastApplied(opCtx, nss, &reason)) {
+        const auto recheckDecision = shouldReadAtLastApplied(opCtx, nss);
+        if (!recheckDecision.readAtLastApplied) {
             // State changed concurrently with setting the read source and we should no longer read
             // at lastApplied.
-            setReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-            readAtLastApplied = false;
+            setReadSource(RecoveryUnit::ReadSource::kNoTimestamp,
+                          recheckDecision.nodeRole,
+                          recheckDecision.reason);
         }
+    } else {
+        dassert(ru->getTimestampReadSource() == requested.readSource);
     }
 
     // All done, log if we made a change to the read source
     if (originalReadSource == RecoveryUnit::ReadSource::kNoTimestamp &&
-        currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
+        effective.readSource == RecoveryUnit::ReadSource::kLastApplied) {
         LOGV2_DEBUG(4452901,
                     2,
                     "Changed ReadSource to kLastApplied",
                     "namespace"_attr = nss,
                     "ts"_attr = ru->getPointInTimeReadTimestamp());
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
-               currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
+               effective.readSource == RecoveryUnit::ReadSource::kLastApplied) {
         LOGV2_DEBUG(6730500,
                     2,
                     "ReadSource kLastApplied updated timestamp",
                     "namespace"_attr = nss,
                     "ts"_attr = ru->getPointInTimeReadTimestamp());
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
-               currentReadSource == RecoveryUnit::ReadSource::kNoTimestamp) {
+               effective.readSource == RecoveryUnit::ReadSource::kNoTimestamp) {
         LOGV2_DEBUG(4452902,
                     2,
                     "Changed ReadSource to kNoTimestamp",
                     "namespace"_attr = nss,
-                    "reason"_attr = reason);
+                    "reason"_attr = toString(effective.reason));
     }
+
+    return effective;
 }
 }  // namespace SnapshotHelper
 }  // namespace mongo

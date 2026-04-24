@@ -514,7 +514,7 @@ void validateAgainstSnapshotPolicy(
     auto currentSnapshotPolicy = txnResources.snapshotPolicy;
     auto& acquisitions = txnResources.acquiredCollections;
     tassert(10141602,
-            "Invalid nested acquisition. Detected a outer transaction resource without snapshot "
+            "Invalid nested acquisition. Detected an outer transaction resource without snapshot "
             "policy. This is unsafe given it will skip the nested acquisition validation.",
             currentSnapshotPolicy || acquisitions.empty());
 
@@ -531,18 +531,18 @@ void validateAgainstSnapshotPolicy(
     // When both acquisitions are on a secondary, this is an implementation bug, so we tassert.
     // When one acquisition is on a primary and the other is on a secondary, this is safe because
     // the open snapshot can't have inconsistent batch application.
-    bool isPrimaryToSecondaryRoleChange =
+    bool wasPrimaryNowNotPrimary =
         currentSnapshotPolicy->nodeRole == SnapshotHelper::NodeRole::kPrimary &&
-        newNodeRole == SnapshotHelper::NodeRole::kSecondary;
+        newNodeRole == SnapshotHelper::NodeRole::kNotPrimary;
     bool fromNoTimestampToLastApplied =
         currentSnapshotPolicy->readSource == RecoveryUnit::ReadSource::kNoTimestamp &&
         newReadSource == RecoveryUnit::ReadSource::kLastApplied;
     tassert(10141601,
-            "Invalid nested acquisition. The first acquisition opened a snapshot at lastest but "
-            "the second requires to read at the last applied timestamp on secondaries. This is "
+            "Invalid nested acquisition. The first acquisition opened a snapshot at latest but "
+            "the second requires reading at the last applied timestamp on secondaries. This is "
             "unsafe because the replicated collection would read without a timestamp and might "
             "return inconsistent data.",
-            isPrimaryToSecondaryRoleChange || !fromNoTimestampToLastApplied);
+            wasPrimaryNowNotPrimary || !fromNoTimestampToLastApplied);
 }
 
 void updateSnapshotPolicy(TransactionResources& txnResources,
@@ -953,6 +953,37 @@ logv2::DynamicAttributes getCurOpLogAttrs(OperationContext* opCtx,
     return attr;
 }
 
+struct ResolvedReadSourceRequest {
+    NamespaceString nss;
+    boost::optional<SnapshotHelper::ReadSourceInfo> desired;
+};
+
+ResolvedReadSourceRequest resolveNamespaceAndDesiredReadSource(
+    OperationContext* opCtx,
+    const std::shared_ptr<const CollectionCatalog>& catalog,
+    const NamespaceStringOrUUID& nsOrUUID) {
+    NamespaceString nss;
+    try {
+        // This can lookup into the commit pending entries without establishing a consistent
+        // collection. This is safe because we only use this resolved namespace to check if the
+        // collection is replicated or not. As we do not allow changing this setting by the user
+        // this is independent of the consistent collection namespace. Note that a later check
+        // in the Acquisition API will verify that it is not uncommitted in the WT snapshot. We
+        // do not allow lookups on uncommitted collections since they still do not exist.
+        nss = catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(opCtx, nsOrUUID);
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        invariant(nsOrUUID.isUUID());
+
+        const auto readSource =
+            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
+        if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
+            readSource == RecoveryUnit::ReadSource::kLastApplied) {
+            throw;
+        }
+    }
+    return {nss, SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(opCtx, nss)};
+}
+
 }  // namespace
 
 CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -1341,97 +1372,67 @@ void SnapshotAttempt::snapshotInitialState() {
 
 SnapshotHelper::ReadSourceInfo SnapshotAttempt::getRequiredReadSourceForSecondaryReads() {
     dassert(_replTermBeforeSnapshot && _catalogBeforeSnapshot);
-    auto catalog = *_catalogBeforeSnapshot;
-    SnapshotHelper::ReadSourceInfo selectedReadSourceInfo{
-        shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource(),
-        SnapshotHelper::getNodeRole(_opCtx),
-        StringData{}};
-    for (auto& nsOrUUID : _acquisitionRequests) {
-        NamespaceString nss;
-        try {
-            // This can lookup into the commit pending entries without establishing a consistent
-            // collection. This is safe because we only use this resolved namespace to check if the
-            // collection is replicated or not. As we do not allow changing this setting by the user
-            // this is independent of the consistent collection namespace. Note that a later check
-            // in the Acquisition API will verify that it is not uncommitted in the WT snapshot. We
-            // do not allow lookups on uncommitted collections since they still do not exist.
-            nss = catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(_opCtx,
-                                                                                       nsOrUUID);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            invariant(nsOrUUID.isUUID());
 
-            const auto readSource =
-                shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource();
-            if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
-                readSource == RecoveryUnit::ReadSource::kLastApplied) {
-                throw;
-            }
+    boost::optional<SnapshotHelper::ReadSourceInfo> requiredReadSourceInfo;
+    for (auto& nsOrUUID : _acquisitionRequests) {
+        auto [nss, desired] =
+            resolveNamespaceAndDesiredReadSource(_opCtx, *_catalogBeforeSnapshot, nsOrUUID);
+        if (!desired) {
+            continue;
         }
-        auto desiredReadSourceInfo =
-            SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(_opCtx, nss);
-        // kLastApplied is the strictest read source possible. We can early exit given no other read
-        // sources would be applied beyond this point.
-        if (desiredReadSourceInfo &&
-            desiredReadSourceInfo->readSource == RecoveryUnit::ReadSource::kLastApplied) {
-            return {RecoveryUnit::ReadSource::kLastApplied,
-                    desiredReadSourceInfo->nodeRole,
-                    desiredReadSourceInfo->reason};
-        } else if (desiredReadSourceInfo) {
-            selectedReadSourceInfo = *desiredReadSourceInfo;
+        // kLastApplied is the strictest read source possible. We can early exit given no other
+        // read sources would be applied beyond this point.
+        if (desired->readSource == RecoveryUnit::ReadSource::kLastApplied) {
+            return *desired;
         }
+        requiredReadSourceInfo = *desired;
     }
 
-    return selectedReadSourceInfo;
+    if (requiredReadSourceInfo) {
+        return *requiredReadSourceInfo;
+    }
+
+    // Reaching here means no read source change was desired by any of the acquisitions requests.
+    return {getRecoveryUnit(_opCtx)->getTimestampReadSource(),
+            SnapshotHelper::getNodeRole(_opCtx),
+            SnapshotHelper::ReadSourceReason::kSecondaryReadChangeNotNeeded};
 }
 
 SnapshotHelper::ReadSourceInfo SnapshotAttempt::changeReadSourceForSecondaryReads() {
     dassert(_replTermBeforeSnapshot && _catalogBeforeSnapshot);
-    auto catalog = *_catalogBeforeSnapshot;
-    // An open snapshot can't change it's read-source
-    bool isSnapshotOpen = shard_role_details::getRecoveryUnit(_opCtx)->isActive();
-    invariant(!isSnapshotOpen);
-    for (auto& nsOrUUID : _acquisitionRequests) {
-        NamespaceString nss;
-        try {
-            // This can lookup into the commit pending entries without establishing a consistent
-            // collection. This is safe because we only use this resolved namespace to check if the
-            // collection is replicated or not. As we do not allow changing this setting by the user
-            // this is independent of the consistent collection namespace. Note that a later check
-            // in the Acquisition API will verify that it is not uncommitted in the WT snapshot. We
-            // do not allow lookups on uncommitted collections since they still do not exist.
-            nss = catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(_opCtx,
-                                                                                       nsOrUUID);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            invariant(nsOrUUID.isUUID());
+    // An open snapshot can't change its read-source.
+    invariant(!shard_role_details::getRecoveryUnit(_opCtx)->isActive());
 
-            const auto readSource =
-                shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource();
-            if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
-                readSource == RecoveryUnit::ReadSource::kLastApplied) {
-                throw;
-            }
+    boost::optional<SnapshotHelper::ReadSourceInfo> effectiveReadSourceInfo;
+
+    for (auto& nsOrUUID : _acquisitionRequests) {
+        auto [nss, desired] =
+            resolveNamespaceAndDesiredReadSource(_opCtx, *_catalogBeforeSnapshot, nsOrUUID);
+        if (!desired) {
+            continue;
         }
-        auto desiredReadSourceInfo =
-            SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(_opCtx, nss);
-        // Given no snapshot is already open and we have got a non-empty desired read source, try to
-        // set it.
-        if (desiredReadSourceInfo) {
+
+        effectiveReadSourceInfo =
             SnapshotHelper::updateReadSourceTimestampForSecondaryReadsIfPossible(
-                _opCtx, nss, desiredReadSourceInfo->readSource, desiredReadSourceInfo->reason);
-        }
-        // If we tried to apply kLastApplied we can early exit.
-        // The function aims at applying kLastApplied or set a kNoTimestamp if not possible.
-        // In any case, we can return given no other read sources will be set.
-        if (desiredReadSourceInfo &&
-            desiredReadSourceInfo->readSource == RecoveryUnit::ReadSource::kLastApplied) {
-            return {getRecoveryUnit(_opCtx)->getTimestampReadSource(),
-                    desiredReadSourceInfo->nodeRole,
-                    desiredReadSourceInfo->reason};
+                _opCtx, nss, *desired);
+
+        // kLastApplied is the strictest read source possible. We can early exit given no other
+        // read sources would be applied beyond this point. We check against 'desired'
+        // intentionally, as requesting the strictest mode in successive iterations would give the
+        // same result (of not being able to set kLastApplied).
+        if (desired->readSource == RecoveryUnit::ReadSource::kLastApplied) {
+            return *effectiveReadSourceInfo;
         }
     }
+
+    if (effectiveReadSourceInfo) {
+        return *effectiveReadSourceInfo;
+    }
+
+    // Reaching here means no read source change was desired by any of the acquisitions requests.
     return {getRecoveryUnit(_opCtx)->getTimestampReadSource(),
             SnapshotHelper::getNodeRole(_opCtx),
-            StringData{}};
+            SnapshotHelper::ReadSourceReason::kSecondaryReadChangeNotNeeded};
 }
 
 void SnapshotAttempt::openStorageSnapshot() {
