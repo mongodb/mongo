@@ -306,11 +306,13 @@ class TestTestTimeout(_ResmokeSelftest):
         failed = [test for test in report["results"] if test["status"] == "fail"]
         passed = [test for test in report["results"] if test["status"] == "pass"]
         self.assertEqual(
-            len(failed), 1, f"Expected one failed out test. Got {failed}"
-        )  # one jstest
+            len(failed),
+            2,
+            f"Expected 2 failed tests - one timeout and one fixture teardown. Got {failed}",
+        )  # one jstest, one fixture teardown
         self.assertEqual(
-            len(passed), 3, f"Expected 3 passing tests. Got {passed}"
-        )  # one jstest, one fixture setup, one fixture teardown
+            len(passed), 1, f"Expected 1 passing test for the fixture setup. Got {passed}"
+        )  # one fixture setup
 
 
 class TestTestSelection(_ResmokeSelftest):

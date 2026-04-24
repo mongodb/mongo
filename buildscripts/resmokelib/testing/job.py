@@ -271,14 +271,6 @@ class Job(object):
             if test.propagate_error is not None:
                 raise test.propagate_error
 
-            if test.timed_out.is_set():
-                # Restart the fixture, since it has been killed by the test's timeout handler
-                self.logger.info(
-                    "Restarting the fixture since it is not running after a test timed out."
-                )
-                self.fixture.setup()
-                self.fixture.await_ready()
-
             # We are intentionally only checking the individual 'test' status and not calling
             # report.wasSuccessful() here. It is possible that a thread running in the background as
             # part of a hook has added a failed test case to 'self.report'. Checking the individual
@@ -287,6 +279,16 @@ class Job(object):
             if self.suite_options.fail_fast and self.report.find_test_info(test).status != "pass":
                 self.logger.info("%s failed, so stopping..." % (test.short_description()))
                 raise errors.StopExecution("%s failed" % (test.short_description()))
+
+            if test.timed_out.is_set():
+                # Continuing after a test timeout has proven unreliable -- the fixture state
+                # after the timeout handler runs (process kills, hang analyzer) is not safe to
+                # reuse, especially in the presence of hooks. Stop further test execution.
+                self.logger.error(
+                    "%s timed out, so stopping further test execution.",
+                    test.short_description(),
+                )
+                raise errors.StopExecution("%s timed out" % (test.short_description()))
 
             if self._check_if_fixture_running and not self.fixture.is_running():
                 self.logger.error(
