@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/document_source_writer.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -88,9 +89,13 @@ public:
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
      * some cases the foreign collection is allowed to be sharded.
      */
-    class LiteParsed final : public LiteParsedDocumentSourceForeignCollection<LiteParsed> {
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines<LiteParsed> {
     public:
-        using LiteParsedDocumentSourceForeignCollection::LiteParsedDocumentSourceForeignCollection;
+        LiteParsed(const BSONElement& spec, NamespaceString foreignNss)
+            : LiteParsedDocumentSourceNestedPipelines(
+                  spec,
+                  std::move(foreignNss),
+                  std::vector<LiteParsedPipeline>{} /* no sub-pipelines for $out */) {}
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -98,7 +103,8 @@ public:
 
         Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                               bool inMultiDocumentTransaction) const final {
-            if (_foreignNss != nss) {
+            tassert(12541300, "Expected foreign namespace to be set for $out", _foreignNss);
+            if (*_foreignNss != nss) {
                 return Status::OK();
             }
 
@@ -113,7 +119,8 @@ public:
                 actions.addAction(ActionType::bypassDocumentValidation);
             }
 
-            return {Privilege(ResourcePattern::forExactNamespace(_foreignNss), actions)};
+            tassert(12541301, "Expected foreign namespace to be set for $out", _foreignNss);
+            return {Privilege(ResourcePattern::forExactNamespace(*_foreignNss), actions)};
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
