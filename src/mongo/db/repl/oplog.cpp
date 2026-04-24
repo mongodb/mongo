@@ -1090,7 +1090,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                                          entry.getNss().dbName(),
                                                          oplogEntry.collUUID,
                                                          oplogEntry.buildUUID,
-                                                         oplogEntry.indexes);
+                                                         oplogEntry.indexes,
+                                                         oplogEntry.indexBuildIdent);
           }
 
           IndexBuildsCoordinator::ApplicationMode applicationMode =
@@ -1139,7 +1140,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                                           oplogEntry.collUUID,
                                                           oplogEntry.buildUUID,
                                                           oplogEntry.indexes,
-                                                          oplogEntry.multikey);
+                                                          oplogEntry.multikey,
+                                                          oplogEntry.indexBuildIdent);
           }
 
           auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
@@ -1178,6 +1180,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                                          oplogEntry.collUUID,
                                                          oplogEntry.buildUUID,
                                                          oplogEntry.indexes,
+                                                         oplogEntry.indexBuildIdent,
                                                          *oplogEntry.cause);
           }
 

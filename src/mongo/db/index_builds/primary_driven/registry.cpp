@@ -34,9 +34,14 @@ namespace mongo::index_builds::primary_driven {
 void Registry::add(UUID buildUUID,
                    DatabaseName dbName,
                    UUID collectionUUID,
-                   std::vector<IndexBuildInfo> indexes) {
+                   std::vector<IndexBuildInfo> indexes,
+                   boost::optional<std::string> indexBuildIdent) {
     std::lock_guard lock{_mutex};
-    _entries.try_emplace(buildUUID, std::move(dbName), collectionUUID, std::move(indexes));
+    _entries.try_emplace(buildUUID,
+                         std::move(dbName),
+                         collectionUUID,
+                         std::move(indexes),
+                         std::move(indexBuildIdent));
 }
 
 void Registry::remove(UUID buildUUID) {

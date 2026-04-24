@@ -36,7 +36,10 @@
 #include "mongo/util/uuid.h"
 
 #include <mutex>
+#include <string>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 MONGO_MOD_PUBLIC;
 namespace mongo::index_builds::primary_driven {
@@ -47,12 +50,14 @@ public:
         DatabaseName dbName;
         UUID collectionUUID;
         std::vector<IndexBuildInfo> indexes;
+        boost::optional<std::string> indexBuildIdent;
     };
 
     void add(UUID buildUUID,
              DatabaseName dbName,
              UUID collectionUUID,
-             std::vector<IndexBuildInfo> indexes);
+             std::vector<IndexBuildInfo> indexes,
+             boost::optional<std::string> indexBuildIdent);
 
     void remove(UUID buildUUID);
 

@@ -47,6 +47,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -806,6 +807,100 @@ TEST_F(MultiIndexBlockTest, AbortDropsTemporaryTables) {
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), sideWritesIdent));
     ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+}
+
+// With resumable primary-driven index builds enabled, MultiIndexBlock::init must create the
+// per-build internal WT table whose ident matches ident::generateNewIndexBuildIdent(buildUUID),
+// and MultiIndexBlock::commit must drop it.
+TEST_F(MultiIndexBlockTest, CommitDropsResumablePrimaryDrivenIndexBuildTable) {
+    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest resumableEnabled{
+        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none));
+    ASSERT_EQUALS(1U, specs.size());
+
+    const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
+
+    // After commit the ident is drop-pending; immediatelyCompletePendingDrop finalizes it.
+    ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), indexBuildIdent));
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+}
+
+// With resumable primary-driven index builds enabled, MultiIndexBlock::init must create the
+// per-build internal WT table whose ident matches ident::generateNewIndexBuildIdent(buildUUID),
+// and MultiIndexBlock::abort must drop it.
+TEST_F(MultiIndexBlockTest, AbortDropsResumablePrimaryDrivenIndexBuildTable) {
+    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest resumableEnabled{
+        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none));
+    ASSERT_EQUALS(1U, specs.size());
+
+    const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+
+    ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), indexBuildIdent));
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 }
 
 TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {

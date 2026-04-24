@@ -2117,6 +2117,7 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                 build.collectionUUID,
                 buildUUID,
                 build.indexes,
+                build.indexBuildIdent,
                 {ErrorCodes::InterruptedDueToReplStateChange,
                  "Aborting primary-driven index build upon step up"}));
             LOGV2(11130400,

@@ -38,6 +38,8 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
@@ -76,7 +78,8 @@ Status start(OperationContext* opCtx,
              DatabaseName dbName,
              const UUID& collectionUUID,
              const UUID& buildUUID,
-             std::vector<IndexBuildInfo> indexes) {
+             std::vector<IndexBuildInfo> indexes,
+             boost::optional<std::string> indexBuildIdent) {
     auto coll = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
@@ -85,6 +88,10 @@ Status start(OperationContext* opCtx,
     CollectionWriter writer{opCtx, &coll};
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
+
+    if (indexBuildIdent) {
+        LazyRecordStore{opCtx, *indexBuildIdent, LazyRecordStore::CreateMode::immediate};
+    }
 
     for (auto&& index : indexes) {
         auto spec = writer->getIndexCatalog()->prepareSpecForCreate(
@@ -123,10 +130,18 @@ Status start(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
         opCtx, coll.nss(), collectionUUID, buildUUID, indexes, /*fromMigrate=*/false);
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [dbName = std::move(dbName), collectionUUID, buildUUID, indexes = std::move(indexes)](
-            OperationContext* opCtx, boost::optional<Timestamp>) mutable {
+        [dbName = std::move(dbName),
+         collectionUUID,
+         buildUUID,
+         indexes = std::move(indexes),
+         indexBuildIdent = std::move(indexBuildIdent)](OperationContext* opCtx,
+                                                       boost::optional<Timestamp>) mutable {
             _registry(opCtx->getServiceContext())
-                .add(buildUUID, std::move(dbName), collectionUUID, std::move(indexes));
+                .add(buildUUID,
+                     std::move(dbName),
+                     collectionUUID,
+                     std::move(indexes),
+                     std::move(indexBuildIdent));
         });
 
     wuow.commit();
@@ -138,7 +153,8 @@ Status commit(OperationContext* opCtx,
               const UUID& collectionUUID,
               const UUID& buildUUID,
               const std::vector<IndexBuildInfo>& indexes,
-              const std::vector<boost::optional<MultikeyPaths>>& multikey) {
+              const std::vector<boost::optional<MultikeyPaths>>& multikey,
+              boost::optional<std::string> indexBuildIdent) {
     auto coll = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
@@ -199,6 +215,11 @@ Status commit(OperationContext* opCtx,
         }
     }
 
+    if (indexBuildIdent) {
+        opCtx->getServiceContext()->getStorageEngine()->addDropPendingIdent(
+            dropTime, std::make_shared<Ident>(*indexBuildIdent));
+    }
+
     opCtx->getServiceContext()->getOpObserver()->onCommitIndexBuild(
         opCtx,
         coll.nss(),
@@ -221,6 +242,7 @@ Status abort(OperationContext* opCtx,
              const UUID& collectionUUID,
              const UUID& buildUUID,
              const std::vector<IndexBuildInfo>& indexes,
+             boost::optional<std::string> indexBuildIdent,
              const Status& cause) {
     auto coll = acquireCollection(
         opCtx,
@@ -255,6 +277,11 @@ Status abort(OperationContext* opCtx,
                               coll.nss(),
                               "IndexBuildAborted",
                               ErrorCodes::IndexBuildAborted);
+    }
+
+    if (indexBuildIdent) {
+        opCtx->getServiceContext()->getStorageEngine()->addDropPendingIdent(
+            dropTime, std::make_shared<Ident>(*indexBuildIdent));
     }
 
     opCtx->getServiceContext()->getOpObserver()->onAbortIndexBuild(opCtx,

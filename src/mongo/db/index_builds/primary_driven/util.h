@@ -39,6 +39,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -56,7 +57,8 @@ Status start(OperationContext* opCtx,
              DatabaseName dbName,
              const UUID& collectionUUID,
              const UUID& buildUUID,
-             std::vector<IndexBuildInfo> indexes);
+             std::vector<IndexBuildInfo> indexes,
+             boost::optional<std::string> indexBuildIdent);
 
 /**
  * Handles the commit of a primary-driven index build. Removes it from the catalog and the registry,
@@ -67,7 +69,8 @@ Status commit(OperationContext* opCtx,
               const UUID& collectionUUID,
               const UUID& buildUUID,
               const std::vector<IndexBuildInfo>& indexes,
-              const std::vector<boost::optional<MultikeyPaths>>& multikey);
+              const std::vector<boost::optional<MultikeyPaths>>& multikey,
+              boost::optional<std::string> indexBuildIdent);
 
 /**
  * Handles the abort of a primary-driven index build. Removes it from the catalog and the registry,
@@ -78,6 +81,7 @@ Status abort(OperationContext* opCtx,
              const UUID& collectionUUID,
              const UUID& buildUUID,
              const std::vector<IndexBuildInfo>& indexes,
+             boost::optional<std::string> indexBuildIdent,
              const Status& cause);
 
 }  // namespace mongo::index_builds::primary_driven

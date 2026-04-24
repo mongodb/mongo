@@ -51,6 +51,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/historical_catalogid_tracker.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -279,7 +280,11 @@ void openCatalog(OperationContext* opCtx,
                 builds.emplace_back(spec, ident, *storageEngine);
             }
             index_builds::primary_driven::registry(opCtx->getServiceContext())
-                .add(buildUUID, entry.dbName, entry.collUUID, std::move(builds));
+                .add(buildUUID,
+                     entry.dbName,
+                     entry.collUUID,
+                     std::move(builds),
+                     ident::generateNewIndexBuildIdent(buildUUID));
         }
     } else {
         // Once all unfinished index builds have been dropped and the catalog has been reloaded,

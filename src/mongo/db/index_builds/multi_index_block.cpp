@@ -52,6 +52,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -70,10 +71,12 @@
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
@@ -373,9 +376,22 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         _phase = resumeInfo->getPhase();
     }
 
-    _resumeStateTempRecordStore.emplace(opCtx,
-                                        ident::generateNewInternalIdent(kResumableIndexIdentStem),
-                                        LazyRecordStore::CreateMode::deferred);
+    // When we're replicating container writes, we need to create the table immediately since that
+    // means its creation is being replicated by the start of the index build. Otherwise, we can
+    // wait to create it until its first use in case it's not needed.
+    if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
+        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        _resumeStateTempRecordStore.emplace(opCtx,
+                                            ident::generateNewIndexBuildIdent(*_buildUUID),
+                                            LazyRecordStore::CreateMode::immediate);
+    } else if (_containerWriteBehavior == ContainerWriteBehavior::kDoNotReplicate) {
+        _resumeStateTempRecordStore.emplace(
+            opCtx,
+            ident::generateNewInternalIdent(kResumableIndexIdentStem),
+            LazyRecordStore::CreateMode::deferred);
+    }
 
     bool forRecovery = initMode == InitMode::Recovery;
     // Guarantees that exceptions cannot be returned from index builder initialization except for
