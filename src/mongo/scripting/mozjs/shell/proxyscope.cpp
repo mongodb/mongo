@@ -110,7 +110,7 @@ std::string MozJSProxyScope::getBaseURL() const {
 }
 
 bool MozJSProxyScope::hasOutOfMemoryException() {
-    bool out;
+    bool out = false;
     runWithoutInterruptionExceptAtGlobalShutdown(
         [&] { out = _implScope->hasOutOfMemoryException(); });
     return out;
@@ -129,19 +129,19 @@ void MozJSProxyScope::requireOwnedObjects() {
 }
 
 double MozJSProxyScope::getNumber(const char* field) {
-    double out;
+    double out = 0.0;
     run([&] { out = _implScope->getNumber(field); });
     return out;
 }
 
 int MozJSProxyScope::getNumberInt(const char* field) {
-    int out;
+    int out = 0;
     run([&] { out = _implScope->getNumberInt(field); });
     return out;
 }
 
 long long MozJSProxyScope::getNumberLongLong(const char* field) {
-    long long out;
+    long long out = 0;
     run([&] { out = _implScope->getNumberLongLong(field); });
     return out;
 }
@@ -159,7 +159,7 @@ std::string MozJSProxyScope::getString(const char* field) {
 }
 
 bool MozJSProxyScope::getBoolean(const char* field) {
-    bool out;
+    bool out = false;
     run([&] { out = _implScope->getBoolean(field); });
     return out;
 }
@@ -218,7 +218,7 @@ void MozJSProxyScope::setFunction(const char* field, const char* code) {
 }
 
 int MozJSProxyScope::type(const char* field) {
-    int out;
+    int out = 0;
     run([&] { out = _implScope->type(field); });
     return out;
 }
@@ -234,7 +234,7 @@ int MozJSProxyScope::invoke(ScriptingFunction func,
                             bool ignoreReturn,
                             bool readOnlyArgs,
                             bool readOnlyRecv) {
-    int out;
+    int out = 0;
     run([&] {
         out = _implScope->invoke(
             func, argsObject, recv, timeoutMs, ignoreReturn, readOnlyArgs, readOnlyRecv);
@@ -249,7 +249,7 @@ bool MozJSProxyScope::exec(StringData code,
                            bool reportError,
                            bool assertOnError,
                            int timeoutMs) {
-    bool out;
+    bool out = false;
     run([&] {
         out = _implScope->exec(code, name, printResult, reportError, assertOnError, timeoutMs);
     });
@@ -261,7 +261,7 @@ void MozJSProxyScope::injectNative(const char* field, NativeFunction func, void*
 }
 
 ScriptingFunction MozJSProxyScope::_createFunction(const char* raw) {
-    ScriptingFunction out;
+    ScriptingFunction out = 0;
     run([&] { out = _implScope->_createFunction(raw); });
     return out;
 }
