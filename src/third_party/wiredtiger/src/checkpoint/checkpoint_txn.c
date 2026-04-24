@@ -2751,20 +2751,6 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
 
         fake_ckpt = true;
         __wt_checkpoint_update_generation(session, btree);
-
-        if (__wt_conn_is_disagg(session)) {
-            /*
-             * In disaggregated storage, fake checkpoints must go through the block manager
-             * start/resolve cycle so their metadata is pushed to shared storage. Without this, the
-             * fake checkpoint only exists in local metadata. If leadership changes, the new node
-             * has no knowledge of the fake checkpoint and starts the checkpoint order at 1 again,
-             * producing a duplicate order with a different time and risking data corruption when
-             * metadata is merged.
-             */
-            WT_ERR(bm->checkpoint_start(bm, session));
-            resolve_bm = true;
-        }
-
         goto fake;
     }
 

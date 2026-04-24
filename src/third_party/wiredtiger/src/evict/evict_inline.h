@@ -602,7 +602,8 @@ __wt_evict_needed(
          * updates or dirty pages.
          */
         if (ignore_updates_dirty && __wt_conn_is_disagg(session) &&
-          (!conn->layered_table_manager.leader || F_ISSET(conn, WT_CONN_RECONFIGURING_STEP_UP))) {
+          (!conn->layered_table_manager.leader ||
+            F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP))) {
             double cache_full = (evict->eviction_target + evict->eviction_trigger) / 2;
             if (pct_updates > cache_full)
                 __wt_verbose_debug1(

@@ -54,9 +54,12 @@ __btree_clear(WT_SESSION_IMPL *session)
 static int
 __btree_pin_hs_dhandle(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
+    WT_DATA_HANDLE *hs_dhandle;
     WT_DECL_ITEM(hs_uri_buf);
     WT_DECL_RET;
     const char *hs_checkpoint_name;
+
+    hs_dhandle = NULL;
 
     /* Look up the most recent history store checkpoint. This fetches the exact name to use. */
     WT_RET(
@@ -70,7 +73,12 @@ __btree_pin_hs_dhandle(WT_SESSION_IMPL *session, WT_BTREE *btree)
     WT_ERR(__wt_buf_fmt(session, hs_uri_buf, "%s/%s", WT_HS_URI_SHARED, hs_checkpoint_name));
     WT_ERR(__wt_session_get_dhandle(session, hs_uri_buf->data, NULL, NULL, 0));
 
-    (void)__wt_atomic_add_int32(&session->dhandle->session_inuse, 1);
+    /*
+     * Save the dhandle pointer before incrementing session_inuse: releasing the dhandle clears the
+     * reference unconditionally, so we need our own copy to undo the increment on the error path.
+     */
+    hs_dhandle = session->dhandle;
+    (void)__wt_atomic_add_int32(&hs_dhandle->session_inuse, 1);
     WT_ERR(__wt_session_release_dhandle(session));
     btree->hs_checkpoint_name = hs_checkpoint_name;
 
@@ -78,6 +86,8 @@ __btree_pin_hs_dhandle(WT_SESSION_IMPL *session, WT_BTREE *btree)
     return (0);
 
 err:
+    if (hs_dhandle != NULL)
+        (void)__wt_atomic_sub_int32(&hs_dhandle->session_inuse, 1);
     __wt_scr_free(session, &hs_uri_buf);
     __wt_free(session, hs_checkpoint_name);
     return (ret);
@@ -150,6 +160,10 @@ __btree_pin_hs_dhandle_and_get_meta_checkpoint(WT_SESSION_IMPL *session, WT_BTRE
     F_SET(btree, WT_BTREE_READONLY);
 
 err:
+    /*
+     * On error, the pinned history store dhandle is not released here. The caller is responsible
+     * for releasing it on the error path.
+     */
     return (ret);
 }
 
@@ -316,6 +330,10 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 
     if (0) {
 err:
+        /*
+         * Closing the btree releases the pinned history store dhandle, covering the case where the
+         * history store was pinned successfully but a later step failed.
+         */
         WT_TRET(__wt_btree_close(session));
     }
     __wt_free(session, lr_fh_meta.bitmap_str);

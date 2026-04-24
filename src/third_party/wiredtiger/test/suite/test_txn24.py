@@ -46,7 +46,7 @@ class test_txn24(wttest.WiredTigerTestCase):
     rollbacks_allowed = 0
 
     def conn_config(self):
-        return 'cache_size=100MB,eviction=(threads_min=4,threads_max=4)'
+        return 'cache_size=100MB,eviction=(threads_min=4,threads_max=4),verbose=[transaction]'
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -55,6 +55,10 @@ class test_txn24(wttest.WiredTigerTestCase):
         return val
 
     def test_snapshot_isolation_and_eviction(self):
+        # Verbose transaction logging is enabled; suppress the "oldest id pinned" messages that
+        # may appear from background eviction threads during the long-running transaction below.
+        self.ignoreStdoutPattern(r"oldest id .* pinned in session")
+
         # Create and populate a table.
         uri = "table:test_txn24"
         table_params = 'key_format={},value_format={}'.format(self.key_format, 'S')
@@ -116,3 +120,52 @@ class test_txn24(wttest.WiredTigerTestCase):
         # Before committing the long running transaction check whether any bytes were written to disk s part of eviction.
         self.assertGreater((bytes_evicted_new - bytes_evicted), 0)
         self.session.commit_transaction()
+
+    def test_oldest_id_log(self):
+        # Create and populate a table.
+        uri = "table:test_txn24"
+        table_params = 'key_format={},value_format=S'.format(self.key_format)
+
+        default_val = 'ABCD' * 60
+        new_val = 'YYYY' * 60
+        # Needs > 10,000 transactions from session3 to exceed the verbose-message threshold
+        # (current_id - oldest_id > 10 * WT_THOUSAND). Keep small enough to avoid cache pressure.
+        n_rows = 12000
+
+        # Populate
+        self.session.create(uri, table_params + self.extraconfig)
+        cursor = self.session.open_cursor(uri, None)
+        for i in range(1, n_rows + 1):
+            cursor[i] = default_val
+        cursor.close()
+
+        # Perform a checkpoint. There should be no dirty content in the cache after this.
+        self.session.checkpoint()
+
+        # Start a long-running transaction, make an update and keep it running.
+        cursor = self.session.open_cursor(uri, None)
+        self.session.begin_transaction()
+        cursor[1] = new_val
+
+        # Start another long-running transaction, make an update and keep it running.
+        session2 = self.setUpSessionOpen(self.conn)
+        cursor2 = session2.open_cursor(uri)
+        session2.begin_transaction()
+        cursor2[2] = new_val
+
+        session3 = self.setUpSessionOpen(self.conn)
+        cursor3 = session3.open_cursor(uri)
+        for i in range(3, n_rows):
+            session3.begin_transaction()
+            cursor3[i] = new_val
+            session3.commit_transaction()
+
+        # Committing the oldest transaction should cause a verbose message to appear when
+        # __wt_txn_update_oldest next runs, because the pinning session has changed.
+        self.session.commit_transaction()
+        session3.checkpoint()
+        self.captureout.checkAdditionalPattern(self, r"oldest id .* pinned in session")
+        # Background eviction threads may continue emitting these messages; ignore trailing
+        # occurrences so tearDown does not flag them as unexpected output.
+        self.ignoreStdoutPattern(r"oldest id .* pinned in session")
+        session2.commit_transaction()

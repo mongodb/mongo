@@ -56,6 +56,23 @@ class CompatibilityTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         build_config = self.build_config if hasattr(self, 'build_config') else None
         return compatibility_common.branch_build_path(branch, build_config)
 
+    def assert_captured_output_contains(self, stream, expected):
+        '''
+        Assert `expected` appears in the captured output of the given stream ('stdout' or
+        'stderr'). The framework redirects the subprocess's stdout/stderr (both Python and
+        C-level writes) to stdout.txt / stderr.txt in the test's working directory.
+        '''
+        if stream == 'stdout':
+            sys.stdout.flush()
+            filename = 'stdout.txt'
+        else:
+            sys.stderr.flush()
+            filename = 'stderr.txt'
+        with open(filename, 'r') as f:
+            contents = f.read()
+        assert expected in contents, \
+            f'expected {expected!r} in {filename}, got:\n{contents}'
+
     def run_method_on_branch(self, branch:WTVersion, method):
         '''
         Run a method on a branch.

@@ -772,13 +772,20 @@ table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op)
      * For this reason, always insert new records (or update previously inserted new records), when
      * inserting into a mirror group. For the same reason, don't reserve a row, that will position
      * the cursor and lead us into an update.
+     *
+     * Both pre-positioning and reserve are skipped for predictable replay because their success
+     * depends on key visibility at the non-deterministic read timestamp. If either succeeds in one
+     * run but fails in another, positioned differs, which changes whether key_gen_insert consumes
+     * data_rnd, causing the commit/rollback decision to diverge.
      */
     positioned = false;
-    if (op != TRUNCATE && (op != INSERT || !table->mirror)) {
+    if (op != TRUNCATE && (op != INSERT || !table->mirror) && !GV(RUNS_PREDICTABLE_REPLAY)) {
         /*
          * Inserts, removes and updates can be done following a cursor set-key, or based on a cursor
          * position taken from a previous search. If not already doing a read, position the cursor
          * at an existing point in the tree 20% of the time.
+         *
+         * FIXME-WT-17260: Enable pre-positioning the cursor in predictable replay mode.
          */
         if (op != READ && mmrand(&tinfo->data_rnd, 1, 5) == 1) {
             ++tinfo->search;
@@ -2133,9 +2140,18 @@ row_remove(TINFO *tinfo, bool positioned)
         cursor->set_key(cursor, tinfo->key);
     }
 
-    /* We use the cursor in overwrite mode, check for existence. */
-    if ((ret = read_op(cursor, SEARCH, NULL)) == 0)
-        ret = cursor->remove(cursor);
+    /*
+     * Call cursor->remove() directly. A prior search guard was removed because overwrite mode no
+     * longer has any effect on cursor->remove(), and the search result sometimes incorrectly
+     * returns WT_NOTFOUND when we actually want WT_ROLLBACK. This can happen when the search sees a
+     * tombstone, but there are newer invisible updates. Whether the search succeeds or not depends
+     * on the current read_ts, which varies non-deterministically across runs.
+     *
+     * In predictable replay mode, this violates our assumption that every operation succeeds or
+     * fails deterministically, since the remove could fail with WT_NOTFOUND in one run and
+     * succeeded in another after rolling back and retrying with a higher read_ts.
+     */
+    ret = cursor->remove(cursor);
 
     if (ret != 0 && ret != WT_NOTFOUND)
         return (ret);
@@ -2161,9 +2177,8 @@ col_remove(TINFO *tinfo, bool positioned)
     if (!positioned)
         cursor->set_key(cursor, tinfo->keyno);
 
-    /* We use the cursor in overwrite mode, check for existence. */
-    if ((ret = read_op(cursor, SEARCH, NULL)) == 0)
-        ret = cursor->remove(cursor);
+    /* See row_remove for the rationale behind calling cursor->remove() directly. */
+    ret = cursor->remove(cursor);
 
     if (ret != 0 && ret != WT_NOTFOUND)
         return (ret);

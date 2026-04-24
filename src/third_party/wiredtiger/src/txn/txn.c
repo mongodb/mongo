@@ -547,23 +547,25 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
         __wt_atomic_store_uint64_v_relaxed(&txn_global->metadata_pinned, metadata_pinned);
     if (__wt_atomic_load_uint64_v_relaxed(&txn_global->oldest_id) < oldest_id)
         __wt_atomic_store_uint64_v_relaxed(&txn_global->oldest_id, oldest_id);
-    if (__wt_atomic_load_uint64_v_relaxed(&txn_global->last_running) < last_running) {
+    if (__wt_atomic_load_uint64_v_relaxed(&txn_global->last_running) < last_running)
         __wt_atomic_store_uint64_v_relaxed(&txn_global->last_running, last_running);
 
-        /*
-         * Output a verbose message about long-running transactions, but only when some progress is
-         * being made.
-         */
-        current_id = __wt_atomic_load_uint64_v_relaxed(&txn_global->current);
-        WT_ASSERT(session, oldest_id <= current_id);
-        if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
-          current_id - oldest_id > (10 * WT_THOUSAND) && oldest_session != NULL) {
-            __wt_verbose(session, WT_VERB_TRANSACTION,
-              "oldest id %" PRIu64 " pinned in session %" PRIu32 " [%s] with snap_min %" PRIu64,
-              oldest_id, oldest_session->id,
-              __wt_tsan_suppress_load_const_char_ptr(&oldest_session->lastop),
-              oldest_session->txn->snapshot_data.snap_min);
-        }
+    /*
+     * When verbose transaction logging is enabled, output a message when a long running transaction
+     * is pinning the oldest ID, but only when the pinning transaction changes to avoid spamming the
+     * log.
+     */
+    current_id = __wt_atomic_load_uint64_v_relaxed(&txn_global->current);
+    WT_ASSERT(session, oldest_id <= current_id);
+    if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
+      !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING) && current_id - oldest_id > (10 * WT_THOUSAND) &&
+      oldest_session != NULL && oldest_id != txn_global->oldest_id_last_verbose) {
+        const char *lastop = __wt_tsan_suppress_load_const_char_ptr(&oldest_session->lastop);
+        txn_global->oldest_id_last_verbose = oldest_id;
+        __wt_verbose(session, WT_VERB_TRANSACTION,
+          "oldest id %" PRIu64 " pinned in session %" PRIu32 " [last_op: %s] (current_id %" PRIu64
+          ")",
+          oldest_id, oldest_session->id, lastop == NULL ? "NONE" : lastop, current_id);
     }
 
 done:

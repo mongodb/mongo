@@ -185,16 +185,6 @@ replay_operation_enabled(thread_op op)
         return (false);
 
     /*
-     * FIXME-WT-10570. We don't permit remove operations with predictable replay.
-     *
-     * This should be something we can and should fix. The problem may be similar to the problem
-     * with modify, where having a varying read timestamp can cause different results for different
-     * runs.
-     */
-    if (op == REMOVE)
-        return (false);
-
-    /*
      * We don't permit truncate operations with predictable replay.
      *
      * Currently, we use an operation's timestamp to help derive the operation's key.

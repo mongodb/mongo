@@ -222,6 +222,7 @@ struct __wt_txn_global {
     wt_shared volatile uint64_t debug_ops;       /* Debug mode op counter */
     uint64_t debug_rollback;                     /* Debug mode rollback */
     wt_shared volatile uint64_t metadata_pinned; /* Oldest ID for metadata */
+    uint64_t oldest_id_last_verbose; /* Oldest ID at last long-running txn verbose message */
 
     WT_TXN_SHARED *txn_shared_list; /* Per-session shared transaction states */
 

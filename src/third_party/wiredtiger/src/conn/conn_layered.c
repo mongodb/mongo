@@ -167,7 +167,6 @@ __disagg_discard_old_checkpoint_check(WT_SESSION_IMPL *session, const char *cfg_
     checkpoint_order = checkpoint_order_new = 0;
     checkpoint_time = checkpoint_time_new = 0;
     *checkpoint_name = checkpoint_name_new = NULL;
-    *discardp = false;
 
     WT_ERR_NOTFOUND_OK(__wt_ckpt_last_name(session, cfg_current, checkpoint_name, &checkpoint_order,
                          &checkpoint_time),
@@ -175,6 +174,7 @@ __disagg_discard_old_checkpoint_check(WT_SESSION_IMPL *session, const char *cfg_
     /* Early exit if we can't find the configuration of last checkpoint. */
     if (ret == WT_NOTFOUND) {
         WT_ASSERT(session, *checkpoint_name == NULL);
+        *discardp = false;
         return (0);
     }
 
@@ -187,28 +187,16 @@ __disagg_discard_old_checkpoint_check(WT_SESSION_IMPL *session, const char *cfg_
       true);
     if (ret == WT_NOTFOUND) {
         WT_ASSERT(session, checkpoint_name_new == NULL);
+        *discardp = false;
         return (0);
     }
 
-    if (checkpoint_order == checkpoint_order_new) {
-        /*
-         * Checkpoint orders are strictly increasing if the checkpoints are written by different
-         * nodes.
-         */
-        if (checkpoint_time != checkpoint_time_new)
-            WT_ERR_PANIC(session, WT_PANIC,
-              "Checkpoint order should be strictly increasing. "
-              "Current checkpoint order: %" PRId64 ", time: %" PRIu64
-              ". New checkpoint order: %" PRId64 ", time: %" PRIu64
-              ". Current configuration: '%s'. New configuration: '%s'.",
-              checkpoint_order, checkpoint_time, checkpoint_order_new, checkpoint_time_new,
-              cfg_current, cfg_new);
-    } else
-        /*
-         * Treat the checkpoint order configurations as the source of truth when determining whether
-         * the checkpoint has changed.
-         */
-        *discardp = true;
+    /*
+     * Treat the checkpoint order and time configurations as the source of truth when determining
+     * whether the checkpoint has changed.
+     */
+    *discardp =
+      !(checkpoint_order == checkpoint_order_new && checkpoint_time == checkpoint_time_new);
 
 #ifdef HAVE_DIAGNOSTIC
     if (!*discardp)
@@ -373,6 +361,8 @@ __disagg_apply_checkpoint_meta(
              * date. Any new opens will get the new metadata.
              *
              * FIXME-WT-14730: check that the other parts of the metadata are identical.
+             * FIXME-WT-16494: how to decide two checkpoints are different if they are written by
+             * different nodes.
              */
             WT_ERR(__disagg_discard_old_checkpoint_check(
               session, current_value_copy, cfg_ret, &checkpoint_name, &discard));
@@ -1286,7 +1276,7 @@ __disagg_step_up(WT_SESSION_IMPL *session)
 
     __wt_verbose_debug1(
       session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "Stepping up to the leader mode");
-    F_SET(conn, WT_CONN_RECONFIGURING_STEP_UP);
+    F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP);
 
     /*
      * Step up to the leader mode. We need to do this first, because the rest of the operations
@@ -1318,7 +1308,7 @@ __disagg_step_up(WT_SESSION_IMPL *session)
 
 err:
     WT_TRET(__wt_session_close_internal(internal_session));
-    F_CLR(conn, WT_CONN_RECONFIGURING_STEP_UP);
+    F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP);
     return (ret);
 }
 
