@@ -55,28 +55,25 @@ class ServiceExecutorSyncImpl::SharedState : public std::enable_shared_from_this
 private:
     class LockRef {
     public:
-        explicit LockRef(SharedState* p) : _p{p} {}
-
-        size_t threads() const {
-            return _p->_threads;
-        }
+        explicit LockRef(SharedState* p) : _p{p}, _lk{_p->_mutex} {}
 
         bool waitForDrain(Milliseconds dur) {
-            return _p->_cv.wait_for(_lk, dur.toSystemDuration(), [&] { return !_p->_threads; });
+            return _p->_cv.wait_for(
+                _lk, dur.toSystemDuration(), [&] { return _p->_threads.loadRelaxed() == 0; });
         }
 
         void onStartThread() {
-            ++_p->_threads;
+            _p->_threads.fetchAndAdd(1);
         }
 
         void onEndThread() {
-            if (!--_p->_threads)
+            if (_p->_threads.subtractAndFetch(1) == 0)
                 _p->_cv.notify_all();
         }
 
     private:
         SharedState* _p;
-        std::unique_lock<std::mutex> _lk{_p->_mutex};
+        std::unique_lock<std::mutex> _lk;
     };
 
 public:
@@ -96,6 +93,20 @@ public:
         return LockRef{this};
     }
 
+    /**
+     * Lock-free read for advisory callers (e.g. yieldIfAppropriate) and stats.
+     *
+     * The atomic is self-synchronizing for the writes themselves. The mutex in
+     * LockRef is retained because onEndThread's decrement-and-conditional-notify
+     * is a compound operation that must pair with waitForDrain's predicate check:
+     * without the mutex, a drain waiter could observe a non-zero count, begin
+     * parking, and miss the notify_all that follows the decrement to zero.
+     * Hot-path readers don't participate in that handshake and can skip the lock.
+     */
+    size_t getRunningThreadsRelaxed() const {
+        return _threads.loadRelaxed();
+    }
+
 private:
     class WorkerThreadInfo;
 
@@ -103,7 +114,7 @@ private:
     mutable std::mutex _mutex;
     stdx::condition_variable _cv;
     AtomicWord<bool> _isRunning;
-    size_t _threads = 0;
+    AtomicWord<size_t> _threads{0};
 };
 
 class ServiceExecutorSyncImpl::SharedState::WorkerThreadInfo {
@@ -186,7 +197,7 @@ Status ServiceExecutorSyncImpl::shutdown(Milliseconds timeout) {
 }
 
 size_t ServiceExecutorSyncImpl::getRunningThreads() const {
-    return _sharedState->lock().threads();
+    return _sharedState->getRunningThreadsRelaxed();
 }
 
 void ServiceExecutorSyncImpl::appendStats(BSONObjBuilder* bob) const {
