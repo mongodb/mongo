@@ -1123,28 +1123,34 @@ long long CollectionImpl::getCappedMaxSize() const {
 
 long long CollectionImpl::numRecords(OperationContext* opCtx) const {
     return (isReplicatedFastCountEnabled(opCtx) && isReplicatedFastCountEligible(_ns))
-        ? ReplicatedFastCountManager::get(opCtx->getServiceContext()).find(uuid()).count +
+        ? replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+                .find(uuid())
+                .count +
             UncommittedFastCountChange::getForRead(opCtx).find(uuid()).count
         : _shared->_recordStore->numRecords();
 }
 
 long long CollectionImpl::dataSize(OperationContext* opCtx) const {
     return (isReplicatedFastCountEnabled(opCtx) && isReplicatedFastCountEligible(_ns))
-        ? ReplicatedFastCountManager::get(opCtx->getServiceContext()).find(uuid()).size +
+        ? replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+                .find(uuid())
+                .size +
             UncommittedFastCountChange::getForRead(opCtx).find(uuid()).size
         : _shared->_recordStore->dataSize();
 }
 
 CollectionSizeCount CollectionImpl::latestSizeCount(OperationContext* opCtx) const {
     return (isReplicatedFastCountEnabled(opCtx) && isReplicatedFastCountEligible(_ns))
-        ? ReplicatedFastCountManager::get(opCtx->getServiceContext()).findLatest(opCtx, uuid())
+        ? replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+              .findLatest(opCtx, uuid())
         : CollectionSizeCount{_shared->_recordStore->dataSize(),
                               _shared->_recordStore->numRecords()};
 }
 
 CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) const {
     return (isReplicatedFastCountEnabled(opCtx) && isReplicatedFastCountEligible(_ns))
-        ? ReplicatedFastCountManager::get(opCtx->getServiceContext()).findPersisted(opCtx, uuid())
+        ? replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+              .findPersisted(opCtx, uuid())
         : CollectionSizeCount{_shared->_recordStore->dataSize(),
                               _shared->_recordStore->numRecords()};
 }

@@ -49,7 +49,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace mongo::replicated_fast_count {
 namespace {
 class ReplicatedFastCountTest : public CatalogTestFixture {
 public:
@@ -495,23 +495,17 @@ TEST_F(ReplicatedFastCountTest, InitializePopulatesMetadataFromExistingInternalC
 
         WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
 
-        ASSERT_OK(
-            Helpers::insert(_opCtx,
-                            *fastCountColl,
-                            BSON("_id" << uuid1 << replicated_fast_count::kValidAsOfKey
-                                       << Timestamp(1, 1) << replicated_fast_count::kMetadataKey
-                                       << BSON(replicated_fast_count::kCountKey
-                                               << expectedCount1 << replicated_fast_count::kSizeKey
-                                               << expectedSize1))));
+        ASSERT_OK(Helpers::insert(
+            _opCtx,
+            *fastCountColl,
+            BSON("_id" << uuid1 << kValidAsOfKey << Timestamp(1, 1) << kMetadataKey
+                       << BSON(kCountKey << expectedCount1 << kSizeKey << expectedSize1))));
 
-        ASSERT_OK(
-            Helpers::insert(_opCtx,
-                            *fastCountColl,
-                            BSON("_id" << uuid2 << replicated_fast_count::kValidAsOfKey
-                                       << Timestamp(1, 1) << replicated_fast_count::kMetadataKey
-                                       << BSON(replicated_fast_count::kCountKey
-                                               << expectedCount2 << replicated_fast_count::kSizeKey
-                                               << expectedSize2))));
+        ASSERT_OK(Helpers::insert(
+            _opCtx,
+            *fastCountColl,
+            BSON("_id" << uuid2 << kValidAsOfKey << Timestamp(1, 1) << kMetadataKey
+                       << BSON(kCountKey << expectedCount2 << kSizeKey << expectedSize2))));
 
         wuow.commit();
     }
@@ -1059,7 +1053,7 @@ repl::OplogEntry makeOplogEntryWithSizeMeta(const NamespaceString& nss,
 TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForInsert) {
     const int32_t sizeDelta = 400;
     const auto insertOp = makeOplogEntryWithSizeMeta(_nss1, repl::OpTypeEnum::kInsert, sizeDelta);
-    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    const auto extractedSizeCount = extractSizeCountDeltaForOp(insertOp);
     ASSERT(extractedSizeCount.has_value());
 
     // Insert means count increases by 1.
@@ -1070,7 +1064,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForInsert) {
 TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForUpdate) {
     const int32_t sizeDelta = 400;
     const auto insertOp = makeOplogEntryWithSizeMeta(_nss1, repl::OpTypeEnum::kUpdate, sizeDelta);
-    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    const auto extractedSizeCount = extractSizeCountDeltaForOp(insertOp);
     ASSERT(extractedSizeCount.has_value());
 
     // Updates imply no new documents, count delta is 0.
@@ -1081,7 +1075,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForUpdate) {
 TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForDelete) {
     const int32_t sizeDelta = 400;
     const auto insertOp = makeOplogEntryWithSizeMeta(_nss1, repl::OpTypeEnum::kDelete, sizeDelta);
-    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    const auto extractedSizeCount = extractSizeCountDeltaForOp(insertOp);
     ASSERT(extractedSizeCount.has_value());
 
     // Delete implies one less document.
@@ -1099,8 +1093,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, NoSizeCountDeltaWhenAbsentFromOplogEnt
         .oField = BSONObj(),
         .wallClockTime = Date_t::now(),
     }}};
-    const auto extractedSizeCount =
-        replicated_fast_count::extractSizeCountDeltaForOp(insertOpNoSizeMetadata);
+    const auto extractedSizeCount = extractSizeCountDeltaForOp(insertOpNoSizeMetadata);
     ASSERT_FALSE(insertOpNoSizeMetadata.getSizeMetadata().has_value());
 }
 
@@ -1114,8 +1107,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, NoSizeCountDeltaWhenAbsentAndIncompati
         .oField = BSONObj(),
         .wallClockTime = Date_t::now(),
     }}};
-    const auto extractedSizeCount =
-        replicated_fast_count::extractSizeCountDeltaForOp(commandOpNoSizeMetadata);
+    const auto extractedSizeCount = extractSizeCountDeltaForOp(commandOpNoSizeMetadata);
     ASSERT_FALSE(commandOpNoSizeMetadata.getSizeMetadata().has_value());
 }
 
@@ -1125,7 +1117,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnUnsupportedOpTy
 
     // Size metadata is only supported for 'insert', 'delete', and 'update' operations. All other
     // operations are incompatible with a top-level 'm' field.
-    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), boost::none);
+    EXPECT_EQ(extractSizeCountDeltaForOp(oplogEntry), boost::none);
 }
 
 TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnNonEligibleNss) {
@@ -1137,7 +1129,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnNonEligibleNss)
         makeOplogEntryWithSizeMeta(localNss, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
 
     // Even though the oplog entry carries size metadata, ineligible namespaces should be skipped.
-    ASSERT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry).has_value());
+    ASSERT_FALSE(extractSizeCountDeltaForOp(oplogEntry).has_value());
 }
 
 TEST_F(ReplicatedFastCountDeltaUtilsTest,
@@ -1155,7 +1147,7 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest,
     }}};
 
     // Local namespace without sizeMetadata shouldn't throw an error.
-    ASSERT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(insertOpLocalNs).has_value());
+    ASSERT_FALSE(extractSizeCountDeltaForOp(insertOpLocalNs).has_value());
 }
 
 TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForApplyOpsInsertsSingleUUID) {
@@ -1964,4 +1956,4 @@ TEST_F(AggregateSizeCountFromOplogTest, InsertAndDropMarkedDropped) {
 }
 }  // namespace
 }  // namespace replicated_fast_count
-}  // namespace mongo
+}  // namespace mongo::replicated_fast_count

@@ -92,10 +92,11 @@ void checkUncommittedFastCountChanges(OperationContext* opCtx,
     EXPECT_EQ(uncommittedSizeAndCount.size, expectedSize);
 }
 
-void checkCommittedFastCountChanges(const UUID& uuid,
-                                    ReplicatedFastCountManager* fastCountManager,
-                                    int64_t expectedCount,
-                                    int64_t expectedSize) {
+void checkCommittedFastCountChanges(
+    const UUID& uuid,
+    replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
+    int64_t expectedCount,
+    int64_t expectedSize) {
     auto committedSizeAndCount = fastCountManager->find(uuid);
 
     EXPECT_EQ(committedSizeAndCount.count, expectedCount);
@@ -103,7 +104,7 @@ void checkCommittedFastCountChanges(const UUID& uuid,
 }
 
 void insertDocs(OperationContext* opCtx,
-                ReplicatedFastCountManager* fastCountManager,
+                replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
                 const NamespaceString& nss,
                 int numDocs,
                 int64_t startingCount,
@@ -141,7 +142,7 @@ void insertDocs(OperationContext* opCtx,
 }
 
 void updateDocs(OperationContext* opCtx,
-                ReplicatedFastCountManager* fastCountManager,
+                replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
                 const NamespaceString& nss,
                 int startIdx,
                 int endIdx,
@@ -177,7 +178,7 @@ void updateDocs(OperationContext* opCtx,
 }
 
 void deleteDocsByIDRange(OperationContext* opCtx,
-                         ReplicatedFastCountManager* fastCountManager,
+                         replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
                          const NamespaceString& nss,
                          int startIdx,
                          int endIdx,

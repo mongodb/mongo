@@ -54,7 +54,7 @@
 #include <boost/optional/optional.hpp>
 
 
-namespace mongo {
+namespace mongo::replicated_fast_count {
 
 /**
  * Maintains an in-memory cache of the size and count of all collections.
@@ -95,9 +95,8 @@ class MONGO_MOD_PUBLIC ReplicatedFastCountManager {
     using FastSizeCountMap = absl::flat_hash_map<UUID, StoredSizeCount>;
 
 public:
-    MONGO_MOD_PRIVATE ReplicatedFastCountManager(
-        replicated_fast_count::SizeCountStore sizeCountStore,
-        replicated_fast_count::SizeCountTimestampStore timestampStore)
+    MONGO_MOD_PRIVATE ReplicatedFastCountManager(SizeCountStore sizeCountStore,
+                                                 SizeCountTimestampStore timestampStore)
         : _sizeCountStore(std::move(sizeCountStore)), _timestampStore(std::move(timestampStore)) {
         initializeFastCountCommitFn();
     }
@@ -303,12 +302,12 @@ private:
     /**
      * Interface for reads / writes to the `config.fast_count_metadata_store`.
      */
-    replicated_fast_count::SizeCountStore _sizeCountStore;
+    SizeCountStore _sizeCountStore;
 
     /**
      * Interface for reads / writes to the `config.fast_count_metadata_timestamp_store`.
      */
-    replicated_fast_count::SizeCountTimestampStore _timestampStore;
+    SizeCountTimestampStore _timestampStore;
 
     /**
      * In-memory cache of committed fast sizes & counts since last checkpoint.
@@ -319,4 +318,4 @@ private:
     bool _flushRequested = false;  // Prevents spurious wakeups.
 };
 
-}  // namespace mongo
+}  // namespace mongo::replicated_fast_count

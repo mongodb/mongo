@@ -47,7 +47,7 @@
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace mongo::replicated_fast_count {
 namespace {
 
 /**
@@ -490,4 +490,4 @@ TEST_F(ReplicatedFastCountTxnFixture, ApplyOpsOplogEntryContainsSizeDeltaMetadat
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::replicated_fast_count

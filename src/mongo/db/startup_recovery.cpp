@@ -934,7 +934,8 @@ void startupRecovery(OperationContext* opCtx,
     });
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        ReplicatedFastCountManager::get(opCtx->getServiceContext()).initializeMetadata(opCtx);
+        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+            .initializeMetadata(opCtx);
     }
 }
 

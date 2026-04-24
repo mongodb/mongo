@@ -43,7 +43,7 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace mongo::replicated_fast_count {
 namespace {
 class ReplicatedFastCountInitTest : public CatalogTestFixture {
 public:
@@ -257,4 +257,4 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyT
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::replicated_fast_count

@@ -40,7 +40,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace mongo::replicated_fast_count {
 namespace {
 
 class PersistedSizeCountTest : public CatalogTestFixture {
@@ -101,4 +101,4 @@ TEST_F(PersistedSizeCountTest, UuidExistsInSizeCountStore) {
     EXPECT_EQ(sizeCount.size, expectedSize);
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::replicated_fast_count

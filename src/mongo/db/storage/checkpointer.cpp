@@ -136,7 +136,8 @@ void Checkpointer::run() {
         const Date_t startTime = Date_t::now();
         opCtx->getServiceContext()->getStorageEngine()->checkpoint();
         if (isReplicatedFastCountEnabled(opCtx.get())) {
-            ReplicatedFastCountManager::get(opCtx->getServiceContext()).flushAsync();
+            replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+                .flushAsync();
         }
 
         const auto secondsElapsed = durationCount<Seconds>(Date_t::now() - startTime);

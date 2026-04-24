@@ -913,7 +913,8 @@ private:
         // when downgrading to an FCV that disables the replicated size and count feature.
         if (gFeatureFlagReplicatedFastCount.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
-            ReplicatedFastCountManager::get(opCtx->getServiceContext()).shutdown(opCtx);
+            replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+                .shutdown(opCtx);
             DropReply unused;
             uassertStatusOK(
                 dropCollection(opCtx,

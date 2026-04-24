@@ -43,7 +43,7 @@
 
 MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
 
-namespace mongo {
+namespace mongo::replicated_fast_count {
 
 namespace {
 
@@ -77,7 +77,7 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 
     massert(11718600,
             "Expected fastcount collection to exist on startup",
-            replicated_fast_count::acquireFastCountCollectionForRead(opCtx).has_value());
+            acquireFastCountCollectionForRead(opCtx).has_value());
 
     LOGV2(12051100, "Starting up ReplicatedFastCountManager thread");
 
@@ -129,22 +129,16 @@ int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
         ++numRecordsScanned;
 
         auto& meta = _metadata[uuid];
-        meta.sizeCount.count = data.getField(replicated_fast_count::kMetadataKey)
-                                   .Obj()
-                                   .getField(replicated_fast_count::kCountKey)
-                                   .Long();
-        meta.sizeCount.size = data.getField(replicated_fast_count::kMetadataKey)
-                                  .Obj()
-                                  .getField(replicated_fast_count::kSizeKey)
-                                  .Long();
-        meta.validAsOf = data.getField(replicated_fast_count::kValidAsOfKey).timestamp();
+        meta.sizeCount.count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
+        meta.sizeCount.size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
+        meta.validAsOf = data.getField(kValidAsOfKey).timestamp();
     }
     return numRecordsScanned;
 }
 
 void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
 
-    auto acquisition = replicated_fast_count::acquireFastCountCollectionForRead(opCtx);
+    auto acquisition = acquireFastCountCollectionForRead(opCtx);
 
     if (!acquisition.has_value()) {
         // This should only be the case on cold boot.
@@ -226,8 +220,7 @@ CollectionSizeCount ReplicatedFastCountManager::findLatest(OperationContext* opC
     auto oplogCursor = oplogColl->getRecordStore()->getCursor(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/true);
 
-    return replicated_fast_count::readLatest(
-        opCtx, _sizeCountStore, _timestampStore, *oplogCursor, uuid);
+    return readLatest(opCtx, _sizeCountStore, _timestampStore, *oplogCursor, uuid);
 }
 
 CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* opCtx,
@@ -236,7 +229,7 @@ CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* 
         return find(uuid);
     }
 
-    return replicated_fast_count::readPersisted(opCtx, _sizeCountStore, uuid);
+    return readPersisted(opCtx, _sizeCountStore, uuid);
 }
 
 void ReplicatedFastCountManager::flushAsync() {
@@ -287,7 +280,7 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
         if (_useLegacyFlush) {
             _flushDirtyMetadata(opCtx, dirtyMetadata);
         } else {
-            replicated_fast_count::advanceCheckpoint(opCtx, _sizeCountStore, _timestampStore);
+            advanceCheckpoint(opCtx, _sizeCountStore, _timestampStore);
         }
         _metrics.addWriteTimeMsTotal((Date_t::now() - startTime).count());
 
@@ -325,7 +318,7 @@ ReplicatedFastCountManager::_getAndClearSnapshotOfDirtyMetadata(WithLock metadat
 
 void ReplicatedFastCountManager::_flushDirtyMetadata(OperationContext* opCtx,
                                                      const FastSizeCountMap& dirtyMetadata) {
-    auto acquisition = replicated_fast_count::acquireFastCountCollectionForWrite(opCtx);
+    auto acquisition = acquireFastCountCollectionForWrite(opCtx);
     massert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
 
     const CollectionPtr& fastCountColl = acquisition->getCollectionPtr();
@@ -457,11 +450,8 @@ void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,
 BSONObj ReplicatedFastCountManager::_getDocForWrite(const UUID& uuid,
                                                     const CollectionSizeCount& sizeCount,
                                                     const Timestamp& validAsOfTS) const {
-    return BSON("_id" << uuid << replicated_fast_count::kValidAsOfKey << validAsOfTS
-                      << replicated_fast_count::kMetadataKey
-                      << BSON(replicated_fast_count::kCountKey << sizeCount.count
-                                                               << replicated_fast_count::kSizeKey
-                                                               << sizeCount.size));
+    return BSON("_id" << uuid << kValidAsOfKey << validAsOfTS << kMetadataKey
+                      << BSON(kCountKey << sizeCount.count << kSizeKey << sizeCount.size));
 }
 
 RecordId ReplicatedFastCountManager::_keyForUUID(const UUID& uuid) const {
@@ -476,4 +466,4 @@ UUID ReplicatedFastCountManager::_UUIDForKey(const RecordId key) const {
     return UUID::parse(record_id_helpers::toBSONAs(key, "").firstElement()).getValue();
 }
 
-}  // namespace mongo
+}  // namespace mongo::replicated_fast_count

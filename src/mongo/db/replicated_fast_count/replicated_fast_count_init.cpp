@@ -137,7 +137,8 @@ void setUpReplicatedFastCount(OperationContext* opCtx) {
         }
     }
 
-    ReplicatedFastCountManager::get(opCtx->getServiceContext()).startup(opCtx);
+    replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+        .startup(opCtx);
 }
 
 namespace {

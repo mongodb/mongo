@@ -173,10 +173,11 @@ void checkUncommittedFastCountChanges(OperationContext* opCtx,
 /**
  * Checks the committed fast count changes for the given UUID.
  */
-void checkCommittedFastCountChanges(const UUID& uuid,
-                                    ReplicatedFastCountManager* fastCountManager,
-                                    int64_t expectedCount,
-                                    int64_t expectedSize);
+void checkCommittedFastCountChanges(
+    const UUID& uuid,
+    replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
+    int64_t expectedCount,
+    int64_t expectedSize);
 /**
  * Inserts the specified number of documents into the given collection, using the provided function
  * 'makeDoc' to generate each document. Checks whether uncommitted and committed changes are updated
@@ -187,7 +188,7 @@ void checkCommittedFastCountChanges(const UUID& uuid,
  * rollback.
  */
 void insertDocs(OperationContext* opCtx,
-                ReplicatedFastCountManager* fastCountManager,
+                replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
                 const NamespaceString& nss,
                 int numDocs,
                 int64_t startingCount,
@@ -203,7 +204,7 @@ void insertDocs(OperationContext* opCtx,
  * representative of what the documents we are updating look like after the update is applied.
  */
 void updateDocs(OperationContext* opCtx,
-                ReplicatedFastCountManager* fastCountManager,
+                replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
                 const NamespaceString& nss,
                 int startIdx,
                 int endIdx,
@@ -217,7 +218,7 @@ void updateDocs(OperationContext* opCtx,
  * Deletes documents with ids in the range [startIdx, endIdx] from the given collection.
  */
 void deleteDocsByIDRange(OperationContext* opCtx,
-                         ReplicatedFastCountManager* fastCountManager,
+                         replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
                          const NamespaceString& nss,
                          int startIdx,
                          int endIdx,
