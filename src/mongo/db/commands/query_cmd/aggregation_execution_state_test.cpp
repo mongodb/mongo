@@ -78,7 +78,7 @@ protected:
             coll->setRequiresTimeseriesExtendedRangeSupport(opCtx);
         }
 
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+        CollectionShardingRuntime::acquireExclusive(opCtx, nss)
             ->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
         PointInTimeChunkManager cm(RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
                                    _dbVersion.getTimestamp());
@@ -142,7 +142,7 @@ protected:
             coll->setRequiresTimeseriesExtendedRangeSupport(opCtx);
         }
 
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+        CollectionShardingRuntime::acquireExclusive(opCtx, nss)
             ->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
 
         getCatalogCacheMock()->setCollectionReturnValue(

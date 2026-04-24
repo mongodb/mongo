@@ -2161,9 +2161,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
     }
 
     if (refreshFailed) {
-        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, _nss);
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
         scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
     }
 

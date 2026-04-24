@@ -169,20 +169,10 @@ public:
                     opCtx.get(), nss, CollectionOptions{});
             }
 
-            {
-                auto coll = acquireCollection(
+            CollectionShardingRuntime::acquireExclusive(opCtx.get(), _outputNss)
+                ->setFilteringMetadata_nonAuthoritative(
                     opCtx.get(),
-                    CollectionAcquisitionRequest{_outputNss,
-                                                 PlacementConcern::kPretendUnsharded,
-                                                 repl::ReadConcernArgs::get(opCtx.get()),
-                                                 AcquisitionPrerequisites::kWrite},
-                    MODE_X);
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx.get(),
-                                                                                     _outputNss)
-                    ->setFilteringMetadata_nonAuthoritative(
-                        opCtx.get(),
-                        CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
-            }
+                    CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
 
             _metrics =
                 ReshardingMetrics::makeInstance_forTest(_sourceUUID,

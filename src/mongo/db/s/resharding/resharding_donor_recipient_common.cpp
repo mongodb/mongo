@@ -474,14 +474,8 @@ void clearFilteringMetadata(OperationContext* opCtx,
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
         }
 
-        const auto acquisition = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
-            MODE_IX);
-
         {
-            auto scopedCsr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
             scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
         }
 

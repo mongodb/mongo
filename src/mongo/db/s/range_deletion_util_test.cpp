@@ -135,9 +135,7 @@ public:
                        ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                        ShardId("dummyShardId")}});
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
-        AutoGetDb autoDb(_opCtx, kNss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, kNss)
+        CollectionShardingRuntime::acquireExclusive(_opCtx, kNss)
             ->setFilteringMetadata_nonAuthoritative(
                 _opCtx, CollectionMetadata(std::move(cm), ShardId("dummyShardId")));
     }

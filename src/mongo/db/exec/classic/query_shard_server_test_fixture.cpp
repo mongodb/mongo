@@ -150,9 +150,7 @@ CollectionMetadata QueryShardServerTestFixture::prepareTestData(
     ASSERT_EQ(_chunks.size(), cm.numChunks());
 
     {
-        AutoGetCollection autoColl(operationContext(), _testNss, MODE_X);
-        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), _testNss);
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), _testNss);
         scopedCsr->setFilteringMetadata_nonAuthoritative(operationContext(),
                                                          CollectionMetadata(cm, curShard));
     }

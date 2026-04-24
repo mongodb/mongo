@@ -70,8 +70,7 @@ namespace mongo {
  *
  * This class is not thread-safe by itself. For this reason, it must always be accessed through
  * ScopedSharedCollectionShardingRuntime and ScopedExclusiveCollectionShardingRuntime helper
- * classes, which acquire the appropriate collection resource locks to protect against concurrent
- * modifications.
+ * classes.
  */
 class MONGO_MOD_USE_REPLACEMENT(CollectionShardingState) CollectionShardingRuntime final
     : public CollectionShardingState,
@@ -139,8 +138,7 @@ public:
 
     static ScopedSharedCollectionShardingRuntime assertCollectionLockedAndAcquireShared(
         OperationContext* opCtx, const NamespaceString& nss);
-    static ScopedExclusiveCollectionShardingRuntime assertCollectionLockedAndAcquireExclusive(
-        OperationContext* opCtx, const NamespaceString& nss);
+
     static ScopedSharedCollectionShardingRuntime acquireShared(OperationContext* opCtx,
                                                                const NamespaceString& nss);
     static ScopedExclusiveCollectionShardingRuntime acquireExclusive(OperationContext* opCtx,

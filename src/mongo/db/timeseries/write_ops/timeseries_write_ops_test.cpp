@@ -249,8 +249,7 @@ public:
         const auto collectionMetadata =
             CollectionMetadata(CurrentChunkManager(rtHandle), shardName);
 
-        AutoGetCollection coll(_opCtx, _nss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss)
+        CollectionShardingRuntime::acquireExclusive(_opCtx, _nss)
             ->setFilteringMetadata_nonAuthoritative(_opCtx, collectionMetadata);
     }
 

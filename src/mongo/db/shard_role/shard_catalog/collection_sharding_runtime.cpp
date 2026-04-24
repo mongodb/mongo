@@ -199,14 +199,6 @@ CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationConte
         ScopedCollectionShardingState::acquire(opCtx, nss));
 }
 
-CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime
-CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(OperationContext* opCtx,
-                                                                     const NamespaceString& nss) {
-    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS));
-    return ScopedExclusiveCollectionShardingRuntime(
-        ScopedExclusiveCollectionShardingState::acquire(opCtx, nss));
-}
-
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
 CollectionShardingRuntime::acquireShared(OperationContext* opCtx, const NamespaceString& nss) {
     return ScopedSharedCollectionShardingRuntime(
@@ -851,8 +843,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
                                auto_get_collection::Options{}.deadline(
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
-    auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss);
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, _nss);
     tassert(7032305,
             "Collection metadata unknown when entering critical section",
             scopedCsr->getCurrentMetadataIfKnown());
@@ -860,14 +851,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
 }
 
 CollectionCriticalSection::~CollectionCriticalSection() {
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-    auto autoGetCollOptions =
-        auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, autoGetCollOptions);
-    auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss);
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, _nss);
     scopedCsr->exitCriticalSection(_opCtx, _reason);
 }
 
@@ -878,8 +862,7 @@ void CollectionCriticalSection::enterCommitPhase() {
                                auto_get_collection::Options{}.deadline(
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
-    auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss);
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, _nss);
     tassert(7032304,
             "Collection metadata unknown when entering critical section commit phase",
             scopedCsr->getCurrentMetadataIfKnown());

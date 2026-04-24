@@ -152,9 +152,7 @@ protected:
         ASSERT_EQ(4, cm.numChunks());
 
         {
-            AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
-            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                operationContext(), kNss);
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kNss);
             scopedCsr->setFilteringMetadata_nonAuthoritative(operationContext(),
                                                              CollectionMetadata(cm, ShardId("0")));
         }

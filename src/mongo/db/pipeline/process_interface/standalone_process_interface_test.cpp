@@ -88,8 +88,7 @@ protected:
 
     void installUntrackedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
         const auto untrackedCollectionMetadata = CollectionMetadata::UNTRACKED();
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+        CollectionShardingRuntime::acquireExclusive(opCtx, nss)
             ->setFilteringMetadata_nonAuthoritative(opCtx, untrackedCollectionMetadata);
     }
 

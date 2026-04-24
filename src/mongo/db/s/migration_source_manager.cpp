@@ -310,8 +310,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
-        auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss());
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss());
 
         auto metadata = checkCollectionIdentity(_opCtx,
                                                 nss(),
@@ -687,13 +686,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     if (!migrationCommitStatus.isOK()) {
         {
-            // TODO (SERVER-71444): Fix to be interruptible or document exception.
-            UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-            AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx,
-                                                                                         nss());
+                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
                 scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
             });
         }
@@ -736,13 +730,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             "migrationId"_attr = _coordinator->getMigrationId(),
                             "error"_attr = redact(ex));
         {
-            // TODO (SERVER-71444): Fix to be interruptible or document exception.
-            UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-            AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx,
-                                                                                         nss());
+                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
                 scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
             });
         }
@@ -911,18 +900,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
     invariant(_state != kDone);
 
     auto cloneDriver = [&]() {
-        // Unregister from the collection's sharding state.
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-        // Cleanup might be happening because the node is stepping down from primary, we don't
-        // want to fail declaring write intent if that is the case.
-        auto autoGetCollOptions =
-            auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-        AutoGetCollection autoColl(_opCtx, nss(), MODE_IX, autoGetCollOptions);
-        auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss());
-
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
         if (_state != kCreated) {
             invariant(_cloneDriver);
         }
@@ -988,14 +966,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
                       "migrationId"_attr = _coordinator->getMigrationId());
         // Something went really wrong when completing the migration just unset the metadata and
         // let the next op to recover.
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-        auto autoGetCollOptions =
-            auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-        AutoGetCollection autoColl(_opCtx, nss(), MODE_IX, autoGetCollOptions);
-        auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss());
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
         scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
     }
 }

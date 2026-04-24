@@ -731,10 +731,7 @@ protected:
                            ChunkVersion({epoch, timestamp}, {1, 0}),
                            ShardId("dummyShardId")}});
 
-            AutoGetDb autoDb(operationContext(), kNss.dbName(), MODE_IX);
-            Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(operationContext(),
-                                                                                 kNss)
+            CollectionShardingRuntime::acquireExclusive(operationContext(), kNss)
                 ->setFilteringMetadata_nonAuthoritative(
                     operationContext(),
                     CollectionMetadata(

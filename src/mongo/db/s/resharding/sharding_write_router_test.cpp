@@ -137,9 +137,7 @@ public:
             OperationShardingState::setShardRole(
                 opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
 
-            Lock::DBLock dbLock{opCtx.get(), kNss.dbName(), MODE_IX};
-            Lock::CollectionLock collLock{opCtx.get(), kNss, MODE_IX};
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx.get(), kNss)
+            CollectionShardingRuntime::acquireExclusive(opCtx.get(), kNss)
                 ->setFilteringMetadata_nonAuthoritative(
                     opCtx.get(), CollectionMetadata(chunkManager, kDonorShard));
         }
@@ -344,10 +342,7 @@ TEST_F(ShardingWriteRouterRegistryTest, CollDescHasNoRoutingTableReturnsNone) {
     {
         const auto client = _serviceContext->getService()->makeClient("test-setup-unsharded");
         const auto opCtx = client->makeOperationContext();
-        Lock::DBLock dbLock{opCtx.get(), untrackedNss.dbName(), MODE_IX};
-        Lock::CollectionLock collLock{opCtx.get(), untrackedNss, MODE_IX};
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx.get(),
-                                                                             untrackedNss)
+        CollectionShardingRuntime::acquireExclusive(opCtx.get(), untrackedNss)
             ->setFilteringMetadata_nonAuthoritative(opCtx.get(), CollectionMetadata());
     }
 

@@ -365,15 +365,11 @@ void DatabaseShardingRuntime::unsetMovePrimaryInProgress(OperationContext* opCtx
 
 void DatabaseShardingRuntime::setDbInfo_DEPRECATED(OperationContext* opCtx,
                                                    const DatabaseType& dbInfo) {
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
-
     _dbMetadataAccessor.setDbMetadata_UNSAFE(opCtx, dbInfo.getPrimary(), dbInfo.getVersion());
 }
 
 void DatabaseShardingRuntime::clearDbInfo_DEPRECATED(OperationContext* opCtx,
                                                      bool cancelOngoingRefresh) {
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
-
     if (cancelOngoingRefresh) {
         _cancelDbMetadataRefresh_DEPRECATED();
     }

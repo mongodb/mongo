@@ -917,8 +917,7 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CheckCriticalSectionMetric
         return fullMetrics.getObjectField("collectionCriticalSectionStatistics").getOwned();
     };
 
-    const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-        operationContext(), kNss);
+    const auto csr = CollectionShardingRuntime::acquireExclusive(operationContext(), kNss);
 
     auto metrics = getStatistics();
     ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
@@ -954,9 +953,7 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsRepo
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
         // Enter the critical section.
-        AutoGetCollection coll(operationContext(), kNss, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), kNss);
+        const auto& csr = CollectionShardingRuntime::acquireExclusive(operationContext(), kNss);
         csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
         csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
     }
@@ -1017,9 +1014,7 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsRepo
     }
 
     {
-        AutoGetCollection coll(operationContext(), kNss, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), kNss);
+        const auto& csr = CollectionShardingRuntime::acquireExclusive(operationContext(), kNss);
         csr->exitCriticalSection(operationContext(), criticalSectionReason);
     }
 
@@ -1077,9 +1072,7 @@ public:
     }
 
     CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime csr() {
-        AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-        return CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), kTestNss);
+        return CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
     }
 
     const UUID& uuid() const {

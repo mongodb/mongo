@@ -62,9 +62,7 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo
 const std::string kPattern = "_id";
 
 void setUntrackedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+    CollectionShardingRuntime::acquireExclusive(opCtx, nss)
         ->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
 }
 

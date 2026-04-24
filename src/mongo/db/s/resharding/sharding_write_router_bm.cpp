@@ -167,9 +167,7 @@ protected:
             // Configuring the filtering metadata such that calls to getCollectionDescription
             // what we want. Specifically the reshardingFields are what we use. Its specified by
             // the chunkManager.
-            Lock::DBLock dbLock{opCtx, kNss.dbName(), MODE_IX};
-            Lock::CollectionLock collLock{opCtx, kNss, MODE_IX};
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, kNss)
+            CollectionShardingRuntime::acquireExclusive(opCtx, kNss)
                 ->setFilteringMetadata_nonAuthoritative(
                     opCtx, CollectionMetadata(chunkManager, originatorShard));
 

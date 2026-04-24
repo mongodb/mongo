@@ -262,9 +262,7 @@ void verifyProcessingFlag(OperationContext* opCtx,
 void _clearFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid) {
     NamespaceString nss = RangeDeleterServiceTest::nssWithUuid[uuid];
 
-    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
 }
 

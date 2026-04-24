@@ -100,13 +100,8 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 
-    const auto coll = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, metadata.getTempReshardingNss(), AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-        opCtx, metadata.getTempReshardingNss());
+    auto scopedCsr =
+        CollectionShardingRuntime::acquireExclusive(opCtx, metadata.getTempReshardingNss());
     scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
 }
 

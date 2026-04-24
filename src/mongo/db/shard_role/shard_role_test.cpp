@@ -208,12 +208,7 @@ void ShardRoleTest::setUp() {
 
 void ShardRoleTest::installUntrackedCollectionMetadata(OperationContext* opCtx,
                                                        const NamespaceString& nss) {
-    AutoGetCollection coll(
-        opCtx,
-        nss,
-        MODE_IX,
-        auto_get_collection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+    CollectionShardingRuntime::acquireExclusive(opCtx, nss)
         ->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
 }
 
@@ -255,8 +250,7 @@ void ShardRoleTest::installShardedCollectionMetadata(
 
     const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), kMyShardName);
 
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+    CollectionShardingRuntime::acquireExclusive(opCtx, nss)
         ->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
 }
 
@@ -948,9 +942,7 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
 TEST_F(ShardRoleTest, AcquireShardedCollWhenShardDoesNotKnowThePlacementVersionThrows) {
     {
         // Clear the collection filtering metadata on the shard.
-        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(operationContext(),
-                                                                             nssShardedCollection1)
+        CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1)
             ->clearFilteringMetadata_nonAuthoritative(operationContext());
     }
 
@@ -987,17 +979,15 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
         // Enter the critical section.
-        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), nssShardedCollection1);
+        const auto& csr =
+            CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1);
         csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
         csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
     }
 
     ON_BLOCK_EXIT([&] {
-        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), nssShardedCollection1);
+        const auto& csr =
+            CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1);
         csr->exitCriticalSection(operationContext(), criticalSectionReason);
     });
 
@@ -2057,9 +2047,8 @@ TEST_F(ShardRoleTest, RestoreForWriteJoinsCriticalSectionWhenNotRetryableWrite) 
 
         // Activate the critical section
         {
-            AutoGetCollection coll(newOpCtx, nssShardedCollection1, MODE_X);
-            const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                newOpCtx, nssShardedCollection1);
+            const auto& csr =
+                CollectionShardingRuntime::acquireExclusive(newOpCtx, nssShardedCollection1);
             csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
             csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
         }
@@ -2084,9 +2073,8 @@ TEST_F(ShardRoleTest, RestoreForWriteJoinsCriticalSectionWhenNotRetryableWrite) 
 
     // Release the critical section.
     {
-        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), nssShardedCollection1);
+        const auto& csr =
+            CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1);
         csr->exitCriticalSection(operationContext(), criticalSectionReason);
     }
 
@@ -2118,17 +2106,15 @@ TEST_F(ShardRoleTest, RestoreForWriteDoesNotJoinCriticalSectionWhenRetryableWrit
     // Activate the critical section
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
-        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), nssShardedCollection1);
+        const auto& csr =
+            CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1);
         csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
         csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
     }
 
     ON_BLOCK_EXIT([&] {
-        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), nssShardedCollection1);
+        const auto& csr =
+            CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1);
         csr->exitCriticalSection(operationContext(), criticalSectionReason);
     });
 

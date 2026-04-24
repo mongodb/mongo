@@ -451,10 +451,7 @@ public:
     }
 
     void setUntrackedFilteringMetadata(const NamespaceString& nss) {
-        AutoGetDb autoDb(operationContext(), nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(operationContext(),
-                                                                             nss)
+        CollectionShardingRuntime::acquireExclusive(operationContext(), nss)
             ->setFilteringMetadata_nonAuthoritative(operationContext(),
                                                     CollectionMetadata::UNTRACKED());
     }

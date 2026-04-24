@@ -377,10 +377,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long ter
             const auto& nss = doc.getNss();
 
             {
-                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                         nss);
+                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
                 scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
             }
 

@@ -89,7 +89,6 @@ public:
         : _nss(nss), _droppingCollection(droppingCollection) {}
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) noexcept override {
-        invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(_nss, MODE_IX));
         invariant(commitTime, "Invalid commit time");
 
         FilteringMetadataCache::get(opCtx)->notifyOfCollectionRefreshEndMarkerSeen(_nss,
@@ -97,8 +96,7 @@ public:
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
-        auto scopedCss =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, _nss);
+        auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
         if (_droppingCollection)
             scopedCss->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
         else
@@ -136,25 +134,6 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
             bsonExtractStringField(query, ShardCollectionType::kNssFieldName, &deletedCollection));
     const NamespaceString deletedNss = NamespaceStringUtil::deserialize(
         boost::none, deletedCollection, SerializationContext::stateDefault());
-
-    // Need the WUOW to retain the lock for CollectionPlacementVersionLogOpHandler::commit().
-    // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
-        shard_role_details::getLocker(opCtx));
-    // TODO SERVER-99703: We have to disable the checks here as we're
-    // violating the ordering of locks for databases. This can happen
-    // because a write to a collection in the config database like the
-    // critical section will make us take a lock on a different database.
-    // That is, we have an operation that has taken a lock on config,
-    // followed by a lock on a user database. Other op observers like the
-    // preimages one will take the inverse order, that is they have a lock
-    // on a user database and then take a lock on the config database.
-    DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-    AutoGetCollection autoColl(
-        opCtx,
-        deletedNss,
-        MODE_IX,
-        auto_get_collection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
 
     tassert(7751400,
             str::stream() << "Untimestamped writes to "
@@ -250,51 +229,12 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 [insertedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                     OperationContext* opCtx, boost::optional<Timestamp>) {
                     if (insertedNss.isDbOnly()) {
-                        // Primaries take locks when writing to certain internal namespaces. It must
-                        // be ensured that those locks are also taken on secondaries, when
-                        // applying the related oplog entries.
-                        boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                        if (!opCtx->isEnforcingConstraints()) {
-                            // TODO SERVER-99703: We have to disable the checks here as we're
-                            // violating the ordering of locks for databases. This can happen
-                            // because a write to a collection in the config database like the
-                            // critical section will make us take a lock on a different database.
-                            // That is, we have an operation that has taken a lock on config,
-                            // followed by a lock on a user database. Other op observers like the
-                            // preimages one will take the inverse order, that is they have a lock
-                            // on a user database and then take a lock on the config database.
-                            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                            lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
-                        }
-                        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
-                            opCtx, insertedNss.dbName());
+                        auto scopedDsr =
+                            DatabaseShardingRuntime::acquireExclusive(opCtx, insertedNss.dbName());
                         scopedDsr->enterCriticalSectionCatchUpPhase(opCtx, reason);
                     } else {
-                        // Primaries take locks when writing to certain internal namespaces. It must
-                        // be ensured that those locks are also taken on secondaries, when
-                        // applying the related oplog entries.
-                        boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                        if (!opCtx->isEnforcingConstraints()) {
-                            // TODO SERVER-99703: We have to disable the checks here as we're
-                            // violating the ordering of locks for databases. This can happen
-                            // because a write to a collection in the config database like the
-                            // critical section will make us take a lock on a different database.
-                            // That is, we have an operation that has taken a lock on config,
-                            // followed by a lock on a user database. Other op observers like the
-                            // preimages one will take the inverse order, that is they have a lock
-                            // on a user database and then take a lock on the config database.
-                            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                            lockCollectionIfNotPrimary.emplace(
-                                opCtx,
-                                insertedNss,
-                                fixLockModeForSystemDotViewsChanges(insertedNss, MODE_IX),
-                                auto_get_collection::Options{}.viewMode(
-                                    auto_get_collection::ViewMode::kViewsPermitted));
-                        }
-
                         auto scopedCsr =
-                            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                                opCtx, insertedNss);
+                            CollectionShardingRuntime::acquireExclusive(opCtx, insertedNss);
                         scopedCsr->enterCriticalSectionCatchUpPhase(opCtx, reason);
                     }
                 });
@@ -362,25 +302,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         auto refreshingFieldNewVal = update_oplog_entry::extractNewValueForField(
             updateDoc, ShardCollectionType::kRefreshingFieldName);
 
-        // Need the WUOW to retain the lock for CollectionPlacementVersionLogOpHandler::commit().
-        // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
-            shard_role_details::getLocker(opCtx));
-
-        // TODO SERVER-99703: We have to disable the checks here as we're
-        // violating the ordering of locks for databases. This can happen
-        // because a write to a collection in the config database like the
-        // critical section will make us take a lock on a different database.
-        // That is, we have an operation that has taken a lock on config,
-        // followed by a lock on a user database. Other op observers like the
-        // preimages one will take the inverse order, that is they have a lock
-        // on a user database and then take a lock on the config database.
-        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-        AutoGetCollection autoColl(opCtx,
-                                   updatedNss,
-                                   MODE_IX,
-                                   auto_get_collection::Options{}.viewMode(
-                                       auto_get_collection::ViewMode::kViewsPermitted));
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
             tassert(7751401,
                     str::stream()
@@ -397,8 +318,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             // Force subsequent uses of the namespace to refresh the filtering metadata so they
             // can synchronize with any work happening on the primary (e.g., migration critical
             // section).
-            auto scopedCss = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                opCtx, updatedNss);
+            auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, updatedNss);
             scopedCss->clearFilteringMetadata_nonAuthoritative(opCtx);
         }
     }
@@ -412,52 +332,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             [updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
                 if (updatedNss.isDbOnly()) {
-                    // Primaries take locks when writing to certain internal namespaces. It must
-                    // be ensured that those locks are also taken on secondaries, when
-                    // applying the related oplog entries.
-                    boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                    if (!opCtx->isEnforcingConstraints()) {
-                        // TODO SERVER-99703: We have to disable the checks here as we're
-                        // violating the ordering of locks for databases. This can happen
-                        // because a write to a collection in the config database like the
-                        // critical section will make us take a lock on a different database.
-                        // That is, we have an operation that has taken a lock on config,
-                        // followed by a lock on a user database. Other op observers like the
-                        // preimages one will take the inverse order, that is they have a lock
-                        // on a user database and then take a lock on the config database.
-                        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                        lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
-                    }
-
-                    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
-                        opCtx, updatedNss.dbName());
+                    auto scopedDsr =
+                        DatabaseShardingRuntime::acquireExclusive(opCtx, updatedNss.dbName());
                     scopedDsr->enterCriticalSectionCommitPhase(opCtx, reason);
                 } else {
-                    // Primaries take locks when writing to certain internal namespaces. It must
-                    // be ensured that those locks are also taken on secondaries, when
-                    // applying the related oplog entries.
-                    boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                    if (!opCtx->isEnforcingConstraints()) {
-                        // TODO SERVER-99703: We have to disable the checks here as we're
-                        // violating the ordering of locks for databases. This can happen
-                        // because a write to a collection in the config database like the
-                        // critical section will make us take a lock on a different database.
-                        // That is, we have an operation that has taken a lock on config,
-                        // followed by a lock on a user database. Other op observers like the
-                        // preimages one will take the inverse order, that is they have a lock
-                        // on a user database and then take a lock on the config database.
-                        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                        lockCollectionIfNotPrimary.emplace(
-                            opCtx,
-                            updatedNss,
-                            fixLockModeForSystemDotViewsChanges(updatedNss, MODE_IX),
-                            auto_get_collection::Options{}.viewMode(
-                                auto_get_collection::ViewMode::kViewsPermitted));
-                    }
-
-                    auto scopedCsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, updatedNss);
+                    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, updatedNss);
                     scopedCsr->enterCriticalSectionCommitPhase(opCtx, reason);
                 }
             });
@@ -568,25 +447,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
              clearCollMetadata = collCSDoc.getClearCollMetadata()](OperationContext* opCtx,
                                                                    boost::optional<Timestamp>) {
                 if (deletedNss.isDbOnly()) {
-                    // Primaries take locks when writing to certain internal namespaces. It must
-                    // be ensured that those locks are also taken on secondaries, when
-                    // applying the related oplog entries.
-                    boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                    if (!opCtx->isEnforcingConstraints()) {
-                        // TODO SERVER-99703: We have to disable the checks here as we're
-                        // violating the ordering of locks for databases. This can happen
-                        // because a write to a collection in the config database like the
-                        // critical section will make us take a lock on a different database.
-                        // That is, we have an operation that has taken a lock on config,
-                        // followed by a lock on a user database. Other op observers like the
-                        // preimages one will take the inverse order, that is they have a lock
-                        // on a user database and then take a lock on the config database.
-                        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                        lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
-                    }
-
-                    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
-                        opCtx, deletedNss.dbName());
+                    auto scopedDsr =
+                        DatabaseShardingRuntime::acquireExclusive(opCtx, deletedNss.dbName());
 
                     // Secondaries that are in oplog application must clear the database metadata
                     // before releasing the in-memory critical section.
@@ -596,31 +458,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
                     scopedDsr->exitCriticalSection(opCtx, reason);
                 } else {
-                    // Primaries take locks when writing to certain internal namespaces. It must
-                    // be ensured that those locks are also taken on secondaries, when
-                    // applying the related oplog entries.
-                    boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                    if (!opCtx->isEnforcingConstraints()) {
-                        // TODO SERVER-99703: We have to disable the checks here as we're
-                        // violating the ordering of locks for databases. This can happen
-                        // because a write to a collection in the config database like the
-                        // critical section will make us take a lock on a different database.
-                        // That is, we have an operation that has taken a lock on config,
-                        // followed by a lock on a user database. Other op observers like the
-                        // preimages one will take the inverse order, that is they have a lock
-                        // on a user database and then take a lock on the config database.
-                        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                        lockCollectionIfNotPrimary.emplace(
-                            opCtx,
-                            deletedNss,
-                            fixLockModeForSystemDotViewsChanges(deletedNss, MODE_IX),
-                            auto_get_collection::Options{}.viewMode(
-                                auto_get_collection::ViewMode::kViewsPermitted));
-                    }
-
-                    auto scopedCsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, deletedNss);
+                    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, deletedNss);
 
                     // Secondaries that are in oplog application must clear the collection
                     // filtering metadata before releasing the in-memory critical section.
@@ -688,8 +526,7 @@ void ShardServerOpObserver::onCreateCollection(
         // happen by first having an UNTRACKED version for a collection that didn't exist followed
         // by a movePrimary to the current shard.
         if (ShardingState::get(opCtx)->enabled()) {
-            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                opCtx, collectionName);
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, collectionName);
             scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
         }
 
@@ -704,8 +541,7 @@ void ShardServerOpObserver::onCreateCollection(
 
     // Temp collections are always UNTRACKED
     if (options.temp) {
-        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            opCtx, collectionName);
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, collectionName);
         scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
         return;
     }
@@ -721,8 +557,7 @@ void ShardServerOpObserver::onCreateCollection(
 
     // If the check above passes, this means the collection doesn't exist and is being created and
     // that the caller will be responsible to eventually set the proper placement version.
-    auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, collectionName);
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, collectionName);
     if (oss._implicitCreationInfo._forceCSRAsUnknownAfterCollectionCreation) {
         scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
 

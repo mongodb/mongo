@@ -183,14 +183,7 @@ void MultipleCollectionAccessorTest::installShardedCollectionMetadata(
 
     const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), kMyShardName);
 
-    auto coll = acquireCollection(
-        operationContext(),
-        CollectionAcquisitionRequest(nss,
-                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                     repl::ReadConcernArgs::get(operationContext()),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+    CollectionShardingRuntime::acquireExclusive(opCtx, nss)
         ->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
 }
 

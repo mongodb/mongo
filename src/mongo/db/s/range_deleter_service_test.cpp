@@ -157,7 +157,7 @@ void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCt
         return CollectionMetadata(std::move(cm), ShardId("this"));
     }();
 
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+    CollectionShardingRuntime::acquireExclusive(opCtx, nss)
         ->setFilteringMetadata_nonAuthoritative(opCtx, metadata);
 }
 

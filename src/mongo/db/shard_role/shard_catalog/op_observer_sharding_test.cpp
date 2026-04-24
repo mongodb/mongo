@@ -91,8 +91,7 @@ const NamespaceString kUnshardedNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "UnshardedColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
-    AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, kTestNss)
+    CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss)
         ->setFilteringMetadata_nonAuthoritative(opCtx, std::move(metadata));
 }
 

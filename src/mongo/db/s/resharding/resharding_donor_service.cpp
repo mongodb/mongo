@@ -535,15 +535,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                 // We force a refresh to make sure that the placement information is updated
                 // in cache after abort decision before the donor state document is deleted.
                 {
-                    const auto coll = acquireCollection(
-                        opCtx.get(),
-                        CollectionAcquisitionRequest::fromOpCtx(opCtx.get(),
-                                                                _metadata.getTempReshardingNss(),
-                                                                AcquisitionPrerequisites::kWrite),
-                        MODE_IX);
-                    auto scopedCsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx.get(), _metadata.getTempReshardingNss());
+                    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
+                        opCtx.get(), _metadata.getTempReshardingNss());
                     scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx.get());
                 }
 

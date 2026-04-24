@@ -337,13 +337,6 @@ protected:
     }
 
     void addFilteringMetadata(OperationContext* opCtx, NamespaceString sourceNss, ShardId shardId) {
-        const auto dataColl =
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest{sourceNss,
-                                                           PlacementConcern::kPretendUnsharded,
-                                                           repl::ReadConcernArgs::get(opCtx),
-                                                           AcquisitionPrerequisites::kRead},
-                              MODE_IS);
         const auto metadata{makeShardedMetadataForOriginalCollection(opCtx, shardId)};
         ScopedSetShardRole scopedSetShardRole{
             opCtx,
@@ -351,7 +344,7 @@ protected:
             ShardVersionFactory::make(metadata) /* shardVersion */,
             boost::none /* databaseVersion */};
 
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, sourceNss)
+        CollectionShardingRuntime::acquireExclusive(opCtx, sourceNss)
             ->setFilteringMetadata_nonAuthoritative(opCtx, metadata);
     }
 

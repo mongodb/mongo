@@ -448,9 +448,7 @@ protected:
         CollectionMetadata metadata(std::move(cm), kMyShardName);
 
         {
-            AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
-            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                opCtx, kTestNss);
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
             scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, metadata);
         }
 

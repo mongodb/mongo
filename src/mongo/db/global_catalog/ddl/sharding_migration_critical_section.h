@@ -62,7 +62,8 @@ public:
     /**
      * Enters the critical section in a mode, which still allows reads.
      *
-     * NOTE: Must be called under the appropriate X lock (collection or database).
+     * NOTE: Must be called under the appropriate X lock in order to block writers/locked readers
+     * (collection or database).
      */
     void enterCriticalSectionCatchUpPhase(const BSONObj& reason);
 
