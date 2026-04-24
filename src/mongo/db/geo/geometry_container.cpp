@@ -1139,6 +1139,11 @@ CRS GeometryContainer::getNativeCRS() const {
     } else if (nullptr != _multiPolygon) {
         return _multiPolygon->crs;
     } else if (nullptr != _geometryCollection) {
+        for (const auto& polygon : _geometryCollection->polygons) {
+            if (polygon->crs == STRICT_SPHERE) {
+                return STRICT_SPHERE;
+            }
+        }
         return SPHERE;
     } else {
         MONGO_UNREACHABLE_TASSERT(9911956);
@@ -1167,6 +1172,11 @@ bool GeometryContainer::supportsProject(CRS otherCRS) const {
         return _multiPolygon->crs == otherCRS;
     } else {
         tassert(9911929, "", nullptr != _geometryCollection);
+        for (const auto& polygon : _geometryCollection->polygons) {
+            if (polygon->crs == STRICT_SPHERE) {
+                return false;
+            }
+        }
         return SPHERE == otherCRS;
     }
 }

@@ -597,4 +597,21 @@ TEST(ExpressionGeoTest, RoundTripSerializeGeoExpressions) {
             })"));
 }
 
+TEST(ExpressionGeoTest, StrictWindingPolygonInQueryGeometryCollectionRejected) {
+    // A GeometryCollection containing a strict-winding polygon is not a valid query geometry.
+    // supportsProject(SPHERE) must return false for such a collection so that
+    // GeoExpression::parseFrom returns BadValue instead of crashing in projectInto().
+    auto assertRejected = [](const char* predicate) {
+        std::string query = std::string("{") + predicate +
+            ": {$geometry: {type: 'GeometryCollection', geometries: ["
+            "{type: 'Polygon', coordinates: [[[0,0],[5,0],[5,5],[0,5],[0,0]]],"
+            " crs: {type: 'name', properties: {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}}}"
+            "]}}}";
+        GeoExpression gq;
+        ASSERT_EQUALS(ErrorCodes::BadValue, gq.parseFrom(fromjson(query)));
+    };
+    assertRejected("$within");
+    assertRejected("$geoIntersects");
+}
+
 }  // namespace mongo
