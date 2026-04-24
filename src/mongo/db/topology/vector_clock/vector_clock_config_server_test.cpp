@@ -97,17 +97,20 @@ protected:
         // The timestamp is only signed if the client is not authorized to advance time.
         makeClientUnauthorizedToAdvanceTime(operationContext()->getClient());
 
-        LogicalTimeValidator::get(getServiceContext())
-            ->enableKeyGenerator(operationContext(), true);
-
         // Create a dummy key to be able to sign timestamps.
         // Note that it's not possible to automatically generate new keys since the
         // `setupMajorityReads` has been explicitly disabled for this test suite.
+        // Insert before enabling the key generator to avoid a race where the background thread
+        // runs before the insert and populates the cache with auto-generated keys, which then
+        // shadow this key due to the newerThanThis optimization in _refreshInternalKeys.
         KeysCollectionDocument keyDoc(_kKeyId);
         keyDoc.setKeysCollectionDocumentBase(
             {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
         ASSERT_OK(insertToConfigCollection(
             operationContext(), NamespaceString::kKeysCollectionNamespace, keyDoc.toBSON()));
+
+        LogicalTimeValidator::get(getServiceContext())
+            ->enableKeyGenerator(operationContext(), true);
 
         _keyManager->refreshNow(operationContext());
         _keyManager->stopMonitoring();
