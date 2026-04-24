@@ -24,7 +24,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // The failpoint will wait for this long before yielding for every iteration.
 const waitPerIterationMs = 200;
 // This is how long we consider an operation as delinquent.
-const delinquentIntervalMs = waitPerIterationMs - 20;
+const delinquentIntervalMs = waitPerIterationMs - 100;
 const findComment = "delinquent_ops.js-COMMENT";
 
 function disableDeprioritizationHeuristic(conn) {
