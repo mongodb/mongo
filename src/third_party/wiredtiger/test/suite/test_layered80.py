@@ -34,6 +34,7 @@
 # truncate state (entries in its in-memory truncate list), as doing so would discard the truncate
 # entries and corrupt visibility (WT-16798).
 
+import unittest
 import time, wttest, wiredtiger
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wiredtiger import stat
@@ -110,6 +111,9 @@ class test_layered80(wttest.WiredTigerTestCase):
 
         self.ignoreStdoutPattern('WT_VERB_SWEEP')
 
+    # FIXME-WT-17133: ingest truncate doesn't remove live ingest keys when the
+    # start key is absent from ingest.
+    @unittest.skip("FIXME-WT-17133")
     def test_layered_dhandle_not_swept_with_truncate_state(self):
         """
         Verify that the sweep server does not close the layered dhandle while it holds

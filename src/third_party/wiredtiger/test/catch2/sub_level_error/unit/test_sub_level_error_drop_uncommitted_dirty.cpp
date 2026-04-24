@@ -20,8 +20,8 @@
 
 #define URI "table:test_drop_uncommitted_dirty"
 #define FILE_URI "file:test_drop_uncommitted_dirty.wt"
-#define UNCOMMITTED_DATA_MSG "the table has uncommitted data and cannot be dropped yet"
-#define DIRTY_DATA_MSG "the table has dirty data and can not be dropped yet"
+#define UNCOMMITTED_DATA_MSG "the table has uncommitted data and cannot be closed yet"
+#define DIRTY_DATA_MSG "the table has dirty data and cannot be closed yet"
 
 /*
  * This test case covers EBUSY errors resulting from drop before committing/checkpointing changes.

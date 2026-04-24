@@ -243,6 +243,7 @@ disagg_switch_roles(void)
         track("[role change] leader -> follower", 0ULL);
         wts_reopen();
         follower_read_latest_checkpoint();
+        wts_prepare_discover(g.wts_conn);
     } else {
         /* Stepping up: [follower -> leader] */
         track("[role change] follower -> leader", 0ULL);

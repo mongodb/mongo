@@ -2,7 +2,6 @@
 # This list are test files that are not run, they are known failures. The reasons for the failures are not known,
 # they'll need to be triaged. When we know something about the failure, they are commented.
 test_autoclose.py
-test_checkpoint06.py # FIXME: WT-15507
 test_config02.py
 test_config09.py
 test_cursor13.py  # FIXME: WT-15369
@@ -36,7 +35,6 @@ test_shared_cache01.py
 test_stat01.py
 test_stat_log02.py
 test_sweep05
-test_timestamp26.py # FIXME: WT-16182
 test_truncate01.py # FIXME: WT-15474
 
 test_util01.py

@@ -1197,7 +1197,7 @@ TEST_F(WiredTigerUtilTest, DropWithUncommittedData) {
     wtSession.get_last_error(&err, &sub_level_err, &err_msg);
 
     ASSERT_EQUALS(WT_UNCOMMITTED_DATA, sub_level_err);
-    ASSERT_EQUALS("the table has uncommitted data and cannot be dropped yet"_sd,
+    ASSERT_EQUALS("the table has uncommitted data and cannot be closed yet"_sd,
                   StringData(err_msg));
 }
 
@@ -1246,8 +1246,7 @@ TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
         // but not checkpointed.
         ASSERT_EQUALS(EBUSY, ret);
         ASSERT_EQUALS(WT_DIRTY_DATA, sub_level_err);
-        ASSERT_EQUALS("the table has dirty data and can not be dropped yet"_sd,
-                      StringData(err_msg));
+        ASSERT_EQUALS("the table has dirty data and cannot be closed yet"_sd, StringData(err_msg));
         break;
     } while (tryCount <= kRetryLimit);
 

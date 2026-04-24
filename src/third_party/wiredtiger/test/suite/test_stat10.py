@@ -105,7 +105,8 @@ class test_stat10(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def test_tree_stats(self):
-        self.skipTest("FIXME-WT-16633: Re-enable the test once fixed")
+        if self.runningHook('disagg') and self.key_format == 'r':
+            self.skipTest("disagg does not support column-store")
         format = "key_format={},value_format={}".format(self.key_format, 'u')
         self.session.create(self.uri, format)
 
@@ -150,7 +151,6 @@ class test_stat10(wttest.WiredTigerTestCase):
         row_empty_values = statscursor[stat.dsrc.btree_row_empty_values][2]
         column_deleted = statscursor[stat.dsrc.btree_column_deleted][2]
         column_rle = statscursor[stat.dsrc.btree_column_rle][2]
-        column_tws = statscursor[stat.dsrc.btree_column_tws][2]
         overflow = statscursor[stat.dsrc.btree_overflow][2]
         # Read backup stats even though backup isn't being used.
         self.assertEqual(0, statscursor[stat.dsrc.backup_blocks_compressed][2])
@@ -167,11 +167,8 @@ class test_stat10(wttest.WiredTigerTestCase):
         # I've kept the timestamp tests and the format tests separate to help clarify
         # this.
 
-        # For RS and VLCS, when oldest passes 30 the two deleted values show up in the count.
-        if self.oldest > 30:
-            self.assertEqual(entries, nrows * 2 - 2)
-        else:
-            self.assertEqual(entries, nrows * 2)
+        # Deleted entries are excluded from btree_entries regardless of visibility.
+        self.assertEqual(entries, nrows * 2 - 2)
 
         # row_empty_values: 1 for RS, otherwise 0; only appears when oldest passes 20
         if self.key_format == 'S':
@@ -182,12 +179,10 @@ class test_stat10(wttest.WiredTigerTestCase):
         else:
             self.assertEqual(row_empty_values, 0)
 
-        # column_deleted: for VLCS only; only appears when oldest passes 30.
+        # column_deleted: for VLCS only. Deleted entries are always counted
+        # regardless of visibility.
         if self.key_format == 'r':
-            if self.oldest > 30:
-                self.assertEqual(column_deleted, 2)
-            else:
-                self.assertEqual(column_deleted, 0)
+            self.assertEqual(column_deleted, 2)
         else:
             self.assertEqual(column_deleted, 0)
 
@@ -198,10 +193,11 @@ class test_stat10(wttest.WiredTigerTestCase):
         else:
             self.assertEqual(column_rle, 0)
 
-        self.assertEqual(column_tws, 0)
-
         # overflow: two keys and one value, so 3 for rows, 1 for VLCS.
-        if self.key_format == 'S':
+        # Disagg does not support overflow, so overflow is always 0.
+        if self.runningHook('disagg'):
+            self.assertEqual(overflow, 0)
+        elif self.key_format == 'S':
             self.assertEqual(overflow, 3)
         else:
             self.assertEqual(overflow, 1)

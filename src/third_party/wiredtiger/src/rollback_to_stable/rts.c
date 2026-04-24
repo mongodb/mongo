@@ -366,7 +366,7 @@ __wti_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_time
           "Rollback to stable finished metadata walk, draining worker queue");
 
         /* Rename session while joining workers so log messages identify us as a worker. */
-        session->name = "rts-main-wk";
+        __wt_atomic_store_ptr_relaxed(&session->name, "rts-main-wk");
         while (!TAILQ_EMPTY(&S2C(session)->rts->rtsqh)) {
             __wti_rts_pop_work(session, &entry);
             if (entry == NULL)
@@ -375,7 +375,7 @@ __wti_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_time
             __wti_rts_work_free(session, entry);
             WT_ERR(ret);
         }
-        session->name = saved_session_name;
+        __wt_atomic_store_ptr_relaxed(&session->name, saved_session_name);
     }
 
     WT_ERR(__rts_thread_destroy(session));
@@ -405,7 +405,7 @@ __wti_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_time
 
     __wt_atomic_store_uint32_relaxed(&S2C(session)->rts->progress.phase, WT_RTS_PHASE_COMPLETE);
 err:
-    session->name = saved_session_name;
+    __wt_atomic_store_ptr_relaxed(&session->name, saved_session_name);
     if (have_cursor)
         WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     if (rts_threads_started)

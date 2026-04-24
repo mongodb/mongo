@@ -395,7 +395,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
             WT_RET(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
             if (!__wt_txn_visible_all(session, btree->max_upd_txn, WT_TS_NONE))
                 WT_RET_SUB(session, EBUSY, WT_UNCOMMITTED_DATA,
-                  "the table has uncommitted data and cannot be dropped yet");
+                  "the table has uncommitted data and cannot be closed yet");
         }
 
         /* Turn off eviction. */

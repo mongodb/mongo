@@ -200,9 +200,9 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     __wt_stat_usecs_hist_incr_disaggbmwrite(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
     __wt_verbose(session, WT_VERB_WRITE,
-      "page_id %" PRIu64 ", size %" WT_SIZET_FMT ", checksum %" PRIx32 ", lsn %" PRIu64
-      ", page_image_size %" WT_SIZET_FMT,
-      page_id, buf->size, checksum, put_args.lsn, page_image_size);
+      "page_id %" PRIu64 ", table_id %" PRIu64 ", size %" WT_SIZET_FMT ", checksum %" PRIx32
+      ", lsn %" PRIu64 ", page_image_size %" WT_SIZET_FMT,
+      page_id, block_disagg->tableid, buf->size, checksum, put_args.lsn, page_image_size);
 
     /* Some extra data is set by the put interface, and must be returned up the chain. */
     block_meta->disagg_lsn = put_args.lsn;
@@ -287,9 +287,10 @@ __wti_block_disagg_page_discard(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block
     WT_RET(__wt_block_disagg_addr_unpack(session, &addr, addr_size, &cookie));
 
     __wt_verbose(session, WT_VERB_BLOCK,
-      "block free: page_id %" PRIu64 ", flags %" PRIx64 ", lsn %" PRIu64 ", base_lsn %" PRIu64
-      ", size %" PRIu32 ", checksum %" PRIx32,
-      cookie.page_id, cookie.flags, cookie.lsn, cookie.base_lsn, cookie.size, cookie.checksum);
+      "block free: page_id %" PRIu64 ", table_id %" PRIu64 ", flags %" PRIx64 ", lsn %" PRIu64
+      ", base_lsn %" PRIu64 ", size %" PRIu32 ", checksum %" PRIx32,
+      cookie.page_id, block_disagg->tableid, cookie.flags, cookie.lsn, cookie.base_lsn, cookie.size,
+      cookie.checksum);
 
     /* Create the discard request. */
     WT_PAGE_LOG_HANDLE *plhandle = block_disagg->plhandle;

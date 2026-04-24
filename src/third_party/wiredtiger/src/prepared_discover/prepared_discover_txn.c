@@ -195,57 +195,50 @@ __wti_prepared_discover_add_artifact_upd(WT_SESSION_IMPL *session, WT_UPDATE *up
 }
 
 /*
+ * __prepared_discover_apply_upd_on_ingest --
+ *     Search the ingest btree for the key, write the update, and register the prepared artifact.
+ *     Must be called with session->dhandle set to the ingest btree.
+ *
+ * The cursor is reused across keys in the same walk: the row search overwrites cbt->ref without
+ *     releasing the prior hazard pointer, so it must be released here before each search.
+ *
+ * Artifact registration must run with the ingest dhandle active so that op->btree is captured as
+ *     the ingest btree; the prepared transaction commit searches that btree to resolve the op.
+ */
+static int
+__prepared_discover_apply_upd_on_ingest(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, WT_UPDATE *upd)
+{
+    WT_DECL_RET;
+
+    if (cbt->ref != NULL) {
+        WT_RET(__wt_page_release(session, cbt->ref, 0));
+        cbt->ref = NULL;
+    }
+    WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, key, true, NULL, false, NULL));
+    WT_RET(ret);
+    WT_RET(__wt_row_modify(cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
+    return (__wti_prepared_discover_add_artifact_upd(session, upd, key));
+}
+
+/*
  * __wti_prepared_discover_restore_and_add_artifact_upd --
- *     In disaggregated storage, in follower mode, stable table cannot be modified, therefore a
- *     prepared update needs to be restored onto ingest table so that the follower node can then
- *     commit the prepared transaction. This function opens the ingest table and inserts the update
- *     restored from disk onto the ingest table.
+ *     In disaggregated storage, follower nodes cannot modify the stable table, so a prepared update
+ *     found on disk must be restored onto the ingest table for later commit. The ingest cursor is
+ *     supplied by the caller and reused across all prepared keys in the same btree walk.
  */
 int
 __wti_prepared_discover_restore_and_add_artifact_upd(WT_SESSION_IMPL *session,
-  const char *stable_uri, WT_ITEM *key, WT_ITEM *value, WT_CELL_UNPACK_KV *unpack)
+  WT_CURSOR *ingest_cursor, WT_ITEM *key, WT_ITEM *value, WT_CELL_UNPACK_KV *unpack)
 {
-    WT_CONNECTION_IMPL *conn;
-    WT_CURSOR *cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
-    WT_LAYERED_TABLE_MANAGER *manager;
-    WT_LAYERED_TABLE_MANAGER_ENTRY *entry;
     WT_UPDATE *upd;
-    uint32_t i, table_count;
-
-    const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), "overwrite", NULL, NULL};
-
-    cursor = NULL;
-    entry = NULL;
-    conn = S2C(session);
-    manager = &conn->layered_table_manager;
-    table_count = manager->open_layered_table_count;
-    for (i = 0; i < table_count; i++) {
-        /* Find the entry with stable uri that matches the currently opened dhandle. */
-        if (manager->entries[i] != NULL) {
-            if (WT_PREFIX_MATCH(stable_uri, manager->entries[i]->stable_uri)) {
-                entry = manager->entries[i];
-                break;
-            }
-        }
-    }
-    WT_ASSERT_ALWAYS(
-      session, entry != NULL, "Unable to find matching ingest table to restore prepared update");
-    /* Open cursor on the ingest table */
-    WT_ERR(__wt_open_cursor(session, entry->ingest_uri, NULL, cfg, &cursor));
-
-    cbt = (WT_CURSOR_BTREE *)cursor;
     size_t size;
-    WT_ERR(__prepare_discover_alloc_upd(session, value, unpack, &upd, &size));
 
-    /* Search the page and apply the modification. */
-    WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, key, true, NULL, false, NULL));
-    WT_ERR(ret);
-    WT_ERR(__wt_row_modify(cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
-    WT_ERR(__wti_prepared_discover_add_artifact_upd(session, upd, key));
-err:
-    if (cursor != NULL)
-        WT_TRET(cursor->close(cursor));
+    cbt = (WT_CURSOR_BTREE *)ingest_cursor;
+    WT_RET(__prepare_discover_alloc_upd(session, value, unpack, &upd, &size));
+    WT_WITH_DHANDLE(
+      session, cbt->dhandle, ret = __prepared_discover_apply_upd_on_ingest(session, cbt, key, upd));
     return (ret);
 }

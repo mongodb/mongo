@@ -439,14 +439,21 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                     if (WT_TIME_WINDOW_HAS_START_PREPARE(&cbt->upd_value->tw))
                         goto skip_on_page;
 
-                    if (__curversion_stop_uses_prepare_ts(version_cursor)) {
-                        if (cbt->upd_value->tw.start_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.start_ts > version_cursor->upd_stop_prepare_ts)
-                            goto skip_on_page;
-                    } else {
-                        if (cbt->upd_value->tw.start_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.start_ts > version_cursor->curversion_stop_ts)
-                            goto skip_on_page;
+                    /*
+                     * Skip the comparison when the previously emitted update was a rolled- back
+                     * prepared update: there is no real stop to compare against, and the fields
+                     * hold rollback metadata rather than a stop timestamp.
+                     */
+                    if (version_cursor->upd_stop_txnid != WT_TXN_ABORTED) {
+                        if (__curversion_stop_uses_prepare_ts(version_cursor)) {
+                            if (cbt->upd_value->tw.start_txn > version_cursor->upd_stop_txnid ||
+                              cbt->upd_value->tw.start_ts > version_cursor->upd_stop_prepare_ts)
+                                goto skip_on_page;
+                        } else {
+                            if (cbt->upd_value->tw.start_txn > version_cursor->upd_stop_txnid ||
+                              cbt->upd_value->tw.start_ts > version_cursor->curversion_stop_ts)
+                                goto skip_on_page;
+                        }
                     }
                 }
                 durable_stop_ts = version_cursor->curversion_durable_stop_ts;
@@ -463,14 +470,20 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                     if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&cbt->upd_value->tw))
                         goto skip_on_page;
 
-                    if (__curversion_stop_uses_prepare_ts(version_cursor)) {
-                        if (cbt->upd_value->tw.stop_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.stop_ts > version_cursor->upd_stop_prepare_ts)
-                            goto skip_on_page;
-                    } else {
-                        if (cbt->upd_value->tw.stop_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.stop_ts > version_cursor->curversion_stop_ts)
-                            goto skip_on_page;
+                    /*
+                     * See the no-stop branch above: skip the comparison when the previous emission
+                     * was a rolled-back prepared update.
+                     */
+                    if (version_cursor->upd_stop_txnid != WT_TXN_ABORTED) {
+                        if (__curversion_stop_uses_prepare_ts(version_cursor)) {
+                            if (cbt->upd_value->tw.stop_txn > version_cursor->upd_stop_txnid ||
+                              cbt->upd_value->tw.stop_ts > version_cursor->upd_stop_prepare_ts)
+                                goto skip_on_page;
+                        } else {
+                            if (cbt->upd_value->tw.stop_txn > version_cursor->upd_stop_txnid ||
+                              cbt->upd_value->tw.stop_ts > version_cursor->curversion_stop_ts)
+                                goto skip_on_page;
+                        }
                     }
 
                     /* The update is not visible if start equals stop. */

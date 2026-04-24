@@ -19,13 +19,14 @@ is the data being shared, and a "signal" variable. The payload could be a number
 
 For the writer to share this payload with readers it needs to perform two steps in the correct
 order. Firstly it writes the payload, then writes a signal variable with a release write. The reader
-threads will read the signal variable to know if the payload is safe to read. The release write must
-use the \c WT_RELEASE_WRITE macro described in @ref rel-marked.
+threads will read the signal variable to know if the payload is safe to read.
 
 The reader threads must read with the opposite order, to do so they read the signal variable using
-the acquire read macro \c WT_ACQUIRE_READ. Then they read the payload, the \c WT_ACQUIRE_READ macro
-provides the required ordering semantics. The macro is described in @ref acq-marked. If the signal
-variable indicates the payload is safe to read the reader thread can read the payload.
+an acquire read. Then they read the payload, the acquire read provides the required ordering semantics.
+If the signal variable indicates the payload is safe to read the reader thread can read the payload.
+
+Acquire/release semantics in WiredTiger work in exactly the same way as the acquire/release semantics
+provided by C standard library atomics. Read more about WiredTiger atomics in @ref lock-free.
 
 This pattern is used in many places in WiredTiger but they are not listed here as the list will
 become stale.
@@ -108,11 +109,11 @@ that will not be covered here.
 If a new slot is required in the array, but all slots are in use and \c slot_count is equal to the
 size \c Z of the array then the array must grow. The variable \c slot_count has additional ordering
 defined when swapping in the array. The array pointer swap must happen before \c slot_count is
-incremented. This requires a @ref rel-marked.
+incremented. This requires a release store.
 
 @subsubsection growable-arrays-reading Reading
 Readers must respect the writer side ordering. The \c slot_count must be read prior to reading the
-array pointer. This requires an @ref acq-marked. If this ordering is not respected the reader could
+array pointer. This requires an acquire read. If this ordering is not respected the reader could
 read an old array pointer but a new \c slot_count and encounter an array index out of bounds
 exception.
 
@@ -149,7 +150,7 @@ used as it provides a much simpler interface for developers when reading and deb
         // we re-read the contents of S to verify it hasn't changed.
         FULL_BARRIER();
 
-        if(*S != initial_s) {
+        if(*S != initial_s_value) {
             // The write was unsuccessful. Rollback or retry.
         }
     }
@@ -159,7 +160,7 @@ used as it provides a much simpler interface for developers when reading and deb
 
 __Note:__ The following example assumes familiarity with WiredTiger's @ref generations.
 
-In the generation code the \c __wt_session_gen_enter function the current value of the
+In the generation code, the \c __wt_session_gen_enter function reads the current value of the
 \c connection->generation (\c S) and writes it to \c session->generation (\c W). Independently a second
 thread executing \c __gen_oldest will first read \c connection->generation and then walk all
 \c session->generations, reporting the smallest generation seen.

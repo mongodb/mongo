@@ -2759,7 +2759,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name, bool open
 
     /* Acquire a session. */
     WT_RET(__wt_open_session(conn, NULL, NULL, open_metadata, &session));
-    session->name = name;
+    __wt_atomic_store_ptr_relaxed(&session->name, name);
 
     /*
      * Internal sessions should not save error info unless they are spawned by an external session,

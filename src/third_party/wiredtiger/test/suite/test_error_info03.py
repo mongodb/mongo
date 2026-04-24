@@ -149,7 +149,7 @@ class test_error_info03(error_info_util):
             cursor.set_value('value')
             self.assertEqual(cursor.update(), 0)
         self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
-        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_UNCOMMITTED_DATA, "the table has uncommitted data and cannot be dropped yet")
+        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_UNCOMMITTED_DATA, "the table has uncommitted data and cannot be closed yet")
 
     def test_dirty_data(self):
         """
@@ -166,4 +166,4 @@ class test_error_info03(error_info_util):
         # Give time for the oldest id to update before dropping the table.
         time.sleep(1)
         self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
-        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_DIRTY_DATA, "the table has dirty data and can not be dropped yet")
+        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_DIRTY_DATA, "the table has dirty data and cannot be closed yet")

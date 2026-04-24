@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wiredtiger import stat, WiredTigerError
+from wiredtiger import stat
 
 # test_scrub_eviction_prepare.py
 #
@@ -94,32 +94,24 @@ class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         num_reconciled = self.pages_reconciled_stat(uri)
 
-        # For disagg testing, we relax the requirement of how many pages
-        # are reconciled, just that it must be at least one.
-        #
-        # We are currently seeing two pages reconciled in disagg, presumably
-        # it is the leaf page + internal/root page? But why is this different
-        # from attached storage?
-        expect_reconciled = 1
-        if self.runningHook('disagg'):
-            self.assertGreater(num_reconciled, 0)
-            expect_reconciled = num_reconciled
-
-        self.assertEqual(expect_reconciled, num_reconciled)
+        # Only the root/internal page should be reconciled: the leaf is clean after scrub
+        # eviction because the prepared update is written to disk with its prepare state intact,
+        # so the re-instantiated in-memory page requires no unresolved updates and stays clean.
+        self.assertEqual(1, num_reconciled)
 
         # Read the key 2 to avoid prepared conflict, this will bring back the page
         # that has both the keys 1 & 2 into the memory.
         self.read_key(uri)
         self.session.checkpoint()
         # The page with prepared update should not be reconciled again.
-        self.assertEqual(expect_reconciled, self.pages_reconciled_stat(uri))
+        self.assertEqual(1, self.pages_reconciled_stat(uri))
 
         # Read the key 2 to avoid prepared conflict, this will bring back the page
         # that has both the keys 1 & 2 into the memory.
         self.read_key(uri)
         self.session.checkpoint()
         # The page with prepared update should not be reconciled again.
-        self.assertEqual(expect_reconciled, self.pages_reconciled_stat(uri))
+        self.assertEqual(1, self.pages_reconciled_stat(uri))
 
 if __name__ == '__main__':
     wttest.run()
