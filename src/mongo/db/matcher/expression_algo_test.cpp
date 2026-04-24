@@ -2765,4 +2765,38 @@ TEST(Independence, MakeIndependent) {
     }
 }
 
+// Regression test for SERVER-124974: Verify that splitting an optimized $expr with a RewriteResult
+// correctly handles the case where both dependentPart and independentPart are non-null.
+TEST(SplitMatchExpression, SplitOptimizedExprWithRewriteResultAndBothParts) {
+    std::unique_ptr<MatchExpression> independent;
+    std::unique_ptr<MatchExpression> dependent;
+
+    {
+        BSONObj matchPredicate =
+            fromjson("{$expr: {$and: [{$in: ['$a', [1, 2]]}, {$in: ['$b', [3, 4]]}]}}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto status = MatchExpressionParser::parse(matchPredicate, expCtx);
+        ASSERT_OK(status.getStatus());
+
+        // Optimize the expression, which sets a RewriteResult on the ExprMatchExpression.
+        auto optimized = optimizeMatchExpression(std::move(status.getValue()));
+
+        // Split by field "b": $in on $a is independent, $in on $b is dependent.
+        std::tie(independent, dependent) =
+            expression::splitMatchExpressionBy(std::move(optimized), {"b"}, {});
+    }
+
+    ASSERT_TRUE(independent);
+    ASSERT_TRUE(dependent);
+
+    // Check the serialization of both the independent and dependent parts to verify that the
+    // optimization pass followed by $expr splitting behaved as expected.
+    ASSERT_BSONOBJ_EQ(
+        independent->serialize(),
+        fromjson("{$and: [{$expr: {$in: ['$a', {$const: [1, 2]}]}}, {a: {$in: [1, 2]}}]}"));
+    ASSERT_BSONOBJ_EQ(
+        dependent->serialize(),
+        fromjson("{$and: [{$expr: {$in: ['$b', {$const: [3, 4]}]}}, {b: {$in: [3, 4]}}]}"));
+}
+
 }  // namespace mongo
