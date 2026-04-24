@@ -181,9 +181,7 @@ void IndexScanStageBase::doSaveState() {
 }
 
 void IndexScanStageBase::restoreCollectionAndIndex() {
-    if (!_coll.isAcquisition()) {
-        _coll.restoreCollection(_opCtx, _dbName, _collUuid);
-    }
+    tassert(12499900, "Expected collection to be an acquisition", _coll.isAcquisition());
 
     auto [identTag, identVal] = _indexIdentAccessor.getViewOfValue();
     tassert(7566700, "Expected ident to be a string", value::isString(identTag));
@@ -204,13 +202,7 @@ void IndexScanStageBase::restoreCollectionAndIndex() {
 
 void IndexScanStageBase::doRestoreState() {
     invariant(_opCtx);
-    if (!_coll.isAcquisition()) {
-        invariant(!_coll);
-        // If this stage has not been prepared, then yield recovery is a no-op.
-        if (!_coll.getCollName()) {
-            return;
-        }
-    }
+    tassert(12499901, "Expected collection to be an acquisition", _coll.isAcquisition());
     restoreCollectionAndIndex();
     auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
     if (_cursor) {

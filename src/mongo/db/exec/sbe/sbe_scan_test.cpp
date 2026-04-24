@@ -124,6 +124,7 @@ TEST_F(ScanStageTest, genericScanStage) {
         return std::make_pair(scanSlot, std::move(scanStage));
     };
 
+    attachCollectionAcquisition(colls);
     inputGuard.reset();
     expectedGuard.reset();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);

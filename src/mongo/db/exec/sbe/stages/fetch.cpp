@@ -157,13 +157,7 @@ void FetchStage::doSaveState() {
 void FetchStage::doRestoreState() {
     tassert(10794904, "Expected opCtx to be non-null", _opCtx);
 
-    if (!_coll.isAcquisition()) {
-        // If this stage has not been prepared, then yield recovery is a no-op.
-        if (!_coll.getCollName()) {
-            return;
-        }
-        _coll.restoreCollection(_opCtx, _dbName, _collectionUuid);
-    }
+    tassert(12499904, "Expected collection to be an acquisition", _coll.isAcquisition());
 
     if (_cursor) {
         const auto tolerateCappedCursorRepositioning = false;
@@ -196,11 +190,7 @@ void FetchStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
     _commonStats.opens++;
 
-    if (!_coll.isAcquisition()) {
-        // We need to re-acquire '_coll' in this case and make some validity checks (the collection
-        // has not been dropped, renamed, etc).
-        _coll.restoreCollection(_opCtx, _dbName, _collectionUuid);
-    }
+    tassert(12499905, "Expected collection to be an acquisition", _coll.isAcquisition());
 
     // Reuse existing cursor if possible.
     if (!reOpen) {

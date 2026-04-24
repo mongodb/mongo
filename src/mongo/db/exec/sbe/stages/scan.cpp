@@ -317,13 +317,7 @@ template <typename Derived>
 void ScanStageBaseImpl<Derived>::doRestoreState() {
     invariant(_opCtx);
 
-    if (!_coll.isAcquisition()) {
-        // If this stage has not been prepared, then yield recovery is a no-op.
-        if (!_coll.getCollName()) {
-            return;
-        }
-        _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
-    }
+    tassert(12499902, "Expected collection to be an acquisition", _coll.isAcquisition());
 
     if (auto cursor = self()->getActiveCursor(); cursor != nullptr) {
         const auto tolerateCappedCursorRepositioning = false;
@@ -424,13 +418,7 @@ void ScanStageBaseImpl<Derived>::open(bool reOpen) {
     // first time ever, or this stage is being opened for the first time after calling close().
     tassert(5071004, "first open to ScanStageBase but reOpen=true", !reOpen && !_open);
     tassert(5071005, "ScanStageBase is not open but has a cursor", !self()->getActiveCursor());
-    if (!_coll.isAcquisition()) {
-        // We need to re-acquire '_coll' in this case and make some validity checks (the collection
-        // has not been dropped, renamed, etc).
-        _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
-
-        tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStageBase", _coll);
-    }
+    tassert(12499903, "Expected collection to be an acquisition", _coll.isAcquisition());
 
     if (_state->scanOpenCallback) {
         _state->scanOpenCallback(_opCtx, _coll.getPtr());

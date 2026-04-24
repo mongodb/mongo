@@ -48,6 +48,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/util/modules.h"
@@ -241,6 +242,14 @@ public:
         int32_t numSlots, const BSONArray& array);
 
     /**
+     * Sets the MultipleCollectionAccessor to use when calling prepareTree(). prepareTree() will
+     * call attachCollectionAcquisition() on the stage tree before opening it.
+     */
+    void attachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
+        _mca = &mca;
+    }
+
+    /**
      * Prepares the tree of PlanStages given by `root`.
      */
     void prepareTree(CompileCtx* ctx, PlanStage* root);
@@ -372,6 +381,7 @@ private:
     std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
     std::unique_ptr<value::SlotIdGenerator> _slotIdGenerator;
     std::unique_ptr<value::SpoolIdGenerator> _spoolIdGenerator;
+    const MultipleCollectionAccessor* _mca = nullptr;
 };
 
 }  // namespace mongo::sbe

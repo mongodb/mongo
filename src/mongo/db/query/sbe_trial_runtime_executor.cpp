@@ -118,6 +118,7 @@ std::pair<value::SlotAccessor*, value::SlotAccessor*> TrialRuntimeExecutor::prep
 void TrialRuntimeExecutor::prepareCandidate(plan_ranker::CandidatePlan* candidate,
                                             bool preparingFromCache) {
     _indexExistenceChecker.check(_opCtx, _collections);
+    candidate->root->attachCollectionAcquisition(_collections);
     std::tie(candidate->data.resultAccessor, candidate->data.recordIdAccessor) =
         prepareExecutionPlan(candidate->root.get(), &candidate->data.stageData, preparingFromCache);
 }
