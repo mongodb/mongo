@@ -40,6 +40,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":primary_driven_index_builds",
+        "//src/mongo/db/repl:timestamp_block",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )

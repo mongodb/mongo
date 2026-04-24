@@ -303,18 +303,22 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
 
             onCleanUp();
 
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [this](OperationContext* opCtx, boost::optional<Timestamp> ts) {
+                    StorageEngine::DropTime dropTime = ts && !ts->isNull()
+                        ? StorageEngine::DropTime{StorageEngine::StableTimestamp{*ts}}
+                        : StorageEngine::DropTime{StorageEngine::Immediate{}};
+
+                    if (_resumeStateTempRecordStore) {
+                        _resumeStateTempRecordStore->drop(opCtx, dropTime);
+                    }
+                    for (auto& index : _indexes) {
+                        index.block->dropTemporaryTables(opCtx, dropTime);
+                    }
+                });
+
             wunit.commit();
             _buildIsCleanedUp = true;
-            // TODO(SERVER-122275) Use the drop timestamp from the WUOW commit. This requires the
-            // ability to drop based on stable timestamp rather than oldest timestamp to avoid
-            // keeping tables alive too long.
-            StorageEngine::DropTime dropTime = StorageEngine::Immediate{};
-            if (_resumeStateTempRecordStore) {
-                _resumeStateTempRecordStore->drop(opCtx, dropTime);
-            }
-            for (auto& index : _indexes) {
-                index.block->dropTemporaryTables(opCtx, dropTime);
-            }
             return;
         } catch (const StorageUnavailableException&) {
             continue;
@@ -1412,10 +1416,9 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext* opCtx, boost::optional<Timestamp> ts) {
             _buildIsCleanedUp = true;
-            // TODO(SERVER-122275) Use the drop timestamp from the commit. This requires the
-            // ability to drop based on stable timestamp rather than oldest timestamp to avoid
-            // keeping tables alive too long.
-            StorageEngine::DropTime dropTime = StorageEngine::Immediate{};
+            StorageEngine::DropTime dropTime = ts && !ts->isNull()
+                ? StorageEngine::DropTime{StorageEngine::StableTimestamp{*ts}}
+                : StorageEngine::DropTime{StorageEngine::Immediate{}};
             if (_resumeStateTempRecordStore) {
                 _resumeStateTempRecordStore->drop(opCtx, dropTime);
             }

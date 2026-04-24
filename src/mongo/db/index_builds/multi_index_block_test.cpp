@@ -667,7 +667,65 @@ TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
     }
 }
 
-TEST_F(MultiIndexBlockTest, CommitDropsTemporaryTables) {
+TEST_F(MultiIndexBlockTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
+    ASSERT_EQUALS(1U, specs.size());
+
+    auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+
+    const Timestamp commitTs(100, 0);
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(commitTs);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
+
+    // After commit, the ident is still in WiredTiger but is drop-pending in the reaper.
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+
+    // The drop was registered at the commit timestamp. A timestamp <= commitTs should fail.
+    ASSERT_THROWS_CODE(
+        storageEngine->dropIdentTimestamped(operationContext(), sideWritesIdent, commitTs),
+        DBException,
+        ErrorCodes::ObjectIsBusy);
+
+    // A timestamp greater than commitTs should succeed.
+    storageEngine->dropIdentTimestamped(
+        operationContext(), sideWritesIdent, Timestamp(commitTs.getSecs() + 1, 0));
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+}
+
+TEST_F(MultiIndexBlockTest, CommitWithNoCommitTimestampDropsImmediately) {
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
     indexer->setBuildUUID(buildUUID);
@@ -704,9 +762,11 @@ TEST_F(MultiIndexBlockTest, CommitDropsTemporaryTables) {
         wuow.commit();
     }
 
-    // After commit, the ident is still in WiredTiger but is drop-pending in the reaper.
+    // The ident is still in WiredTiger, pending drop in the reaper.
     ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+
+    // Without a commit timestamp, the drop is registered as Immediate.
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), sideWritesIdent));
     ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
@@ -878,5 +938,44 @@ TEST_F(MultiIndexBlockTest, BasicMetrics) {
             keysInsertedBefore + (numDocsInColl * numIndexSpecs));
     }
 }
+TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
+    auto indexer = getIndexer();
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
+    ASSERT_EQUALS(1U, specs.size());
+
+    auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+
+    // The ident is still in WiredTiger, pending drop in the reaper.
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+
+    // Without a commit timestamp, the drop is registered as Immediate.
+    ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), sideWritesIdent));
+    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
+}
+
 }  // namespace
 }  // namespace mongo

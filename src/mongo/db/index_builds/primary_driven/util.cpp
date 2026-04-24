@@ -148,11 +148,10 @@ Status commit(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
-    // TODO(SERVER-122275) Use the drop timestamp from the WUOW. This depends on
-    // schema epochs being fully implemented, as currently it is unsafe to drop
-    // the table until after a checkpoint.
-    StorageEngine::DropTime dropTime(
-        opCtx->getServiceContext()->getStorageEngine()->getCheckpointIteration());
+    auto commitTs = shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp();
+    StorageEngine::DropTime dropTime = !commitTs.isNull()
+        ? StorageEngine::DropTime{StorageEngine::StableTimestamp{commitTs}}
+        : StorageEngine::DropTime{StorageEngine::Immediate{}};
 
     for (size_t i = 0; i < indexes.size(); ++i) {
         auto&& index = indexes[i];
@@ -232,11 +231,10 @@ Status abort(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
-    // TODO(SERVER-122275) Use the drop timestamp from the WUOW. This depends on
-    // schema epochs being fully implemented, as currently it is unsafe to drop
-    // the table until after a checkpoint.
-    StorageEngine::DropTime dropTime(
-        opCtx->getServiceContext()->getStorageEngine()->getCheckpointIteration());
+    auto commitTs = shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp();
+    StorageEngine::DropTime dropTime = !commitTs.isNull()
+        ? StorageEngine::DropTime{StorageEngine::StableTimestamp{commitTs}}
+        : StorageEngine::DropTime{StorageEngine::Immediate{}};
 
     for (auto&& index : indexes) {
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(

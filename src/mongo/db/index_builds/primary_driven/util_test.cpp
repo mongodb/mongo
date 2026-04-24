@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -337,6 +338,74 @@ TEST_F(UtilTest, Abort) {
     ASSERT_EQ(args.cause, cause);
     EXPECT_FALSE(args.fromMigrate);
     EXPECT_FALSE(args.isTimeseries);
+}
+
+TEST_F(UtilTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a"});
+    std::vector<boost::optional<MultikeyPaths>> multikey(indexes.size());
+
+    ASSERT_OK(start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes));
+
+    const Timestamp commitTs(200, 0);
+    {
+        TimestampBlock tsBlock(operationContext(), commitTs);
+        ASSERT_OK(commit(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, multikey));
+    }
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    for (auto&& index : indexes) {
+        // The drop was registered at the commit timestamp. A timestamp <= commitTs should fail.
+        ASSERT_THROWS_CODE(storageEngine->dropIdentTimestamped(
+                               operationContext(), *index.sideWritesIdent, commitTs),
+                           DBException,
+                           ErrorCodes::ObjectIsBusy);
+
+        // A timestamp greater than commitTs should succeed.
+        storageEngine->dropIdentTimestamped(
+            operationContext(), *index.sideWritesIdent, Timestamp(commitTs.getSecs() + 1, 0));
+    }
+}
+
+TEST_F(UtilTest, AbortUsesCommitTimestampForTemporaryTableDrops) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a"});
+    Status cause{ErrorCodes::Error{11130402}, "abort"};
+
+    ASSERT_OK(start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes));
+
+    const Timestamp commitTs(300, 0);
+    {
+        TimestampBlock tsBlock(operationContext(), commitTs);
+        ASSERT_OK(abort(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, cause));
+    }
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    for (auto&& index : indexes) {
+        ASSERT_THROWS_CODE(storageEngine->dropIdentTimestamped(
+                               operationContext(), *index.sideWritesIdent, commitTs),
+                           DBException,
+                           ErrorCodes::ObjectIsBusy);
+
+        storageEngine->dropIdentTimestamped(
+            operationContext(), *index.sideWritesIdent, Timestamp(commitTs.getSecs() + 1, 0));
+    }
+}
+
+TEST_F(UtilTest, AbortWithNoCommitTimestampDropsImmediately) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a"});
+    Status cause{ErrorCodes::Error{11130403}, "abort"};
+
+    ASSERT_OK(start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes));
+    ASSERT_OK(abort(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, cause));
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    for (auto&& index : indexes) {
+        // Without a commit timestamp, the drop is registered as Immediate.
+        ASSERT_OK(
+            engine.immediatelyCompletePendingDrop(operationContext(), *index.sideWritesIdent));
+    }
 }
 
 }  // namespace
