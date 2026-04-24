@@ -32,6 +32,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -40,6 +42,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -57,6 +60,20 @@ namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceGraphLookUpTest = AggregationContextFixture;
+
+const NamespaceString kGraphLookupForeignNs =
+    NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+
+std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> parseLiteGraphLookup(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto stageSpec = BSON("$graphLookup" << BSON("from" << "foreign"
+                                                        << "startWith" << "$a"
+                                                        << "connectFromField" << "b"
+                                                        << "connectToField" << "c"
+                                                        << "as" << "d"));
+    return DocumentSourceGraphLookUp::LiteParsed::parse(
+        expCtx->getNamespaceString(), stageSpec.firstElement(), LiteParserOptions{});
+}
 
 //
 // Evaluation.
@@ -375,6 +392,35 @@ TEST_F(DocumentSourceGraphLookUpTest, StartWithCloneRebindsExpressionContext) {
     ASSERT_EQ(docSource->getStartWithField()->getExpressionContext(), expCtx);
     // clonedDocSource points to the new ExpressionContext
     ASSERT_EQ(docSourceClone->getStartWithField()->getExpressionContext(), newExpCtx);
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupInvolvedNamespacesReturnsForeignNss) {
+    auto liteParsed = parseLiteGraphLookup(getExpCtx());
+    auto nssSet = liteParsed->getInvolvedNamespaces();
+    ASSERT_EQ(1ul, nssSet.size());
+    ASSERT_EQ(1ul, nssSet.count(kGraphLookupForeignNs));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupForeignExecutionNamespacesIsEmpty) {
+    auto liteParsed = parseLiteGraphLookup(getExpCtx());
+    stdx::unordered_set<NamespaceString> nssSet;
+    liteParsed->getForeignExecutionNamespaces(nssSet);
+    ASSERT_TRUE(nssSet.empty());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupRequiredPrivileges) {
+    auto liteParsed = parseLiteGraphLookup(getExpCtx());
+    auto privileges = liteParsed->requiredPrivileges(/*isMongos*/ false,
+                                                     /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(1ul, privileges.size());
+    ASSERT_EQ(privileges[0].getResourcePattern(),
+              ResourcePattern::forExactNamespace(kGraphLookupForeignNs));
+    ASSERT_TRUE(privileges[0].getActions().contains(ActionType::find));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupHasEmptySubPipelines) {
+    auto liteParsed = parseLiteGraphLookup(getExpCtx());
+    ASSERT_TRUE(liteParsed->getMutableSubPipelines().empty());
 }
 
 }  // namespace
