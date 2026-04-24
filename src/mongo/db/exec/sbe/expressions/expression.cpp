@@ -1428,9 +1428,9 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
             auto unit = parseTimeUnit(unitString);
 
             auto [binSizeTag, binSizeValue] = _nodes[3]->as<EConstant>()->getConstant();
-            auto [binSizeLongOwn, binSizeLongTag, binSizeLongValue] =
+            auto binSizeLong =
                 genericNumConvert(binSizeTag, binSizeValue, value::TypeTags::NumberInt64);
-            auto binSize = value::bitcastTo<int64_t>(binSizeLongValue);
+            auto binSize = value::bitcastTo<int64_t>(binSizeLong.value());
 
             auto [timezoneTag, timezoneVal] = _nodes[4]->as<EConstant>()->getConstant();
             auto timezone = vm::getTimezone(timezoneTag, timezoneVal, timezoneDB);

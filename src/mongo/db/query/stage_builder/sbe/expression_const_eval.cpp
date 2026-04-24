@@ -222,11 +222,12 @@ void ExpressionConstEval::transport(abt::ABT& n, const abt::UnaryOp& op, abt::AB
             // Negation is implemented as a subtraction from 0.
             if (const auto childConst = child.cast<abt::Constant>(); childConst) {
                 auto [tag, value] = childConst->get();
-                auto [_, resultType, resultValue] =
+                auto [resultType, resultValue] =
                     sbe::value::genericSub(sbe::value::TypeTags::NumberInt32,
                                            sbe::value::bitcastFrom<int32_t>(0),
                                            tag,
-                                           value);
+                                           value)
+                        .releaseToOwnedRaw();
                 swapAndUpdate(n, abt::make<abt::Constant>(resultType, resultValue));
             }
             break;
@@ -253,8 +254,8 @@ void ExpressionConstEval::transport(abt::ABT& n,
             if (lhsConst && rhsConst) {
                 auto [lhsTag, lhsValue] = lhsConst->get();
                 auto [rhsTag, rhsValue] = rhsConst->get();
-                auto [_, resultType, resultValue] =
-                    sbe::value::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue);
+                auto [resultType, resultValue] =
+                    sbe::value::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue).releaseToOwnedRaw();
                 swapAndUpdate(n, abt::make<abt::Constant>(resultType, resultValue));
             }
             break;
@@ -269,8 +270,8 @@ void ExpressionConstEval::transport(abt::ABT& n,
             if (lhsConst && rhsConst) {
                 auto [lhsTag, lhsValue] = lhsConst->get();
                 auto [rhsTag, rhsValue] = rhsConst->get();
-                auto [_, resultType, resultValue] =
-                    sbe::value::genericSub(lhsTag, lhsValue, rhsTag, rhsValue);
+                auto [resultType, resultValue] =
+                    sbe::value::genericSub(lhsTag, lhsValue, rhsTag, rhsValue).releaseToOwnedRaw();
                 swapAndUpdate(n, abt::make<abt::Constant>(resultType, resultValue));
             }
             break;
@@ -285,8 +286,8 @@ void ExpressionConstEval::transport(abt::ABT& n,
             if (lhsConst && rhsConst) {
                 auto [lhsTag, lhsValue] = lhsConst->get();
                 auto [rhsTag, rhsValue] = rhsConst->get();
-                auto [_, resultType, resultValue] =
-                    sbe::value::genericMul(lhsTag, lhsValue, rhsTag, rhsValue);
+                auto [resultType, resultValue] =
+                    sbe::value::genericMul(lhsTag, lhsValue, rhsTag, rhsValue).releaseToOwnedRaw();
                 swapAndUpdate(n, abt::make<abt::Constant>(resultType, resultValue));
             }
             break;
@@ -466,8 +467,8 @@ void ExpressionConstEval::transport(abt::ABT& n,
                         }
                     };
 
-                    auto [_, resultType, resultValue] =
-                        performOp(lhsTag, lhsValue, rhsTag, rhsValue);
+                    auto [resultType, resultValue] =
+                        performOp(lhsTag, lhsValue, rhsTag, rhsValue).releaseToOwnedRaw();
                     swapAndUpdate(rhs, abt::make<abt::Constant>(resultType, resultValue));
                 }
                 args.erase(args.begin(), it - 1);
@@ -544,8 +545,9 @@ void ExpressionConstEval::transport(abt::ABT& n,
                     if (tagRhs == sbe::value::TypeTags::NumberInt32) {
                         sbe::value::TypeTags targetTypeTag =
                             (sbe::value::TypeTags)sbe::value::bitcastTo<int32_t>(valRhs);
-                        auto [_, convertedTag, convertedVal] =
-                            sbe::value::genericNumConvert(tag, val, targetTypeTag);
+                        auto [convertedTag, convertedVal] =
+                            sbe::value::genericNumConvert(tag, val, targetTypeTag)
+                                .releaseToOwnedRaw();
                         swapAndUpdate(n, abt::make<abt::Constant>(convertedTag, convertedVal));
                     }
                 }

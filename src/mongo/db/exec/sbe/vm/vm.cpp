@@ -653,10 +653,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags 
         accValue = value::bitcastFrom<int32_t>(0);
     }
 
-    auto resultTuple = genericAdd(accTag, accValue, fieldTag, fieldValue);
+    auto result = genericAdd(accTag, accValue, fieldTag, fieldValue);
 
     guard.reset();
-    return resultTuple;
+    return result.releaseToRaw();
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggCount(value::TypeTags accTag,

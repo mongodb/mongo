@@ -2469,8 +2469,7 @@ inline T numericCast(TypeTags tag, Value val) noexcept {
  * TypeTag. In the case that a conversion is lossy, we return Nothing.
  */
 template <typename T>
-inline FastTuple<bool, value::TypeTags, value::Value> numericConvLossless(
-    T value, value::TypeTags targetTag) {
+inline TagValueMaybeOwned numericConvLossless(T value, value::TypeTags targetTag) {
     switch (targetTag) {
         case value::TypeTags::NumberInt32: {
             if (auto result = representAs<int32_t>(value); result) {

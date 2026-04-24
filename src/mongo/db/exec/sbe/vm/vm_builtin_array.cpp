@@ -1164,20 +1164,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::stdDevHelper(ArityType 
         if (value::isNumber(elemTag)) {
             count++;
 
-            auto [deltaOwned, deltaTag, deltaVal] = genericSub(elemTag, elemVal, meanTag, meanVal);
+            auto [deltaOwned, deltaTag, deltaVal] =
+                genericSub(elemTag, elemVal, meanTag, meanVal).releaseToRaw();
             auto [divOwned, divTag, divVal] =
                 genericDiv(deltaTag, deltaVal, value::TypeTags::NumberInt64, count).releaseToRaw();
             auto [newMeanOwned, newMeanTag, newMeanVal] =
-                genericAdd(meanTag, meanVal, divTag, divVal);
+                genericAdd(meanTag, meanVal, divTag, divVal).releaseToRaw();
             meanTag = newMeanTag;
             meanVal = newMeanVal;
 
             auto [deltaOwned2, deltaTag2, deltaVal2] =
-                genericSub(elemTag, elemVal, meanTag, meanVal);
+                genericSub(elemTag, elemVal, meanTag, meanVal).releaseToRaw();
             auto [multOwned, multTag, multVal] =
-                genericMul(deltaTag, deltaVal, deltaTag2, deltaVal2);
+                genericMul(deltaTag, deltaVal, deltaTag2, deltaVal2).releaseToRaw();
             auto [newMeanSquaredOwned, newMeanSquaredTag, newMeanSquaredVal] =
-                genericAdd(meanSquaredTag, meanSquaredVal, multTag, multVal);
+                genericAdd(meanSquaredTag, meanSquaredVal, multTag, multVal).releaseToRaw();
             meanSquaredTag = newMeanSquaredTag;
             meanSquaredVal = newMeanSquaredVal;
         }
@@ -1224,7 +1225,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::avgOrSumOfArrayHelper(A
         if (value::isNumber(elemTag)) {
             count++;
             auto [partialSumOwned, partialSumTag, partialSumVal] =
-                value::genericAdd(sumTag, sumVal, elemTag, elemVal);
+                value::genericAdd(sumTag, sumVal, elemTag, elemVal).releaseToRaw();
             sumTag = partialSumTag;
             sumVal = partialSumVal;
         }

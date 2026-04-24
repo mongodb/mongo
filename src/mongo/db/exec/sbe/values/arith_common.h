@@ -33,19 +33,19 @@
 
 namespace mongo::sbe::value {
 
-FastTuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
-                                                          value::Value lhsValue,
-                                                          value::TypeTags rhsTag,
-                                                          value::Value rhsValue);
-FastTuple<bool, value::TypeTags, value::Value> genericSub(value::TypeTags lhsTag,
-                                                          value::Value lhsValue,
-                                                          value::TypeTags rhsTag,
-                                                          value::Value rhsValue);
-FastTuple<bool, value::TypeTags, value::Value> genericMul(value::TypeTags lhsTag,
-                                                          value::Value lhsValue,
-                                                          value::TypeTags rhsTag,
-                                                          value::Value rhsValue);
-FastTuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
-                                                                 value::Value lhsValue,
-                                                                 value::TypeTags targetTag);
+value::TagValueMaybeOwned genericAdd(value::TypeTags lhsTag,
+                                     value::Value lhsValue,
+                                     value::TypeTags rhsTag,
+                                     value::Value rhsValue);
+value::TagValueMaybeOwned genericSub(value::TypeTags lhsTag,
+                                     value::Value lhsValue,
+                                     value::TypeTags rhsTag,
+                                     value::Value rhsValue);
+value::TagValueMaybeOwned genericMul(value::TypeTags lhsTag,
+                                     value::Value lhsValue,
+                                     value::TypeTags rhsTag,
+                                     value::Value rhsValue);
+value::TagValueMaybeOwned genericNumConvert(value::TypeTags lhsTag,
+                                            value::Value lhsValue,
+                                            value::TypeTags targetTag);
 }  // namespace mongo::sbe::value

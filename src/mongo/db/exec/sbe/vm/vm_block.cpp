@@ -546,12 +546,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
             } else {
                 value::ValueGuard curBlockResGuard{blockResTag, blockResVal};
 
-                auto [sumOwned, sumTag, sumVal] =
-                    genericAdd(blockResTag, blockResVal, block.tags()[i], block.vals()[i]);
-
-                if (!sumOwned) {
-                    std::tie(sumTag, sumVal) = value::copyValue(sumTag, sumVal);
-                }
+                auto [sumTag, sumVal] =
+                    genericAdd(blockResTag, blockResVal, block.tags()[i], block.vals()[i])
+                        .releaseToOwnedRaw();
 
                 std::tie(blockResTag, blockResVal) = std::pair(sumTag, sumVal);
             }
@@ -573,12 +570,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
     }
 
     // Compute the result of adding the accumulator state with 'blockRes'.
-    auto [resultOwned, resultTag, resultVal] = genericAdd(accTag, accVal, blockResTag, blockResVal);
-
-    // If 'result' is not owned, make it owned.
-    if (!resultOwned) {
-        std::tie(resultTag, resultVal) = value::copyValue(resultTag, resultVal);
-    }
+    auto [resultTag, resultVal] =
+        genericAdd(accTag, accVal, blockResTag, blockResVal).releaseToOwnedRaw();
 
     // Return 'result' as the updated accumulator state.
     return {true, resultTag, resultVal};
@@ -1390,18 +1383,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithm
             continue;
         }
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-            auto [_, resTag, resVal] = genericAdd(
-                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
+            auto [resTag, resVal] =
+                genericAdd(
+                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-            auto [_, resTag, resVal] = genericSub(
-                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
+            auto [resTag, resVal] =
+                genericSub(
+                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-            auto [_, resTag, resVal] = genericMul(
-                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
+            auto [resTag, resVal] =
+                genericMul(
+                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
@@ -1432,18 +1431,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithm
 
     for (size_t i = 0; i < valsNum; ++i) {
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-            auto [_, resTag, resVal] = genericAdd(
-                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
+            auto [resTag, resVal] =
+                genericAdd(
+                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-            auto [_, resTag, resVal] = genericSub(
-                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
+            auto [resTag, resVal] =
+                genericSub(
+                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-            auto [_, resTag, resVal] = genericMul(
-                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
+            auto [resTag, resVal] =
+                genericMul(
+                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
@@ -1480,18 +1485,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArith
             continue;
         }
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-            auto [_, resTag, resVal] = genericAdd(
-                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
+            auto [resTag, resVal] =
+                genericAdd(
+                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-            auto [_, resTag, resVal] = genericSub(
-                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
+            auto [resTag, resVal] =
+                genericSub(
+                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-            auto [_, resTag, resVal] = genericMul(
-                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
+            auto [resTag, resVal] =
+                genericMul(
+                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
@@ -1521,18 +1532,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArith
 
     for (size_t i = 0; i < valsNum; ++i) {
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-            auto [_, resTag, resVal] = genericAdd(
-                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
+            auto [resTag, resVal] =
+                genericAdd(
+                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-            auto [_, resTag, resVal] = genericSub(
-                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
+            auto [resTag, resVal] =
+                genericSub(
+                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-            auto [_, resTag, resVal] = genericMul(
-                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
+            auto [resTag, resVal] =
+                genericMul(
+                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
@@ -1569,18 +1586,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
             continue;
         }
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-            auto [_, resTag, resVal] = genericAdd(
-                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
+            auto [resTag, resVal] =
+                genericAdd(
+                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-            auto [_, resTag, resVal] = genericSub(
-                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
+            auto [resTag, resVal] =
+                genericSub(
+                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-            auto [_, resTag, resVal] = genericMul(
-                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
+            auto [resTag, resVal] =
+                genericMul(
+                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
@@ -1610,18 +1633,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
 
     for (size_t i = 0; i < valsNum; ++i) {
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-            auto [_, resTag, resVal] = genericAdd(
-                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
+            auto [resTag, resVal] =
+                genericAdd(
+                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-            auto [_, resTag, resVal] = genericSub(
-                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
+            auto [resTag, resVal] =
+                genericSub(
+                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-            auto [_, resTag, resVal] = genericMul(
-                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
+            auto [resTag, resVal] =
+                genericMul(
+                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
+                    .releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
@@ -1646,22 +1675,25 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarScalarArit
     value::TagValueView leftInputScalar, value::TagValueView rightInputScalar, size_t valsNum) {
     std::unique_ptr<value::MonoBlock> resBlock;
     if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-        auto [_, resultTag, resultValue] = genericAdd(leftInputScalar.tag,
-                                                      leftInputScalar.value,
-                                                      rightInputScalar.tag,
-                                                      rightInputScalar.value);
+        auto [resultTag, resultValue] = genericAdd(leftInputScalar.tag,
+                                                   leftInputScalar.value,
+                                                   rightInputScalar.tag,
+                                                   rightInputScalar.value)
+                                            .releaseToOwnedRaw();
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-        auto [_, resultTag, resultValue] = genericSub(leftInputScalar.tag,
-                                                      leftInputScalar.value,
-                                                      rightInputScalar.tag,
-                                                      rightInputScalar.value);
+        auto [resultTag, resultValue] = genericSub(leftInputScalar.tag,
+                                                   leftInputScalar.value,
+                                                   rightInputScalar.tag,
+                                                   rightInputScalar.value)
+                                            .releaseToOwnedRaw();
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-        auto [_, resultTag, resultValue] = genericMul(leftInputScalar.tag,
-                                                      leftInputScalar.value,
-                                                      rightInputScalar.tag,
-                                                      rightInputScalar.value);
+        auto [resultTag, resultValue] = genericMul(leftInputScalar.tag,
+                                                   leftInputScalar.value,
+                                                   rightInputScalar.tag,
+                                                   rightInputScalar.value)
+                                            .releaseToOwnedRaw();
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
         auto [resultTag, resultValue] = genericDiv(leftInputScalar.tag,
@@ -2302,9 +2334,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNewFill(ArityType arity) {
     tassert(11079907, "Unexpected arity value", arity == 2);
 
-    auto [rightOwned, rightTag, rightVal] = getFromStack(1);
+    auto right = viewFromStack(1);
     auto [countOwned, countTag, countVal] =
-        value::genericNumConvert(rightTag, rightVal, value::TypeTags::NumberInt32);
+        value::genericNumConvert(right.tag, right.value, value::TypeTags::NumberInt32)
+            .releaseToRaw();
     tassert(8141602,
             "valueBlockNewFill expects an integer in the size argument",
             countTag == value::TypeTags::NumberInt32);
@@ -2597,24 +2630,23 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMod(Ar
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockConvert(ArityType arity) {
     tassert(11079901, "Unexpected arity value", arity == 2);
-    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+    auto input = viewFromStack(0);
 
     tassert(8332901,
             "First argument of convert must be block of values.",
-            inputTag == value::TypeTags::valueBlock);
-    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+            input.tag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(input.value);
 
-    auto [targetOwned, targetTag, targetVal] = getFromStack(1);
-    tassert(8907000, "Expected targetTag to be int32", targetTag == value::TypeTags::NumberInt32);
-    auto convertTag = static_cast<sbe::value::TypeTags>(value::bitcastTo<int32_t>(targetVal));
+    auto target = viewFromStack(1);
+    tassert(8907000, "Expected targetTag to be int32", target.tag == value::TypeTags::NumberInt32);
+    auto convertTag = static_cast<sbe::value::TypeTags>(value::bitcastTo<int32_t>(target.value));
 
     // Numeric convert expects always a numeric type as target. However, it does not check for it
     // and throws if the value is not numeric. We let genericNumConvert do this check and we do not
     // make any checks here.
     const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
-            auto [_, resTag, resVal] = value::genericNumConvert(tag, val, convertTag);
-            return {resTag, resVal};
+            return value::genericNumConvert(tag, val, convertTag).releaseToOwnedRaw();
         });
 
     auto res = valueBlockIn->map(cmpOp);

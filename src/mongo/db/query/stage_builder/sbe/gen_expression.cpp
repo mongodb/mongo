@@ -1915,14 +1915,13 @@ public:
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
                         sbe::value::isNumber(binSizeTag));
-                auto [binSizeLongOwn, binSizeLongTag, binSizeLongValue] =
-                    sbe::value::genericNumConvert(
-                        binSizeTag, binSizeValue, sbe::value::TypeTags::NumberInt64);
+                auto binSizeLong = sbe::value::genericNumConvert(
+                    binSizeTag, binSizeValue, sbe::value::TypeTags::NumberInt64);
                 tassert(7157938,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
-                        binSizeLongTag != sbe::value::TypeTags::Nothing);
-                auto binSize = sbe::value::bitcastTo<int64_t>(binSizeLongValue);
+                        binSizeLong.tag() != sbe::value::TypeTags::Nothing);
+                auto binSize = sbe::value::bitcastTo<int64_t>(binSizeLong.value());
                 tassert(7157939,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",

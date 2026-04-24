@@ -596,18 +596,16 @@ void ByteCode::aggStdDevImpl(value::Array* arr, value::TypeTags rhsTag, value::V
             ++count < std::numeric_limits<int64_t>::max());
     auto newCountVal = value::bitcastFrom<int64_t>(count);
 
-    auto delta = value::TagValueMaybeOwned::fromRaw(genericSub(
-        value::TypeTags::NumberDouble, curVal, value::TypeTags::NumberDouble, mean.value));
+    auto delta = genericSub(
+        value::TypeTags::NumberDouble, curVal, value::TypeTags::NumberDouble, mean.value);
     auto deltaDivCount =
         genericDiv(delta.tag(), delta.value(), value::TypeTags::NumberInt64, newCountVal);
-    auto newMean = value::TagValueMaybeOwned::fromRaw(
-        genericAdd(mean.tag, mean.value, deltaDivCount.tag(), deltaDivCount.value()));
-    auto newDelta = value::TagValueMaybeOwned::fromRaw(
-        genericSub(value::TypeTags::NumberDouble, curVal, newMean.tag(), newMean.value()));
-    auto deltaMultNewDelta = value::TagValueMaybeOwned::fromRaw(
-        genericMul(delta.tag(), delta.value(), newDelta.tag(), newDelta.value()));
-    auto newM2 = value::TagValueMaybeOwned::fromRaw(
-        genericAdd(m2.tag, m2.value, deltaMultNewDelta.tag(), deltaMultNewDelta.value()));
+    auto newMean = genericAdd(mean.tag, mean.value, deltaDivCount.tag(), deltaDivCount.value());
+    auto newDelta =
+        genericSub(value::TypeTags::NumberDouble, curVal, newMean.tag(), newMean.value());
+    auto deltaMultNewDelta =
+        genericMul(delta.tag(), delta.value(), newDelta.tag(), newDelta.value());
+    auto newM2 = genericAdd(m2.tag, m2.value, deltaMultNewDelta.tag(), deltaMultNewDelta.value());
 
     return setStdDevArray(newCountVal, newMean.value(), newM2.value(), arr);
 }

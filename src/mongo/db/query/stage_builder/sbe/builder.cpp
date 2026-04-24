@@ -4143,7 +4143,7 @@ public:
                 sbe::value::ValueGuard unitGuard{unitTag, unitVal};
                 auto [timezoneTag, timezoneVal] = sbe::value::makeNewString("UTC");
                 sbe::value::ValueGuard timezoneGuard{timezoneTag, timezoneVal};
-                auto [longOffsetOwned, longOffsetTag, longOffsetVal] = genericNumConvert(
+                auto longOffset = genericNumConvert(
                     offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
                 unitGuard.reset();
                 timezoneGuard.reset();
@@ -4151,7 +4151,7 @@ public:
                                       SbSlot{*state.getTimeZoneDBSlot()},
                                       boundSlot,
                                       b.makeConstant(unitTag, unitVal),
-                                      b.makeConstant(longOffsetTag, longOffsetVal),
+                                      b.makeConstant(longOffset.tag(), longOffset.value()),
                                       b.makeConstant(timezoneTag, timezoneVal));
             } else {
                 return b.makeBinaryOp(

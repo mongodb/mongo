@@ -1069,16 +1069,15 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
     auto maxAccumulatorBytes = internalQueryTopNAccumulatorBytes.load();
     if (maxSizeExpr.isConstantExpr()) {
         auto [tag, val] = maxSizeExpr.getConstantValue();
-        auto [convertOwn, convertTag, convertVal] =
-            genericNumConvert(tag, val, sbe::value::TypeTags::NumberInt64);
+        auto convert = genericNumConvert(tag, val, sbe::value::TypeTags::NumberInt64);
         uassert(7548606,
                 "parameter 'n' must be coercible to a positive 64-bit integer",
-                convertTag != sbe::value::TypeTags::Nothing &&
-                    static_cast<int64_t>(convertVal) > 0);
+                convert.tag() != sbe::value::TypeTags::Nothing &&
+                    static_cast<int64_t>(convert.value()) > 0);
         return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray,
                                               b.makeFunction(sbe::EFn::kNewArray),
                                               b.makeInt64Constant(0),
-                                              b.makeConstant(convertTag, convertVal),
+                                              b.makeConstant(convert.tag(), convert.value()),
                                               b.makeInt32Constant(0),
                                               b.makeInt32Constant(maxAccumulatorBytes),
                                               std::move(isGroupAccumExpr)));

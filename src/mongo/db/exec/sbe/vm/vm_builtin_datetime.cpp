@@ -661,12 +661,12 @@ bool ByteCode::validateDateTruncParameters(TimeUnit* unit,
     if (!value::isNumber(binSizeTag)) {
         return false;
     }
-    auto [binSizeLongOwned, binSizeLongTag, binSizeLongValue] =
+    auto binSizeLong =
         value::genericNumConvert(binSizeTag, binSizeValue, value::TypeTags::NumberInt64);
-    if (binSizeLongTag == value::TypeTags::Nothing) {
+    if (binSizeLong.tag() == value::TypeTags::Nothing) {
         return false;
     }
-    *binSize = value::bitcastTo<int64_t>(binSizeLongValue);
+    *binSize = value::bitcastTo<int64_t>(binSizeLong.value());
     if (*binSize <= 0) {
         return false;
     }

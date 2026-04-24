@@ -529,7 +529,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
         value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-        auto [owned, tag, val] = genericAdd(lhsTag, lhsVal, rhsTag, rhsVal);
+        auto [owned, tag, val] = genericAdd(lhsTag, lhsVal, rhsTag, rhsVal).releaseToRaw();
 
         pushStack(owned, tag, val);
     }
@@ -543,7 +543,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
         value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-        auto [owned, tag, val] = genericSub(lhsTag, lhsVal, rhsTag, rhsVal);
+        auto [owned, tag, val] = genericSub(lhsTag, lhsVal, rhsTag, rhsVal).releaseToRaw();
 
         pushStack(owned, tag, val);
     }
@@ -557,7 +557,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
         value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-        auto [owned, tag, val] = genericMul(lhsTag, lhsVal, rhsTag, rhsVal);
+        auto [owned, tag, val] = genericMul(lhsTag, lhsVal, rhsTag, rhsVal).releaseToRaw();
 
         pushStack(owned, tag, val);
     }
@@ -611,7 +611,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         value::ValueGuard paramGuard(owned && popParam, tag, val);
 
         auto [resultOwned, resultTag, resultVal] =
-            genericSub(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0), tag, val);
+            genericSub(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0), tag, val)
+                .releaseToRaw();
 
         pushStack(resultOwned, resultTag, resultVal);
     }
@@ -622,7 +623,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
         auto [owned, lhsTag, lhsVal] = getFromStack(0);
 
-        auto [rhsOwned, rhsTag, rhsVal] = genericNumConvert(lhsTag, lhsVal, tag);
+        auto [rhsOwned, rhsTag, rhsVal] = genericNumConvert(lhsTag, lhsVal, tag).releaseToRaw();
 
         topStack(rhsOwned, rhsTag, rhsVal);
 

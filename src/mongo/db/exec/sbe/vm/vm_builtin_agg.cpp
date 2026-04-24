@@ -1540,14 +1540,13 @@ value::TagValueMaybeOwned ByteCode::integralOfTwoPointsByTrapezoidalRule(
 
     if ((prevSortByVal.tag == value::TypeTags::Date && newSortByVal.tag == value::TypeTags::Date) ||
         (value::isNumber(prevSortByVal.tag) && value::isNumber(newSortByVal.tag))) {
-        auto deltaTagVal = value::TagValueMaybeOwned::fromRaw(genericSub(
-            newSortByVal.tag, newSortByVal.value, prevSortByVal.tag, prevSortByVal.value));
+        auto deltaTagVal = genericSub(
+            newSortByVal.tag, newSortByVal.value, prevSortByVal.tag, prevSortByVal.value);
 
-        auto sumYTagVal = value::TagValueMaybeOwned::fromRaw(
-            genericAdd(newInput.tag, newInput.value, prevInput.tag, prevInput.value));
+        auto sumYTagVal = genericAdd(newInput.tag, newInput.value, prevInput.tag, prevInput.value);
 
-        auto integralTagVal = value::TagValueMaybeOwned::fromRaw(genericMul(
-            sumYTagVal.tag(), sumYTagVal.value(), deltaTagVal.tag(), deltaTagVal.value()));
+        auto integralTagVal = genericMul(
+            sumYTagVal.tag(), sumYTagVal.value(), deltaTagVal.tag(), deltaTagVal.value());
 
         auto result = genericDiv(integralTagVal.tag(),
                                  integralTagVal.value(),
@@ -1905,15 +1904,15 @@ value::TagValueMaybeOwned ByteCode::builtinAggDerivativeFinalize(ArityType arity
                     value::isNumber(sortByLastTagVal.tag()));
     }
 
-    auto runTagVal = value::TagValueMaybeOwned::fromRaw(genericSub(sortByLastTagVal.tag(),
-                                                                   sortByLastTagVal.value(),
-                                                                   sortByFirstTagVal.tag(),
-                                                                   sortByFirstTagVal.value()));
+    auto runTagVal = genericSub(sortByLastTagVal.tag(),
+                                sortByLastTagVal.value(),
+                                sortByFirstTagVal.tag(),
+                                sortByFirstTagVal.value());
 
-    auto riseTagVal = value::TagValueMaybeOwned::fromRaw(genericSub(inputLastTagVal.tag(),
-                                                                    inputLastTagVal.value(),
-                                                                    inputFirstTagVal.tag(),
-                                                                    inputFirstTagVal.value()));
+    auto riseTagVal = genericSub(inputLastTagVal.tag(),
+                                 inputLastTagVal.value(),
+                                 inputFirstTagVal.tag(),
+                                 inputFirstTagVal.value());
 
     uassert(7821012, "Input delta should be numeric", value::isNumber(riseTagVal.tag()));
 
@@ -1932,11 +1931,10 @@ value::TagValueMaybeOwned ByteCode::builtinAggDerivativeFinalize(ArityType arity
         genericDiv(riseTagVal.tag(), riseTagVal.value(), runTagVal.tag(), runTagVal.value());
 
     if (unitMillis) {
-        auto [mulOwned, mulTag, mulVal] = genericMul(divTagVal.tag(),
-                                                     divTagVal.value(),
-                                                     value::TypeTags::NumberInt64,
-                                                     value::bitcastFrom<int64_t>(*unitMillis));
-        return {mulOwned, mulTag, mulVal};
+        return genericMul(divTagVal.tag(),
+                          divTagVal.value(),
+                          value::TypeTags::NumberInt64,
+                          value::bitcastFrom<int64_t>(*unitMillis));
     } else {
         return divTagVal;
     }
@@ -1995,8 +1993,7 @@ value::TagValueMaybeOwned covarianceCheckNonFinite(value::TypeTags xTag,
             }
             isDecimal = true;
         } else {
-            auto doubleTagVal = value::TagValueMaybeOwned::fromRaw(
-                genericNumConvert(tag, val, value::TypeTags::NumberDouble));
+            auto doubleTagVal = genericNumConvert(tag, val, value::TypeTags::NumberDouble);
             auto value = value::bitcastTo<double>(doubleTagVal.value());
             if (value == std::numeric_limits<double>::infinity()) {
                 posCnt++;
@@ -2115,17 +2112,17 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovarianceAdd(ArityType arity) {
     }
 
     auto meanXTagVal = aggRemovableAvgFinalizeImpl(sumXState, count);
-    auto deltaXTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericSub(xTagVal.tag(), xTagVal.value(), meanXTagVal.tag(), meanXTagVal.value()));
+    auto deltaXTagVal =
+        genericSub(xTagVal.tag(), xTagVal.value(), meanXTagVal.tag(), meanXTagVal.value());
     aggRemovableSumImpl<1>(sumXState, xTagVal.tag(), xTagVal.value());
 
     aggRemovableSumImpl<1>(sumYState, yTagVal.tag(), yTagVal.value());
     auto meanYTagVal = aggRemovableAvgFinalizeImpl(sumYState, count + 1);
-    auto deltaYTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericSub(yTagVal.tag(), yTagVal.value(), meanYTagVal.tag(), meanYTagVal.value()));
+    auto deltaYTagVal =
+        genericSub(yTagVal.tag(), yTagVal.value(), meanYTagVal.tag(), meanYTagVal.value());
 
-    auto deltaCXYTagVal = value::TagValueMaybeOwned::fromRaw(genericMul(
-        deltaXTagVal.tag(), deltaXTagVal.value(), deltaYTagVal.tag(), deltaYTagVal.value()));
+    auto deltaCXYTagVal = genericMul(
+        deltaXTagVal.tag(), deltaXTagVal.value(), deltaYTagVal.tag(), deltaYTagVal.value());
     aggRemovableSumImpl<1>(cXYState, deltaCXYTagVal.tag(), deltaCXYTagVal.value());
 
     state->setAt(static_cast<size_t>(AggCovarianceElems::kCount),
@@ -2275,17 +2272,16 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovarianceRemove(ArityType arity) 
 
     aggRemovableSumImpl<-1>(sumXState, xTagVal.tag(), xTagVal.value());
     auto meanXTagVal = aggRemovableAvgFinalizeImpl(sumXState, count - 1);
-    auto deltaXTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericSub(xTagVal.tag(), xTagVal.value(), meanXTagVal.tag(), meanXTagVal.value()));
+    auto deltaXTagVal =
+        genericSub(xTagVal.tag(), xTagVal.value(), meanXTagVal.tag(), meanXTagVal.value());
 
-    auto meanYTagVal = value::TagValueMaybeOwned::fromRaw(
-        aggRemovableAvgFinalizeImpl(sumYState, count).releaseToRaw());
-    auto deltaYTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericSub(yTagVal.tag(), yTagVal.value(), meanYTagVal.tag(), meanYTagVal.value()));
+    auto meanYTagVal = aggRemovableAvgFinalizeImpl(sumYState, count);
+    auto deltaYTagVal =
+        genericSub(yTagVal.tag(), yTagVal.value(), meanYTagVal.tag(), meanYTagVal.value());
     aggRemovableSumImpl<-1>(sumYState, yTagVal.tag(), yTagVal.value());
 
-    auto deltaCXYTagVal = value::TagValueMaybeOwned::fromRaw(genericMul(
-        deltaXTagVal.tag(), deltaXTagVal.value(), deltaYTagVal.tag(), deltaYTagVal.value()));
+    auto deltaCXYTagVal = genericMul(
+        deltaXTagVal.tag(), deltaXTagVal.value(), deltaYTagVal.tag(), deltaYTagVal.value());
     aggRemovableSumImpl<-1>(cXYState, deltaCXYTagVal.tag(), deltaCXYTagVal.value());
 
     state->setAt(static_cast<size_t>(AggCovarianceElems::kCount),
@@ -2844,24 +2840,22 @@ value::TagValueMaybeOwned ByteCode::linearFillInterpolate(value::TagValueView x1
                                                           value::TagValueView y2,
                                                           value::TagValueView x) {
     // (y2 - y1)
-    auto delY = value::TagValueMaybeOwned::fromRaw(genericSub(y2.tag, y2.value, y1.tag, y1.value));
+    auto delY = genericSub(y2.tag, y2.value, y1.tag, y1.value);
 
     // (x2 - x1)
-    auto delX = value::TagValueMaybeOwned::fromRaw(genericSub(x2.tag, x2.value, x1.tag, x1.value));
+    auto delX = genericSub(x2.tag, x2.value, x1.tag, x1.value);
 
     // (y2 - y1) / (x2 - x1)
-    auto div = value::TagValueMaybeOwned::fromRaw(
-        genericDiv(delY.tag(), delY.value(), delX.tag(), delX.value()).releaseToRaw());
+    auto div = genericDiv(delY.tag(), delY.value(), delX.tag(), delX.value());
 
     // (x - x1)
-    auto sub = value::TagValueMaybeOwned::fromRaw(genericSub(x.tag, x.value, x1.tag, x1.value));
+    auto sub = genericSub(x.tag, x.value, x1.tag, x1.value);
 
     // (x - x1) * ((y2 - y1) / (x2 - x1))
-    auto mul = value::TagValueMaybeOwned::fromRaw(
-        genericMul(sub.tag(), sub.value(), div.tag(), div.value()));
+    auto mul = genericMul(sub.tag(), sub.value(), div.tag(), div.value());
 
     // y1 + (x - x1) * ((y2 - y1) / (x2 - x1))
-    return value::TagValueMaybeOwned::fromRaw(genericAdd(y1.tag, y1.value, mul.tag(), mul.value()));
+    return genericAdd(y1.tag, y1.value, mul.tag(), mul.value());
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAggLinearFillFinalize(ArityType arity) {
@@ -2921,11 +2915,10 @@ std::tuple<value::Array*, size_t> firstLastNState(value::TypeTags stateTag, valu
 }  // namespace
 
 value::TagValueMaybeOwned ByteCode::builtinAggFirstLastNInit(ArityType arity) {
-    auto [_, fieldTag, fieldVal] = getFromStack(0);
-    auto fieldTagVal = value::rawToView({fieldTag, fieldVal});
+    auto fieldTagVal = viewFromStack(0);
 
-    auto nTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericNumConvert(fieldTagVal.tag, fieldTagVal.value, value::TypeTags::NumberInt64));
+    auto nTagVal =
+        genericNumConvert(fieldTagVal.tag, fieldTagVal.value, value::TypeTags::NumberInt64);
     uassert(8070607,
             "Failed to convert to 64-bit integer",
             nTagVal.tag() == value::TypeTags::NumberInt64);
@@ -3263,10 +3256,9 @@ accumulatorNState(value::TypeTags stateTag, value::Value stateVal) {
 }  // namespace
 
 value::TagValueMaybeOwned ByteCode::aggRemovableMinMaxNInitImpl(CollatorInterface* collator) {
-    auto size = value::TagValueMaybeOwned::fromRaw(getFromStack(0));
+    auto size = viewFromStack(0);
 
-    auto nTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericNumConvert(size.tag(), size.value(), value::TypeTags::NumberInt64));
+    auto nTagVal = genericNumConvert(size.tag, size.value, value::TypeTags::NumberInt64);
     uassert(8178107,
             "Failed to convert to 64-bit integer",
             nTagVal.tag() == value::TypeTags::NumberInt64);
@@ -3274,10 +3266,10 @@ value::TagValueMaybeOwned ByteCode::aggRemovableMinMaxNInitImpl(CollatorInterfac
     auto n = value::bitcastTo<int64_t>(nTagVal.value());
     uassert(8178108, "Expected 'n' to be positive", n > 0);
 
-    auto sizeCap = value::TagValueMaybeOwned::fromRaw(getFromStack(1));
+    auto sizeCap = viewFromStack(1);
     uassert(8178109,
             "The size cap must be of type NumberInt32",
-            sizeCap.tag() == value::TypeTags::NumberInt32);
+            sizeCap.tag == value::TypeTags::NumberInt32);
 
     // Initialize the state
     auto state = value::TagValueOwned::fromRaw(value::makeNewArray());
@@ -3291,8 +3283,8 @@ value::TagValueMaybeOwned ByteCode::aggRemovableMinMaxNInitImpl(CollatorInterfac
                         nTagVal.value());  // The maximum number of elements in the multiset.
     stateArr->push_back(value::TypeTags::NumberInt32,
                         value::bitcastFrom<int32_t>(0));  // The size of the multiset in bytes.
-    stateArr->push_back(sizeCap.tag(),
-                        sizeCap.value());  // The maximum possible size of the multiset in bytes.
+    stateArr->push_back(sizeCap.tag,
+                        sizeCap.value);  // The maximum possible size of the multiset in bytes.
     return state;
 }
 
@@ -3402,11 +3394,10 @@ template value::TagValueMaybeOwned
 ByteCode::builtinAggRemovableMinMaxNFinalize<(AccumulatorMinMaxN::MinMaxSense)1>(ArityType arity);
 
 value::TagValueMaybeOwned ByteCode::builtinAggRemovableTopBottomNInit(ArityType arity) {
-    auto maxSize = value::TagValueMaybeOwned::fromRaw(getFromStack(0));
-    auto memLimit = value::TagValueMaybeOwned::fromRaw(getFromStack(1));
+    auto maxSize = viewFromStack(0);
+    auto memLimit = viewFromStack(1);
 
-    auto nTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericNumConvert(maxSize.tag(), maxSize.value(), value::TypeTags::NumberInt64));
+    auto nTagVal = genericNumConvert(maxSize.tag, maxSize.value, value::TypeTags::NumberInt64);
     uassert(8155711,
             "Failed to convert to 64-bit integer",
             nTagVal.tag() == value::TypeTags::NumberInt64);
@@ -3416,7 +3407,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableTopBottomNInit(ArityType 
 
     tassert(8155709,
             "memLimit should be of type NumberInt32",
-            memLimit.tag() == value::TypeTags::NumberInt32);
+            memLimit.tag == value::TypeTags::NumberInt32);
 
     auto state = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto stateArr = value::getArrayView(state.value());
@@ -3426,7 +3417,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableTopBottomNInit(ArityType 
 
     stateArr->push_back(nTagVal.tag(), nTagVal.value());
     stateArr->push_back(value::TypeTags::NumberInt32, 0);
-    stateArr->push_back(memLimit.tag(), memLimit.value());
+    stateArr->push_back(memLimit.tag, memLimit.value);
 
     return state;
 }
