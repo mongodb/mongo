@@ -59,6 +59,8 @@ ViewDefinition::ViewDefinition(const ViewDefinition& other)
       _pipeline(other._pipeline) {}
 
 ViewDefinition& ViewDefinition::operator=(const ViewDefinition& other) {
+    if (this == &other)
+        return *this;
     _viewNss = other._viewNss;
     _viewOnNss = other._viewOnNss;
     _collator = CollatorInterface::cloneCollator(other._collator.get());

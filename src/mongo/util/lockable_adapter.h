@@ -69,9 +69,7 @@ private:
 
     template <typename T>
     static inline VTable forT = VTable{+[](void* t) { static_cast<T*>(t)->lock(); },
-                                       +[](void* t) {
-                                           static_cast<T*>(t)->unlock();
-                                       }};
+                                       +[](void* t) { static_cast<T*>(t)->unlock(); }};
 
     void* _underlyingLock;
     const VTable* _vtable;

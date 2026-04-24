@@ -171,10 +171,8 @@ TEST_F(BalancerCommandsSchedulerTest, StartAndStopScheduler) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
-    auto remoteResponsesFuture =
-        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
-            return OkReply().toBSON();
-        }});
+    auto remoteResponsesFuture = setRemoteResponses(
+        {[&](const executor::RemoteCommandRequest& request) { return OkReply().toBSON(); }});
     _scheduler.start(operationContext());
     ShardsvrMoveRange shardsvrRequest(kNss);
     shardsvrRequest.setCollectionTimestamp(Timestamp(10));
@@ -194,10 +192,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
-    auto remoteResponsesFuture =
-        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
-            return OkReply().toBSON();
-        }});
+    auto remoteResponsesFuture = setRemoteResponses(
+        {[&](const executor::RemoteCommandRequest& request) { return OkReply().toBSON(); }});
     _scheduler.start(operationContext());
 
     ChunkRange range(BSON("x" << 0), BSON("x" << 20));
@@ -227,10 +223,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
     chunkSizeResponse.append("ok", "1");
     chunkSizeResponse.append("size", 156);
     chunkSizeResponse.append("numObjects", 25);
-    auto remoteResponsesFuture =
-        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
-            return chunkSizeResponse.obj();
-        }});
+    auto remoteResponsesFuture = setRemoteResponses(
+        {[&](const executor::RemoteCommandRequest& request) { return chunkSizeResponse.obj(); }});
 
     _scheduler.start(operationContext());
     ChunkType chunk = makeChunk(0, kShardId0);
@@ -301,10 +295,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveCollectionRequest) {
 
 TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
     auto timeoutError = Status{ErrorCodes::NetworkTimeout, "Mock error: network timed out"};
-    auto remoteResponsesFuture =
-        setRemoteResponses({[&](const executor::RemoteCommandRequest& request) {
-            return timeoutError;
-        }});
+    auto remoteResponsesFuture = setRemoteResponses(
+        {[&](const executor::RemoteCommandRequest& request) { return timeoutError; }});
     _scheduler.start(operationContext());
     auto req = makeMoveRangeRequest(0, kShardId1, kShardId0);
     auto futureResponse = _scheduler.requestMoveRange(

@@ -633,9 +633,8 @@ StatusWith<std::vector<BSONObj>> Shard::runAggregationWithResult(
     Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
         Shard::RetryStrategy::extractRequestTransactionState(aggRequest.getGenericArguments());
     RetryStrategyWithFailureRetryHook retryStrategy{
-        RetryStrategy{*this, retryPolicy, isStartTransaction}, [&](Status s) {
-            aggResult.clear();
-        }};
+        RetryStrategy{*this, retryPolicy, isStartTransaction},
+        [&](Status s) { aggResult.clear(); }};
 
     auto status =
         runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {

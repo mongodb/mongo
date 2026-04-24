@@ -370,9 +370,7 @@ private:
 
     // See documentWithoutMongosInfo().
     Deferred<BSONObj (*)(const BSONObj&)> _documentWithoutMongosInfo{
-        [](const BSONObj& fullDocument) {
-            return fullDocument.removeField("mongos");
-        }};
+        [](const BSONObj& fullDocument) { return fullDocument.removeField("mongos"); }};
 
     // See hashWithoutMongosInfo().
     Deferred<size_t (*)(const BSONObj&)> _hashWithoutMongos{simpleHash};

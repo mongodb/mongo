@@ -252,8 +252,7 @@ protected:
     }
 
 protected:
-    AutoMergerPolicy _automerger{[]() {
-    }};
+    AutoMergerPolicy _automerger{[]() {}};
 
     inline const static auto _shards =
         std::vector<ShardType>{ShardType{"shard0", "host0:123"}, ShardType{"shard1", "host1:123"}};

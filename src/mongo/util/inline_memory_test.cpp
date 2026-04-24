@@ -81,9 +81,7 @@ public:
     std::vector<std::tuple<void*, size_t, size_t>> upstreamDeallocations;
     MockResource<> mockResource{
         [&](void* p, size_t sz, size_t al) { upstreamAllocations.push_back({p, sz, al}); },
-        [&](void* p, size_t sz, size_t al) {
-            upstreamDeallocations.push_back({p, sz, al});
-        }};
+        [&](void* p, size_t sz, size_t al) { upstreamDeallocations.push_back({p, sz, al}); }};
 };
 
 TEST_F(MonotonicBufferResourceTest, UpstreamAllocationsReduced) {

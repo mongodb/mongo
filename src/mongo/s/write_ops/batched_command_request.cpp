@@ -156,9 +156,7 @@ void BatchedCommandRequest::unsetLegacyRuntimeConstants() {
     _visit(OverloadedVisitor{
         [](write_ops::InsertCommandRequest&) {},
         [&](write_ops::UpdateCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); },
-        [&](write_ops::DeleteCommandRequest& op) {
-            op.setLegacyRuntimeConstants(boost::none);
-        }});
+        [&](write_ops::DeleteCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); }});
 }
 
 const boost::optional<LegacyRuntimeConstants>& BatchedCommandRequest::getLegacyRuntimeConstants()
@@ -195,9 +193,7 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
 void BatchedCommandRequest::setLet(boost::optional<mongo::BSONObj> value) {
     _visit(OverloadedVisitor{[&](write_ops::InsertCommandRequest& op) {},
                              [&](write_ops::UpdateCommandRequest& op) { op.setLet(value); },
-                             [&](write_ops::DeleteCommandRequest& op) {
-                                 op.setLet(value);
-                             }});
+                             [&](write_ops::DeleteCommandRequest& op) { op.setLet(value); }});
 }
 
 void BatchedCommandRequest::evaluateAndReplaceLetParams(OperationContext* opCtx) {

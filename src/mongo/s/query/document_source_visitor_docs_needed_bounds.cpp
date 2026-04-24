@@ -38,7 +38,6 @@ void visit(DocsNeededBoundsContext* ctx, const T&) {
 }
 
 const ServiceContext::ConstructorActionRegisterer DocsNeededBoundsRegisterer{
-    "DocsNeededBoundsRegistererMongos", [](ServiceContext* service) {
-        registerMongosVisitor<DocsNeededBoundsContext>(service);
-    }};
+    "DocsNeededBoundsRegistererMongos",
+    [](ServiceContext* service) { registerMongosVisitor<DocsNeededBoundsContext>(service); }};
 }  // namespace mongo

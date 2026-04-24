@@ -49,9 +49,8 @@ void rotateAuditLog() {}
 namespace {
 const auto getAuditInterface = ServiceContext::declareDecoration<std::unique_ptr<AuditInterface>>();
 ServiceContext::ConstructorActionRegisterer registerCreateNoopAudit{
-    "initializeNoopAuditInterface", [](ServiceContext* svcCtx) {
-        AuditInterface::set(svcCtx, std::make_unique<AuditNoOp>());
-    }};
+    "initializeNoopAuditInterface",
+    [](ServiceContext* svcCtx) { AuditInterface::set(svcCtx, std::make_unique<AuditNoOp>()); }};
 }  // namespace
 
 AuditInterface* AuditInterface::get(ServiceContext* service) {

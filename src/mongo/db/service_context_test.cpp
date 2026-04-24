@@ -550,9 +550,7 @@ typename T::ConstructorActionRegisterer registerConstructorAction(
     return typename T::ConstructorActionRegisterer{name,
                                                    prereqs,
                                                    [name](T*) { actionListener.onConstruct(name); },
-                                                   [name](T*) {
-                                                       actionListener.onDestruct(name);
-                                                   }};
+                                                   [name](T*) { actionListener.onDestruct(name); }};
 }
 
 const auto serviceContext1Registerer = registerConstructorAction<ServiceContext>("ServiceContext1");

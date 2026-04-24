@@ -525,20 +525,15 @@ public:
         };
         std::set<CpuId, decltype(cmp)> cpuIds(cmp);
 
-        CpuInfoParser cpuInfoParser{{
-                                        {"physical id",
-                                         [&](const std::string& value) {
-                                             parsedCpuId.physical = value;
-                                         }},
-                                        {"core id",
-                                         [&](const std::string& value) {
-                                             parsedCpuId.core = value;
-                                         }},
-                                    },
-                                    [&]() {
-                                        cpuIds.insert(parsedCpuId);
-                                        parsedCpuId = CpuId{};
-                                    }};
+        CpuInfoParser cpuInfoParser{
+            {
+                {"physical id", [&](const std::string& value) { parsedCpuId.physical = value; }},
+                {"core id", [&](const std::string& value) { parsedCpuId.core = value; }},
+            },
+            [&]() {
+                cpuIds.insert(parsedCpuId);
+                parsedCpuId = CpuId{};
+            }};
         cpuInfoParser.run();
 
         physicalCores = cpuIds.size();
@@ -550,14 +545,11 @@ public:
     static int getNumCpuSockets() {
         std::set<std::string> socketIds;
 
-        CpuInfoParser cpuInfoParser{{
-                                        {"physical id",
-                                         [&](const std::string& value) {
-                                             socketIds.insert(value);
-                                         }},
-                                    },
-                                    []() {
-                                    }};
+        CpuInfoParser cpuInfoParser{
+            {
+                {"physical id", [&](const std::string& value) { socketIds.insert(value); }},
+            },
+            []() {}};
         cpuInfoParser.run();
 
         // On ARM64, the "physical id" field is unpopulated, causing there to be 0 sockets found. In
@@ -580,61 +572,25 @@ public:
 
         procCount = 0;
 
-        CpuInfoParser cpuInfoParser{{
+        CpuInfoParser cpuInfoParser{
+            {
 #ifdef __s390x__
-                                        {R"re(processor\s+\d+)re",
-                                         [&](const std::string& value) {
-                                             procCount++;
-                                         }},
-                                        {"cpu MHz static",
-                                         [&](const std::string& value) {
-                                             freq = value;
-                                         }},
-                                        {"features",
-                                         [&](const std::string& value) {
-                                             features = value;
-                                         }},
+                {R"re(processor\s+\d+)re", [&](const std::string& value) { procCount++; }},
+                {"cpu MHz static", [&](const std::string& value) { freq = value; }},
+                {"features", [&](const std::string& value) { features = value; }},
 #else
-                                        {"processor",
-                                         [&](const std::string& value) {
-                                             procCount++;
-                                         }},
-                                        {"model name",
-                                         [&](const std::string& value) {
-                                             modelString = value;
-                                         }},
-                                        {"cpu MHz",
-                                         [&](const std::string& value) {
-                                             freq = value;
-                                         }},
-                                        {"flags",
-                                         [&](const std::string& value) {
-                                             features = value;
-                                         }},
-                                        {"CPU implementer",
-                                         [&](const std::string& value) {
-                                             cpuImplementer = value;
-                                         }},
-                                        {"CPU architecture",
-                                         [&](const std::string& value) {
-                                             cpuArchitecture = value;
-                                         }},
-                                        {"CPU variant",
-                                         [&](const std::string& value) {
-                                             cpuVariant = value;
-                                         }},
-                                        {"CPU part",
-                                         [&](const std::string& value) {
-                                             cpuPart = value;
-                                         }},
-                                        {"CPU revision",
-                                         [&](const std::string& value) {
-                                             cpuRevision = value;
-                                         }},
+                {"processor", [&](const std::string& value) { procCount++; }},
+                {"model name", [&](const std::string& value) { modelString = value; }},
+                {"cpu MHz", [&](const std::string& value) { freq = value; }},
+                {"flags", [&](const std::string& value) { features = value; }},
+                {"CPU implementer", [&](const std::string& value) { cpuImplementer = value; }},
+                {"CPU architecture", [&](const std::string& value) { cpuArchitecture = value; }},
+                {"CPU variant", [&](const std::string& value) { cpuVariant = value; }},
+                {"CPU part", [&](const std::string& value) { cpuPart = value; }},
+                {"CPU revision", [&](const std::string& value) { cpuRevision = value; }},
 #endif
-                                    },
-                                    []() {
-                                    }};
+            },
+            []() {}};
         cpuInfoParser.run();
     }
 

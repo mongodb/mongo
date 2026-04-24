@@ -84,14 +84,10 @@ private:
           }}},
         {"server",
          {BSON(ChangeLogType::server() << _kServer),
-          [&](const ChangeLogType& changelog) {
-              ASSERT_EQUALS(changelog.getServer(), _kServer);
-          }}},
+          [&](const ChangeLogType& changelog) { ASSERT_EQUALS(changelog.getServer(), _kServer); }}},
         {"shard",
          {BSON(ChangeLogType::shard() << _kShard),
-          [&](const ChangeLogType& changelog) {
-              ASSERT_EQUALS(changelog.getShard(), _kShard);
-          }}},
+          [&](const ChangeLogType& changelog) { ASSERT_EQUALS(changelog.getShard(), _kShard); }}},
         {"clientAddr",
          {BSON(ChangeLogType::clientAddr() << _kClientAddr),
           [&](const ChangeLogType& changelog) {
@@ -99,14 +95,10 @@ private:
           }}},
         {"time",
          {BSON(ChangeLogType::time() << _kTime),
-          [&](const ChangeLogType& changelog) {
-              ASSERT_EQUALS(changelog.getTime(), _kTime);
-          }}},
+          [&](const ChangeLogType& changelog) { ASSERT_EQUALS(changelog.getTime(), _kTime); }}},
         {"what",
          {BSON(ChangeLogType::what() << _kWhat),
-          [&](const ChangeLogType& changelog) {
-              ASSERT_EQUALS(changelog.getWhat(), _kWhat);
-          }}},
+          [&](const ChangeLogType& changelog) { ASSERT_EQUALS(changelog.getWhat(), _kWhat); }}},
         {"versionContext",
          {BSON(ChangeLogType::versionContext() << _kVersionContext.toBSON()),
           [&](const ChangeLogType& changelog) {

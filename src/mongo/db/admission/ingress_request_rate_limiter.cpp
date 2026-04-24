@@ -56,9 +56,8 @@ const auto getIngressRequestRateLimiter =
     ServiceContext::declareDecoration<boost::optional<IngressRequestRateLimiter>>();
 
 const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
-    "InitIngressRequestRateLimiter", [](ServiceContext* ctx) {
-        getIngressRequestRateLimiter(ctx).emplace();
-    }};
+    "InitIngressRequestRateLimiter",
+    [](ServiceContext* ctx) { getIngressRequestRateLimiter(ctx).emplace(); }};
 
 class ClientAdmissionControlState {
 public:

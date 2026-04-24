@@ -975,12 +975,9 @@ public:
         CanonicalQuery* cq,
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<QueryPlannerParams> plannerParams)
-        : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{opCtx,
-                                                                  collections,
-                                                                  cq,
-                                                                  policy,
-                                                                  std::move(plannerParams),
-                                                                  false /*useSbePlanCache*/} {}
+        : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{
+              opCtx, collections, cq, policy, std::move(plannerParams), false /*useSbePlanCache*/} {
+    }
 
 private:
     PlanCacheKey buildPlanCacheKey() const override {

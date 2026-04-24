@@ -203,9 +203,7 @@ const BSONObj& BatchWriteCommandRefImpl::getFilter(int index) const {
         index,
         OverloadedVisitor{
             [&](const write_ops::UpdateOpEntry& updateOp) -> RetT { return updateOp.getQ(); },
-            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT {
-                return deleteOp.getQ();
-            }});
+            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT { return deleteOp.getQ(); }});
 }
 
 const BSONObj& BatchWriteCommandRefImpl::getHint(int index) const {
@@ -214,9 +212,7 @@ const BSONObj& BatchWriteCommandRefImpl::getHint(int index) const {
         index,
         OverloadedVisitor{
             [&](const write_ops::UpdateOpEntry& updateOp) -> RetT { return updateOp.getHint(); },
-            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT {
-                return deleteOp.getHint();
-            }});
+            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT { return deleteOp.getHint(); }});
 }
 
 const BSONObj& BatchWriteCommandRefImpl::getDocument(int index) const {
@@ -225,14 +221,12 @@ const BSONObj& BatchWriteCommandRefImpl::getDocument(int index) const {
 }
 
 bool BatchWriteCommandRefImpl::getMulti(int index) const {
-    return visitOpData(index,
-                       OverloadedVisitor{[&](const BSONObj& insertDoc) { return false; },
-                                         [&](const write_ops::UpdateOpEntry& updateOp) {
-                                             return updateOp.getMulti();
-                                         },
-                                         [&](const write_ops::DeleteOpEntry& deleteOp) {
-                                             return deleteOp.getMulti();
-                                         }});
+    return visitOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BSONObj& insertDoc) { return false; },
+            [&](const write_ops::UpdateOpEntry& updateOp) { return updateOp.getMulti(); },
+            [&](const write_ops::DeleteOpEntry& deleteOp) { return deleteOp.getMulti(); }});
 }
 
 const NamespaceString& BatchWriteCommandRefImpl::getNss(int index) const {
@@ -270,14 +264,12 @@ const write_ops::UpdateModification& BatchWriteCommandRefImpl::getUpdateMods(int
 }
 
 bool BatchWriteCommandRefImpl::getUpsert(int index) const {
-    return visitOpData(index,
-                       OverloadedVisitor{[&](const BSONObj& insertDoc) { return false; },
-                                         [&](const write_ops::UpdateOpEntry& updateOp) {
-                                             return updateOp.getUpsert();
-                                         },
-                                         [&](const write_ops::DeleteOpEntry& deleteOp) {
-                                             return false;
-                                         }});
+    return visitOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BSONObj& insertDoc) { return false; },
+            [&](const write_ops::UpdateOpEntry& updateOp) { return updateOp.getUpsert(); },
+            [&](const write_ops::DeleteOpEntry& deleteOp) { return false; }});
 }
 
 OptionalBool BatchWriteCommandRefImpl::getUpsertSupplied(int index) const {
@@ -316,20 +308,16 @@ boost::optional<mongo::BSONObj> BatchWriteCommandRefImpl::getSort(int index) con
         OverloadedVisitor{
             [&](const BSONObj& insertDoc) -> RetT { return boost::none; },
             [&](const write_ops::UpdateOpEntry& updateOp) -> RetT { return updateOp.getSort(); },
-            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT {
-                return boost::none;
-            }});
+            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT { return boost::none; }});
 }
 
 BSONObj BatchWriteCommandRefImpl::toBSON(int index) const {
-    return visitOpData(index,
-                       OverloadedVisitor{[&](const BSONObj& insertDoc) { return insertDoc; },
-                                         [&](const write_ops::UpdateOpEntry& updateOp) {
-                                             return updateOp.toBSON();
-                                         },
-                                         [&](const write_ops::DeleteOpEntry& deleteOp) {
-                                             return deleteOp.toBSON();
-                                         }});
+    return visitOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BSONObj& insertDoc) { return insertDoc; },
+            [&](const write_ops::UpdateOpEntry& updateOp) { return updateOp.toBSON(); },
+            [&](const write_ops::DeleteOpEntry& deleteOp) { return deleteOp.toBSON(); }});
 }
 
 int BulkWriteCommandRefImpl::estimateOpSizeInBytes(int index) const {
@@ -389,9 +377,7 @@ const boost::optional<BSONObj>& BulkWriteCommandRefImpl::getCollation(int index)
         OverloadedVisitor{
             [&](const BulkWriteInsertOp& insertOp) -> RetT { return kMissingBSONObj; },
             [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getCollation(); },
-            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
-                return deleteOp.getCollation();
-            }});
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT { return deleteOp.getCollation(); }});
 }
 
 boost::optional<BSONObj> BulkWriteCommandRefImpl::getConstants(int index) const {
@@ -406,9 +392,7 @@ const BSONObj& BulkWriteCommandRefImpl::getFilter(int index) const {
         index,
         OverloadedVisitor{
             [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getFilter(); },
-            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
-                return deleteOp.getFilter();
-            }});
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT { return deleteOp.getFilter(); }});
 }
 
 boost::optional<UUID> BulkWriteCommandRefImpl::getSampleId(int index) const {
@@ -417,9 +401,7 @@ boost::optional<UUID> BulkWriteCommandRefImpl::getSampleId(int index) const {
         index,
         OverloadedVisitor{
             [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getSampleId(); },
-            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
-                return deleteOp.getSampleId();
-            }});
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT { return deleteOp.getSampleId(); }});
 }
 
 const BSONObj& BulkWriteCommandRefImpl::getHint(int index) const {
@@ -428,9 +410,7 @@ const BSONObj& BulkWriteCommandRefImpl::getHint(int index) const {
         index,
         OverloadedVisitor{
             [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getHint(); },
-            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
-                return deleteOp.getHint();
-            }});
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT { return deleteOp.getHint(); }});
 }
 
 const BSONObj& BulkWriteCommandRefImpl::getDocument(int index) const {
@@ -444,9 +424,7 @@ bool BulkWriteCommandRefImpl::getMulti(int index) const {
         index,
         OverloadedVisitor{[&](const BulkWriteInsertOp& insertOp) { return false; },
                           [&](const BulkWriteUpdateOp& updateOp) { return updateOp.getMulti(); },
-                          [&](const BulkWriteDeleteOp& deleteOp) {
-                              return deleteOp.getMulti();
-                          }});
+                          [&](const BulkWriteDeleteOp& deleteOp) { return deleteOp.getMulti(); }});
 }
 
 const NamespaceString& BulkWriteCommandRefImpl::getNss(int index) const {
@@ -467,9 +445,7 @@ BatchedCommandRequest::BatchType BulkWriteCommandRefImpl::getOpType(int index) c
         OverloadedVisitor{
             [&](const BulkWriteInsertOp&) { return BatchedCommandRequest::BatchType_Insert; },
             [&](const BulkWriteUpdateOp&) { return BatchedCommandRequest::BatchType_Update; },
-            [&](const BulkWriteDeleteOp&) {
-                return BatchedCommandRequest::BatchType_Delete;
-            }});
+            [&](const BulkWriteDeleteOp&) { return BatchedCommandRequest::BatchType_Delete; }});
 }
 
 const write_ops::UpdateModification& BulkWriteCommandRefImpl::getUpdateMods(int index) const {
@@ -501,9 +477,7 @@ bool BulkWriteCommandRefImpl::getUpsert(int index) const {
         index,
         OverloadedVisitor{[&](const BulkWriteInsertOp& insertOp) { return false; },
                           [&](const BulkWriteUpdateOp& updateOp) { return updateOp.getUpsert(); },
-                          [&](const BulkWriteDeleteOp& deleteOp) {
-                              return false;
-                          }});
+                          [&](const BulkWriteDeleteOp& deleteOp) { return false; }});
 }
 
 const boost::optional<mongo::EncryptionInformation>&
@@ -522,9 +496,7 @@ boost::optional<mongo::BSONObj> BulkWriteCommandRefImpl::getSort(int index) cons
         OverloadedVisitor{
             [&](const BulkWriteInsertOp& insertOp) -> RetT { return boost::none; },
             [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getSort(); },
-            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
-                return boost::none;
-            }});
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT { return boost::none; }});
 }
 
 BSONObj BulkWriteCommandRefImpl::toBSON(int index) const {

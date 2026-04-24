@@ -216,9 +216,7 @@ private:
         return visit(
             OverloadedVisitor{
                 [](std::reference_wrapper<RecoveryUnit> ru) -> RecoveryUnit& { return ru; },
-                [](const std::function<RecoveryUnit&()>& ru) -> RecoveryUnit& {
-                    return ru();
-                }},
+                [](const std::function<RecoveryUnit&()>& ru) -> RecoveryUnit& { return ru(); }},
             _ru);
     }
 

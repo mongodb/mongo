@@ -783,9 +783,7 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
                       }
                   },
                   [](const MigrateInfo& _) { FAIL("Unexpected action type"); },
-                  [](const MergeAllChunksOnShardInfo& _) {
-                      FAIL("Unexpected action type");
-                  }},
+                  [](const MergeAllChunksOnShardInfo& _) { FAIL("Unexpected action type"); }},
               action);
     };
     inspectAction(*nextAction);

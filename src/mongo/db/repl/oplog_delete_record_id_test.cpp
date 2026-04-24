@@ -421,9 +421,7 @@ TEST_F(DeleteWithRecordIdAndPreImagesTest,
     // Create a delete oplog entry with recordId.
     OpTime opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] {
-            wuow.commit();
-        }};
+        ScopeGuard guard{[&wuow] { wuow.commit(); }};
         return repl::getNextOpTime(opCtx);
     }();
     auto op = makeDeleteOplogEntryWithRecordId(opTime, _nss, _uuid, BSON("_id" << 1), rid);
@@ -463,9 +461,7 @@ DEATH_TEST_F(DeleteWithRecordIdAndPreImagesDeathTest,
     // Create an update oplog entry with the non-existent recordId.
     OpTime opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] {
-            wuow.commit();
-        }};
+        ScopeGuard guard{[&wuow] { wuow.commit(); }};
         return repl::getNextOpTime(opCtx);
     }();
     auto op =

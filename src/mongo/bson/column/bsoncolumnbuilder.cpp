@@ -1196,12 +1196,11 @@ typename BSONColumnBuilder<Allocator>::BinaryDiff BSONColumnBuilder<Allocator>::
     // Save some state related to last control byte so we can see how it changes after finalize() is
     // called.
     ptrdiff_t controlOffset =
-        visit(OverloadedVisitor{[](const typename InternalState::Regular& regular) {
-                                    return regular._controlByteOffset;
-                                },
-                                [](const typename InternalState::Interleaved&) {
-                                    return kNoSimple8bControl;
-                                }},
+        visit(OverloadedVisitor{
+                  [](const typename InternalState::Regular& regular) {
+                      return regular._controlByteOffset;
+                  },
+                  [](const typename InternalState::Interleaved&) { return kNoSimple8bControl; }},
               _is.state);
     uint8_t lastControlByte =
         controlOffset != kNoSimple8bControl ? *(_bufBuilder.buf() + controlOffset) : 0;
@@ -1348,9 +1347,7 @@ BSONElement BSONColumnBuilder<Allocator>::last() const {
                              *regular._prev.data() == stdx::to_underlying(BSONType::eoo) ? 0 : 1,
                              BSONElement::TrustedInitTag{}};
                      },
-                     [](const typename InternalState::Interleaved&) {
-                         return BSONElement{};
-                     }},
+                     [](const typename InternalState::Interleaved&) { return BSONElement{}; }},
                  _is.state);
 }
 

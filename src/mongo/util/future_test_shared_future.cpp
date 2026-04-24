@@ -305,9 +305,7 @@ using unittest::JoinThread;
 TEST(SharedFuture, ConcurrentTest_Simple) {
     SharedPromise<void> promise;
     auto shared = promise.getFuture();
-    JoinThread thread{stdx::thread{[&] {
-        shared.get();
-    }}};
+    JoinThread thread{stdx::thread{[&] { shared.get(); }}};
     stdx::this_thread::yield();  // Slightly increase the chance of racing.
     promise.emplaceValue();
 }

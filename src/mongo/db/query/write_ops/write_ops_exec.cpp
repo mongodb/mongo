@@ -555,9 +555,8 @@ inline boost::optional<query_shape::DeferredQueryShape> computeInsertQueryShape(
     if (wholeOp.getEncryptionInformation()) {
         return boost::none;
     }
-    query_shape::DeferredQueryShape deferredShape{[&]() {
-        return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(wholeOp);
-    }};
+    query_shape::DeferredQueryShape deferredShape{
+        [&]() { return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(wholeOp); }};
     return deferredShape;
 }
 

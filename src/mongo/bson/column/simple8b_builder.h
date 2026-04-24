@@ -427,7 +427,7 @@ Simple8bBuilder<T, Allocator>::PendingValue::PendingValue(
     boost::optional<T> val,
     std::array<uint8_t, kNumOfSelectorTypes> bitCount,
     std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount)
-    : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount){};
+    : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount) {};
 
 template <typename T, class Allocator>
 Simple8bBuilder<T, Allocator>::PendingIterator::PendingIterator(

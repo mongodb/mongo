@@ -586,9 +586,7 @@ TEST_F(UpdateWithRecordIdAndPreImagesTest,
     // Create an update oplog entry with recordId.
     OpTime opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] {
-            wuow.commit();
-        }};
+        ScopeGuard guard{[&wuow] { wuow.commit(); }};
         return repl::getNextOpTime(opCtx);
     }();
     auto op = makeUpdateOplogEntryWithRecordId(
@@ -631,9 +629,7 @@ DEATH_TEST_F(UpdateWithRecordIdAndPreImagesDeathTest,
     // Create an update oplog entry with the non-existent recordId.
     OpTime opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] {
-            wuow.commit();
-        }};
+        ScopeGuard guard{[&wuow] { wuow.commit(); }};
         return repl::getNextOpTime(opCtx);
     }();
     auto op = makeUpdateOplogEntryWithRecordId(

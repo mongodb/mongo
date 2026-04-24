@@ -351,9 +351,7 @@ struct ValidationErrorContext {
                                     verifySizeAndAppend(details, kDetailsString, builder);
                                 },
                                 [&](const std::monostate& state) -> void { MONGO_UNREACHABLE },
-                                [&](const std::string& str) -> void {
-                                    MONGO_UNREACHABLE
-                                }},
+                                [&](const std::string& str) -> void { MONGO_UNREACHABLE }},
               latestCompleteError);
     }
     /**
@@ -374,9 +372,7 @@ struct ValidationErrorContext {
                           verifySizeAndAppend(elem, builder);
                       }
                   },
-                  [&](const std::monostate& state) -> void {
-                      MONGO_UNREACHABLE
-                  }},
+                  [&](const std::monostate& state) -> void { MONGO_UNREACHABLE }},
               latestCompleteError);
     }
 

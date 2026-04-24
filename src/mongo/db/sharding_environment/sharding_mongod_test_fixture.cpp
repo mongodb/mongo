@@ -183,10 +183,8 @@ std::unique_ptr<ShardRegistry> ShardingMongoDTestFixture::makeShardRegistry(
         std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     auto shardRemovalHooks = std::vector<ShardRegistry::ShardRemovalHook>{
-        [&shardSharedStateCache =
-             ShardSharedStateCache::get(service)](const ShardId& removedShard) {
-            shardSharedStateCache.forgetShardState(removedShard);
-        }};
+        [&shardSharedStateCache = ShardSharedStateCache::get(service)](
+            const ShardId& removedShard) { shardSharedStateCache.forgetShardState(removedShard); }};
 
     return std::make_unique<ShardRegistry>(
         getServiceContext(), std::move(shardFactory), configConnStr, std::move(shardRemovalHooks));

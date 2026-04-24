@@ -570,7 +570,8 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDecreasingOffsets) {
     };
 
     std::vector<IteratorPtr> invalidRanges{
-        makeRange(0, 1), makeRange(2, 1),  // end < start
+        makeRange(0, 1),
+        makeRange(2, 1),  // end < start
     };
     SorterStats sorterStats{nullptr};
 
@@ -1158,9 +1159,7 @@ TEST_F(BoundedSorterTest, ForceSpill) {
             testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAsc(options, std::move(spiller));
     // Sorter stores pointers to sorterTracker and fileStats, it has to be destroyed before them.
-    ScopeGuard sorterReset{[&]() {
-        sorter.reset();
-    }};
+    ScopeGuard sorterReset{[&]() { sorter.reset(); }};
 
     std::vector<Doc> input = {
         {7},

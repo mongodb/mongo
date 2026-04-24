@@ -270,9 +270,8 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // the size storer information is no longer accurate. This may be necessary if capped deletes
     // are rolled-back or if rollback occurs across a collection rename.
     sizeRecovery.setRecordStoresShouldAlwaysCheckSize(true);
-    ScopeGuard sizeRecoveryStateGuard{[&sizeRecovery] {
-        sizeRecovery.setRecordStoresShouldAlwaysCheckSize(false);
-    }};
+    ScopeGuard sizeRecoveryStateGuard{
+        [&sizeRecovery] { sizeRecovery.setRecordStoresShouldAlwaysCheckSize(false); }};
 
     // After successfully transitioning to the ROLLBACK state, we must always transition back to
     // SECONDARY, even if we fail at any point during the rollback process.

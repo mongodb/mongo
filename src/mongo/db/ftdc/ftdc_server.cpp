@@ -114,7 +114,7 @@ boost::filesystem::path getFTDCDirectoryPathParameter() {
 }
 
 Status onUpdateFTDCEnabled(const bool value) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         return controller->setEnabled(value);
     }
@@ -123,7 +123,7 @@ Status onUpdateFTDCEnabled(const bool value) {
 }
 
 Status onUpdateFTDCMetadataCaptureFrequency(const std::int32_t potentialNewValue) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMetadataCaptureFrequency(potentialNewValue);
     }
@@ -132,7 +132,7 @@ Status onUpdateFTDCMetadataCaptureFrequency(const std::int32_t potentialNewValue
 }
 
 Status onUpdateFTDCPeriod(const std::int32_t potentialNewValue) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setPeriod(Milliseconds(potentialNewValue));
         FTDCCollectionMetrics::get(getGlobalServiceContext())
@@ -152,7 +152,7 @@ Status onUpdateFTDCDirectorySize(const std::int32_t potentialNewValue) {
                 << "' which is the current value of diagnosticDataCollectionFileSizeMB.");
     }
 
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMaxDirectorySizeBytes(potentialNewValue * 1024 * 1024);
     }
@@ -170,7 +170,7 @@ Status onUpdateFTDCFileSize(const std::int32_t potentialNewValue) {
                 << "' which is the current value of diagnosticDataCollectionDirectorySizeMB.");
     }
 
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMaxFileSizeBytes(potentialNewValue * 1024 * 1024);
     }
@@ -179,7 +179,7 @@ Status onUpdateFTDCFileSize(const std::int32_t potentialNewValue) {
 }
 
 Status onUpdateFTDCSamplesPerChunk(const std::int32_t potentialNewValue) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMaxSamplesPerArchiveMetricChunk(potentialNewValue);
     }
@@ -188,7 +188,7 @@ Status onUpdateFTDCSamplesPerChunk(const std::int32_t potentialNewValue) {
 }
 
 Status onUpdateFTDCPerInterimUpdate(const std::int32_t potentialNewValue) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setMaxSamplesPerInterimMetricChunk(potentialNewValue);
     }
@@ -197,7 +197,7 @@ Status onUpdateFTDCPerInterimUpdate(const std::int32_t potentialNewValue) {
 }
 
 Status onUpdateFTDCSampleTimeout(std::int32_t potentialNewValue) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         return controller->setSampleTimeout(Milliseconds(potentialNewValue));
     }
@@ -206,7 +206,7 @@ Status onUpdateFTDCSampleTimeout(std::int32_t potentialNewValue) {
 }
 
 Status onUpdateFTDCMinThreads(std::int32_t potentialNewValue) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         return controller->setMinThreads(potentialNewValue);
     }
@@ -215,7 +215,7 @@ Status onUpdateFTDCMinThreads(std::int32_t potentialNewValue) {
 }
 
 Status onUpdateFTDCMaxThreads(std::int32_t potentialNewValue) {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         return controller->setMaxThreads(potentialNewValue);
     }
@@ -471,7 +471,7 @@ void startFTDC(ServiceContext* serviceContext,
 }
 
 void stopFTDC() {
-    if (FTDCController * controller;
+    if (FTDCController* controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->stop();
     }

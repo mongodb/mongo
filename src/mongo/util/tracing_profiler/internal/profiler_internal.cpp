@@ -65,9 +65,7 @@ ProfilerTag ProfilerTags::getOrInsertTag(StringData name) {
 size_t CallTree::ChildrenMap::size() const {
     return std::visit(
         OverloadedVisitor{[](const ChildrenInlinedMap& map) -> size_t { return map.size; },
-                          [](const ChildrenHashMap& map) -> size_t {
-                              return map.size();
-                          }},
+                          [](const ChildrenHashMap& map) -> size_t { return map.size(); }},
         *this);
 }
 

@@ -223,12 +223,10 @@ void doProfile(auto opCtx,
 
     boost::optional<CollectionAcquisition> profileCollection;
     while (true) {
-        const auto deadline =
-            std::visit(OverloadedVisitor{[&](const NoTimeoutTag&) { return Date_t::max(); },
-                                         [&](const Milliseconds& millis) {
-                                             return Date_t::now() + millis;
-                                         }},
-                       lockTimeout);
+        const auto deadline = std::visit(
+            OverloadedVisitor{[&](const NoTimeoutTag&) { return Date_t::max(); },
+                              [&](const Milliseconds& millis) { return Date_t::now() + millis; }},
+            lockTimeout);
 
         profileCollection.emplace(acquireCollection(
             newCtx.get(),

@@ -48,9 +48,7 @@ CallTree::ChildrenHashMap getChildren(const CallTree::Node& node) {
                                             }
                                             return r;
                                         },
-                                        [](const CallTree::ChildrenHashMap& map) {
-                                            return map;
-                                        }},
+                                        [](const CallTree::ChildrenHashMap& map) { return map; }},
                       node.children);
 }
 

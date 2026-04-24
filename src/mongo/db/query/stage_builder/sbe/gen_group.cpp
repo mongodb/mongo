@@ -747,9 +747,8 @@ boost::optional<SbBlockAggExprVector> tryToGenerateOneBlockAccumulator(
  * exit.
  */
 auto makeValueGuard(auto* dst, auto val) {
-    return ScopeGuard{[dst, old = std::exchange(*dst, std::move(val))]() mutable {
-        *dst = std::move(old);
-    }};
+    return ScopeGuard{
+        [dst, old = std::exchange(*dst, std::move(val))]() mutable { *dst = std::move(old); }};
 }
 
 SbHashAggAccumulatorVector generateScalarAccumulators(StageBuilderState& state,

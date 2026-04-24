@@ -549,8 +549,8 @@ public:
         RetryBudget& budget,
         RetryCriteria retryCriteria = defaultRetryCriteria,
         RetryParameters parameters = DefaultRetryStrategy::getRetryParametersFromServerParameters())
-        : _underlyingStrategy{std::make_unique<DefaultRetryStrategy>(std::move(retryCriteria),
-                                                                     parameters)},
+        : _underlyingStrategy{
+              std::make_unique<DefaultRetryStrategy>(std::move(retryCriteria), parameters)},
           _budget{&budget} {}
 
     /**

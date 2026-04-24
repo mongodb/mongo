@@ -619,9 +619,8 @@ public:
                            ExtractRetryParameters extractRetryParameters = {}) && {
         using ReturnType = FutureContinuationResult<Callable, const TargetingMetadata&>;
 
-        return mongo::AsyncTry{[body = std::move(_body), strategy] {
-                   return body(strategy->getTargetingMetadata());
-               }}
+        return mongo::AsyncTry{
+            [body = std::move(_body), strategy] { return body(strategy->getTargetingMetadata()); }}
             .until([strategy, extractRetryParameters = std::move(extractRetryParameters)](
                        const StatusOrStatusWith<ReturnType>& swResult) {
                 auto result = extractRetryParameters(swResult);

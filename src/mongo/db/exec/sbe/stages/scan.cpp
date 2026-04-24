@@ -472,7 +472,7 @@ ScanStageBaseImpl<Derived>::ScanStageBaseImpl(UUID collUuid,
                     scanOpenCallback,
                     forward,
                     // Optional arguments:
-                    participateInTrialRunTracking){};
+                    participateInTrialRunTracking) {};
 
 
 template <typename Derived>
@@ -480,7 +480,7 @@ ScanStageBaseImpl<Derived>::ScanStageBaseImpl(std::shared_ptr<ScanStageBaseState
                                               PlanYieldPolicySBE* yieldPolicy,
                                               PlanNodeId nodeId,
                                               bool participateInTrialRunTracking)
-    : ScanStageBase(std::move(state), yieldPolicy, nodeId, participateInTrialRunTracking){};
+    : ScanStageBase(std::move(state), yieldPolicy, nodeId, participateInTrialRunTracking) {};
 
 ScanStage::ScanStage(UUID collUuid,
                      DatabaseName dbName,

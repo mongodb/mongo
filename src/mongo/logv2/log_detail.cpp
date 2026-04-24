@@ -121,8 +121,7 @@ GetTenantIDFn& getTenantID() {
     return *fn;
 }
 LogCounterCallback& getLogCounterCallback() {
-    static StaticImmortal<LogCounterCallback> fn{[]() {
-    }};
+    static StaticImmortal<LogCounterCallback> fn{[]() {}};
     return *fn;
 }
 }  // namespace

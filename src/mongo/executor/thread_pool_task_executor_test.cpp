@@ -354,9 +354,7 @@ TEST_F(ThreadPoolExecutorTest, CancelFromAnotherThread) {
         finishedShutdown.get();
     });
 
-    unittest::JoinThread th{[&] {
-        executor.cancel(swCbHandle.getValue());
-    }};
+    unittest::JoinThread th{[&] { executor.cancel(swCbHandle.getValue()); }};
 
     startedCancellation.get();
     shutdownExecutorThread();

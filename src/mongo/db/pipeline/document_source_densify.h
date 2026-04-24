@@ -84,9 +84,7 @@ public:
      */
     Value toValue() const {
         return visit(OverloadedVisitor{[&](Value unwrappedVal) { return unwrappedVal; },
-                                       [&](Date_t dateVal) {
-                                           return Value(dateVal);
-                                       }
+                                       [&](Date_t dateVal) { return Value(dateVal); }
 
                      },
                      _value);
@@ -130,9 +128,7 @@ public:
 
     std::string toString() const {
         return visit(OverloadedVisitor{[&](Value v) { return v.toString(); },
-                                       [&](Date_t d) {
-                                           return d.toString();
-                                       }},
+                                       [&](Date_t d) { return d.toString(); }},
                      _value);
     }
 
@@ -151,9 +147,7 @@ public:
      */
     size_t getApproximateSize() const {
         return visit(OverloadedVisitor{[&](Value v) { return v.getApproximateSize(); },
-                                       [&](Date_t d) {
-                                           return Value(d).getApproximateSize();
-                                       }},
+                                       [&](Date_t d) { return Value(d).getApproximateSize(); }},
                      _value);
     }
 

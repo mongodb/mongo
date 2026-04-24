@@ -52,7 +52,7 @@ public:
 
     // Allow implicit construction from a string literal, but not from a const char*.
     template <size_t N>
-    StrongStringAlias(const char (&value)[N]) : _value(value){};
+    StrongStringAlias(const char (&value)[N]) : _value(value) {};
 
     // We disallow empty strings based on the tag's kAllowEmpty field.
     template <class TagType1 = TagType, class = typename std::enable_if_t<!TagType1::kAllowEmpty>>

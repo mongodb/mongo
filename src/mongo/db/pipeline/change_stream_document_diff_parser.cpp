@@ -215,10 +215,9 @@ void buildUpdateDescriptionWithDeltaOplog(
 
                   while (auto nextSubDiff = reader->nextSubDiff()) {
                       std::variant<DocumentDiffReader*, ArrayDiffReader*> nextReader;
-                      visit(OverloadedVisitor{[&nextReader](auto& reader) {
-                                nextReader = &reader;
-                            }},
-                            nextSubDiff->second);
+                      visit(
+                          OverloadedVisitor{[&nextReader](auto& reader) { nextReader = &reader; }},
+                          nextSubDiff->second);
                       buildUpdateDescriptionWithDeltaOplog(
                           nextReader, builder, {{nextSubDiff->first}});
                   }

@@ -50,19 +50,17 @@ protected:
     }
 
     PrimaryOnlyServiceRetryStrategy makeStrategy() {
-        return PrimaryOnlyServiceRetryStrategy{kDefaultRetryabilityPredicate,
-                                               [this](const Status& s) { ++_transientErrorCount; },
-                                               [this](const Status& s) {
-                                                   ++_unrecoverableErrorCount;
-                                               }};
+        return PrimaryOnlyServiceRetryStrategy{
+            kDefaultRetryabilityPredicate,
+            [this](const Status& s) { ++_transientErrorCount; },
+            [this](const Status& s) { ++_unrecoverableErrorCount; }};
     }
 
     PrimaryOnlyServiceRetryStrategy makeNeverRetryStrategy() {
-        return PrimaryOnlyServiceRetryStrategy{makeNeverRetryPredicate(),
-                                               [this](const Status& s) { ++_transientErrorCount; },
-                                               [this](const Status& s) {
-                                                   ++_unrecoverableErrorCount;
-                                               }};
+        return PrimaryOnlyServiceRetryStrategy{
+            makeNeverRetryPredicate(),
+            [this](const Status& s) { ++_transientErrorCount; },
+            [this](const Status& s) { ++_unrecoverableErrorCount; }};
     }
 
     int transientErrorCount() const {

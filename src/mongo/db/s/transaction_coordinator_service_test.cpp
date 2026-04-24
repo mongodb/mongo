@@ -1030,9 +1030,7 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     // Vote commit before the deadline
     onCommands({[&](const executor::RemoteCommandRequest&) { return kPrepareOk; },
-                [&](const executor::RemoteCommandRequest&) {
-                    return kPrepareOk;
-                }});
+                [&](const executor::RemoteCommandRequest&) { return kPrepareOk; }});
 
     // Reach the deadline.
     network()->enterNetwork();
@@ -1077,9 +1075,7 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
 
     // Simulate a participant voting to abort.
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
-                [&](const executor::RemoteCommandRequest& request) {
-                    return kNoSuchTransaction;
-                }});
+                [&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; }});
 
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();

@@ -276,9 +276,8 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
     shardToNumDocsCopied.emplace(shard2, 200);
 
     runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
-            _dao->updateNumberOfDocsToCopy(_opCtx, shardToNumDocsCopied);
-        }});
+        .initialPhase = CoordinatorStateEnum::kApplying,
+        .transitionFn = [&]() { _dao->updateNumberOfDocsToCopy(_opCtx, shardToNumDocsCopied); }});
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsCopiedFinal) {
@@ -360,9 +359,8 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
     auto applyStartTime = _clock->now();
 
     runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
-            _dao->transitionToApplyingPhase(_opCtx, applyStartTime);
-        }});
+        .initialPhase = CoordinatorStateEnum::kApplying,
+        .transitionFn = [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime); }});
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, TransitionToBlockingWritesPhaseSucceeds) {
@@ -450,9 +448,8 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
     Status abortReason = Status::OK();
 
     runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
-            _dao->transitionToAbortingPhase(_opCtx, now, abortReason);
-        }});
+        .initialPhase = CoordinatorStateEnum::kApplying,
+        .transitionFn = [&]() { _dao->transitionToAbortingPhase(_opCtx, now, abortReason); }});
 }
 
 DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
@@ -462,9 +459,8 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
     Status abortReason{ErrorCodes::InternalError, "Something went horribly wrong"};
 
     runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kCommitting, .transitionFn = [&]() {
-            _dao->transitionToAbortingPhase(_opCtx, now, abortReason);
-        }});
+        .initialPhase = CoordinatorStateEnum::kCommitting,
+        .transitionFn = [&]() { _dao->transitionToAbortingPhase(_opCtx, now, abortReason); }});
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, UpdateSessionSetsSessionField) {

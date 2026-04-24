@@ -1787,9 +1787,7 @@ TEST_F(DConcurrencyTestFixture,
         auto result = task.get_future();
         stdx::thread taskThread{std::move(task)};
 
-        ScopeGuard joinGuard{[&taskThread] {
-            taskThread.join();
-        }};
+        ScopeGuard joinGuard{[&taskThread] { taskThread.join(); }};
 
         // Wait for the database X lock to conflict.
         while (!shard_role_details::getLocker(opCtx2)->hasLockPending()) {

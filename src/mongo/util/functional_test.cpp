@@ -120,9 +120,7 @@ TEST(UniqueFunctionTest, construct_simple_unique_function_from_lambda) {
     // Explicit construction
     {
         RunDetection<0> runDetection;
-        mongo::unique_function<void()> uf{[] {
-            RunDetection<0>::itRan = true;
-        }};
+        mongo::unique_function<void()> uf{[] { RunDetection<0>::itRan = true; }};
 
         uf();
 

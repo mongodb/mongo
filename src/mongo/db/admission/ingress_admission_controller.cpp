@@ -43,9 +43,8 @@ const auto getIngressAdmissionController =
     ServiceContext::declareDecoration<IngressAdmissionController>();
 
 const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
-    "InitIngressAdmissionController", [](ServiceContext* ctx) {
-        getIngressAdmissionController(ctx).init();
-    }};
+    "InitIngressAdmissionController",
+    [](ServiceContext* ctx) { getIngressAdmissionController(ctx).init(); }};
 }  // namespace
 
 void IngressAdmissionController::init() {

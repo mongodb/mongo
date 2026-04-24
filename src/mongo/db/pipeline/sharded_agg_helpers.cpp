@@ -1823,23 +1823,21 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
     bool useCollectionDefaultCollator) {
     auto&& aggRequestPipelinePair = [&] {
         return visit(
-            OverloadedVisitor{[&](std::unique_ptr<Pipeline>&& pipeline) {
-                                  return std::make_pair(
-                                      AggregateCommandRequest(expCtx->getNamespaceString(),
-                                                              pipeline->serializeToBson()),
-                                      std::move(pipeline));
-                              },
-                              [&](AggregateCommandRequest&& aggRequest) {
-                                  auto rawPipeline = aggRequest.getPipeline();
-                                  return std::make_pair(
-                                      std::move(aggRequest),
-                                      pipeline_factory::makePipeline(
-                                          rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
-                              },
-                              [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>&&
-                                      aggRequestPipelinePair) {
-                                  return std::move(aggRequestPipelinePair);
-                              }},
+            OverloadedVisitor{
+                [&](std::unique_ptr<Pipeline>&& pipeline) {
+                    return std::make_pair(AggregateCommandRequest(expCtx->getNamespaceString(),
+                                                                  pipeline->serializeToBson()),
+                                          std::move(pipeline));
+                },
+                [&](AggregateCommandRequest&& aggRequest) {
+                    auto rawPipeline = aggRequest.getPipeline();
+                    return std::make_pair(
+                        std::move(aggRequest),
+                        pipeline_factory::makePipeline(
+                            rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
+                },
+                [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>&&
+                        aggRequestPipelinePair) { return std::move(aggRequestPipelinePair); }},
             std::move(targetRequest));
     }();
     const auto& aggRequest = aggRequestPipelinePair.first;

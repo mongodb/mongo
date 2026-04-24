@@ -82,9 +82,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT SessionThread {
     struct StopException {};
 
     explicit SessionThread(std::shared_ptr<transport::Session> s)
-        : _session{std::move(s)}, _thread{[this] {
-              _run();
-          }} {}
+        : _session{std::move(s)}, _thread{[this] { _run(); }} {}
 
     ~SessionThread() {
         if (!_thread.joinable())

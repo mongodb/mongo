@@ -157,9 +157,7 @@ void appendElementToBuilder(std::variant<mutablebson::Element, BSONElement> elem
                                     element.writeArrayTo(&subBuilder);
                                 }
                             },
-                            [&](BSONElement element) {
-                                builder->appendAs(element, fieldName);
-                            }},
+                            [&](BSONElement element) { builder->appendAs(element, fieldName); }},
           elem);
 }
 
@@ -539,10 +537,9 @@ boost::optional<std::pair<size_t, ArrayDiffReader::ArrayModification>> ArrayDiff
                 str::stream() << "expected sub diff at index " << idx << " but got " << next,
                 next.type() == BSONType::object);
 
-        auto modification = visit(OverloadedVisitor{[](const auto& reader) -> ArrayModification {
-                                      return {reader};
-                                  }},
-                                  getReader(next.embeddedObject()));
+        auto modification = visit(
+            OverloadedVisitor{[](const auto& reader) -> ArrayModification { return {reader}; }},
+            getReader(next.embeddedObject()));
         return {{idx, modification}};
     } else {
         uasserted(4770502,

@@ -1653,9 +1653,8 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 
     {
         auto task = RunBackgroundTaskAndWaitForFailpoint{
-            "hangTimeSeriesBatchPrepareWaitingForConflictingOperation", [&]() {
-                ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns1)));
-            }};
+            "hangTimeSeriesBatchPrepareWaitingForConflictingOperation",
+            [&]() { ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns1))); }};
 
         // Finish the first batch.
         finish(*_bucketCatalog, batch1);
@@ -1690,9 +1689,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
 
     {
         auto task = RunBackgroundTaskAndWaitForFailpoint{
-            "hangTimeSeriesBatchPrepareWaitingForConflictingOperation", [&]() {
-                ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
-            }};
+            "hangTimeSeriesBatchPrepareWaitingForConflictingOperation",
+            [&]() { ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2))); }};
 
         // If we abort the third batch, it should abort the second one too, as it isn't prepared.
         // However, since the first batch is prepared, we can't abort it or clean up the bucket. We

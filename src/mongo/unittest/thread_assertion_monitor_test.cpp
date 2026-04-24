@@ -60,9 +60,7 @@ TEST(ThreadAssertionMonitor, Trivial) {
 
 TEST(ThreadAssertionMonitor, ControllerInStdxThread) {
     ThreadAssertionMonitor monitor;
-    stdx::thread{[&] {
-        monitor.notifyDone();
-    }}.join();
+    stdx::thread{[&] { monitor.notifyDone(); }}.join();
 }
 
 TEST(ThreadAssertionMonitor, OnlyControllerInSpawn) {

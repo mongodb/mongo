@@ -117,9 +117,7 @@ public:
         auto body = std::make_shared<BodyCallable>(std::move(_body));
         return AsyncTry{[body, retryFactory = _retryFactory, executor, cancelToken] {
                    auto strategy = retryFactory.make();
-                   return AsyncTry{[body](const TargetingMetadata& metadata) {
-                              return (*body)();
-                          }}
+                   return AsyncTry{[body](const TargetingMetadata& metadata) { return (*body)(); }}
                        .withRetryStrategy(strategy)
                        .on(executor, cancelToken);
                }}
@@ -142,9 +140,8 @@ public:
     auto runOn(SleepableExecutor executor,
                CancellationToken cancelToken,
                std::shared_ptr<RetryStrategy> retryStrategy) && {
-        return AsyncTry{[body = std::move(_body)](const TargetingMetadata& metadata) {
-                   return body();
-               }}
+        return AsyncTry{
+            [body = std::move(_body)](const TargetingMetadata& metadata) { return body(); }}
             .withRetryStrategy(std::move(retryStrategy))
             .on(executor, cancelToken);
     }

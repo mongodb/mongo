@@ -127,9 +127,7 @@ public:
      */
     void waitForOngoingCoordinatorsToFinish(OperationContext* opCtx,
                                             std::function<bool(const ShardingCoordinator&)> pred = {
-                                                [](const ShardingCoordinator&) {
-                                                    return true;
-                                                }});
+                                                [](const ShardingCoordinator&) { return true; }});
 
     void waitForRecovery(OperationContext* opCtx) const override;
 

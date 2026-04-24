@@ -260,9 +260,7 @@ BSONColumn::Iterator& BSONColumn::Iterator::operator++() {
     ++_index;
 
     visit(OverloadedVisitor{[&](Regular& regular) { _incrementRegular(regular); },
-                            [&](Interleaved& interleaved) {
-                                _incrementInterleaved(interleaved);
-                            }},
+                            [&](Interleaved& interleaved) { _incrementInterleaved(interleaved); }},
           _mode);
 
     return *this;

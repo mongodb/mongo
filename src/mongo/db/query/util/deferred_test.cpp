@@ -105,9 +105,7 @@ TEST(DeferredTest, DeferredInitializationWithOneArgument) {
 }
 
 TEST(DeferredTest, DeferredInitializationWithTwoArgs) {
-    Deferred deferred{[&](const string& input, const string& prefix) {
-        return prefix + input;
-    }};
+    Deferred deferred{[&](const string& input, const string& prefix) { return prefix + input; }};
 
     ASSERT_EQ(deferred.get("cowbell", "more "), "more cowbell"s);
     ASSERT_EQ(deferred.get("cowbell", "more "), "more cowbell"s);

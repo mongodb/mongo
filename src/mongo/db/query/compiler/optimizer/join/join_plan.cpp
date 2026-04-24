@@ -158,19 +158,17 @@ BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
         bob << "cost" << getCost(nodeId).toBSON();
     }
     std::visit(
-        OverloadedVisitor{[this, numNodesToPrint, &bob](const JoiningNode& join) {
-                              bob << "method" << joinMethodToString(join.method);
-                              bob << "left" << joinPlanNodeToBSON(join.left, numNodesToPrint);
-                              bob << "right" << joinPlanNodeToBSON(join.right, numNodesToPrint);
-                          },
-                          [&bob](const INLJRHSNode& ip) {
-                              bob << "accessPath"
-                                  << (str::stream()
-                                      << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern());
-                          },
-                          [&bob](const BaseNode& base) {
-                              bob << "accessPath" << base.soln->summaryString();
-                          }},
+        OverloadedVisitor{
+            [this, numNodesToPrint, &bob](const JoiningNode& join) {
+                bob << "method" << joinMethodToString(join.method);
+                bob << "left" << joinPlanNodeToBSON(join.left, numNodesToPrint);
+                bob << "right" << joinPlanNodeToBSON(join.right, numNodesToPrint);
+            },
+            [&bob](const INLJRHSNode& ip) {
+                bob << "accessPath"
+                    << (str::stream() << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern());
+            },
+            [&bob](const BaseNode& base) { bob << "accessPath" << base.soln->summaryString(); }},
         get(nodeId));
     return bob.obj();
 }

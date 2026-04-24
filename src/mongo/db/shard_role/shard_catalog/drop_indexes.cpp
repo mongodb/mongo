@@ -570,14 +570,13 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
               "CMD: dropIndexes",
               logAttrs(collAcq->nss()),
               "uuid"_attr = collectionUUID,
-              "indexes"_attr = visit(OverloadedVisitor{[](const std::string& arg) { return arg; },
-                                                       [](const std::vector<std::string>& arg) {
-                                                           return boost::algorithm::join(arg, ",");
-                                                       },
-                                                       [](const BSONObj& arg) {
-                                                           return arg.toString();
-                                                       }},
-                                     index));
+              "indexes"_attr =
+                  visit(OverloadedVisitor{[](const std::string& arg) { return arg; },
+                                          [](const std::vector<std::string>& arg) {
+                                              return boost::algorithm::join(arg, ",");
+                                          },
+                                          [](const BSONObj& arg) { return arg.toString(); }},
+                        index));
     }
 
     DropIndexesReply reply;
