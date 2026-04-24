@@ -134,6 +134,8 @@ public:
             const auto& cmd = request();
             const auto& nss = request().getNamespace();
 
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+
             ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
                 opCtx, {nss}, definition()->getName(), {.acquireDDLLocks = true});
 

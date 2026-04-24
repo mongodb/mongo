@@ -440,6 +440,14 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
                 (!options.timeseries->getTimeField().starts_with('$') &&
                  !options.timeseries->getMetaField().value_or("").starts_with('$')));
 
+    if (createViewlessTimeseriesColl && options.isView()) {
+        const auto viewOnNss = NamespaceStringUtil::deserialize(ns.dbName(), options.viewOn);
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Cannot create view '" << ns.toStringForErrorMsg()
+                              << "' on an internal system.buckets collection",
+                !viewOnNss.isTimeseriesBucketsCollection());
+    }
+
     return Status::OK();
 }
 

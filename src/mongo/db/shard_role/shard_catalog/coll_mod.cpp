@@ -1115,6 +1115,16 @@ void staticValidateCollMod(OperationContext* opCtx,
             "supported.",
             !nss.isTimeseriesBucketsCollection());
 
+    if (request.getViewOn() &&
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx))) {
+        const auto viewOnNss = NamespaceStringUtil::deserialize(nss.dbName(), *request.getViewOn());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Cannot modify view '" << nss.toStringForErrorMsg()
+                              << "' to point to an internal system.buckets collection",
+                !viewOnNss.isTimeseriesBucketsCollection());
+    }
+
     if (hasTimeseriesOptions(request)) {
         auto containsNotTimeseriesOptions = false;
         for (const auto& field : request.toBSON()) {

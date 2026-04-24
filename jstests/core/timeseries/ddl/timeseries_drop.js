@@ -43,19 +43,6 @@ jsTest.log.info("normal timeseries, drop by the main NS");
     assertDoesntExist(coll);
 }
 
-jsTest.log.info("view on buckets, buckets doesn't exist, drop by the main NS");
-{
-    let coll = getNewColl(db);
-    const bucketsColl = db["system.buckets." + coll.getName()];
-    assert.commandWorked(db.createView(coll.getName(), bucketsColl.getName(), []));
-    assertDoesntExist(bucketsColl);
-    // Reported as "timeseries", even though the buckets collection doesn't exist.
-    assertExistsAndTypeIs(coll, "timeseries");
-    assert.commandWorked(db.runCommand({drop: coll.getName()}));
-    assertDoesntExist(coll);
-    assertDoesntExist(bucketsColl);
-}
-
 jsTest.log.info("view on another collection, buckets doesn't exist, drop by the main NS");
 {
     let coll = getNewColl(db);
