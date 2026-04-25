@@ -13,13 +13,6 @@ const kSize10MB = 10 * 1024 * 1024;
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
 
-// The write concern to use when inserting documents into test collections. Waiting for the
-// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
-// command with readPreference "secondaryPreferred".
-const writeConcern = {
-    w: numNodesPerRS,
-};
-
 const simpleCollation = {
     locale: "simple",
 };
@@ -61,6 +54,11 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
+
+    // The write concern to use when inserting documents into test collections. Waiting for the
+    // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+    // command with readPreference "secondaryPreferred".
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(conn, numNodesPerRS);
 
     // To verify that the metrics calculation uses simple collation, make the collection have
     // case-sensitive default collation and make some of its documents have fields that only differ

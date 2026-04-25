@@ -14,13 +14,6 @@ const numNodesPerRS = 2;
 const numMostCommonValues = 5;
 const internalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
 
-// The write concern to use when inserting documents into test collections. Waiting for the
-// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
-// command with readPreference "secondaryPreferred".
-const writeConcern = {
-    w: numNodesPerRS,
-};
-
 /**
  * Finds the profiler entries for all aggregate and count commands with the given comment on the
  * given mongods and verifies that they all used index scan and did not fetch any documents, and
@@ -92,6 +85,10 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
             frequency: 1,
         });
     }
+    // The write concern to use when inserting documents into test collections. Waiting for the
+    // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+    // command with readPreference "secondaryPreferred".
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(conn, numNodesPerRS);
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
@@ -157,6 +154,10 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
         sign *= -1;
     }
+    // The write concern to use when inserting documents into test collections. Waiting for the
+    // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+    // command with readPreference "secondaryPreferred".
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);

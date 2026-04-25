@@ -16,12 +16,6 @@ import {
 const numNodesPerRS = 2;
 
 const batchSize = 1000;
-// The write concern to use when inserting documents into test collections. Waiting for the
-// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
-// command with readPreference "secondaryPreferred".
-const writeConcern = {
-    w: numNodesPerRS,
-};
 
 const defaultSampleSize = 10000;
 const numDocsTotal = 50000;
@@ -94,6 +88,11 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
     const indexOptions = isUnique ? {unique: true} : {};
     assert.commandWorked(coll.createIndex({a: 1}, indexOptions));
     const isClusteredColl = AnalyzeShardKeyUtil.isClusterCollection(conn, dbName, collName);
+
+    // The write concern to use when inserting documents into test collections. Waiting for the
+    // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+    // command with readPreference "secondaryPreferred".
+    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(conn, numNodesPerRS);
 
     if (isShardedColl) {
         assert(st);
