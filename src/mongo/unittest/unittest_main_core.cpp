@@ -58,6 +58,7 @@
 #include "mongo/util/testing_proctor.h"
 
 #include <algorithm>
+#include <csignal>
 #include <iostream>
 #include <memory>
 #include <string>
