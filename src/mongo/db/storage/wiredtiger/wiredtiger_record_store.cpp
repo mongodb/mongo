@@ -1229,7 +1229,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx, RecoveryU
         // TODO (SERVER-105908): Convert this to a different error code that is distinguishable from
         // a true write conflict.
         int err, sub_level_err;
-        const char* err_msg;
+        const char* err_msg = "<none>";
         sessRaii.get_last_error(&err, &sub_level_err, &err_msg);
         LOGV2_DEBUG(9979800,
                     2,
