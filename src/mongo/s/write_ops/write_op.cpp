@@ -222,6 +222,8 @@ void WriteOp::targetWrites(OperationContext* opCtx,
     const auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
         opCtx, targeter.getNS(), _itemRef.getOpType(), endpoints);
 
+    const bool isSharded = targeter.isTargetedCollectionSharded();
+
     for (auto&& endpoint : endpoints) {
         // If the operation was already successfull on that shard, do not repeat it
         if (_successfulShardSet.count(endpoint.shardName))
@@ -233,14 +235,17 @@ void WriteOp::targetWrites(OperationContext* opCtx,
 
         // Outside of a transaction, multiple endpoints currently imply no versioning, since we
         // can't retry half a regular multi-write.
-        if (endpoints.size() > 1u && !inTransaction) {
+        if (isSharded && endpoints.size() > 1u && !inTransaction) {
             // Do not ignore shard version if this is WriteType::WithoutShardKeyWithId
             // TODO: PM-3673 for non-retryable writes.
             if (!targeter.isUpdateOneWithIdWithoutShardKeyEnabled() ||
                 (isNonTargetedWriteWithoutShardKeyWithExactId &&
                  !*isNonTargetedWriteWithoutShardKeyWithExactId) ||
                 (!isNonTargetedWriteWithoutShardKeyWithExactId)) {
-                endpoint.shardVersion->setPlacementVersionIgnored();
+                auto& shardVersion = endpoint.shardVersion;
+                tassert(11841904, "Expected shardVersion to be set", shardVersion.has_value());
+
+                shardVersion->setPlacementVersionIgnored();
             }
         }
 
