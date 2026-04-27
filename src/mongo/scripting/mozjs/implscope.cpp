@@ -773,7 +773,16 @@ bool MozJSImplScope::awaitPromise(JSContext* cx,
         return false;
     }
 
-    invariant(scope->_promiseResult.has_value());
+    // We can get here without a resolved result if the wait loop above broke
+    // out on an error state (e.g. OOM during scope init's bootstrap script
+    // execution). The promise never reached Fulfilled and the resolved
+    // callback never ran, so `_promiseResult` was never populated. Return
+    // false and let the caller propagate the already-pending error instead
+    // of crashing on an invariant.
+    if (!scope->_promiseResult.has_value()) {
+        return false;
+    }
+
     out.set(*scope->_promiseResult);
     scope->_promiseResult = boost::none;
     return true;
