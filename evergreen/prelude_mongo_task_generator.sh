@@ -1,6 +1,6 @@
 function setup_mongo_task_generator {
     if [ ! -f mongo-task-generator ]; then
-        curl -L https://github.com/mongodb/mongo-task-generator/releases/download/v3.5.1/mongo-task-generator --output mongo-task-generator
+        curl -fL --retry 5 --retry-delay 10 --retry-max-time 120 https://github.com/mongodb/mongo-task-generator/releases/download/v3.5.2/mongo-task-generator --output mongo-task-generator
         chmod +x mongo-task-generator
     fi
 }
