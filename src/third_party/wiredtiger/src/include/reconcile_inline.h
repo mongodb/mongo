@@ -399,12 +399,12 @@ __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *add
 }
 
 /*
- * __wt_rec_cell_build_val --
+ * __wti_rec_cell_build_val --
  *     Process a data item and return a WT_CELL structure and byte string to be stored on the page.
  */
 static WT_INLINE int
-__wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size,
-  WT_TIME_WINDOW *tw, uint64_t rle)
+__wti_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size,
+  WT_TIME_WINDOW *tw, uint64_t rle, bool *ovfl_val)
 {
     WT_BTREE *btree;
     WT_REC_KV *val;
@@ -423,6 +423,9 @@ __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *d
     WT_ASSERT(session, btree->maxleafvalue > 0);
     if (val->buf.size > btree->maxleafvalue) {
         WT_STAT_CONN_DATA_INCR(session, rec_overflow_value);
+
+        if (ovfl_val != NULL)
+            *ovfl_val = true;
 
         return (__wt_rec_cell_build_ovfl(session, r, val, WT_CELL_VALUE_OVFL, tw, rle));
     }
