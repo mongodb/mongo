@@ -93,4 +93,117 @@ TEST(DoubleHistogramImplTest, RecordsFractionalValues) {
                       BSON("histogram" << BSON("average" << 3.14 << "count" << 1)));
 }
 
+template <typename T, typename... AttributeTs>
+std::unique_ptr<HistogramImpl<T, AttributeTs...>> createHistogramWithDefs(
+    const AttributeDefinition<AttributeTs>&... defs) {
+#ifdef MONGO_CONFIG_OTEL
+    return std::make_unique<HistogramImpl<T, AttributeTs...>>(
+        *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
+        "name",
+        "description",
+        "unit",
+        boost::none,
+        defs...);
+#else
+    return std::make_unique<HistogramImpl<T, AttributeTs...>>(defs...);
+#endif  // MONGO_CONFIG_OTEL
+}
+
+TEST(HistogramImplWithAttributesTest, ThrowsOnDuplicateAttributeValues) {
+    ASSERT_THROWS_CODE(createHistogramWithDefs<int64_t>(AttributeDefinition<bool>{
+                           .name = "is_internal", .values = {true, true}}),
+                       DBException,
+                       ErrorCodes::BadValue);
+}
+
+TEST(HistogramImplWithAttributesTest, ThrowsOnEmptyAttributeValues) {
+    ASSERT_THROWS_CODE(createHistogramWithDefs<int64_t>(
+                           AttributeDefinition<StringData>{.name = "type", .values = {}}),
+                       DBException,
+                       ErrorCodes::BadValue);
+}
+
+TEST(HistogramImplWithAttributesTest, ThrowsOnDuplicateAttributeNames) {
+    ASSERT_THROWS_CODE(
+        (createHistogramWithDefs<int64_t>(
+            AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}},
+            AttributeDefinition<StringData>{.name = "is_internal", .values = {"foo", "bar"}})),
+        DBException,
+        ErrorCodes::BadValue);
+}
+
+TEST(HistogramImplWithAttributesTest, ThrowsOnInvalidAttributes) {
+    auto histogram = createHistogramWithDefs<int64_t>(
+        AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+    histogram->record(10, {"foo"_sd});
+    ASSERT_THROWS_CODE(histogram->record(10, {"x"_sd}), DBException, ErrorCodes::BadValue);
+}
+
+TEST(HistogramImplWithAttributesTest, StringDataAttributeValueIsCopied) {
+    // If the source strings are destroyed after histogram creation, the histogram must have its own
+    // copies and remain valid. Sanitizer builds will catch use-after-free if it does not.
+    auto sourceValues = std::make_unique<std::vector<std::string>>(
+        std::initializer_list<std::string>{"foo", "bar"});
+    auto histogram = createHistogramWithDefs<int64_t>(AttributeDefinition<StringData>{
+        .name = "type", .values = {(*sourceValues)[0], (*sourceValues)[1]}});
+    sourceValues = nullptr;
+
+    histogram->record(10, {"foo"_sd});
+    histogram->record(20, {"bar"_sd});
+}
+
+TEST(HistogramImplWithAttributesTest, SpanAttributeValueIsCopied) {
+    // If the source span data is destroyed after histogram creation, the histogram must have its
+    // own copies and remain valid. Sanitizer builds will catch use-after-free if it does not.
+    auto sourceIntData = std::make_unique<std::vector<std::vector<int32_t>>>(
+        std::vector<std::vector<int32_t>>{{1, 2}, {3, 4}});
+    auto histogram = createHistogramWithDefs<int64_t>(AttributeDefinition<std::span<int32_t>>{
+        .name = "data",
+        .values = {std::span<int32_t>((*sourceIntData)[0]),
+                   std::span<int32_t>((*sourceIntData)[1])}});
+    sourceIntData = nullptr;
+
+    std::vector<int32_t> input{1, 2};
+    histogram->record(10, {std::span<int32_t>(input)});
+}
+
+TEST(HistogramImplWithAttributesTest, RecordsWithSingleAttribute) {
+    auto histogram = createHistogramWithDefs<int64_t>(
+        AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}});
+    histogram->record(10, {true});
+    histogram->record(20, {false});
+    ASSERT_THROWS_CODE(histogram->record(-1, {true}), DBException, ErrorCodes::BadValue);
+}
+
+TEST(HistogramImplWithAttributesTest, SerializationWithSingleAttribute) {
+    auto histogram = createHistogramWithDefs<int64_t>(
+        AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}});
+    const std::string key = "histogram_seconds";
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson(key),
+                      BSON(key << BSON("average" << 0.0 << "count" << 0)));
+
+    histogram->record(10, {true});
+    histogram->record(20, {false});
+    // "average" is the exponential moving average of the values above.
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson(key),
+                      BSON(key << BSON("average" << 12.0 << "count" << 2)));
+}
+
+TEST(HistogramImplWithAttributesTest, SerializationWithMultipleAttributes) {
+    auto histogram = createHistogramWithDefs<int64_t>(
+        AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}},
+        AttributeDefinition<int64_t>{.name = "priority", .values = {1, 2}});
+    const std::string key = "histogram_seconds";
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson(key),
+                      BSON(key << BSON("average" << 0.0 << "count" << 0)));
+
+    histogram->record(10, {true, int64_t{1}});
+    histogram->record(10, {true, int64_t{2}});
+    histogram->record(10, {false, int64_t{1}});
+    histogram->record(20, {false, int64_t{2}});
+    // "average" is the exponential moving average of the values above.
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson(key),
+                      BSON(key << BSON("average" << 12.0 << "count" << 4)));
+}
+
 }  // namespace mongo::otel::metrics

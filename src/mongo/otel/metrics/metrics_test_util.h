@@ -216,15 +216,25 @@ public:
     double readDoubleGauge(MetricName name);
 
     /**
-     * Gets the data of an int64_t histogram and throws an exception if it is not found.
-     * TODO SERVER-124076: Add attribute support.
+     * Gets the data of an int64_t histogram for the given attribute combination and throws an
+     * exception if it is not found.
      */
+    template <AttributeType... AttributeTs>
+    HistogramData<int64_t> readInt64Histogram(MetricName name,
+                                              const std::tuple<AttributeTs...>& attributes);
+
+    /** Overload of the above for when there are no attributes. */
     HistogramData<int64_t> readInt64Histogram(MetricName name);
 
     /**
-     * Gets the data of a double histogram and throws an exception if it is not found.
-     * TODO SERVER-124076: Add attribute support.
+     * Gets the data of a double histogram for the given attribute combination and throws an
+     * exception if it is not found.
      */
+    template <AttributeType... AttributeTs>
+    HistogramData<double> readDoubleHistogram(MetricName name,
+                                              const std::tuple<AttributeTs...>& attributes);
+
+    /** Overload of the above for when there are no attributes. */
     HistogramData<double> readDoubleHistogram(MetricName name);
 
     /**
@@ -381,6 +391,30 @@ double OtelMetricsCapturer::readDoubleGauge(MetricName name,
             fmt::format("Metric {} does not have matching value type", name.getName()),
             std::holds_alternative<double>(data.value_));
     return std::get<double>(data.value_);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif
+}
+
+template <AttributeType... AttributeTs>
+HistogramData<int64_t> OtelMetricsCapturer::readInt64Histogram(
+    MetricName name, const std::tuple<AttributeTs...>& attributes) {
+#ifdef MONGO_CONFIG_OTEL
+    return test_util_detail::getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(
+        *_metrics, *_reader, _metricsService, name, attributes);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif
+}
+
+template <AttributeType... AttributeTs>
+HistogramData<double> OtelMetricsCapturer::readDoubleHistogram(
+    MetricName name, const std::tuple<AttributeTs...>& attributes) {
+#ifdef MONGO_CONFIG_OTEL
+    return test_util_detail::getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(
+        *_metrics, *_reader, _metricsService, name, attributes);
 #else
     invariant(false, kUsingOtelOnWindows);
     return {};

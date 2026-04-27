@@ -94,23 +94,6 @@ void createAndRegisterHistogramView(WithLock lock,
                std::move(aggregationConfig));
 }
 
-template <typename T>
-std::unique_ptr<T> makeHistogram(WithLock lock,
-                                 opentelemetry::metrics::MeterProvider& provider,
-                                 std::string name,
-                                 std::string description,
-                                 std::string unit,
-                                 boost::optional<std::vector<double>> explicitBucketBoundaries) {
-    if (explicitBucketBoundaries.has_value()) {
-        createAndRegisterHistogramView(
-            lock, &provider, name, description, unit, explicitBucketBoundaries.value());
-    }
-    return std::make_unique<T>(*provider.GetMeter(std::string{MetricsService::kMeterName}),
-                               name,
-                               description,
-                               unit,
-                               explicitBucketBoundaries);
-}
 }  // namespace
 
 void MetricsService::OwnedMetricVisitor::operator()(
@@ -201,31 +184,28 @@ void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MaxGauge<dou
     newObservableInstruments.push_back(observable);
 }
 
-void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<Histogram<double>>& histogram) {
-    auto* histogramImpl = dynamic_cast<HistogramImpl<double>*>(histogram.get());
-    invariant(histogramImpl);
-    if (histogramImpl->explicitBucketBoundaries.has_value()) {
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<HistogramBase<double>>& histogram) {
+    if (histogram->explicitBucketBoundaries.has_value()) {
         createAndRegisterHistogramView(lock,
                                        &provider,
                                        name,
                                        id.description,
                                        std::string(toString(id.unit)),
-                                       histogramImpl->explicitBucketBoundaries.value());
+                                       histogram->explicitBucketBoundaries.value());
     }
     histogram->reset(provider.GetMeter(std::string(MetricsService::kMeterName)).get());
 }
 
 void MetricsService::OwnedMetricVisitor::operator()(
-    std::unique_ptr<Histogram<int64_t>>& histogram) {
-    auto* histogramImpl = dynamic_cast<HistogramImpl<int64_t>*>(histogram.get());
-    invariant(histogramImpl);
-    if (histogramImpl->explicitBucketBoundaries.has_value()) {
+    std::unique_ptr<HistogramBase<int64_t>>& histogram) {
+    if (histogram->explicitBucketBoundaries.has_value()) {
         createAndRegisterHistogramView(lock,
                                        &provider,
                                        name,
                                        id.description,
                                        std::string(toString(id.unit)),
-                                       histogramImpl->explicitBucketBoundaries.value());
+                                       histogram->explicitBucketBoundaries.value());
     }
     histogram->reset(provider.GetMeter(std::string(MetricsService::kMeterName)).get());
 }
@@ -247,6 +227,22 @@ void MetricsService::initialize(opentelemetry::metrics::MeterProvider& provider)
     // Re-assign the observable instruments vector stored in MetricsService, implicitly invoking the
     // destructors of any observable instrument instance(s) created before initialization.
     _observableInstruments = std::move(newObservableInstruments);
+}
+
+void MetricsService::_registerHistogramView(
+    WithLock lock,
+    const std::string& name,
+    const std::string& description,
+    const std::string& unit,
+    const boost::optional<std::vector<double>>& explicitBucketBoundaries) {
+    if (explicitBucketBoundaries.has_value()) {
+        createAndRegisterHistogramView(lock,
+                                       opentelemetry::metrics::Provider::GetMeterProvider().get(),
+                                       name,
+                                       description,
+                                       unit,
+                                       explicitBucketBoundaries.value());
+    }
 }
 #endif  // MONGO_CONFIG_OTEL
 
@@ -418,51 +414,6 @@ MaxGauge<double>& MetricsService::createDoubleMaxGauge(MetricName name,
                                                        MetricUnit unit,
                                                        const GaugeOptions& options) {
     return createMaxGauge<double>(name, description, unit, options);
-}
-
-template <typename T>
-Histogram<T>& MetricsService::createHistogram(MetricName name,
-                                              std::string description,
-                                              MetricUnit unit,
-                                              const HistogramOptions& options) {
-    const std::string unitStr = static_cast<std::string>(toString(unit));
-    MetricIdentifier identifier{.description = description,
-                                .unit = unit,
-                                .serverStatusOptions = options.serverStatusOptions,
-                                .histogramBucketBoundaries = options.explicitBucketBoundaries};
-    return _createMetric<HistogramImpl<T>, Histogram<T>, HistogramOptions>(
-        name,
-        options,
-        std::move(identifier),
-        /* makeInstrument= */
-        [&](WithLock lock, const std::string& nameStr) -> std::unique_ptr<HistogramImpl<T>> {
-#ifdef MONGO_CONFIG_OTEL
-            return makeHistogram<HistogramImpl<T>>(
-                lock,
-                *opentelemetry::metrics::Provider::GetMeterProvider(),
-                nameStr,
-                description,
-                unitStr,
-                options.explicitBucketBoundaries);
-#else
-            return std::make_unique<HistogramImpl<T>>();
-#endif  // MONGO_CONFIG_OTEL
-        },
-        /* addObservable= */ [](WithLock, const std::string&, Histogram<T>*) {});
-}
-
-Histogram<double>& MetricsService::createDoubleHistogram(MetricName name,
-                                                         std::string description,
-                                                         MetricUnit unit,
-                                                         const HistogramOptions& options) {
-    return createHistogram<double>(name, description, unit, options);
-}
-
-Histogram<int64_t>& MetricsService::createInt64Histogram(MetricName name,
-                                                         std::string description,
-                                                         MetricUnit unit,
-                                                         const HistogramOptions& options) {
-    return createHistogram<int64_t>(name, description, unit, options);
 }
 
 std::vector<std::string> MetricsService::getAttributeNamesForTests(MetricName name) const {

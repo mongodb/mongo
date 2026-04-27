@@ -243,29 +243,37 @@ public:
 
     /**
      * Creates an int64_t histogram with the provided parameters. The function will throw an
-     * exception if the counter would collide with an existing metric (i.e., same name but different
-     * type or other parameters). Metrics should be stashed once they are created to avoid taking a
-     * lock on the global list of metrics in performance-sensitive codepaths.
+     * exception if the histogram would collide with an existing metric (i.e., same name but
+     * different type or other parameters). Metrics should be stashed once they are created to avoid
+     * taking a lock on the global list of metrics in performance-sensitive codepaths. Note that
+     * attribute definitions determine the set of valid attribute combinations passed to record().
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    Histogram<int64_t>& createInt64Histogram(MetricName name,
-                                             std::string description,
-                                             MetricUnit unit,
-                                             const HistogramOptions& options = {});
+    template <AttributeType... AttributeTs>
+    Histogram<int64_t, AttributeTs...>& createInt64Histogram(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const HistogramOptions& options = {});
 
     /**
      * Creates a double histogram with the provided parameters. The function will throw an exception
-     * if the counter would collide with an existing metric (i.e., same name but different type or
+     * if the histogram would collide with an existing metric (i.e., same name but different type or
      * other parameters). Metrics should be stashed once they are created to avoid taking a lock on
-     * the global list of metrics in performance-sensitive codepaths.
+     * the global list of metrics in performance-sensitive codepaths. Note that attribute
+     * definitions determine the set of valid attribute combinations passed to record().
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    Histogram<double>& createDoubleHistogram(MetricName name,
-                                             std::string description,
-                                             MetricUnit unit,
-                                             const HistogramOptions& options = {});
+    template <AttributeType... AttributeTs>
+    Histogram<double, AttributeTs...>& createDoubleHistogram(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const HistogramOptions& options = {});
 
     /**
      * Used in unit tests only. Removes all metrics registered by this MetricsService from the
@@ -371,11 +379,21 @@ private:
                                  const GaugeOptions& options,
                                  T initialValue);
 
-    template <typename T>
-    Histogram<T>& createHistogram(MetricName name,
-                                  std::string description,
-                                  MetricUnit unit,
-                                  const HistogramOptions& options);
+    template <typename T, AttributeType... AttributeTs>
+    Histogram<T, AttributeTs...>& _createHistogram(MetricName name,
+                                                   std::string description,
+                                                   MetricUnit unit,
+                                                   const AttributeDefinition<AttributeTs>&... defs,
+                                                   const HistogramOptions& options);
+
+#ifdef MONGO_CONFIG_OTEL
+    void _registerHistogramView(
+        WithLock lock,
+        const std::string& name,
+        const std::string& description,
+        const std::string& unit,
+        const boost::optional<std::vector<double>>& explicitBucketBoundaries);
+#endif  // MONGO_CONFIG_OTEL
 
     /**
      * If `serverStatusOptions` is specified, registers the given metric onto one of the
@@ -424,8 +442,8 @@ private:
                                      std::unique_ptr<MinGauge<double>>,
                                      std::unique_ptr<MaxGauge<int64_t>>,
                                      std::unique_ptr<MaxGauge<double>>,
-                                     std::unique_ptr<Histogram<int64_t>>,
-                                     std::unique_ptr<Histogram<double>>>;
+                                     std::unique_ptr<HistogramBase<int64_t>>,
+                                     std::unique_ptr<HistogramBase<double>>>;
 
 #ifdef MONGO_CONFIG_OTEL
     /**
@@ -451,8 +469,8 @@ private:
         void operator()(std::unique_ptr<MinGauge<double>>& gauge);
         void operator()(std::unique_ptr<MaxGauge<int64_t>>& gauge);
         void operator()(std::unique_ptr<MaxGauge<double>>& gauge);
-        void operator()(std::unique_ptr<Histogram<double>>& histogram);
-        void operator()(std::unique_ptr<Histogram<int64_t>>& histogram);
+        void operator()(std::unique_ptr<HistogramBase<double>>& histogram);
+        void operator()(std::unique_ptr<HistogramBase<int64_t>>& histogram);
     };
 #endif  // MONGO_CONFIG_OTEL
 
@@ -595,6 +613,63 @@ Counter<double, AttributeTs...>& MetricsService::createDoubleCounter(
     const AttributeDefinition<AttributeTs>&... defs,
     const CounterOptions& options) {
     return _createCounter<double, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
+
+template <typename T, AttributeType... AttributeTs>
+Histogram<T, AttributeTs...>& MetricsService::_createHistogram(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const HistogramOptions& options) {
+    const std::string unitStr = static_cast<std::string>(toString(unit));
+    MetricIdentifier identifier{
+        .description = description,
+        .unit = unit,
+        .serverStatusOptions = options.serverStatusOptions,
+        .histogramBucketBoundaries = options.explicitBucketBoundaries,
+        .attributeDefinitions = {makeComparableAttributeDefinition(defs)...}};
+    return _createMetric<HistogramImpl<T, AttributeTs...>, HistogramBase<T>, HistogramOptions>(
+        name,
+        options,
+        std::move(identifier),
+        /* makeInstrument= */
+        [&](WithLock lock, const std::string& nameStr) {
+#ifdef MONGO_CONFIG_OTEL
+            _registerHistogramView(
+                lock, nameStr, description, unitStr, options.explicitBucketBoundaries);
+            auto meter = opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter(
+                std::string{kMeterName});
+            return std::make_unique<HistogramImpl<T, AttributeTs...>>(
+                *meter, nameStr, description, unitStr, options.explicitBucketBoundaries, defs...);
+#else
+            return std::make_unique<HistogramImpl<T, AttributeTs...>>(defs...);
+#endif  // MONGO_CONFIG_OTEL
+        },
+        /* addObservable= */
+        [](WithLock, const std::string&, HistogramImpl<T, AttributeTs...>*) {});
+}
+
+template <AttributeType... AttributeTs>
+Histogram<int64_t, AttributeTs...>& MetricsService::createInt64Histogram(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const HistogramOptions& options) {
+    return _createHistogram<int64_t, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
+
+template <AttributeType... AttributeTs>
+Histogram<double, AttributeTs...>& MetricsService::createDoubleHistogram(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const HistogramOptions& options) {
+    return _createHistogram<double, AttributeTs...>(
         name, std::move(description), unit, defs..., options);
 }
 

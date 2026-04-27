@@ -32,10 +32,13 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/otel/metrics/metrics_attributes.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/moving_average.h"
+
+#include <absl/container/flat_hash_set.h>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/context/context.h>
@@ -50,17 +53,61 @@ namespace mongo::otel::metrics {
 template <typename T>
 concept HistogramValueType = std::same_as<T, int64_t> || std::same_as<T, double>;
 
+/**
+ * Type-erased base stored in MetricsService's variant. Carries the bucket boundary configuration
+ * so MetricsService can access it without knowing the attribute types.
+ */
 template <HistogramValueType T>
-class MONGO_MOD_PUBLIC Histogram : public Metric {
+class MONGO_MOD_PUBLIC HistogramBase : public Metric {
 public:
+    explicit HistogramBase(boost::optional<std::vector<double>> boundaries = boost::none)
+        : explicitBucketBoundaries(std::move(boundaries)) {}
+
+    ~HistogramBase() override = default;
+
+    boost::optional<std::vector<double>> explicitBucketBoundaries;
+};
+
+/**
+ * General case: histogram with one or more attributes.
+ */
+template <HistogramValueType T, AttributeType... AttributeTs>
+class MONGO_MOD_PUBLIC Histogram : public HistogramBase<T> {
+public:
+    using Attributes = std::tuple<AttributeTs...>;
+
+    explicit Histogram(boost::optional<std::vector<double>> boundaries = boost::none)
+        : HistogramBase<T>(std::move(boundaries)) {}
+
     ~Histogram() override = default;
 
     /**
-     * Records a value.
+     * Records a value for a specific attribute combination.
      *
      * The value must be nonnegative.
      */
-    virtual void record(T value) = 0;
+    virtual void record(T value, const Attributes& attributes) = 0;
+};
+
+/**
+ * Specialization for no attributes. Adds a convenience record(T value) overload so existing
+ * callers don't need to pass an empty tuple.
+ */
+template <HistogramValueType T>
+class MONGO_MOD_PUBLIC Histogram<T> : public HistogramBase<T> {
+public:
+    using Attributes = std::tuple<>;
+
+    explicit Histogram(boost::optional<std::vector<double>> boundaries = boost::none)
+        : HistogramBase<T>(std::move(boundaries)) {}
+
+    ~Histogram() override = default;
+
+    virtual void record(T value, const std::tuple<>& attributes) = 0;
+
+    void record(T value) {
+        record(value, {});
+    }
 };
 
 /**
@@ -68,37 +115,47 @@ public:
  *
  * Supported types: int64_t and double.
  *
+ * Attributes are passed directly to the underlying OTel histogram's Record() call. OTel
+ * handles per-attribute aggregation internally, so no per-combination storage is pre-allocated
+ * here.
+ *
  * WARNING: The underlying OpenTelemetry library acquires locks during Record() operations.
  * Avoid using histograms in performance-sensitive code paths where lock contention could
- * impact latency/throughput.
+ * impact latency/throughput. If you are using histogram in performance-sensitive code paths,
+ * verify the performance is acceptable with a high level of concurrency.
  */
-template <HistogramValueType T>
-class HistogramImpl final : public Histogram<T> {
+template <HistogramValueType T, typename... AttributeTs>
+class HistogramImpl final : public Histogram<T, AttributeTs...> {
 public:
+    using Attributes = typename Histogram<T, AttributeTs...>::Attributes;
+
 #ifdef MONGO_CONFIG_OTEL
     /**
-     * Creates a new Histogram instance.
+     * Creates a new HistogramImpl instance.
      *
-     * Meter must be non-null and remain valid for the lifetime of the Histogram instance.
+     * Meter must be non-null and remain valid for the lifetime of the HistogramImpl instance.
      */
     HistogramImpl(opentelemetry::metrics::Meter& meter,
                   std::string name,
                   std::string description,
                   std::string unit,
-                  boost::optional<std::vector<double>> explicitBucketBoundaries);
+                  boost::optional<std::vector<double>> explicitBucketBoundaries,
+                  const AttributeDefinition<AttributeTs>&... defs);
 #else
-    HistogramImpl();
+    explicit HistogramImpl(const AttributeDefinition<AttributeTs>&... defs);
 #endif  // MONGO_CONFIG_OTEL
 
     /**
-     * Records a value.
+     * Records a value for the given attribute combination.
      *
      * The value must be nonnegative.
      */
-    void record(T value) override;
+    void record(T value, const Attributes& attributes) override;
+    using Histogram<T, AttributeTs...>::record;
 
     /**
-     * Serializes the internal metrics `_avg` and `_count` to BSON.
+     * Serializes the internal metrics `_avg` and `_count` to BSON, aggregated across all
+     * attribute combinations.
      */
     BSONObj serializeToBson(const std::string& key) const override;
 
@@ -110,12 +167,16 @@ public:
     void reset(opentelemetry::metrics::Meter* meter) override;
 #endif  // MONGO_CONFIG_OTEL
 
-    boost::optional<std::vector<double>> explicitBucketBoundaries;
-
 private:
-    // Internal metrics used for server status reporting.
+    // Internal metrics used for server status reporting, aggregated across all attribute
+    // combinations.
     MovingAverage _avg;
     Atomic<int64_t> _count;
+
+    std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
+
+    OwnedAttributeValueLists<AttributeTs...> _ownedValueLists;
+    absl::flat_hash_set<Attributes, AttributesHasher, AttributesEq> _validCombinations;
 
 #ifdef MONGO_CONFIG_OTEL
     using UnderlyingType = std::conditional_t<std::is_same_v<T, int64_t>, uint64_t, double>;
@@ -133,7 +194,7 @@ private:
     // Read-write mutex that protects the _histogram pointer.
     mutable WriteRarelyRWMutex _rwMutex;
 
-    // The underlying OpenTelemety histogram implementation.
+    // The underlying OpenTelemetry histogram implementation.
     std::unique_ptr<opentelemetry::metrics::Histogram<UnderlyingType>> _histogram;
 #endif  // MONGO_CONFIG_OTEL
 };
@@ -142,12 +203,13 @@ private:
 constexpr double kAlpha = 0.2;
 
 #ifdef MONGO_CONFIG_OTEL
-template <HistogramValueType T>
-std::unique_ptr<opentelemetry::metrics::Histogram<typename HistogramImpl<T>::UnderlyingType>>
-HistogramImpl<T>::createOpenTelemetryHistogram(opentelemetry::metrics::Meter& meter,
-                                               const std::string& name,
-                                               const std::string& description,
-                                               const std::string& unit) {
+template <HistogramValueType T, typename... AttributeTs>
+std::unique_ptr<
+    opentelemetry::metrics::Histogram<typename HistogramImpl<T, AttributeTs...>::UnderlyingType>>
+HistogramImpl<T, AttributeTs...>::createOpenTelemetryHistogram(opentelemetry::metrics::Meter& meter,
+                                                               const std::string& name,
+                                                               const std::string& description,
+                                                               const std::string& unit) {
     if constexpr (std::is_same_v<T, int64_t>) {
         // The OpenTelemetry library provides histogram implementations for uint64_t and double.
         // If a negative integer is passed to `HistogramImpl<uint64_t>::record`, it wraps to an
@@ -160,39 +222,90 @@ HistogramImpl<T>::createOpenTelemetryHistogram(opentelemetry::metrics::Meter& me
     }
 }
 
-template <HistogramValueType T>
-HistogramImpl<T>::HistogramImpl(opentelemetry::metrics::Meter& meter,
-                                std::string name,
-                                std::string description,
-                                std::string unit,
-                                boost::optional<std::vector<double>> explicitBucketBoundaries)
-    : explicitBucketBoundaries(std::move(explicitBucketBoundaries)),
+template <HistogramValueType T, typename... AttributeTs>
+HistogramImpl<T, AttributeTs...>::HistogramImpl(
+    opentelemetry::metrics::Meter& meter,
+    std::string name,
+    std::string description,
+    std::string unit,
+    boost::optional<std::vector<double>> explicitBucketBoundaries,
+    const AttributeDefinition<AttributeTs>&... defs)
+    : Histogram<T, AttributeTs...>(std::move(explicitBucketBoundaries)),
       _avg(kAlpha),
+      _attributeNames{defs.name...},
+      _ownedValueLists(makeOwnedAttributeValueLists(defs...)),
+      _validCombinations([this] {
+          auto tuples = safeMakeAttributeTuples(_ownedValueLists);
+          return absl::flat_hash_set<Attributes, AttributesHasher, AttributesEq>(tuples.begin(),
+                                                                                 tuples.end());
+      }()),
       _name(std::move(name)),
       _description(std::move(description)),
       _unit(std::move(unit)) {
+    massert(ErrorCodes::BadValue,
+            "Attribute values list cannot be empty",
+            ((!defs.values.empty()) && ...));
+    massert(ErrorCodes::BadValue,
+            "Attribute names are duplicated",
+            !containsDuplicates(_attributeNames));
     _histogram = createOpenTelemetryHistogram(meter, _name, _description, _unit);
 }
 #else
-template <HistogramValueType T>
-HistogramImpl<T>::HistogramImpl() : _avg(kAlpha) {}
+template <HistogramValueType T, typename... AttributeTs>
+HistogramImpl<T, AttributeTs...>::HistogramImpl(const AttributeDefinition<AttributeTs>&... defs)
+    : _avg(kAlpha),
+      _attributeNames{defs.name...},
+      _ownedValueLists(makeOwnedAttributeValueLists(defs...)),
+      _validCombinations([this] {
+          auto tuples = safeMakeAttributeTuples(_ownedValueLists);
+          return absl::flat_hash_set<Attributes, AttributesHasher, AttributesEq>(tuples.begin(),
+                                                                                 tuples.end());
+      }()) {
+    massert(ErrorCodes::BadValue,
+            "Attribute values list cannot be empty",
+            ((!defs.values.empty()) && ...));
+    massert(ErrorCodes::BadValue,
+            "Attribute names are duplicated",
+            !containsDuplicates(_attributeNames));
+}
 #endif  // MONGO_CONFIG_OTEL
 
-template <HistogramValueType T>
-void HistogramImpl<T>::record(T value) {
+template <HistogramValueType T, typename... AttributeTs>
+void HistogramImpl<T, AttributeTs...>::record(T value, const Attributes& attributes) {
     massert(ErrorCodes::BadValue, "Histogram values must be nonnegative", value >= 0);
+    if constexpr (sizeof...(AttributeTs) > 0) {
+        massert(ErrorCodes::BadValue,
+                "Called record using undeclared set of attributes",
+                _validCombinations.contains(attributes));
+    }
 #ifdef MONGO_CONFIG_OTEL
     {
         auto readLock = _rwMutex.readLock();
-        _histogram->Record(value, opentelemetry::context::Context{});
+        if constexpr (sizeof...(AttributeTs) == 0) {
+            _histogram->Record(value, opentelemetry::context::Context{});
+        } else {
+            std::vector<AttributeNameAndValue> nameAndValues;
+            nameAndValues.reserve(sizeof...(AttributeTs));
+            size_t i = 0;
+            std::apply(
+                [&](const auto&... vals) {
+                    (nameAndValues.push_back({.name = StringData(_attributeNames[i++]),
+                                              .value = AnyAttributeType(vals)}),
+                     ...);
+                },
+                attributes);
+            _histogram->Record(value,
+                               AttributesKeyValueIterable(std::move(nameAndValues)),
+                               opentelemetry::context::Context{});
+        }
     }
 #endif  // MONGO_CONFIG_OTEL
     _avg.addSample(value);
     _count.fetchAndAddRelaxed(1);
 }
 
-template <HistogramValueType T>
-BSONObj HistogramImpl<T>::serializeToBson(const std::string& key) const {
+template <HistogramValueType T, typename... AttributeTs>
+BSONObj HistogramImpl<T, AttributeTs...>::serializeToBson(const std::string& key) const {
     BSONObjBuilder builder;
     BSONObjBuilder metrics{builder.subobjStart(key)};
     metrics.append("average", _avg.get().value_or(0.0));
@@ -202,8 +315,8 @@ BSONObj HistogramImpl<T>::serializeToBson(const std::string& key) const {
 }
 
 #ifdef MONGO_CONFIG_OTEL
-template <HistogramValueType T>
-void HistogramImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
+template <HistogramValueType T, typename... AttributeTs>
+void HistogramImpl<T, AttributeTs...>::reset(opentelemetry::metrics::Meter* meter) {
     invariant(meter);
     _avg.reset();
     _count.store(0);
@@ -211,4 +324,5 @@ void HistogramImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
     _histogram = createOpenTelemetryHistogram(*meter, _name, _description, _unit);
 };
 #endif  // MONGO_CONFIG_OTEL
+
 }  // namespace mongo::otel::metrics

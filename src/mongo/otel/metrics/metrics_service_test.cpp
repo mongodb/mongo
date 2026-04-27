@@ -1291,9 +1291,79 @@ TEST_F(CreateDoubleMaxGaugeTest, RecordsMaximumValue) {
     }
 }
 
+using CreateHistogramWithAttributesValidationTest = MetricsServiceTest;
+
+TEST_F(CreateHistogramWithAttributesValidationTest,
+       ExceptionWhenSameNameButDifferentAttributeValues) {
+    metricsService->createInt64Histogram<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+    ASSERT_THROWS_CODE(metricsService->createInt64Histogram<bool>(
+                           MetricNames::kTest1,
+                           "description",
+                           MetricUnit::kSeconds,
+                           AttributeDefinition<bool>{.name = "cool", .values = {true}}),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
+TEST_F(CreateHistogramWithAttributesValidationTest,
+       ExceptionWhenSameNameButDifferentAttributeNames) {
+    metricsService->createInt64Histogram<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+    ASSERT_THROWS_CODE(metricsService->createInt64Histogram<bool>(
+                           MetricNames::kTest1,
+                           "description",
+                           MetricUnit::kSeconds,
+                           AttributeDefinition<bool>{.name = "other", .values = {true, false}}),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
+TEST_F(CreateHistogramWithAttributesValidationTest,
+       ExceptionWhenSameNameButDifferentAttributeType) {
+    // Sanity check that the bool value `true` is formatted to be equal to the StringData value
+    // `"true"`, since this test would fail otherwise.
+    invariant(fmt::format("{}", true) == fmt::format("{}", "true"_sd));
+
+    metricsService->createInt64Histogram<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+    ASSERT_THROWS_CODE(
+        metricsService->createInt64Histogram<StringData>(
+            MetricNames::kTest1,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<StringData>{.name = "cool", .values = {"true", "false"}}),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
+}
+
+TEST_F(CreateHistogramWithAttributesValidationTest,
+       SameMetricReturnedWhenAttributeDefinitionsMatch) {
+    Histogram<int64_t, bool>& h1 = metricsService->createInt64Histogram<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+    Histogram<int64_t, bool>& h2 = metricsService->createInt64Histogram<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "cool", .values = {true, false}});
+    EXPECT_EQ(&h1, &h2);
+}
+
 using CreateHistogramTest = MetricsServiceTest;
 
-TEST_F(CreateHistogramTest, RecordsInt64Values) {
+TEST_F(CreateHistogramTest, RecordsInt64ValuesWithoutAttributes) {
     auto& histogram1 = metricsService->createInt64Histogram(
         MetricNames::kTest1, "description", MetricUnit::kSeconds);
 
@@ -1329,7 +1399,7 @@ TEST_F(CreateHistogramTest, RecordsInt64Values) {
     }
 }
 
-TEST_F(CreateHistogramTest, RecordsDoubleValues) {
+TEST_F(CreateHistogramTest, RecordsDoubleValuesWithoutAttributes) {
     auto& histogram1 = metricsService->createDoubleHistogram(
         MetricNames::kTest1, "description", MetricUnit::kSeconds);
 
@@ -1362,6 +1432,112 @@ TEST_F(CreateHistogramTest, RecordsDoubleValues) {
         EXPECT_DOUBLE_EQ(data2.max, 103.14);
         EXPECT_THAT(data2.counts, ElementsAre(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
         EXPECT_EQ(data2.count, 1);
+    }
+}
+
+TEST_F(CreateHistogramTest, RecordsInt64ValuesWithAttributes) {
+    Histogram<int64_t, bool>& h1 = metricsService->createInt64Histogram<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}});
+    Histogram<int64_t, bool, StringData>& h2 =
+        metricsService->createInt64Histogram<bool, StringData>(
+            MetricNames::kTest2,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}},
+            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    h1.record(5, {true});
+    h1.record(3, {false});
+    h1.record(2, {true});
+
+    if (metricsCapturer.canReadMetrics()) {
+        const auto internalData =
+            metricsCapturer.readInt64Histogram(MetricNames::kTest1, std::tuple{true});
+        EXPECT_EQ(internalData.sum, 7);
+        EXPECT_EQ(internalData.count, 2u);
+
+        const auto externalData =
+            metricsCapturer.readInt64Histogram(MetricNames::kTest1, std::tuple{false});
+        EXPECT_EQ(externalData.sum, 3);
+        EXPECT_EQ(externalData.count, 1u);
+    }
+
+    h2.record(10, {true, "foo"_sd});
+    h2.record(5, {false, "bar"_sd});
+
+    if (metricsCapturer.canReadMetrics()) {
+        const auto internalFooData =
+            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{true, "foo"_sd});
+        EXPECT_EQ(internalFooData.sum, 10);
+        EXPECT_EQ(internalFooData.count, 1u);
+
+        const auto externalBarData =
+            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{false, "bar"_sd});
+        EXPECT_EQ(externalBarData.sum, 5);
+        EXPECT_EQ(externalBarData.count, 1u);
+
+        ASSERT_THROWS_CODE(
+            metricsCapturer.readInt64Histogram(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            DBException,
+            ErrorCodes::KeyNotFound);
+    }
+}
+
+TEST_F(CreateHistogramTest, RecordsDoubleValuesWithAttributes) {
+    Histogram<double, bool>& h1 = metricsService->createDoubleHistogram<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}});
+    Histogram<double, bool, StringData>& h2 =
+        metricsService->createDoubleHistogram<bool, StringData>(
+            MetricNames::kTest2,
+            "description",
+            MetricUnit::kSeconds,
+            AttributeDefinition<bool>{.name = "is_internal", .values = {true, false}},
+            AttributeDefinition<StringData>{.name = "type", .values = {"foo", "bar"}});
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    h1.record(5.5, {true});
+    h1.record(3.5, {false});
+    h1.record(2.5, {true});
+
+    if (metricsCapturer.canReadMetrics()) {
+        const auto internalData =
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest1, std::tuple{true});
+        EXPECT_DOUBLE_EQ(internalData.sum, 8.0);
+        EXPECT_EQ(internalData.count, 2u);
+
+        const auto externalData =
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest1, std::tuple{false});
+        EXPECT_DOUBLE_EQ(externalData.sum, 3.5);
+        EXPECT_EQ(externalData.count, 1u);
+    }
+
+    h2.record(10.5, {true, "foo"_sd});
+    h2.record(5.5, {false, "bar"_sd});
+
+    if (metricsCapturer.canReadMetrics()) {
+        const auto internalFooData =
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{true, "foo"_sd});
+        EXPECT_DOUBLE_EQ(internalFooData.sum, 10.5);
+        EXPECT_EQ(internalFooData.count, 1u);
+
+        const auto externalBarData =
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{false, "bar"_sd});
+        EXPECT_DOUBLE_EQ(externalBarData.sum, 5.5);
+        EXPECT_EQ(externalBarData.count, 1u);
+
+        ASSERT_THROWS_CODE(
+            metricsCapturer.readDoubleHistogram(MetricNames::kTest2, std::tuple{true, "bar"_sd}),
+            DBException,
+            ErrorCodes::KeyNotFound);
     }
 }
 
@@ -1436,6 +1612,7 @@ TEST_F(CreateHistogramTest, RecordsDoubleValuesExplicitBoundaries) {
         EXPECT_EQ(data2.count, 1);
     }
 }
+
 
 using GetAttributeNamesForTestingTest = MetricsServiceTest;
 
