@@ -231,26 +231,7 @@ def make_task(targets_to_run, variant_name):
                 "execute resmoke tests via bazel",
                 {
                     "targets": " ".join(targets_to_run),
-                    "bazel_args": (
-                        "--test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test "
-                        "--test_arg=--testTimeout=960 "
-                        "--test_timeout=1500 "
-                        "--config=evg "
-                    ),
-                    "task_compile_flags": (
-                        "--keep_going "
-                        "--verbose_failures "
-                        "--simple_build_id=True "
-                        "--define=MONGO_VERSION=${version} "
-                        "--linkstatic=True "
-                        "--features=strip_debug "
-                        "--separate_debug=False "
-                        "--remote_download_outputs=minimal "
-                        "--zip_undeclared_test_outputs"
-                    ),
                     "generate_burn_in_targets": True,
-                    "compiling_for_test": True,
-                    "build_timeout_seconds": 1800,
                 },
             ),
         ],

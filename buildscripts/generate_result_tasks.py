@@ -53,6 +53,7 @@ def _bazel_binary() -> str:
 
 def make_results_task(target: str) -> Task:
     commands = [
+        FunctionCall("execute resmoke tests via bazel", {"targets": target, "result_task": True}),
         FunctionCall("fetch remote test results", {"test_label": target}),
     ]
 
@@ -78,17 +79,22 @@ def make_task_group(
         setup_group_can_fail_task=True,
         setup_group=[
             FunctionCall("git get project and add git tag"),
-            FunctionCall("get engflow cert"),
-            FunctionCall("get engflow key"),
+            FunctionCall("set task expansion macros"),
+            FunctionCall("f_expansions_write"),
+            FunctionCall("set up venv"),
+            FunctionCall("configure evergreen api credentials"),
+            FunctionCall("set up credentials"),
+            FunctionCall("get engflow creds"),
             BuiltInCommand(
                 "s3.get",
                 {
                     "aws_key": "${aws_key_new}",
                     "aws_secret": "${aws_secret}",
-                    "local_file": "build_events.json",
+                    "local_file": "src/build_events.json",
                     "remote_file": "${project}/${version_id}/${build_variant}/"
                     + f"{resmoke_task}/build_events.json",
                     "bucket": "mciuploads",
+                    "optional": True,
                 },
             ),
             BuiltInCommand(
@@ -100,6 +106,7 @@ def make_task_group(
                     "remote_file": "${project}/${build_variant}/${revision}/"
                     + f"bazel-invocation-{resmoke_task}-0.txt",
                     "bucket": "mciuploads",
+                    "optional": True,
                 },
             ),
         ],
