@@ -52,7 +52,6 @@
 #include "mongo/transport/session_manager_common_gen.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_options_gen.h"
-#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/processinfo.h"
@@ -82,9 +81,6 @@ struct ClientSummary {
     friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
         logv2::DynamicAttributes attrs;
         attrs.add("remote", m.remote);
-        if (isUnixDomainSocket(m.local.host())) {
-            attrs.add("unixSockPath", m.local);
-        }
         attrs.add("isLoadBalanced", m.isLoadBalanced);
         attrs.add("isProxyUnixSock", m.isProxyUnixSock);
         if (m.isLoadBalanced || m.isProxyUnixSock) {
@@ -102,8 +98,6 @@ struct ClientSummary {
 
     UUID uuid;
     HostAndPort remote;
-    // `local` is here only so that we can use it to indicate the path to the unix domain socket
-    // when the client is connected to a unix domain socket.
     HostAndPort local;
     HostAndPort sourceClient;
     SessionId id;
