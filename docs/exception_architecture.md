@@ -15,6 +15,8 @@ MongoDB code uses the following types of assertions that are available for use:
 - `invariant`
   - Checks process invariant. Process-fatal. Use to detect code logic errors ("pointer should never
     be null", "we should always be locked").
+- `dassert`
+  - Calls `invariant` but only in debug mode.
 
 **Note**: Calling C function `assert` is not allowed. Use one of the above instead.
 
@@ -23,8 +25,6 @@ The following types of assertions are deprecated:
 - `MONGO_verify`
   - Checks per-operation invariants. A synonym for massert but doesn't require an error code.
     Process fatal in debug mode. Do not use for new code; use invariant or fassert instead.
-- `dassert`
-  - Calls `invariant` but only in debug mode. Do not use!
 
 MongoDB uses a series of `ErrorCodes` (defined in [mongo/base/error_codes.yml][error_codes_yml]) to
 identify and categorize error conditions. `ErrorCodes` are defined in a YAML file and converted to
