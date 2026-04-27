@@ -30,9 +30,11 @@
 #pragma once
 
 #include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -41,6 +43,11 @@ namespace unified_write_executor {
 class WriteBatchScheduler {
 public:
     using CollectionsToCreate = ProcessorResult::CollectionsToCreate;
+
+    struct RoundResult {
+        bool madeProgress;
+        bool metadataRefreshed;
+    };
 
     WriteBatchScheduler(WriteCommandRef cmdRef,
                         WriteOpBatcher& batcher,
@@ -58,14 +65,16 @@ public:
 
 protected:
     /**
-     * Helper method for executing a batch and processing the responses. Returns a boolean that
-     * indicates if any progress was made.
+     * Helper method for executing a batch and processing the responses. Returns a RoundResult
+     * where 'madeProgress' is true if at least one op completed successfully, and
+     * 'metadataRefreshed' is true if the routing cache returned a different ShardVersion or
+     * DatabaseVersion compared to the stale versions from the previous round.
      *
      * This method takes care of marking ops for re-processing as needed, it will create collections
      * as needed if there were any CannotImplicitlyCreateCollection errors, and it will also inform
      * the batcher to stop making batches if an unrecoverable error has occurred.
      */
-    bool executeRound(OperationContext* opCtx);
+    RoundResult executeRound(OperationContext* opCtx);
 
     /**
      * Helper method for creating a RoutingContext.
@@ -117,6 +126,16 @@ protected:
     WriteBatchExecutor& _executor;
     WriteBatchResponseProcessor& _processor;
     boost::optional<OID> _targetEpoch;
+
+private:
+    // The StaleConfig receivedVersion and originating ShardId per namespace from the previous
+    // round. Compared against the new RoutingContext's shard-specific version to detect productive
+    // StaleConfig refreshes.
+    stdx::unordered_map<NamespaceString, std::pair<ShardId, ShardVersion>> _prevStaleVersions;
+
+    // The StaleDbVersion receivedVersion per database from the previous round, compared against
+    // the current round's DatabaseVersion to detect productive database-version refreshes.
+    stdx::unordered_map<DatabaseName, DatabaseVersion> _prevStaleDbVersions;
 };
 
 }  // namespace unified_write_executor

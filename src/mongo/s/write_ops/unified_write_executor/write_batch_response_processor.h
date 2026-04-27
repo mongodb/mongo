@@ -31,10 +31,13 @@
 
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/wc_error.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::unified_write_executor {
@@ -193,6 +196,26 @@ public:
      * max size, we record this as an error for the next write op.
      */
     bool checkBulkWriteReplyMaxSize(OperationContext* opCtx);
+
+    /**
+     * Returns the StaleConfig receivedVersion and originating ShardId observed during the most
+     * recent call to onWriteBatchResponse(), keyed by namespace. Only the first stale error per
+     * namespace is recorded; a single entry is sufficient to detect productive cache refreshes
+     * because a productive refresh updates routing metadata for the entire collection.
+     */
+    const stdx::unordered_map<NamespaceString, std::pair<ShardId, ShardVersion>>&
+    getLastRoundStaleVersions() const {
+        return _lastRoundStaleVersions;
+    }
+
+    /**
+     * Returns the StaleDbVersion receivedVersion observed during the most recent call to
+     * onWriteBatchResponse(), keyed by database name. Only the first stale error per database is
+     * recorded; a single entry is sufficient to detect productive database-version refreshes.
+     */
+    const stdx::unordered_map<DatabaseName, DatabaseVersion>& getLastRoundStaleDbVersions() const {
+        return _lastRoundStaleDbVersions;
+    }
 
 private:
     ProcessorResult _onWriteBatchResponse(OperationContext* opCtx,
@@ -384,6 +407,16 @@ private:
     int32_t _approximateSize = 0;
     std::vector<ShardWCError> _wcErrors;
     stdx::unordered_set<StmtId> _retriedStmtIds;
+
+    // The StaleConfig receivedVersion and originating ShardId for each namespace seen in the most
+    // recent call to onWriteBatchResponse(). Cleared at the start of each call and populated in
+    // noteRetryableError(). Only the first stale error per namespace is recorded.
+    stdx::unordered_map<NamespaceString, std::pair<ShardId, ShardVersion>> _lastRoundStaleVersions;
+
+    // The StaleDbVersion receivedVersion for each database seen in the most recent call to
+    // onWriteBatchResponse(). Cleared at the start of each call and populated in
+    // noteRetryableError(). Only the first stale error per database is recorded.
+    stdx::unordered_map<DatabaseName, DatabaseVersion> _lastRoundStaleDbVersions;
 };
 
 }  // namespace mongo::unified_write_executor

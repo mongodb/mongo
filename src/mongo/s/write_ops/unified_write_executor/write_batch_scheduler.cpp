@@ -37,6 +37,63 @@
 
 namespace mongo {
 namespace unified_write_executor {
+namespace {
+
+// Returns true if the routing cache produced new metadata relative to the stale versions observed
+// in the previous round. Checks both StaleConfig (shard-specific ShardVersion per namespace) and
+// StaleDbVersion (DatabaseVersion per database) errors.
+bool checkMetadataRefreshed(
+    const RoutingContext& routingCtx,
+    const std::vector<NamespaceString>& nssList,
+    const stdx::unordered_map<NamespaceString, std::pair<ShardId, ShardVersion>>& prevStaleVersions,
+    const stdx::unordered_map<DatabaseName, DatabaseVersion>& prevStaleDbVersions) {
+    // Check StaleConfig: compare shard-specific ShardVersions (not the collection-level max) to
+    // avoid false positives on multi-shard collections.
+    for (const auto& [nss, shardAndVersion] : prevStaleVersions) {
+        const auto& [shardId, prevVersion] = shardAndVersion;
+        if (!routingCtx.hasNss(nss)) {
+            // StaleConfig errors can carry the internal buckets namespace (system.buckets.*)
+            // rather than the user-facing timeseries namespace, which is what _nssSet tracks.
+            tassert(12378201,
+                    "NSS from StaleConfig error not found in RoutingContext and is not a "
+                    "timeseries buckets namespace",
+                    nss.isTimeseriesBucketsCollection());
+            continue;
+        }
+        const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+        if (!cri.hasRoutingTable()) {
+            // Guard before getShardVersion() to avoid tassert when the collection has no routing
+            // table. The transition from tracked (prevVersion != UNTRACKED) to untracked is a
+            // productive refresh. Once the routing cache has already settled on untracked
+            // (prevVersion == UNTRACKED), further StaleConfig rounds are not productive.
+            if (prevVersion != ShardVersion::UNTRACKED()) {
+                return true;
+            }
+        } else if (cri.getShardVersion(shardId) != prevVersion) {
+            return true;
+        }
+    }
+
+    // Check StaleDbVersion: for each affected database, find any namespace in that database and
+    // compare DatabaseVersions. A change in DatabaseVersion means the primary shard changed, which
+    // is a productive refresh.
+    for (const auto& [dbName, prevDbVersion] : prevStaleDbVersions) {
+        for (const auto& nss : nssList) {
+            if (nss.dbName() != dbName) {
+                continue;
+            }
+            const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+            if (cri.getDbVersion() != prevDbVersion) {
+                return true;
+            }
+            break;  // one NSS per database is enough
+        }
+    }
+
+    return false;
+}
+
+}  // namespace
 
 void WriteBatchScheduler::run(OperationContext* opCtx) {
     // The loop below uses an exponential backoff scheme that kicks in when there are one or more
@@ -70,33 +127,45 @@ void WriteBatchScheduler::run(OperationContext* opCtx) {
         }
 
         // Execute a round.
-        bool madeProgress = executeRound(opCtx);
+        auto result = executeRound(opCtx);
 
         // Increment 'rounds', update 'numRoundsWithoutProgress', and print a message to the log.
         ++rounds;
-        numRoundsWithoutProgress = !madeProgress ? numRoundsWithoutProgress + 1 : 0;
+        numRoundsWithoutProgress =
+            (result.madeProgress || result.metadataRefreshed) ? 0 : numRoundsWithoutProgress + 1;
         LOGV2_DEBUG(10896504, 4, "Completed round", "rounds completed"_attr = rounds);
     }
 }
 
-bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
+WriteBatchScheduler::RoundResult WriteBatchScheduler::executeRound(OperationContext* opCtx) {
     const bool ordered = _cmdRef.getOrdered();
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     const auto nssList = std::vector<NamespaceString>{_nssSet.begin(), _nssSet.end()};
 
-    // If we've exceeded our memory limit, stop execution.
+    // Take ownership of the previous round's stale versions so we can compare them against the
+    // new RoutingContext below. Both maps will be repopulated after this round.
+    auto prevStaleVersions = std::move(_prevStaleVersions);
+    auto prevStaleDbVersions = std::move(_prevStaleDbVersions);
+
+    // If we've exceeded our memory limit, stop execution. _prevStaleVersions is intentionally
+    // not restored here because stopMakingBatches() guarantees no further rounds will run.
     if (_processor.checkBulkWriteReplyMaxSize(opCtx)) {
         _batcher.stopMakingBatches();
-        return false;
+        return RoundResult{.madeProgress = false, .metadataRefreshed = false};
     }
 
     // Create a RoutingContext. If creating the RoutingContext fails, handle the failure and
-    // return an empty vector.
+    // return early. _prevStaleVersions is intentionally not restored here because
+    // handleInitRoutingContextError() either throws or calls stopMakingBatches(), guaranteeing
+    // no further rounds will run.
     auto swRoutingCtx = initRoutingContext(opCtx, nssList);
     if (!swRoutingCtx.isOK()) {
         handleInitRoutingContextError(opCtx, swRoutingCtx.getStatus());
-        return false;
+        return RoundResult{.madeProgress = false, .metadataRefreshed = false};
     }
+
+    bool metadataRefreshed = checkMetadataRefreshed(
+        *swRoutingCtx.getValue(), nssList, prevStaleVersions, prevStaleDbVersions);
 
     // Capture how many OK responses there have been at the start of the round so we can compare
     // against it when the round has finished.
@@ -132,6 +201,10 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
             return _processor.onWriteBatchResponse(opCtx, routingCtx, batchResponse);
         });
 
+    // Save the stale versions from this round for the next round's metadata-refresh check.
+    _prevStaleVersions = _processor.getLastRoundStaleVersions();
+    _prevStaleDbVersions = _processor.getLastRoundStaleDbVersions();
+
     // Check if any progress was made during this round.
     bool madeProgress = _processor.getNumOkItemsProcessed() > previousNumOkItems;
 
@@ -139,7 +212,7 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
     // call stopMakingBatches() to stop any further execution of this command and then return.
     if ((ordered || inTransaction) && _processor.getNumErrorsRecorded() > 0) {
         _batcher.stopMakingBatches();
-        return madeProgress;
+        return RoundResult{.madeProgress = madeProgress, .metadataRefreshed = metadataRefreshed};
     }
 
     // Mark each op in 'opsToRetry' for re-processing.
@@ -153,8 +226,9 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
     // if the call to createCollections() successfully created one or more collections.
     madeProgress |= createCollections(opCtx, result.collsToCreate);
 
-    return madeProgress;
+    return RoundResult{.madeProgress = madeProgress, .metadataRefreshed = metadataRefreshed};
 }
+
 
 StatusWith<std::unique_ptr<RoutingContext>> WriteBatchScheduler::initRoutingContext(
     OperationContext* opCtx, const std::vector<NamespaceString>& nssList) {
