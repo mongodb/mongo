@@ -125,7 +125,9 @@ placement version of the ranges located on the shard. Similarly, the overall col
 consists of the collection generation and the maximum placement version of any range in the
 collection.
 
-> [!NOTE] Both mongod and mongos processes log Shard Version values
+<!-- prettier-ignore -->
+> [!NOTE]
+> Both mongod and mongos processes log Shard Version values
 > [using](https://github.com/mongodb/mongo/blob/6dfd42e971cb39367418203ed8137d423e28df3d/src/mongo/db/versioning_protocol/chunk_version.cpp#L75-L77)
 > the `M|m||E||T` format.
 

@@ -489,9 +489,11 @@ acquisition of the stripe lock:
    document to storage.
 3. Finish - Modifying the bucket catalog to reflect what was written to storage.
 
-> [!NOTE] Retrying time-series writes within the server is a distinct process from retryable writes,
-> which is retrying writes from the outside the server in the driver. This section discusses retries
-> within the server, which also handles retryable writes (see contains retry in the image below).
+<!-- prettier-ignore -->
+> [!NOTE]
+> Retrying time-series writes within the server is a distinct process from retryable writes, which
+> is retrying writes from the outside the server in the driver. This section discusses retries within
+> the server, which also handles retryable writes (see contains retry in the image below).
 
 ![SERVER-103329 Drawings (7)](https://github.com/user-attachments/assets/aceb7dfb-45f3-4aac-a0cb-744f080ead76)
 

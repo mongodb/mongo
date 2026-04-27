@@ -5,8 +5,10 @@ easier to discover for new engineers. As you contribute new documentation for se
 please don't forget to link it below and kindly add a reverse link to this README in your new doc.
 Happy knowledge sharing!
 
-> [!NOTE] For the purposes of this README, search is a shorthand to refer to all mongot pipeline
-> stages, so $search/$vectorSearch/$searchMeta.
+<!-- prettier-ignore -->
+> [!NOTE]
+> For the purposes of this README, search is a shorthand to refer to all mongot pipeline stages, so
+> $search/$vectorSearch/$searchMeta.
 
 ## Technical Details
 
@@ -71,8 +73,10 @@ $rankFusion uses the Reciprocal Rank Fusion algorithm while $scoreFusion relies 
 score combination configuration/logic. See
 [this docs page](https://dochub.mongodb.org/core/rank-fusion) to learn more about hybrid search.
 
-> [!NOTE] Hybrid Search stages with and without mongot input pipelines can run on views but not in
-> view definitions. For more information about how mongot stages run on views, see this page.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Hybrid Search stages with and without mongot input pipelines can run on views but not in view
+> definitions. For more information about how mongot stages run on views, see this page.
 
 ### scoreDetails Technical Overview
 

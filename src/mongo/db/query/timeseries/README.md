@@ -58,7 +58,9 @@ resolve when querying viewless timeseries collections.
 
 ### Queries that return user documents
 
-> [!NOTE] This is the expected workflow for users.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is the expected workflow for users.
 
 Like with queries against viewful timeseries collections, queries against viewless timeseries
 collections are also transformed into aggregation requests, since we still must prepend the
@@ -77,7 +79,9 @@ pipeline will then set `_translatedForViewlessTimeseries` to true, since the tim
 
 ### Queries that return raw buckets
 
-> [!NOTE] This is not the expected workflow for users.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is not the expected workflow for users.
 
 Unlike viewful timeseries collections, we cannot query `system.buckets.<namespace>` directly because
 the namespace does not exist. To maintain this functionality, queries directly on the buckets use

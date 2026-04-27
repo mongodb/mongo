@@ -183,10 +183,12 @@ latency-critical paths.
 
 ### Histograms: Acquires Locks (Avoid in Hot Paths)
 
-> [!WARNING] The underlying OpenTelemetry library acquires locks during histogram `Record()`
-> operations. Avoid using histograms in performance-sensitive code paths where lock contention could
-> impact latency or throughput. [SERVER-117030](https://jira.mongodb.org/browse/SERVER-117030)
-> tracks improvements to histogram performance.
+<!-- prettier-ignore -->
+> [!WARNING]
+> The underlying OpenTelemetry library acquires locks during histogram `Record()` operations. Avoid
+> using histograms in performance-sensitive code paths where lock contention could impact latency or
+> throughput. [SERVER-117030](https://jira.mongodb.org/browse/SERVER-117030) tracks improvements to
+> histogram performance.
 
 **When to use histograms:**
 

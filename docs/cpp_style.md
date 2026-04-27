@@ -568,9 +568,10 @@ The rules here change in C++23, such that all temporaries in the range initializ
 fix is a theoretically a breaking change for some code. But the risk tradeoff overwhelmingly favored
 making this change anyway.
 
-> [!WARNING] The compilers we are using have not all implemented this feature yet, even on the v5
-> toolchain. So we still need to be extremely careful with range expressions that rely on
-> intermediate temporaries.
+<!-- prettier-ignore -->
+> [!WARNING]
+> The compilers we are using have not all implemented this feature yet, even on the v5 toolchain. So
+> we still need to be extremely careful with range expressions that rely on intermediate temporaries.
 
 It would be helpful to read the
 [CppReference](https://en.cppreference.com/w/cpp/language/range-for#Temporary_range_initializer) on

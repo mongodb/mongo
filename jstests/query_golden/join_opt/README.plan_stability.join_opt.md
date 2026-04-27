@@ -88,11 +88,13 @@ processed and reported separately.
 
 ## Debugging
 
-> [!WARNING] > **_WARNING:_** The queries dumped by this test, the diff tooling or the summary
-> report may contain EJSON constructs, such as $numberDecimal that are not properly processed by
-> `coll.aggregate()` unless converted using `EJSON.parse()`. Typing information around ISO dates may
-> have also been lost, so manually recreate those as `ISODate(...)`. See the "A note on the queries"
-> section below for more information.
+<!-- prettier-ignore -->
+> [!WARNING]
+> **_WARNING:_** The queries dumped by this test, the diff tooling or the summary report may contain
+> EJSON constructs, such as $numberDecimal that are not properly processed by `coll.aggregate()`
+> unless converted using `EJSON.parse()`. Typing information around ISO dates may have also been
+> lost, so manually recreate those as `ISODate(...)`. See the "A note on the queries" section below
+> for more information.
 
 ### Determining the offending query
 
