@@ -1618,9 +1618,10 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
                                                   pipelineToTarget->serializeToBson());
             PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
 
-            if (expCtx->getIfrContext() &&
-                expCtx->getIfrContext()->getSavedFlagValue(
-                    feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+            auto ifrCtx = expCtx->getIfrContext();
+            auto hybridSearchFlagEnabled = ifrCtx &&
+                ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+            if (hybridSearchFlagEnabled) {
                 liteParsedPipeline.validateWithCollectionMetadata(cri);
             } else {
                 // TODO SERVER-117803 Delete this duplicated check.
@@ -1943,9 +1944,10 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                                                   pipelineToTarget->serializeToBson());
             PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
 
-            if (expCtx->getIfrContext() &&
-                expCtx->getIfrContext()->getSavedFlagValue(
-                    feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+            auto ifrCtx = expCtx->getIfrContext();
+            auto hybridSearchFlagEnabled = ifrCtx &&
+                ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+            if (hybridSearchFlagEnabled) {
                 liteParsedPipeline.validateWithCollectionMetadata(cri);
             } else {
                 // TODO SERVER-117803 Delete this duplicated check.

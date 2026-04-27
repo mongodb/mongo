@@ -840,9 +840,10 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     const auto& itr = allAcquisitions.find(expCtx->getNamespaceString());
     tassert(10313201, "Must acquire the primary namespace", itr != allAcquisitions.end());
     const CollectionOrViewAcquisition& primaryAcquisition = itr->second;
-    if (expCtx->getIfrContext() &&
-        expCtx->getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (hybridSearchFlagEnabled) {
         LiteParsedPipeline(expCtx->getNamespaceString(), serializedPipeline)
             .validateWithCollectionMetadata(primaryAcquisition);
     } else {

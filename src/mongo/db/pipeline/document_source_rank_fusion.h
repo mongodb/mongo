@@ -30,21 +30,15 @@
 #pragma once
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/pipeline/lite_parsed_rank_fusion.h"
 
 #include <list>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(RankFusion);
 
 /**
  * The $rankFusion stage is syntactic sugar for generating an output of ranked results by combining
@@ -76,73 +70,13 @@ public:
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines<LiteParsed> {
-    public:
-        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec,
-                                                 const LiteParserOptions& options);
-
-        LiteParsed(const BSONElement& spec,
-                   const NamespaceString& nss,
-                   std::vector<LiteParsedPipeline> pipelines)
-            : LiteParsedDocumentSourceNestedPipelines(spec, nss, std::move(pipelines)) {}
-
-
-        PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final {
-            return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
-        };
-
-        bool requiresAuthzChecks() const override {
-            return false;
-        }
-
-        bool isSearchStage() const final {
-            return _pipelines[0].hasSearchStage();
-        }
-
-        bool isHybridSearchStage() const final {
-            return true;
-        }
-
-        // $rankFusion desugars into a pipeline that includes $sort.
-        bool isRankedStage() const final {
-            return true;
-        }
-
-        // $rankFusion computes a reciprocal rank fusion score for each document.
-        bool isScoredStage() const final {
-            return true;
-        }
-
-        // $rankFusion does not modify documents, only combines and reorders them.
-        bool isSelectionStage() const final {
-            return true;
-        }
-
-        // $rankFusion is unsupported on timeseries collections.
-        Constraints constraints() const override {
-            return {.canRunOnTimeseries = false};
-        }
-
-        void validate() const override;
-
-        bool hasExtensionVectorSearchStage() const override {
-            return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
-                return pipeline.hasExtensionVectorSearchStage();
-            });
-        }
-
-        bool hasExtensionSearchStage() const override {
-            return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
-                return pipeline.hasExtensionSearchStage();
-            });
-        }
-
-        std::unique_ptr<StageParams> getStageParams() const override {
-            return std::make_unique<RankFusionStageParams>(_originalBson);
-        }
-    };
+    /**
+     * Creates DocumentSource from StageParams. Used when featureFlagExtensionsInsideHybridSearch
+     * is enabled to support extension stages in rank fusion input pipelines.
+     */
+    static std::list<boost::intrusive_ptr<DocumentSource>> createFromStageParams(
+        const RankFusionStageParams& params,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     // It is illegal to construct a DocumentSourceRankFusion directly, use createFromBson() instead.

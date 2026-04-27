@@ -208,6 +208,12 @@ filters:
   - "lite_parsed*":
     approvers:
       - 10gen/query-optimization
+  - "lite_parsed_rank_fusion*":
+    approvers:
+      - 10gen/query-integration-search
+  - "lite_parsed_score_fusion*":
+    approvers:
+      - 10gen/query-integration-search
   - "hybrid_search_pipeline_builder*":
     approvers:
       - 10gen/query-integration

@@ -37,13 +37,13 @@
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/score_fusion_pipeline_builder.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -51,113 +51,32 @@ namespace mongo {
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(
     scoreFusion,
-    DocumentSourceScoreFusion::LiteParsed::parse,
+    LiteParsedScoreFusion::parse,
     AllowedWithApiStrict::kNeverInVersion1,
     &feature_flags::gFeatureFlagSearchHybridScoringFull);
 
-REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(scoreFusion,
-                                                   DocumentSourceScoreFusion,
-                                                   ScoreFusionStageParams);
-
-std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << kStageName << " must take a nested object but found: " << spec,
-            spec.type() == BSONType::object);
-
-    auto parsedSpec = ScoreFusionSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
-    auto inputPipesObj = parsedSpec.getInput().getPipelines();
-
-    auto opts = options;
-    opts.makeSubpipelineOwned = true;
-
-    // Parse each pipeline.
-    std::vector<LiteParsedPipeline> liteParsedPipelines;
-    std::transform(inputPipesObj.begin(),
-                   inputPipesObj.end(),
-                   std::back_inserter(liteParsedPipelines),
-                   [nss, opts](const auto& elem) {
-                       return LiteParsedPipeline(nss, parsePipelineFromBSON(elem), false, opts);
-                   });
-
-    return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(
-        spec, nss, std::move(liteParsedPipelines));
-}
-
-// TODO SERVER-121091 This is currently repeated code with $rankFusion but we can merge both once we
-// have an internal LiteParsed hybrid search stage.
-void DocumentSourceScoreFusion::LiteParsed::validate() const {
-    static const std::string scorePipelineMsg =
-        "All subpipelines to the $scoreFusion stage must begin with one of $search, "
-        "$vectorSearch, or have a custom $score in the pipeline.";
-
-    // Validate pipeline names are unique. We navigate _originalBson directly (rather than
-    // through IDL parsing) so the StringData from fieldNameStringData() points into the
-    // stable _originalBson member and avoids use-after-free.
-    auto pipelinesObj = _originalBson.Obj()["input"].Obj()["pipelines"].Obj();
-    StringDataSet seenNames;
-    for (const auto& elem : pipelinesObj) {
-        auto pipelineName = elem.fieldNameStringData();
-        uassertStatusOKWithContext(
-            FieldPath::validateFieldName(pipelineName),
-            "$scoreFusion pipeline names must follow the naming rules of field path expressions.");
-        uassert(12108715,
-                str::stream()
-                    << "$scoreFusion pipeline names must be unique, but found duplicate name '"
-                    << pipelineName << "'.",
-                seenNames.insert(pipelineName).second);
+namespace {
+DocumentSourceContainer scoreFusionStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<ScoreFusionStageParams*>(stageParams.get());
+    tassert(12192020,
+            "Expected ScoreFusionStageParams in $scoreFusion dispatch",
+            typedParams != nullptr);
+    // TODO SERVER-121094 Remove the createFromBson path when the feature flag is deleted.
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (hybridSearchFlagEnabled) {
+        return DocumentSourceScoreFusion::createFromStageParams(*typedParams, expCtx);
     }
-
-    for (const auto& pipeline : _pipelines) {
-        const auto& stages = pipeline.getStages();
-
-        // Each input pipeline must not be empty.
-        uassert(12108710,
-                str::stream() << "$scoreFusion input pipeline cannot be empty. "
-                              << scorePipelineMsg,
-                !stages.empty());
-
-        // TODO SERVER-117661: Remove this once extension $vectorSearch is supported in hybrid
-        // search pipelines. This must be checked before the scored/selection checks because
-        // extension $vectorSearch doesn't report isScoredStage on its LiteParsedExpandable.
-        search_helpers::throwIfrKickbackIfNecessary(
-            pipeline.hasExtensionVectorSearchStage(),
-            feature_flags::gFeatureFlagVectorSearchExtension,
-            vector_search_metrics::inHybridSearchKickbackRetryCount,
-            "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
-
-        search_helpers::throwIfrKickbackIfNecessary(
-            pipeline.hasExtensionSearchStage(),
-            feature_flags::gFeatureFlagSearchExtension,
-            search_metrics::inHybridSearchKickbackRetryCount,
-            "$search-as-an-extension is not allowed in a $scoreFusion pipeline.");
-
-        // No nested hybrid search stages ($rankFusion/$scoreFusion).
-        uassert(12108711,
-                "$scoreFusion input pipeline has a nested hybrid search stage "
-                "($rankFusion/$scoreFusion). " +
-                    scorePipelineMsg,
-                !pipeline.hasHybridSearchStage());
-
-        // Pipeline must be scored.
-        uassert(12108712,
-                "Pipeline did not begin with a scored stage and did not contain an explicit "
-                "$score stage. " +
-                    scorePipelineMsg,
-                pipeline.isScoredPipeline());
-
-        // All stages must be selection stages.
-        for (const auto& stage : stages) {
-            uassert(12108713,
-                    str::stream()
-                        << stage->getParseTimeName()
-                        << " is not a selection stage because it modifies or transforms the input "
-                           "documents. Only stages that retrieve, limit, or order documents are "
-                           "allowed.",
-                    stage->isSelectionStage());
-        }
-    }
+    return DocumentSourceScoreFusion::createFromBson(typedParams->getOriginalBson(), expCtx);
 }
+}  // namespace
+
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(scoreFusion,
+                                                 ScoreFusionStageParams::id,
+                                                 scoreFusionStageParamsToDocumentSourceFn);
 
 /**
  * Checks that the input pipeline is a valid scored pipeline. This means it is either one of
@@ -259,6 +178,22 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelection
         inputPipelines[inputName] = std::move(pipeline);
     }
     return inputPipelines;
+}
+
+std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::createFromStageParams(
+    const ScoreFusionStageParams& params, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    const auto& spec = params.getSpec();
+    const auto& inputPipelines = params.buildInputPipelines(pExpCtx);
+
+    StringMap<double> weights;
+    const auto& combinationSpec = spec.getCombination();
+    if (combinationSpec.has_value() && combinationSpec->getWeights().has_value()) {
+        weights = hybrid_scoring_util::validateWeights(
+            combinationSpec->getWeights()->getOwned(), inputPipelines, kStageName);
+    }
+
+    ScoreFusionPipelineBuilder builder(spec, weights);
+    return builder.constructDesugaredOutput(inputPipelines, pExpCtx);
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::createFromBson(

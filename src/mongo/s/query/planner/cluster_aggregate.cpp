@@ -563,11 +563,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     const auto wasDesugaredHere =
         !alreadyDesugared && LiteParsedDesugarer::desugar(&clonedLPP, ifrContext);
 
-    bool extensionsInHybridSearchEnabled = expCtx->getIfrContext() &&
-        expCtx->getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
     bool criIsSharded = cri && cri->hasRoutingTable();
-    if (extensionsInHybridSearchEnabled && criIsSharded) {
+    if (hybridSearchFlagEnabled && criIsSharded) {
         clonedLPP.validateWithCollectionMetadata(cri.get());
     }
 

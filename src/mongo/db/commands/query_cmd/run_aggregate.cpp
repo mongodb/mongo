@@ -1066,9 +1066,10 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         desugaredHere ? SecondParseRequirement::kReparseFromLPP : SecondParseRequirement::kNone;
 
     // Validate the entire lite parsed pipeline with the view definition.
-    if (expCtx->getIfrContext() &&
-        expCtx->getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (hybridSearchFlagEnabled) {
         if (aggCatalogState.lockAcquired()) {
             desugaredLPP.validateWithCollectionMetadata(aggCatalogState.getMainCollectionOrView());
         }

@@ -299,6 +299,23 @@ public:
     }
 
     /**
+     * Throws if any stage in the pipeline is not a selection stage. The error message names the
+     * offending stage and `parentStageName` (e.g. "$rankFusion"). Used by hybrid search stages
+     * to validate input pipelines.
+     */
+    void validateAllStagesAreSelection(int errorCode, StringData parentStageName) const {
+        for (const auto& stage : _stageSpecs) {
+            uassert(errorCode,
+                    str::stream()
+                        << parentStageName << " input pipelines must not contain "
+                        << stage->getParseTimeName()
+                        << " because it modifies or transforms the input documents. Only stages "
+                           "that retrieve, limit, or order documents are allowed.",
+                    stage->isSelectionStage());
+        }
+    }
+
+    /**
      * Returns true if the pipeline contains at least one stage that requires the aggregation
      * command to be exempt from ingress admission control.
      */

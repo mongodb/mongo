@@ -40,13 +40,13 @@
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/lite_parsed_rank_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/rank_fusion_pipeline_builder.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
@@ -62,114 +62,30 @@
 namespace mongo {
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(rankFusion,
-                                     DocumentSourceRankFusion::LiteParsed::parse,
+                                     LiteParsedRankFusion::parse,
                                      AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(rankFusion,
-                                                             DocumentSourceRankFusion,
-                                                             RankFusionStageParams);
-
-std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << kStageName << " must take a nested object but found: " << spec,
-            spec.type() == BSONType::object);
-
-    auto parsedSpec = RankFusionSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
-    auto inputPipesObj = parsedSpec.getInput().getPipelines();
-
-    auto opts = options;
-    opts.makeSubpipelineOwned = true;
-
-    // Ensure that all pipelines are valid ranked selection pipelines.
-    std::vector<LiteParsedPipeline> liteParsedPipelines;
-    std::transform(inputPipesObj.begin(),
-                   inputPipesObj.end(),
-                   std::back_inserter(liteParsedPipelines),
-                   [nss, opts](const auto& elem) {
-                       return LiteParsedPipeline(nss, parsePipelineFromBSON(elem), false, opts);
-                   });
-
-    return std::make_unique<DocumentSourceRankFusion::LiteParsed>(
-        spec, nss, std::move(liteParsedPipelines));
-}
-
-void DocumentSourceRankFusion::LiteParsed::validate() const {
-    static const std::string rankPipelineMsg =
-        "All subpipelines to the $rankFusion stage must begin with one of $search, "
-        "$vectorSearch, $geoNear, or have a $sort in the pipeline.";
-
-    // Validate pipeline names are unique. We navigate _originalBson directly (rather than
-    // through IDL parsing) so the StringData from fieldNameStringData() points into the
-    // stable _originalBson member and avoids use-after-free.
-    auto pipelinesObj = _originalBson.Obj()["input"].Obj()["pipelines"].Obj();
-    StringDataSet seenNames;
-    for (const auto& elem : pipelinesObj) {
-        auto pipelineName = elem.fieldNameStringData();
-        uassertStatusOKWithContext(
-            FieldPath::validateFieldName(pipelineName),
-            "$rankFusion pipeline names must follow the naming rules of field path expressions.");
-        uassert(
-            12108714,
-            str::stream() << "$rankFusion pipeline names must be unique, but found duplicate name '"
-                          << pipelineName << "'.",
-            seenNames.insert(pipelineName).second);
+namespace {
+DocumentSourceContainer rankFusionStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<RankFusionStageParams*>(stageParams.get());
+    tassert(
+        12192021, "Expected RankFusionStageParams in $rankFusion dispatch", typedParams != nullptr);
+    // TODO SERVER-121094 Remove the createFromBson path when the feature flag is deleted.
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (hybridSearchFlagEnabled) {
+        return DocumentSourceRankFusion::createFromStageParams(*typedParams, expCtx);
     }
-
-    for (const auto& pipeline : _pipelines) {
-        const auto& stages = pipeline.getStages();
-
-        // Each input pipeline must not be empty.
-        uassert(12108700,
-                str::stream() << "$rankFusion input pipeline cannot be empty. " << rankPipelineMsg,
-                !stages.empty());
-
-        // TODO SERVER-115791: Remove this once extension $vectorSearch is supported in hybrid
-        // search pipelines. This must be checked before the ranked/selection checks because
-        // extension $vectorSearch doesn't report isRankedStage on its LiteParsedExpandable.
-        if (pipeline.hasExtensionVectorSearchStage()) {
-            vector_search_metrics::inHybridSearchKickbackRetryCount.increment();
-            uassertStatusOK(
-                Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
-                       "$vectorSearch-as-an-extension is not allowed in a $rankFusion pipeline."));
-        }
-
-        if (pipeline.hasExtensionSearchStage()) {
-            search_metrics::inHybridSearchKickbackRetryCount.increment();
-            uassertStatusOK(
-                Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagSearchExtension.getName()),
-                       "$search-as-an-extension is not allowed in a $rankFusion pipeline."));
-        }
-
-        // No nested hybrid search stages ($rankFusion/$scoreFusion).
-        uassert(12108701,
-                "$rankFusion input pipeline has a nested hybrid search stage "
-                "($rankFusion/$scoreFusion). " +
-                    rankPipelineMsg,
-                !pipeline.hasHybridSearchStage());
-
-        // Pipeline must be ranked.
-        uassert(12108702,
-                "Pipeline did not begin with a ranked stage and did not contain an explicit "
-                "$sort stage. " +
-                    rankPipelineMsg,
-                pipeline.isRankedPipeline());
-
-        // All stages must be selection stages and must not contain $score.
-        for (const auto& stage : stages) {
-            uassert(12108703,
-                    "$rankFusion input pipelines must not contain a $score stage.",
-                    stage->getParseTimeName() != "$score");
-            uassert(12108704,
-                    str::stream()
-                        << stage->getParseTimeName()
-                        << " is not a selection stage because it modifies or transforms the input "
-                           "documents. Only stages that retrieve, limit, or order documents are "
-                           "allowed.",
-                    stage->isSelectionStage());
-        }
-    }
+    return DocumentSourceRankFusion::createFromBson(typedParams->getOriginalBson(), expCtx);
 }
+}  // namespace
+
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(rankFusion,
+                                                 RankFusionStageParams::id,
+                                                 rankFusionStageParamsToDocumentSourceFn);
 
 /**
  * Checks that the input pipeline is a valid ranked pipeline. This means it is either one of
@@ -265,6 +181,26 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateRankedSelection
         inputPipelines[inputName] = std::move(pipeline);
     }
     return inputPipelines;
+}
+
+std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromStageParams(
+    const RankFusionStageParams& params, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "'featureFlagRankFusionBasic' must be enabled to use rankFusion",
+            bypassRankFusionFCVGate || pExpCtx->isBasicRankFusionFeatureFlagEnabled());
+
+    const auto& spec = params.getSpec();
+    const auto& inputPipelines = params.buildInputPipelines(pExpCtx);
+
+    StringMap<double> weights;
+    const auto& combinationSpec = spec.getCombination();
+    if (combinationSpec.has_value()) {
+        weights = hybrid_scoring_util::validateWeights(
+            combinationSpec->getWeights(), inputPipelines, kStageName);
+    }
+
+    RankFusionPipelineBuilder builder(spec, weights);
+    return builder.constructDesugaredOutput(inputPipelines, pExpCtx);
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
