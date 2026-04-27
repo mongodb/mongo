@@ -2190,13 +2190,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
     migrationutil::deleteMigrationRecipientRecoveryDocument(opCtx, *_migrationId);
 }
 
-void MigrationDestinationManager::onStepUpBegin(OperationContext* opCtx, long long term) {
-    std::lock_guard<std::mutex> sl(_mutex);
-    auto newCancellationSource = CancellationSource();
-    std::swap(_cancellationSource, newCancellationSource);
-}
-
-void MigrationDestinationManager::onStepDown() {
+void MigrationDestinationManager::_cancelAndJoinMigrateThread() {
     boost::optional<SharedSemiFuture<State>> migrateThreadFinishedFuture;
     {
         std::lock_guard<std::mutex> sl(_mutex);
@@ -2211,11 +2205,37 @@ void MigrationDestinationManager::onStepDown() {
     // Wait for the migrateThread to finish.
     if (migrateThreadFinishedFuture) {
         LOGV2(8991401,
-              "Waiting for migrate thread to finish on stepdown",
+              "Waiting for migrate thread to finish",
               logAttrs(_nss),
               "migrationId"_attr = _migrationId);
         migrateThreadFinishedFuture->wait();
     }
+
+    if (_migrateThreadHandle.joinable()) {
+        LOGV2_DEBUG(12510301,
+                    2,
+                    "Start waiting for the existing migrate thread to complete",
+                    "migrationId"_attr = _migrationId);
+        _migrateThreadHandle.join();
+        LOGV2_DEBUG(12510302,
+                    2,
+                    "Finished waiting for the existing migrate thread to complete",
+                    "migrationId"_attr = _migrationId);
+    }
+}
+
+void MigrationDestinationManager::onStepUpBegin(OperationContext* opCtx, long long term) {
+    std::lock_guard<std::mutex> sl(_mutex);
+    auto newCancellationSource = CancellationSource();
+    std::swap(_cancellationSource, newCancellationSource);
+}
+
+void MigrationDestinationManager::onStepDown() {
+    _cancelAndJoinMigrateThread();
+}
+
+void MigrationDestinationManager::onShutdown() {
+    _cancelAndJoinMigrateThread();
 }
 
 boost::optional<BSONObj> MigrationDestinationManager::checkForExistingDocumentsInRange(

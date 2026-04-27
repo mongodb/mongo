@@ -307,6 +307,11 @@ private:
                                                                const Timer& timeInCriticalSection);
 
     /**
+     * Called by onShutdown/onStepDown hooks to cancel and join migrateThread.
+     */
+    void _cancelAndJoinMigrateThread();
+
+    /**
      * ReplicaSetAwareService entry points.
      */
     void onStartup(OperationContext* opCtx) final {}
@@ -314,7 +319,7 @@ private:
     void onConsistentDataAvailable(OperationContext* opCtx,
                                    bool isMajority,
                                    bool isRollback) final {}
-    void onShutdown() final {}
+    void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final {}
     void onStepDown() final;
