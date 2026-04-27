@@ -90,7 +90,13 @@ protected:
         ShardServerTestFixture::tearDown();
     }
 
-private:
+    void populateKeyCache() {
+        LogicalTimeValidator::get(getServiceContext())
+            ->enableKeyGenerator(operationContext(), true);
+        _keyManager->refreshNow(operationContext());
+        _keyManager->stopMonitoring();
+    }
+
     std::shared_ptr<KeysCollectionManager> _keyManager;
 };
 
@@ -162,7 +168,7 @@ TEST_F(VectorClockShardServerTest, GossipOutInternal) {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
-    LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
+    populateKeyCache();
 
     const auto clusterTime = vc->tickClusterTime(1);
 
@@ -186,7 +192,7 @@ TEST_F(VectorClockShardServerTest, GossipOutExternal) {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
-    LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
+    populateKeyCache();
 
     const auto clusterTime = vc->tickClusterTime(1);
 
