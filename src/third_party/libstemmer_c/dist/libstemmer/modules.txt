@@ -21,6 +21,7 @@ norwegian       UTF_8,ISO_8859_1        norwegian,no,nor
 portuguese      UTF_8,ISO_8859_1        portuguese,pt,por
 romanian        UTF_8,ISO_8859_2        romanian,ro,rum,ron
 russian         UTF_8,KOI8_R            russian,ru,rus
+serbian         UTF_8                   serbian,sr,srp
 spanish         UTF_8,ISO_8859_1        spanish,es,esl,spa
 swedish         UTF_8,ISO_8859_1        swedish,sv,swe
 turkish         UTF_8                   turkish,tr,tur
