@@ -150,6 +150,24 @@ public:
             {coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks});
     }
 
+    bool searchIndexExistsForCollection(OperationContext* opCtx, const NamespaceString& nss) {
+        if (_searchIndexResults.empty()) {
+            return _searchIndexDefaultResult;
+        }
+        auto result = std::move(_searchIndexResults.front());
+        _searchIndexResults.erase(_searchIndexResults.begin());
+        return uassertStatusOK(result);
+    }
+
+    void pushSearchIndexResult(bool result) {
+        _searchIndexResults.push_back(result);
+    }
+
+    void pushSearchIndexError(ErrorCodes::Error errorCode) {
+        _searchIndexResults.push_back(
+            Status{errorCode, "Failing call to searchIndexExistsForCollection"});
+    }
+
     void tellAllDonorsToRefresh(OperationContext* opCtx,
                                 const NamespaceString& sourceNss,
                                 const UUID& reshardingUUID,
@@ -325,6 +343,9 @@ private:
     std::mutex _mutex;
     stdx::condition_variable _blockInGetDocumentsDeltaCV;
     bool _doKeepBlockingInGetDocumentsDelta = true;
+
+    std::vector<StatusWith<bool>> _searchIndexResults;
+    bool _searchIndexDefaultResult{false};
 
     CoordinatorStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
@@ -2925,6 +2946,28 @@ TEST_F(ReshardingCoordinatorServiceTest,
 
     ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
               ErrorCodes::ReshardCollectionAborted);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       ReshardingFailsWhenSearchIndexCheckThrowsUnrecoverableError) {
+    externalState()->pushSearchIndexError(ErrorCodes::InternalError);
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator();
+    ASSERT_THROWS_CODE(
+        coordinator->getCompletionFuture().get(opCtx), DBException, ErrorCodes::InternalError);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, ReshardingSucceedsAfterSearchIndexCheckRetryableError) {
+    externalState()->pushSearchIndexError(ErrorCodes::HostUnreachable);
+    runReshardingToCompletion();
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, ReshardingFailsWithIllegalOperationWhenSearchIndexExists) {
+    externalState()->pushSearchIndexResult(true);
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator();
+    ASSERT_THROWS_CODE(
+        coordinator->getCompletionFuture().get(opCtx), DBException, ErrorCodes::IllegalOperation);
 }
 
 }  // namespace

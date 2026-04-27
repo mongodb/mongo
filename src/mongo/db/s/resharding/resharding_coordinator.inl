@@ -1262,6 +1262,19 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
     auto shardsAndChunks = _reshardingCoordinatorExternalState->calculateParticipantShardsAndChunks(
         opCtx.get(), _coordinatorDoc, zones);
 
+    // This is a best effort check to avoid dropping existing search indexes on the source
+    // collection. There is a known race condition where a new search index could be created after
+    // this check passes, in which case the index will be dropped when resharding commits.
+    // TODO: SERVER-125557 (resolve the index-creation race)
+    uassert(
+        ErrorCodes::IllegalOperation,
+        str::stream() << "Cannot reshard collection "
+                      << _coordinatorDoc.getSourceNss().toStringForErrorMsg()
+                      << " because it has MongoDB Search indexes which would be dropped. If you "
+                         "still want to reshard the collection, drop the search indexes first.",
+        !_reshardingCoordinatorExternalState->searchIndexExistsForCollection(
+            opCtx.get(), _coordinatorDoc.getSourceNss()));
+
     auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
                               opCtx.get(), _coordinatorDoc.getSourceNss()) ||
         (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection);

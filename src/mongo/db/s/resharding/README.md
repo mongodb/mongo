@@ -11,7 +11,7 @@ command
 [to the primary of admin database](https://github.com/mongodb/mongo/blob/c8778bfa3b21e9f6c6ac125ca48b816dc1994bf0/src/mongo/s/commands/cluster_reshard_collection_cmd.cpp#L121).
 The primary will
 [create a `ReshardCollectionCoordinatorDocument` and `ReshardCollectionCoordinator`](https://github.com/mongodb/mongo/blob/c8778bfa3b21e9f6c6ac125ca48b816dc1994bf0/src/mongo/db/s/shardsvr_reshard_collection_command.cpp#L106).
-The `RechardCollectionCoordinator` then issues
+The `ReshardCollectionCoordinator` then issues
 [`_configsvrReshardCollection` command to the config shard](https://github.com/mongodb/mongo/blob/c8778bfa3b21e9f6c6ac125ca48b816dc1994bf0/src/mongo/db/s/reshard_collection_coordinator.cpp#L177)
 to ask the config server to start the resharding process.
 

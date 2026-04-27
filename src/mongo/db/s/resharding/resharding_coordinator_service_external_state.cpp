@@ -254,6 +254,37 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             initialChunks};
 }
 
+bool ReshardingCoordinatorExternalStateImpl::searchIndexExistsForCollection(
+    OperationContext* opCtx, const NamespaceString& nss) {
+
+    // $listSearchIndex can be run on any shard that owns at least part of the collection
+    // we are interested in. Here we get the shard which owns the MinKey chunk to make the
+    // command more deterministic and easier to test.
+    const auto cri =
+        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
+    const auto minKeyShardId = cri.getChunkManager().getMinKeyShardIdWithSimpleCollation();
+
+    const auto shardPtr =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId));
+
+    std::vector<BSONObj> pipeline{};
+    pipeline.emplace_back(BSON("$listSearchIndexes" << BSONObj{}));
+    pipeline.emplace_back(BSON("$limit" << 1));
+
+    AggregateCommandRequest aggRequest(nss, pipeline);
+    aggRequest.setWriteConcern(WriteConcernOptions());
+    aggRequest.setCursor(SimpleCursorOptions{});
+
+    try {
+        auto indexes = uassertStatusOK(
+            shardPtr->runAggregationWithResult(opCtx, aggRequest, Shard::RetryPolicy::kIdempotent));
+        return !indexes.empty();
+    } catch (const ExceptionFor<ErrorCodes::SearchNotEnabled>&) {
+        // If search is not enabled, no search indexes could exist.
+        return false;
+    }
+}
+
 void ReshardingCoordinatorExternalStateImpl::tellAllDonorsToRefresh(
     OperationContext* opCtx,
     const NamespaceString& sourceNss,

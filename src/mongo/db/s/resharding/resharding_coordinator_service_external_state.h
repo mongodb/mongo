@@ -64,6 +64,9 @@ public:
         const ReshardingCoordinatorDocument& coordinatorDoc,
         std::vector<ReshardingZoneType> zones) = 0;
 
+    virtual bool searchIndexExistsForCollection(OperationContext* opCtx,
+                                                const NamespaceString& nss) = 0;
+
     ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
 
     bool getIsUnsplittable(OperationContext* opCtx, const NamespaceString& nss);
@@ -177,6 +180,9 @@ public:
         OperationContext* opCtx,
         const ReshardingCoordinatorDocument& coordinatorDoc,
         std::vector<ReshardingZoneType> zones) override;
+
+    bool searchIndexExistsForCollection(OperationContext* opCtx,
+                                        const NamespaceString& nss) override;
 
     void tellAllDonorsToRefresh(OperationContext* opCtx,
                                 const NamespaceString& sourceNss,
