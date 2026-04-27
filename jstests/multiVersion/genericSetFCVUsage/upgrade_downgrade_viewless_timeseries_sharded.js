@@ -6,8 +6,6 @@
  * @tags: [
  *   requires_timeseries,
  *   requires_sharding,
- *   requires_fcv_90,
- *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

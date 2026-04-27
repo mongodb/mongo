@@ -5,8 +5,6 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   requires_fcv_90,
- *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

@@ -4,9 +4,7 @@
 //   uses_change_streams,
 //   requires_replication,
 //   requires_timeseries,
-//   featureFlagCreateViewlessTimeseriesCollections,
 //   featureFlagChangeStreamPreciseShardTargeting,
-//   requires_fcv_90,
 // ]
 
 import "jstests/multiVersion/libs/verify_versions.js";

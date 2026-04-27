@@ -8,8 +8,6 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   requires_fcv_90,
- *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
