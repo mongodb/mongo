@@ -542,7 +542,8 @@ void broadcastDropCollection(OperationContext* opCtx,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
                              const CancellationToken& token,
                              const OperationSessionInfo& osi,
-                             const boost::optional<UUID>& expectedUUID = boost::none) {
+                             const boost::optional<UUID>& expectedUUID,
+                             bool fromMigrate) {
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -561,7 +562,7 @@ void broadcastDropCollection(OperationContext* opCtx,
         executor,
         token,
         osi,
-        true /* fromMigrate */,
+        fromMigrate,
         false /* dropSystemCollections */,
         expectedUUID);
 }
@@ -2508,7 +2509,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                                         **executor,
                                         token,
                                         session,
-                                        _uuid);
+                                        _uuid,
+                                        false /*fromMigrate*/);
             }
 
 
