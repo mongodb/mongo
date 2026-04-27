@@ -65,6 +65,11 @@ void sendReshardingCommand(OperationContext* opCtx,
     resharding::sendCommandToShards(opCtx, opts, shardIds);
 }
 
+/**
+ * Returns the union of all donor and recipient shard IDs from the coordinator document.
+ */
+std::vector<ShardId> getAllParticipantShardIds(const ReshardingCoordinatorDocument& doc);
+
 void tellAllParticipantsToJoinMigrations(
     OperationContext* opCtx,
     const OperationSessionInfo& osi,

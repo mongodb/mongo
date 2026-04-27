@@ -127,6 +127,12 @@ public:
                           const OperationSessionInfo&) override {
         MONGO_UNREACHABLE;
     }
+    std::unique_ptr<CausalityBarrier> buildCausalityBarrier(
+        std::vector<ShardId> participants,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken token) override {
+        MONGO_UNREACHABLE;
+    }
 };
 
 /**

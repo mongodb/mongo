@@ -37,19 +37,16 @@
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
 
 namespace mongo {
-namespace {
+namespace resharding {
+
 std::vector<ShardId> getAllParticipantShardIds(const ReshardingCoordinatorDocument& doc) {
-    auto donorShardIds = resharding::extractShardIdsFromParticipantEntries(doc.getDonorShards());
-    auto recipientShardIds =
-        resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards());
+    auto donorShardIds = extractShardIdsFromParticipantEntries(doc.getDonorShards());
+    auto recipientShardIds = extractShardIdsFromParticipantEntries(doc.getRecipientShards());
 
     std::set<ShardId> shardIds{donorShardIds.begin(), donorShardIds.end()};
     shardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
     return {shardIds.begin(), shardIds.end()};
 }
-}  // namespace
-
-namespace resharding {
 
 void tellAllParticipantsToJoinMigrations(
     OperationContext* opCtx,

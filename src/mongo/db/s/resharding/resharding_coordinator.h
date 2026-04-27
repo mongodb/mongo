@@ -691,6 +691,8 @@ private:
     boost::optional<Status> _originalReshardingStatus;
 
     OperationSessionTracker _sessionTracker;
+
+    const bool _isRecovery;
 };
 
 }  // namespace mongo

@@ -169,7 +169,8 @@ ReshardingCoordinator::ReshardingCoordinator(
       _markKilledExecutor{resharding::makeThreadPoolForMarkKilledExecutor(
           "ReshardingCoordinatorCancelableOpCtxPool")},
       _reshardingCoordinatorExternalState(externalState),
-      _sessionTracker(this) {
+      _sessionTracker(this),
+      _isRecovery(coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
     _reshardingCoordinatorObserver = std::make_shared<ReshardingCoordinatorObserver>();
 
     // If the coordinator is recovering from step-up, make sure to properly initialize the
@@ -400,7 +401,25 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                return ExecutorFuture<void>(**executor)
                    .then([this] { _insertCoordDocAndChangeOrigCollEntry(); })
                    .then([this, executor] { _stopMigrations(executor); })
-                   .then([this] { _calculateParticipantsAndChunksThenWriteToDisk(); });
+                   .then([this] { _calculateParticipantsAndChunksThenWriteToDisk(); })
+                   .then([this, executor] {
+                       // Advance the session txnNumber on all participant shards to invalidate
+                       // stale OSI-stamped commands from the previous primary before re-sending
+                       // them.
+                       auto opCtx = _makeOperationContext();
+                       auto useOSI = resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
+                           VersionContext::getDecoration(opCtx.get()),
+                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+                       if (useOSI && _isRecovery) {
+                           auto barrier =
+                               _reshardingCoordinatorExternalState->buildCausalityBarrier(
+                                   resharding::getAllParticipantShardIds(_coordinatorDoc),
+                                   **executor,
+                                   _ctHolder->getStepdownToken());
+                           _sessionTracker.performCausalityBarrier(opCtx.get(), *barrier);
+                       }
+                   });
            })
         .onTransientError([](const Status& status) {
             LOGV2(5093703,

@@ -33,6 +33,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -634,6 +635,14 @@ void ReshardingCoordinatorExternalStateImpl::resumeMigrations(OperationContext* 
                                                               const UUID& expectedCollectionUUID,
                                                               const OperationSessionInfo& osi) {
     sharding_ddl_util::resumeMigrations(opCtx, nss, expectedCollectionUUID, osi);
+}
+
+std::unique_ptr<CausalityBarrier> ReshardingCoordinatorExternalStateImpl::buildCausalityBarrier(
+    std::vector<ShardId> participants,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken token) {
+    return std::make_unique<ParticipantCausalityBarrier>(
+        std::move(participants), std::move(executor), std::move(token));
 }
 
 }  // namespace mongo

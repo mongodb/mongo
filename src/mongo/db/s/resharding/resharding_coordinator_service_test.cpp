@@ -287,6 +287,23 @@ public:
                       BSON("$unset" << BSON(CollectionType::kAllowMigrationsFieldName << "")));
     }
 
+    std::unique_ptr<CausalityBarrier> buildCausalityBarrier(std::vector<ShardId>,
+                                                            std::shared_ptr<executor::TaskExecutor>,
+                                                            CancellationToken) override {
+        _causalityBarrierInvokeCount.fetch_add(1);
+        class NoOpBarrier : public CausalityBarrier {
+        public:
+            // Unit tests have no real shard servers. Skip the no-op retryable write to avoid
+            // network errors.
+            void perform(OperationContext*, const OperationSessionInfo&) override {}
+        };
+        return std::make_unique<NoOpBarrier>();
+    }
+
+    int getCausalityBarrierInvokeCount() const {
+        return _causalityBarrierInvokeCount.load();
+    }
+
     void throwUnrecoverableErrorIn(CoordinatorStateEnum phase, ExternalFunction func) {
         _errorFunction = std::make_tuple(phase, func);
     }
@@ -299,6 +316,8 @@ public:
 
 private:
     const Options _options;
+
+    std::atomic<int> _causalityBarrierInvokeCount{0};
 
     boost::optional<std::tuple<CoordinatorStateEnum, ExternalFunction>> _errorFunction =
         boost::none;
@@ -990,6 +1009,14 @@ public:
 
     using TransitionFunctionMap = stdx::unordered_map<CoordinatorStateEnum, std::function<void()>>;
 
+    static std::vector<CoordinatorStateEnum> defaultReshardingCompletionStates() {
+        return {CoordinatorStateEnum::kPreparingToDonate,
+                CoordinatorStateEnum::kCloning,
+                CoordinatorStateEnum::kApplying,
+                CoordinatorStateEnum::kBlockingWrites,
+                CoordinatorStateEnum::kCommitting};
+    }
+
     void runReshardingToCompletion() {
         runReshardingToCompletion(TransitionFunctionMap{});
     }
@@ -997,13 +1024,10 @@ public:
     void runReshardingToCompletion(
         const TransitionFunctionMap& transitionFunctions,
         std::unique_ptr<PauseDuringStateTransitions> stateTransitionsGuard = nullptr,
-        const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
-                                                          CoordinatorStateEnum::kCloning,
-                                                          CoordinatorStateEnum::kApplying,
-                                                          CoordinatorStateEnum::kBlockingWrites,
-                                                          CoordinatorStateEnum::kCommitting},
+        std::vector<CoordinatorStateEnum> states = defaultReshardingCompletionStates(),
         boost::optional<ReshardingOptions> reshardingOptions = boost::none,
-        boost::optional<CoordinatorStateEnum> errorState = boost::none) {
+        boost::optional<CoordinatorStateEnum> errorState = boost::none,
+        boost::optional<CoordinatorStateEnum> failoverAtState = boost::none) {
         auto runFunctionForState = [&](CoordinatorStateEnum state) {
             auto it = transitionFunctions.find(state);
             if (it == transitionFunctions.end()) {
@@ -1044,6 +1068,17 @@ public:
                 return;
             } else {
                 waitUntilCommittedCoordinatorDocReach(opCtx, state);
+                if (failoverAtState && state == *failoverAtState) {
+                    stepDown(opCtx);
+                    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
+                              ErrorCodes::CallbackCanceled);
+                    coordinator.reset();
+
+                    stepUp(opCtx);
+                    auto instanceId = BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
+                                           << _reshardingUUID);
+                    coordinator = getCoordinator(opCtx, instanceId);
+                }
             }
 
             switch (state) {
@@ -1076,6 +1111,19 @@ public:
         auto cumulativeMetricsBSON = bob.obj();
         ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countStarted"].numberInt(), 1);
         ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countSucceeded"].numberInt(), 1);
+    }
+
+    /**
+     * Same as runReshardingToCompletion(), but performs a `stepDown`/`stepUp`
+     * immediately after `failoverAtState` is reached.
+     */
+    void runReshardingToCompletionWithFailoverAt(CoordinatorStateEnum failoverAtState) {
+        runReshardingToCompletion(TransitionFunctionMap{},
+                                  nullptr /* stateTransitionsGuard */,
+                                  defaultReshardingCompletionStates(),
+                                  boost::none /* reshardingOptions */,
+                                  boost::none /* errorState */,
+                                  failoverAtState);
     }
 
     void runReshardingWithUnrecoverableError(
@@ -2131,6 +2179,22 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingSendsCloneCmdNotRefresh) {
     pauseBeforeTellingRecipientsToClone->waitForTimesEntered(timesEnteredFailPoint + 1);
     stepDown(opCtx);
     pauseBeforeTellingRecipientsToClone->setMode(FailPoint::off, 0);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierSkippedOnInitialRun) {
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingInitNoRefresh", true);
+
+    runReshardingToCompletion();
+    ASSERT_EQ(externalState()->getCausalityBarrierInvokeCount(), 0);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierInvokedOnRecovery) {
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingInitNoRefresh", true);
+
+    runReshardingToCompletionWithFailoverAt(CoordinatorStateEnum::kPreparingToDonate);
+    ASSERT_EQ(externalState()->getCausalityBarrierInvokeCount(), 1);
 }
 
 class ReshardingCoordinatorServiceFailCloningVerificationTest

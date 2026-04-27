@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
@@ -160,6 +161,14 @@ public:
                                   const NamespaceString& nss,
                                   const UUID& expectedCollectionUUID,
                                   const OperationSessionInfo& osi) = 0;
+    /**
+     * Builds a CausalityBarrier for the given participant shards, which is used to perform a no-op
+     * retryable write on each shard.
+     */
+    virtual std::unique_ptr<CausalityBarrier> buildCausalityBarrier(
+        std::vector<ShardId> participants,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken token) = 0;
 };
 
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
@@ -230,6 +239,11 @@ public:
                           const NamespaceString& nss,
                           const UUID& expectedCollectionUUID,
                           const OperationSessionInfo& osi) override;
+
+    std::unique_ptr<CausalityBarrier> buildCausalityBarrier(
+        std::vector<ShardId> participants,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken token) override;
 
 private:
     /**
