@@ -30,7 +30,6 @@
 #include "mongo/scripting/mozjs/shell/implscope.h"
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 #include <memory>
 
@@ -59,6 +58,7 @@ TEST_F(MozJSImplScopeTest, JsExceptionToStatusOutOfMemoryCheck) {
     }
     setGlobalScriptEngine(nullptr);
 }
+
 }  // namespace
 
 }  // namespace mozjs

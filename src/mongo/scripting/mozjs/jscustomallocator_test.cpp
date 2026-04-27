@@ -28,8 +28,11 @@
  */
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 #include <memory>
 #include <string>
@@ -200,6 +203,40 @@ TEST_F(JSCustomAllocatorTest, ResizeMany) {
     scope.reset();
     setGlobalScriptEngine(nullptr);
 }
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+// Sweep an OOM injection point across scope construction and assert that
+// every failure surfaces as a DBException rather than crashing the process.
+TEST_F(JSCustomAllocatorTest, OOMDuringScopeInitDoesNotCrash) {
+    constexpr int64_t kDisableOomInjection = -1;
+
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    ON_BLOCK_EXIT([] {
+        mongo::sm::set_fail_on_allocation(kDisableOomInjection);
+        setGlobalScriptEngine(nullptr);
+    });
+
+    // Chosen to comfortably exceed the allocations a full scope construction
+    // performs on current SpiderMonkey; beyond this the hook never fires.
+    constexpr int64_t kMaxScopeAllocationsWithMargin = 3800;
+    // Step by 5 to keep the test's runtime tolerable. Set kStep to 1 when
+    // upgrading SpiderMonkey so every allocation index is exercised — a new
+    // crash site could hide at any single-allocation offset.
+    constexpr int64_t kStep = 5;
+    for (int64_t n = 0; n <= kMaxScopeAllocationsWithMargin; n += kStep) {
+        mongo::sm::set_fail_on_allocation(n);
+        try {
+            std::unique_ptr<mongo::Scope> scope(
+                mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+            // Disarm so teardown allocations aren't hijacked.
+            mongo::sm::set_fail_on_allocation(kDisableOomInjection);
+            scope.reset();
+        } catch (const DBException&) {
+            mongo::sm::set_fail_on_allocation(kDisableOomInjection);
+        }
+    }
+}
+#endif  // MONGO_CONFIG_DEBUG_BUILD
 
 }  // namespace mozjs
 }  // namespace mongo

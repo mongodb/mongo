@@ -79,7 +79,19 @@ thread_local size_t max_bytes = 0;
 
 // Allow disabling mmap tracking as a fallback in case counted memory goes too high
 thread_local bool track_mmap_bytes = true;
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+thread_local int64_t fail_on_allocation = -1;
+thread_local int64_t allocation_counter = 0;
+#endif
 }  // namespace
+
+void set_fail_on_allocation(int64_t n) {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    fail_on_allocation = n;
+    allocation_counter = 0;
+#endif
+}
 
 size_t get_total_bytes() {
     return get_malloc_bytes() + get_mmap_bytes();
@@ -146,6 +158,18 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
     // for the SharedImmutableStringsCache (order 600). This triggered a failure of a MOZ_ASSERT
     // which enforces correct lock ordering in the JS engine. For this reason, we avoid checking
     // for an OOM here if we are requesting zero bytes (i.e freeing memory).
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    // Sticky test-only OOM injection; see set_fail_on_allocation.
+    if (bytes) {
+        ++allocation_counter;
+        if (fail_on_allocation >= 0 && allocation_counter >= fail_on_allocation &&
+            !js::AutoEnterOOMUnsafeRegion::isInOOMUnsafeRegion()) {
+            signal_oom();
+            return nullptr;
+        }
+    }
+#endif
+
     if (mb && bytes && (mlb + mmb + bytes > mb)) {
         bool oomUnsafe = js::AutoEnterOOMUnsafeRegion::isInOOMUnsafeRegion();
         LOGV2(10920000,
