@@ -361,7 +361,7 @@ private:
                            const CollectionPtr& collection,
                            RecordStore& rs) const;
 
-    BSONObj _constructStateObject(OperationContext* opCtx, const CollectionPtr& collection) const;
+    BSONObj _constructStateObject() const;
 
     Status _failPointHangDuringBuild(OperationContext* opCtx,
                                      FailPoint* fp,

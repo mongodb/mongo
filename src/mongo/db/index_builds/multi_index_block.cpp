@@ -1511,7 +1511,7 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
                                         const CollectionPtr& collection,
                                         RecordStore& rs) const {
-    auto obj = _constructStateObject(opCtx, collection);
+    auto obj = _constructStateObject();
 
     WriteUnitOfWork wuow(opCtx);
 
@@ -1559,8 +1559,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
           "details"_attr = obj);
 }
 
-BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
-                                               const CollectionPtr& collection) const {
+BSONObj MultiIndexBlock::_constructStateObject() const {
     ResumeIndexInfo resumeIndexInfo;
     resumeIndexInfo.setBuildUUID(*_buildUUID);
     resumeIndexInfo.setPhase(_phase);
