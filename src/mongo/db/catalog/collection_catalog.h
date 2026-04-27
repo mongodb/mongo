@@ -335,10 +335,12 @@ public:
      *
      * Adds the collection to the drop pending state in the catalog when isDropPending=true.
      */
-    std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx,
-                                                     const UUID& uuid,
-                                                     bool isDropPending,
-                                                     boost::optional<Timestamp> commitTime);
+    std::shared_ptr<Collection> deregisterCollection(
+        OperationContext* opCtx,
+        const UUID& uuid,
+        bool isDropPending,
+        boost::optional<Timestamp> commitTime,
+        std::shared_ptr<Collection> dropPendingCollection = nullptr);
 
     /**
      * Create a temporary record of an uncommitted view namespace to aid in detecting a simultaneous

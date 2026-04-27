@@ -190,6 +190,7 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection, boo
     invariant(it->collection.get() == collection);
     it->action = Entry::Action::kDroppedCollection;
     it->externalUUID = it->collection->uuid();
+    it->droppedCollection = it->collection;
     it->collection = nullptr;
     it->isDropPending = isDropPending;
 }

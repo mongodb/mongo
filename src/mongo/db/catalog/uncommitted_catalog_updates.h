@@ -116,6 +116,12 @@ public:
         // Whether the collection or index entry is drop pending.
         // Set for actions kDroppedCollection and kDroppedIndex, boost::none otherwise.
         boost::optional<bool> isDropPending;
+
+        // Store the dropped collection. Set for kDroppedCollection only. The "collection" is used
+        // to implement "read your own writes", meaning a dropped collection needs to be nullptr.
+        // However, when deregistering a collection we may want to act on the latest non-dropped
+        // copy.
+        std::shared_ptr<Collection> droppedCollection;
     };
 
     struct CollectionLookupResult {

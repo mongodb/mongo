@@ -435,8 +435,10 @@ public:
                     writeJobs.push_back([opCtx,
                                          uuid = *entry.uuid(),
                                          isDropPending = *entry.isDropPending,
+                                         dropPendingCollection = entry.droppedCollection,
                                          commitTime](CollectionCatalog& catalog) {
-                        catalog.deregisterCollection(opCtx, uuid, isDropPending, commitTime);
+                        catalog.deregisterCollection(
+                            opCtx, uuid, isDropPending, commitTime, dropPendingCollection);
                     });
                     break;
                 }
@@ -2400,10 +2402,12 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     OperationContext* opCtx,
     const UUID& uuid,
     bool isDropPending,
-    boost::optional<Timestamp> commitTime) {
+    boost::optional<Timestamp> commitTime,
+    std::shared_ptr<Collection> dropPendingCollection) {
     invariant(_catalog.find(uuid));
+    invariant(!dropPendingCollection || dropPendingCollection->uuid() == uuid);
 
-    auto coll = std::move(_catalog[uuid]);
+    auto coll = dropPendingCollection ? dropPendingCollection : std::move(_catalog[uuid]);
     auto ns = coll->ns();
     auto dbIdPair = std::make_pair(ns.dbName(), uuid);
 

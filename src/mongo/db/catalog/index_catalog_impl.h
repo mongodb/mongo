@@ -116,6 +116,8 @@ public:
               Collection* collection,
               bool isPointInTimeRead = false) override;
 
+    void onDeregisterFromCatalog(ServiceContext* svcCtx, Collection* collection) override;
+
     bool haveAnyIndexes() const override;
 
     bool haveAnyIndexesInProgress() const override;

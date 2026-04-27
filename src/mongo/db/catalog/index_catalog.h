@@ -233,6 +233,8 @@ public:
                       Collection* collection,
                       bool isPointInTimeRead = false) = 0;
 
+    virtual void onDeregisterFromCatalog(ServiceContext* svcCtx, Collection* collection) = 0;
+
     // ---- accessors -----
 
     virtual bool haveAnyIndexes() const = 0;

@@ -356,6 +356,19 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
     info.init(opCtx, collection);
 }
 
+void IndexCatalogImpl::onDeregisterFromCatalog(ServiceContext* svcCtx, Collection* collection) {
+    auto& indexUsageTracker = CollectionIndexUsageTrackerDecoration::write(collection);
+    for (const auto& entry : _readyIndexes) {
+        indexUsageTracker.unregisterIndex(entry->descriptor()->indexName());
+    }
+    for (const auto& entry : _buildingIndexes) {
+        indexUsageTracker.unregisterIndex(entry->descriptor()->indexName());
+    }
+    for (const auto& entry : _frozenIndexes) {
+        indexUsageTracker.unregisterIndex(entry->descriptor()->indexName());
+    }
+}
+
 std::unique_ptr<IndexCatalog::IndexIterator> IndexCatalogImpl::getIndexIterator(
     OperationContext* const opCtx, InclusionPolicy inclusionPolicy) const {
     if (inclusionPolicy == InclusionPolicy::kReady) {
