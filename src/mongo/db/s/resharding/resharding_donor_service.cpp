@@ -124,6 +124,9 @@ MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsAfterTransitionToDonatingOplogEntrie
 MONGO_FAIL_POINT_DEFINE(removeDonorDocFailpoint);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsBeforeObtainingTimestamp);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsUpdatingChangeStreamsMonitorProgress);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorBeforeInitCancelState);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorAfterInitCancelState);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorInAbortBeforePromiseSet);
 
 namespace {
 
@@ -1534,6 +1537,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 
 void ReshardingDonorService::DonorStateMachine::_initCancelState(
     const CancellationToken& stepdownToken) {
+    reshardingPauseDonorBeforeInitCancelState.pauseWhileSet();
     {
         std::lock_guard<std::mutex> lk(_mutex);
         _cancelState = std::make_unique<primary_only_service_helpers::CancelState>(stepdownToken);
@@ -1554,6 +1558,7 @@ void ReshardingDonorService::DonorStateMachine::_initCancelState(
             _cancelState->abort();
         }
     }
+    reshardingPauseDonorAfterInitCancelState.pauseWhileSet();
 }
 
 otel::traces::Span ReshardingDonorService::DonorStateMachine::_startSpan(
@@ -1575,10 +1580,22 @@ void ReshardingDonorService::DonorStateMachine::abort(bool isUserCancelled) {
         _cancelState->abort();
     }
 
+    reshardingPauseDonorInAbortBeforePromiseSet.pauseWhileSet();
+
+    bool cancelAfterSettingPromise = false;
     {
         std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(
             lk, _coordinatorHasDecisionPersisted, resharding::kCoordinatorAbortedError);
+
+        // If _cancelState is initialized between our initial read and setting the
+        // promise, we may miss aborting it. Re-check _cancelState here.
+        if (!cancelStateInitialized && _cancelState != nullptr) {
+            cancelAfterSettingPromise = true;
+        }
+    }
+    if (cancelAfterSettingPromise) {
+        _cancelState->abort();
     }
 }
 

@@ -140,7 +140,9 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeEnteringStrictConsistency)
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeTransitionToCreateCollection);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailInPhase);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeCleanup);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeInitCancelState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientAfterInitCancelState);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientInAbortBeforePromiseSet);
 MONGO_FAIL_POINT_DEFINE(reshardingSkipWriteStrictConsistencyOplog);
 
 namespace {
@@ -2205,6 +2207,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
 
 void ReshardingRecipientService::RecipientStateMachine::_initCancelState(
     const CancellationToken& stepdownToken) {
+    reshardingPauseRecipientBeforeInitCancelState.pauseWhileSet();
     {
         std::lock_guard<std::mutex> lk(_mutex);
         _cancelState = std::make_unique<primary_only_service_helpers::CancelState>(stepdownToken);
@@ -2336,12 +2339,24 @@ void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancell
         _cancelState->abort();
     }
 
+    reshardingPauseRecipientInAbortBeforePromiseSet.pauseWhileSet();
+
+    bool cancelAfterSettingPromise = false;
     {
         std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(
             lk, _coordinatorHasEngagedCriticalSection, resharding::kCoordinatorAbortedError);
         ensureFulfilledPromise(
             lk, _coordinatorHasDecisionPersisted, resharding::kCoordinatorAbortedError);
+
+        // If _cancelState is initialized between our initial read and setting the
+        // promises, we may miss aborting it. Re-check _cancelState here.
+        if (!cancelStateInitialized && _cancelState != nullptr) {
+            cancelAfterSettingPromise = true;
+        }
+    }
+    if (cancelAfterSettingPromise) {
+        _cancelState->abort();
     }
 }
 

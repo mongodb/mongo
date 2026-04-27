@@ -2038,6 +2038,94 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
     }
 }
 
+TEST_F(ReshardingRecipientServiceTest, AbortRacesWithInitCancelStateOnStepUp) {
+    auto fpBeforeInit =
+        globalFailPointRegistry().find("reshardingPauseRecipientBeforeInitCancelState");
+    auto fpAfterInit =
+        globalFailPointRegistry().find("reshardingPauseRecipientAfterInitCancelState");
+    auto fpInAbort =
+        globalFailPointRegistry().find("reshardingPauseRecipientInAbortBeforePromiseSet");
+
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        setupFeatureFlags(testOptions);
+
+        LOGV2(11513901,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testOptions"_attr = testOptions);
+
+        // Drive instance 1 to kCreatingCollection and pause there before stepDown(),
+        // matching the synchronization pattern from StepDownStepUpEachTransition. Calling
+        // stepDown() directly after getOrCreate races with run() scheduling and the
+        // completion future does not resolve.
+        PauseDuringStateTransitions creatingCollectionGuard{
+            controller(), RecipientStateEnum::kCreatingCollection};
+        auto doc = makeRecipientDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        if (testOptions.isAlsoDonor) {
+            createSourceCollection(opCtx.get(), doc);
+        }
+
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        creatingCollectionGuard.wait(RecipientStateEnum::kCreatingCollection);
+        stepDown();
+        creatingCollectionGuard.unset(RecipientStateEnum::kCreatingCollection);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
+        recipient.reset();
+
+        // Arm failpoints before stepUp so instance 2's run() pauses at the start of
+        // _initCancelState the moment it is scheduled.
+        auto fpBeforeBaseline = fpBeforeInit->setMode(FailPoint::alwaysOn);
+        auto fpAfterBaseline = fpAfterInit->setMode(FailPoint::alwaysOn);
+        auto fpAbortBaseline = fpInAbort->setMode(FailPoint::alwaysOn);
+
+        stepUp(opCtx.get());
+
+        auto [maybeRecipient, isPausedOrShutdown] =
+            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeRecipient);
+        ASSERT_FALSE(isPausedOrShutdown);
+        recipient = *maybeRecipient;
+
+        // Instance 2's run() paused at the start of _initCancelState; _cancelState is null.
+        fpBeforeInit->waitForTimesEntered(fpBeforeBaseline + 1);
+
+        // abort() will observe _cancelState == nullptr, skip the fast-path cancel, and
+        // pause before setting the coordinator promises.
+        stdx::thread abortThread([&] { recipient->abort(false); });
+        ON_BLOCK_EXIT([&] {
+            if (abortThread.joinable()) {
+                abortThread.join();
+            }
+        });
+        fpInAbort->waitForTimesEntered(fpAbortBaseline + 1);
+
+        // Let _initCancelState publish _cancelState. Its isReady() safety-net check sees
+        // the promise is not yet set (abort is paused), so it skips the safety-net cancel.
+        fpBeforeInit->setMode(FailPoint::off);
+        fpAfterInit->waitForTimesEntered(fpAfterBaseline + 1);
+
+        // Release abort() and let it finish its late cancel.
+        fpInAbort->setMode(FailPoint::off);
+        abortThread.join();
+
+        fpAfterInit->setMode(FailPoint::off);
+
+        // The recipient must complete the abort path even though abort() and
+        // _initCancelState raced; a regression would leave _cancelState uncanceled and
+        // hang here.
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkRecipientDocumentRemoved(opCtx.get());
+    }
+}
+
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
     // The temporary collection is renamed by the donor service when the shard is also a donor. Only
     // on non-donor shards will the recipient service rename the temporary collection.
