@@ -53,6 +53,7 @@
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
@@ -661,6 +662,18 @@ public:
 
     bool getMayDbProfile() const {
         return _params.mayDbProfile;
+    }
+
+    /**
+     * Returns the query execution timer precision appropriate for this ExpressionContext.
+     */
+    QueryExecTimerPrecision getExecTimerPrecision() const {
+        if (!getExplain() && !getMayDbProfile()) {
+            return QueryExecTimerPrecision::kNoTiming;
+        }
+        return getQueryKnobConfiguration().getMeasureQueryExecutionTimeInNanoseconds()
+            ? QueryExecTimerPrecision::kNanos
+            : QueryExecTimerPrecision::kMillis;
     }
 
     bool getAllowDiskUse() const {

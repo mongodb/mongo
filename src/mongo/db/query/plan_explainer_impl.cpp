@@ -292,21 +292,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
         // Include the execution time if it was recorded.
-        if (stats.common.executionTime.precision == QueryExecTimerPrecision::kMillis) {
-            bob->appendNumber(
-                "executionTimeMillisEstimate",
-                durationCount<Milliseconds>(stats.common.executionTime.executionTimeEstimate));
-        } else if (stats.common.executionTime.precision == QueryExecTimerPrecision::kNanos) {
-            bob->appendNumber(
-                "executionTimeMillisEstimate",
-                durationCount<Milliseconds>(stats.common.executionTime.executionTimeEstimate));
-            bob->appendNumber(
-                "executionTimeMicros",
-                durationCount<Microseconds>(stats.common.executionTime.executionTimeEstimate));
-            bob->appendNumber(
-                "executionTimeNanos",
-                durationCount<Nanoseconds>(stats.common.executionTime.executionTimeEstimate));
-        }
+        appendExecutionTimeFields(*bob, stats.common.executionTime);
 
         bob->appendNumber("works", static_cast<long long>(stats.common.works));
         bob->appendNumber("advanced", static_cast<long long>(stats.common.advanced));

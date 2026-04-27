@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/plan_stage_timer.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/operation_context.h"
@@ -423,22 +424,9 @@ protected:
      * stage. May return boost::none if it is not necessary to collect timing info.
      */
     boost::optional<ScopedTimer> getOptTimer() {
-        if (_opCtx && _commonStats.executionTime.precision != QueryExecTimerPrecision::kNoTiming) {
-            if (MONGO_likely(_commonStats.executionTime.precision ==
-                             QueryExecTimerPrecision::kMillis)) {
-                return boost::optional<ScopedTimer>(
-                    boost::in_place_init,
-                    &_commonStats.executionTime.executionTimeEstimate,
-                    &_opCtx->fastClockSource());
-            } else {
-                return boost::optional<ScopedTimer>(
-                    boost::in_place_init,
-                    &_commonStats.executionTime.executionTimeEstimate,
-                    _opCtx->getServiceContext()->getTickSource());
-            }
-        }
-
-        return boost::none;
+        return maybeMakeScopedTimer(_opCtx,
+                                    _commonStats.executionTime.precision,
+                                    &_commonStats.executionTime.executionTimeEstimate);
     }
 
     Children _children;

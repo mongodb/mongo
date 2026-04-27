@@ -38,11 +38,10 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
-#include <variant>
-
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+
 /**
  * Increments a counter by the time elapsed since its construction when it goes out of
  * scope.

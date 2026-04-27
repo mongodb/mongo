@@ -34,13 +34,16 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/express/express_plan.h"
+#include "mongo/db/exec/plan_stage_timer.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -164,6 +167,7 @@ class PlanExecutorExpress final : public PlanExecutor {
 public:
     PlanExecutorExpress(OperationContext* opCtx,
                         std::unique_ptr<CanonicalQuery> cq,
+                        QueryExecTimerPrecision precision,
                         CollectionAcquisition coll,
                         Plan plan,
                         const express::ExceptionRecoveryPolicy* recoveryPolicy,
@@ -350,6 +354,7 @@ template <class Plan>
 PlanExecutorExpress<Plan>::PlanExecutorExpress(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
+    QueryExecTimerPrecision precision,
     CollectionAcquisition collection,
     Plan plan,
     const express::ExceptionRecoveryPolicy* recoveryPolicy,
@@ -361,15 +366,21 @@ PlanExecutorExpress<Plan>::PlanExecutorExpress(
       _planExplainer(&_planStats,
                      &_iteratorStats,
                      &_writeOperationStats,
+                     &_commonStats,
                      _cq ? _cq->getFindCommandRequest().getProjection() : BSONObj{}),
       _plan(std::move(plan)),
       _mustReturnOwnedBson(returnOwnedBson) {
+    _commonStats.executionTime.precision = precision;
     _plan.open(
         _opCtx, collection, recoveryPolicy, &_planStats, &_iteratorStats, &_writeOperationStats);
 }
 
 template <class Plan>
 PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordId* dlOut) {
+    auto optTimer = maybeMakeScopedTimer(_opCtx,
+                                         _commonStats.executionTime.precision,
+                                         &_commonStats.executionTime.executionTimeEstimate);
+
     bool haveOutput = false;
     size_t numUnavailabilityYieldsSinceLastSuccess = 0;
     size_t numWriteConflictYieldsSinceLastSuccess = 0;
@@ -504,8 +515,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
                                              std::move(chosenShardFilter),
                                              std::move(chosenProjection));
 
+            const auto precision = (cq && cq->getExpCtxRaw())
+                ? cq->getExpCtxRaw()->getExecTimerPrecision()
+                : QueryExecTimerPrecision::kNoTiming;
             return {new PlanExecutorExpress(opCtx,
                                             std::move(cq),
+                                            precision,
                                             coll,
                                             std::move(plan),
                                             &doNotRecoverPolicy,
@@ -726,6 +741,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
     fastPathQueryCounters.incrementExpressQueryCounter();
     auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, canonicalUpdate.yieldPolicy());
 
+    const auto precision = canonicalUpdate.expCtx()
+        ? canonicalUpdate.expCtx()->getExecTimerPrecision()
+        : QueryExecTimerPrecision::kNoTiming;
     return std::visit(
         [&](auto chosenIterator,
             auto chosenShardFilter) -> std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> {
@@ -733,10 +751,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
                                              std::move(writeOperation),
                                              std::move(chosenShardFilter),
                                              express::IdentityProjection());
-            return {
-                new PlanExecutorExpress(
-                    opCtx, nullptr, collection, std::move(plan), recoveryPolicy, returnOwnedBson),
-                PlanExecutor::Deleter(opCtx)};
+            return {new PlanExecutorExpress(opCtx,
+                                            nullptr,
+                                            precision,
+                                            collection,
+                                            std::move(plan),
+                                            recoveryPolicy,
+                                            returnOwnedBson),
+                    PlanExecutor::Deleter(opCtx)};
         },
         std::move(iterator),
         std::move(shardFilter));
@@ -794,6 +816,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
     fastPathQueryCounters.incrementExpressQueryCounter();
     auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, parsedDelete.yieldPolicy());
 
+    const auto precision = parsedDelete.expCtx() ? parsedDelete.expCtx()->getExecTimerPrecision()
+                                                 : QueryExecTimerPrecision::kNoTiming;
     return std::visit(
         [&](auto chosenIterator,
             auto chosenWriteOperation,
@@ -804,6 +828,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
                                              express::IdentityProjection());
             return {new PlanExecutorExpress(opCtx,
                                             nullptr /* cq */,
+                                            precision,
                                             collection,
                                             std::move(plan),
                                             recoveryPolicy,

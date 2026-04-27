@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/modules.h"
@@ -205,10 +206,12 @@ public:
     PlanExplainerExpress(const express::PlanStats* planStats,
                          const express::IteratorStats* iteratorStats,
                          const express::WriteOperationStats* writeOperationStats,
+                         const CommonStats* commonStats,
                          BSONObj projection)
         : _planStats(planStats),
           _iteratorStats(iteratorStats),
           _writeOperationStats(writeOperationStats),
+          _commonStats(commonStats),
           _projection(std::move(projection)) {}
 
     const ExplainVersion& getVersion() const override {
@@ -239,6 +242,7 @@ private:
     const express::PlanStats* _planStats;
     const express::IteratorStats* _iteratorStats;
     const express::WriteOperationStats* _writeOperationStats;
+    const CommonStats* _commonStats;
     BSONObj _projection;
 };
 }  // namespace mongo

@@ -48,6 +48,9 @@ std::string PlanExplainerExpress::getPlanSummary() const {
 void PlanExplainerExpress::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->nReturned = _planStats->numResults();
     _iteratorStats->populateSummaryStats(statsOut);
+    if (_commonStats) {
+        statsOut->executionTime = _commonStats->executionTime;
+    }
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
@@ -75,9 +78,12 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
     getSummaryStats(&stats);
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        bob.appendNumber("nReturned", static_cast<long long>(stats.nReturned));
+        if (_commonStats) {
+            appendExecutionTimeFields(bob, _commonStats->executionTime);
+        }
         bob.appendNumber("keysExamined", static_cast<long long>(stats.totalKeysExamined));
         bob.appendNumber("docsExamined", static_cast<long long>(stats.totalDocsExamined));
-        bob.appendNumber("nReturned", static_cast<long long>(stats.nReturned));
         if (!_writeOperationStats->stageName().empty()) {
             _writeOperationStats->populateExecStats(bob);
         }

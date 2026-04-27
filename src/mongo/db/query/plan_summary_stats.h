@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/util/duration.h"
@@ -51,6 +52,26 @@ struct QueryExecTime {
     // Time elapsed while executing this plan.
     Nanoseconds executionTimeEstimate{0};
 };
+
+/**
+ * Appends execution-time fields derived from `execTime` to `bob`:
+ *   * kNoTiming -> nothing is appended,
+ *   * kMillis   -> `executionTimeMillisEstimate`,
+ *   * kNanos    -> `executionTimeMillisEstimate`, `executionTimeMicros`, `executionTimeNanos`.
+ */
+inline void appendExecutionTimeFields(BSONObjBuilder& bob, const QueryExecTime& execTime) {
+    if (execTime.precision == QueryExecTimerPrecision::kMillis) {
+        bob.appendNumber("executionTimeMillisEstimate",
+                         durationCount<Milliseconds>(execTime.executionTimeEstimate));
+    } else if (execTime.precision == QueryExecTimerPrecision::kNanos) {
+        bob.appendNumber("executionTimeMillisEstimate",
+                         durationCount<Milliseconds>(execTime.executionTimeEstimate));
+        bob.appendNumber("executionTimeMicros",
+                         durationCount<Microseconds>(execTime.executionTimeEstimate));
+        bob.appendNumber("executionTimeNanos",
+                         durationCount<Nanoseconds>(execTime.executionTimeEstimate));
+    }
+}
 
 /**
  * A container for the summary statistics that the profiler, slow query log, and

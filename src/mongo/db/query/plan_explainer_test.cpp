@@ -353,6 +353,40 @@ TEST_F(PlanExplainerTest, ExpressPlanSingleFieldEqExplainDiagnostics) {
     ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 1");
 }
 
+TEST_F(PlanExplainerTest, ExpressPlanExecStatsIncludeExecutionTime) {
+    // When explain is set on the ExpressionContext, the express executor should collect per-stage
+    // timing and the explain output at kExecStats verbosity should include the
+    // 'executionTimeMillisEstimate' field.
+    expCtx->setExplain(ExplainOptions::Verbosity::kExecStats);
+    auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto&& [winningPlan, summary] =
+        explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+    ASSERT_STRING_CONTAINS(winningPlan.toString(), "EXPRESS_IXSCAN");
+    ASSERT(winningPlan.hasField("executionTimeMillisEstimate"))
+        << "stage output missing executionTimeMillisEstimate: " << winningPlan.toString();
+    ASSERT_EQ(summary->executionTime.precision, QueryExecTimerPrecision::kMillis);
+}
+
+TEST_F(PlanExplainerTest, ExpressPlanExecStatsIncludeNanoExecutionTime) {
+    // With the nanosecond-precision knob enabled, the express stage output should expose
+    // 'executionTimeMicros' and 'executionTimeNanos' alongside the millisecond estimate.
+    RAIIServerParameterControllerForTest nanosController(
+        "internalMeasureQueryExecutionTimeInNanoseconds", true);
+    expCtx->setExplain(ExplainOptions::Verbosity::kExecStats);
+    auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto&& [winningPlan, summary] =
+        explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+    ASSERT_STRING_CONTAINS(winningPlan.toString(), "EXPRESS_IXSCAN");
+    ASSERT(winningPlan.hasField("executionTimeMillisEstimate")) << winningPlan.toString();
+    ASSERT(winningPlan.hasField("executionTimeMicros")) << winningPlan.toString();
+    ASSERT(winningPlan.hasField("executionTimeNanos")) << winningPlan.toString();
+    ASSERT_EQ(summary->executionTime.precision, QueryExecTimerPrecision::kNanos);
+}
+
 TEST_F(PlanExplainerTest, ClassicPipelinePlanExplain) {
     // A pipeline query including sargable predicates on different fields will consider multiple
     // plans during planning. Its executor can be explained, and the explain output should indicate
