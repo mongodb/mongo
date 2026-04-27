@@ -348,7 +348,7 @@ public:
 
     boost::optional<ScopedSetShardRole> setLocalRouting(
         OperationContext* opCtx, const NamespaceString& subPipelineNss) override {
-        return boost::none;
+        MONGO_UNREACHABLE;
     }
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
