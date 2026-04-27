@@ -799,21 +799,36 @@ bool CollectionImpl::isCappedAndNeedsDelete(OperationContext* opCtx) const {
         return false;
     }
 
-    // When writes are batched, the capped collection insert is not written to the oplog until the
-    // top-level WriteUnitOfWork commits. When writes are not batched, the capped collection insert
-    // is written to the oplog immediately. latestSizeCount() scans the oplog to compute the latest
-    // collection size/count, so it misses the latest insert when writes are batched. To correctly
-    // compute currentDataSize and currentNumRecords, we include the uncommitted size/count changes
-    // if and only if writes are batched.
-    const bool batched = BatchedWriteContext::get(opCtx).writesAreBatched();
-    const CollectionSizeCount uncommittedChanges = (batched)
-        ? UncommittedFastCountChange::getForRead(opCtx).find(uuid())
-        : CollectionSizeCount{.size = 0, .count = 0};
+    long long currentDataSize;
+    long long currentNumRecords;
 
-    const auto [latestSize, latestCount] = latestSizeCount(opCtx);
+    // TODO(SERVER-125506): Remove latestSizeCountEnabled, the entire if-else statement, and the
+    // declaration of currentDataSize and currentNumRecords. See SERVER-123334 for the concise
+    // version of this code.
+    const bool latestSizeCountEnabled =
+        gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (latestSizeCountEnabled && isReplicatedFastCountEnabled(opCtx)) {
+        // When writes are batched, the capped collection insert is not written to the oplog until
+        // the top-level WriteUnitOfWork commits. When writes are not batched, the capped collection
+        // insert is written to the oplog immediately. latestSizeCount() scans the oplog to compute
+        // the latest collection size/count, so it misses the latest insert when writes are batched.
+        // To correctly compute currentDataSize and currentNumRecords, we include the uncommitted
+        // size/count changes if and only if writes are batched.
+        const bool batched = BatchedWriteContext::get(opCtx).writesAreBatched();
+        const CollectionSizeCount uncommittedChanges = (batched)
+            ? UncommittedFastCountChange::getForRead(opCtx).find(uuid())
+            : CollectionSizeCount{.size = 0, .count = 0};
 
-    const long long currentDataSize = latestSize + uncommittedChanges.size;
-    const long long currentNumRecords = latestCount + uncommittedChanges.count;
+        const auto [latestSize, latestCount] = latestSizeCount(opCtx);
+
+        currentDataSize = latestSize + uncommittedChanges.size;
+        currentNumRecords = latestCount + uncommittedChanges.count;
+    } else {
+        currentDataSize = dataSize(opCtx);
+        currentNumRecords = numRecords(opCtx);
+    }
 
     if (currentDataSize > getCollectionOptions().cappedSize) {
         return true;
