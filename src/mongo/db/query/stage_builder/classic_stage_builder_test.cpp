@@ -94,7 +94,8 @@ public:
     /**
      * Builds a PlanStage using the given WorkingSet and QuerySolution.
      */
-    std::unique_ptr<PlanStage> buildPlanStage(std::unique_ptr<QuerySolution> querySolution) {
+    std::unique_ptr<PlanStage> buildPlanStage(std::unique_ptr<QuerySolution> querySolution,
+                                              Collection* collection = nullptr) {
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
@@ -102,7 +103,8 @@ public:
 
         // The collection holder is guaranteed to be valid for the lifetime of the test. This
         // initialization is safe.
-        CollectionPtr collptr = CollectionPtr::CollectionPtr_UNSAFE(_collection.get());
+        CollectionPtr collptr =
+            CollectionPtr::CollectionPtr_UNSAFE(collection ? collection : _collection.get());
         auto coll =
             shard_role_mock::acquireCollectionMocked(_opCtx.get(), kNss, std::move(collptr));
         stage_builder::ClassicStageBuilder builder{
@@ -176,7 +178,7 @@ IndexEntry buildIndexEntryWithIdent(const BSONObj& kp, StringData ident) {
 }
 
 IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
-    return buildIndexEntryWithIdent(kp, "");
+    return buildIndexEntryWithIdent(kp, "a_1");
 }
 }  // namespace
 
@@ -235,11 +237,13 @@ TEST_F(ClassicStageBuilderTest, IndexFetchTranslationPopulatesMap) {
 // The stage builder looks up the index by ident when building the plan. If the ident is gone
 // from the catalog (index was dropped after planning), it throws QueryPlanKilled.
 TEST_F(ClassicStageBuilderTest, DroppedIndexThrowsQueryPlanKilled) {
-    // setUp creates a catalog entry with ident "". The plan refers to "original-ident",
-    // which is not present — simulates the index having been dropped.
+    // Use an empty catalog — no entries at all — so both name and ident lookup fail.
+    // This simulates the index having been dropped with no replacement.
+    auto emptyCollection =
+        std::make_unique<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
     auto idxScan = std::make_unique<IndexScanNode>(
         kNss, buildIndexEntryWithIdent(BSON("a" << 1), "original-ident"));
-    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(idxScan))),
+    ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(idxScan)), emptyCollection.get()),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
 }
@@ -248,7 +252,7 @@ TEST_F(ClassicStageBuilderTest, DroppedIndexThrowsQueryPlanKilled) {
 // means the original index was dropped and replaced. The stage builder detects this via ident
 // comparison (not name lookup) and throws QueryPlanKilled.
 TEST_F(ClassicStageBuilderTest, DroppedAndReplacedIndexThrowsQueryPlanKilled) {
-    // setUp has "a_1" with ident "" in the catalog. The plan refers to "original-ident".
+    // setUp has "a_1" with ident "a_1" in the catalog. The plan refers to "original-ident".
     // findIndexByName("a_1") would succeed, but findIndexByIdent("original-ident") returns
     // null — proving the check is ident-based, not name-based.
     auto idxScan = std::make_unique<IndexScanNode>(

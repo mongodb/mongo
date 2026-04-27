@@ -182,11 +182,9 @@ public:
                                         Collection* collection,
                                         IndexDescriptor&& descriptor,
                                         CreateIndexEntryFlags) override {
-        auto entry = std::make_shared<IndexCatalogEntryMock>(opCtx,
-                                                             CollectionPtr(collection),
-                                                             "" /* ident */,
-                                                             std::move(descriptor),
-                                                             false /* isFrozen */);
+        const auto ident = descriptor.indexName();
+        auto entry = std::make_shared<IndexCatalogEntryMock>(
+            opCtx, CollectionPtr(collection), ident, std::move(descriptor), false /* isFrozen */);
 
         auto save = entry.get();
         _indexEntries.add(std::move(entry));

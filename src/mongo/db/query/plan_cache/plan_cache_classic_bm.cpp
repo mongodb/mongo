@@ -323,46 +323,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     auto opCtx = serviceContext.makeOperationContext();
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
-    auto findCommand = makeFindFromBmParams(bmParams);
-    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build();
-    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = expCtx,
-        .parsedFind = ParsedFindCommandParams{
-            .findCommand = std::move(findCommand),
-            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
-    const size_t nWorks = 1;
-    auto decision = createDecision(nWorks);
-    auto callbacks = createCallback(*cq, *decision);
-
-    auto params = extractFromBmParams(bmParams);
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, *params);
-    ASSERT_OK(statusWithMultiPlanSolns.getStatus());
-
-    auto solns = std::move(statusWithMultiPlanSolns.getValue());
-    size_t indexToGet = -1;
-    if (bmParams.index == kTwoIndexes && bmParams.filter == kAndFilter) {
-        // In the test case for an AND stage of two indexes, there will be 3 plans that come out of
-        // QueryPlanner::plan(): one that uses just the index on {a: 1}, one that uses just
-        // the index on {b: 1}, and one that is {a: 1} AND {b: 1}. For this test case, we want to
-        // explicitly use the third case, so we extract that plan from the result.
-        ASSERT(solns.size() == 3);
-        for (size_t i = 0; i < solns.size(); i++) {
-            if (solns[i]->hasNode(STAGE_AND_SORTED)) {
-                indexToGet = i;
-                break;
-            }
-        }
-    } else {
-        // For the rest of the test cases in this benchmark there should only ever be one solution
-        // that comes out of QueryPlanner::plan(). This is because in the case where there are no
-        // specified indexes, we will always generate just a collection scan plan. If there is an
-        // index, we will only generate the relevant index scan plan but not the collection scan
-        // plan.
-        ASSERT(solns.size() == 1);
-        indexToGet = 0;
-    }
-    auto soln = std::move(solns[indexToGet]);
-
+    // Create the mock collection before extracting planner params so indexes get catalog entries.
     auto collection =
         std::make_shared<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
     // The initialization of the CollectionPtr is SAFE. The lifetime of the Mocked Collection
@@ -402,6 +363,62 @@ void BM_PlanCacheClassic(benchmark::State& state) {
         collection->getIndexCatalog()->createIndexEntry(
             opCtx.get(), collection.get(), std::move(ixDescriptor2), {});
     }
+
+    auto findCommand = makeFindFromBmParams(bmParams);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build();
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = expCtx,
+        .parsedFind = ParsedFindCommandParams{
+            .findCommand = std::move(findCommand),
+            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    const size_t nWorks = 1;
+    auto decision = createDecision(nWorks);
+    auto callbacks = createCallback(*cq, *decision);
+
+    auto params = extractFromBmParams(bmParams);
+
+    // Stage builder resolves indexes by ident via indexCatalogEntryStorage.
+    auto mockEntries =
+        collection->getIndexCatalog()->getEntriesShared(IndexCatalog::InclusionPolicy::kReady);
+    for (auto& indexEntry : params->mainCollectionInfo.indexes) {
+        bool found = false;
+        for (const auto& ice : mockEntries) {
+            if (ice->descriptor()->indexName() == indexEntry.identifier.catalogName) {
+                indexEntry.indexCatalogEntryStorage = ice;
+                found = true;
+                break;
+            }
+        }
+        ASSERT(found);
+    }
+
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, *params);
+    ASSERT_OK(statusWithMultiPlanSolns.getStatus());
+
+    auto solns = std::move(statusWithMultiPlanSolns.getValue());
+    size_t indexToGet = -1;
+    if (bmParams.index == kTwoIndexes && bmParams.filter == kAndFilter) {
+        // In the test case for an AND stage of two indexes, there will be 3 plans that come out of
+        // QueryPlanner::plan(): one that uses just the index on {a: 1}, one that uses just
+        // the index on {b: 1}, and one that is {a: 1} AND {b: 1}. For this test case, we want to
+        // explicitly use the third case, so we extract that plan from the result.
+        ASSERT(solns.size() == 3);
+        for (size_t i = 0; i < solns.size(); i++) {
+            if (solns[i]->hasNode(STAGE_AND_SORTED)) {
+                indexToGet = i;
+                break;
+            }
+        }
+    } else {
+        // For the rest of the test cases in this benchmark there should only ever be one solution
+        // that comes out of QueryPlanner::plan(). This is because in the case where there are no
+        // specified indexes, we will always generate just a collection scan plan. If there is an
+        // index, we will only generate the relevant index scan plan but not the collection scan
+        // plan.
+        ASSERT(solns.size() == 1);
+        indexToGet = 0;
+    }
+    auto soln = std::move(solns[indexToGet]);
 
     auto planCache =
         CollectionQueryInfo::get(collectionsAccessor.getMainCollection()).getPlanCache();
