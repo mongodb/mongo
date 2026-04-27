@@ -100,6 +100,18 @@ function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = f
 }
 
 /**
+ * Build expected events with cursor metadata from a command sequence.
+ * @param {Array<Command>} commands - Command objects
+ * @param {number} watchMode - ChangeStreamWatchMode
+ * @returns {Array<{event: Object, cursorClosed: boolean}>}
+ */
+function buildExpectedEvents(commands, watchMode) {
+    return commands
+        .flatMap((cmd) => cmd.getChangeEvents(watchMode))
+        .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
+}
+
+/**
  * Create a SingleChangeStreamMatcher from expected events.
  * @param {Array<{event: Object, cursorClosed: boolean}>} expectedEvents - Expected events with metadata
  * @returns {SingleChangeStreamMatcher} The configured matcher
@@ -661,9 +673,13 @@ export {
     TEST_COLL_2,
     TEST_SEED,
     kExcludedOperationTypes,
+    buildExpectedEvents,
+    createMatcher,
     createShardingTest,
+    getCurrentClusterTime,
     setupFsmCluster,
     resolveWatchConfig,
+    runTeardownSteps,
     BackgroundMutatorOpType,
     verifyContinuous,
     verifyResume,

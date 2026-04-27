@@ -287,7 +287,12 @@ function makePlacementChangedEntryTemplate(commitTime, dbName, collName = null) 
 // Each comparison is performed over a subset of op entry fields to remove dependencies on
 // timestamps and active FCV version.
 // The function also returns the raw entries retrieved on each shard (in increasing 'ts' order).
-function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderStrict = true) {
+function verifyCommitOpEntriesOnShards(
+    expectedOpEntryTemplates,
+    shards,
+    orderStrict = true,
+    customOpEntryRedactor = null,
+) {
     const namespaces = [...new Set(expectedOpEntryTemplates.map((t) => t.ns))];
     const foundOpEntriesByShard = {};
     for (const shard of shards) {
@@ -328,6 +333,9 @@ function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderSt
                 // Also remove the 'o' field, containing a human-readable message on the commit
                 // (equivalent information is expected to also be present within 'o2').
                 delete strippedOpEntry.o;
+            }
+            if (customOpEntryRedactor) {
+                customOpEntryRedactor(strippedOpEntry);
             }
             return strippedOpEntry;
         });
@@ -714,7 +722,9 @@ function testRenameCollection() {
         assert.eq(sourcePlacementBeforeRename.uuid, targetPlacementAfterRename.uuid);
         assert.sameMembers(sourcePlacementBeforeRename.shards, targetPlacementAfterRename.shards);
         assert(timestampCmp(sourcePlacementBeforeRename.timestamp, sourcePlacementAfterRename.timestamp) < 0);
-        assert(timestampCmp(sourcePlacementAfterRename.timestamp, targetPlacementAfterRename.timestamp) === 0);
+        const targetCollNamespaceChangeTime = targetPlacementAfterRename.timestamp;
+        const commitTime = sourcePlacementAfterRename.timestamp;
+        assert(timestampCmp(targetCollNamespaceChangeTime, commitTime) < 0);
 
         // 2.1 The data-bearing shard has to emit the user-visible commit op entry and the namespace
         // placement change for the source.
@@ -793,8 +803,12 @@ function testRenameCollection() {
         assert.sameMembers(sourcePlacementBeforeRename.shards, targetPlacementAfterRename.shards);
         // Cross-DB rename ops do not maintain the uuid of the source collection.
         assert.neq(sourcePlacementAfterRename.uuid, targetPlacementAfterRename.uuid);
-        assert(timestampCmp(sourcePlacementAfterRename.timestamp, targetPlacementAfterRename.timestamp) === 0);
+
+        // The placement change for the target collection must be logged before the one for the source collection
+        // (which is generated as part of the transaction committing the DDL on the global catalog).
+        const targetCollNamespaceChangeTime = targetPlacementAfterRename.timestamp;
         const commitTime = sourcePlacementAfterRename.timestamp;
+        assert(timestampCmp(targetCollNamespaceChangeTime, commitTime) < 0);
 
         // When a cross-DB rename is performed, the request will involve the use of a temporary
         // collection under the target DB with a randomly generated name.
@@ -833,7 +847,7 @@ function testRenameCollection() {
         // to this, the commit will be matched by a non-visible notification of a
         // dropCollection.
         const expectedEntryTemplatesOnTargetDataBearingShard = [
-            makePlacementChangedEntryTemplate(commitTime, targetDbName, targetCollName),
+            makePlacementChangedEntryTemplate(targetCollNamespaceChangeTime, targetDbName, targetCollName),
             makeDropCollectionEntryTemplate(targetDbName, targetCollName),
         ];
 
@@ -843,9 +857,8 @@ function testRenameCollection() {
         )[targetDataBearingShard];
         assert.eq(commitDropTargetOpEntry.fromMigrate, true);
 
-        // The placement change is first notified on the target collection, so that change stream
-        // readers get redirected to the data bearing shard of the source to see the effect of the
-        // rename.
+        // Similarly to what logged on config.placementHistory, the placement change is first notified on the target collection,
+        //  so that change stream readers get redirected to the data bearing shard of the source to see the effect of the rename.
         assert(timestampCmp(targetPlacementChangeEntry.ts, sourcePlacementChangeEntry.ts) < 0);
     }
 
@@ -877,18 +890,33 @@ function testRenameCollection() {
         assert.sameMembers([], targetPlacementAfterRename.shards);
         assert.eq(sourceCollUuidBeforeRename, targetPlacementAfterRename.uuid);
 
-        // On the source shard,
+        // Verify the expected entries on the data bearing shard of the source collection.
+
+        // Since the source collection is unsharded, we are unable to retrieve a timestamp for the commit from the sharding catalog;
+        // weaker assertions will be hence performed.
+        const redactedCommitTime = null;
+        const validateThenRedactNssPlacementChangedEntry = (opEntry) => {
+            if (opEntry.o2.namespacePlacementChanged === 1) {
+                assert(opEntry.o2.committedAt);
+                assert(timestampCmp(opEntry.o2.committedAt, targetPlacementAfterRename.timestamp) > 0);
+                opEntry.o2.committedAt = null;
+            }
+        };
+
         const expectedEntryTemplatesOnSourceDataBearingShard = [
             makeRenameCollectionEntryTemplate(dbName, sourceCollName, targetCollName, targetPlacementBeforeRename.uuid),
-            makePlacementChangedEntryTemplate(targetPlacementAfterRename.timestamp, dbName, sourceCollName),
+            makePlacementChangedEntryTemplate(redactedCommitTime, dbName, sourceCollName),
         ];
 
         const [renameCommitOpEntry, sourcePlacementChangeEntry] = verifyCommitOpEntriesOnShards(
             expectedEntryTemplatesOnSourceDataBearingShard,
             [sourceDataBearingShard],
+            true /*orderStrict*/,
+            validateThenRedactNssPlacementChangedEntry /*customEntryRedactor*/,
         )[sourceDataBearingShard];
         assert(!renameCommitOpEntry.fromMigrate || renameCommitOpEntry.fromMigrate === false);
 
+        // Verify the expected entries on the data bearing shard for the target collection.
         const expectedEntryTemplatesOnTargetDataBearingShard = [
             makePlacementChangedEntryTemplate(targetPlacementAfterRename.timestamp, dbName, targetCollName),
             makeDropCollectionEntryTemplate(dbName, targetCollName),

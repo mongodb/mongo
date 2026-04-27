@@ -143,10 +143,6 @@ structs:
                     C2C needs to do the renames to replicate create collection."
                 type: bool
                 optional: true
-            commitTimeInGlobalCatalog:
-                type: timestamp
-                description: "Cluster time referenced in each config.collections and config.placementHistory document inserted of modified by the commit of this operation."
-                optional: true
             renamedCollectionEpoch:
                 type: objectid
                 description: "The new epoch that will be applied on the global catalog to the renamed collection"

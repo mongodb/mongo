@@ -1,4 +1,5 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 
 export var RoutingTableConsistencyChecker = (function () {
     const sameObjectFields = (lhsObjFields, rhsObjFields) => {
@@ -218,6 +219,17 @@ export var RoutingTableConsistencyChecker = (function () {
     };
 
     const checkHistoricalPlacementMetadataConsistency = (mongos) => {
+        // Only execute if the FCV state is stable and featureFlagChangeStreamPreciseShardTargeting is enabled
+        const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+        if (
+            isMultiversion ||
+            !isStableFCVSuite() ||
+            !FeatureFlagUtil.isPresentAndEnabled(mongos.getDB("admin"), "ChangeStreamPreciseShardTargeting")
+        ) {
+            jsTest.log.info("Skipping cross-consistency check of config.placementHistory");
+            return;
+        }
+
         const metadataByNamespace = collectPlacementMetadataByNamespace(mongos);
 
         metadataByNamespace.forEach(function (namespaceMetadata) {

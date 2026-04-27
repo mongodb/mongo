@@ -293,7 +293,7 @@ void persistPlacementChangeForCollectionBeingRenamed(
     const NamespaceString& nss,
     const UUID& originalUUID,
     const UUID& uuidUponRename,
-    const Timestamp& clusterTimeUponRename,
+    const Timestamp& timeAtNewPlacementForTargetCollection,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const OperationSessionInfo& osi) {
     auto shardIds =
@@ -302,7 +302,12 @@ void persistPlacementChangeForCollectionBeingRenamed(
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
         constexpr auto stmtId = 1;
         sharding_ddl_util::upsertPlacementHistoryDocInTransaction(
-            txnClient, nss, uuidUponRename, clusterTimeUponRename, std::move(shardIds), stmtId);
+            txnClient,
+            nss,
+            uuidUponRename,
+            timeAtNewPlacementForTargetCollection,
+            std::move(shardIds),
+            stmtId);
 
         return SemiFuture<void>::makeReady();
     };
@@ -410,20 +415,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             // Delete TO collection (if it is also tracked).
             sharding_ddl_util::deleteTrackedCollectionInTransaction(
                 txnClient, toNss, droppedTargetUUID, stmtId++);
-            // Log the placement change for TO through an upsert statement
-            // (Note: a first copy may have been already committed during the
-            // kSetupChangeStreamsPreconditions phase, but then deleted as a consequence of a
-            // concurrent resetPlacementHistory command).
-            auto shardIds =
-                sharding_ddl_util::getListOfShardsOwningChunksForCollection(opCtx, fromUUID);
-            if (!shardIds.empty()) {
-                sharding_ddl_util::upsertPlacementHistoryDocInTransaction(txnClient,
-                                                                          toNss,
-                                                                          newTargetCollectionUuid,
-                                                                          commitTime,
-                                                                          std::move(shardIds),
-                                                                          stmtId++);
-            }
+
             // Delete FROM collection.
             sharding_ddl_util::deleteTrackedCollectionInTransaction(
                 txnClient, fromNss, fromUUID, stmtId++);
@@ -445,21 +437,9 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             // updated accordingly.
             updateUnsplittableCollChunkStmt(txnClient, *optFromCollType, newTargetCollectionUuid);
         } else {
-            // If TO is tracked, remove its routing table and log the placement change.
-            // (Note: the placement change may have been already committed during the
-            // kSetupChangeStreamsPreconditions phase, but then deleted as a consequence of a
-            // concurrent resetPlacementHistory command).
-            const auto targetMetadataDeleted =
-                sharding_ddl_util::deleteTrackedCollectionInTransaction(
-                    txnClient, toNss, droppedTargetUUID, stmtId++);
-            if (targetMetadataDeleted) {
-                sharding_ddl_util::upsertPlacementHistoryDocInTransaction(txnClient,
-                                                                          toNss,
-                                                                          newTargetCollectionUuid,
-                                                                          commitTime,
-                                                                          {} /*shards=*/,
-                                                                          stmtId++);
-            }
+            // If TO is tracked, remove its routing table.
+            sharding_ddl_util::deleteTrackedCollectionInTransaction(
+                txnClient, toNss, droppedTargetUUID, stmtId++);
             deleteZonesStatement(txnClient, toNss);
         }
 
@@ -867,18 +847,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 acquireCriticalSectionOnParticipantsFor(toNss);
 
                 // 2. Define stable values for:
-                // - The cluster time at which the commit of this operation will be recorded in the
-                //   content of notification events and config.collections/placementHistory
-                //   documents;
                 // - The new epoch for FROM, once renamed to TO.
                 // - The identity of the shard that will notify change stream readers of FROM once
                 //   the operation gets committed.
-                if (!_doc.getCommitTimeInGlobalCatalog()) {
+                if (!_doc.getRenamedCollectionEpoch()) {
                     auto newDoc = _doc;
 
-                    auto now = VectorClock::get(opCtx)->getTime();
-                    auto commitTime = now.clusterTime().asTimestamp();
-                    newDoc.setCommitTimeInGlobalCatalog(commitTime);
                     newDoc.setRenamedCollectionEpoch(OID::gen());
                     auto changeStreamsNotifierForSource =
                         getChangeStreamNotifierShardIdFor(_doc.getSourceUUID().value());
@@ -896,13 +870,18 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // and existing change stream readers for this collection to the data bearing shards
                 // of FROM, where they will be able to observe the "commit" event involving both
                 // namespaces.
+                auto timeAtNewPlacementForTargetCollection = [&] {
+                    auto now = VectorClock::get(opCtx)->getTime();
+                    return now.clusterTime().asTimestamp();
+                }();
+
                 const auto session = getNewSession(opCtx);
                 persistPlacementChangeForCollectionBeingRenamed(
                     opCtx,
                     toNss,
                     _doc.getSourceUUID().value(),
                     _doc.getNewTargetCollectionUuid().value(),
-                    _doc.getCommitTimeInGlobalCatalog().value(),
+                    timeAtNewPlacementForTargetCollection,
                     **executor,
                     session);
 
@@ -910,7 +889,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto changeStreamNotifierForTarget =
                     getChangeStreamNotifierShardIdFor(_doc.getTargetUUID());
 
-                NamespacePlacementChanged notification(toNss, *_doc.getCommitTimeInGlobalCatalog());
+                NamespacePlacementChanged notification(toNss,
+                                                       timeAtNewPlacementForTargetCollection);
                 auto buildNewSessionFn = [this](OperationContext* opCtx) {
                     return getNewSession(opCtx);
                 };
@@ -1029,13 +1009,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto preciseChangeStreamTargeterEnabled =
                     supportsPreciseChangeStreamTargeter(opCtx);
                 const auto commitTime = [&] {
-                    if (preciseChangeStreamTargeterEnabled) {
-                        tassert(10723700,
-                                "The commit time must be already present in the recovery document",
-                                _doc.getCommitTimeInGlobalCatalog().has_value());
-                        return _doc.getCommitTimeInGlobalCatalog().value();
-                    }
-
                     auto now = VectorClock::get(opCtx)->getTime();
                     return now.clusterTime().asTimestamp();
                 }();
@@ -1062,8 +1035,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // Generate post-commit placement change event for FROM.
                 if (preciseChangeStreamTargeterEnabled) {
-                    NamespacePlacementChanged notification(fromNss,
-                                                           *_doc.getCommitTimeInGlobalCatalog());
+                    NamespacePlacementChanged notification(fromNss, commitTime);
                     auto buildNewSessionFn = [this](OperationContext* opCtx) {
                         return getNewSession(opCtx);
                     };
