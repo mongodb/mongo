@@ -87,17 +87,21 @@ struct ReadAtLastAppliedDecision {
  */
 ReadAtLastAppliedDecision shouldReadAtLastApplied(OperationContext* opCtx,
                                                   boost::optional<const NamespaceString&> nss) {
-    auto* replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool canAcceptWrites = replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
-    const auto nodeRole = canAcceptWrites ? SnapshotHelper::NodeRole::kPrimary
-                                          : SnapshotHelper::NodeRole::kNotPrimary;
-
     // Non-replicated collections do not need to read at lastApplied, as those collections are not
     // written by the replication system. However, the oplog is special, as it *is* written by the
     // replication system.
     if (nss && !nss->isReplicated() && !nss->isOplog()) {
-        return {false, nodeRole, SnapshotHelper::ReadSourceReason::kUnreplicatedCollection};
+        // canAcceptWritesForDatabase requires RSTL to be held, which is not true for unreplicated
+        // collections.
+        return {false,
+                SnapshotHelper::getNodeRole(opCtx),
+                SnapshotHelper::ReadSourceReason::kUnreplicatedCollection};
     }
+
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool canAcceptWrites = replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
+    const auto nodeRole = canAcceptWrites ? SnapshotHelper::NodeRole::kPrimary
+                                          : SnapshotHelper::NodeRole::kNotPrimary;
 
     // If this node can accept writes (i.e. primary), then no conflicting replication batches are
     // being applied and we can read from the default snapshot. If we are in a replication state
