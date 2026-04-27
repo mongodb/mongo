@@ -371,7 +371,14 @@ const ReplicaSetAwareServiceRegistry::Registerer<MigrationDestinationManager> md
 
 MigrationDestinationManager::MigrationDestinationManager() = default;
 
-MigrationDestinationManager::~MigrationDestinationManager() = default;
+MigrationDestinationManager::~MigrationDestinationManager() {
+    if (_sessionMigration && _sessionMigration->joinable()) {
+        _sessionMigration->join();
+    }
+    if (_migrateThreadHandle.joinable()) {
+        _migrateThreadHandle.join();
+    }
+}
 
 MigrationDestinationManager* MigrationDestinationManager::get(ServiceContext* serviceContext) {
     return &getMigrationDestinationManager(serviceContext);
