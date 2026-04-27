@@ -16,8 +16,10 @@ if (_isWindows()) {
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isMacOS} from "jstests/libs/os_helpers.js";
 
 const kInternalErrorCode = 1;
+const kExpectedGid = getCurrentGid();
 
 function makeProxySocketPath(prefix, port) {
     return `${prefix}/proxy-mongodb-${port}.sock`;
@@ -49,9 +51,23 @@ function testWithVersion(conn, ingressPort, egressPort, proxySocketPath, version
     }
 }
 
+function getFileGid(path) {
+    const outFile = `${MongoRunner.dataDir}/socket_gid.txt`;
+    const statCmd = isMacOS() ? `stat -f %g '${path}' > '${outFile}'` : `stat -c %g '${path}' > '${outFile}'`;
+    assert.eq(0, runNonMongoProgram("bash", "-c", statCmd), `stat failed for ${path}`);
+    return Number(cat(outFile).trim());
+}
+
+function getCurrentGid() {
+    const outFile = `${MongoRunner.dataDir}/current_gid.txt`;
+    assert.eq(0, runNonMongoProgram("bash", "-c", `id -g > '${outFile}'`));
+    return Number(cat(outFile).trim());
+}
+
 function runPeerCredentialValidationTest(conn, prefix) {
     const proxySocketPath = makeProxySocketPath(prefix, conn.port);
     assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
+    assert.eq(getFileGid(proxySocketPath), kExpectedGid);
 
     const proxyServer = new ProxyProtocolServer(allocatePort(), conn.port, 2, {
         egressUnixSocket: proxySocketPath,
@@ -61,10 +77,10 @@ function runPeerCredentialValidationTest(conn, prefix) {
 
     try {
         {
-            // Proxy server GID of 1000 should succeed.
+            // Matching remoteGid should succeed.
             const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
                 mode: "alwaysOn",
-                data: {expectedGid: NumberInt(1000), remoteGid: NumberInt(1000)},
+                data: {remoteGid: NumberInt(kExpectedGid)},
             });
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             new Mongo(uri);
@@ -72,10 +88,10 @@ function runPeerCredentialValidationTest(conn, prefix) {
         }
 
         {
-            // Proxy server GID of 1001 should fail when 1000 is expected.
+            // Differing remoteGid should fail.
             const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
                 mode: "alwaysOn",
-                data: {expectedGid: NumberInt(1000), remoteGid: NumberInt(1001)},
+                data: {remoteGid: NumberInt(kExpectedGid - 1)},
             });
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             assert.throws(() => new Mongo(uri));
@@ -138,6 +154,7 @@ function runMongodTest() {
 
     const mongod = MongoRunner.runMongod({
         proxyUnixSocketPrefix: prefix,
+        proxyUnixSocketFileGroupId: kExpectedGid,
         setParameter: {
             proxyProtocolTimeoutSecs: 1,
             logComponentVerbosity: {network: {verbosity: 4}},
@@ -161,6 +178,7 @@ function runMongosTest() {
         other: {
             mongosOptions: {
                 proxyUnixSocketPrefix: prefix,
+                proxyUnixSocketFileGroupId: kExpectedGid,
                 setParameter: {
                     proxyProtocolTimeoutSecs: 1,
                     logComponentVerbosity: {network: {verbosity: 4}},

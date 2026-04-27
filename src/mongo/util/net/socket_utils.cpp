@@ -287,6 +287,18 @@ void setUnixDomainSocketPermissions(const std::string& path, int permissions) {
         fassertFailedNoTrace(40487);
     }
 }
+
+void setUnixDomainSocketGroup(const std::string& path, gid_t gid) {
+    if (::chown(path.c_str(), -1, gid) == -1) {
+        auto ec = lastPosixError();
+        LOGV2_ERROR(12335300,
+                    "Failed to chown socket file",
+                    "path"_attr = path,
+                    "gid"_attr = gid,
+                    "error"_attr = errorMessage(ec));
+        fassertFailedNoTrace(12335301);
+    }
+}
 #endif
 
 // If an ip address is passed in, just return that.  If a hostname is passed
