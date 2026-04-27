@@ -145,6 +145,9 @@ roles:
           - reshardCollection
           - rewriteCollection
           - unshardCollection
+      - matchType: cluster
+        actions:
+          - enableSharding
 
   readAnyDatabase:
     adminOnly: true
@@ -345,6 +348,7 @@ roles:
 
   clusterManager:
     roles:
+      - enableSharding
       - role: read
         db: "config"
     adminOnly: true
