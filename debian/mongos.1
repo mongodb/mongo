@@ -12,16 +12,16 @@ any other MongoDB instance.
 .IP \(bu 2
 Never change the name of the \fBmongos\f1 binary.
 .IP \(bu 2
-MongoDB disables support for TLS 1.0
-encryption on systems where TLS 1.1+ is available.
+MongoDB disables support for TLS 1.0 and TLS 1.1
+encryption on systems where TLS 1.2+ is available.
 .IP \(bu 2
 The \fBmongos\f1\f1 binary cannot connect to \fBmongod\f1\f1
 instances whose \fBfeature compatibility version (FCV)\f1 is greater
 than that of the \fBmongos\f1\f1\&. For example, you cannot connect
-a MongoDB 5.0 version \fBmongos\f1\f1 to a 8.0
+a MongoDB 6.0 version \fBmongos\f1\f1 to a 8.0
 sharded cluster with \fBFCV\f1 set to 8.0\&. You
-can, however, connect a MongoDB 5.0 version
-\fBmongos\f1\f1 to a 8.0 sharded cluster with \fBFCV\f1 set to 5.0\&.
+can, however, connect a MongoDB 6.0 version
+\fBmongos\f1\f1 to a 8.0 sharded cluster with \fBFCV\f1 set to 6.0\&.
 .IP \(bu 2
 \fBmongod\f1\f1 includes a \fBFull Time Diagnostic Data Capture\f1 mechanism to assist MongoDB engineers with troubleshooting
 deployments. If this thread fails, it terminates the originating process.
@@ -124,7 +124,7 @@ list, for example: \fBrest, exec\f1\&. If the configuration file contains
 expansion directives not specified to \fB\-\-configExpand\f1\f1, the \fBmongos\f1
 returns an error and terminates.
 .PP
-See \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1 for configuration files
+See \fBExternal Configuration Values for Self\-Managed MongoDB\f1 for configuration files
 for more information on expansion directives.
 .RE
 .PP
@@ -536,8 +536,8 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
 .RE
 .PP
-\fBmongos\f1 installed from official \fBInstall MongoDB Community Edition on Debian\f1
-and \fBInstall MongoDB Community Edition on Red Hat or CentOS\f1 packages
+\fBmongos\f1 installed from official \fBInstall MongoDB Community Edition\f1
+and \fBInstall MongoDB Community Edition\f1 packages
 have the \fBbind_ip\f1 configuration set to \fB127.0.0.1\f1 by
 default.
 .RE
@@ -708,7 +708,7 @@ and use the \fBtimeZoneInfo\f1\f1 parameter.
 .PP
 Outputs the \fBmongos\f1 instance\(aqs configuration options, formatted
 in YAML, to \fBstdout\f1 and exits the \fBmongos\f1 instance. For
-configuration options that uses \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1,
+configuration options that uses \fBExternal Configuration Values for Self\-Managed MongoDB\f1,
 \fB\-\-outputConfig\f1\f1 returns the resolved value for those options.
 .PP
 This may include any configured passwords or secrets previously
@@ -784,7 +784,7 @@ documentation for more information.
 .RE
 .SS TLS OPTIONS
 .PP
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 for full documentation of MongoDB\(aqs
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 for full documentation of MongoDB\(aqs
 support.
 .PP
 \fBmongos \-\-tlsMode\f1
@@ -841,7 +841,7 @@ If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -863,7 +863,7 @@ On Windows or macOS, you must specify either \fB\-\-tlsCertificateKeyFile\f1\f1 
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -888,7 +888,7 @@ unencrypted PEM file.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -953,7 +953,7 @@ If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -982,7 +982,7 @@ connection if the presented X.509 certificate expires within \fB30\f1
 days of the \fBmongod/mongos\f1 host system time.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1007,7 +1007,7 @@ use an unencrypted PEM file.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1024,7 +1024,7 @@ the operating system\(aqs secure store instead of a PEM key file. See
 do not need to, but can, also specify the \fB\-\-tlsCAFile\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1051,7 +1051,7 @@ do not need to, but can, also specify the \fB\-\-tlsClusterCAFile\f1\f1\&.
 Requires that \fB\-\-tlsCAFile\f1\f1 is set.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1190,7 +1190,7 @@ certificate store.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1217,7 +1217,7 @@ a mixed deployment that includes clients that do not or cannot present
 certificates to the \fBmongos\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1239,7 +1239,7 @@ the \fB\-\-tlsAllowInvalidCertificates\f1\f1 setting, MongoDB
 logs a warning regarding the use of the invalid certificate.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1253,7 +1253,7 @@ to other members if the hostnames in their certificates do not match
 their configured hostname.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -1299,8 +1299,20 @@ Directs the \fBmongos\f1 to use the FIPS mode of the  TLS
 library. Your system must have a FIPS
 compliant library to use the \fB\-\-tlsFIPSMode\f1\f1 option.
 .PP
+Starting in MongoDB 8.3, you cannot specify \fBSCRAM\-SHA\-1\f1 for
+\fBauthenticationMechanisms\f1\f1 while also specifying
+\fBmongod \-\-tlsFIPSMode\f1\f1 or \fBmongos \-\-tlsFIPSMode\f1\f1\&.
+.PP
+If you try to specify \fBSCRAM\-SHA\-1\f1 for \fBauthenticationMechanisms\f1 while
+also specifying \fB\-\-tlsFIPSMode\f1, the server throws an error and
+logs a message similar to the following:
+.PP
+.EX
+  SCRAM\-SHA\-1 is not allowed in FIPS mode.
+.EE
+.PP
 FIPS\-compatible TLS/SSL is
-available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&. See
+available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&. See
 \fBConfigure MongoDB for FIPS\f1 for more information.
 .RE
 .SS AUDIT OPTIONS
@@ -1337,7 +1349,7 @@ Do not compress the audit log.
 .RE
 .RE
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .RE
@@ -1388,7 +1400,7 @@ Output the audit events to the file specified in
 .RE
 .RE
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
@@ -1401,7 +1413,7 @@ Interoperability Protocol (KMIP) key for \fBaudit log encryption\f1\&.
 You cannot use \fB\-\-auditEncryptionKeyUID\f1\f1 and
 \fB\-\-auditLocalKeyFile\f1\f1 together.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .RE
@@ -1440,7 +1452,7 @@ specified in \fB\-\-auditPath\f1\f1\&.
 Printing audit events to a file in JSON format degrades server
 performance more than printing to a file in BSON format.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
@@ -1458,7 +1470,7 @@ Management Interoperability Protocol (KMIP) server.
 You cannot use \fB\-\-auditLocalKeyFile\f1\f1 and
 \fB\-\-auditEncryptionKeyUID\f1\f1 together.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .RE
@@ -1471,7 +1483,7 @@ Specifies the output file for auditing if
 \fB\-\-auditPath\f1\f1 option can take either a full path name or a
 relative path name.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
@@ -1496,7 +1508,7 @@ To specify the audit filter in a
 \fBconfiguration file\f1, you must use the YAML format
 of the configuration file.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP

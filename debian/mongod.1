@@ -1,5 +1,5 @@
 .TH mongod 1
-.SH MONGOD
+.SH MONGOD INSTANCES
 .SH SYNOPSIS
 \fBmongod\f1 is the primary daemon process for the MongoDB
 system. It handles data requests, manages data access, and performs
@@ -13,8 +13,8 @@ your database.
 .PP
 \fBSelf\-Managed Configuration File Settings and Command\-Line Options Mapping\f1
 .PP
-MongoDB disables support for TLS 1.0
-encryption on systems where TLS 1.1+ is available.
+MongoDB disables support for TLS 1.0 and TLS 1.1
+encryption on systems where TLS 1.2+ is available.
 .SH COMPATIBILITY
 .PP
 Deployments hosted in the following environments use \fBmongod\f1:
@@ -254,7 +254,7 @@ list, for example: \fBrest, exec\f1\&. If the configuration file contains
 expansion directives not specified to \fB\-\-configExpand\f1\f1, the \fBmongod\f1
 returns an error and terminates.
 .PP
-See \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1 for configuration files
+See \fBExternal Configuration Values for Self\-Managed MongoDB\f1 for configuration files
 for more information on expansion directives.
 .RE
 .PP
@@ -501,8 +501,8 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
 .RE
 .PP
-\fBmongod\f1 installed from official \fBInstall MongoDB Community Edition on Debian\f1
-and \fBInstall MongoDB Community Edition on Red Hat or CentOS\f1 packages
+\fBmongod\f1 installed from official \fBInstall MongoDB Community Edition\f1
+and \fBInstall MongoDB Community Edition\f1 packages
 have the \fBbind_ip\f1 configuration set to \fB127.0.0.1\f1 by
 default.
 .RE
@@ -512,7 +512,7 @@ default.
 .PP
 Outputs the \fBmongod\f1 instance\(aqs configuration options, formatted
 in YAML, to \fBstdout\f1 and exits the \fBmongod\f1 instance. For
-configuration options that uses \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1,
+configuration options that uses \fBExternal Configuration Values for Self\-Managed MongoDB\f1,
 \fB\-\-outputConfig\f1\f1 returns the resolved value for those options.
 .PP
 This may include any configured passwords or secrets previously
@@ -586,6 +586,8 @@ replication activity
 connection accepted events
 .IP \(bu 2
 connection closed events
+.IP \(bu 2
+client metadata
 .RE
 .RE
 .PP
@@ -1241,9 +1243,12 @@ an empty mapping document causes mapping to fail.
 .PP
 The following shows two transformation documents. The first
 document matches against any string ending in \fB@ENGINEERING\f1, placing
-anything preceeding the suffix into a regex capture group. The
+anything preceding the suffix into a regex capture group. The
 second document matches against any string ending in \fB@DBA\f1, placing
-anything preceeding the suffix into a regex capture group.
+anything preceding the suffix into a regex capture group.
+.PP
+IMPORTANT You must pass the array to
+\fB\-\-ldapUserToDNMapping\f1\f1 as a string.
 .PP
 .EX
   "[
@@ -1596,60 +1601,19 @@ WiredTiger cache memory.
 Avoid increasing the WiredTiger internal cache size above its
 default value. If your use case requires to do so, you can use
 \fB\-\-wiredTigerCacheSizePct\f1\f1 to specify a percentage of up to 80% of available
-memory. Values can range from \fB0.25\f1 GB to \fB10000\f1 GB.
+memory. Values can range from 0.256GB to 10000GB.
 .PP
-The default WiredTiger internal cache size is the larger of either:
-.RS
-.IP \(bu 2
-50% of (RAM \- 1 GB), or
-.IP \(bu 2
-256 MB.
-.RE
+To learn more, see \fBMemory Use\f1\&.
 .PP
-For example, on a system with a total of 4GB of RAM the
-WiredTiger cache uses 1.5GB of RAM (\fB0.5 * (4 GB \- 1 GB) =
-1.5 GB\f1). Conversely, on a system with a total of 1.25 GB of
-RAM WiredTiger allocates 256 MB to the WiredTiger cache
-because that is more than half of the total RAM minus one
-gigabyte (\fB0.5 * (1.25 GB \- 1 GB) = 128 MB < 256 MB\f1).
+In some instances, such as when running in a container that is configured
+to use less RAM than the amount of memory provisioned for the host, you
+must account for the limits. You may need to configure the WiredTiger cache
+to an appropriate value, as WiredTiger may not account for the memory
+limits of the specific container in certain cases.
 .PP
-In some instances, such as when running in a container, the database
-can have memory constraints that are lower than the total system
-memory. In such instances, this memory limit, rather than the total
-system memory, is used as the maximum RAM available.
-.PP
-To see the memory limit, see \fBhostInfo.system.memLimitMB\f1\f1\&.
-.PP
-With WiredTiger, MongoDB utilizes both the WiredTiger internal cache
-and the filesystem cache.
-.PP
-With the filesystem cache, MongoDB automatically uses all free memory
-that is not used by the WiredTiger cache or by other processes.
-.PP
-The \fB\-\-wiredTigerCacheSizeGB\f1\f1 limits the size of the WiredTiger internal
-cache. The operating system uses the available free memory
-for filesystem cache, which allows the compressed MongoDB data
-files to stay in memory. In addition, the operating system
-uses any free RAM to buffer file system blocks and file system
-cache.
-.PP
-To accommodate the additional consumers of RAM, you may have to
-decrease WiredTiger internal cache size.
-.PP
-The default WiredTiger internal cache size value assumes that there is a
-single \fBmongod\f1\f1 instance per machine. If a single machine
-contains multiple MongoDB instances, decrease the setting to accommodate
-the other \fBmongod\f1\f1 instances.
-.PP
-If you run \fBmongod\f1\f1 in a container (for example, \fBlxc\f1,
-\fBcgroups\f1, Docker, etc.) that does \fInot\f1 have access to all of the
-RAM available in a system, you must set \fB\-\-wiredTigerCacheSizeGB\f1\f1 to a value
-less than the amount of RAM available in the container. The exact
-amount depends on the other processes running in the container. See
-\fBmemLimitMB\f1\f1\&.
-.PP
-You can only provide one of either \fB\-\-wiredTigerCacheSizeGB\f1\f1 or
-\fB\-\-wiredTigerCacheSizePct\f1\f1\&.
+To view the \fBmemory limit\f1\f1, the value
+that WiredTiger utilizes as the maximum amount of RAM available use the
+\fBhostInfo\f1\f1 command.
 .RE
 .PP
 \fBmongod \-\-wiredTigerCacheSizePct\f1
@@ -1661,32 +1625,21 @@ percentage of physical RAM. The memory that an index build consumes (see
 WiredTiger cache memory.
 .PP
 You can specify a percentage of up to 80% of available memory.
-Values range from \fB0.25\f1 GB to \fB10000\f1 GB.
+Calculated values range from 0.256GB to 10000GB. For example, on a
+system with 2GB of RAM the \fB\-\-wiredTigerCacheSizePct\f1 cannot be set to 10
+because 10% of 2GB is 0.2GB, which is less than 0.256GB.
 .PP
-The default WiredTiger internal cache size is the larger of either:
-.RS
-.IP \(bu 2
-50% of (RAM \- 1 GB), or
-.IP \(bu 2
-256 MB.
-.RE
+To learn more about memory limits, see \fBMemory Use\f1\&.
 .PP
-For example, on a system with a total of 4GB of RAM the
-WiredTiger cache uses 1.5GB of RAM (\fB0.5 * (4 GB \- 1 GB) =
-1.5 GB\f1). Conversely, on a system with a total of 1.25 GB of
-RAM WiredTiger allocates 256 MB to the WiredTiger cache
-because that is more than half of the total RAM minus one
-gigabyte (\fB0.5 * (1.25 GB \- 1 GB) = 128 MB < 256 MB\f1).
+In some instances, such as when running in a container that is configured
+to use less RAM than the amount of memory provisioned for the host, you
+must account for the limits. You may need to configure the WiredTiger cache
+to an appropriate value, as WiredTiger may not account for the memory
+limits of the specific container in certain cases.
 .PP
-In some instances, such as when running in a container, the database
-can have memory constraints that are lower than the total system
-memory. In such instances, this memory limit, rather than the total
-system memory, is used as the maximum RAM available.
-.PP
-To see the memory limit, see \fBhostInfo.system.memLimitMB\f1\f1\&.
-.PP
-With WiredTiger, MongoDB utilizes both the WiredTiger internal cache
-and the filesystem cache.
+To view the \fBmemory limit\f1\f1, the value
+that WiredTiger utilizes as the maximum amount of RAM available use the
+\fBhostInfo\f1\f1 command.
 .PP
 With the filesystem cache, MongoDB automatically uses all free memory
 that is not used by the WiredTiger cache or by other processes.
@@ -1708,8 +1661,8 @@ the other \fBmongod\f1\f1 instances.
 .PP
 If you run \fBmongod\f1\f1 in a container (for example, \fBlxc\f1,
 \fBcgroups\f1, Docker, etc.) that does \fInot\f1 have access to all of the
-RAM available in a system, you must set \fB\-\-wiredTigerCacheSizePct\f1\f1 to a value
-less than the amount of RAM available in the container. The exact
+RAM available in a system, you must set \fB\-\-wiredTigerCacheSizePct\f1\f1 or \fB\-\-wiredTigerCacheSizeGB\f1\f1
+to a value less than the amount of RAM available in the container. The exact
 amount depends on the other processes running in the container. See
 \fBmemLimitMB\f1\f1\&.
 .PP
@@ -1876,7 +1829,7 @@ the oplog returns to its maximum size \fIor\f1 is configured for a
 smaller maximum size. See \fBReducing Oplog Size Does Not Immediately Return Disk Space\f1\&.
 .IP \(bu 2
 The \fBmongod\f1 compares the system wall clock to an
-oplog entries creation wall clock time when enforcing oplog entry
+oplog entry creation \fBwall clock time\f1 when enforcing oplog entry
 retention. Clock drift between cluster components may result in
 unexpected oplog retention behavior. See
 \fBClock Synchronization\f1 for more information on
@@ -1978,9 +1931,18 @@ Once maintenance has completed, remove the
 \fBskipShardingConfigurationChecks\f1\f1 parameter and restart
 with \fB\-\-shardsvr\f1\f1\&.
 .RE
+.PP
+\fBmongod \-\-replicaSetConfigShardMaintenanceMode\f1
+.RS
+.PP
+Configures the \fBmongod\f1 instance to start in maintenance
+mode. The option disables some startup checks, which allows
+you to convert a replica set into a sharded cluster with an
+embedded config shard.
+.RE
 .SS TLS OPTIONS
 .PP
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 for full
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 for full
 documentation of MongoDB\(aqs support.
 .PP
 \fBmongod \-\-tlsMode\f1
@@ -2037,7 +1999,7 @@ If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2070,7 +2032,7 @@ use \fB\-\-tlsCertificateSelector\f1\f1\&.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2102,7 +2064,7 @@ PEM file. Use \fB\-\-tlsCertificateSelector\f1\f1 instead.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2167,7 +2129,7 @@ If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2199,7 +2161,7 @@ connection if the presented X.509 certificate expires within \fB30\f1
 days of the \fBmongod/mongos\f1 host system time.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .PP
 For Windows \fBonly\f1, MongoDB does not support
@@ -2385,7 +2347,7 @@ PEM file. Use \fB\-\-tlsClusterCertificateSelector\f1\f1 instead.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2418,7 +2380,7 @@ secure certificate store.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2455,7 +2417,7 @@ secure certificate store.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2482,7 +2444,7 @@ certificate store.
 .RE
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2504,7 +2466,7 @@ the \fB\-\-tlsAllowInvalidCertificates\f1\f1 setting, MongoDB
 logs a warning regarding the use of the invalid certificate.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2518,7 +2480,7 @@ to other members if the hostnames in their certificates do not match
 their configured hostname.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2545,7 +2507,7 @@ a mixed deployment that includes clients that do not or cannot present
 certificates to the \fBmongod\f1\&.
 .PP
 For more information about TLS and MongoDB, see
-\fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
+\fBConfigure MongoDB Instances for TLS/SSL on Self\-Managed Deployments\f1 and
 \fBTLS/SSL Configuration for Clients\f1 .
 .RE
 .PP
@@ -2591,8 +2553,20 @@ Directs the \fBmongod\f1 to use the FIPS mode of the  TLS
 library. Your system must have a FIPS
 compliant library to use the \fB\-\-tlsFIPSMode\f1\f1 option.
 .PP
+Starting in MongoDB 8.3, you cannot specify \fBSCRAM\-SHA\-1\f1 for
+\fBauthenticationMechanisms\f1\f1 while also specifying
+\fBmongod \-\-tlsFIPSMode\f1\f1 or \fBmongos \-\-tlsFIPSMode\f1\f1\&.
+.PP
+If you try to specify \fBSCRAM\-SHA\-1\f1 for \fBauthenticationMechanisms\f1 while
+also specifying \fB\-\-tlsFIPSMode\f1, the server throws an error and
+logs a message similar to the following:
+.PP
+.EX
+  SCRAM\-SHA\-1 is not allowed in FIPS mode.
+.EE
+.PP
 FIPS\-compatible TLS/SSL is
-available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&. See
+available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&. See
 \fBConfigure MongoDB for FIPS\f1 for more information.
 .RE
 .SS PROFILER OPTIONS
@@ -2633,6 +2607,9 @@ The profiler only captures operations that match the
 .RS
 .PP
 The profiler collects data for all operations.
+.PP
+When set to level \fB2\f1, the profiler ignores user
+provided values for \fBslowms\f1 and \fBfilter\f1\&.
 .RE
 .PP
 Profiling can degrade performance and expose unencrypted query data in the
@@ -2671,6 +2648,17 @@ For \fBmongod\f1 instances, \fB\-\-slowms\f1\f1 affects the diagnostic log
 and, if enabled, the profiler.
 .PP
 \fBDatabase Profiler\f1
+.RE
+.PP
+\fBmongod \-\-defaultSlowInProgMS\f1
+.RS
+.PP
+\fIDefault\f1: 5000
+.PP
+The slow operation time threshold for an in\-progress query, in milliseconds.
+MongoDB logs operations that run for longer than this threshold as slow
+in\-progess queries. MongoDB logs a query as a slow in\-progress query as soon as
+the query operation crosses the time threshold.
 .RE
 .PP
 \fBmongod \-\-slowOpSampleRate\f1
@@ -2723,7 +2711,7 @@ Do not compress the audit log.
 .RE
 .RE
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .RE
@@ -2774,7 +2762,7 @@ Output the audit events to the file specified in
 .RE
 .RE
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
@@ -2787,7 +2775,7 @@ Interoperability Protocol (KMIP) key for \fBaudit log encryption\f1\&.
 You cannot use \fB\-\-auditEncryptionKeyUID\f1\f1 and
 \fB\-\-auditLocalKeyFile\f1\f1 together.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .RE
@@ -2826,7 +2814,7 @@ specified in \fB\-\-auditPath\f1\f1\&.
 Printing audit events to a file in JSON format degrades server
 performance more than printing to a file in BSON format.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
@@ -2844,7 +2832,7 @@ Management Interoperability Protocol (KMIP) server.
 You cannot use \fB\-\-auditLocalKeyFile\f1\f1 and
 \fB\-\-auditEncryptionKeyUID\f1\f1 together.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)\&.
 MongoDB Enterprise and Atlas have different configuration
 requirements.
 .RE
@@ -2857,7 +2845,7 @@ Specifies the output file for auditing if
 \fB\-\-auditPath\f1\f1 option can take either a full path name or a
 relative path name.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
@@ -2882,7 +2870,7 @@ To specify the audit filter in a
 \fBconfiguration file\f1, you must use the YAML format
 of the configuration file.
 .PP
-Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
@@ -3182,7 +3170,7 @@ To enable encryption at rest with KMIP on Windows, you must:
 .IP \(bu 2
 Import the client certificate into the Windows Certificate Store.
 .IP \(bu 2
-Use the \fB\-\-kmipClientCertificateSelector\f1\f1 option.
+Use the \fB\-\-kmipClientCertificateSelector\f1\f1 configuration option.
 .RE
 .PP
 On macOS or Windows, you can use a certificate
