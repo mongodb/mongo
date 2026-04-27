@@ -1136,6 +1136,13 @@ const Collection* CollectionCatalog::_instantiateCollectionIfTesting(
 
     auto newCollection = createNewCollection(opCtx, readTimestamp, *catalogEntry);
     if (newCollection) {
+        // Share the current RecordStore's in-memory size-tracking state so the two instances
+        // track the same counters under concurrent size-storer activity.
+        if (auto currentCollection = lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);
+            currentCollection) {
+            newCollection->getRecordStore()->adoptSharedSizeState_forTest(
+                *currentCollection->getRecordStore());
+        }
         openedCollections.store(newCollection, newCollection->ns(), newCollection->uuid());
         return newCollection.get();
     }
