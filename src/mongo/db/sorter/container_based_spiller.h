@@ -121,7 +121,11 @@ public:
     }
 
     SorterRange getRange() const override {
-        return {_start, _end, static_cast<int64_t>(_originalChecksum)};
+        SorterRange range{_start, _end, static_cast<int64_t>(_originalChecksum)};
+        if (_position != _unpositioned) {
+            range.setCurrent(_position);
+        }
+        return range;
     }
 
     bool spillable() const override {

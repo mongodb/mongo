@@ -34,6 +34,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sorter/container_test_utils.h"
+#include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
@@ -125,30 +126,47 @@ TEST(ContainerIteratorTest, Iterate) {
                                                        /*_checksumCalculator=*/3272515249,
                                                        sorter::kLatestChecksumVersion};
 
+    // Before iteration starts, getRange() reports no current position.
+    EXPECT_FALSE(iterator.getRange().getCurrent().has_value());
+
     ASSERT_TRUE(iterator.more());
     auto next = iterator.next();
     EXPECT_EQ(next.first, key1);
     EXPECT_EQ(next.second, value1);
+    ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey1);
 
     ASSERT_TRUE(iterator.more());
     next = iterator.next();
     EXPECT_EQ(next.first, key2);
     EXPECT_EQ(next.second, value2);
+    ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey2);
 
     ASSERT_TRUE(iterator.more());
     EXPECT_EQ(iterator.nextWithDeferredValue(), key3);
     EXPECT_EQ(iterator.getDeferredValue(), value3);
+    ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey3);
 
     ASSERT_TRUE(iterator.more());
     EXPECT_EQ(iterator.nextWithDeferredValue(), key4);
     EXPECT_EQ(iterator.getDeferredValue(), value4);
+    ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey4);
 
     ASSERT_TRUE(iterator.more());
     next = iterator.next();
     EXPECT_EQ(next.first, key5);
     EXPECT_EQ(next.second, value5);
+    ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey5);
 
     EXPECT_FALSE(iterator.more());
+
+    // After exhaustion, getRange() reports the last key consumed.
+    ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey5);
 }
 
 TEST(ContainerIteratorTest, MultipleCursors) {
