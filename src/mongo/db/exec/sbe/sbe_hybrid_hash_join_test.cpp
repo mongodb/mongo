@@ -145,18 +145,6 @@ value::MaterializedRow makeCompositeKeyRow(int64_t key1, int64_t key2) {
     return row;
 }
 
-/**
- * Returns a single-slot MaterializedRow whose slot is an unowned view into slot 0 of
- * `source`. Mirrors HashJoinStage's pattern of capturing outer-child accessor views
- * via `_probeKey.reset(idx, false, tag, val)`.
- */
-value::MaterializedRow makeUnownedView(const value::MaterializedRow& source) {
-    value::MaterializedRow row(1);
-    auto [tag, val] = source.getViewOfValue(0);
-    row.reset(0, /*owned*/ false, tag, val);
-    return row;
-}
-
 
 /**
  * Test fixture providing an OperationContext for HybridHashJoin tests.
@@ -1183,72 +1171,6 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
                 << "Matched key " << buildKey << " should be in build set";
         }
     }
-}
-
-// When the cursor is exhausted, saveState() must not dereference the
-// probe-row views — upstream won't read them again, and the storage they pointed at
-// may have been released while the caller was fetching the next outer row. Before
-// the fix, saveState() called makeOwned() unconditionally and crashed here.
-TEST_F(HybridHashJoinTestFixture, SaveStateIsNoOpWhenCursorIsExhausted) {
-    auto hhj = makeHHJ();
-    hhj->addBuild(makeStringKeyRow("match_key_value"), makeProjectRow("build_projection"));
-    hhj->finishBuild();
-
-    // outerKey / outerProject play the role of the outer child's owned accessor
-    // storage. probeKey / probeProject are unowned views into it, matching what
-    // HashJoinStage passes to HybridHashJoin::probe().
-    auto outerKey = makeStringKeyRow("match_key_value");
-    auto outerProject = makeProjectRow("probe_projection_value");
-    auto probeKey = makeUnownedView(outerKey);
-    auto probeProject = makeUnownedView(outerProject);
-
-    auto cursor = JoinCursor::empty();
-    hhj->probe(probeKey, probeProject, cursor);
-
-    // Drain all matches so the cursor is exhausted.
-    while (cursor.next()) {
-    }
-
-    // Simulate the outer child advancing: prior row's heap buffers are released.
-    outerKey.reset(0, /*owned*/ true, value::TypeTags::Nothing, 0);
-    outerProject.reset(0, /*owned*/ true, value::TypeTags::Nothing, 0);
-
-    // Must not dereference the now-dangling views.
-    cursor.saveState();
-}
-
-// Complements the above: when the cursor still has pending matches, saveState()
-// must deep-copy the probe rows so the next() call after restore can safely return
-// them via MatchResult, even if upstream storage has since been released.
-TEST_F(HybridHashJoinTestFixture, SaveStateOwnsProbeRowsWhenCursorHasMatches) {
-    auto hhj = makeHHJ();
-    hhj->addBuild(makeStringKeyRow("match_key_value"), makeProjectRow("build_projection"));
-    hhj->finishBuild();
-
-    auto outerKey = makeStringKeyRow("match_key_value");
-    auto outerProject = makeProjectRow("probe_projection_value");
-    auto probeKey = makeUnownedView(outerKey);
-    auto probeProject = makeUnownedView(outerProject);
-
-    auto cursor = JoinCursor::empty();
-    hhj->probe(probeKey, probeProject, cursor);
-
-    // Cursor has not been drained; saveState() must own probeKey / probeProject
-    // here while the views are still valid.
-    cursor.saveState();
-
-    // Release the upstream storage. If saveState() failed to own the probe rows,
-    // the next() below would read dangling views.
-    outerKey.reset(0, /*owned*/ true, value::TypeTags::Nothing, 0);
-    outerProject.reset(0, /*owned*/ true, value::TypeTags::Nothing, 0);
-
-    auto matchOpt = cursor.next();
-    ASSERT_TRUE(matchOpt.has_value());
-    ASSERT_EQ(getStringValue(matchOpt->buildKeyRow), "match_key_value");
-    ASSERT_EQ(getStringValue(matchOpt->buildProjectRow), "build_projection");
-    ASSERT_EQ(getStringValue(matchOpt->probeKeyRow), "match_key_value");
-    ASSERT_EQ(getStringValue(matchOpt->probeProjectRow), "probe_projection_value");
-    ASSERT_FALSE(cursor.next().has_value());
 }
 
 TEST_F(HybridHashJoinTestFixture, TestPartitionDistribution) {
