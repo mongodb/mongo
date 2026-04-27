@@ -1529,9 +1529,8 @@ void SortedDataIndexAccessMethod::getKeys(
             onSuppressedErrorFn(opCtx, entry, ex.toStatus(), obj, id);
         } else {
             LOGV2_WARNING(20686,
-                          "Suppressed key generation error during oplog application on secondary. "
-                          "Index entry was not written; index may have fewer entries than "
-                          "documents.",
+                          "Suppressed key generation error. Index entry was not written; index may "
+                          "be missing entries.",
                           "error"_attr = redact(ex.toStatus()),
                           "loc"_attr = id,
                           "ns"_attr = collection->ns(),
