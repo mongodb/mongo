@@ -1067,9 +1067,9 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
             return Status::OK();
         }
 
-        pos = (blobBuf.rawData() + blobBuf.size()) - buf.data();
+        pos += blobBuf.size();
 
-        auto swCert = decodePEMBlob(buf);
+        auto swCert = decodePEMBlob(blobBuf);
         if (!swCert.isOK()) {
             return swCert.getStatus();
         }
@@ -1089,7 +1089,7 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
         if (!CertAddCRLContextToStore(certStore, crl, CERT_STORE_ADD_NEW, NULL)) {
             auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertAddCRLContextToStore Failed  " << errorMessage(ec));
+                          str::stream() << "CertAddCRLContextToStore Failed: " << errorMessage(ec));
         }
     }
 
