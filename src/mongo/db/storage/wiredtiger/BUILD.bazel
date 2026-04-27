@@ -158,6 +158,7 @@ mongo_cc_unit_test(
         "spill_wiredtiger_kv_engine_test.cpp",
         "wiredtiger_c_api_test.cpp",
         "wiredtiger_connection_test.cpp",
+        "wiredtiger_cursor_helpers_test.cpp",
         "wiredtiger_error_util_test.cpp",
         "wiredtiger_init_test.cpp",
         "wiredtiger_kv_engine_test.cpp",

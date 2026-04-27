@@ -30,7 +30,11 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/rss/persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
@@ -314,7 +318,14 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId());
+    auto& pp = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    // The _id index is excluded from blind writes: its duplicate-key detection depends on
+    // WT returning WT_DUPLICATE_KEY, which only happens with overwrite=false.
+    const bool allowOverwrite = !isIdIndex() &&
+        chooseBlindWriteOverwrite(/*defaultOverwrite=*/false,
+                                  pp.shouldUseBlindWriteWhenSafe(opCtx),
+                                  opCtx->getClient()->getPrng());
+    auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId(), allowOverwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
@@ -331,7 +342,14 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId());
+    auto& pp = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    // The _id index is excluded from blind writes: its duplicate-key detection depends on
+    // WT returning WT_DUPLICATE_KEY, which only happens with overwrite=false.
+    const bool allowOverwrite = !isIdIndex() &&
+        chooseBlindWriteOverwrite(/*defaultOverwrite=*/false,
+                                  pp.shouldUseBlindWriteWhenSafe(opCtx),
+                                  opCtx->getClient()->getPrng());
+    auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId(), allowOverwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();

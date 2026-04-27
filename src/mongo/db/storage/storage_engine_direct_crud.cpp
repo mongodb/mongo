@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/shared_buffer.h"
@@ -44,32 +43,36 @@ Status insert(StorageEngine& engine,
               RecoveryUnit& ru,
               StringData ident,
               std::span<const char> key,
-              std::span<const char> value) {
-    return engine.getEngine()->insertIntoIdent(ru, ident, key, value);
+              std::span<const char> value,
+              BlindWritePolicy policy) {
+    return engine.getEngine()->insertIntoIdent(ru, ident, key, value, policy);
 }
 
 Status insert(StorageEngine& engine,
               RecoveryUnit& ru,
               StringData ident,
               int64_t key,
-              std::span<const char> value) {
-    return engine.getEngine()->insertIntoIdent(ru, ident, key, value);
+              std::span<const char> value,
+              BlindWritePolicy policy) {
+    return engine.getEngine()->insertIntoIdent(ru, ident, key, value, policy);
 }
 
 Status update(StorageEngine& engine,
               RecoveryUnit& ru,
               StringData ident,
               std::span<const char> key,
-              std::span<const char> value) {
-    return engine.getEngine()->updateInIdent(ru, ident, key, value);
+              std::span<const char> value,
+              BlindWritePolicy policy) {
+    return engine.getEngine()->updateInIdent(ru, ident, key, value, policy);
 }
 
 Status update(StorageEngine& engine,
               RecoveryUnit& ru,
               StringData ident,
               int64_t key,
-              std::span<const char> value) {
-    return engine.getEngine()->updateInIdent(ru, ident, key, value);
+              std::span<const char> value,
+              BlindWritePolicy policy) {
+    return engine.getEngine()->updateInIdent(ru, ident, key, value, policy);
 }
 
 StatusWith<UniqueBuffer> get(StorageEngine& engine,
@@ -89,12 +92,17 @@ StatusWith<UniqueBuffer> get(StorageEngine& engine,
 Status remove(StorageEngine& engine,
               RecoveryUnit& ru,
               StringData ident,
-              std::span<const char> key) {
-    return engine.getEngine()->deleteFromIdent(ru, ident, key);
+              std::span<const char> key,
+              BlindWritePolicy policy) {
+    return engine.getEngine()->deleteFromIdent(ru, ident, key, policy);
 }
 
-Status remove(StorageEngine& engine, RecoveryUnit& ru, StringData ident, int64_t key) {
-    return engine.getEngine()->deleteFromIdent(ru, ident, key);
+Status remove(StorageEngine& engine,
+              RecoveryUnit& ru,
+              StringData ident,
+              int64_t key,
+              BlindWritePolicy policy) {
+    return engine.getEngine()->deleteFromIdent(ru, ident, key, policy);
 }
 
 }  // namespace mongo::storage_engine_direct_crud

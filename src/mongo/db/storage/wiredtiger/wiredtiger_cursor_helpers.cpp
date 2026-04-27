@@ -29,9 +29,13 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -104,5 +108,40 @@ int wiredTigerCursorRemove(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     }
     return ret;
 }
+
+bool chooseBlindWriteOverwrite(bool defaultOverwrite,
+                               bool providerAllowsBlindWrite,
+                               PseudoRandom& prng) {
+    // Blind writes are a one-way upgrade: false -> (maybe) true. If the caller's default already
+    // asks for overwrite=true, preserve it. Downgrading true -> false is never useful (the point
+    // of blind writes is to skip a lookup, not add a redundant one) and is actively unsafe for
+    // callers whose invariants depend on overwrite=true.
+    if (defaultOverwrite) {
+        return true;
+    }
+    if (!providerAllowsBlindWrite) {
+        return false;
+    }
+    const double ratio = gWiredTigerBlindWriteRatio.load();
+    if (ratio >= 1.0) {
+        return true;
+    }
+    if (ratio <= 0.0) {
+        return false;
+    }
+    return prng.trueWithProbability(ratio);
+}
+
+namespace {
+// Set the blind-write ratio to 0 when TestingProctor is enabled so correctness suites exercise
+// the non-blind path regardless of the server parameter's default. Runs after TestingDiagnostics
+// so the proctor's final state is visible, and unit tests can still override the ratio at runtime.
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetBlindWriteRatioUnderTestingProctor, ("TestingDiagnostics"))
+(InitializerContext*) {
+    if (TestingProctor::instance().isEnabled()) {
+        gWiredTigerBlindWriteRatio.store(0.0);
+    }
+}
+}  // namespace
 
 }  // namespace mongo

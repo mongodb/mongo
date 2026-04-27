@@ -494,6 +494,25 @@ server_parameters:
             lte: 1.0
         redact: false
 
+    wiredTigerBlindWriteRatio:
+        description: >-
+            Fraction (0.0-1.0) of writes that use WiredTiger cursor overwrite=true (blind writes).
+            Only applied during standby oplog application, where the primary has already validated
+            the write. The remaining (1 - ratio) fraction performs a non-blind write as a
+            durability sanity check. 0.0 disables blind writes entirely; 1.0 always uses blind
+            writes. Blind writes avoid a redundant read-before-write, eliminating standby cache
+            misses during oplog application.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<double>"
+        cpp_varname: gWiredTigerBlindWriteRatio
+        # 99.9% blind -- 1-in-1000 writes remain non-blind as a sanity check without materially
+        # regressing standby write throughput.
+        default: 0.999
+        validator:
+            gte: 0.0
+            lte: 1.0
+        redact: false
+
 configs:
     # WiredTiger storage engine options
     "storage.wiredTiger.engineConfig.cacheSizeGB":

@@ -236,6 +236,17 @@ public:
     virtual bool usesSchemaEpochs() const = 0;
 
     /**
+     * Returns true if the current operation may skip the read-before-write existence check that
+     * the storage layer would otherwise perform on a write (a "blind write"). Skipping the check
+     * avoids redundant work on non-primaries applying oplog, but is only safe when the primary
+     * has already validated the write. A true return signals that the context is safe for a
+     * blind write; whether one actually happens is a separate decision made at the call site.
+     * Providers whose storage engines do not benefit from blind writes return false
+     * unconditionally. Providers that do must also verify that the node is currently a standby.
+     */
+    virtual bool shouldUseBlindWriteWhenSafe(OperationContext* opCtx) const = 0;
+
+    /**
      * Returns the schema epoch to use when passing a schema-related operation at the given
      * timestamp to WiredTiger. Returns 0 for backends that do not use schema epochs.
      */

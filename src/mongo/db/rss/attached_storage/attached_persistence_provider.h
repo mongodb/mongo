@@ -196,6 +196,12 @@ public:
     bool usesSchemaEpochs() const override;
 
     /**
+     * Attached storage does not use layered tables, so blind writes offer no benefit. Always
+     * returns false.
+     */
+    bool shouldUseBlindWriteWhenSafe(OperationContext* opCtx) const override;
+
+    /**
      * Attached storage does not use schema epochs; always returns 0.
      */
     uint64_t getSchemaEpochForTimestamp(Timestamp ts) const override;

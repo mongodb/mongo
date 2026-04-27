@@ -51,6 +51,18 @@ class OperationContext;
 class RecoveryUnit;
 class SnapshotManager;
 
+/**
+ * Whether a write may skip the read-before-write existence check the storage engine would
+ * otherwise perform. A "blind" write is safe only when the caller has already validated the
+ * operation (e.g. secondary oplog application of an op the primary accepted).
+ */
+enum class BlindWritePolicy {
+    // Storage engine performs its usual existence check before writing.
+    nonBlind,
+    // Skip the existence check; overwrite if a value is already present.
+    blind,
+};
+
 class MONGO_MOD_OPEN KVEngine {
 public:
     using IdentKey = std::variant<std::span<const char>, int64_t>;
@@ -525,28 +537,44 @@ public:
     virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) = 0;
 
     /**
-     * Inserts a key-value pair into the specified 'ident'. Must be called from within a
-     * storage transaction. Duplicate keys (and by extension, updates) are not allowed.
+     * Returns the blind-write policy to use for a write on this engine in the given context. The
+     * default returns `nonBlind`; engines that support blind writes override to sample based on
+     * engine state.
+     */
+    virtual BlindWritePolicy chooseBlindWritePolicy(OperationContext* opCtx) {
+        return BlindWritePolicy::nonBlind;
+    }
+
+    /**
+     * Inserts a key-value pair into the specified 'ident'. Must be called from within a storage
+     * transaction. With `BlindWritePolicy::nonBlind` duplicate keys are rejected. With
+     * `BlindWritePolicy::blind` the duplicate key check is skipped: any existing value at `key` is
+     * silently overwritten.
      *
-     * Returns OK on success, 'DuplicateKey' if the key already exists, or the error returned by
-     * the underlying storage engine on other failures.
+     * Returns OK on success, `DuplicateKey` if the key already exists (nonBlind only), or the
+     * error returned by the underlying storage engine on other failures.
      */
     virtual Status insertIntoIdent(RecoveryUnit& ru,
                                    StringData ident,
                                    IdentKey key,
-                                   std::span<const char> value) = 0;
+                                   std::span<const char> value,
+                                   BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
 
     /**
-     * Updates the value associated with 'key' in the specified 'ident'. The key must already exist.
-     * Must be called from within a storage transaction.
+     * Updates the value associated with `key` in the specified 'ident'. Must be called from within
+     * a storage transaction. With `BlindWritePolicy::nonBlind` the key must already exist; missing
+     * keys are rejected with `NoSuchKey`. With `BlindWritePolicy::blind` the key-existence check
+     * is skipped and the operation becomes an upsert: a missing key is inserted, and an existing
+     * value is overwritten.
      *
-     * Returns OK on success, 'NoSuchKey' if the key does not exist, or the error returned by
-     * the underlying storage engine on other failures.
+     * Returns OK on success, `NoSuchKey` if the key does not exist (nonBlind only), or the error
+     * returned by the underlying storage engine on other failures.
      */
     virtual Status updateInIdent(RecoveryUnit& ru,
                                  StringData ident,
                                  IdentKey key,
-                                 std::span<const char> value) = 0;
+                                 std::span<const char> value,
+                                 BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
 
     /**
      * Retrieves the value associated with 'key' from the specified 'ident'.
@@ -561,11 +589,14 @@ public:
     /**
      * Deletes the key from the specified 'ident'.
      *
-     * Returns OK on success, 'KeyNotFound' if the key does not exist, or the error returned by the
+     * Returns OK on success, 'NoSuchKey' if the key does not exist, or the error returned by the
      * underlying storage engine on other failures. Must be called from within a storage
      * transaction.
      */
-    virtual Status deleteFromIdent(RecoveryUnit& ru, StringData ident, IdentKey key) = 0;
+    virtual Status deleteFromIdent(RecoveryUnit& ru,
+                                   StringData ident,
+                                   IdentKey key,
+                                   BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
 
     /**
      * See `StorageEngine::dump`

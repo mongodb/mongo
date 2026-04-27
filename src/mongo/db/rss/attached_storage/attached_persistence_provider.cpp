@@ -203,6 +203,10 @@ bool AttachedPersistenceProvider::usesSchemaEpochs() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::shouldUseBlindWriteWhenSafe(OperationContext*) const {
+    return false;
+}
+
 uint64_t AttachedPersistenceProvider::getSchemaEpochForTimestamp(Timestamp) const {
     return 0;
 }

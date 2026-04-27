@@ -222,6 +222,16 @@ public:
                   "StubPersistenceProvider::usesSchemaEpochs() method not implemented");
     }
 
+    /**
+     * Unlike the rest of this stub, this method returns false instead of uasserting so existing
+     * Stub-based test providers continue to work without each one having to add an override.
+     * false is the safe default -- it matches attached storage and makes chooseBlindWriteOverwrite
+     * short-circuit to the caller's default.
+     */
+    bool shouldUseBlindWriteWhenSafe(OperationContext*) const override {
+        return false;
+    }
+
     uint64_t getSchemaEpochForTimestamp(Timestamp ts) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::getSchemaEpochForTimestamp() not implemented");

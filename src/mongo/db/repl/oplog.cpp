@@ -88,6 +88,7 @@
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -3072,13 +3073,21 @@ Status applyContainerOperations(OperationContext* opCtx,
         const BSONObj o = op->getObject();
         Status s = Status::OK();
 
+        // Sample the blind-write policy from the engine. On a primary, the engine returns
+        // nonBlind unconditionally, so primary writes always perform the storage-engine
+        // existence check. On a standby applying an op the primary already validated, the
+        // engine samples blind with probability gWiredTigerBlindWriteRatio (default 0.999),
+        // skipping the read-before-write on layered tables.
+        const auto policy = engine->getEngine()->chooseBlindWritePolicy(opCtx);
+
         switch (op->getOpType()) {
             case repl::OpTypeEnum::kContainerInsert: {
                 auto parsed = repl::ContainerInsertOplogEntryO::parse(
                     o, IDLParserContext("ContainerInsertOplogEntryO"));
                 auto valSpan = parsed.getValue().data();
                 s = parsed.getKey().visit([&](auto key) {
-                    return storage_engine_direct_crud::insert(*engine, *ru, ident, key, valSpan);
+                    return storage_engine_direct_crud::insert(
+                        *engine, *ru, ident, key, valSpan, policy);
                 });
                 break;
             }
@@ -3087,7 +3096,8 @@ Status applyContainerOperations(OperationContext* opCtx,
                     o, IDLParserContext("ContainerUpdateOplogEntryO"));
                 auto valSpan = parsed.getValue().data();
                 s = parsed.getKey().visit([&](auto key) {
-                    return storage_engine_direct_crud::update(*engine, *ru, ident, key, valSpan);
+                    return storage_engine_direct_crud::update(
+                        *engine, *ru, ident, key, valSpan, policy);
                 });
                 break;
             }
@@ -3095,7 +3105,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                 auto parsed = repl::ContainerDeleteOplogEntryO::parse(
                     o, IDLParserContext("ContainerDeleteOplogEntryO"));
                 s = parsed.getKey().visit([&](auto key) {
-                    return storage_engine_direct_crud::remove(*engine, *ru, ident, key);
+                    return storage_engine_direct_crud::remove(*engine, *ru, ident, key, policy);
                 });
                 break;
             }
