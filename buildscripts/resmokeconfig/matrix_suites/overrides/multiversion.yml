@@ -407,8 +407,6 @@
       # TODO (SERVER-122384) Re-enable the following tests
       - jstests/core/ddl/create_collection.js
       - jstests/core/timeseries/ddl/timeseries_index.js
-      # TODO (SERVER-122382) Re-enable the following tests
-      - jstests/core/query/or/subplanning_blocked_during_replanning.js
 
 - name: sharding_last_continuous_excluded_files
   value:

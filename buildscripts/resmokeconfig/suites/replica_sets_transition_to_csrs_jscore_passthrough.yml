@@ -66,9 +66,6 @@ selector:
     - jstests/core/**/find_and_modify_concurrent_update.js
     - jstests/core/**/shellstartparallel.js
 
-    # TODO (SERVER-122382) Re-enable the following tests
-    - jstests/core/index/index_check6.js
-
   exclude_with_any_tags:
     - assumes_standalone_mongod
     ##
