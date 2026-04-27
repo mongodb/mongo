@@ -111,6 +111,7 @@ if (!checkSbeCompletelyDisabled(null)) {
     const sbeConn = MongoRunner.runMongod({
         setParameter: {
             featureFlagGetExecutorDeferredEngineChoice: true,
+            featureFlagCostBasedRanker: true,
             internalQuerySamplingBySequentialScan: true,
             // Yield after every document so we reliably hit a yield window in the sampling query.
             internalQueryExecYieldIterations: 1,
