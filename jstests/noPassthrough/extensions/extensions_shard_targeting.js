@@ -1,9 +1,13 @@
 /**
- * Tests shard targeting for an extension stage.
+ * Tests shard targeting for extension stages.
  *
- * $readNDocuments desugars to $produceIds (a source stage) followed by $_internalSearchIdLookup.
- * $produceIds provides a filter of {_id: {$gte: 0, $lt: numDocs}} via getFilter(), which the
- * planner uses to determine which shards to target.
+ * Source stage: $readNDocuments desugars to $produceIds (a source stage) followed by
+ * $_internalSearchIdLookup. $produceIds provides a filter of {_id: {$gte: 0, $lt: numDocs}} via
+ * getFilter(), which the planner uses to determine which shards to target.
+ *
+ * Transform stage: $testBar is a no-op transform stage that reports its arguments as a filter via
+ * getFilter(). The stage passes through all input documents unchanged — the profiler verifies
+ * targeting.
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
@@ -16,7 +20,7 @@ import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noP
 checkPlatformCompatibleWithExtensions();
 
 withExtensions(
-    {"libread_n_documents_mongo_extension.so": {}},
+    {"libread_n_documents_mongo_extension.so": {}, "libbar_mongo_extension.so": {}},
     (conn, shardingTest) => {
         const dbName = jsTestName();
         const testDB = conn.getDB(dbName);
@@ -43,16 +47,17 @@ withExtensions(
         assert.commandWorked(shard0DB.setProfilingLevel(2));
         assert.commandWorked(shard1DB.setProfilingLevel(2));
 
-        {
-            // _id range [0, 3) falls entirely on shard0, so the pipeline should only be sent there.
-            const comment = "single_shard_targeted";
-            const results = coll.aggregate([{$readNDocuments: {numDocs: 3}}], {comment: comment}).toArray();
-            assert.eq(results.length, 3, results);
+        /**
+         * Asserts that the given pipeline targets only shard0, not shard1, and returns the
+         * expected IDs.
+         */
+        function assertTargetsShard0Only(pipeline, expectedIds, comment) {
+            const results = coll.aggregate(pipeline, {comment}).toArray();
+            assert.eq(results.length, expectedIds.length, results);
             assert.sameMembers(
                 results.map((d) => d._id),
-                [0, 1, 2],
+                expectedIds,
             );
-
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: shard0DB,
                 filter: {
@@ -67,16 +72,16 @@ withExtensions(
             });
         }
 
-        {
-            // _id range [0, 8) spans both shards, so the pipeline should be sent to both.
-            const comment = "both_shards_targeted";
-            const results = coll.aggregate([{$readNDocuments: {numDocs: 8}}], {comment: comment}).toArray();
-            assert.eq(results.length, 8, results);
+        /**
+         * Asserts that the given pipeline targets both shards and returns the expected IDs.
+         */
+        function assertTargetsBothShards(pipeline, expectedIds, comment) {
+            const results = coll.aggregate(pipeline, {comment}).toArray();
+            assert.eq(results.length, expectedIds.length, results);
             assert.sameMembers(
                 results.map((d) => d._id),
-                [0, 1, 2, 3, 4, 5, 6, 7],
+                expectedIds,
             );
-
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: shard0DB,
                 filter: {
@@ -94,6 +99,30 @@ withExtensions(
                 },
             });
         }
+
+        const idsInRange = (n) => Array.from({length: n}, (_, i) => i);
+
+        // Source stage: filter [0, 3) falls entirely on shard0.
+        assertTargetsShard0Only([{$readNDocuments: {numDocs: 3}}], idsInRange(3), "source_single_shard_targeted");
+
+        // Source stage: filter [0, 8) spans both shards.
+        assertTargetsBothShards([{$readNDocuments: {numDocs: 8}}], idsInRange(8), "source_both_shards_targeted");
+
+        // Transform stage: filter {_id: {$gte: 0, $lt: 3}} falls entirely on shard0. $testBar is
+        // a no-op passthrough, so all docs from shard0 (ids 0-4) are returned.
+        assertTargetsShard0Only(
+            [{$testBar: {_id: {$gte: 0, $lt: 3}}}],
+            idsInRange(5),
+            "transform_single_shard_targeted",
+        );
+
+        // Transform stage: filter {_id: {$gte: 0, $lt: 8}} spans both shards. All 10 docs
+        // returned since $testBar is a no-op passthrough.
+        assertTargetsBothShards(
+            [{$testBar: {_id: {$gte: 0, $lt: 8}}}],
+            idsInRange(10),
+            "transform_both_shards_targeted",
+        );
     },
     ["sharded"],
     {shards: 2},

@@ -2951,9 +2951,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest, GetFilter_TransformStageWithFilte
     auto optimizable = host::DocumentSourceExtensionOptimizable::create(
         getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
 
-    // Transform stages do not currently report a filter even if they have one.
-    ASSERT_FALSE(optimizable->hasQuery());
-    ASSERT_BSONOBJ_EQ(optimizable->getQuery(), BSONObj());
+    ASSERT_TRUE(optimizable->hasQuery());
+    ASSERT_BSONOBJ_EQ(optimizable->getQuery(), LogicalStageWithFilter::kFilter);
 }
 
 }  // namespace

@@ -1729,12 +1729,11 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
 
     auto expCtx = pipeline->getContext();
 
-    // Look for an initial match. This works whether we got an initial query or not. If not, it
-    // results in a "{}" query, which will be what we want in that case. Note that if there is a
-    // leading $match, 'queryObj' will hold a reference to that $match's MatchExpression backing
-    // BSON. This gets passed into the FindCommandRequest we construct later through
-    // 'prepareExecutor', and this is how we keep the MatchExpression's backing BSON alive.
-    const BSONObj queryObj = pipeline->getInitialQuery();
+    // Look for a leading $match to pull into the query executor. If present, 'queryObj' will hold a
+    // reference to that MatchExpression BSON. This gets passed into the FindCommandRequest we
+    // construct later through 'prepareExecutor', and this is how we keep the MatchExpression's
+    // backing BSON alive.
+    BSONObj queryObj;
     boost::intrusive_ptr<DocumentSourceMatch> leadingMatch;
     bool isTextQuery = false;
     const bool isChangeStream =
@@ -1743,18 +1742,14 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     // removed from the pipeline.
     // We avoid performing further optimizations on change stream MatchExpressions to avoid
     // causing lifetime issues to the BSONObj included in the relevant MatchExpressions.
-    if (!queryObj.isEmpty()) {
-        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())) {
+    if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())) {
+        queryObj = matchStage->getQuery();
+        if (!queryObj.isEmpty()) {
             if (!isChangeStream) {
                 leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(matchStage);
                 isTextQuery = matchStage->isTextQuery();
             }
             pipeline->popFront();
-        } else {
-            // A $geoNear stage, the only other stage that can produce an initial query, is also
-            // a valid initial stage. However, we should be in buildInnerQueryExecutorGeoNear()
-            // instead.
-            MONGO_UNREACHABLE;
         }
     }
 
@@ -2137,7 +2132,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     Pipeline& pipeline) {
     bool shouldProduceEmptyDocs;  // Don't care about result.
     QueryMetadataBitSet availableMetadata(0);
-    auto queryObj = pipeline.getInitialQuery();
+    BSONObj queryObj;
 
     boost::intrusive_ptr<DocumentSourceMatch> leadingMatch;
 
@@ -2145,7 +2140,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // that we have exactly one $match at the front of the pipeline.
     if (!pipeline.empty()) {
         auto firstSource = pipeline.getSources().front().get();
-        if (auto* match = dynamic_cast<DocumentSourceMatch*>(firstSource); match) {
+        if (auto* match = dynamic_cast<DocumentSourceMatch*>(firstSource)) {
+            queryObj = match->getQuery();
             leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(match);
             pipeline.popFront();
         }

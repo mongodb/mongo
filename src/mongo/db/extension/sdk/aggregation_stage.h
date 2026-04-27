@@ -87,9 +87,9 @@ public:
     }
 
     /**
-     * Returns the filter predicate applied by this stage for shard targeting. Source stages that
-     * filter documents should override this to enable shard targeting. Returns an empty BSONObj by
-     * default (no filter).
+     * Returns the filter predicate applied by this stage for shard targeting. Stages that filter
+     * documents should override this to enable shard targeting. Returns an empty BSONObj by default
+     * (no filter).
      */
     virtual BSONObj getFilter() const {
         return BSONObj();

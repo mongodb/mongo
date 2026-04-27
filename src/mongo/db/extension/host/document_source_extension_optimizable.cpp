@@ -542,8 +542,7 @@ BSONObj DocumentSourceExtensionOptimizable::getQuery() const {
         return BSONObj();
     }
 
-    // Only expose source stage filters, for shard targeting purposes.
-    return _properties.getRequiresInputDocSource() ? BSONObj() : _logicalStage->getFilter();
+    return _logicalStage->getFilter();
 }
 
 bool DocumentSourceExtensionOptimizable::hasQuery() const {

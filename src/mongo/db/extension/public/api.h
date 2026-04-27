@@ -835,7 +835,7 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      * Returns the filter predicate that will be applied by the stage, if applicable. If the stage
      * does not apply a filter, the output buffer is left as nullptr.
      *
-     * This method is called by the host for determining which shards to target on source stages.
+     * This method is called by the host for determining which shards to target on any given stage.
      *
      * Ownership of the output buffer is transferred to the caller.
      */
