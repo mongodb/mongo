@@ -7021,7 +7021,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
                 expectFail: true, // shard0name doesn't exist
               },
               {
@@ -7054,7 +7054,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
                 expectFail: true, // shard0name doesn't exist
               },
               {
@@ -7090,7 +7090,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
                 expectFail: true,
               },
               {
