@@ -561,7 +561,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // optimize out the reparse.
     auto clonedLPP = liteParsedPipeline.clone();
     const auto wasDesugaredHere =
-        !alreadyDesugared && LiteParsedDesugarer::desugar(&clonedLPP, ifrContext);
+        !alreadyDesugared && LiteParsedDesugarer::desugar(&clonedLPP, expCtx->getIfrContext());
 
     auto ifrCtx = expCtx->getIfrContext();
     auto hybridSearchFlagEnabled = ifrCtx &&

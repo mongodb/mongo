@@ -995,7 +995,8 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
         desugaredLPP,
         aggExState.getResolvedView(),
         aggExState.getOriginalNss(),
-        uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())));
+        uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
+        LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
     return SecondParseRequirement::kReparseFromLPP;
 }
 

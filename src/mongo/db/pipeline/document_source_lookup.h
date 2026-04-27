@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
+#include "mongo/db/pipeline/lite_parsed_lookup.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -92,7 +94,14 @@ struct LookUpSharedState {
 
 void lookupPipeValidator(const Pipeline& pipeline);
 
-DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(LookUp);
+// Parses $lookup's 'from' field. Accepts a string or a '{db, coll}' object with specific
+// exceptions. `usingMongos` and `isParsingViewDefinition` tighten validation; lite-parse omits
+// them because expCtx is unavailable.
+NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
+                                                   const DatabaseName& defaultDb,
+                                                   bool allowGenericForeignDbLookup,
+                                                   bool usingMongos = false,
+                                                   bool isParsingViewDefinition = false);
 
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.
@@ -106,59 +115,6 @@ public:
     static constexpr StringData kForeignField = "foreignField"_sd;
     static constexpr StringData kPipelineField = "pipeline"_sd;
     static constexpr StringData kAsField = "as"_sd;
-
-    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines<LiteParsed> {
-    public:
-        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec,
-                                                 const LiteParserOptions& options);
-
-        LiteParsed(const BSONElement& spec,
-                   NamespaceString foreignNss,
-                   boost::optional<LiteParsedPipeline> pipeline)
-            : LiteParsedDocumentSourceNestedPipelines(
-                  spec, std::move(foreignNss), std::move(pipeline)) {}
-
-        /**
-         * Lookup from a sharded collection may not be allowed.
-         */
-        Status checkShardedForeignCollAllowed(const NamespaceString& nss,
-                                              bool inMultiDocumentTransaction) const final {
-            const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
-            if (!inMultiDocumentTransaction ||
-                gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
-                return Status::OK();
-            }
-            auto involvedNss = getInvolvedNamespaces();
-            if (involvedNss.find(nss) == involvedNss.end()) {
-                return Status::OK();
-            }
-
-            return Status(ErrorCodes::NamespaceCannotBeSharded,
-                          "Sharded $lookup is not allowed within a multi-document transaction");
-        }
-
-        void getForeignExecutionNamespaces(
-            stdx::unordered_set<NamespaceString>& nssSet) const final {
-            tassert(6235100, "Expected foreignNss to be initialized for $lookup", _foreignNss);
-            nssSet.emplace(*_foreignNss);
-        }
-
-        PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final;
-
-        bool requiresAuthzChecks() const override {
-            return false;
-        }
-
-        bool hasExtensionSearchStage() const override {
-            return !_pipelines.empty() && _pipelines[0].hasExtensionSearchStage();
-        }
-
-        std::unique_ptr<StageParams> getStageParams() const override {
-            return std::make_unique<LookUpStageParams>(_originalBson);
-        }
-    };
 
     /**
      * Copy constructor used for clone().
@@ -205,6 +161,33 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    // Build a $lookup from pre-parsed StageParams. Performs expCtx-dependent validation
+    // (cross-db on mongos / view definition, hybrid-search timeseries) and forwards the
+    // desugared LPP into the LPP-accepting constructor when a subpipeline is present.
+    static DocumentSourceContainer createFromStageParams(
+        LookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Constructor accepting a pre-desugared LiteParsedPipeline. Avoids the per-construction
+     * re-parse of the subpipeline's BSON that createFromBson does. Used by createFromStageParams
+     * when LookUpStageParams::liteParsedPipeline is present.
+     */
+    DocumentSourceLookUp(NamespaceString fromNs,
+                         std::string as,
+                         std::vector<BSONObj> userPipeline,
+                         LiteParsedPipeline desugaredPipeline,
+                         BSONObj letVariables,
+                         boost::optional<std::pair<std::string, std::string>> localForeignFields,
+                         boost::optional<BSONObj> unwindSpec,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    static std::unique_ptr<Pipeline> parsePipelineFromLPPWithMaybeViewDefinition(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const ResolvedNamespace& resolvedNs,
+        LiteParsedPipeline& desugaredPipeline,
+        const std::vector<BSONObj>& rawPipeline,
+        const NamespaceString& userNss);
 
     void resolvedPipelineHelper(
         NamespaceString fromNs,
@@ -277,6 +260,10 @@ public:
 
     inline const VariablesParseState& getVariablesParseState_forTest() {
         return _variablesParseState;
+    }
+
+    inline const std::vector<BSONObj>& getResolvedPipelineForTest() const {
+        return _sharedState->resolvedPipeline;
     }
 
     const DocumentSourceContainer* getSubPipeline() const final {
@@ -395,6 +382,19 @@ private:
      * pipelines will be built recursively.
      */
     void initializeResolvedIntrospectionPipeline();
+
+    /**
+     * Validates each name in 'letVariables' and appends a corresponding entry to '_letVariables'
+     * (parsed expression + variable id from '_variablesParseState').
+     */
+    void parseAndDefineLetVariables(const BSONObj& letVariables,
+                                    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * If '_fieldMatchPipelineIdx' is set, inserts an empty $match placeholder into
+     * '_sharedState->resolvedPipeline' at that index.
+     */
+    void insertFieldMatchPlaceholder();
 
     /**
      * Given a mutable document, appends execution stats such as 'totalDocsExamined',

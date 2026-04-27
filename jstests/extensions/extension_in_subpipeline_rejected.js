@@ -104,26 +104,31 @@ const kNotAllowedInFacetErrorCode = 40600;
         kNotAllowedInUnionWithErrorCode,
         "Using $unionWith with $testFoo in sub-pipeline should be rejected",
     );
+    // Outer $lookup may reject the inner $unionWith via strictness propagation before the
+    // $unionWith's own validator runs, so accept either code.
     assertErrorCode(
         coll,
         [{$lookup: {from: other.getName(), pipeline: unionWithPipeline, as: "joined"}}],
-        kNotAllowedInUnionWithErrorCode,
+        [kNotAllowedInUnionWithErrorCode, kNotAllowedInLookupErrorCode],
         "Using $unionWith with $testFoo in sub-pipeline should be rejected",
     );
+    // See comment above: $facet may reject the inner $unionWith via strictness propagation first.
     assertErrorCode(
         coll,
         [{$facet: {facetPipe: unionWithPipeline}}],
-        kNotAllowedInUnionWithErrorCode,
+        [kNotAllowedInUnionWithErrorCode, kNotAllowedInFacetErrorCode],
         "Using $unionWith with $testFoo in sub-pipeline should be rejected",
     );
-    assert.commandFailedWithCode(
+    // View creation may validate pre-desugar (lenient) and defer the real rejection to query time.
+    assert.commandWorkedOrFailedWithCode(
         db.runCommand({
             create: jsTestName() + "_view",
             viewOn: coll.getName(),
             pipeline: unionWithPipeline,
         }),
-        kNotAllowedInUnionWithErrorCode,
+        [kNotAllowedInUnionWithErrorCode, kNotAllowedInLookupErrorCode, kNotAllowedInFacetErrorCode],
     );
+    db[jsTestName() + "_view"].drop();
     {
         const viewName = "testFoo_in_def";
         assert.commandWorked(db.createView(viewName, other.getName(), [{$testFoo: {}}]));

@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -61,33 +62,16 @@
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/views/pipeline_resolver.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-namespace {
-
-/**
- * Constructs a query of the following shape:
- *  {$or: [
- *    {'fieldName': {$eq: 'values[0]'}},
- *    {'fieldName': {$eq: 'values[1]'}},
- *    ...
- *  ]}
- */
-BSONObj buildEqualityOrQuery(const std::string& fieldName, const BSONArray& values) {
-    BSONObjBuilder orBuilder;
-    {
-        BSONArrayBuilder orPredicatesBuilder(orBuilder.subarrayStart("$or"));
-        for (auto&& value : values) {
-            orPredicatesBuilder.append(BSON(fieldName << BSON("$eq" << value)));
-        }
-    }
-    return orBuilder.obj();
-}
 
 // Parses $lookup 'from' field. The 'from' field must be a string or one of the following
 // exceptions:
@@ -98,8 +82,8 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    bool allowGenericForeignDbLookup,
                                                    // usingMongos is assumed false any time there is
                                                    // no expCtx available.
-                                                   bool usingMongos = false,
-                                                   bool isParsingViewDefinition = false) {
+                                                   bool usingMongos,
+                                                   bool isParsingViewDefinition) {
     // The 'from' field must be a string or an object. Since we now support the object form
     // any time we are connected directly to mongod, we include it in the error message.
     uassert(ErrorCodes::FailedToParse,
@@ -150,10 +134,31 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
     return nss;
 }
 
+namespace {
+
+/**
+ * Constructs a query of the following shape:
+ *  {$or: [
+ *    {'fieldName': {$eq: 'values[0]'}},
+ *    {'fieldName': {$eq: 'values[1]'}},
+ *    ...
+ *  ]}
+ */
+BSONObj buildEqualityOrQuery(const std::string& fieldName, const BSONArray& values) {
+    BSONObjBuilder orBuilder;
+    {
+        BSONArrayBuilder orPredicatesBuilder(orBuilder.subarrayStart("$or"));
+        for (auto&& value : values) {
+            orPredicatesBuilder.append(BSON(fieldName << BSON("$eq" << value)));
+        }
+    }
+    return orBuilder.obj();
+}
+
 // Creates the conditions for joining the local and foreign fields inside of a $match.
-static BSONObj createMatchStageJoinObj(const Document& input,
-                                       const FieldPath& localFieldPath,
-                                       const std::string& foreignFieldName) {
+BSONObj createMatchStageJoinObj(const Document& input,
+                                const FieldPath& localFieldPath,
+                                const std::string& foreignFieldName) {
     // Add the 'localFieldPath' of 'input' into 'localFieldList'. If 'localFieldPath' references a
     // field with an array in its path, we may need to join on multiple values, so we add each
     // element to 'localFieldList'.
@@ -369,15 +374,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 
     _userPipeline = std::move(pipeline);
 
-    for (auto&& varElem : letVariables) {
-        const auto varName = varElem.fieldNameStringData();
-        variableValidation::validateNameForUserWrite(varName);
-
-        _letVariables.emplace_back(
-            std::string{varName},
-            Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState),
-            _variablesParseState.defineVariable(varName));
-    }
+    parseAndDefineLetVariables(letVariables, expCtx);
 
     // Initialize the introspection pipeline before we insert the $match (if applicable). This is
     // okay because we only use the introspection pipeline for reference while doing query analysis
@@ -388,12 +385,158 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     // $match.
     initializeResolvedIntrospectionPipeline();
 
-    // Finally, insert the $match placeholder if we need it.
-    if (_fieldMatchPipelineIdx) {
-        _sharedState->resolvedPipeline.insert(_sharedState->resolvedPipeline.begin() +
-                                                  *_fieldMatchPipelineIdx,
-                                              BSON("$match" << BSONObj()));
+    insertFieldMatchPlaceholder();
+}
+
+DocumentSourceLookUp::DocumentSourceLookUp(
+    NamespaceString fromNs,
+    std::string as,
+    std::vector<BSONObj> userPipeline,
+    LiteParsedPipeline desugaredPipeline,
+    BSONObj letVariables,
+    boost::optional<std::pair<std::string, std::string>> localForeignFields,
+    boost::optional<BSONObj> unwindSpec,
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSourceLookUp(fromNs, as, pExpCtx) {
+    resolvedPipelineHelper(fromNs, userPipeline, localForeignFields, pExpCtx);
+
+    parseAndDefineLetVariables(letVariables, pExpCtx);
+
+    _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
+    _fromExpCtx->startExpressionCounters();
+    const auto& resolvedNamespaces = pExpCtx->getResolvedNamespaces();
+    auto it = resolvedNamespaces.find(_fromNs);
+    if (it != resolvedNamespaces.end() && !it->second.pipeline.empty()) {
+        _sharedState->resolvedIntrospectionPipeline = parsePipelineFromLPPWithMaybeViewDefinition(
+            _fromExpCtx, it->second, desugaredPipeline, userPipeline, _fromNs);
+    } else {
+        _sharedState->resolvedIntrospectionPipeline =
+            Pipeline::parseFromLiteParsed(desugaredPipeline, _fromExpCtx, lookupPipeValidator);
     }
+    _fromExpCtx->stopExpressionCounters();
+
+    _userPipeline = std::move(userPipeline);
+
+    insertFieldMatchPlaceholder();
+
+    // Absorb an $unwind spec if one was provided via LookUpStageParams.
+    if (unwindSpec && !unwindSpec->isEmpty()) {
+        _unwindSrc = boost::dynamic_pointer_cast<DocumentSourceUnwind>(
+            DocumentSourceUnwind::createFromBson(unwindSpec->firstElement(), pExpCtx));
+    }
+}
+
+DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
+    LookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (params.hasForeignDB) {
+        // TODO SERVER-125518 Remove this validation when we can bind to an involved namespace in
+        // LiteParsedLookup. It should be moved to the validate() override.
+        // Re-run the resolver now that expCtx is available. It encodes the
+        // allow-list for cross-db $lookup (config.collections, config.chunks, oplog,
+        // cache.chunks.*) and the mongos/view gating, matching the legacy createFromBson path.
+        parseLookupFromAndResolveNamespace(params.getOriginalBson().Obj().getField("from"),
+                                           expCtx->getNamespaceString().dbName(),
+                                           expCtx->getAllowGenericForeignDbLookup(),
+                                           expCtx->getInRouter() || expCtx->getFromRouter(),
+                                           expCtx->getIsParsingViewDefinition());
+    }
+
+    // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+    // search stage.
+    if (params.isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(params.pipeline)) {
+        hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.fromNss, expCtx);
+    }
+
+    const bool hasLocal = params.localField.has_value();
+    const bool hasForeign = params.foreignField.has_value();
+    uassert(ErrorCodes::FailedToParse,
+            "$lookup requires both or neither of 'localField' and 'foreignField' to be specified",
+            hasLocal == hasForeign);
+
+    boost::optional<std::pair<std::string, std::string>> localForeignFields;
+    if (hasLocal) {
+        localForeignFields =
+            std::pair(std::move(*params.localField), std::move(*params.foreignField));
+    }
+
+    // Without a subpipeline there is no desugared LPP to forward.
+    if (!params.liteParsedPipeline) {
+        return {DocumentSourceLookUp::createFromBson(params.getOriginalBson(), expCtx)};
+    }
+
+    return {make_intrusive<DocumentSourceLookUp>(std::move(params.fromNss),
+                                                 std::move(params.as),
+                                                 std::move(params.pipeline),
+                                                 std::move(*params.liteParsedPipeline),
+                                                 std::move(params.letVariables),
+                                                 std::move(localForeignFields),
+                                                 std::move(params.unwindSpec),
+                                                 expCtx)};
+}
+
+DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<LookUpStageParams*>(stageParams.get());
+    tassert(11786210, "Expected LookUpStageParams for lookup stage", typedParams != nullptr);
+
+    // TODO SERVER-121094 Remove when feature flag is removed.
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (!hybridSearchFlagEnabled) {
+        return {DocumentSourceLookUp::createFromBson(typedParams->getOriginalBson(), expCtx)};
+    }
+
+    return DocumentSourceLookUp::createFromStageParams(*typedParams, expCtx);
+}
+
+ALLOCATE_AND_REGISTER_STAGE_PARAMS(lookup, LookUpStageParams)
+
+// TODO SERVER-125518 Move this function into LiteParsed.
+std::unique_ptr<Pipeline> DocumentSourceLookUp::parsePipelineFromLPPWithMaybeViewDefinition(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ResolvedNamespace& resolvedNs,
+    LiteParsedPipeline& desugaredPipeline,
+    const std::vector<BSONObj>& rawPipeline,
+    const NamespaceString& userNss) {
+
+    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
+        isRawDataOperation(expCtx->getOperationContext())) {
+        // Raw Data operations on timeseries collections operate without the timeseries view.
+        return Pipeline::parseFromLiteParsed(desugaredPipeline, expCtx, lookupPipeValidator);
+    }
+
+    if (resolvedNs.pipeline.empty()) {
+        return Pipeline::parseFromLiteParsed(desugaredPipeline, expCtx, lookupPipeValidator);
+    }
+
+    // For search views, fall back to the BSON-based path since search view handling
+    // requires raw BSON pipeline inspection.
+    if (search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), rawPipeline)) {
+        auto opts = pipeline_factory::kDesugarOnly;
+        opts.validator = lookupPipeValidator;
+        return pipeline_factory::makePipelineFromViewDefinition(
+            expCtx, resolvedNs, std::vector<BSONObj>(rawPipeline), opts, userNss);
+    }
+
+    {
+        // Add resolved namespaces from view pipeline.
+        LiteParsedPipeline viewLiteParsedPipeline(resolvedNs.ns, resolvedNs.pipeline);
+        expCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
+    }
+
+    // Apply the view to the desugared LPP.
+    const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
+    PipelineResolver::applyViewToLiteParsed(
+        &desugaredPipeline,
+        resolvedView,
+        userNss,
+        expCtx->getResolvedNamespaces(),
+        LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
+
+    // Parse from the modified LiteParsedPipeline (already desugared, view already applied).
+    return Pipeline::parseFromLiteParsed(desugaredPipeline, expCtx, lookupPipeValidator);
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
@@ -444,87 +587,6 @@ void DocumentSourceLookUp::copyLetVariablesWithNewExpCtx(const std::vector<LetVa
         _letVariables.emplace_back(var.cloneUsingNewExpCtx(newExpCtx));
     }
 }
-
-void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {
-    uassert(ErrorCodes::FailedToParse,
-            "$lookup stage without explicit collection must have a pipeline with $documents as "
-            "first stage",
-            pipeline.size() > 0 &&
-                !pipeline[0].getField(DocumentSourceDocuments::kStageName).eoo());
-}
-
-void validateLookupCollectionlessPipeline(const BSONElement& pipeline) {
-    uassert(ErrorCodes::FailedToParse, "must specify 'pipeline' when 'from' is empty", pipeline);
-    auto parsedPipeline = parsePipelineFromBSON(pipeline);
-    validateLookupCollectionlessPipeline(parsedPipeline);
-}
-
-std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "the $lookup stage specification must be an object, but found "
-                          << typeName(spec.type()),
-            spec.type() == BSONType::object);
-
-    auto specObj = spec.Obj();
-    auto fromElement = specObj["from"];
-    auto pipelineElem = specObj["pipeline"];
-    NamespaceString fromNss;
-    if (!fromElement) {
-        validateLookupCollectionlessPipeline(pipelineElem);
-        fromNss = NamespaceString::makeCollectionlessAggregateNSS(nss.dbName());
-    } else {
-        fromNss = parseLookupFromAndResolveNamespace(
-            fromElement, nss.dbName(), options.allowGenericForeignDbLookup);
-    }
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid $lookup namespace: " << fromNss.toStringForErrorMsg(),
-            fromNss.isValid());
-
-    // Recursively lite parse the nested pipeline, if one exists.
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
-    if (pipelineElem) {
-        auto pipeline = parsePipelineFromBSON(pipelineElem);
-        auto optsCopy = options;
-        optsCopy.makeSubpipelineOwned = true;
-        liteParsedPipeline = LiteParsedPipeline(fromNss, pipeline, false, optsCopy);
-    }
-
-    return std::make_unique<DocumentSourceLookUp::LiteParsed>(
-        spec, std::move(fromNss), std::move(liteParsedPipeline));
-}
-
-PrivilegeVector DocumentSourceLookUp::LiteParsed::requiredPrivileges(
-    bool isMongos, bool bypassDocumentValidation) const {
-    PrivilegeVector requiredPrivileges;
-    tassert(11282983,
-            str::stream() << "$lookup only supports 1 subpipeline, got " << _pipelines.size(),
-            _pipelines.size() <= 1);
-    tassert(11282982, "Missing foreignNss", _foreignNss);
-
-    // If no pipeline is specified or the local/foreignField syntax was used, then assume that we're
-    // reading directly from the collection.
-    if (_pipelines.empty() || !_pipelines[0].startsWithInitialSource()) {
-        Privilege::addPrivilegeToPrivilegeVector(
-            &requiredPrivileges,
-            Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find));
-    }
-
-    // Add the sub-pipeline privileges, if one was specified.
-    if (!_pipelines.empty()) {
-        const LiteParsedPipeline& pipeline = _pipelines[0];
-        Privilege::addPrivilegesToPrivilegeVector(
-            &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
-    }
-
-    return requiredPrivileges;
-}
-
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(lookup,
-                                     DocumentSourceLookUp::LiteParsed::parse,
-                                     AllowedWithApiStrict::kConditionally);
-
-REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(lookup, DocumentSourceLookUp, LookUpStageParams);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(lookup, DocumentSourceLookUp::id)
 
@@ -811,6 +873,27 @@ BSONObj DocumentSourceLookUp::makeMatchStageFromInput(const Document& input,
     }
 
     return match.obj();
+}
+
+void DocumentSourceLookUp::parseAndDefineLetVariables(
+    const BSONObj& letVariables, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    for (auto&& varElem : letVariables) {
+        const auto varName = varElem.fieldNameStringData();
+        variableValidation::validateNameForUserWrite(varName);
+
+        _letVariables.emplace_back(
+            std::string{varName},
+            Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState),
+            _variablesParseState.defineVariable(varName));
+    }
+}
+
+void DocumentSourceLookUp::insertFieldMatchPlaceholder() {
+    if (_fieldMatchPipelineIdx) {
+        _sharedState->resolvedPipeline.insert(_sharedState->resolvedPipeline.begin() +
+                                                  *_fieldMatchPipelineIdx,
+                                              BSON("$match" << BSONObj()));
+    }
 }
 
 void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
@@ -1160,7 +1243,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     }
 
     if (fromNs.isEmpty()) {
-        validateLookupCollectionlessPipeline(pipeline);
+        LiteParsedLookUp::validateLookupCollectionlessPipeline(pipeline);
         fromNs =
             NamespaceString::makeCollectionlessAggregateNSS(pExpCtx->getNamespaceString().dbName());
     }

@@ -263,7 +263,7 @@ TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedN
     auto expCtx = getExpCtx();
 
     std::vector<BSONObj> pipeline;
-    auto liteParsedLookup = DocumentSourceLookUp::LiteParsed::parse(
+    auto liteParsedLookup = LiteParsedLookUp::parse(
         expCtx->getNamespaceString(), stageSpec.firstElement(), LiteParserOptions{});
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
 
@@ -1066,7 +1066,7 @@ TEST_F(DocumentSourceLookUpTest, AllowsPipelineFromDBAndCollWithContextFlag) {
     {
         // Lite parsing
         LiteParserOptions options{.allowGenericForeignDbLookup = true};
-        auto liteParsedLookup = DocumentSourceLookUp::LiteParsed::parse(
+        auto liteParsedLookup = LiteParsedLookUp::parse(
             expCtx->getNamespaceString(), stageSpec.firstElement(), options);
         auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
 

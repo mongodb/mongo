@@ -45,7 +45,7 @@ const unstablePipelines = [
     [{$listSessions: {}}],
     [{$planCacheStats: {}}],
     [{$unionWith: {coll: "coll2", pipeline: [{$collStats: {latencyStats: {}}}]}}],
-    [{$lookup: {from: "coll2", pipeline: [{$indexStats: {}}]}}],
+    [{$lookup: {from: "coll2", as: "out", pipeline: [{$indexStats: {}}]}}],
     [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],
     [{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}],
     [{$score: {score: 10}}],

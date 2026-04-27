@@ -272,6 +272,11 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     bool hasForeignDB)
     : DocumentSource(kStageName, expCtx) {
     _hasForeignDB = hasForeignDB;
+    // TODO SERVER-121094 Remove when feature flag is removed.
+    auto ifrContext = expCtx->getIfrContext();
+    if (!ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+        LiteParsedDesugarer::desugar(&desugaredPipeline, expCtx->getIfrContext());
+    }
     boost::optional<ResolvedNamespace> resolvedUnionNs;
     try {
         auto resolvedNamespaces = expCtx->getResolvedNamespaces();
@@ -694,14 +699,9 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineFromLPPWithMaybe
     LiteParsedPipeline& desugaredPipeline,
     const std::vector<BSONObj>& rawPipeline,
     const NamespaceString& userNss) {
-
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
     subExpCtx->setInUnionWith(true);
-
-    // TODO SERVER-117882 Remove this call once $lookup forwards its desugared LPP subpipeline in
-    // StageParams.
-    LiteParsedDesugarer::desugar(&desugaredPipeline, expCtx->getIfrContext());
 
     if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
         isRawDataOperation(expCtx->getOperationContext())) {

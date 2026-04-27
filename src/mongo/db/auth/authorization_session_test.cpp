@@ -1048,7 +1048,8 @@ TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnJoinedNamespa
 
         authzSession->assumePrivilegesForDB(Privilege(rsrcFoo, ActionType::find), nssFoo.dbName());
 
-        BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssBar.coll())));
+        BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssBar.coll() << "as"
+                                                                      << "out")));
         auto aggReq = buildAggReq(nssFoo, pipeline);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, false));
@@ -1070,7 +1071,8 @@ TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
             {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::find)},
             nssFoo.dbName());
 
-        BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssBar.coll())));
+        BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssBar.coll() << "as"
+                                                                      << "out")));
         auto aggReq = buildAggReq(nssFoo, pipeline);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, true));
@@ -1094,9 +1096,11 @@ TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnNestedJoinedN
             {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::find)},
             nssFoo.dbName());
 
-        BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssQux.coll())));
+        BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssQux.coll() << "as"
+                                                                            << "out")));
         BSONArray pipeline = BSON_ARRAY(
-            BSON("$lookup" << BSON("from" << nssBar.coll() << "pipeline" << nestedPipeline)));
+            BSON("$lookup" << BSON("from" << nssBar.coll() << "pipeline" << nestedPipeline << "as"
+                                          << "out")));
         auto aggReq = buildAggReq(nssFoo, pipeline);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, false));
@@ -1121,9 +1125,11 @@ TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnNestedJoinedNamespa
                                              Privilege(rsrcQux, ActionType::find)},
                                             nssFoo.dbName());
 
-        BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssQux.coll())));
+        BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssQux.coll() << "as"
+                                                                            << "out")));
         BSONArray pipeline = BSON_ARRAY(
-            BSON("$lookup" << BSON("from" << nssBar.coll() << "pipeline" << nestedPipeline)));
+            BSON("$lookup" << BSON("from" << nssBar.coll() << "pipeline" << nestedPipeline << "as"
+                                          << "out")));
         auto aggReq = buildAggReq(nssFoo, pipeline);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, false));
@@ -1241,9 +1247,9 @@ TEST_F(AuthorizationSessionTest,
         // We only have find on the aggregation namespace.
         authzSession->assumePrivilegesForDB(Privilege(rsrcFoo, ActionType::find), nssFoo.dbName());
 
-        BSONArray pipeline =
-            BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
-                                "[{$graphLookup: {from: 'qux'}}]}}"));
+        BSONArray pipeline = BSON_ARRAY(
+            fromjson("{$facet: {lookup: [{$lookup: {from: 'bar', as: 'out'}}], graphLookup: "
+                     "[{$graphLookup: {from: 'qux'}}]}}"));
         auto aggReq = buildAggReq(nssFoo, pipeline);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, false));
@@ -1281,9 +1287,9 @@ TEST_F(AuthorizationSessionTest,
                                              Privilege(rsrcQux, ActionType::find)},
                                             nssFoo.dbName());
 
-        BSONArray pipeline =
-            BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
-                                "[{$graphLookup: {from: 'qux'}}]}}"));
+        BSONArray pipeline = BSON_ARRAY(
+            fromjson("{$facet: {lookup: [{$lookup: {from: 'bar', as: 'out'}}], graphLookup: "
+                     "[{$graphLookup: {from: 'qux'}}]}}"));
 
         auto aggReq = buildAggReq(nssFoo, pipeline);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
