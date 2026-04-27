@@ -64,6 +64,7 @@ extern FailPoint hangAfterThrowWouldChangeOwningShardRetryableWrite;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeInsertOnUpdateShardKey);
+MONGO_FAIL_POINT_DEFINE(updateChangeOwningShardThrowsInterruptedAtShutdown);
 
 /**
  * Calls into the command execution stack to run the given command. Will blindly uassert on any
@@ -210,6 +211,10 @@ std::pair<bool, boost::optional<BSONObj>> handleWouldChangeOwningShardErrorRetry
     boost::optional<BSONObj> upsertedId;
     RouterOperationContextSession routerSession(opCtx);
     try {
+        if (MONGO_unlikely(updateChangeOwningShardThrowsInterruptedAtShutdown.shouldFail())) {
+            uasserted(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
+        }
+
         // Set the opCtx read concern to local.
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
@@ -265,7 +270,7 @@ std::pair<bool, boost::optional<BSONObj>> handleWouldChangeOwningShardErrorRetry
         // Set the error status to the status of the failed command and abort the transaction.
         auto status = e.toStatus();
         auto txnRouterForAbort = TransactionRouter::get(opCtx);
-        if (txnRouterForAbort)
+        if (txnRouterForAbort && txnRouterForAbort.isInitialized())
             txnRouterForAbort.implicitlyAbortTransaction(opCtx, status);
     }
 

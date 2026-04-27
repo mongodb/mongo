@@ -336,7 +336,7 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
         }
 
         auto txnRouter = TransactionRouter::get(newOpCtx);
-        if (txnRouter.isInitialized()) {
+        if (txnRouter && txnRouter.isInitialized()) {
             txnRouter.implicitlyAbortTransaction(newOpCtx, shutDownStatus);
         }
     }

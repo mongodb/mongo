@@ -671,7 +671,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
         auto writeCmdStatus = response.toStatus();
-        if (!writeCmdStatus.isOK()) {
+        if (!writeCmdStatus.isOK() && txnRouter.isInitialized()) {
             txnRouter.implicitlyAbortTransaction(opCtx, writeCmdStatus);
         }
     }

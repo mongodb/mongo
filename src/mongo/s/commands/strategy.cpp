@@ -199,7 +199,8 @@ void invokeInTransactionRouter(TransactionRouter::Router& txnRouter,
         auto opCtx = rec->getOpCtx();
 
         // Abort if the router wasn't yielded, which may happen at global shutdown.
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        if (auto txnRouter = TransactionRouter::get(opCtx);
+            txnRouter && txnRouter.isInitialized()) {
             txnRouter.implicitlyAbortTransaction(opCtx, status);
         }
 
@@ -316,7 +317,8 @@ void ExecCommandClient::_epilogue() {
         c->incrementCommandsFailed();
 
         auto status = getStatusFromCommandResult(body.asTempObj());
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        if (auto txnRouter = TransactionRouter::get(opCtx);
+            txnRouter && txnRouter.isInitialized()) {
             txnRouter.implicitlyAbortTransaction(opCtx, status);
         }
 
@@ -1021,7 +1023,11 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
         return;
     }
 
-    ScopeGuard abortGuard([&] { txnRouter.implicitlyAbortTransaction(opCtx, status); });
+    ScopeGuard abortGuard([&] {
+        if (txnRouter.isInitialized()) {
+            txnRouter.implicitlyAbortTransaction(opCtx, status);
+        }
+    });
 
     if (!_canRetry()) {
         addContextForTransactionAbortingError(
