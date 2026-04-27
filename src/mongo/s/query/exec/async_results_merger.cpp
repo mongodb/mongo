@@ -1379,6 +1379,15 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                        parsedResponse.getStatus(),
                        remote->shardHostAndPort,
                        cbData.response.getErrorLabels())) {
+            if (!_opCtx) {
+                // ARM is detached — scheduling a retry on the dead SubBaton would cause it to
+                // resolve immediately and attempt to re-acquire _mutex on the same thread,
+                // deadlocking. Instead, leave the remote in a retriable state ('outstandingRequest'
+                // already cleared, no error set, cursor ID still valid). On reattach,
+                // '_scheduleGetMores()' will see the remote and re-send the getMore naturally.
+                _signalCurrentEventIfReady(lk);
+                return;
+            }
             // Schedule a retry for the request on the baton. The 'AsyncResultsMerger' instance is
             // captured here using a weak_ptr, so that the scheduled retry operation does not block
             // the destruction of the instance. If the retry is scheduled after the instance was
