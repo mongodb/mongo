@@ -4656,6 +4656,32 @@ TEST_F(PipelineOptimizationTest, ComplexRenameNotPromotedWithoutProof) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+// $group with $push always produces an array in the accumulator field. A complex rename reading
+// from that array path (e.g. {c: "$arr.b"}) should NOT allow $match to push past $project,
+// because the rename source prefix is always an array and the rename is unsafe to reverse.
+TEST_F(PipelineOptimizationTest, ComplexRenameNotPromotedWhenPipelineIntroducesArrays) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    std::string inputPipe =
+        "["
+        " {$group: {_id: '$x', arr: {$push: '$b'}}},"
+        " {$project: {c: '$arr.b'}},"
+        " {$match: {c: {$eq: {}}}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$group: {_id: '$x', arr: {$push: '$b'}, $willBeMerged: false}},"
+        " {$project: {_id: true, c: '$arr.b'}},"
+        " {$match: {c: {$eq: {}}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$group: {_id: '$x', arr: {$push: '$b'}, $willBeMerged: false}},"
+        " {$project: {_id: true, c: '$arr.b'}},"
+        " {$match: {c: {$eq: {}}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST_F(PipelineOptimizationTest, internalAllCollectionStatsAbsorbsMatchOnNs) {
     std::string inputPipe =
         "["

@@ -233,6 +233,13 @@ public:
         return nullptr;
     }
 
+    boost::intrusive_ptr<ExpressionContext> getSubpipelineExpCtx() const final {
+        if (_sharedState->_pipeline) {
+            return _sharedState->_pipeline->getContext();
+        }
+        return nullptr;
+    }
+
     std::shared_ptr<UnionWithSharedState> getSharedState() const {
         return _sharedState;
     }

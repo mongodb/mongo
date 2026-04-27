@@ -1225,13 +1225,31 @@ private:
                              dsInfo.isSingleDocumentTransformation(),
                              nextNewScopeId});
 
-        // Build a separate dependency graph for sub-pipelines (e.g. $lookup, $unionWith).
-        // TODO SERVER-124146: Pass the sub-collection's PathArrayness callback so that
-        // canPathBeArray() returns precise results inside subpipelines instead of always true.
-        if (auto* subPipeline = ds->getSubPipeline()) {
-            _subpipelineGraphs.push_back(std::make_unique<DependencyGraph>(*subPipeline));
-            _stages[stageId].subpipelineGraph = _subpipelineGraphs.back().get();
+        createSubpipelineGraph(ds, stageId);
+    }
+
+    /**
+     * If the stage has a sub-pipeline (e.g. $lookup, $unionWith), builds a separate
+     * DependencyGraph for it. Initialize the corresponding PathArrayness API with
+     * canSecondaryCollPathBeArray().
+     */
+    void createSubpipelineGraph(DocumentSource* ds, StageId stageId) {
+        auto* subPipeline = ds->getSubPipeline();
+        if (!subPipeline) {
+            return;
         }
+        CanPathBeArray subPipelineCanPathBeArray = defaultCanPathBeArray;
+        if (auto expCtx = ds->getExpCtx()) {
+            if (auto subExpCtx = ds->getSubpipelineExpCtx()) {
+                subPipelineCanPathBeArray = [expCtx, subExpCtx](StringData path) -> bool {
+                    return expCtx->canPathBeArrayForNss(FieldRef(path),
+                                                        subExpCtx->getNamespaceString());
+                };
+            }
+        }
+        _subpipelineGraphs.push_back(
+            std::make_unique<DependencyGraph>(*subPipeline, std::move(subPipelineCanPathBeArray)));
+        _stages[stageId].subpipelineGraph = _subpipelineGraphs.back().get();
     }
 
     /**

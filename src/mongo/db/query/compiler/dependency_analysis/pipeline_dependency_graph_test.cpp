@@ -819,6 +819,155 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineWithEmptyPipeline) {
     runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "zip")); });
 }
 
+TEST_F(PipelineDependencyGraphTest, SubPipelineUsesSecondaryCollPathArrayness) {
+    // The sub-pipeline DependencyGraph should query the PathArrayness of the subpipeline.
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs",
+        let: {},
+        pipeline: [{$match: {b_foo: 1}}]
+    }}])");
+
+    // Get the sub-pipeline's ExpressionContext (the $lookup's _fromExpCtx). The sub-pipeline
+    // has one stage ($match) whose ExpCtx is the from-collection context.
+    auto* subPipeline = stages[0]->getSubPipeline();
+    ASSERT_NOT_EQUALS(subPipeline, nullptr);
+    ASSERT_FALSE(subPipeline->empty());
+    auto subExpCtx = subPipeline->front()->getExpCtx();
+
+    // Set up a PathArrayness for coll_b that marks 'b_non_array' as provably not an array.
+    auto secondaryPathArrayness = std::make_shared<PathArrayness>();
+    secondaryPathArrayness->addPath(
+        FieldPath("b_non_array"), {} /*multikeyPath*/, true /*isFullRebuild*/);
+
+    // Inject the secondary PA using the sub-pipeline NSS as the key.
+    const auto collBNss = subExpCtx->getNamespaceString();
+
+    auto expCtx = stages[0]->getExpCtx();
+    expCtx->setPathArraynessForNss(collBNss, secondaryPathArrayness);
+
+    runTest([&] {
+        // This is refering to 'b_non_array' originating from the base collection.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "b_non_array"));
+
+        // This refers to the 'docs.b_non_array' originating from the secondary collection which
+        // cannot be an array.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_non_array"));
+
+        // An unindexed field not in the PathArrayness trie is conservatively true.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "b_unknown"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineEmptyCanPathBeArray) {
+    // $lookup with a truly empty sub-pipeline. Inject PathArrayness for the secondary
+    // collection to verify it propagates even when there are no sub-pipeline stages.
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "docs"
+    }},
+    {$match: {x: 1}}])");
+
+    // Use getSubpipelineExpCtx() to obtain the from-collection's ExpCtx
+    // even though the sub-pipeline is empty.
+    auto subExpCtx = stages[0]->getSubpipelineExpCtx();
+    ASSERT_NOT_EQUALS(subExpCtx, nullptr);
+
+    // Set up a PathArrayness for coll_b that marks 'b_non_array' as provably not an array.
+    auto secondaryPathArrayness = std::make_shared<PathArrayness>();
+    secondaryPathArrayness->addPath(
+        FieldPath("b_non_array"), {} /*multikeyPath*/, true /*isFullRebuild*/);
+
+    // Inject the secondary PA using the sub-pipeline NSS as the key.
+    const auto collBNss = subExpCtx->getNamespaceString();
+
+    auto expCtx = stages[0]->getExpCtx();
+    expCtx->setPathArraynessForNss(collBNss, secondaryPathArrayness);
+
+    runTest([&] {
+        // The sub-pipeline graph should exist even though the pipeline is empty.
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+
+        // 'docs.b_non_array' crosses into the empty sub-pipeline and resolves via
+        // coll_b's PathArrayness — provably not an array.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_non_array"));
+
+        // An unindexed field in coll_b is conservatively true.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "docs.b_unknown"));
+
+        // Base-collection field is unrelated to the sub-pipeline — conservatively true.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "base_field"));
+    });
+}
+TEST_F(PipelineDependencyGraphTest, SubPipelineNestedCanPathBeArray) {
+    // Nested $lookup: outer $lookup from coll_b contains an inner $lookup from coll_c.
+    // Inject PathArrayness for coll_c to verify it propagates through the nested sub-pipeline.
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "b_foo",
+        as: "outer_docs",
+        let: {},
+        pipeline: [
+            {$match: {b_foo: 1}},
+            {$lookup: {
+                from: "coll_c",
+                localField: "key",
+                foreignField: "c_key",
+                as: "inner_docs",
+                let: {},
+                pipeline: [{$match: {c_key: 1}}]
+            }}
+        ]
+    }}])");
+
+    // Get the inner $lookup's sub-pipeline ExpCtx (coll_c context).
+    auto* outerSubPipeline = stages[0]->getSubPipeline();
+    ASSERT_NOT_EQUALS(outerSubPipeline, nullptr);
+    auto innerLookupIt = outerSubPipeline->begin();
+    std::advance(innerLookupIt, 1);  // second stage = inner $lookup
+    auto* innerSubPipeline = (*innerLookupIt)->getSubPipeline();
+    ASSERT_NOT_EQUALS(innerSubPipeline, nullptr);
+    ASSERT_FALSE(innerSubPipeline->empty());
+    auto innerSubExpCtx = innerSubPipeline->front()->getExpCtx();
+
+    // Set up a PathArrayness for coll_c that marks 'c_non_array' as provably not an array.
+    auto innerPathArrayness = std::make_shared<PathArrayness>();
+    innerPathArrayness->addPath(
+        FieldPath("c_non_array"), {} /*multikeyPath*/, true /*isFullRebuild*/);
+
+    const auto collCNss = innerSubExpCtx->getNamespaceString();
+    auto expCtx = stages[0]->getExpCtx();
+    expCtx->setPathArraynessForNss(collCNss, innerPathArrayness);
+
+    // Also set PathArrayness on coll_b's ExpCtx so the nested $lookup can query it.
+    // The nested $lookup's lambda uses coll_b's ExpCtx to query PathArrayness for coll_c.
+    auto outerSubExpCtx = stages[0]->getSubpipelineExpCtx();
+    ASSERT_NOT_EQUALS(outerSubExpCtx, nullptr);
+    outerSubExpCtx->setPathArraynessForNss(collCNss, innerPathArrayness);
+
+    runTest([&] {
+        // 'outer_docs.inner_docs.c_non_array' should resolve through both $lookups into coll_c's
+        // PathArrayness.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "outer_docs.inner_docs.c_non_array"));
+
+        // An unindexed field in coll_c is conservatively true.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "outer_docs.inner_docs.c_unknown"));
+
+        // 'outer_docs.b_field' stays in the outer sub-pipeline (coll_b) which has no PathArrayness
+        // set.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "outer_docs.b_field"));
+
+        // Base-collection field is unrelated to sub-pipelines.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "base_field"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, SimpleCase) {
     setPipeline(
         "[{$set: { a: 'foo' }},"
