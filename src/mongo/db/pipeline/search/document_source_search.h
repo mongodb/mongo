@@ -120,6 +120,17 @@ public:
         return id;
     }
 
+    SortPattern getSortPattern() const override {
+        if (_spec.getSortSpec().has_value()) {
+            return SortPattern(_spec.getSortSpec()->getOwned(), getExpCtx());
+        }
+        SortPattern::SortPatternPart part;
+        part.isAscending = false;
+        part.expression = make_intrusive<ExpressionMeta>(
+            getExpCtx().get(), DocumentMetadataFields::MetaType::kSearchScore);
+        return SortPattern({std::move(part)});
+    }
+
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : getExpCtx();

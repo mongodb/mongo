@@ -183,5 +183,34 @@ TEST(IsSortOnSingleMetaFieldTest, TestingIsSortOnSingleMetaFieldFn) {
          (1 << DocumentMetadataFields::MetaType::kScore))));
 }
 
+// SortPatternPart::operator== compares ExpressionMeta by meta type, not pointer identity.
+// Two independently-constructed SortPatterns from the same meta spec must compare equal.
+TEST(SortPatternEqualityTest, EqualityHoldsForIndependentlyConstructedMetaExpressions) {
+    auto expCtx = getExpCtx();
+    auto pattern1 = SortPattern(fromjson("{score: {$meta: 'searchScore'}}"), expCtx);
+    auto pattern2 = SortPattern(fromjson("{score: {$meta: 'searchScore'}}"), expCtx);
+    ASSERT_EQ(pattern1, pattern2);
+
+    auto pattern3 = SortPattern(fromjson("{score: {$meta: 'vectorSearchScore'}}"), expCtx);
+    ASSERT_NE(pattern1, pattern3);
+}
+
+// Confirms that explicitly building a SortPattern with ExpressionMeta (as $vectorSearch does)
+// produces the same result as parsing the equivalent BSON $meta spec (as an extension might do via
+// getSortPattern()). Field name in the BSON key is discarded for $meta sorts.
+TEST(SortPatternEqualityTest, ExplicitMetaConstructionEqualsMetaBsonParsed) {
+    auto expCtx = getExpCtx();
+
+    SortPattern::SortPatternPart part;
+    part.isAscending = false;
+    part.expression = make_intrusive<ExpressionMeta>(
+        expCtx.get(), DocumentMetadataFields::MetaType::kVectorSearchScore);
+    SortPattern explicit_pattern({std::move(part)});
+
+    auto bson_pattern = SortPattern(fromjson("{score: {$meta: 'vectorSearchScore'}}"), expCtx);
+
+    ASSERT_EQ(explicit_pattern, bson_pattern);
+}
+
 }  // namespace
 }  // namespace mongo

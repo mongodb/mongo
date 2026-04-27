@@ -74,6 +74,10 @@ public:
         return true;
     }
 
+    BSONObj getSortPattern() const override {
+        return BSON("vectorSearchScore" << BSON("$meta" << "vectorSearchScore"));
+    }
+
     mongo::BSONObj serialize() const override {
         BSONObjBuilder spec;
         spec.append("limit", _buildSpecWithExtractedLimit());
@@ -109,7 +113,6 @@ public:
         if (ruleName == "eraseExtensionLimit") {
             return ctx->eraseNthNext(2);
         }
-
         // In-Place Rule Transforms
         if (ruleName == "noopInPlace") {
             _inPlaceRuleApplied = true;

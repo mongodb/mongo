@@ -888,6 +888,28 @@ export function getLookupStage(root) {
 }
 
 /**
+ * Returns all occurrences of a stage in a sharded explain's splitPipeline,
+ * searching both mergerPart and shardsPart. Each result is tagged with which
+ * part it came from so callers can assert placement.
+ *
+ * @param {object} root Explain output (must contain splitPipeline).
+ * @param {string} stage Stage name including '$' (e.g. "$testVectorSearch").
+ * @returns {Array<{part: "mergerPart"|"shardsPart", stage: object}>}
+ */
+export function getSplitPipelineStages(root, stage) {
+    if (!root.splitPipeline) {
+        return getAggPlanStages(root, stage);
+    }
+    const collect = (part) =>
+        (root.splitPipeline[part] || []).filter((s) => s.hasOwnProperty(stage)).map((s) => ({part, stage: s}));
+    return [...collect("mergerPart"), ...collect("shardsPart")];
+}
+
+export function countSplitPipelineStages(root, stage) {
+    return getSplitPipelineStages(root, stage).length;
+}
+
+/**
  * Given an explain node representing a $lookup stage, identify the index used in an INLJ
  * strategy and return its name and key pattern.
  * TODO: SERVER-121842 Remove the check for the presence of the indexName field once all

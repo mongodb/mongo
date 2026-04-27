@@ -321,8 +321,8 @@ DocumentSourceContainer::iterator DocumentSourceSort::optimizeAt(
         } else {
             // If there's a limit between two adjacent sorts with the same key pattern it's safe to
             // merge the two sorts and take the minimum of the limits.
-            if (dynamic_cast<DocumentSourceSort*>((*itr).get())->getSortKeyPattern() ==
-                nextSort->getSortKeyPattern()) {
+            if (dynamic_cast<DocumentSourceSort*>((*itr).get())->getSortPattern() ==
+                nextSort->getSortPattern()) {
                 // When coalescing subsequent $sort stages, the existing/lower limit is retained in
                 // 'setLimit'.
                 nextSort->_sortExecutor->setLimit(*limit);

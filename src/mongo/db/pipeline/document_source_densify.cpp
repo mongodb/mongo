@@ -341,7 +341,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalDensify::combineSorts(
     auto densifySortPattern =
         document_source_densify::getSortPatternForDensify(_range, _partitions, _field);
 
-    auto preDensifySortPattern = preSortStage->getSortKeyPattern();
+    auto preDensifySortPattern = preSortStage->getSortPattern();
     if (densifySortPattern != preDensifySortPattern) {
         return std::next(itr);
     }
@@ -354,7 +354,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalDensify::combineSorts(
         // stage in the pipeline.
         return std::next(itr);
     }
-    auto postDensifySortPattern = postSortStage->getSortKeyPattern();
+    auto postDensifySortPattern = postSortStage->getSortPattern();
 
     // We can only combine the sorts if the sorts are compatible. $densify only preserves a sort on
     // the fields on which it operates, as any other fields will be missing in generated documents.

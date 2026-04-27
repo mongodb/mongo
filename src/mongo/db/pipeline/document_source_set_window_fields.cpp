@@ -433,8 +433,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::optimiz
         return std::next(itr);
     }
 
-    auto nextPattern = nextSort->getSortKeyPattern();
-    auto prevPattern = prevSort->getSortKeyPattern();
+    auto nextPattern = nextSort->getSortPattern();
+    auto prevPattern = prevSort->getSortPattern();
 
     if (nextSort->getLimit() != boost::none || modifiedSortPaths(nextPattern, getModifiedPaths())) {
         return std::next(itr);

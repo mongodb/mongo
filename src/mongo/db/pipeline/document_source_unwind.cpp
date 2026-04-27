@@ -108,7 +108,7 @@ bool DocumentSourceUnwind::canPushSortBack(const DocumentSourceSort* sort) const
         auto modifiedPaths = getModifiedPaths();
 
         // Checks if any of the $sort's paths depend on the unwind path (or vice versa).
-        SortPattern sortKeyPattern = sort->getSortKeyPattern();
+        SortPattern sortKeyPattern = sort->getSortPattern();
         bool sortDependsOnUnwind =
             std::any_of(sortKeyPattern.begin(), sortKeyPattern.end(), [&](auto& sortKey) {
                 // If 'sortKey' is a $meta expression, we can do the swap.

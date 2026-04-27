@@ -450,6 +450,14 @@ public:
 
     Id getId() const override;
 
+    SortPattern getSortPattern() const override {
+        auto bson = _logicalStage->getSortPattern();
+        if (bson.isEmpty()) {
+            return SortPattern({});
+        }
+        return SortPattern(bson, getExpCtx());
+    }
+
     const MongoExtensionStaticProperties& getStaticProperties() const {
         return _properties;
     }

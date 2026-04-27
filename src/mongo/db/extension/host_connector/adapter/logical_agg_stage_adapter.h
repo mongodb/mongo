@@ -198,6 +198,15 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _hostGetSortPattern(
+        ::MongoExtensionLogicalAggStage* logicalStage, ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            tasserted(
+                12327101,
+                "_hostGetSortPattern should not be called on a host-allocated logical stage.");
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
@@ -213,6 +222,7 @@ private:
         .evaluate_rule_transform = &_hostEvaluateRuleTransform,
         .get_filter = &_hostGetFilter,
         .apply_pipeline_suffix_dependencies = &_hostApplyPipelineSuffixDependencies,
+        .get_sort_pattern = &_hostGetSortPattern,
     };
 
     std::unique_ptr<host::LogicalAggStage> _logicalAggStage;

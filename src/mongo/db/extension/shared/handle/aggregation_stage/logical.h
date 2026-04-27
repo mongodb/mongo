@@ -118,6 +118,12 @@ public:
      */
     void applyPipelineSuffixDependencies(const ::MongoExtensionPipelineDependencies* deps);
 
+    /**
+     * Returns the sort pattern applied by this stage. Returns an empty BSONObj if the stage does
+     * not apply a sort pattern.
+     */
+    BSONObj getSortPattern() const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11420603, "LogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(11173703, "LogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
@@ -143,6 +149,9 @@ public:
         tassert(12200100,
                 "LogicalAggStage 'apply_pipeline_suffix_dependencies' is null",
                 vtable.apply_pipeline_suffix_dependencies != nullptr);
+        tassert(12327100,
+                "LogicalAggStage 'get_sort_pattern' is null",
+                vtable.get_sort_pattern != nullptr);
     }
 };
 

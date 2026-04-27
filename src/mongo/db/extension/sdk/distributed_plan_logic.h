@@ -60,8 +60,13 @@ public:
      */
     DPLArrayContainer mergingPipeline;
     /**
-     * Sort pattern indicating which fields are ascending and which fields are descending when
-     * merging streams together.
+     * Sort pattern describing how shard results are sorted when they arrive at the merging node.
+     * The sharding merge step uses this to merge-sort the incoming shard streams.
+     *
+     * This is distinct from LogicalAggStage::getSortPattern(), which describes the sort order of
+     * this stage's final output (post-merge). For source stages (no input required), these two
+     * values must be equal; for transform stages they can differ when the merging pipeline changes
+     * the sort order.
      */
     BSONObj sortPattern;
 };

@@ -2955,5 +2955,41 @@ TEST_F(DocumentSourceExtensionOptimizableTest, GetFilter_TransformStageWithFilte
     ASSERT_BSONOBJ_EQ(optimizable->getQuery(), LogicalStageWithFilter::kFilter);
 }
 
+namespace {
+/**
+ * A LogicalAggStage that declares a non-empty sort pattern via getSortPattern().
+ */
+class LogicalStageWithSortPattern : public sdk::shared_test_stages::TransformLogicalAggStage {
+public:
+    BSONObj getSortPattern() const override {
+        return kSortPattern;
+    }
+
+    static const BSONObj kSortPattern;
+};
+const BSONObj LogicalStageWithSortPattern::kSortPattern = BSON("score" << -1);
+}  // namespace
+
+TEST_F(DocumentSourceExtensionOptimizableTest, GetSortPattern_ExtensionSortPatternPropagated) {
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStageAdapter(std::make_unique<LogicalStageWithSortPattern>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
+
+    auto expected = SortPattern(LogicalStageWithSortPattern::kSortPattern, getExpCtx());
+    ASSERT_EQ(optimizable->getSortPattern(), expected);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, GetSortPattern_EmptyWhenNotOverridden) {
+    auto logicalStage = new sdk::ExtensionLogicalAggStageAdapter(
+        std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
+
+    ASSERT_TRUE(optimizable->getSortPattern().empty());
+}
+
 }  // namespace
 }  // namespace mongo::extension

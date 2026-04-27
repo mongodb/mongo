@@ -31,9 +31,12 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
@@ -223,6 +226,24 @@ TEST_F(DocumentSourceVectorSearchTest, HasTheCorrectStagesWhenCreated) {
     const auto* idLookupStage =
         dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(vectorStage.back().get());
     ASSERT(idLookupStage);
+}
+
+TEST_F(DocumentSourceVectorSearchTest, GetSortPatternReturnsOwnedVectorSearchScoreSortSpec) {
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10
+        }
+    })");
+
+    auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx());
+    auto sortPattern = vectorStage->getSortPattern();
+    ASSERT_EQ(sortPattern.size(), 1u);
+    ASSERT_FALSE(sortPattern[0].isAscending);
+    ASSERT_TRUE(sortPattern[0].expression);
+    ASSERT_EQ(sortPattern[0].expression->getMetaType(), DocumentMetadataFields::kVectorSearchScore);
 }
 
 TEST_F(DocumentSourceVectorSearchTest, RedactsCorrectly) {

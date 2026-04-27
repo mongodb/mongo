@@ -1087,7 +1087,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
                                                                false};
     createSort(BSON("a" << 1));
     auto boundedSort = DocumentSourceSort::createBoundedSort(
-        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, false, getExpCtx());
+        sort()->getSortPattern(), DocumentSourceSort::kMin, 1337, 10, false, getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  //
         R"({"$sort":{"HASH<a>":1}})",
@@ -1169,7 +1169,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithSortKeyMetadata) {
                                                                false};
     createSort(BSON("a" << 1));
     auto boundedSort = DocumentSourceSort::createBoundedSort(
-        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, true, getExpCtx());
+        sort()->getSortPattern(), DocumentSourceSort::kMin, 1337, 10, true, getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  //
         R"({"$sort":{"HASH<a>":1}})",
@@ -1252,7 +1252,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
     createSort(BSON("a" << 1));
     createSortStage();
     auto boundedSort = DocumentSourceSort::createBoundedSort(
-        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, false, getExpCtx());
+        sort()->getSortPattern(), DocumentSourceSort::kMin, 1337, 10, false, getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  //
         R"({"$sort":{"HASH<a>":1}})",

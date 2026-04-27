@@ -95,6 +95,20 @@ public:
         return BSONObj();
     }
 
+    /**
+     * Returns the BSON sort pattern that this stage produces in its output. Extension stages that
+     * output documents in a defined sort order should override this. Returns an empty BSONObj by
+     * default (no sort guaranteed).
+     *
+     * This is distinct from DistributedPlanLogic::sortPattern, which describes the sort order of
+     * shard results arriving at the merging node. For source stages (no input required), these two
+     * values must be equal; for transform stages they can differ when the merging pipeline changes
+     * the sort order.
+     */
+    virtual BSONObj getSortPattern() const {
+        return BSONObj();
+    }
+
     void setExtractedLimitVal_deprecated(boost::optional<long long> extractedLimitVal) {
         _limit = extractedLimitVal;
     }
@@ -323,6 +337,21 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extGetSortPattern(
+        ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+            const auto& impl =
+                static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage)->getImpl();
+            auto pattern = impl.getSortPattern();
+            if (!pattern.isEmpty()) {
+                // Allocate a buffer on the heap. Ownership is transferred to the caller.
+                *output = new ByteBuf(pattern);
+            }
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
@@ -337,7 +366,8 @@ private:
         .evaluate_rule_precondition = &_extEvaluateRulePrecondition,
         .evaluate_rule_transform = &_extEvaluateRuleTransform,
         .get_filter = &_extGetFilter,
-        .apply_pipeline_suffix_dependencies = &_extApplyPipelineSuffixDependencies};
+        .apply_pipeline_suffix_dependencies = &_extApplyPipelineSuffixDependencies,
+        .get_sort_pattern = &_extGetSortPattern};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

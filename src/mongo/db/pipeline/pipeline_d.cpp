@@ -766,7 +766,7 @@ RewriteOnFirstDocumentResult tryDistinctGroupRewrite(const DocumentSourceContain
         auto sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
         if (sortStage) {
             if (!sortStage->hasLimit()) {
-                sortStagePattern = sortStage->getSortKeyPattern();
+                sortStagePattern = sortStage->getSortPattern();
                 ++sourcesIt;
             } else {
                 // This $sort stage was previously followed by a $limit stage which disqualifies it
@@ -954,7 +954,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // Pipeline, since it will be handled instead by PlanStage execution.
     BSONObj sortObj;
     if (sortStage) {
-        sortObj = sortStage->getSortKeyPattern()
+        sortObj = sortStage->getSortPattern()
                       .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                       .toBson();
 
@@ -1635,7 +1635,7 @@ boost::optional<TraversalPreference> createTimeSeriesTraversalPreference(
     const auto metaField = unpack->bucketUnpacker().getMetaField();
     BSONObjBuilder builder;
     // Reverse the sort pattern so we can look for indexes that match.
-    for (const auto& sortPart : sort->getSortKeyPattern()) {
+    for (const auto& sortPart : sort->getSortPattern()) {
         if (!sortPart.fieldPath) {
             return boost::none;
         }
@@ -1781,7 +1781,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
         // on time as these are the only ones that _might_ end up using bounded sort.
         // Note: This check (sort on time after unpacking) also disables the streaming group
         // optimization, that might happen w/o bounded sort.
-        for (const auto& sortKey : sort->getSortKeyPattern()) {
+        for (const auto& sortKey : sort->getSortPattern()) {
             if (sortKey.fieldPath &&
                 *(sortKey.fieldPath) == unpack->bucketUnpacker().getTimeField()) {
                 expCtx->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
@@ -1958,7 +1958,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
         rootStage = nullptr;
     }
 
-    const auto& sortPattern = sort->getSortKeyPattern();
+    const auto& sortPattern = sort->getSortPattern();
     if (auto agree = supportsSort(unpack->bucketUnpacker(), rootStage, sortPattern)) {
         // Scan the pipeline to check if it's compatible with the optimization.
         bool unsupportedStage = false;
@@ -2027,7 +2027,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
             sources.insert(
                 iter,
                 DocumentSourceSort::createBoundedSort(
-                    sort->getSortKeyPattern(),
+                    sort->getSortPattern(),
                     (indexOrderedByMinTime ? DocumentSourceSort::kMin : DocumentSourceSort::kMax),
                     [&]() -> long long {
                         if (indexSortOrderAgree) {

@@ -30,9 +30,11 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
@@ -105,6 +107,32 @@ TEST_F(SearchTest, ShouldFailToParseIfSpecIsNotObject) {
     ASSERT_THROWS_CODE(DocumentSourceSearch::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
+}
+
+TEST_F(SearchTest, GetSortPatternReturnsDefaultSearchScoreWhenNoSortSpec) {
+    const auto stageObj = BSON("$search" << fromjson("{term: 'asdf'}"));
+
+    intrusive_ptr<DocumentSource> searchDS =
+        DocumentSourceSearch::createFromBson(stageObj.firstElement(), getExpCtx());
+    auto sortPattern = searchDS->getSortPattern();
+    ASSERT_EQ(sortPattern.size(), 1u);
+    ASSERT_FALSE(sortPattern[0].isAscending);
+    ASSERT_TRUE(sortPattern[0].expression);
+    ASSERT_EQ(sortPattern[0].expression->getMetaType(), DocumentMetadataFields::kSearchScore);
+}
+
+TEST_F(SearchTest, GetSortPatternHonorsMongotSortSpec) {
+    // Pass a non-owned BSONObj view into the spec to exercise the getOwned() codepath.
+    auto sortSpecBacking = BSON("customField" << 1);
+    InternalSearchMongotRemoteSpec spec(fromjson("{term: 'asdf'}").getOwned());
+    spec.setSortSpec(BSONObj(sortSpecBacking.objdata()));
+
+    auto searchDS = make_intrusive<DocumentSourceSearch>(getExpCtx(), std::move(spec));
+    auto sortPattern = searchDS->getSortPattern();
+    ASSERT_EQ(sortPattern.size(), 1u);
+    ASSERT_TRUE(sortPattern[0].isAscending);
+    ASSERT_TRUE(sortPattern[0].fieldPath);
+    ASSERT_EQ(sortPattern[0].fieldPath->fullPath(), "customField");
 }
 
 using SearchDeathTest = SearchTest;

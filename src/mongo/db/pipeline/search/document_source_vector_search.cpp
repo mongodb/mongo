@@ -237,7 +237,7 @@ DocumentSourceVectorSearch::_attemptSortAfterVectorSearchOptimization(
             // $vectorSearch results are always sorted by 'vectorSearchScore',
             // so if the $sort stage is also sorted by 'vectorSearchScore', the $sort stage
             // is redundant and can safely be removed.
-            if (isSortOnVectorSearchMeta(sortStage->getSortKeyPattern())) {
+            if (isSortOnVectorSearchMeta(sortStage->getSortPattern())) {
                 // Optimization successful.
                 container->remove(*optItr);
                 return {itr, true};  // Return the same pointer in case there are other

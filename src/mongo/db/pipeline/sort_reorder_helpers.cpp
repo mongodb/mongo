@@ -86,8 +86,7 @@ DocumentSourceContainer::iterator tryReorderingWithSort(DocumentSourceContainer:
     // query planner allows for an index-provided sort.
     auto nextSort = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
     if (nextSort &&
-        checkModifiedPathsSortReorder(nextSort->getSortKeyPattern(),
-                                      docSource->getModifiedPaths())) {
+        checkModifiedPathsSortReorder(nextSort->getSortPattern(), docSource->getModifiedPaths())) {
         std::swap(*itr, *std::next(itr));
         return itr == container->begin() ? itr : std::prev(itr);
     }

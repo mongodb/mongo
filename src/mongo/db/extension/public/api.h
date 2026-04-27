@@ -832,7 +832,7 @@ typedef struct MongoExtensionLogicalAggStageVTable {
                                                      bool* result);
 
     /**
-     * Returns the filter predicate that will be applied by the stage, if applicable. If the stage
+     * Populates the filter predicate that will be applied by the stage, if applicable. If the stage
      * does not apply a filter, the output buffer is left as nullptr.
      *
      * This method is called by the host for determining which shards to target on any given stage.
@@ -852,6 +852,18 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*apply_pipeline_suffix_dependencies)(
         MongoExtensionLogicalAggStage* logicalStage,
         const struct MongoExtensionPipelineDependencies* deps);
+
+    /**
+     * Populates the `sortPattern` field with the BSON sortPattern value if available. If the stage
+     * does not apply a sort pattern, the output buffer is left as nullptr.
+     *
+     * This method is called by the extension and can be used in optimizations to determine what the
+     * sort pattern is.
+     *
+     * Ownership of the output buffer is transferred to the caller.
+     */
+    MongoExtensionStatus* (*get_sort_pattern)(MongoExtensionLogicalAggStage* logicalStage,
+                                              MongoExtensionByteBuf** sortPattern);
 
 } MongoExtensionLogicalAggStageVTable;
 

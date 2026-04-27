@@ -1988,7 +1988,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         auto sortStage = dynamic_cast<DocumentSourceSort*>(innerStage);
         if (sortStage) {
             auto pattern =
-                sortStage->getSortKeyPattern()
+                sortStage->getSortPattern()
                     .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                     .toBson();
             auto limit = sortStage->getLimit().get_value_or(0);

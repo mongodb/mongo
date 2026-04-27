@@ -228,7 +228,7 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(DocumentSourceSort* prospectiveSor
         return false;
     }
 
-    auto sortPattern = prospectiveSort->getSortKeyPattern();
+    auto sortPattern = prospectiveSort->getSortPattern();
     // Does not support sort by meta field(s).
     for (auto&& sortPatternPart : sortPattern) {
         if (sortPatternPart.expression) {

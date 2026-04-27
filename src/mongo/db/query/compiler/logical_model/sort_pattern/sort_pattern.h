@@ -66,9 +66,16 @@ public:
         boost::optional<FieldPath> fieldPath;
         boost::intrusive_ptr<ExpressionMeta> expression;
 
+        // Compare expression by meta type rather than pointer identity: two separately-constructed
+        // ExpressionMeta objects wrapping the same MetaType must be considered equal.
         bool operator==(const SortPatternPart& other) const {
-            return isAscending == other.isAscending && fieldPath == other.fieldPath &&
-                expression == other.expression;
+            if (isAscending != other.isAscending || fieldPath != other.fieldPath) {
+                return false;
+            }
+            if (expression && other.expression) {
+                return expression->getMetaType() == other.expression->getMetaType();
+            }
+            return !expression && !other.expression;
         }
         bool operator!=(const SortPatternPart& other) const {
             return !(*this == other);

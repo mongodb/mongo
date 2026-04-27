@@ -107,6 +107,13 @@ public:
         return std::make_unique<ProduceIdsLogicalStage>(_name, _arguments);
     }
 
+    BSONObj getSortPattern() const override {
+        if (_arguments["sortById"] && _arguments["sortById"].booleanSafe()) {
+            return BSON("_id" << 1);
+        }
+        return BSONObj();
+    }
+
     boost::optional<extension::sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
         // We only need to provide distributed planning logic for correctness when we
         // need to sort by _id, but we specify it unconditionally to force more interesting

@@ -30,6 +30,7 @@
 #include "mongo/db/extension/host_connector/adapter/logical_agg_stage_adapter.h"
 
 #include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::extension::host_connector {
 
@@ -52,7 +53,6 @@ namespace mongo::extension::host_connector {
         // Null output indicates no filter - only initialize 'output' when we have a non-empty
         // filter.
         if (!filter.isEmpty()) {
-            // Allocate a buffer on the heap. Ownership is transferred to the caller.
             *output = new ByteBuf(filter);
         }
     });

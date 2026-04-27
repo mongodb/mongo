@@ -477,6 +477,16 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanCo
         logic.mergeSortPattern = sortPattern.getOwned();
     }
 
+    // For source stages (no input required), the DPL sort pattern is the only sort order the
+    // merging pipeline will observe. It must match what the stage declares via getSortPattern()
+    // so the optimizer can reason about it correctly.
+    if (!_properties.getRequiresInputDocSource()) {
+        tassert(12327102,
+                str::stream() << "Source extension stage '" << getSourceName()
+                              << "': DPL sortPattern must equal getSortPattern()",
+                sortPattern.woCompare(_logicalStage->getSortPattern()) == 0);
+    }
+
     return logic;
 }
 
@@ -556,7 +566,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceExtensionOptimizable::clone(
 
 DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    // TODO SERVER-123271: Only apply the sort optimization when featureFlagExtensionsOptimizations
+    // TODO SERVER-123972: Only apply the sort optimization when featureFlagExtensionsOptimizations
     // is disabled.
 
     // Attempt to remove a $sort on metadata if the extension stage is sorted by vector

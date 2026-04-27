@@ -207,16 +207,6 @@ testLimitExtraction(desugarFalseStage);
 // vectorSearch Rewrite Rule Optimization Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Returns true if a stage with the given name exists anywhere in the explain output, including
-// splitPipeline.shardsPart. Note that getAggPlanStages does not check the splitPipeline and can
-// only handle non-sharded topologies.
-const stageExistsInExplain = (explainOutput, stageName) => {
-    return (
-        getStageFromSplitPipeline(explainOutput, stageName) != null ||
-        getAggPlanStages(explainOutput, stageName).length > 0
-    );
-};
-
 // Returns the inner spec of the $testVectorSearch stage from explain, handling both sharded
 // (splitPipeline) and non-sharded topologies.
 const getTestVectorSearchSpecFromExplain = (explainOutput) => {
@@ -261,7 +251,7 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const pipeline = [desugarFalseStage, {$project: {_id: 1}}];
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
-        !stageExistsInExplain(explain, "$project"),
+        !getStageFromSplitPipeline(explain, "$project"),
         "Expected $project to be erased by eraseStage rule, but found it in: " + tojson(explain),
     );
 }
@@ -273,7 +263,7 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const pipeline = [buildTestVectorSearchOptStage({storedSource: false}), {$project: {_id: 1}}];
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
-        stageExistsInExplain(explain, "$project"),
+        getStageFromSplitPipeline(explain, "$project"),
         "Expected $project to remain since eraseStage should not fire with an intervening desugared " +
             "stage, but got: " +
             tojson(explain),
@@ -285,7 +275,7 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const pipeline = [desugarFalseStage, {$project: {_id: 1}}, {$project: {_id: 1}}];
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
-        !stageExistsInExplain(explain, "$project"),
+        !getStageFromSplitPipeline(explain, "$project"),
         "Expected $project to be erased by eraseStage rule, but found it in: " + tojson(explain),
     );
 }
@@ -296,11 +286,11 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const pipeline = [desugarFalseStage, {$addFields: {a: 1}}, {$extensionLimit: 3}];
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
-        !stageExistsInExplain(explain, "$extensionLimit"),
+        !getStageFromSplitPipeline(explain, "$extensionLimit"),
         "Expected $extensionLimit to be erased by eraseExtensionLimit rule, but found it in: " + tojson(explain),
     );
     assert(
-        stageExistsInExplain(explain, "$addFields"),
+        getStageFromSplitPipeline(explain, "$addFields"),
         "Expected $addFields to remain after eraseExtensionLimit, but got: " + tojson(explain),
     );
 }
@@ -312,7 +302,7 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const pipeline = [buildTestVectorSearchOptStage({storedSource: true}), {$extensionLimit: 3}];
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
-        !stageExistsInExplain(explain, "$extensionLimit"),
+        !getStageFromSplitPipeline(explain, "$extensionLimit"),
         "Expected $extensionLimit to be erased for desugared pipeline (storedSource:true), but " +
             "found it in: " +
             tojson(explain),
@@ -324,7 +314,7 @@ const getTestVectorSearchSpecFromExplain = (explainOutput) => {
     const pipeline = [desugarFalseStage, {$addFields: {a: 1}}, {$skip: 3}];
     const explain = coll.explain("queryPlanner").aggregate(pipeline);
     assert(
-        stageExistsInExplain(explain, "$skip"),
+        getStageFromSplitPipeline(explain, "$skip"),
         "Expected $skip to remain since eraseExtensionLimit should not fire, but got: " + tojson(explain),
     );
 }

@@ -228,11 +228,11 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     auto sortPattern = flipSort
         ? SortPattern(
               QueryPlannerCommon::reverseSortObj(
-                  sort.getSortKeyPattern()
+                  sort.getSortPattern()
                       .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                       .toBson()),
               sort.getExpCtx())
-        : sort.getSortKeyPattern();
+        : sort.getSortPattern();
     std::vector<SortPattern::SortPatternPart> updatedPattern;
 
     for (const auto& entry : sortPattern) {
@@ -1382,7 +1382,7 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
             break;
         }
         if (auto sortStagePtr = dynamic_cast<DocumentSourceSort*>(itr->get())) {
-            isSortedOnTime = sortStagePtr->getSortKeyPattern().front().fieldPath == timeField;
+            isSortedOnTime = sortStagePtr->getSortPattern().front().fieldPath == timeField;
         } else if (!itr->get()->constraints().preservesOrderAndMetadata) {
             // If this is after the sort, the sort is invalidated. If it's before the sort, there's
             // no harm in keeping the boolean false.
@@ -1600,7 +1600,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
     }
 
     auto metaField = maybeMetaField.value();
-    if (!checkMetadataSortReorder(sortStage->getSortKeyPattern(), metaField, timeField)) {
+    if (!checkMetadataSortReorder(sortStage->getSortPattern(), metaField, timeField)) {
         return false;
     }
 
@@ -1640,7 +1640,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
     auto isSortValidForGroup = [&](AccumulatorDocumentsNeeded targetAccum) {
         bool firstpointTimeIsAscending =
             (targetAccum == AccumulatorDocumentsNeeded::kFirstInputDocument);
-        for (const auto& entry : sortStage->getSortKeyPattern()) {
+        for (const auto& entry : sortStage->getSortPattern()) {
             auto isTimeField = entry.fieldPath->fullPath() == timeField;
             if (isTimeField && (entry.isAscending == firstpointTimeIsAscending)) {
                 // This is a first-point query, which is disallowed.
@@ -1832,7 +1832,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
         sortPtr && !_sharedState->_eventFilter) {
         if (auto metaField = _sharedState->_bucketUnpacker.getMetaField();
             metaField && !haveComputedMetaField) {
-            if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.value())) {
+            if (checkMetadataSortReorder(sortPtr->getSortPattern(), metaField.value())) {
                 // We have a sort on metadata field following this stage. Reorder the two stages
                 // and return a pointer to the preceding stage.
                 auto sortForReorder = createMetadataSortForReorder(*sortPtr);

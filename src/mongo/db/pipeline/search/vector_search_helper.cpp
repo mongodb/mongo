@@ -121,7 +121,7 @@ bool findAndRemoveSortStage(DocumentSourceContainer::iterator idLookupReplaceRoo
     // 'vectorSearchScore', so if the $sort stage is also sorted by
     // 'vectorSearchScore', the $sort stage is redundant and can safely be
     // removed.
-    if (!(isSortOnVectorSearchMeta(sortStage->getSortKeyPattern()))) {
+    if (!(isSortOnVectorSearchMeta(sortStage->getSortPattern()))) {
         return false;
     }
     // Optimization successful.

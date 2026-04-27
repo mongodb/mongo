@@ -158,6 +158,14 @@ public:
         return id;
     }
 
+    SortPattern getSortPattern() const override {
+        SortPattern::SortPatternPart part;
+        part.isAscending = false;
+        part.expression = make_intrusive<ExpressionMeta>(
+            getExpCtx().get(), DocumentMetadataFields::MetaType::kVectorSearchScore);
+        return SortPattern({std::move(part)});
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) override {
         DistributedPlanLogic logic;

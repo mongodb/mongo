@@ -160,4 +160,22 @@ void LogicalAggStageAPI::applyPipelineSuffixDependencies(
         [&]() { return _vtable().apply_pipeline_suffix_dependencies(get(), deps); });
 }
 
+
+/**
+ * Returns the sort pattern applied by this stage. Returns an empty BSONObj if the stage does
+ * not apply a sort pattern.
+ */
+BSONObj LogicalAggStageAPI::getSortPattern() const {
+    ::MongoExtensionByteBuf* buf{nullptr};
+    invokeCAndConvertStatusToException([&]() {
+        return _vtable().get_sort_pattern(const_cast<LogicalAggStageAPI*>(this)->get(), &buf);
+    });
+
+    if (!buf) {
+        return BSONObj();
+    }
+
+    ExtensionByteBufHandle ownedBuf{buf};
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
+}
 }  // namespace mongo::extension

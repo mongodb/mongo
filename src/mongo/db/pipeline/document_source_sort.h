@@ -256,10 +256,7 @@ public:
         return _sortExecutor;
     }
 
-    /**
-     * Returns the sort key pattern.
-     */
-    const SortPattern& getSortKeyPattern() const {
+    SortPattern getSortPattern() const override {
         return _sortExecutor->sortPattern();
     }
 

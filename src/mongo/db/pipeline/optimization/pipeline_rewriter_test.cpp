@@ -173,7 +173,7 @@ TEST_F(PipelineRewriteEngineTest, InsertStageBeforeCurrent) {
     };
     static auto insertMatchBefore = [](PipelineRewriteContext& ctx) {
         auto filter = ctx.currentAs<DocumentSourceSort>()
-                          .getSortKeyPattern()
+                          .getSortPattern()
                           .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                           .toBson();
         auto matchStage = DocumentSourceMatch::create(filter, ctx.current().getExpCtx());
