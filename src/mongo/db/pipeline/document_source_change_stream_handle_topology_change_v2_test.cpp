@@ -3214,5 +3214,448 @@ DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
                        10657555);
 }
 
+// Tests that a tassert is thrown when trying to transition to kWaiting from any state other than
+// kUninitialized (enforces that kWaiting is only reachable from the start state).
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   CheckStateTransitionToWaitingFromInvalidState,
+                   "Tripwire assertion.*10657529") {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(42, 0), ChangeStreamReadMode::kStrict));
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), nullptr);
+
+    for (auto state : {V2Stage::State::kFetchingInitialization,
+                       V2Stage::State::kFetchingGettingChangeEvent,
+                       V2Stage::State::kFetchingStartingChangeStreamSegment,
+                       V2Stage::State::kFetchingNormalGettingChangeEvent,
+                       V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                       V2Stage::State::kDowngrading}) {
+        docSource->setState_forTest(state, false /* validateStateTransition */);
+
+        ASSERT_THROWS_CODE(docSource->setState_forTest(V2Stage::State::kWaiting,
+                                                       true /* validateStateTransition */),
+                           AssertionException,
+                           10657529);
+    }
+}
+
+// Tests that a tassert is thrown when trying to transition to kFetchingInitialization from any
+// state other than kUninitialized or kWaiting (initialization is a one-time phase).
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   CheckStateTransitionToFetchingInitializationFromInvalidState,
+                   "Tripwire assertion.*10657530") {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(42, 0), ChangeStreamReadMode::kStrict));
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), nullptr);
+
+    for (auto state : {V2Stage::State::kFetchingGettingChangeEvent,
+                       V2Stage::State::kFetchingStartingChangeStreamSegment,
+                       V2Stage::State::kFetchingNormalGettingChangeEvent,
+                       V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                       V2Stage::State::kDowngrading}) {
+        docSource->setState_forTest(state, false /* validateStateTransition */);
+
+        ASSERT_THROWS_CODE(docSource->setState_forTest(V2Stage::State::kFetchingInitialization,
+                                                       true /* validateStateTransition */),
+                           AssertionException,
+                           10657530);
+    }
+}
+
+// Tests state machine for input state kFetchingGettingChangeEvent for a control event where the
+// shard targeter returns kSwitchToV1. Expects the state to transition to kDowngrading, then to
+// kFinal.
+TEST_F(DSV2StageTest, StateFetchingGettingChangeEventControlEventSwitchToV1) {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kStrict));
+
+    const BSONObj event = BSON("operationType" << "test" << "foo" << "bar"
+                                               << Document::metaFieldChangeStreamControlEvent << 1);
+
+    // Prepare ShardTargeterMock responses.
+    std::vector<ChangeStreamShardTargeterMock::Response> shardTargeterResponses;
+    shardTargeterResponses.emplace_back(Document{event},
+                                        ShardTargeterDecision::kSwitchToV1,
+                                        boost::optional<Timestamp>{},
+                                        kEmptyShardTargeterCallback);
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [=](OperationContext* opCtx, const ChangeStream& changeStream) {
+            auto shardTargeter = std::make_unique<ChangeStreamShardTargeterMock>();
+            shardTargeter->bufferResponses(shardTargeterResponses);
+            return shardTargeter;
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(
+            Document::fromBsonWithMetaData(event))};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
+                                false /* validateStateTransition */);
+
+    // The shard targeter returns kSwitchToV1 for the control event, so the state should
+    // transition to kDowngrading and an EOF should be returned.
+    auto result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isEOF());
+    ASSERT_EQ(V2Stage::State::kDowngrading, docSource->getState_forTest());
+
+    // Calling the state machine again must throw RetryChangeStream and transition to kFinal.
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(),
+                       AssertionException,
+                       ErrorCodes::RetryChangeStream);
+    ASSERT_EQ(V2Stage::State::kFinal, docSource->getState_forTest());
+
+    // Calling 'getNext()' again must return the same error.
+    ASSERT_THROWS_CODE(docSource->getNext(), AssertionException, ErrorCodes::RetryChangeStream);
+}
+
+// Tests state machine for input state kFetchingDegradedGettingChangeEvent without the segment end
+// timestamp being set. This should tassert because the segment end is required to know when to
+// exit degraded mode.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingDegradedGettingChangeEventWithoutSegmentEndTimestamp,
+                   "Tripwire assertion.*10657521") {
+    const Timestamp ts = Timestamp(23, 0);
+
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [](OperationContext* opCtx, const ChangeStream& changeStream) {
+            return std::make_unique<ChangeStreamShardTargeterMock>();
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get());
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                                false /* validateStateTransition */);
+    docSource->setSegmentStartTimestamp_forTest(ts);
+
+    // Intentionally do not set the segment end timestamp before entering the state to trigger the
+    // following tassert.
+    ASSERT_FALSE(docSource->getSegmentEndTimestamp_forTest().has_value());
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657521);
+}
+
+// Tests state machine for input state kFetchingDegradedGettingChangeEvent when the shard targeter
+// returns kContinue but its callback made cursor management calls, which must not happen in
+// degraded mode.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingDegradedGettingChangeEventContinueWithBufferedCursorRequests,
+                   "Tripwire assertion.*10657556") {
+    const Timestamp ts = Timestamp(23, 0);
+    const Timestamp segmentEndTimestamp = Timestamp(23, 99);
+
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    const BSONObj event =
+        BSON("operationType" << "test1" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(23, 2)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 2))));
+
+    MutableDocument docBuilder(Document::fromBsonWithMetaData(event));
+    docBuilder.metadata().setChangeStreamControlEvent();
+    Document doc = docBuilder.freeze();
+
+    // The shard targeter returns kContinue but its callback illegally opens a data shard cursor
+    // inside a degraded-mode context, which should trigger the tassert.
+    std::vector<ChangeStreamShardTargeterMock::Response> shardTargeterResponses;
+    shardTargeterResponses.emplace_back(
+        doc,
+        ShardTargeterDecision::kContinue,
+        boost::optional<Timestamp>{},
+        [](ChangeStreamShardTargeterMock::TimestampOrDocument tsOrDoc,
+           ChangeStreamReaderContext& readerContext) {
+            readerContext.openCursorsOnDataShards(Timestamp(23, 2),
+                                                  stdx::unordered_set<ShardId>{{"shardA"}});
+        });
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [=](OperationContext* opCtx, const ChangeStream& changeStream) {
+            auto shardTargeter = std::make_unique<ChangeStreamShardTargeterMock>();
+            shardTargeter->bufferResponses(shardTargeterResponses);
+            return shardTargeter;
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(std::move(doc))};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                                false /* validateStateTransition */);
+    docSource->setSegmentStartTimestamp_forTest(ts);
+    docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
+
+    getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 1));
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657556);
+}
+
+// Tests state machine for input state kFetchingStartingChangeStreamSegment when the shard targeter
+// returns kContinue with a segment end timestamp (entering degraded mode), but the callback opened
+// a config server cursor. The implementation must tassert because no config server cursor may be
+// open when entering degraded mode.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingStartingChangeStreamSegmentToDegradedWithConfigServerCursorOpen,
+                   "Tripwire assertion.*12013806") {
+    const Timestamp ts = Timestamp(23, 0);
+    const Timestamp segmentEndTimestamp = Timestamp(42, 1);
+
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    // The shard targeter returns kContinue with an end timestamp (degraded mode), but its callback
+    // opens a cursor on the config server, violating the contract.
+    std::vector<ChangeStreamShardTargeterMock::Response> shardTargeterResponses;
+    shardTargeterResponses.emplace_back(
+        ts,
+        ShardTargeterDecision::kContinue,
+        segmentEndTimestamp,
+        [ts](ChangeStreamShardTargeterMock::TimestampOrDocument tsOrDoc,
+             ChangeStreamReaderContext& readerContext) {
+            readerContext.openCursorOnConfigServer(ts);
+        });
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [=](OperationContext* opCtx, const ChangeStream& changeStream) {
+            auto shardTargeter = std::make_unique<ChangeStreamShardTargeterMock>();
+            shardTargeter->bufferResponses(shardTargeterResponses);
+            return shardTargeter;
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get());
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
+                                false /* validateStateTransition */);
+    docSource->setSegmentStartTimestamp_forTest(ts);
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 12013806);
+}
+
+// Tests that a tassert is thrown when the state machine enters kFetchingGettingChangeEvent in
+// ignoreRemovedShards mode, since that state is exclusively valid in strict mode.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingGettingChangeEventInIgnoreRemovedShardsMode,
+                   "Tripwire assertion.*10657515") {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [](OperationContext* opCtx, const ChangeStream& changeStream) {
+            return std::make_unique<ChangeStreamShardTargeterMock>();
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get());
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
+                                false /* validateStateTransition */);
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657515);
+}
+
+// Tests that a tassert is thrown when the state machine enters kFetchingStartingChangeStreamSegment
+// in strict mode, since that state is exclusively valid in ignoreRemovedShards mode.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingStartingChangeStreamSegmentInStrictMode,
+                   "Tripwire assertion.*10657515") {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kStrict));
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [](OperationContext* opCtx, const ChangeStream& changeStream) {
+            return std::make_unique<ChangeStreamShardTargeterMock>();
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get());
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
+                                false /* validateStateTransition */);
+    docSource->setSegmentStartTimestamp_forTest(Timestamp(23, 0));
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657515);
+}
+
+// Tests that a tassert is thrown when the state machine enters kFetchingNormalGettingChangeEvent in
+// strict mode, since that state is exclusively valid in ignoreRemovedShards mode.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingNormalGettingChangeEventInStrictMode,
+                   "Tripwire assertion.*10657515") {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kStrict));
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [](OperationContext* opCtx, const ChangeStream& changeStream) {
+            return std::make_unique<ChangeStreamShardTargeterMock>();
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get());
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                false /* validateStateTransition */);
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657515);
+}
+
+// Tests that a tassert is thrown when the state machine enters
+// kFetchingDegradedGettingChangeEvent in strict mode, since that state is exclusively valid in
+// ignoreRemovedShards mode.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingDegradedGettingChangeEventInStrictMode,
+                   "Tripwire assertion.*10657515") {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kStrict));
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [](OperationContext* opCtx, const ChangeStream& changeStream) {
+            return std::make_unique<ChangeStreamShardTargeterMock>();
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get());
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                                false /* validateStateTransition */);
+    docSource->setSegmentStartTimestamp_forTest(Timestamp(23, 0));
+    docSource->setSegmentEndTimestamp_forTest(Timestamp(42, 0));
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657515);
+}
+
+// Tests state machine for input state kFetchingNormalGettingChangeEvent for a control event, when
+// opening a new data shard cursor fails with 'ShardNotFound' and only the config server cursor is
+// open (no data shard cursors). Unlike the case with no open cursors at all, the stage should
+// transition to degraded mode rather than starting a new segment, because there is still a cursor
+// active (the config server one).
+TEST_F(DSV2StageTest,
+       StateFetchingNormalGettingChangeEventShardNotFoundWithOnlyConfigServerCursorOpen) {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    const BSONObj event =
+        BSON("operationType" << "test" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(23, 1)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 1)))
+                             << Document::metaFieldChangeStreamControlEvent << 1);
+
+    // Prepare ShardTargeterMock responses.
+    std::vector<ChangeStreamShardTargeterMock::Response> shardTargeterResponses;
+    shardTargeterResponses.emplace_back(
+        Document{event},
+        ShardTargeterDecision::kContinue,
+        boost::optional<Timestamp>{},
+        [](ChangeStreamShardTargeterMock::TimestampOrDocument tsOrDoc,
+           ChangeStreamReaderContext& readerContext) {
+            readerContext.openCursorsOnDataShards(
+                V2Stage::extractTimestampFromDocument(std::get<Document>(tsOrDoc)),
+                stdx::unordered_set<ShardId>{{"shardA"}});
+        });
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [=](OperationContext* opCtx, const ChangeStream& changeStream) {
+            auto shardTargeter = std::make_unique<ChangeStreamShardTargeterMock>();
+            shardTargeter->bufferResponses(shardTargeterResponses);
+            return shardTargeter;
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(
+            Document::fromBsonWithMetaData(event))};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                false /* validateStateTransition */);
+
+    // Open only a config server cursor (no data shard cursors).
+    getCursorManagerMock(params)->openCursorOnConfigServer(
+        getExpCtx(), getOpCtx(), Timestamp(23, 0));
+    ASSERT_TRUE(getCursorManagerMock(params)->cursorOpenedOnConfigServer());
+    ASSERT_TRUE(getCursorManagerMock(params)->getCurrentlyTargetedDataShards().empty());
+
+    // Enable 'ShardNotFound' so opening the data shard cursor will fail.
+    getCursorManagerMock(params)->setThrowShardNotFoundExceptions(1);
+
+    auto result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_FALSE(result.has_value());
+
+    // The config server cursor being open makes this go to degraded mode (not start a new segment).
+    ASSERT_EQ(V2Stage::State::kFetchingDegradedGettingChangeEvent, docSource->getState_forTest());
+
+    // Segment end is set to the event's timestamp + 1.
+    ASSERT_TRUE(docSource->getSegmentEndTimestamp_forTest().has_value());
+    ASSERT_EQ(Timestamp(23, 2), *docSource->getSegmentEndTimestamp_forTest());
+
+    // Undo mode must have been enabled when entering the degraded fetching state.
+    ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
+}
+
 }  // namespace
 }  // namespace mongo
