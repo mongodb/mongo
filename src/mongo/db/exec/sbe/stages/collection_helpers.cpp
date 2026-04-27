@@ -29,74 +29,13 @@
 
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-
 
 namespace mongo::sbe {
 
-CollectionPtr CollectionRef::getConsistentCollection(OperationContext* opCtx,
-                                                     const DatabaseName& dbName,
-                                                     const UUID& collUuid) {
-    auto timestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
-    return CollectionPtr{CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, NamespaceStringOrUUID{dbName, collUuid}, timestamp)};
-}
-
-void CollectionRef::acquireCollection(OperationContext* opCtx,
-                                      const DatabaseName& dbName,
-                                      const UUID& collUuid) {
-    // The collection is either locked at a higher level or a snapshot of the catalog (consistent
-    // with the storage engine snapshot from which we are reading) has been stashed on the
-    // 'OperationContext'. Either way, this means that the UUID must still exist in our view of the
-    // collection catalog.
-    if (!isAcquisition()) {
-        tassert(
-            9367600, "'_coll' should not be initialized prior to 'acquireCollection()'", !(*this));
-        CollectionPtr collPtr = getConsistentCollection(opCtx, dbName, collUuid);
-
-        // Perform any work that might throw before updating '_collPtr', because in the event an
-        // exception is thrown we don't want '_collPtr' to be holding a CollectionPtr.
-        tassert(
-            5071000, str::stream() << "Collection uuid " << collUuid << " does not exist", collPtr);
-
-        _collName = collPtr->ns();
-        _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
-        _collPtr.emplace(std::move(collPtr));
-    }
-}
-
-void CollectionRef::restoreCollection(OperationContext* opCtx,
-                                      const DatabaseName& dbName,
-                                      const UUID& collUuid) {
-    tassert(5777401, "Collection name should be initialized", _collName);
-    tassert(5777402, "Catalog epoch should be initialized", _catalogEpoch);
-
-    // Establish a consistent collection instance and restore the collection pointer. If the
-    // collection has been dropped, then this UUID lookup will result in a null pointer. If the
-    // collection has been renamed, then the resulting collection object should have a different
-    // name from the original '_collName'. In either scenario, we throw a 'QueryPlanKilled' error
-    // and terminate the query.
-    CollectionPtr collPtr = getConsistentCollection(opCtx, dbName, collUuid);
-
-    // Perform any work that might throw before updating '_collPtr', because in the event an
-    // exception is thrown we don't want '_collPtr' to be holding a CollectionPtr.
-    if (!collPtr) {
-        PlanYieldPolicy::throwCollectionDroppedError(collUuid);
-    }
-
-    if (*_collName != collPtr->ns()) {
-        PlanYieldPolicy::throwCollectionRenamedError(*_collName, collPtr->ns(), collUuid);
-    }
-
-    uassert(ErrorCodes::QueryPlanKilled,
-            "the catalog was closed and reopened",
-            CollectionCatalog::get(opCtx)->getEpoch() == *_catalogEpoch);
-
-    _collPtr.emplace(std::move(collPtr));
+void CollectionRef::acquireCollection(const MultipleCollectionAccessor* mca, const UUID& uuid) {
+    tassert(12555900, "MultipleCollectionAccessor must be set on CompileCtx", mca);
+    setCollAcquisition(mca->getCollectionAcquisitionFromUuid(uuid));
 }
 
 }  // namespace mongo::sbe

@@ -113,7 +113,7 @@ void FetchStage::prepare(CompileCtx& ctx) {
                 insertedRename);
     }
 
-    _coll.acquireCollection(_opCtx, _dbName, _collectionUuid);
+    _coll.acquireCollection(ctx.mca, _collectionUuid);
 }
 
 value::SlotAccessor* FetchStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {

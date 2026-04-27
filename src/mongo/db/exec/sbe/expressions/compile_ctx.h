@@ -42,6 +42,10 @@
 #include <utility>
 #include <vector>
 
+namespace mongo {
+class MultipleCollectionAccessor;
+}
+
 namespace mongo::sbe {
 
 using SpoolBuffer = std::vector<value::MaterializedRow>;
@@ -88,6 +92,7 @@ struct CompileCtx {
     bool aggExpression{false};
     vm::LabelId lastLabelId{0};
     RemoteCursorMap* remoteCursors{nullptr};
+    const MultipleCollectionAccessor* mca{nullptr};
 
 private:
     // Any data that a PlanStage needs from the RuntimeEnvironment should not be accessed directly

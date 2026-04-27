@@ -93,8 +93,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
         uassert(4822821, str::stream() << "duplicate slot: " << _vars[idx], inserted);
     }
 
-    // No-op if using acquisition.
-    _coll.acquireCollection(_opCtx, _dbName, _collUuid);
+    _coll.acquireCollection(ctx.mca, _collUuid);
 
     auto indexCatalog = _coll.getPtr()->getIndexCatalog();
     auto indexEntry = indexCatalog->findIndexByName(_opCtx, _indexName);

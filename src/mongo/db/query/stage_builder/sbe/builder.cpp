@@ -262,6 +262,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     auto& env = data->env;
     env.ctx.remoteCursors = remoteCursors;
+    env.ctx.mca = &collections;
 
     root->prepare(env.ctx);
 

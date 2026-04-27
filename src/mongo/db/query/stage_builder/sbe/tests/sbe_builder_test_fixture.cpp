@@ -201,6 +201,7 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
                                     MODE_IS));
         colls = MultipleCollectionAccessor(*localColl);
     }
+    attachCollectionAcquisition(colls);
 
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), colls, false /*hasRecordId*/, std::move(param));

@@ -104,6 +104,7 @@ public:
     void simpleScan(benchmark::State& state, ScanDummyTest& dummyTest) {
         auto colls = dummyTest.createCollection(
             {fromjson("{_id: 0, a: 10}"), fromjson("{_id: 1, a: 20}")}, BSON("a" << 1));
+        dummyTest.attachCollectionAcquisition(colls);
 
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();

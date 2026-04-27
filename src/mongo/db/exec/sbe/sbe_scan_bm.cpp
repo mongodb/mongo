@@ -101,6 +101,7 @@ public:
             docs.push_back(BSON("_id" << i << "a" << i));
         }
         auto colls = dummyTest.createCollection(docs, boost::none);
+        dummyTest.attachCollectionAcquisition(colls);
 
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();
@@ -143,6 +144,7 @@ public:
             docs.push_back(BSON("_id" << i << "a" << i));
         }
         auto colls = dummyTest.createCollection(docs, boost::none);
+        dummyTest.attachCollectionAcquisition(colls);
 
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();

@@ -135,6 +135,9 @@ void PlanStageTestFixture::prepareTree(CompileCtx* ctx, PlanStage* root) {
         _yieldPolicy->registerPlan(root);
     }
     root->attachToOperationContext(operationContext());
+    if (_mca) {
+        ctx->mca = _mca;
+    }
     root->prepare(*ctx);
     if (_mca) {
         root->attachCollectionAcquisition(*_mca);

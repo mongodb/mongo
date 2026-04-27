@@ -136,6 +136,7 @@ public:
         }
 
         // Prepare the SBE tree for execution.
+        attachCollectionAcquisition(colls);
         auto ctx = makeCompileCtx();
         prepareTree(ctx.get(), stage.get());
 
@@ -1203,6 +1204,7 @@ protected:
         }
 
         auto context = makeCompileCtx(data.env->makeDeepCopy());
+        attachCollectionAcquisition(colls);
         prepareTree(context.get(), rootStage.get());
 
         return ExecutablePlan(std::move(colls),

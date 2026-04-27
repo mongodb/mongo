@@ -140,8 +140,7 @@ void ScanStageBase::prepareShared(CompileCtx& ctx) {
         _indexKeyPatternAccessor = ctx.getAccessor(*(_state->indexKeyPatternSlot));
     }
 
-    // No-op if using acquisition.
-    _coll.acquireCollection(_opCtx, _state->dbName, _state->collUuid);
+    _coll.acquireCollection(ctx.mca, _state->collUuid);
 }
 
 value::SlotAccessor* ScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId slot) {
