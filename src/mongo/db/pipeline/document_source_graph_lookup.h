@@ -34,9 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
@@ -46,8 +43,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
+#include "mongo/db/pipeline/lite_parsed_graph_lookup.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -56,7 +52,6 @@
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -83,53 +78,9 @@ struct GraphLookUpParams {
     boost::optional<long long> maxDepth;
 };
 
-DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(GraphLookUp);
-
 class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$graphLookup"_sd;
-
-    class LiteParsed : public LiteParsedDocumentSourceNestedPipelines<LiteParsed> {
-    public:
-        // TODO SERVER-125119 $graphLookup does not yet accept a user-provided sub-pipeline, but it
-        // is modeled as a LiteParsedDocumentSourceNestedPipelines so that view definitions resolved
-        // from the foreign namespace can be attached as sub-pipelines during lite parsing.
-        LiteParsed(const BSONElement& spec, NamespaceString foreignNss)
-            : LiteParsedDocumentSourceNestedPipelines(
-                  spec, std::move(foreignNss), std::vector<LiteParsedPipeline>{}) {}
-
-        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec,
-                                                 const LiteParserOptions& options);
-
-
-        Status checkShardedForeignCollAllowed(const NamespaceString& nss,
-                                              bool inMultiDocumentTransaction) const override {
-            tassert(12509601, "Expected foreign namespace to be set for $graphLookup", _foreignNss);
-            const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
-            if (!inMultiDocumentTransaction || *_foreignNss != nss ||
-                gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
-                return Status::OK();
-            }
-
-            return Status(
-                ErrorCodes::NamespaceCannotBeSharded,
-                "Sharded $graphLookup is not allowed within a multi-document transaction");
-        }
-
-        // TODO SERVER-125119 Once $graphLookup populates `_pipelines` (e.g. via view definition
-        // resolution), this must also account for the privileges required by each pipeline in
-        // `_pipelines` in addition to `_foreignNss`.
-        PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const override {
-            tassert(12509600, "Expected foreign namespace to be set for $graphLookup", _foreignNss);
-            return {Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find)};
-        }
-
-        std::unique_ptr<StageParams> getStageParams() const override {
-            return std::make_unique<GraphLookUpStageParams>(_originalBson);
-        }
-    };
 
     DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&,
                               const boost::intrusive_ptr<ExpressionContext>&);
@@ -236,6 +187,9 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    static boost::intrusive_ptr<DocumentSource> createFromStageParams(
+        GraphLookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;

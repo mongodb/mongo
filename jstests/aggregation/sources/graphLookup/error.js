@@ -1,5 +1,11 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
 //
+// TODO SERVER-121094 When featureFlagExtensionsInsideHybridSearch is removed, the legacy
+// full-parse code path in DocumentSourceGraphLookUp::createFromBson will be deleted. At that
+// point, remove the legacy error codes from the arrays below so each assertion only checks the
+// code from LiteParsedGraphLookup.
+// Legacy error codes: 40100, 40101, 40102, 40103, 40104, 40185, and 40105 (in kMissingFieldErrorCodes).
+//
 // @tags: [
 //   not_allowed_with_signed_security_token,
 //   requires_fcv_82,
@@ -41,7 +47,7 @@ pipeline = {
         maxDepth: "string",
     },
 };
-assertErrorCode(local, pipeline, 40100, "maxDepth must be numeric");
+assertErrorCode(local, pipeline, [40100, 12109307], "maxDepth must be numeric");
 
 pipeline = {
     $graphLookup: {
@@ -53,7 +59,7 @@ pipeline = {
         maxDepth: -1,
     },
 };
-assertErrorCode(local, pipeline, 40101, "maxDepth must be nonnegative");
+assertErrorCode(local, pipeline, [40101, 12109308], "maxDepth must be nonnegative");
 
 pipeline = {
     $graphLookup: {
@@ -65,7 +71,7 @@ pipeline = {
         maxDepth: 2.3,
     },
 };
-assertErrorCode(local, pipeline, 40102, "maxDepth must be representable as a long long");
+assertErrorCode(local, pipeline, [40102, 12109309], "maxDepth must be representable as a long long");
 
 pipeline = {
     $graphLookup: {
@@ -98,7 +104,7 @@ pipeline = {
         as: 0,
     },
 };
-assertErrorCode(local, pipeline, 40103, "as must be a string");
+assertErrorCode(local, pipeline, [40103, 12109311], "as must be a string");
 
 pipeline = {
     $graphLookup: {
@@ -120,7 +126,7 @@ pipeline = {
         as: "output",
     },
 };
-assertErrorCode(local, pipeline, 40103, "connectFromField must be a string");
+assertErrorCode(local, pipeline, [40103, 12109311], "connectFromField must be a string");
 
 pipeline = {
     $graphLookup: {
@@ -142,7 +148,7 @@ pipeline = {
         as: "output",
     },
 };
-assertErrorCode(local, pipeline, 40103, "connectToField must be a string");
+assertErrorCode(local, pipeline, [40103, 12109311], "connectToField must be a string");
 
 pipeline = {
     $graphLookup: {
@@ -165,7 +171,7 @@ pipeline = {
         depthField: 0,
     },
 };
-assertErrorCode(local, pipeline, 40103, "depthField must be a string");
+assertErrorCode(local, pipeline, [40103, 12109311], "depthField must be a string");
 
 pipeline = {
     $graphLookup: {
@@ -189,7 +195,7 @@ pipeline = {
         restrictSearchWithMatch: "notamatch",
     },
 };
-assertErrorCode(local, pipeline, 40185, "restrictSearchWithMatch must be an object");
+assertErrorCode(local, pipeline, [40185, 12109310], "restrictSearchWithMatch must be an object");
 
 pipeline = {
     $graphLookup: {
@@ -201,27 +207,29 @@ pipeline = {
         notAField: "foo",
     },
 };
-assertErrorCode(local, pipeline, 40104, "unknown argument");
+assertErrorCode(local, pipeline, [40104, 12109312], "unknown argument");
+
+const kMissingFieldErrorCodes = [40105, 12109300];
 
 pipeline = {
     $graphLookup: {from: "foreign", startWith: {$literal: 0}, connectFromField: "b", as: "output"},
 };
-assertErrorCode(local, pipeline, 40105, "connectToField was not specified");
+assertErrorCode(local, pipeline, kMissingFieldErrorCodes, "connectToField was not specified");
 
 pipeline = {
     $graphLookup: {from: "foreign", startWith: {$literal: 0}, connectToField: "a", as: "output"},
 };
-assertErrorCode(local, pipeline, 40105, "connectFromField was not specified");
+assertErrorCode(local, pipeline, kMissingFieldErrorCodes, "connectFromField was not specified");
 
 pipeline = {
     $graphLookup: {from: "foreign", connectToField: "a", connectFromField: "b", as: "output"},
 };
-assertErrorCode(local, pipeline, 40105, "startWith was not specified");
+assertErrorCode(local, pipeline, kMissingFieldErrorCodes, "startWith was not specified");
 
 pipeline = {
     $graphLookup: {from: "foreign", startWith: {$literal: 0}, connectToField: "a", connectFromField: "b"},
 };
-assertErrorCode(local, pipeline, 40105, "as was not specified");
+assertErrorCode(local, pipeline, kMissingFieldErrorCodes, "as was not specified");
 
 pipeline = {
     $graphLookup: {startWith: {$literal: 0}, connectToField: "a", connectFromField: "b", as: "output"},

@@ -33,7 +33,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string_util.h"
@@ -45,9 +44,12 @@
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -84,32 +86,25 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
 
 using boost::intrusive_ptr;
 
-std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "the $graphLookup stage specification must be an object, but found "
-                          << typeName(spec.type()),
-            spec.type() == BSONType::object);
+DocumentSourceContainer graphLookupStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<GraphLookUpStageParams*>(stageParams.get());
+    tassert(
+        11786300, "Expected GraphLookUpStageParams for graphLookup stage", typedParams != nullptr);
 
-    auto specObj = spec.Obj();
-    auto fromElement = specObj["from"];
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "missing 'from' option to $graphLookup stage specification: "
-                          << specObj,
-            fromElement);
+    // TODO SERVER-121094 Remove when feature flag is removed.
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (!hybridSearchFlagEnabled) {
+        return {DocumentSourceGraphLookUp::createFromBson(typedParams->getOriginalBson(), expCtx)};
+    }
 
-    return std::make_unique<LiteParsed>(
-        spec, parseGraphLookupFromAndResolveNamespace(fromElement, nss.dbName()));
+    return {DocumentSourceGraphLookUp::createFromStageParams(*typedParams, expCtx)};
 }
 
-
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(graphLookup,
-                                     DocumentSourceGraphLookUp::LiteParsed::parse,
-                                     AllowedWithApiStrict::kAlways);
-
-REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(graphLookup,
-                                                   DocumentSourceGraphLookUp,
-                                                   GraphLookUpStageParams);
+ALLOCATE_AND_REGISTER_STAGE_PARAMS(graphLookup, GraphLookUpStageParams)
 
 ALLOCATE_DOCUMENT_SOURCE_ID(graphLookup, DocumentSourceGraphLookUp::id)
 
@@ -232,6 +227,7 @@ DocumentSourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
     return std::next(itr);
 }
 
+// TODO SERVER-125478 refactor serialization to use IDL toBSON.
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
                                                  const SerializationOptions& opts) const {
     // Do not include tenantId in serialized 'from' namespace.
@@ -318,6 +314,8 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
         globalOpCounters().gotNestedAggregate();
     }
 
+    // TODO SERVER-125119 Refactor $graphLookup to use a subpipeline when namespaces are resolved on
+    // mongos.
     const auto& resolvedNamespace = getExpCtx()->getResolvedNamespace(getFromNs());
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
         getExpCtx(), resolvedNamespace.ns, resolvedNamespace.uuid);
@@ -376,6 +374,59 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
                                                            maxDepth),
 
                                          std::move(unwindSrc));
+}
+
+intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromStageParams(
+    GraphLookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // The lite-parse stage only enforces that 'from' is present. All other required fields are
+    // enforced here so that auth-check-only flows (which never reach full parse) do not fail on
+    // an incomplete spec.
+    if (!params.as || !params.startWith || !params.connectFromField || !params.connectToField) {
+        std::string missing;
+        auto append = [&](StringData field) {
+            if (!missing.empty()) {
+                missing += ", ";
+            }
+            missing.append(field.data(), field.size());
+        };
+        if (!params.as) {
+            append("'as'"_sd);
+        }
+        if (!params.startWith) {
+            append("'startWith'"_sd);
+        }
+        if (!params.connectFromField) {
+            append("'connectFromField'"_sd);
+        }
+        if (!params.connectToField) {
+            append("'connectToField'"_sd);
+        }
+        uasserted(12109300,
+                  str::stream() << "$graphLookup is missing required field(s): " << missing);
+    }
+
+    VariablesParseState vps = expCtx->variablesParseState;
+    boost::intrusive_ptr<Expression> startWith =
+        Expression::parseOperand(expCtx.get(), *params.startWith, vps);
+
+    if (params.additionalFilter) {
+        // We don't need to keep ahold of the MatchExpression, but we do need to ensure
+        // that the specified object is parseable and does not contain extensions.
+        uassertStatusOKWithContext(
+            MatchExpressionParser::parse(*params.additionalFilter, expCtx),
+            "Failed to parse 'restrictSearchWithMatch' option to $graphLookup");
+    }
+
+    return new DocumentSourceGraphLookUp(expCtx,
+                                         GraphLookUpParams(std::move(params.from),
+                                                           std::move(*params.as),
+                                                           std::move(*params.connectFromField),
+                                                           std::move(*params.connectToField),
+                                                           std::move(startWith),
+                                                           std::move(params.additionalFilter),
+                                                           std::move(params.depthField),
+                                                           params.maxDepth),
+                                         boost::none);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(

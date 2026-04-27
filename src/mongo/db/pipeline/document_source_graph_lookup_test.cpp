@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/graph_lookup_mock_mongo_interface.h"
+#include "mongo/db/pipeline/lite_parsed_graph_lookup.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
@@ -64,14 +65,14 @@ using DocumentSourceGraphLookUpTest = AggregationContextFixture;
 const NamespaceString kGraphLookupForeignNs =
     NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
 
-std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> parseLiteGraphLookup(
+std::unique_ptr<LiteParsedGraphLookUp> parseLiteGraphLookup(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto stageSpec = BSON("$graphLookup" << BSON("from" << "foreign"
                                                         << "startWith" << "$a"
                                                         << "connectFromField" << "b"
                                                         << "connectToField" << "c"
                                                         << "as" << "d"));
-    return DocumentSourceGraphLookUp::LiteParsed::parse(
+    return LiteParsedGraphLookUp::parse(
         expCtx->getNamespaceString(), stageSpec.firstElement(), LiteParserOptions{});
 }
 
@@ -317,8 +318,8 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), _targetColl);
-    auto liteParsedLookup = DocumentSourceGraphLookUp::LiteParsed::parse(
-        nss, originalBSON.firstElement(), LiteParserOptions{});
+    auto liteParsedLookup =
+        LiteParsedGraphLookUp::parse(nss, originalBSON.firstElement(), LiteParserOptions{});
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
     ASSERT_EQ(1ul,
