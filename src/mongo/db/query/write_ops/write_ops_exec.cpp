@@ -50,9 +50,11 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/op_observer/batched_write_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
@@ -78,12 +80,11 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/update_key.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/insert.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
-#include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
@@ -1116,27 +1117,27 @@ long long performDelete(OperationContext* opCtx,
 
     const auto& collectionPtr = collection.getCollectionPtr();
 
-    if (const auto& coll = collection.getCollectionPtr()) {
+    if (collectionPtr) {
         // Transactions are not allowed to operate on capped collections.
-        uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
+        uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, collectionPtr));
     }
 
     if (isTimeseriesLogicalRequest) {
         timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),
-                                                           collection.getCollectionPtr(),
+                                                           collectionPtr,
                                                            deleteRequest,
                                                            timeseries::deleteRequestCheckFunction);
-        timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
-                                                             deleteRequest);
+        timeseries::timeseriesHintTranslation<DeleteRequest>(collectionPtr, deleteRequest);
     }
 
-    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesLogicalRequest);
-    uassertStatusOK(parsedDelete.parseRequest());
+    auto canonicalDelete = uassertStatusOK(CanonicalDelete::makeFromRequest(
+        opCtx, collectionPtr, *deleteRequest, isTimeseriesLogicalRequest));
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics(
-        "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{parsedDelete.expCtx()});
+        "ExpCtxDiagnostics",
+        diagnostic_printers::ExpressionContextPrinter{canonicalDelete.expCtx()});
 
     if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
         tassert(9276703,
@@ -1154,7 +1155,7 @@ long long performDelete(OperationContext* opCtx,
     assertCanWrite_inlock(opCtx, nsString);
 
     const auto exec = uassertStatusOK(
-        getExecutorDelete(&curOp->debug(), collection, parsedDelete, boost::none /* verbosity
+        getExecutorDelete(&curOp->debug(), collection, canonicalDelete, boost::none /* verbosity
         */));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
@@ -2206,7 +2207,9 @@ static SingleWriteResult performSingleDeleteOp(
                 ? collection.getShardingDescription().getKeyPattern()
                 : BSONObj()});
 
-    if (source == OperationSource::kTimeseriesDelete) {
+    const bool isRequestToTimeseries = source == OperationSource::kTimeseriesDelete;
+
+    if (isRequestToTimeseries) {
         timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),
                                                            collection.getCollectionPtr(),
                                                            &request,
@@ -2215,16 +2218,14 @@ static SingleWriteResult performSingleDeleteOp(
                                                              &request);
     }
 
-    ParsedDelete parsedDelete(opCtx,
-                              &request,
-                              collection.getCollectionPtr(),
-                              source == OperationSource::kTimeseriesDelete);
-    uassertStatusOK(parsedDelete.parseRequest());
+    auto canonicalDelete = uassertStatusOK(CanonicalDelete::makeFromRequest(
+        opCtx, collection.getCollectionPtr(), request, isRequestToTimeseries));
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics(
-        "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{parsedDelete.expCtx()});
+        "ExpCtxDiagnostics",
+        diagnostic_printers::ExpressionContextPrinter{canonicalDelete.expCtx()});
 
     if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
         tassert(9276704,
@@ -2243,8 +2244,8 @@ static SingleWriteResult performSingleDeleteOp(
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
-    auto exec = uassertStatusOK(
-        getExecutorDelete(&curOp.debug(), collection, parsedDelete, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(getExecutorDelete(
+        &curOp.debug(), collection, canonicalDelete, boost::none /* verbosity */));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -2662,13 +2663,12 @@ void explainDelete(OperationContext* opCtx,
                                                              &deleteRequest);
     }
 
-    ParsedDelete parsedDelete(
-        opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
-    uassertStatusOK(parsedDelete.parseRequest());
+    auto canonicalDelete = uassertStatusOK(CanonicalDelete::makeFromRequest(
+        opCtx, collection.getCollectionPtr(), deleteRequest, isTimeseriesViewRequest));
 
     // Explain the plan tree.
     auto exec = uassertStatusOK(
-        getExecutorDelete(&CurOp::get(opCtx)->debug(), collection, parsedDelete, verbosity));
+        getExecutorDelete(&CurOp::get(opCtx)->debug(), collection, canonicalDelete, verbosity));
     auto bodyBuilder = result->getBodyBuilder();
 
     // Capture diagnostics to be logged in the case of a failure.

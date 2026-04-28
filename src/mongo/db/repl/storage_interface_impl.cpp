@@ -59,9 +59,9 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/record_id.h"
@@ -1250,17 +1250,18 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
                               << " using filter " << filter};
         }
 
-        // ParsedDelete needs to be inside the write conflict retry loop because it may create a
-        // CanonicalQuery whose ownership will be transferred to the plan executor in
+        // CanonicalDelete needs to be inside the write conflict retry loop because it may create
+        // a CanonicalQuery whose ownership will be transferred to the plan executor in
         // getExecutorDelete().
-        ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
-        auto parsedDeleteStatus = parsedDelete.parseRequest();
-        if (!parsedDeleteStatus.isOK()) {
-            return parsedDeleteStatus;
+        auto swCanonicalDelete =
+            CanonicalDelete::makeFromRequest(opCtx, collection.getCollectionPtr(), request);
+        if (!swCanonicalDelete.isOK()) {
+            return swCanonicalDelete.getStatus();
         }
+        auto canonicalDelete = std::move(swCanonicalDelete.getValue());
 
         auto planExecutorResult = mongo::getExecutorDelete(
-            nullptr, collection, parsedDelete, boost::none /* verbosity */);
+            nullptr, collection, canonicalDelete, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }

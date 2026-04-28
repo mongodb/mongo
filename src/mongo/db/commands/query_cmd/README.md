@@ -335,10 +335,13 @@ Inserts are internally
 as a `BulkWriteCommandRequest` which contains an array of `BulkWriteInsertOp`s. No query
 optimization is needed for inserts beyond parsing, since insert is a write-only operation.
 
-`DeleteRequest`s are passed into a `ParsedDelete` constructor which will pass the request to
-[`parseWriteQueryToCQ()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/query/write_ops/parsed_writes_common.h#L84).
-This function parses the `filter` component of the write query as if it were a `FindCommandRequest`,
-and the result is a `CanonicalQuery`, just as it is with `find`.
+`DeleteRequest`s are passed to `parsed_delete_command::parse()`, which parses them into
+`ParsedDelete` objects. `parsed_delete_command::parse()` uses `parseWriteQueryToParsedFindCommand()`
+to parse the `filter` component of the write query. This shares the same parsing flow as
+`parseWriteQueryToCQ()`. However, the difference is that it generates a pre-optimized
+`ParsedFindCommand`, allowing other components to access the pre-optimized parsed structure from
+`ParsedDelete`. Subsequently, the `ParsedDelete` objects are passed to `CanonicalDelete::make()`,
+which constructs a `CanonicalDelete` consisting of a `CanonicalQuery`.
 
 `UpdateRequest`s are passed to `parsed_update_command::parse()`, which parses them into
 `ParsedUpdate` objects. `parsed_update_command::parse()` uses
@@ -350,8 +353,8 @@ which constructs a `CanonicalUpdate` consisting of a `CanonicalQuery`.
 
 `FindAndModifyCommandRequest`s can contain both find and update/delete syntax. For this reason, the
 query portion is entirely delegated to the `find` query parser. The update or delete portion is
-translated into a `CanonicalUpdate` or `ParsedDelete`, each of which uses the corresponding codepath
-henceforth.
+translated into a `CanonicalUpdate` or `CanonicalDelete`, each of which uses the corresponding
+codepath henceforth.
 
 ```mermaid
 ---
@@ -366,19 +369,20 @@ flowchart LR
         n8["Update"]
         n9["FindAndModify"]
   end
-    n11["FindCommandRequest"] -- "parsed_find_command::parse()" --> n13["ParsedFindCommand"]
-    n13 --> n17["CanonicalQuery"]
     n6 --> n31["IDL Parsing"]
     n7 --> n31
     n8 --> n31
     n9 --> n31
     n31 --> n32["BulkWriteCommandRequest"] & n34["DeleteRequest"] & n35["UpdateRequest"] & n39["FindAndModifyCommandRequest"]
     n32 --o n33["BulkWriteInsertOp"]
-    n34 --> n36["ParsedDelete"]
-    n39 & n35 -- "parsed_update_command::parse()" --> n37["ParsedUpdate"]
+    n34 -- "parsed_delete_command::parse()" --> n36["ParsedDelete"]
+    n35 -- "parsed_update_command::parse()" --> n37["ParsedUpdate"]
     n39 --> n36
-    n36 -- "parseWriteQueryToCQ()" --> n11
-    n37 -- "parseWriteQueryToCQ()" --> n11
+    n39 --> n37
+    n36 -- "CanonicalDelete::make()" --> n40["CanonicalDelete"]
+    n37 -- "CanonicalUpdate::make()" --> n41["CanonicalUpdate"]
+    n40 --o n17["CanonicalQuery"]
+    n41 --o n17
 
     n17@{ shape: dbl-circ}
     n31@{ shape: extract}

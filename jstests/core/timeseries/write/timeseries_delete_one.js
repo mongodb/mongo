@@ -89,3 +89,13 @@ import {
         nDeleted: 1,
     });
 })();
+
+// Simple _id equality filter.
+(function testSimpleIdFilterDeletesOne() {
+    testDeleteOne({
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
+        filter: {_id: 2},
+        expectedResultDocs: [doc1_a_nofields, doc3_a_f102],
+        nDeleted: 1,
+    });
+})();

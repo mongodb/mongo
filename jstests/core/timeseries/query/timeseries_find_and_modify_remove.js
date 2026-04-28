@@ -165,6 +165,19 @@ import {
     });
 })();
 
+// Simple _id equality filter.
+(function testSimpleIdFilterDeletesOne() {
+    testFindOneAndRemove({
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
+        cmd: {filter: {_id: 2}},
+        res: {
+            nDeleted: 1,
+            deletedDoc: doc2_a_f101,
+            nReturned: 1,
+        },
+    });
+})();
+
 // Verifies that the collation is properly propagated to the bucket-level filter when the
 // query-level collation overrides the collection default collation.
 (function testFindAndRemoveWithCollation() {

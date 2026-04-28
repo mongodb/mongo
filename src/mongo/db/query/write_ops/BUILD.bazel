@@ -42,6 +42,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "canonical_update_and_delete",
     srcs = [
+        "canonical_delete.cpp",
         "canonical_update.cpp",
         "parsed_delete.cpp",
         "update_result.cpp",

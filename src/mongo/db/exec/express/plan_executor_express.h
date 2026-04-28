@@ -32,8 +32,8 @@
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/util/modules.h"
@@ -83,7 +83,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
     bool returnOwnedBson);
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelete(
-    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete& parsedDelete);
+    OperationContext* opCtx, CollectionAcquisition collection, CanonicalDelete& canonicalDelete);
 
 /**
  * Tries to find an index suitable for use in the express equality path. Excludes indexes which

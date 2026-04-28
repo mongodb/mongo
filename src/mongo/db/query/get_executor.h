@@ -46,8 +46,8 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -170,7 +170,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     const CountCommandRequest& count);
 
 /**
- * Get a PlanExecutor for a delete operation. 'parsedDelete' describes the query predicate
+ * Get a PlanExecutor for a delete operation. 'canonicalDelete' describes the query predicate
  * and delete flags like 'isMulti'. The caller must hold the appropriate MODE_X or MODE_IX
  * locks, and must not release these locks until after the returned PlanExecutor is deleted.
  *
@@ -179,7 +179,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  * If the delete operation is executed in explain mode, the 'verbosity' parameter should be
  * set to the requested verbosity level, or boost::none otherwise.
  *
- * The returned PlanExecutor will used the YieldPolicy returned by parsedDelete->yieldPolicy().
+ * The returned PlanExecutor will used the YieldPolicy returned by canonicalDelete->yieldPolicy().
  *
  * Does not take ownership of its arguments.
  *
@@ -191,7 +191,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    ParsedDelete& parsedDelete,
+    CanonicalDelete& canonicalDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**

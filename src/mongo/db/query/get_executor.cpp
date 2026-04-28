@@ -1420,13 +1420,13 @@ auto makePlannerFactory(OperationContext* opCtx,
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    ParsedDelete& parsedDelete,
+    CanonicalDelete& canonicalDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
 
-    auto expCtx = parsedDelete.expCtx();
+    auto expCtx = canonicalDelete.expCtx();
     OperationContext* opCtx = expCtx->getOperationContext();
-    const DeleteRequest* request = parsedDelete.getRequest();
+    const DeleteRequest* request = canonicalDelete.getRequest();
 
     const NamespaceString& nss(request->getNsString());
 
@@ -1474,15 +1474,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             std::make_unique<WorkingSet>(),
             std::make_unique<EOFStage>(expCtx.get(), eof_node::EOFType::NonExistentNamespace),
             coll,
-            parsedDelete.yieldPolicy(),
+            canonicalDelete.yieldPolicy(),
             false, /* whether we must return owned data */
             nss);
     }
 
-    if (!parsedDelete.hasParsedQuery()) {
+    if (!canonicalDelete.hasParsedQuery()) {
 
-        // Only consider using the idhack if no hint was provided.
-        if (request->getHint().isEmpty()) {
+        // Only consider using the idhack if no hint was provided and this is not a timeseries
+        // request.
+        // TODO SERVER-87213 Allow hinted queries to go through idhack.
+        if (!canonicalDelete.isRequestToTimeseries() && request->getHint().isEmpty()) {
             // This is the idhack fast-path for getting a PlanExecutor without doing the work to
             // create a CanonicalQuery.
             const BSONObj& unparsedQuery = request->getQuery();
@@ -1509,23 +1511,23 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
                 LOGV2_DEBUG(8376000, 2, "Using express", "query"_attr = redact(unparsedQuery));
 
-                return makeExpressExecutorForDelete(opCtx, coll, parsedDelete);
+                return makeExpressExecutorForDelete(opCtx, coll, canonicalDelete);
             }
         }
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
         // the idhack fast path. We need to force canonicalization now.
-        Status cqStatus = parsedDelete.parseQueryToCQ();
+        Status cqStatus = canonicalDelete.parseQueryToCQ();
         if (!cqStatus.isOK()) {
             return cqStatus;
         }
     }
 
     // This is the regular path for when we have a CanonicalQuery.
-    std::unique_ptr<CanonicalQuery> cq(parsedDelete.releaseParsedQuery());
+    std::unique_ptr<CanonicalQuery> cq(canonicalDelete.releaseParsedQuery());
     maybeUpgradeIdHackFlag(*cq, collectionPtr);
 
-    const auto policy = parsedDelete.yieldPolicy();
+    const auto policy = canonicalDelete.yieldPolicy();
 
     DeleteStageParams deleteStageParams;
     deleteStageParams.isMulti = request->getMulti();
@@ -1536,8 +1538,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams.opDebug = opDebug;
     deleteStageParams.stmtId = request->getStmtId();
 
-    if (parsedDelete.isRequestToTimeseries() &&
-        !parsedDelete.isEligibleForArbitraryTimeseriesDelete()) {
+    if (canonicalDelete.isRequestToTimeseries() &&
+        !canonicalDelete.isEligibleForArbitraryTimeseriesDelete()) {
         deleteStageParams.numStatsForDoc = timeseries::numMeasurementsForBucketCounter(
             collectionPtr->getTimeseriesOptions()->getTimeField());
     }
@@ -1566,7 +1568,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     MultipleCollectionAccessor collections{coll};
     auto addDeleteStageFn = [&](classic_runtime_planner::ClassicPlannerInterface* runtimePlanner) {
-        runtimePlanner->addDeleteStage(parsedDelete, projection.get(), deleteStageParams);
+        runtimePlanner->addDeleteStage(canonicalDelete, projection.get(), deleteStageParams);
     };
 
     // Invoke the lambda returned from the factory for the initial planner params.

@@ -53,9 +53,9 @@
 #include "mongo/db/query/plan_explainer_express.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -765,8 +765,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelete(
-    OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete& parsedDelete) {
-    const DeleteRequest* request = parsedDelete.getRequest();
+    OperationContext* opCtx, CollectionAcquisition collection, CanonicalDelete& canonicalDelete) {
+    const DeleteRequest* request = canonicalDelete.getRequest();
 
     using Iterator =
         std::variant<express::IdLookupViaIndex, express::IdLookupOnClusteredCollection>;
@@ -814,10 +814,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
     }();
 
     fastPathQueryCounters.incrementExpressQueryCounter();
-    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, parsedDelete.yieldPolicy());
+    auto recoveryPolicy = getExpressRecoveryPolicy(opCtx, canonicalDelete.yieldPolicy());
 
-    const auto precision = parsedDelete.expCtx() ? parsedDelete.expCtx()->getExecTimerPrecision()
-                                                 : QueryExecTimerPrecision::kNoTiming;
+    const auto precision = canonicalDelete.expCtx()
+        ? canonicalDelete.expCtx()->getExecTimerPrecision()
+        : QueryExecTimerPrecision::kNoTiming;
     return std::visit(
         [&](auto chosenIterator,
             auto chosenWriteOperation,

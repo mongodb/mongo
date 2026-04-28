@@ -31,7 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/assert_util.h"
 
@@ -56,11 +56,11 @@ long long deleteObjects(OperationContext* opCtx,
     request.setFromMigrate(fromMigrate);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-    ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
-    uassertStatusOK(parsedDelete.parseRequest());
+    auto canonicalDelete = uassertStatusOK(
+        CanonicalDelete::makeFromRequest(opCtx, collection.getCollectionPtr(), request));
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), collection, parsedDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, canonicalDelete, boost::none /* verbosity */));
 
     return exec->executeDelete();
 }
@@ -68,11 +68,11 @@ long long deleteObjects(OperationContext* opCtx,
 DeleteResult deleteObject(OperationContext* opCtx,
                           const CollectionAcquisition& collection,
                           const DeleteRequest& request) {
-    ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
-    uassertStatusOK(parsedDelete.parseRequest());
+    auto canonicalDelete = uassertStatusOK(
+        CanonicalDelete::makeFromRequest(opCtx, collection.getCollectionPtr(), request));
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), collection, parsedDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, canonicalDelete, boost::none /* verbosity */));
 
     if (!request.getReturnDeleted()) {
         return {exec->executeDelete(), boost::none};

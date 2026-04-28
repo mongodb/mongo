@@ -44,8 +44,8 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::classic_runtime_planner {
@@ -63,7 +63,7 @@ public:
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform deletes.
      */
-    void addDeleteStage(ParsedDelete& parsedDelete,
+    void addDeleteStage(CanonicalDelete& canonicalDelete,
                         projection_ast::Projection* projection,
                         DeleteStageParams deleteStageParams);
     /**

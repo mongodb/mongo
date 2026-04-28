@@ -29,152 +29,72 @@
 
 #include "mongo/db/query/write_ops/parsed_delete.h"
 
-#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/timeseries_update_delete_util.h"
-#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 
+#include <memory>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 
 namespace mongo {
 
-// Note: The caller should hold a lock on the 'collection' if it really exists so that it can stay
-// alive until the end of the ParsedDelete's lifetime.
-ParsedDelete::ParsedDelete(OperationContext* opCtx,
-                           const DeleteRequest* request,
-                           const CollectionPtr& collection,
-                           bool isTimeseriesDelete)
-    : _opCtx(opCtx),
-      _request(request),
-      _collection(collection),
-      _timeseriesDeleteQueryExprs(
-          isTimeseriesDelete
-              ? createTimeseriesWritesQueryExprsIfNecessary(
-                    feature_flags::gTimeseriesDeletesSupport.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
-                    collection)
-              : nullptr),
-      _isRequestToTimeseries(isTimeseriesDelete) {}
+PlanYieldPolicy::YieldPolicy getDeleteYieldPolicy(const DeleteRequest* request) {
+    return request->getGod() ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                             : request->getYieldPolicy();
+}
 
-Status ParsedDelete::parseRequest() {
-    dassert(!_canonicalQuery.get());
+const DeleteRequest* ParsedDelete::getRequest() const {
+    return request;
+}
+
+bool ParsedDelete::hasParsedFindCommand() const {
+    return parsedFind.get() != nullptr;
+}
+
+namespace parsed_delete_command {
+
+StatusWith<ParsedDelete> parse(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               const DeleteRequest* request,
+                               std::unique_ptr<const ExtensionsCallback> extensionsCallback) {
+    ParsedDelete out;
+    out.request = request;
+    out.extensionsCallback = std::move(extensionsCallback);
+
     tassert(11052001,
             "Cannot request DeleteStage to return the deleted document during a multi-delete",
-            !(_request->getReturnDeleted() && _request->getMulti()));
+            !(request->getReturnDeleted() && request->getMulti()));
 
     tassert(11052002,
             "Cannot apply projection to DeleteStage if the DeleteStage would not return the "
             "deleted document",
-            _request->getProj().isEmpty() || _request->getReturnDeleted());
+            request->getProj().isEmpty() || request->getReturnDeleted());
 
-    auto [collatorToUse, collationMatchesDefault] =
-        resolveCollator(_opCtx, _request->getCollation(), _collection);
-    _expCtx = ExpressionContextBuilder{}
-                  .fromRequest(_opCtx, *_request)
-                  .collator(std::move(collatorToUse))
-                  .collationMatchesDefault(collationMatchesDefault)
-                  .build();
+    expCtx->startExpressionCounters();
 
-    // The '_id' field of a time-series collection needs to be handled as other fields.
-    if (isSimpleIdQuery(_request->getQuery()) && !_timeseriesDeleteQueryExprs) {
-        return Status::OK();
+
+    if (isSimpleIdQuery(request->getQuery())) {
+        return out;
     }
 
-    if (_isRequestToTimeseries && _collection &&
-        _collection->getRequiresTimeseriesExtendedRangeSupport()) {
-        _expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+    auto swParsedFind =
+        impl::parseWriteQueryToParsedFindCommand(expCtx.get(), *out.extensionsCallback, *request);
+    if (!swParsedFind.isOK()) {
+        return swParsedFind.getStatus();
     }
+    out.parsedFind = std::move(swParsedFind.getValue());
 
-    _expCtx->startExpressionCounters();
-
-    if (auto&& queryExprs = _timeseriesDeleteQueryExprs) {
-        // TODO: Due to the complexity which is related to the efficient sort support, we don't
-        // support yet findAndModify with a query and sort but it should not be impossible. This
-        // code assumes that in findAndModify code path, the parsed delete constructor should be
-        // called with isTimeseriesDelete = true for a time-series collection.
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform a findAndModify with a query and sort on a time-series collection.",
-                _request->getMulti() || _request->getSort().isEmpty());
-
-        // If we're deleting documents from a time-series collection, splits the match expression
-        // into a bucket-level match expression and a residual expression so that we can push down
-        // the bucket-level match expression to the system bucket collection SCAN or FETCH/IXSCAN.
-        *_timeseriesDeleteQueryExprs =
-            timeseries::getMatchExprsForWrites(_expCtx,
-                                               *_collection->getTimeseriesOptions(),
-                                               _request->getQuery(),
-                                               _collection->areTimeseriesBucketsFixed());
-
-        // At this point, we parsed user-provided match expression. After this point, the new
-        // canonical query is internal to the bucket SCAN or FETCH/IXSCAN and will have additional
-        // internal match expression. We do not need to track the internal match expression counters
-        // and so we stop the counters.
-        _expCtx->stopExpressionCounters();
-
-        if (_request->getMulti() && !getResidualExpr()) {
-            // The command is performing a time-series meta delete.
-            timeseriesCounters.incrementMetaDelete();
-        }
-
-        // At least, the bucket-level filter must contain the closed bucket filter.
-        tassert(7542400, "Bucket-level filter must not be null", queryExprs->_bucketExpr);
-    }
-
-    return parseQueryToCQ();
+    return out;
 }
-
-Status ParsedDelete::parseQueryToCQ() {
-    dassert(!_canonicalQuery.get());
-
-    auto statusWithCQ = mongo::parseWriteQueryToCQ(
-        _expCtx.get(),
-        *_request,
-        _timeseriesDeleteQueryExprs ? _timeseriesDeleteQueryExprs->_bucketExpr.get() : nullptr);
-
-    if (statusWithCQ.isOK()) {
-        _canonicalQuery = std::move(statusWithCQ.getValue());
-    }
-
-    return statusWithCQ.getStatus();
-}
-
-const DeleteRequest* ParsedDelete::getRequest() const {
-    return _request;
-}
-
-PlanYieldPolicy::YieldPolicy ParsedDelete::yieldPolicy() const {
-    return _request->getGod() ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                              : _request->getYieldPolicy();
-}
-
-bool ParsedDelete::hasParsedQuery() const {
-    return _canonicalQuery.get() != nullptr;
-}
-
-std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
-    tassert(11052003,
-            "Expected ParsedDelete to own a CanonicalQuery",
-            _canonicalQuery.get() != nullptr);
-    return std::move(_canonicalQuery);
-}
-
-bool ParsedDelete::isEligibleForArbitraryTimeseriesDelete() const {
-    return _timeseriesDeleteQueryExprs && (getResidualExpr() || !_request->getMulti());
-}
+}  // namespace parsed_delete_command
 
 }  // namespace mongo

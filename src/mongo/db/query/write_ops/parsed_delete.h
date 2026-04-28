@@ -30,14 +30,12 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -46,138 +44,65 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
-class CanonicalQuery;
-class Database;
 class DeleteRequest;
-class OperationContext;
 
 /**
- * This class takes a pointer to a DeleteRequest, and converts that request into a parsed form
- * via the parseRequest() method. A ParsedDelete can then be used to retrieve a PlanExecutor
- * capable of executing the delete.
- *
- * It is invalid to request that the DeleteStage return the deleted document during a
- * multi-remove. It is also invalid to request that a ProjectionStage be applied to the
- * DeleteStage if the DeleteStage would not return the deleted document.
- *
- * A delete request is parsed to a CanonicalQuery, so this class is a thin, delete-specific
- * wrapper around canonicalization.
+ * Get the YieldPolicy, adjusted for GodMode.
  */
-class MONGO_MOD_PUBLIC ParsedDelete {
-    ParsedDelete(const ParsedDelete&) = delete;
-    ParsedDelete& operator=(const ParsedDelete&) = delete;
+PlanYieldPolicy::YieldPolicy getDeleteYieldPolicy(const DeleteRequest* request);
 
-public:
-    /**
-     * Constructs a parsed delete for a regular delete or a delete on a timeseries collection.
-     *
-     * The object pointed to by "request" must stay in scope for the life of the constructed
-     * ParsedDelete.
-     */
-    ParsedDelete(OperationContext* opCtx,
-                 const DeleteRequest* request,
-                 const CollectionPtr& collection,
-                 bool isTimeseriesDelete = false);
-
-    /**
-     * Parses the delete request to a canonical query. On success, the parsed delete can be
-     * used to create a PlanExecutor capable of executing this delete.
-     */
-    Status parseRequest();
-
-    /**
-     * As an optimization, we do not create a canonical query if the predicate is a simple
-     * _id equality. This method can be used to force full parsing to a canonical query,
-     * as a fallback if the idhack path is not available (e.g. no _id index).
-     */
-    Status parseQueryToCQ();
-
+/**
+ * ParsedDelete is a struct that holds the parsed query from a DeleteRequest. It is produced by
+ * parsed_delete_command::parse().
+ *
+ * The filter is parsed into a ParsedFindCommand unless it is a simple _id equality (idhack
+ * fast path). The ParsedFindCommand is not yet optimized and has not undergone timeseries
+ * transformations.
+ *
+ * ParsedDelete is later consumed by CanonicalDelete::make(), which constructs a CanonicalDelete and
+ * does timeseries transformations.
+ */
+struct MONGO_MOD_PUBLIC ParsedDelete {
     /**
      * Get the raw request.
      */
     const DeleteRequest* getRequest() const;
 
     /**
-     * Get the YieldPolicy, adjusted for GodMode.
+     * Returns true when the filter was parsed into a ParsedFindCommand. Returns false for the
+     * idhack fast path.
      */
-    PlanYieldPolicy::YieldPolicy yieldPolicy() const;
+    bool hasParsedFindCommand() const;
 
-    /**
-     * As an optimization, we don't create a canonical query for updates with simple _id
-     * queries. Use this method to determine whether or not we actually parsed the query.
-     */
-    bool hasParsedQuery() const;
-
-    /**
-     * Releases ownership of the canonical query to the caller.
-     */
-    std::unique_ptr<CanonicalQuery> releaseParsedQuery();
-
-    /**
-     * This may return nullptr, specifically in cases where the query is IDHACK eligible.
-     */
-    const CanonicalQuery* parsedQuery() const {
-        return _canonicalQuery.get();
+    PlanYieldPolicy::YieldPolicy yieldPolicy() const {
+        return getDeleteYieldPolicy(request);
     }
 
-    /**
-     * Always guaranteed to return a valid expression context.
-     */
-    boost::intrusive_ptr<ExpressionContext> expCtx() {
-        tassert(11052004, "Expected ExpressionContext to exist", _expCtx.get());
-        return _expCtx;
-    }
-
-    /**
-     * Returns the non-modifiable residual MatchExpression.
-     *
-     * Note: see _timeseriesDeleteDetails._residualExpr for more details.
-     */
-    const MatchExpression* getResidualExpr() const {
-        return _timeseriesDeleteQueryExprs ? _timeseriesDeleteQueryExprs->_residualExpr.get()
-                                           : nullptr;
-    }
-
-    /**
-     * Releases the ownership of the residual MatchExpression.
-     *
-     * Note: see _timeseriesDeleteDetails._bucketMatchExpr for more details.
-     */
-    std::unique_ptr<MatchExpression> releaseResidualExpr() {
-        return _timeseriesDeleteQueryExprs ? std::move(_timeseriesDeleteQueryExprs->_residualExpr)
-                                           : nullptr;
-    }
-
-    /**
-     * Returns true when we are performing multi deletes using a residual predicate on a time-series
-     * collection or when performing singleton deletes on a time-series collection.
-     */
-    bool isEligibleForArbitraryTimeseriesDelete() const;
-
-    bool isRequestToTimeseries() const {
-        return _isRequestToTimeseries;
-    }
-
-private:
-    // Transactional context.  Not owned by us.
-    OperationContext* _opCtx;
-
-    // Unowned pointer to the request object that this executor will process.
-    const DeleteRequest* const _request;
+    // Unowned pointer to the request object to process. The pointer must outlive this object.
+    const DeleteRequest* request;
 
     // Parsed query object, or NULL if the query proves to be an id hack query.
-    std::unique_ptr<CanonicalQuery> _canonicalQuery;
+    std::unique_ptr<ParsedFindCommand> parsedFind;
 
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
-
-    const CollectionPtr& _collection;
-    // Contains the bucket-level expression and the residual expression and the bucket-level
-    // expresion should be pushed down to the bucket collection.
-    std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesDeleteQueryExprs;
-
-    const bool _isRequestToTimeseries;
+    // Reference to an extensions callback used when parsing to a canonical query.
+    std::unique_ptr<const ExtensionsCallback> extensionsCallback;
 };
 
-}  // namespace mongo
+namespace parsed_delete_command {
+
+/**
+ * Parses the delete request and returns ParsedDelete.
+ *
+ * Note: As ExtensionsCallbackReal is available only on the mongod, mongos will pass an
+ * ExtensionsCallbackNoop for parameter 'extensionsCallback' while mongod would use
+ * ExtensionsCallbackReal.
+ */
+StatusWith<ParsedDelete> parse(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               const DeleteRequest* request,
+                               std::unique_ptr<const ExtensionsCallback> extensionsCallback);
+
+}  // namespace parsed_delete_command
+
+}  // namespace MONGO_MOD_PUBLIC mongo

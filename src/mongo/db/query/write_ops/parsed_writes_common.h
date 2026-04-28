@@ -41,12 +41,21 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 class DeleteRequest;
+class ExtensionsCallbackNoop;
 class UpdateRequest;
+
+template <typename T, typename... Ts>
+requires std::is_same_v<T, ExtensionsCallbackNoop> || std::is_same_v<T, ExtensionsCallbackReal>
+MONGO_MOD_PUBLIC std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
+    return std::make_unique<T>(std::forward<Ts>(args)...);
+}
 
 /**
  * Query for timeseries arbitrary writes should be split into two parts: bucket expression and

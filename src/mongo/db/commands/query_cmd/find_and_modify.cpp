@@ -57,11 +57,10 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/insert.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
-#include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops.h"
@@ -405,12 +404,11 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                                                  &deleteRequest);
         }
 
-        ParsedDelete parsedDelete(
-            opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesLogicalRequest);
-        uassertStatusOK(parsedDelete.parseRequest());
+        auto canonicalDelete = uassertStatusOK(CanonicalDelete::makeFromRequest(
+            opCtx, collection.getCollectionPtr(), deleteRequest, isTimeseriesLogicalRequest));
 
         const auto exec =
-            uassertStatusOK(getExecutorDelete(opDebug, collection, parsedDelete, verbosity));
+            uassertStatusOK(getExecutorDelete(opDebug, collection, canonicalDelete, verbosity));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(

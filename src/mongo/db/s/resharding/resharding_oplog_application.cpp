@@ -39,9 +39,9 @@
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/update.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/update_result.h"
@@ -578,11 +578,13 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
             request.setMulti(false);
             request.setReturnDeleted(true);
 
-            ParsedDelete parsedDelete(opCtx, &request, stashColl.getCollectionPtr());
-            uassertStatusOK(parsedDelete.parseRequest());
+            auto canonicalDelete = uassertStatusOK(
+                CanonicalDelete::makeFromRequest(opCtx, stashColl.getCollectionPtr(), request));
 
-            auto exec = uassertStatusOK(getExecutorDelete(
-                &CurOp::get(opCtx)->debug(), stashColl, parsedDelete, boost::none /* verbosity */));
+            auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),
+                                                          stashColl,
+                                                          canonicalDelete,
+                                                          boost::none /* verbosity */));
             BSONObj res;
             auto state = exec->getNext(&res, nullptr);
 

@@ -41,22 +41,12 @@
 
 #include <map>
 #include <memory>
-#include <type_traits>
-#include <utility>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
-class ExtensionsCallbackNoop;
-class ExtensionsCallbackReal;
 class UpdateRequest;
-
-template <typename T, typename... Ts>
-requires std::is_same_v<T, ExtensionsCallbackNoop> || std::is_same_v<T, ExtensionsCallbackReal>
-std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
-    return std::make_unique<T>(std::forward<Ts>(args)...);
-}
 
 /**
  * Get the YieldPolicy, adjusted for GodMode.
