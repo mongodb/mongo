@@ -208,21 +208,16 @@ class InsertDocCommand extends Command {
 
 /**
  * Create database command.
- *
- * Does not pin a primary shard — the server picks one automatically.
+ * Targets a random primary shard from the shard set using the seeded PRNG.
  */
 class CreateDatabaseCommand extends Command {
     constructor(dbName, collName, shardSet, collectionCtx, primaryShard = null) {
         super(dbName, collName, shardSet, collectionCtx);
-        this.primaryShard = primaryShard;
+        this.primaryShard = primaryShard ?? shardSet[Random.randInt(shardSet.length)]._id;
     }
 
     execute(connection) {
-        const cmd = {enableSharding: this.dbName};
-        if (this.primaryShard) {
-            cmd.primaryShard = this.primaryShard;
-        }
-        assert.commandWorked(connection.adminCommand(cmd));
+        assert.commandWorked(connection.adminCommand({enableSharding: this.dbName, primaryShard: this.primaryShard}));
     }
 
     toString() {
@@ -237,22 +232,20 @@ class CreateDatabaseCommand extends Command {
 
 /**
  * Create unsplittable collection command.
- * TODO SERVER-121676: Pins to the DB primary shard to avoid v2 shard-targeting
- * issues on resume. Once fixed, this can target a random shard again.
+ * Targets a random shard from the shard set using the seeded PRNG.
  */
 class CreateUnsplittableCollectionCommand extends Command {
     constructor(dbName, collName, shardSet, collectionCtx, dataShard = null) {
         super(dbName, collName, shardSet, collectionCtx);
-        this.dataShard = dataShard;
+        this.dataShard = dataShard ?? shardSet[Random.randInt(shardSet.length)]._id;
     }
 
     execute(connection) {
-        const dataShard = this.dataShard ?? getDbPrimary(connection, this.dbName);
         const db = connection.getDB(this.dbName);
         assert.commandWorked(
             db.runCommand({
                 createUnsplittableCollection: this.collName,
-                dataShard,
+                dataShard: this.dataShard,
             }),
         );
     }
@@ -642,8 +635,6 @@ class ShardCollectionCommand extends Command {
 /**
  * Unshard collection command.
  * Converts a sharded collection to an unsplittable (single-shard) collection.
- * TODO SERVER-121676: Pins to the DB primary shard to avoid v2 shard-targeting
- * issues on resume. Once fixed, this can target a random shard again.
  *
  * CHANGE STREAM EVENT BEHAVIOR:
  * ============================
@@ -962,7 +953,7 @@ class MoveCommandBase extends Command {
 
 /**
  * Move primary command.
- * TODO SERVER-122025: disabled in the FSM model — breaks cross-db rename.
+ * Moves the primary shard for a database to a different shard.
  */
 class MovePrimaryCommand extends MoveCommandBase {
     constructor(dbName, collName, shardSet, collectionCtx, targetShard = null) {
@@ -997,8 +988,6 @@ class MovePrimaryCommand extends MoveCommandBase {
 
 /**
  * Move collection command.
- * TODO SERVER-121676: Currently disabled in the FSM model. Once shard-targeting on
- * resume is fixed, re-enable and allow random target shard selection.
  *
  * Resolves where the collection lives via _getCurrentShard: unsplittable → from
  * config.chunks, untracked → DB primary. The base _getTargetShard picks a different shard.

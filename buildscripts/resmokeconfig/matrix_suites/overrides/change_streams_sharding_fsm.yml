@@ -87,6 +87,8 @@
               enableBgMutator: true
               migrationRetryJitterMS: 2000
               migrationRetryExtraDDLCommands:
+                - "create"
+                - "createUnsplittableCollection"
                 - "drop"
                 - "dropDatabase"
                 - "dropIndexes"
@@ -99,7 +101,9 @@
               migrationRetryExtraDDLErrors:
                 - "ReshardCollectionInterruptedDueToFCVChange"
                 - "Interrupted"
+                - "MovePrimaryInProgress"
               migrationRetryMatchFCVErrors: true
+              migrationRetryWriteErrors: true
               threadOverrides:
                 - "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js"
                 - "jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js"

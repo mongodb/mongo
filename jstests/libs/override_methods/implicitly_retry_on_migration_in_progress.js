@@ -6,6 +6,8 @@
  *   TestData.migrationRetryExtraDDLCommands  - array of extra command names to retry
  *   TestData.migrationRetryExtraDDLErrors    - array of extra ErrorCodes names to retry
  *   TestData.migrationRetryMatchFCVErrors    - boolean, retry FCV-related CommandNotSupported
+ *   TestData.migrationRetryWriteErrors       - boolean, also retry on matching writeErrors
+ *                                              (e.g. insert returning ok:1 with writeErrors)
  */
 
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
@@ -28,6 +30,7 @@ const MigrationRetryConfig = {
     ]),
     queryErrors: new Set([ErrorCodes.QueryPlanKilled]),
     matchFCVErrors: TestData.migrationRetryMatchFCVErrors || false,
+    retryWriteErrors: TestData.migrationRetryWriteErrors || false,
     retryJitterMS: TestData.migrationRetryJitterMS || 0,
 };
 
@@ -102,6 +105,17 @@ function _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj
     return queryResponse;
 }
 
+function _hasRetryableWriteError(response) {
+    if (!MigrationRetryConfig.retryWriteErrors) {
+        return false;
+    }
+    if (!response || response.ok !== 1 || !response.writeErrors) {
+        return false;
+    }
+    const errors = Array.isArray(response.writeErrors) ? response.writeErrors : [response.writeErrors];
+    return errors.some((we) => MigrationRetryConfig.ddlErrors.has(we.code));
+}
+
 function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs) {
     const kNoRetry = true;
     const kRetry = false;
@@ -119,6 +133,17 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
 
             commandResponse = func.apply(conn, makeFuncArgs(commandObj));
             if (commandResponse.ok === 1) {
+                if (_hasRetryableWriteError(commandResponse)) {
+                    jsTest.log.debug(
+                        "Retrying " +
+                            commandName +
+                            " due to retryable write error (attempt " +
+                            attempt +
+                            "): " +
+                            tojson(commandResponse.writeErrors),
+                    );
+                    return kRetry;
+                }
                 return kNoRetry;
             }
 

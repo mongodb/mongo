@@ -18,6 +18,8 @@ executor:
         TestData:
           migrationRetryJitterMS: 2000
           migrationRetryExtraDDLCommands:
+            - "create"
+            - "createUnsplittableCollection"
             - "drop"
             - "dropDatabase"
             - "dropIndexes"
@@ -30,6 +32,8 @@ executor:
           migrationRetryExtraDDLErrors:
             - "ReshardCollectionInterruptedDueToFCVChange"
             - "Interrupted"
+            - "MovePrimaryInProgress"
           migrationRetryMatchFCVErrors: true
+          migrationRetryWriteErrors: true
           threadOverrides:
             - "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js"

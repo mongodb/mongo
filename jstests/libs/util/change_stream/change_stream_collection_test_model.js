@@ -3,29 +3,10 @@
  * Manages state transitions for database and collection operations.
  *
  * ========================================================================================
- * KNOWN DEFECTS — disabled transitions
+ * NOTES
  * ========================================================================================
  *
- * ── MOVE_PRIMARY ────────────────────────────────────────────────────────────────
- *    Disabled: MOVE_PRIMARY changes the DB primary shard, which breaks
- *    cross-database rename operations that target a different DB (the rename
- *    targets the original primary, not the new one).
- *    Disabled transitions:
- *      - MOVE_PRIMARY  (from DATABASE_PRESENT_COLLECTION_ABSENT, SHARDED_RANGE,
- *                        SHARDED_HASHED, UNSPLITTABLE, UNTRACKED)
- *    TODO SERVER-122025: re-enable once rename-after-movePrimary is handled.
- *
- * ── MOVE_COLLECTION / RENAME from sharded states ──────────────────────────────
- *    TODO SERVER-122025: fix and re-enable.
- *    Impact: these operations change the data placement, causing v2 (precise
- *            shard targeting) to resume on the wrong shard.
- *    Disabled transitions:
- *      - MOVE_COLLECTION                  (from UNSPLITTABLE, UNTRACKED)
- *      - RENAME_TO_NON_EXISTENT_SAME_DB   (from SHARDED_RANGE, SHARDED_HASHED)
- *      - RENAME_TO_EXISTENT_SAME_DB       (from SHARDED_RANGE, SHARDED_HASHED)
- *    Re-enable: uncomment MOVE_COLLECTION and RENAME actions.
- *
- * ── Note on createIndexes / dropIndexes ──────────────────────────────────────────
+ * ── createIndexes / dropIndexes ──────────────────────────────────────────────────
  *    These events are excluded at the reader level (kExcludedOperationTypes in
  *    change_stream_sharding_utils.js, applied as a $nin pipeline filter) and
  *    omitted from expected events (getChangeEvents() returns [] for
@@ -71,11 +52,9 @@ class CollectionTestModel {
     /**
      * "db absent" mode.
      *
-     * The generator starts at DATABASE_ABSENT. All actions are enabled except
-     * MOVE_PRIMARY, MOVE_COLLECTION (from unsplittable/untracked) and RENAME
-     * from sharded states (all SERVER-122025). DROP_COLLECTION and RENAME
-     * (from non-sharded states) provide return paths from collection-present
-     * states to DB_PRESENT_COLL_ABSENT, allowing the generator to cycle through
+     * The generator starts at DATABASE_ABSENT. DROP_COLLECTION and RENAME provide
+     * return paths from collection-present states to DB_PRESENT_COLL_ABSENT,
+     * allowing the generator to cycle through
      * all create and collection-type transitions.
      *
      * DROP_DATABASE is omitted from DB_PRESENT_COLL_ABSENT but available from
@@ -98,11 +77,8 @@ class CollectionTestModel {
      * "db present, no drops" mode.
      *
      * The generator starts at DATABASE_PRESENT_COLLECTION_ABSENT. DATABASE_ABSENT
-     * and DROP_DATABASE are excluded entirely. All other actions are enabled except
-     * MOVE_PRIMARY, MOVE_COLLECTION (from unsplittable/untracked) and RENAME
-     * from sharded states (all SERVER-122025). DROP_COLLECTION and RENAME
-     * (from non-sharded states) provide return paths from collection-present
-     * states to DB_PRESENT_COLL_ABSENT.
+     * and DROP_DATABASE are excluded entirely. DROP_COLLECTION and RENAME provide
+     * return paths from collection-present states to DB_PRESENT_COLL_ABSENT.
      */
     _configureDbPresentNoDrops() {
         this._initializeCollectionStates();
@@ -126,8 +102,7 @@ class CollectionTestModel {
             [Action.CREATE_SHARDED_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.CREATE_UNSPLITTABLE_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
             [Action.CREATE_UNTRACKED_COLLECTION, State.COLLECTION_PRESENT_UNTRACKED],
-            // TODO SERVER-122025: re-enable MOVE_PRIMARY.
-            // [Action.MOVE_PRIMARY, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+            [Action.MOVE_PRIMARY, State.DATABASE_PRESENT_COLLECTION_ABSENT],
         ]);
     }
 
@@ -142,13 +117,11 @@ class CollectionTestModel {
             [Action.INSERT_DOC, State.COLLECTION_PRESENT_SHARDED_RANGE],
             [Action.DROP_COLLECTION, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             ...(includeDropDatabase ? [[Action.DROP_DATABASE, State.DATABASE_ABSENT]] : []),
-            // TODO SERVER-122025: re-enable RENAME from sharded states.
-            // [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
-            // [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+            [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+            [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
             [Action.RESHARD_COLLECTION_TO_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
-            // TODO SERVER-122025: re-enable MOVE_PRIMARY.
-            // [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_RANGE],
+            [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_RANGE],
             [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED_RANGE],
         ]);
 
@@ -157,13 +130,11 @@ class CollectionTestModel {
             [Action.INSERT_DOC, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.DROP_COLLECTION, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             ...(includeDropDatabase ? [[Action.DROP_DATABASE, State.DATABASE_ABSENT]] : []),
-            // TODO SERVER-122025: re-enable RENAME from sharded states.
-            // [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
-            // [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+            [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+            [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
             [Action.RESHARD_COLLECTION_TO_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
-            // TODO SERVER-122025: re-enable MOVE_PRIMARY.
-            // [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_HASHED],
+            [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED_HASHED],
         ]);
 
@@ -176,10 +147,8 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             [Action.SHARD_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
             [Action.SHARD_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
-            // TODO SERVER-122025: re-enable MOVE_PRIMARY.
-            // [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNSPLITTABLE],
-            // TODO SERVER-122025: re-enable MOVE_COLLECTION.
-            // [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
+            [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNSPLITTABLE],
+            [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
         ]);
 
         // ===== COLLECTION_PRESENT_UNTRACKED =====
@@ -191,10 +160,8 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             [Action.SHARD_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
             [Action.SHARD_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
-            // TODO SERVER-122025: re-enable MOVE_PRIMARY.
-            // [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNTRACKED],
-            // TODO SERVER-122025: re-enable MOVE_COLLECTION.
-            // [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNTRACKED],
+            [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNTRACKED],
+            [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNTRACKED],
         ]);
     }
 

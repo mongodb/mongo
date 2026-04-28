@@ -88,6 +88,7 @@ describe("MoveChunk System Events (v2)", function () {
     const collName = "coll";
 
     before(function () {
+        Random.setRandomSeed();
         this.st = createShardingTest(/* mongos */ 1, /* shards */ 3);
         this.st.stopBalancer();
         this.shards = assert.commandWorked(this.st.s.adminCommand({listShards: 1})).shards;
