@@ -120,6 +120,10 @@ public:
         return true;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
