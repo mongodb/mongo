@@ -332,9 +332,10 @@ public:
         return _container.ident()->getIdent();
     };
 
-    void keep() override {
-        MONGO_UNIMPLEMENTED_TASSERT(11374702);
-    };
+    /**
+     * The lifetime of the container is managed by the user of the storage, so keeping is a no-op.
+     */
+    void keep() override {};
 
     /**
      * Updates the key assigned for a KV pair for SortedContainerWriter creation.
