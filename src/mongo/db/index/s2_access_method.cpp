@@ -338,6 +338,12 @@ void S2AccessMethod::doGetKeys(OperationContext* opCtx,
                                KeyStringSet* multikeyMetadataKeys,
                                MultikeyPaths* multikeyPaths,
                                const boost::optional<RecordId>& id) const {
+    uassert(12113200,
+            str::stream() << IndexNames::GEO_2DSPHERE_BUCKET
+                          << " indexes are only supported on time-series collections",
+            entry->descriptor()->getIndexType() != IndexType::INDEX_2DSPHERE_BUCKET ||
+                collection->isTimeseriesCollection());
+
     index2dsphere::getS2Keys(pooledBufferBuilder,
                              obj,
                              entry->descriptor()->keyPattern(),

@@ -43,6 +43,8 @@ last-continuous:
       ticket: SERVER-123567
     - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
       ticket: SERVER-121822
+    - test_file: jstests/core/index/index_on_incorrect_collection.js
+      ticket: SERVER-121132
   suites: null
 last-lts:
   all:
