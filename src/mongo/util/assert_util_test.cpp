@@ -39,6 +39,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 
+#include <csignal>
 #include <ostream>
 #include <type_traits>
 

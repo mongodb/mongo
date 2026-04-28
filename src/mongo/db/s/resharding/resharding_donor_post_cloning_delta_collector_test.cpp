@@ -66,7 +66,8 @@ public:
         std::vector<ReshardingZoneType>) override {
         MONGO_UNREACHABLE;
     }
-    bool searchIndexExistsForCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    bool searchIndexExistsForCollection(OperationContext* opCtx,
+                                        const NamespaceString& nss) override {
         MONGO_UNREACHABLE;
     }
     void tellAllDonorsToRefresh(OperationContext*,
