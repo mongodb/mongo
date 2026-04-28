@@ -46,8 +46,10 @@ const PathArrayness& PathArrayness::emptyPathArrayness() {
 }
 
 bool PathArrayness::isIndexEligibleToAddToPathArrayness(const IndexDescriptor& descriptor) {
-    return (descriptor.getIndexType() != INDEX_WILDCARD) && !descriptor.isPartial() &&
-        !descriptor.hidden();
+    if (descriptor.isPartial() || descriptor.hidden()) {
+        return false;
+    }
+    return descriptor.getIndexType() == INDEX_BTREE;
 }
 
 void PathArrayness::addPath(const FieldPath& path,

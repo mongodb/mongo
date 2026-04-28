@@ -128,11 +128,11 @@ public:
 
     /**
      * Static helper to determine if an index is suitable for tracking array pathness.
-     * We generally skip:
-     * 1. Wildcard indexes: Unbounded size of multikey paths. We read later once we have
-     * materialized 'CanonicalQuery'.
-     * 2. Partial indexes: Don't cover the full document set.
-     * 3. Hidden indexes: Intended to be invisible to the query optimizer.
+     * Only BTREE indexes are eligible because other index types (wildcard, text, hashed, geo,
+     * column store, etc.) either have unbounded multikey paths, do not expose meaningful array path
+     * semantics, or are not used by the query planner in a way that benefits from this structure.
+     * Among BTREE indexes, partial indexes (don't cover the full document set) and hidden indexes
+     * (invisible to the query optimizer) are also excluded.
      */
     static bool isIndexEligibleToAddToPathArrayness(const IndexDescriptor& descriptor);
 
