@@ -270,6 +270,7 @@ function runTests(conn, mongotMock) {
             runUnionWithOnViewSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue);
             runUnionWithOnViewWithSearchInViewDefinitionTests(conn, mongotMock, isSearchMeta, featureFlagValue);
             runSearchHybridSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue);
+            // TODO SERVER-117259: Add coverage for the $search/$searchMeta-in-$lookup kickback.
         }
     }
 }

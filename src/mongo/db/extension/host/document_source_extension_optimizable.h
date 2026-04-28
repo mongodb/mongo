@@ -395,6 +395,25 @@ public:
                 "The $search/$searchMeta extension stage is not supported in a $unionWith");
         }
 
+        if (expCtx->getInLookup() && !hybridSearchFlagEnabled) {
+            const auto stageName = std::string(astNode->getName());
+            // Throw the IFR retry error for extension $search/$searchMeta in $lookup if the
+            // feature flag is not enabled. Note: $vectorSearch is independently disallowed in
+            // $lookup (see LookupRequirement::kNotAllowed) and is not handled here.
+            //
+            // TODO SERVER-117259: today this kickback is unreachable because the pre-desugar
+            // LookupRequirement::kNotAllowed constraint on DocumentSourceExtensionForQueryShape
+            // (and on DocumentSourceExtensionOptimizable post-desugar) rejects the stage before
+            // create() is called. Once that ticket lifts the constraint to kAllowed, this
+            // kickback becomes the runtime gate for extension $search/$searchMeta in $lookup
+            // when featureFlagExtensionsInsideHybridSearch is disabled.
+            search_helpers::throwIfrKickbackIfNecessary(
+                search_helpers::isExtensionSearchStage(stageName),
+                feature_flags::gFeatureFlagSearchExtension,
+                search_metrics::inLookupKickbackRetryCount,
+                "The $search/$searchMeta extension stage is not supported in a $lookup");
+        }
+
         return boost::intrusive_ptr<DocumentSourceExtensionOptimizable>(
             new DocumentSourceExtensionOptimizable(expCtx, std::move(astNode)));
     }
