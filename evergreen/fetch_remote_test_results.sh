@@ -4,7 +4,7 @@
 #   bash fetch_remote_test_results.sh
 #
 # Assumes the following files exist:
-#  ./src/"build_events.json"                       Build events JSON containing the records of remote test executions
+#  ./src/"build_events.json" (or set path in $BEP_FILE)      Build events JSON containing the records of remote test executions
 #  engflow.cert and engflow.key located in either ${workdir}/src or ${HOME}/.engflow/creds
 #
 # Required environment variables:
@@ -285,7 +285,7 @@ function resolve_file() {
     return 1
 }
 
-BEP_FILE='src/build_events.json'
+BEP_FILE="${BEP_FILE:-src/build_events.json}"
 
 if ! [ -f "$ENGFLOW_CERT" ]; then
     cert_candidates=(

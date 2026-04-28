@@ -67,6 +67,7 @@ export ENGFLOW_KEY="${workdir}/src/engflow.key"
 export ENGFLOW_CERT="${workdir}/src/engflow.cert"
 export workdir="$TEMP_DIR" # Change workdir so the script downloads outputs to the temporary dir, rather than task workdir.
 export test_label="$TEST_TARGET"
+export BEP_FILE="build_events.json"
 bash ./evergreen/fetch_remote_test_results.sh
 echo ""
 unset workdir # Unset workdir, it's a default Evergreen expansion that might confuse a later script.
