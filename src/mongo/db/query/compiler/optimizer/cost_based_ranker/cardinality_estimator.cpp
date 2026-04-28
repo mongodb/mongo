@@ -1309,7 +1309,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
         }
     }
 
-    resultCard = std::min(resultCard, _inputCard);
+    resultCard = resultCard < _inputCard ? resultCard : _inputCard;
     return resultCard;
 }
 
