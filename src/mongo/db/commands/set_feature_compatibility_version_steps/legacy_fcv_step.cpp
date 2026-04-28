@@ -31,6 +31,7 @@
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/set_feature_compatibility_version_steps/fcv_step.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/generic_argument_util.h"
@@ -76,10 +77,13 @@
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
+#include <mutex>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
 namespace mongo {
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(setFCVPauseAfterReadingConfigDropPendingDBs);
 
@@ -283,6 +287,32 @@ void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
     }
 }
 
+// Helper function for running processCollModCommand() under a nested CurOp so the sub-operation's
+// namespace and raised dbProfileLevel (via AutoStatsTracker) don't leak onto the parent setFCV
+// CurOp. Without this, a slow setFCV can write profile entries to system.profile of
+// databases the user never enabled profiling on.
+//
+// See SERVER-85925 (original fix) / SERVER-122438 (regression).
+Status processCollModCommandWithNestedCurOp(OperationContext* opCtx,
+                                            const NamespaceStringOrUUID& nsOrUUID,
+                                            const CollMod& cmd,
+                                            BSONObjBuilder* result) {
+    auto parentCurOp = CurOp::get(opCtx);
+
+    // Pushed onto the CurOp stack; pops itself on scope exit via ~CurOp.
+    CurOp nestedCurOp;
+    nestedCurOp.push(opCtx);
+    {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        nestedCurOp.setGenericOpRequestDetails(
+            lk, cmd.getNamespace(), parentCurOp->getCommand(), cmd.toBSON(), NetworkOp::dbMsg);
+    }
+
+    return processCollModCommand(opCtx, nsOrUUID, cmd, nullptr, result);
+}
+
+}  // namespace
+
 class LegacyFCVStep : public mongo::FCVStep {
 public:
     static LegacyFCVStep* get(ServiceContext* serviceContext);
@@ -326,8 +356,8 @@ private:
                     collModCmd.set_removeLegacyTimeseriesBucketingParametersHaveChanged(true);
 
                     BSONObjBuilder responseBuilder;
-                    uassertStatusOK(processCollModCommand(
-                        opCtx, collection->ns(), collModCmd, nullptr, &responseBuilder));
+                    uassertStatusOK(processCollModCommandWithNestedCurOp(
+                        opCtx, collection->ns(), collModCmd, &responseBuilder));
                 },
                 [&](const Collection* collection) {
                     return collection->shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged();
@@ -412,8 +442,8 @@ private:
             // deprecated catalog metadata and to correct any invalid value types previously
             // allowed in metadata.
             BSONObjBuilder responseBuilder;
-            uassertStatusOK(processCollModCommand(
-                opCtx, collection->ns(), CollMod{collection->ns()}, nullptr, &responseBuilder));
+            uassertStatusOK(processCollModCommandWithNestedCurOp(
+                opCtx, collection->ns(), CollMod{collection->ns()}, &responseBuilder));
             return true;
         });
     }
@@ -882,11 +912,8 @@ private:
                         // storage, issue the "collMod" command with none of the parameters
                         // set.
                         BSONObjBuilder responseBuilder;
-                        uassertStatusOK(processCollModCommand(opCtx,
-                                                              collection->ns(),
-                                                              CollMod{collection->ns()},
-                                                              nullptr,
-                                                              &responseBuilder));
+                        uassertStatusOK(processCollModCommandWithNestedCurOp(
+                            opCtx, collection->ns(), CollMod{collection->ns()}, &responseBuilder));
                     },
                     [&](const Collection* collection) {
                         // Only remove the catalog entry flag if it exists. It could've been
@@ -972,8 +999,8 @@ private:
                     BSONObjBuilder responseBuilder;
                     auto collMod = CollMod{collection->ns()};
                     collMod.setRecordIdsReplicated(false);
-                    uassertStatusOK(processCollModCommand(
-                        opCtx, collection->ns(), collMod, nullptr, &responseBuilder));
+                    uassertStatusOK(processCollModCommandWithNestedCurOp(
+                        opCtx, collection->ns(), collMod, &responseBuilder));
                 },
                 [&](const Collection* collection) { return collection->areRecordIdsReplicated(); });
         }
