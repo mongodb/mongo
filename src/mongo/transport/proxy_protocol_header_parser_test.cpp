@@ -631,6 +631,19 @@ std::string buildTLV(uint8_t type, const std::string& data) {
     return tlv;
 }
 
+std::string buildRepeatedTLVs(size_t count, uint8_t type = 0xE0, StringData data = StringData()) {
+    std::string tlvs;
+    tlvs.reserve(count * (3 + data.size()));
+    for (size_t i = 0; i < count; ++i) {
+        tlvs += buildTLV(type, std::string{data});
+    }
+    return tlvs;
+}
+
+std::string buildSSLTLVPayload(uint8_t clientFlags,
+                               uint32_t verify,
+                               const std::string& subTlvData = "");
+
 class ProxyProtocolParameterizedTestFixture : public testing::TestWithParam<AddressFamily> {};
 
 INSTANTIATE_TEST_SUITE_P(ProxyProtocolHeaderParser,
@@ -678,6 +691,56 @@ TEST_P(ProxyProtocolParameterizedTestFixture, TLVParsingManyTLVs) {
     ASSERT_EQ(result->tlvs[3].data, "custom");
     ASSERT_EQ(result->tlvs[4].type, 0xE0);
     ASSERT_EQ(result->tlvs[4].data, "custom");
+}
+
+TEST(ProxyProtocolHeaderParser, TLVParsingAcceptsBoundedEntryCounts) {
+    for (const auto tlvCount :
+         {size_t{1}, size_t{16}, kMaxProxyProtocolTLVEntriesPerVector}) {
+        auto result = parseWithTLV(AddressFamily::TCP4, buildRepeatedTLVs(tlvCount, 0xE0, "x"_sd));
+        ASSERT_TRUE(result) << tlvCount;
+        ASSERT_TRUE(result->endpoints) << tlvCount;
+        ASSERT_EQ(result->tlvs.size(), tlvCount) << tlvCount;
+        ASSERT_FALSE(result->sslTlvs) << tlvCount;
+    }
+}
+
+TEST(ProxyProtocolHeaderParser, TLVParsingRejectsExcessiveEntryCounts) {
+    ASSERT_THROWS_WITH_CHECK(
+        parseWithTLV(AddressFamily::TCP4,
+                     buildRepeatedTLVs(kMaxProxyProtocolTLVEntriesPerVector + 1, 0xE0, "x"_sd)),
+        DBException,
+        [](const DBException& ex) {
+            ASSERT_THAT(ex.toStatus(),
+                        StatusIs(Eq(ErrorCodes::FailedToParse),
+                                 ContainsRegex("TLV entry count exceeds")));
+        });
+}
+
+TEST(ProxyProtocolHeaderParser, TLVParsingRejectsDenseEntriesAfterSingleSslTLV) {
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x07, 0));
+    auto denseTlvs = buildRepeatedTLVs(kMaxProxyProtocolTLVEntriesPerVector, 0xE0, "x"_sd);
+
+    ASSERT_THROWS_WITH_CHECK(parseWithTLV(AddressFamily::TCP4, sslTlv + denseTlvs),
+                             DBException,
+                             [](const DBException& ex) {
+                                 ASSERT_THAT(ex.toStatus(),
+                                             StatusIs(Eq(ErrorCodes::FailedToParse),
+                                                      ContainsRegex("TLV entry count exceeds")));
+                             });
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsRejectsExcessiveEntryCounts) {
+    auto subTlvs =
+        buildRepeatedTLVs(kMaxProxyProtocolTLVEntriesPerVector + 1, 0x21, "x"_sd);
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x07, 0, subTlvs));
+
+    ASSERT_THROWS_WITH_CHECK(parseWithTLV(AddressFamily::TCP4, sslTlv),
+                             DBException,
+                             [](const DBException& ex) {
+                                 ASSERT_THAT(ex.toStatus(),
+                                             StatusIs(Eq(ErrorCodes::FailedToParse),
+                                                      ContainsRegex("TLV entry count exceeds")));
+                             });
 }
 
 TEST_P(ProxyProtocolParameterizedTestFixture, TLVParsingFails) {
@@ -736,7 +799,7 @@ TEST_P(ProxyProtocolParameterizedTestFixture, UnixProxySocketWithV1ProtocolIsRej
 // The payload format is: clientFlags (1 byte) + verify (4 bytes big-endian) + optional sub-TLVs.
 std::string buildSSLTLVPayload(uint8_t clientFlags,
                                uint32_t verify,
-                               const std::string& subTlvData = "") {
+                               const std::string& subTlvData) {
     std::string payload;
     payload += static_cast<char>(clientFlags);
     // verify in big-endian.

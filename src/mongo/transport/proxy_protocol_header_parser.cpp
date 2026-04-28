@@ -222,6 +222,7 @@ void parseSubTLVVectors(StringData buffer, boost::optional<ProxiedSSLData>& sslT
 void parseTLVVectors(StringData buffer,
                      std::vector<ProxiedSupplementaryDataEntry>& tlvs,
                      boost::optional<ProxiedSSLData>& sslTlvs) {
+    size_t tlvCount = 0;
     while (buffer.size()) {
         static constexpr size_t kTLVHeaderSize = 3;
         uassert(ErrorCodes::FailedToParse,
@@ -230,6 +231,11 @@ void parseTLVVectors(StringData buffer,
                             buffer.size(),
                             kTLVHeaderSize),
                 buffer.size() > kTLVHeaderSize);
+        uassert(ErrorCodes::FailedToParse,
+                fmt::format("Proxy Protocol Version 2 TLV entry count exceeds {}",
+                            kMaxProxyProtocolTLVEntriesPerVector),
+                tlvCount < kMaxProxyProtocolTLVEntriesPerVector);
+        ++tlvCount;
 
         auto type = extract<uint8_t>(buffer);
         uassert(ErrorCodes::FailedToParse,
