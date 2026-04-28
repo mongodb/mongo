@@ -778,6 +778,119 @@ operation’s`$readPreference` specifies primary-only. A primary node that recei
 preference operation will service it, although this case is rare since it requires the node to step
 up before it receives the operation.
 
+# Replicated Record Ids
+
+By default, a
+[`RecordId`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/record_id.h)
+is assigned locally by the storage engine and is not guaranteed to match across replica set members.
+The **Replicated Record Ids** feature ensures that every node in a replica set uses the same
+`RecordId` for the same document. This enables secondaries to apply update and delete oplog entries
+by looking up the target document directly via its `RecordId` instead of using the `_id` index and
+provides a stable document address across the replica set.
+
+See the [Storage README](../storage/README.md#replicated-record-ids) for how the setting is tracked
+at the storage layer and the storage-engine implications. The rest of this section describes how
+record IDs are propagated through the replication pipeline.
+
+## Oplog Representation
+
+CRUD oplog entries (`insert`, `update`, `delete`) for collections with replicated record IDs carry
+an optional `rid` field containing the `RecordId` of the affected document. The field is defined as
+`recordId` (of type `RecordId`) in [`oplog_entry.idl`](oplog_entry.idl):
+
+```
+{ op: "i", ns: "test.coll", ui: <uuid>, o: {_id: 1, x: "a"}, rid: <RecordId token> }
+{ op: "u", ns: "test.coll", ui: <uuid>, o: {...}, o2: {_id: 1}, rid: <RecordId token> }
+{ op: "d", ns: "test.coll", ui: <uuid>, o: {_id: 1},            rid: <RecordId token> }
+```
+
+The `create` collection oplog entry for a collection with replicated record IDs includes
+`"recordIdsReplicated": true` at the top level of the `o` field, alongside `create` and `idIndex`.
+Secondaries read this field when applying the entry and create the collection with the matching
+setting.
+
+The `rid` field is not surfaced in change stream events. The `recordIdsReplicated` field on a
+`createCollection` change event is only visible when `showExpandedEvents: true` is set.
+
+The `rid` field is stripped from all operations (including operations nested inside a nested
+`applyOps`) when an `applyOps` command is invoked by a user. The command handler runs
+[`removeRidFieldFromOps`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/commands/apply_ops_cmd.cpp#L283)
+on the input before executing the batch, so `applyOps` commands used for migration, dump, and
+restore workflows never apply a donor's record IDs on the destination. On the apply path, the
+secondary additionally `tassert`s that no operation received in `kApplyOpsCmd` mode carries a `rid`.
+
+Replicated `applyOps` oplog entries (generated internally by transactions and batched writes) are a
+separate case and do carry `rid` fields for collections with replicated record IDs. Secondaries
+preserve and apply those record IDs, so the replica-set-wide `RecordId` invariant holds even when
+operations are bundled inside an `applyOps` oplog entry.
+
+## Primary Behavior
+
+When a primary inserts documents into a collection with replicated record IDs, the storage engine
+assigns record IDs as it normally would. After the insert batch is written to the storage engine,
+the write path collects the resulting `RecordId` values and forwards them to
+[`OpObserverImpl::onInserts()`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/op_observer/op_observer_impl.cpp#L823)
+to be embedded in the generated oplog entries. This is done in
+[`collection_write_path.cpp`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/collection_crud/collection_write_path.cpp#L373-L381).
+
+For updates and deletes, the `OpObserver` records the `RecordId` of the affected document in the
+corresponding oplog entry so that secondaries can apply the operation directly by `RecordId`.
+
+## Secondary Behavior (Steady-State Replication)
+
+When applying oplog entries for a collection with replicated record IDs, secondaries deviate from
+the default oplog application path in the following ways:
+
+- **Inserts**: The document is inserted at the exact `RecordId` specified by the `rid` field. If the
+  insert fails with `DuplicateKey` (either on `_id` or on the `RecordId` itself), the node crashes
+  via `LOGV2_FATAL_NOTRACE`, because a duplicate `RecordId` on a replicated record IDs collection is
+  treated as a hard constraint violation rather than a condition to retry as an upsert.
+- **Updates**: The target document is looked up directly by its `RecordId` using the `rid` field,
+  bypassing the `_id` index. A safeguard asserts that the document found at that `RecordId` has the
+  same `_id` as the oplog entry. A mismatch triggers a fatal error through
+  `assertOnInconsistentDocuments`.
+- **Deletes**: The target document is located directly by its `RecordId` from the `rid` field,
+  bypassing the `_id` index. The same `_id` consistency safeguard applies.
+
+This direct-by-`RecordId` application is implemented in [`oplog.cpp`](oplog.cpp).
+
+## Logical Initial Sync
+
+The `recordIdsReplicated` state of each collection must be preserved during logical initial sync.
+
+During the data clone phase, the `CollectionCloner` retrieves the `recordIdsReplicated` state from
+the sync source's catalog metadata and creates collections on the syncing node with the matching
+setting. Documents are fetched from the sync source with their `RecordId`s projected and are
+inserted at those exact `RecordId`s.
+
+During the oplog application phase, oplog batches are split on **"new primary"** NOOP oplog entries
+(written by a node when it first becomes primary). Splitting on these boundaries ensures that record
+IDs are not reused within a single batch, preserving uniqueness.
+
+Oplog application follows the same rules as steady-state replication with key relaxations: the
+safeguards that trigger fatal errors on secondaries (document not found at the expected `RecordId`,
+`_id` mismatch between the oplog entry and the document at that `RecordId`) do not crash the node
+during logical initial sync. For insert oplog entries, a `DuplicateKey` error causes the entry to be
+skipped rather than aborting the sync, since the document may already have been written during the
+data clone phase.
+
+## Code References
+
+- [`oplog_entry.idl`](https://github.com/mongodb/mongo/blob/a0a609ec27d13d1b82fbc5e3298ffd50f9acffd3/src/mongo/db/repl/oplog_entry.idl#L174-L181)
+  — `rid` field (`recordId`) on `DurableReplOperation`
+- [`oplog_entry.h`](https://github.com/mongodb/mongo/blob/ff4ee2914bc1f2fa2c741d1f3443f6d5023ffb18/src/mongo/db/repl/oplog_entry.h#L389-L395)
+  — `setRecordId()` / `clearRecordId()`
+- [`op_observer_impl.cpp`](https://github.com/mongodb/mongo/blob/ff4ee2914bc1f2fa2c741d1f3443f6d5023ffb18/src/mongo/db/op_observer/op_observer_impl.cpp#L1652-L1665)
+  — `onCreateCollection()` which serializes `recordIdsReplicated` into the `create` oplog entry
+- [`collection.h`](https://github.com/mongodb/mongo/blob/ff4ee2914bc1f2fa2c741d1f3443f6d5023ffb18/src/mongo/db/shard_role/shard_catalog/collection.h#L675)
+  — `areRecordIdsReplicated()` on the `Collection` interface
+- [`collection_record_store_options.cpp`](https://github.com/mongodb/mongo/blob/ff4ee2914bc1f2fa2c741d1f3443f6d5023ffb18/src/mongo/db/shard_role/shard_catalog/collection_record_store_options.cpp#L46)
+  — sets `allowOverwrite: false` for replicated record ID collections
+- [`oplog_insert_record_id_test.cpp`](https://github.com/mongodb/mongo/blob/ff4ee2914bc1f2fa2c741d1f3443f6d5023ffb18/src/mongo/db/repl/oplog_insert_record_id_test.cpp),
+  [`oplog_update_record_id_test.cpp`](https://github.com/mongodb/mongo/blob/ff4ee2914bc1f2fa2c741d1f3443f6d5023ffb18/src/mongo/db/repl/oplog_update_record_id_test.cpp),
+  [`oplog_delete_record_id_test.cpp`](https://github.com/mongodb/mongo/blob/ff4ee2914bc1f2fa2c741d1f3443f6d5023ffb18/src/mongo/db/repl/oplog_delete_record_id_test.cpp)
+  — unit tests for oplog application with replicated record IDs
+
 # Transactions
 
 **Multi-document transactions** were introduced in MongoDB to provide atomicity for reads and writes
@@ -2274,13 +2387,11 @@ timestamps before executing the associated write (ex:
 [insert path](https://github.com/mongodb/mongo/blob/2ff8fff5b01eeda5722884c5fd104716117c9606/src/mongo/db/ops/write_ops_exec.cpp#L379)).
 Since this timestamp is used to maintain the oplog visibility point, it is important that all
 operations up to and including this timestamp are committed. This is so that we can replicate the
-oplog without any gaps.  
-This is calculated at the storage level and can be retrieved through
-[getAllDurableTimestamp](https://github.com/mongodb/mongo/blob/2ff8fff5b01eeda5722884c5fd104716117c9606/src/mongo/db/repl/storage_interface.h#L471).  
-Contrary
-to what the name might imply, this timestamp does not indicate that all transactions preceding it
-are durable on disk; rather, it solely signifies they are committed. Therefore, replication
-consistently
+oplog without any gaps. This is calculated at the storage level and can be retrieved through
+[getAllDurableTimestamp](https://github.com/mongodb/mongo/blob/2ff8fff5b01eeda5722884c5fd104716117c9606/src/mongo/db/repl/storage_interface.h#L471).
+Contrary to what the name might imply, this timestamp does not indicate that all transactions
+preceding it are durable on disk; rather, it solely signifies they are committed. Therefore,
+replication consistently
 [maintains that](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L4981-L4998)
 `stable_timestamp` <= `all_durable`.
 
@@ -2291,12 +2402,11 @@ Since it is reset every time we recalculate the stable optime, it will also be u
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
 When a node comes out of initial sync, we inform the storage engine that the `initialDataTimestamp`
-is the node's `lastApplied`.  
-By setting this value to 0, it informs the storage engine to take unstable checkpoints. Stable
-checkpoints can be viewed as timestamped reads that persist the data they read into a checkpoint.
-Unstable checkpoints simply open a transaction and read all data that is currently committed at the
-time the transaction is opened. They read a consistent snapshot of data, but the snapshot they read
-from is not associated with any particular timestamp.
+is the node's `lastApplied`. By setting this value to 0, it informs the storage engine to take
+unstable checkpoints. Stable checkpoints can be viewed as timestamped reads that persist the data
+they read into a checkpoint. Unstable checkpoints simply open a transaction and read all data that
+is currently committed at the time the transaction is opened. They read a consistent snapshot of
+data, but the snapshot they read from is not associated with any particular timestamp.
 
 **`lastWritten`**: OpTime of the latest oplog entry that has been written to the `rs.oplog`
 collection, though it is not necessary to be flushed to the journal. On primary, it is equal to the
@@ -2345,8 +2455,7 @@ populated internally from the `currentCommittedSnapshot` timestamp inside `Repli
 checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
 majority committed (other than a specific caveat during restore noted below) so that RTT rollback
-can use it.  
-The calculation of this value in the replication layer occurs
+can use it. The calculation of this value in the replication layer occurs
 [here](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L4957-L5027).
 The replication layer will
 [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5048-L5062)

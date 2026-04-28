@@ -28,6 +28,52 @@ record identity is fixed, but other storage engines may change it when updating 
 that changing record ids can be very expensive, as indexes map to the RecordId. A single document
 with a large array may have thousands of index entries, resulting in very expensive updates.
 
+### Replicated Record Ids
+
+By default, a `RecordId` is assigned by the storage engine at insert time and is not guaranteed to
+match across replica set members. Different members may independently assign different `RecordId`s
+to the same logical document. The **Replicated Record Ids** feature changes this so that all nodes
+in a replica set use the same `RecordId` for the same document. This enables secondary oplog
+application to locate documents directly by `RecordId` rather than by `_id`-index lookup and
+provides a stable document address across the replica set.
+
+A collection opts into this behavior when its catalog metadata has `recordIdsReplicated: true`. This
+is stored as a separate, top-level field in
+[`CatalogEntryMetaData`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/shard_role/shard_catalog/durable_catalog_entry_metadata.h)
+rather than inside `CollectionOptions`, because it is an internal-only parameter decided by the
+server at collection-creation time and cannot be specified via the `createCollection` command.
+Collections with replicated record IDs are visible via the `$listCatalog` aggregation, which
+includes `"recordIdsReplicated": true` in the `md` section of the corresponding catalog entry.
+
+For collections with replicated record IDs, the `RecordStore` is configured with
+`allowOverwrite: false`, the same restriction applied to clustered collections. This prevents the
+storage engine from silently overwriting an existing record when an insert specifies a `RecordId`
+that is already occupied, guaranteeing record uniqueness. The write path enforces a complementary
+invariant: a caller-supplied `RecordId` must be provided if and only if the collection has
+`recordIdsReplicated: true`. Omitting or supplying a `RecordId` for the wrong collection type is a
+programming error caught by an `invariant`. See
+[`getRecordStoreOptions`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/shard_role/shard_catalog/collection_record_store_options.cpp)
+and
+[`collection_write_path.cpp`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/collection_crud/collection_write_path.cpp).
+
+The `recordIdsReplicated` setting is meaningful only within a single replica set. Different shards
+in a sharded cluster may have different `recordIdsReplicated` states for the same logical collection
+and this is not considered an inconsistency. When documents move between shards (via `moveChunk`,
+`reshardCollection`, or `movePrimary`), the recipient decides independently whether the collection
+should use replicated record IDs, and migrated documents may receive different `RecordId`s on the
+recipient even if both shards have replicated record IDs enabled. To prevent stale record IDs from
+being applied at the recipient, the `rid` field is stripped from oplog entries fetched from the
+donor during the resharding oplog fetch phase.
+
+`dbHash` supports an opt-in `includeReplicatedRecordIds: true` flag that folds the `RecordId` of
+each document into the per-document hash for collections with `recordIdsReplicated: true`. This
+allows verification that replica set members agree not only on document content but also on the
+`RecordId` assigned to each document. Without this flag, record IDs do not factor into the hash. See
+[`dbhash.cpp`](https://github.com/mongodb/mongo/blob/40099d95c16656d47cd5a6a3c83c83022c94bf49/src/mongo/db/commands/dbhash.cpp).
+
+For a full description of how record IDs are propagated through the replication pipeline see the
+[Replication README](../repl/README.md#replicated-record-ids).
+
 ### Spill Tables
 
 Some operations may wish to relieve memory pressure by temporarily spilling some of their state to
