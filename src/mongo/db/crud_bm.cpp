@@ -162,6 +162,7 @@ class CrudBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
     static constexpr auto kCollection = "test"_sd;
     static constexpr auto kDatabase = "test"_sd;
+    static constexpr int kInsertManyBatchSize = 100;
 
     void setUpServiceContext(ServiceContext* svcCtx) override {
         auto service = svcCtx->getService();
@@ -239,20 +240,36 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
     });
 }
 
-BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT)(benchmark::State& state) {
-    auto cmd = std::invoke([&state] {
-        static const std::string data(256, 'x');
-        BSONObjBuilder bob;
-        bob.append("insert", kCollection);
-        bob.append("$db", kDatabase);
-        BSONArrayBuilder bab;
-        for (int i = 0; i < state.range(0); ++i) {
-            bab.append(BSON("data" << data));
-        }
-        bob.append("documents", bab.obj());
-        return bob.obj();
-    });
-    runBenchmark(state, [cmd] { return cmd; });
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT_ONE)
+(benchmark::State& state) {
+    // Prepopulate the collection so we are not benchmarking collection creation time.
+    _populateTestData(getGlobalServiceContext());
+    static const std::string data(256, 'x');
+    // clang-format off
+    BSONObj cmd = BSON(
+            "insert" << kCollection
+            << "$db" << kDatabase
+            << "documents" << BSON_ARRAY(BSON("data" << data)));
+    // clang-format on
+    runBenchmark(state, [=] { return cmd; });
+}
+
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT_MANY)
+(benchmark::State& state) {
+    // Prepopulate the collection so we are not benchmarking collection creation time.
+    _populateTestData(getGlobalServiceContext());
+    static const std::string data(256, 'x');
+    BSONArrayBuilder documents;
+    for (int i = 0; i < kInsertManyBatchSize; ++i) {
+        documents.append(BSON("data" << data));
+    }
+    // clang-format off
+    BSONObj cmd = BSON(
+            "insert" << kCollection
+            << "$db" << kDatabase
+            << "documents" << documents.arr());
+    // clang-format on
+    runBenchmark(state, [=] { return cmd; });
 }
 
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->Threads(1)->Threads(kCommandBMMaxThreads);
@@ -260,9 +277,12 @@ BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
     ->Threads(1)
     ->Threads(kCommandBMMaxThreads);
 
-static constexpr unsigned long long minDocsToInsert{1};
-static constexpr unsigned long long maxDocsToInsert{4096};
-BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT)->Range(minDocsToInsert, maxDocsToInsert);
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT_ONE)
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT_MANY)
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
 
 }  // namespace
 }  // namespace mongo
