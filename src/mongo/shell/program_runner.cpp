@@ -442,8 +442,9 @@ ProgramRunner::ProgramRunner(BSONObj args,
     parseArgs(args, isMongo, isMongodProgram);
     loadEnvironmentVariables(env);
 
-    bool needsPort =
-        isMongo && (isMongodProgram || isMongosProgram || (programName == "mongobridge"));
+    bool needsPort = isMongo &&
+        (isMongodProgram || isMongosProgram || (programName == "mongobridge") ||
+         (programName == "mongosentry"));
     if (!needsPort) {
         _port = -1;
     }

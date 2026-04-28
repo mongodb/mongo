@@ -365,8 +365,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
     if (responseStatus.isOK()) {
         networkTime = cbData.response.elapsed.value_or(Microseconds{0});
-        // TODO(sz) Because the term is duplicated in ReplSetMetaData, we can get rid of this
-        // and update tests.
+        // TODO (SERVER-123321): Because the term is duplicated in ReplSetMetaData, we can get rid
+        // of this and update tests.
         const auto& hbResponse = hbStatusResponse.getValue();
         _updateTerm(lk, hbResponse.getTerm());
         // Postpone election timeout if we have a successful heartbeat response from the primary.
@@ -1301,7 +1301,8 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionReason
 
 void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock lk,
                                                              StartElectionReasonEnum reason) {
-    // If it is not a single node replica set, no need to start an election after stepdown timeout.
+    // If it is not a single node replica set, no need to start an election after stepdown
+    // timeout.
     if (reason == StartElectionReasonEnum::kSingleNodePromptElection &&
         !_topCoord->isElectableNodeInSingleNodeReplicaSet()) {
         LOGV2_FOR_ELECTION(

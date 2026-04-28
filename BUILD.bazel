@@ -339,6 +339,7 @@ mongo_install(
         "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
         "//src/mongo/tools/mongobridge_tool:mongobridge",
+        "//src/mongo/tools/mongosentry_tool:mongosentry",
         "//src/mongo/util:pretty_printer_test_program",
         "//src/third_party/wiredtiger:wt",
     ] + select({
