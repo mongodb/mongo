@@ -228,14 +228,12 @@ protected:
 };
 
 TEST_F(ShardingWriteRouterRegistryTest, NoReshardingOperationReturnsNone) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto router = makeRouter();
     auto result = router.getReshardingDestinedRecipient(BSON("_id" << 0 << "y" << 5));
     ASSERT_FALSE(result.has_value());
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, OnlyRecipientRoleReturnsNone) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto& registry = LocalReshardingOperationsRegistry::get();
     auto metadata = makeMetadata();
     registry.registerOperation(LocalReshardingOperationsRegistry::Role::kRecipient, metadata);
@@ -246,7 +244,6 @@ TEST_F(ShardingWriteRouterRegistryTest, OnlyRecipientRoleReturnsNone) {
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, OnlyCoordinatorRoleReturnsNone) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto& registry = LocalReshardingOperationsRegistry::get();
     auto metadata = makeMetadata();
     registry.registerOperation(LocalReshardingOperationsRegistry::Role::kCoordinator, metadata);
@@ -257,7 +254,6 @@ TEST_F(ShardingWriteRouterRegistryTest, OnlyCoordinatorRoleReturnsNone) {
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, DonorRoleRegisteredReturnsShardId) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto& registry = LocalReshardingOperationsRegistry::get();
     auto metadata = makeMetadata();
     registry.registerOperation(LocalReshardingOperationsRegistry::Role::kDonor, metadata);
@@ -269,7 +265,6 @@ TEST_F(ShardingWriteRouterRegistryTest, DonorRoleRegisteredReturnsShardId) {
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, DonorAndRecipientRolesReturnsShardId) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto& registry = LocalReshardingOperationsRegistry::get();
     auto metadata = makeMetadata();
     registry.registerOperation(LocalReshardingOperationsRegistry::Role::kDonor, metadata);
@@ -282,7 +277,6 @@ TEST_F(ShardingWriteRouterRegistryTest, DonorAndRecipientRolesReturnsShardId) {
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, OperationUnregisteredReturnsNone) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto& registry = LocalReshardingOperationsRegistry::get();
     auto metadata = makeMetadata();
     registry.registerOperation(LocalReshardingOperationsRegistry::Role::kDonor, metadata);
@@ -294,7 +288,6 @@ TEST_F(ShardingWriteRouterRegistryTest, OperationUnregisteredReturnsNone) {
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, DifferentNamespaceReturnsNone) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto& registry = LocalReshardingOperationsRegistry::get();
     auto metadata = makeMetadata();
     registry.registerOperation(LocalReshardingOperationsRegistry::Role::kDonor, metadata);
@@ -320,7 +313,6 @@ TEST_F(ShardingWriteRouterRegistryTest, DifferentNamespaceReturnsNone) {
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, NotShardServerReturnsNone) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     serverGlobalParams.clusterRole = ClusterRole::None;
 
     const auto client = _serviceContext->getService()->makeClient("test-non-shard");
@@ -334,7 +326,6 @@ TEST_F(ShardingWriteRouterRegistryTest, NotShardServerReturnsNone) {
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, CollDescHasNoRoutingTableReturnsNone) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     const auto untrackedNss =
         NamespaceString::createNamespaceString_forTest("test", "unsharded_coll");
 

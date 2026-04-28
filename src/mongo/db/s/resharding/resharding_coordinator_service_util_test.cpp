@@ -307,7 +307,6 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 }
 
 TEST_F(ReshardingCoordinatorServiceUtilTest, RegistryPathThrowsWhenReshardingUUIDNotFound) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
 
     ASSERT_THROWS_CODE(retrieveReshardingUUID(opCtx.get(), kSourceNss),
@@ -316,7 +315,6 @@ TEST_F(ReshardingCoordinatorServiceUtilTest, RegistryPathThrowsWhenReshardingUUI
 }
 
 TEST_F(ReshardingCoordinatorServiceUtilTest, RegistryPathReturnsReshardingUUID) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto reshardingUUID = UUID::gen();
     auto meta = makeMetadata(reshardingUUID);

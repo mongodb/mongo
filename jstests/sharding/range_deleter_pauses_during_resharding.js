@@ -2,8 +2,8 @@
  * Tests that range deletion tasks for a collection actively undergoing resharding are not executed.
  *
  * @tags: [
- *  requires_fcv_81,
- *  featureFlagReshardingRegistry,
+ *  requires_fcv_90,
+ *  resource_intensive,
  * ]
  */
 

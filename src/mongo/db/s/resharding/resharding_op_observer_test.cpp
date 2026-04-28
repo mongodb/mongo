@@ -155,7 +155,6 @@ protected:
 };
 
 TEST_F(ReshardingOpObserverRegistryTest, InsertCoordinatorDocRegistersCoordinatorRole) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
     auto doc = makeCoordinatorDocBson(metadata);
@@ -171,7 +170,6 @@ TEST_F(ReshardingOpObserverRegistryTest, InsertCoordinatorDocRegistersCoordinato
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, InsertDonorDocRegistersDonorRole) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
     auto doc = makeDonorDocBson(metadata);
@@ -186,7 +184,6 @@ TEST_F(ReshardingOpObserverRegistryTest, InsertDonorDocRegistersDonorRole) {
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, InsertRecipientDocRegistersRecipientRole) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
     auto doc = makeRecipientDocBson(metadata);
@@ -201,7 +198,6 @@ TEST_F(ReshardingOpObserverRegistryTest, InsertRecipientDocRegistersRecipientRol
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, InsertUnrelatedCollectionDoesNotRegister) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
     auto doc = makeCoordinatorDocBson(metadata);
@@ -213,7 +209,6 @@ TEST_F(ReshardingOpObserverRegistryTest, InsertUnrelatedCollectionDoesNotRegiste
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, InsertMultipleRolesRegistersAll) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
 
@@ -236,7 +231,6 @@ TEST_F(ReshardingOpObserverRegistryTest, InsertMultipleRolesRegistersAll) {
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, InsertDuplicateIsNoOp) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
     auto doc = makeCoordinatorDocBson(metadata);
@@ -251,7 +245,6 @@ TEST_F(ReshardingOpObserverRegistryTest, InsertDuplicateIsNoOp) {
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, DeleteCoordinatorDocUnregistersCoordinatorRole) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
 
@@ -266,7 +259,6 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteCoordinatorDocUnregistersCoordina
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, DeleteRecipientDocUnregistersRecipientRole) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
 
@@ -281,7 +273,6 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteRecipientDocUnregistersRecipientR
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, DeleteOneRoleLeavesOtherRoles) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
 
@@ -298,7 +289,6 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteOneRoleLeavesOtherRoles) {
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, DeleteUnrelatedCollectionDoesNotUnregister) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
 
@@ -314,7 +304,6 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteUnrelatedCollectionDoesNotUnregis
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, InsertThenDeleteLifecycle) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
     auto doc = makeCoordinatorDocBson(metadata);
@@ -327,7 +316,6 @@ TEST_F(ReshardingOpObserverRegistryTest, InsertThenDeleteLifecycle) {
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, DeleteNonExistentOperationIsNoOp) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
     auto doc = makeCoordinatorDocBson(metadata);
@@ -337,7 +325,6 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteNonExistentOperationIsNoOp) {
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, UpdateCoordinatorDocToQuiescedUnregistersCoordinator) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
 
@@ -354,7 +341,6 @@ TEST_F(ReshardingOpObserverRegistryTest, UpdateCoordinatorDocToQuiescedUnregiste
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, UpdateCoordinatorDocToNonQuiescedDoesNotUnregister) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
 
@@ -373,7 +359,6 @@ TEST_F(ReshardingOpObserverRegistryTest, UpdateCoordinatorDocToNonQuiescedDoesNo
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, QuiescedCoordinatorThenNewOperationLifecycle) {
-    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
     auto opCtx = makeOperationContext();
 
     auto metadata1 = makeMetadata();

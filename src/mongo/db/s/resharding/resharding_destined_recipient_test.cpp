@@ -159,8 +159,8 @@ public:
                                                ShardType("shard1", "Host1:12345")};
 
     void setUp() override {
-        if (GetParam()) {
-            _featureFlagScope.emplace("featureFlagReshardingRegistry", true);
+        if (!GetParam()) {
+            _featureFlagScope.emplace("featureFlagReshardingRegistry", false);
         }
 
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
