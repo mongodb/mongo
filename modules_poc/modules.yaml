@@ -351,6 +351,9 @@ catalog_and_routing.topology:
     # change streams:
     - src/mongo/s/change_streams*
 
+    # standby clusters:
+    - src/mongo/tools/mongosentry_tool/
+
 transactions:
   meta:
     slack: server-replication

@@ -25,6 +25,12 @@ const fixture = new StandbyClusterTestFixture({
 fixture.st.s.getDB("admin").createUser({user: ADMIN_USER, pwd: ADMIN_PWD, roles: ["root"]});
 fixture.st.s.getDB("admin").auth(ADMIN_USER, ADMIN_PWD);
 
+// Create both a sharded and unsharded collection to ensure that the catalog cache is correctly
+// disabled.
+assert.commandWorked(fixture.st.s.getDB("unshardedDB").getCollection("test").insertOne({x: 1}));
+assert.commandWorked(fixture.st.s.getDB("shardedDB").getCollection("test").insertOne({x: 1}));
+assert.commandWorked(fixture.st.s.adminCommand({shardCollection: "shardedDB.test", key: {_id: 1}}));
+
 fixture.transitionToStandby();
 
 const mongos = MongoRunner.runMongos({
@@ -38,6 +44,10 @@ assert.neq(null, mongos, "mongoS failed to start up against standby config serve
 mongos.getDB("admin").auth(ADMIN_USER, ADMIN_PWD);
 
 assert.commandWorked(mongos.adminCommand({hello: 1}));
+
+// Test that operations against both sharded and unsharded collections fail due to configOnly mode.
+assert.commandFailedWithCode(mongos.getDB("unshardedDB").runCommand({find: "test"}), 12319007);
+assert.commandFailedWithCode(mongos.getDB("shardedDB").runCommand({find: "test"}), 12319007);
 
 MongoRunner.stopMongos(mongos);
 fixture.teardown();
