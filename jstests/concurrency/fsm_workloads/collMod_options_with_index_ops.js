@@ -46,12 +46,6 @@ var $config = (function() {
         checkMetadataConsistency: function(db, collName) {
             const inconsistencies = db[collName].checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
-
-            // Manual check since CollectionOptionsMismatch is not fully supported on MongoDB v7.0
-            const listCatalog = db[collName].aggregate([{$listCatalog: {}}]).toArray();
-            for (const entry of listCatalog) {
-                assert.docEq(entry.md.options, listCatalog[0].md.options, tojson(listCatalog));
-            }
         },
     };
 
