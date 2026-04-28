@@ -1,11 +1,11 @@
 10gen/devprod-build:
   - Build
-10gen/devprod-correctness:
-  - Correctness
 10gen/devprod-performance-infrastructure:
   - Performance Infrastructure
 10gen/devprod-services-integrations:
   - Services & Integrations
+10gen/devprod-test-infrastructure:
+  - DevProd Test Infrastructure
 10gen/performance:
   - Product Performance
 10gen/platsec-server:

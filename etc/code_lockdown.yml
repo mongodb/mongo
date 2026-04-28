@@ -141,7 +141,6 @@ groups:
   - name: "Developer Productivity"
     teams:
       - "DevProd Build"
-      - "DevProd Correctness"
       - "DevProd Evergreen App"
       - "DevProd Evergreen UI"
       - "DevProd Infrastructure"
@@ -149,6 +148,7 @@ groups:
       - "DevProd Release Infrastructure"
       - "DevProd Runtime Environments"
       - "DevProd Services & Integrations"
+      - "DevProd Test Infrastructure"
     slack_tags:
       - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com - VP
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
@@ -317,10 +317,6 @@ teams:
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
       - "<@U03JWS27799>" # john.daniels@mongodb.com - Lead
-  - name: "DevProd Correctness"
-    slack_tags:
-      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
-      - "<@U06RQRMS2SE>" # steve.mcclure@mongodb.com - Lead
   - name: "DevProd Evergreen App"
     slack_tags:
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
@@ -343,3 +339,7 @@ teams:
   - name: "DevProd Services & Integrations"
     slack_tags:
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
+  - name: "DevProd Test Infrastructure"
+    slack_tags:
+      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+      - "<@U06RQRMS2SE>" # steve.mcclure@mongodb.com - Lead

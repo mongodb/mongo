@@ -230,5 +230,5 @@ Evergreen configuration details, see
 
 ## Additional Resources
 
-If you are interested in leveraging Antithesis feel free to reach out to #ask-devprod-correctness or
-#server-testing on Slack.
+If you are interested in leveraging Antithesis feel free to reach out to
+#ask-devprod-test-infrastructure or #server-testing on Slack.

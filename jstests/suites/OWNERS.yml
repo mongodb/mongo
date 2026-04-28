@@ -2,4 +2,4 @@ version: 2.0.0
 filters:
   - "README.md":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure

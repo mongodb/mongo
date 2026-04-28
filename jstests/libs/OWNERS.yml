@@ -47,7 +47,7 @@ filters:
       - 10gen/query-integration-observability
   - "mochalite.js":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "check_shard_filtering_metadata_helpers.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

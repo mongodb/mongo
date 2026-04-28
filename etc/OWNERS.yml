@@ -5,13 +5,13 @@ filters:
       - 10gen/devprod-build
   - "backports_required_for_multiversion_tests.yml":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "burn_in_tests.yml":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "code_lockdown.yml":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
       - jbergler
       - mickgraham-mongodb
   - "coverity.yml":

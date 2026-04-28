@@ -5,7 +5,7 @@ filters:
       - 10gen/mongo-default-approvers
   - "README.md":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "aggregation*":
     approvers:
       - 10gen/query
@@ -47,7 +47,7 @@ filters:
       - 10gen/query
   - "buildscripts_test.yml":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "bulk_write*":
     approvers:
       - 10gen/query-execution-write-exec
@@ -146,7 +146,7 @@ filters:
       - 10gen/server-rw-concerns
   - "resmoke_end2end_tests.yml":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "retryable_writes*":
     approvers:
       - 10gen/server-transactions

@@ -164,8 +164,8 @@ clang_tidy_checks:
 
 shell:
   meta:
-    slack: ask-devprod-correctness
-    jira: DevProd Correctness
+    slack: ask-devprod-test-infrastructure
+    jira: DevProd Test Infrastructure
     fully_marked: true
   files:
     - src/mongo/shell/

@@ -84,7 +84,7 @@ rules:
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/devprod.yaml
           - assigned_to_jira_team_devprod_build
-          - assigned_to_jira_team_devprod_correctness
+          - assigned_to_jira_team_devprod_test_infrastructure
           - assigned_to_jira_team_devprod_infrastructure
           - assigned_to_jira_team_devprod_evergreen_app
           - assigned_to_jira_team_devprod_evergreen_ui

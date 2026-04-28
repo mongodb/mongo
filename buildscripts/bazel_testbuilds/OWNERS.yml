@@ -5,7 +5,7 @@ filters:
       - 10gen/devprod-build
   - "jstest_timeout*":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "verify_resmoke_coredump_test.sh":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure

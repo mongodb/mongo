@@ -5,7 +5,7 @@ filters:
       - 10gen/mongo-default-approvers
   - "README.md":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "/generated_suites/*legacy_timeseries_no_rawdata.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

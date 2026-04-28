@@ -11,10 +11,10 @@ filters:
       - 10gen/server-programmability
   - "devcontainer-setup.md":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "devcontainer/**":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "exception_architecture.md":
     approvers:
       - 10gen/server-programmability
@@ -35,10 +35,10 @@ filters:
       - 10gen/server-programmability
   - "owners/**":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "poetry_execution.md":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "server_parameters.md":
     approvers:
       - 10gen/server-programmability

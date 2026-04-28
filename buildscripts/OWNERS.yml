@@ -7,37 +7,37 @@ filters:
       - 10gen/devprod-build
   - "burn_in_tests.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "auto_install_db_contrib_tool.sh":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "resmoke.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "setup_multiversion_mongodb.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "setup_spawnhost_coredump":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "hang_analyzer.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "errorcodes.py":
     approvers:
       - 10gen/server-programmability
   - "evergreen_resmoke_job_count.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "evergreen_task_timeout.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "resmoke_tests_runtime_validate.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "powercycle*":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "golden_test.py":
     approvers:
       - 10gen/query-optimization
@@ -46,22 +46,22 @@ filters:
       - 10gen/streams-engine
   - "compare_evergreen_versions.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "ciconfig":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "evergreen_activate_result_tasks.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "generate_result_tasks.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "evergreen_activate_gen_tasks.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "bazel_burn_in.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "sbom_linter.py":
     approvers:
       - 10gen/code-review-team-ssdlc

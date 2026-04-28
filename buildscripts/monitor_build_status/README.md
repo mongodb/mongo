@@ -149,6 +149,6 @@ The above will _not_ send notifications to the Slack channel.
 
 ### Slack Notifications
 
-Slack notifications use a webhook from the Devprod Correctness Slack app (rather than user
+Slack notifications use a webhook from the Devprod Test Infrastructure Slack app (rather than user
 credentials) for security. The webhook URL is read from the `mongo-code-lockdown-webhook` Evergreen
 expansion, which points to the `#10gen-mongo-code-lockdown` Slack channel.

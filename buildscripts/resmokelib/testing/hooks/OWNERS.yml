@@ -5,7 +5,7 @@ filters:
       - 10gen/mongo-default-approvers
   - "README.md":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "add_remove_shards.py":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
@@ -71,11 +71,11 @@ filters:
       - 10gen/server-workload-resilience
   - "fuzz_runtime_parameters.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "validate.py":
     approvers:
       - 10gen/server-validate
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "validate_find_and_modify_image_collection_not_exist.py":
     approvers:
       - 10gen/server-replication-reviewers
@@ -93,4 +93,4 @@ filters:
       - 10gen/server-jstest-infra
   - "cleanup.py":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure

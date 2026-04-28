@@ -42,20 +42,20 @@ to true it will stop upwards OWNERS resolution.
 version: 2.0.0 # corresponds to the owners.yml version you are using
 aliases:
   # Contains the markdown-approvers alias
-  - //buildscripts/resmokelib/devprod_correctness_aliases.yml
+  - //buildscripts/resmokelib/devprod_test_infrastructure_aliases.yml
 filters: # List of all filters
   - "*": # Select all files (will apply recursively)
     approvers: # Anyone on this list can approve PRs
-      - devprod-correctness # alias for a group of users
+      - devprod-test-infrastructure # alias for a group of users
       - IamXander # github username
       - user.name@mongodb.com # email address
     metadata:
       emeritus_approvers: # This list is just for historical reference
         - userB
-      owning_team: "10gen/devprod-correctness" # The team which owns the matching files. These folks are not required approvers that will block a PR.
+      owning_team: "10gen/devprod-test-infrastructure" # The team which owns the matching files. These folks are not required approvers that will block a PR.
   - "/*": # Select all files in the current directory (not recursive)
     approvers: # Anyone on this list can approve PRs
-      - devprod-correctness # alias for a group of users
+      - devprod-test-infrastructure # alias for a group of users
   - "*.md": # Select all markdown files in the current directory (not recursive)
     approvers:
       - markdown-approvers

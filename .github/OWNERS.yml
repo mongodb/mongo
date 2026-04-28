@@ -8,4 +8,4 @@ filters:
       - alex.neben@mongodb.com
   - "workflows":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure

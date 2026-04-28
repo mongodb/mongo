@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-test-infrastructure
   - "multi_router_basic.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
