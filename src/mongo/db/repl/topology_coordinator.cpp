@@ -3661,7 +3661,7 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
             "candidate's data is staler than mine. candidate's last written OpTime: {}, "
             "my last written OpTime: {}"_format(args.getLastWrittenOpTime().toString(),
                                                 getMyLastWrittenOpTime().toString()));
-    } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
+    } else if (!args.isADryRun() && _lastVote.getTerm() >= args.getTerm()) {
         response->setVoteGranted(false);
         response->setReason("already voted for another candidate ({}) this term ({})"_format(
             _rsConfig.getMemberAt(_lastVote.getCandidateIndex()).getHostAndPort(),
