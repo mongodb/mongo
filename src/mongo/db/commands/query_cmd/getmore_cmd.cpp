@@ -74,6 +74,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -322,6 +323,9 @@ void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
                                                   const GetMoreCommandRequest& cmd,
                                                   bool disableAwaitDataFailpointActive) {
     applyConcernsAndReadPreference(opCtx, cursor);
+
+    // Restore rawData onto the opCtx.
+    isRawDataOperation(opCtx) = cursor.getRawData();
 
     auto apiParamsFromClient = APIParameters::get(opCtx);
     uassert(

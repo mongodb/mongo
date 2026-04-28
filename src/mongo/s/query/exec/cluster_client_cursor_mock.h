@@ -123,6 +123,10 @@ public:
 
     boost::optional<repl::ReadConcernArgs> getReadConcern() const final;
 
+    bool getRawData() const final {
+        return false;
+    }
+
     Date_t getCreatedDate() const final;
 
     Date_t getLastUseDate() const final;

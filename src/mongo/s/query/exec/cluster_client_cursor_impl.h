@@ -138,6 +138,8 @@ public:
 
     boost::optional<repl::ReadConcernArgs> getReadConcern() const final;
 
+    bool getRawData() const final;
+
     Date_t getCreatedDate() const final;
 
     Date_t getLastUseDate() const final;
@@ -207,6 +209,9 @@ private:
     // The OperationContext that we're executing within. This can be updated if necessary by using
     // detachFromOperationContext() and reattachToOperationContext().
     OperationContext* _opCtx = nullptr;
+
+    // Whether the originating command was a rawData operation.
+    bool _rawData = false;
 
     // The time the cursor was created.
     Date_t _createdDate;

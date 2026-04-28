@@ -545,6 +545,9 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
         repl::ReadConcernArgs::get(opCtx) = *readConcern;
     }
 
+    // Restore rawData onto the opCtx.
+    isRawDataOperation(opCtx) = cursor->getRawData();
+
     auto apiParamsFromClient = APIParameters::get(opCtx);
     uassert(
         ErrorCodes::APIMismatchError,

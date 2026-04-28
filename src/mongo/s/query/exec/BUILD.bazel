@@ -106,6 +106,7 @@ mongo_cc_library(
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/shard_role/shard_catalog:raw_data_operation",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/util/concurrency:spin_lock",
     ],

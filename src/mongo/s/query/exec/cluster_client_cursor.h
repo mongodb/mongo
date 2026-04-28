@@ -217,6 +217,11 @@ public:
     virtual boost::optional<repl::ReadConcernArgs> getReadConcern() const = 0;
 
     /**
+     * Returns whether the originating command was a rawData operation.
+     */
+    virtual bool getRawData() const = 0;
+
+    /**
      * Returns the creation date of the cursor.
      */
     virtual Date_t getCreatedDate() const = 0;

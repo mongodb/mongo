@@ -39,6 +39,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
@@ -134,6 +135,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _writeConcernOptions(std::move(params.writeConcernOptions)),
       _readConcernArgs(std::move(params.readConcernArgs)),
       _readPreferenceSetting(std::move(params.readPreferenceSetting)),
+      _rawData(isRawDataOperation(operationUsingCursor)),
       _originatingCommand(params.originatingCommandObj),
       _originatingPrivileges(std::move(params.originatingPrivileges)),
       _tailableMode(params.tailableMode),

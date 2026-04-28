@@ -186,6 +186,11 @@ public:
     ReadPreferenceSetting getReadPreferenceSetting() const {
         return _readPreferenceSetting;
     }
+
+    bool getRawData() const {
+        return _rawData;
+    }
+
     bool getQueryStatsWillNeverExhaust() const {
         return _queryStatsWillNeverExhaust;
     }
@@ -441,6 +446,9 @@ private:
     const WriteConcernOptions _writeConcernOptions;
     const repl::ReadConcernArgs _readConcernArgs;
     const ReadPreferenceSetting _readPreferenceSetting;
+
+    // Whether the originating command was a rawData operation.
+    const bool _rawData;
 
     // Tracks whether dispose() has been called, to make sure it happens before destruction. It is
     // an error to use a ClientCursor once it has been disposed.

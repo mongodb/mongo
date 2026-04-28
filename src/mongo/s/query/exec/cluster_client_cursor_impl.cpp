@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/s/query/exec/async_results_merger.h"
@@ -105,6 +106,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _root(buildMergerPlan(opCtx, std::move(executor), &_params)),
       _lsid(lsid),
       _opCtx(opCtx),
+      _rawData(isRawDataOperation(opCtx)),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
@@ -133,6 +135,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _root(std::move(root)),
       _lsid(lsid),
       _opCtx(opCtx),
+      _rawData(isRawDataOperation(opCtx)),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
@@ -344,6 +347,10 @@ boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreferenc
 
 boost::optional<repl::ReadConcernArgs> ClusterClientCursorImpl::getReadConcern() const {
     return _params.readConcern;
+}
+
+bool ClusterClientCursorImpl::getRawData() const {
+    return _rawData;
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
