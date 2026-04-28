@@ -60,6 +60,8 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    const KVEngine& engine,
                                    RecordStore& oplog,
                                    bool isReplSet) {
+    _oplogIdent = std::string{oplog.getIdent()};
+
     // Prime the oplog read timestamp.
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor = oplog.getCursor(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /* false = reverse cursor */);
@@ -83,9 +85,8 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         // be interpreted as signed so we need to use signed int64_t max to make sure it is always
         // larger than any user 'ts' field.
         setOplogReadTimestamp(Timestamp(std::numeric_limits<int64_t>::max()));
+        return;
     }
-
-    _oplogIdent = std::string{oplog.getIdent()};
 
     std::lock_guard<std::mutex> lk(_oplogVisibilityStateMutex);
     invariant(!_oplog);
