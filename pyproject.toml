@@ -84,7 +84,7 @@ tenacity = "^9.0.0"
 # Use the S3 simple index so Poetry can pick a matching wheel or fall back to
 # the sdist when a wheel is unavailable for the current platform.
 [tool.poetry.group.powercycle-incompatible.dependencies]
-rapidyaml = { version = "==0.9.0.post0", source = "mdb-build-public", markers = "python_version == '3.13'" }
+rapidyaml = { version = "==0.9.0.post0", source = "mdb-build-public", markers = "python_version == '3.10' or python_version == '3.13'" }
 
 [tool.poetry.group.export.dependencies]
 pipx = "1.6.0"

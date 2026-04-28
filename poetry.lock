@@ -734,7 +734,7 @@ description = "A library to handle automated deprecations"
 optional = false
 python-versions = "*"
 groups = ["powercycle-incompatible"]
-markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and python_version == \"3.13\""
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and (python_version == \"3.13\" or python_version == \"3.10\")"
 files = [
     {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
     {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
@@ -3720,10 +3720,19 @@ description = "Rapid YAML - a library to parse and emit YAML, and do it fast"
 optional = false
 python-versions = ">=3.6"
 groups = ["powercycle-incompatible"]
-markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and python_version == \"3.13\""
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and (python_version == \"3.13\" or python_version == \"3.10\")"
 files = [
+    {file = "rapidyaml-0.9.0.post0-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:dacc7b634a836fd8d439321a4310aad6c23dba2a5936364a7a2c0d7704bcfae3"},
+    {file = "rapidyaml-0.9.0.post0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:1b829e4652fe6bd70f868eb9e39ccc8bc2c3227bba491006493894e9a8fbaacc"},
+    {file = "rapidyaml-0.9.0.post0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:3e0beeebf91779c50b7cfe3a3c7bc4a54fe78ddaa8e09dcbd8565408d01d3e6d"},
+    {file = "rapidyaml-0.9.0.post0-cp310-cp310-manylinux2014_ppc64le.manylinux_2_17_ppc64le.whl", hash = "sha256:bcd0535f284e200248d24b95e5ad0bb8caab639a74eb7b1d57c47ac6f6ad3b69"},
+    {file = "rapidyaml-0.9.0.post0-cp310-cp310-manylinux2014_s390x.manylinux_2_17_s390x.whl", hash = "sha256:8803369277aea17d9302b2022015d19b83c5e3f2994263fdb114f1c2b8f6c33a"},
+    {file = "rapidyaml-0.9.0.post0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:cad08b44de36f918ea952cb6b3dc3cf385a6a7de423ddacb77150f040e0d48e1"},
+    {file = "rapidyaml-0.9.0.post0-cp310-cp310-win_amd64.whl", hash = "sha256:96aa6dcb5d6d190478b6de45124fb26dd3f4db023dbe8fe9ed33de47883a7816"},
+    {file = "rapidyaml-0.9.0.post0-cp312-cp312-win_amd64.whl", hash = "sha256:d23cfe03a5523286c29cda795a3fd41c985d25b6bc93665b15d1e44717705738"},
     {file = "rapidyaml-0.9.0.post0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:5276ca91c401d5a8c0a2a97b3a63d7d42af7ed79be0aaa223ab73cdeb1ec35f1"},
     {file = "rapidyaml-0.9.0.post0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:6c0136ae1e3f06e9e5e123cbb8b3646507259c0292ed76ac152c302c40856cd6"},
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-macosx_26_0_x86_64.whl", hash = "sha256:33802b1355a5e20eec69d80bef67af370c1470976af8504ccaa3d6bdca7fed8d"},
     {file = "rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:8334c27797f118770224a161578c8213575b209a5f25e730f489be6731033969"},
     {file = "rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_ppc64le.manylinux_2_17_ppc64le.whl", hash = "sha256:f92c2c5ac8657d8a448cefc2ec1817ad938696aacb0521d12323118179b97ce2"},
     {file = "rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_s390x.manylinux_2_17_s390x.whl", hash = "sha256:e13c0dbf866f67dc496cef709e08fd844fb9ed34d16eff59ada8ef960981dc08"},
@@ -5695,4 +5704,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "6df39922067ea53741473494c0f387323df3db412253f8f60dc8024e11964fd9"
+content-hash = "b5e4ac6a8b31501905fcdfca2d1b4d33ee65e9c5e331b3a9dc27a07101c4e419"
