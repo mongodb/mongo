@@ -1263,12 +1263,14 @@ void SortedDataIndexAccessMethod::getKeys(
         if (onSuppressedErrorFn) {
             onSuppressedErrorFn(opCtx, entry, ex.toStatus(), obj, id);
         } else {
-            LOGV2_DEBUG(20686,
-                        1,
-                        "Suppressed key generation error",
-                        "error"_attr = redact(ex.toStatus()),
-                        "loc"_attr = id,
-                        "obj"_attr = redact(obj));
+            LOGV2_WARNING(20686,
+                          "Suppressed key generation error. Index entry was not written; index may "
+                          "be missing entries.",
+                          "error"_attr = redact(ex.toStatus()),
+                          "loc"_attr = id,
+                          "ns"_attr = collection->ns(),
+                          "indexName"_attr = entry->descriptor()->indexName(),
+                          "obj"_attr = redact(obj));
         }
     }
 }
