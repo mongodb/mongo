@@ -114,6 +114,16 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "resharding_change_event_o2_field",
+    srcs = [
+        ":resharding_change_event_o2_field_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 idl_generator(
     name = "resharding_oplog_applier_progress_gen",
     src = "resharding_oplog_applier_progress.idl",

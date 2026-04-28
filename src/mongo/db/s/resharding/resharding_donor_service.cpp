@@ -44,6 +44,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -54,7 +55,6 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
-#include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -827,39 +827,10 @@ void ReshardingDonorService::DonorStateMachine::
 
     {
         auto opCtx = _makeOperationContext(factory);
-        auto rawOpCtx = opCtx.get();
-
-        auto generateOplogEntry = [&]() {
-            ReshardBeginChangeEventO2Field changeEvent{
-                _metadata.getSourceNss(),
-                _metadata.getReshardingUUID(),
-            };
-
-            repl::MutableOplogEntry oplog;
-            oplog.setNss(_metadata.getSourceNss());
-            oplog.setOpType(repl::OpTypeEnum::kNoop);
-            oplog.setUuid(_metadata.getSourceUUID());
-            oplog.setObject(BSON("msg" << "Created temporary resharding collection"));
-            oplog.setObject2(changeEvent.toBSON());
-            oplog.setFromMigrate(true);
-            oplog.setOpTime(OplogSlot());
-            oplog.setWallClockTime(opCtx->fastClockSource().now());
-            return oplog;
-        };
-
-        auto oplog = generateOplogEntry();
-        writeConflictRetry(
-            rawOpCtx, "ReshardingBeginOplog", NamespaceString::kRsOplogNamespace, [&] {
-                AutoGetOplogFastPath oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
-                WriteUnitOfWork wunit(rawOpCtx);
-                const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
-                uassert(5052101,
-                        str::stream()
-                            << "Failed to create new oplog entry for oplog with opTime: "
-                            << oplog.getOpTime().toString() << ": " << redact(oplog.toBSON()),
-                        !oplogOpTime.isNull());
-                wunit.commit();
-            });
+        notifyChangeStreamsOnReshardCollectionBegin(opCtx.get(),
+                                                    _metadata.getSourceNss(),
+                                                    _metadata.getSourceUUID(),
+                                                    _metadata.getReshardingUUID());
     }
 
     LOGV2_DEBUG(5390702,
@@ -971,53 +942,15 @@ void ReshardingDonorService::DonorStateMachine::
 
     {
         auto opCtx = _makeOperationContext(factory);
-        auto rawOpCtx = opCtx.get();
-
-        auto generateOplogEntry = [&](ShardId destinedRecipient) {
-            ReshardBlockingWritesChangeEventO2Field changeEvent{
-                _metadata.getSourceNss(),
-                _metadata.getReshardingUUID(),
-                std::string{resharding::kReshardFinalOpLogType},
-            };
-
-            repl::MutableOplogEntry oplog;
-            oplog.setNss(_metadata.getSourceNss());
-            oplog.setOpType(repl::OpTypeEnum::kNoop);
-            oplog.setUuid(_metadata.getSourceUUID());
-            oplog.setDestinedRecipient(destinedRecipient);
-            oplog.setObject(
-                BSON("msg" << fmt::format(
-                         "Writes to {} are temporarily blocked for resharding.",
-                         NamespaceStringUtil::serialize(_metadata.getSourceNss(),
-                                                        SerializationContext::stateDefault()))));
-            oplog.setObject2(changeEvent.toBSON());
-            oplog.setOpTime(OplogSlot());
-            oplog.setWallClockTime(opCtx->fastClockSource().now());
-            return oplog;
-        };
 
         try {
             Timer latency;
 
-            for (const auto& recipient : _recipientShardIds) {
-                auto oplog = generateOplogEntry(recipient);
-                writeConflictRetry(
-                    rawOpCtx,
-                    "ReshardingBlockWritesOplog",
-                    NamespaceString::kRsOplogNamespace,
-                    [&] {
-                        AutoGetOplogFastPath oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
-                        WriteUnitOfWork wunit(rawOpCtx);
-                        const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
-                        uassert(5279507,
-                                str::stream()
-                                    << "Failed to create new oplog entry for oplog with opTime: "
-                                    << oplog.getOpTime().toString() << ": "
-                                    << redact(oplog.toBSON()),
-                                !oplogOpTime.isNull());
-                        wunit.commit();
-                    });
-            }
+            notifyChangeStreamsOnReshardCollectionBlockingWrites(opCtx.get(),
+                                                                 _metadata.getSourceNss(),
+                                                                 _metadata.getSourceUUID(),
+                                                                 _metadata.getReshardingUUID(),
+                                                                 _recipientShardIds);
 
             LOGV2_DEBUG(5279504,
                         0,

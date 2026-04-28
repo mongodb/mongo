@@ -249,7 +249,6 @@ mongo_cc_library(
     srcs = [
         "migration_recipient_recovery_document_gen",
         "//src/mongo/db/s/resharding:recipient_resume_document_gen",
-        "//src/mongo/db/s/resharding:resharding_change_event_o2_field_gen",
         "//src/mongo/db/s/resharding:resharding_coordinator.inl",
         "//src/mongo/db/s/resharding:resharding_coordinator_part_0.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_part_1.cpp",
@@ -311,6 +310,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:primary_only_service",
         "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/db/repl:wait_for_majority_service",
+        "//src/mongo/db/s/resharding:resharding_change_event_o2_field",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role",

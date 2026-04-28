@@ -44,6 +44,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
@@ -76,40 +77,6 @@
 namespace mongo {
 
 namespace {
-
-void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opCtx,
-                                                           const NamespaceString& collNss,
-                                                           const KeyPattern& shardKey,
-                                                           const KeyPattern& oldShardKey,
-                                                           const UUID& collUUID) {
-
-    const auto collNssStr =
-        NamespaceStringUtil::serialize(collNss, SerializationContext::stateDefault());
-    const std::string oMessage = str::stream()
-        << "Refine shard key for collection " << collNssStr << " with " << shardKey.toString();
-
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("refineCollectionShardKey", collNssStr);
-    cmdBuilder.append("shardKey", shardKey.toBSON());
-    cmdBuilder.append("oldShardKey", oldShardKey.toBSON());
-
-    auto const serviceContext = opCtx->getClient()->getServiceContext();
-
-    writeConflictRetry(opCtx, "RefineCollectionShardKey", NamespaceString::kRsOplogNamespace, [&] {
-        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
-        WriteUnitOfWork uow(opCtx);
-        serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
-                                                             collNss,
-                                                             collUUID,
-                                                             BSON("msg" << oMessage),
-                                                             cmdBuilder.obj(),
-                                                             boost::none,
-                                                             boost::none,
-                                                             boost::none,
-                                                             boost::none);
-        uow.commit();
-    });
-}
 
 void logRefineCollectionShardKey(OperationContext* opCtx,
                                  const NamespaceString& nss,

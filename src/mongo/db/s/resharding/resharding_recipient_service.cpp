@@ -65,7 +65,6 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
-#include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
@@ -1520,42 +1519,12 @@ bool ReshardingRecipientService::RecipientStateMachine::_hasAlreadyWrittenStrict
 void ReshardingRecipientService::RecipientStateMachine::_writeStrictConsistencyOplog(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     auto opCtx = _makeOperationContext(factory);
-    auto rawOpCtx = opCtx.get();
-
-    auto generateOplogEntry = [&]() {
-        ReshardDoneCatchUpChangeEventO2Field changeEvent{_metadata.getTempReshardingNss(),
-                                                         _metadata.getReshardingUUID()};
-
-        repl::MutableOplogEntry oplog;
-        oplog.setOpType(repl::OpTypeEnum::kNoop);
-        oplog.setNss(_metadata.getTempReshardingNss());
-        oplog.setUuid(_metadata.getReshardingUUID());
-        oplog.setObject(BSON("msg" << "The temporary resharding collection now has a "
-                                      "strictly consistent view of the data"));
-        oplog.setObject2(changeEvent.toBSON());
-        oplog.setFromMigrate(true);
-        oplog.setOpTime(OplogSlot());
-        oplog.setWallClockTime(opCtx->fastClockSource().now());
-        return oplog;
-    };
-
-    auto oplog = generateOplogEntry();
-    writeConflictRetry(
-        rawOpCtx, "ReshardDoneCatchUpOplog", NamespaceString::kRsOplogNamespace, [&] {
-            AutoGetOplogFastPath oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
-            WriteUnitOfWork wunit(rawOpCtx);
-            const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
-            uassert(5063601,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplog.getOpTime().toString() << ": " << redact(oplog.toBSON()),
-                    !oplogOpTime.isNull());
-            wunit.commit();
-            LOGV2(12340303,
-                  "Successfully wrote ReshardDoneCatchUp oplog entry",
-                  logAttrs(_metadata.getSourceNss()),
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "opTime"_attr = oplogOpTime);
-        });
+    notifyChangeStreamsOnReshardCollectionStrictConsistency(
+        opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
+    LOGV2(12340303,
+          "Successfully wrote ReshardDoneCatchUp oplog entry",
+          logAttrs(_metadata.getSourceNss()),
+          "reshardingUUID"_attr = _metadata.getReshardingUUID());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardingCollection(

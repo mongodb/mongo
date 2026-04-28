@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
@@ -39,6 +40,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -365,6 +368,107 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
                                                               noMoreCollectionChunksOnDonor,
                                                               firstCollectionChunkOnRecipient),
                                    "ChunkMigrationWritesOplog");
+}
+
+void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opCtx,
+                                                           const NamespaceString& collNss,
+                                                           const KeyPattern& shardKey,
+                                                           const KeyPattern& oldShardKey,
+                                                           const UUID& collUUID) {
+    const auto collNssStr =
+        NamespaceStringUtil::serialize(collNss, SerializationContext::stateDefault());
+    const std::string oMessage = str::stream()
+        << "Refine shard key for collection " << collNssStr << " with " << shardKey.toString();
+
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("refineCollectionShardKey", collNssStr);
+    cmdBuilder.append("shardKey", shardKey.toBSON());
+    cmdBuilder.append("oldShardKey", oldShardKey.toBSON());
+
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(collNss);
+    oplogEntry.setUuid(collUUID);
+    oplogEntry.setTid(collNss.tenantId());
+    oplogEntry.setObject(BSON("msg" << oMessage));
+    oplogEntry.setObject2(cmdBuilder.obj());
+    oplogEntry.setOpTime(repl::OpTime());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+
+    insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "RefineCollectionShardKey");
+}
+
+void notifyChangeStreamsOnReshardCollectionBegin(OperationContext* opCtx,
+                                                 const NamespaceString& sourceNss,
+                                                 const UUID& sourceUUID,
+                                                 const UUID& reshardingUUID) {
+    ReshardBeginChangeEventO2Field changeEvent{sourceNss, reshardingUUID};
+
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setNss(sourceNss);
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setUuid(sourceUUID);
+    oplogEntry.setObject(BSON("msg" << "Created temporary resharding collection"));
+    oplogEntry.setObject2(changeEvent.toBSON());
+    oplogEntry.setFromMigrate(true);
+    oplogEntry.setOpTime(repl::OpTime());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+
+    insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "ReshardingBeginOplog");
+}
+
+void notifyChangeStreamsOnReshardCollectionBlockingWrites(
+    OperationContext* opCtx,
+    const NamespaceString& sourceNss,
+    const UUID& sourceUUID,
+    const UUID& reshardingUUID,
+    const std::vector<ShardId>& recipientShardIds) {
+    const auto nssStr =
+        NamespaceStringUtil::serialize(sourceNss, SerializationContext::stateDefault());
+
+    std::vector<repl::MutableOplogEntry> oplogEntries;
+    oplogEntries.reserve(recipientShardIds.size());
+    for (const auto& recipient : recipientShardIds) {
+        ReshardBlockingWritesChangeEventO2Field changeEvent{
+            sourceNss,
+            reshardingUUID,
+            std::string{resharding::kReshardFinalOpLogType},
+        };
+
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setNss(sourceNss);
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setUuid(sourceUUID);
+        oplogEntry.setDestinedRecipient(recipient);
+        const std::string msg = str::stream()
+            << "Writes to " << nssStr << " are temporarily blocked for resharding.";
+        oplogEntry.setObject(BSON("msg" << msg));
+        oplogEntry.setObject2(changeEvent.toBSON());
+        oplogEntry.setOpTime(repl::OpTime());
+        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+        oplogEntries.push_back(std::move(oplogEntry));
+    }
+
+    insertNotificationOplogEntries(opCtx, std::move(oplogEntries), "ReshardingBlockWritesOplog");
+}
+
+void notifyChangeStreamsOnReshardCollectionStrictConsistency(OperationContext* opCtx,
+                                                             const NamespaceString& tempNss,
+                                                             const UUID& reshardingUUID) {
+    ReshardDoneCatchUpChangeEventO2Field changeEvent{tempNss, reshardingUUID};
+
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(tempNss);
+    oplogEntry.setUuid(reshardingUUID);
+    oplogEntry.setObject(BSON("msg" << "The temporary resharding collection now has a "
+                                       "strictly consistent view of the data"));
+    oplogEntry.setObject2(changeEvent.toBSON());
+    oplogEntry.setFromMigrate(true);
+    oplogEntry.setOpTime(repl::OpTime());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+
+    insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "ReshardDoneCatchUpOplog");
 }
 
 }  // namespace mongo

@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -46,9 +47,8 @@
 
 namespace MONGO_MOD_PUB mongo {
 
-/*
- * This function writes a no-op oplog entry on shardCollection event.
- * TODO SERVER-66333: move all other notifyChangeStreams* functions here.
+/**
+ * Writes a no-op oplog entry on shardCollection event.
  */
 void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
                                           const CollectionSharded& notification);
@@ -130,5 +130,41 @@ void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
                                           const LogicalSessionId& lsid,
                                           const TxnNumber& txnNumber,
                                           const std::vector<NamespaceString>& affectedNamespaces);
+
+/**
+ * Writes a no-op oplog entry when refinement of collection shard key is complete.
+ */
+void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opCtx,
+                                                           const NamespaceString& collNss,
+                                                           const KeyPattern& shardKey,
+                                                           const KeyPattern& oldShardKey,
+                                                           const UUID& collUUID);
+
+/**
+ * Writes a no-op oplog entry when a temporary resharding collection is created on a donor shard.
+ */
+void notifyChangeStreamsOnReshardCollectionBegin(OperationContext* opCtx,
+                                                 const NamespaceString& sourceNss,
+                                                 const UUID& sourceUUID,
+                                                 const UUID& reshardingUUID);
+
+/**
+ * Writes one no-op oplog entry per recipient shard when writes are temporarily blocked for
+ * resharding.
+ */
+void notifyChangeStreamsOnReshardCollectionBlockingWrites(
+    OperationContext* opCtx,
+    const NamespaceString& sourceNss,
+    const UUID& sourceUUID,
+    const UUID& reshardingUUID,
+    const std::vector<ShardId>& recipientShardIds);
+
+/**
+ * Writes a no-op oplog entry when the temporary resharding collection has reached strict
+ * consistency on a recipient shard.
+ */
+void notifyChangeStreamsOnReshardCollectionStrictConsistency(OperationContext* opCtx,
+                                                             const NamespaceString& tempNss,
+                                                             const UUID& reshardingUUID);
 
 }  // namespace MONGO_MOD_PUB mongo
