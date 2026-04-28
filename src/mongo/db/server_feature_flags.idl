@@ -303,7 +303,8 @@ feature_flags:
     featureFlagQEPrefixSuffixSearch:
         description: "Queryable Encryption encrypted prefix & suffix search support"
         cpp_varname: gFeatureFlagQEPrefixSuffixSearch
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
     # TODO (SERVER-122417): Remove this feature flag once v9.0 branches out.
     featureFlagListIndexesAlwaysIncludesSimpleCollation:
