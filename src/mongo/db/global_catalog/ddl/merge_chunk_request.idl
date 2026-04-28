@@ -50,6 +50,21 @@ types:
         is_view: false
 
 structs:
+    ShardsvrMergeChunksRequest:
+        description: "mergeChunks command parameters"
+        strict: false
+        fields:
+            bounds:
+                description: "Chunk bounds to merge."
+                type: array<object_owned>
+            epoch:
+                description: "The expected epoch of the collection for the chunks being merged."
+                type: objectid
+            timestamp:
+                description: "The expected timestamp of the collection that is being committed."
+                type: timestamp
+                optional: true
+
     ConfigSvrMergeResponse:
         description: "Response of the _configsvrCommitChunksMerge command"
         strict: false
@@ -124,17 +139,8 @@ commands:
         api_version: ""
         type: namespacestring
         strict: false
-        fields:
-            bounds:
-                description: "Chunk bounds to merge."
-                type: array<object_owned>
-            epoch:
-                description: "The expected epoch of the collection for the chunks being merged."
-                type: objectid
-            timestamp:
-                description: "The expected timestamp of the collection that is being committed."
-                type: timestamp
-                optional: true
+        chained_structs:
+            ShardsvrMergeChunksRequest: ShardsvrMergeChunksRequest
 
     clusterMergeAllChunksOnShard:
         command_name: mergeAllChunksOnShard

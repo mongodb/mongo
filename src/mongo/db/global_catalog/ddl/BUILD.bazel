@@ -582,6 +582,16 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "merge_chunks_coordinator_document_gen",
+    src = "merge_chunks_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:merge_chunk_request_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
+    ],
+)
+
+idl_generator(
     name = "test_chunk_operation_sharding_coordinator_document_gen",
     src = "test_chunk_operation_sharding_coordinator_document.idl",
     deps = [

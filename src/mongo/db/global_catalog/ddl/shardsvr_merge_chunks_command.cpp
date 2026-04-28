@@ -35,9 +35,11 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/merge_chunk_request_gen.h"
+#include "mongo/db/global_catalog/ddl/merge_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -49,8 +51,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
@@ -67,6 +72,67 @@
 namespace mongo {
 
 namespace {
+
+/**
+ * Attempts to execute the merge through the sharding coordinator service, retrying while a
+ * conflicting coordinator is already running for the same namespace. Returns true if the merge
+ * completed via the coordinator; returns false if the caller should fall back to the legacy
+ * config-server path (because the authoritative metadata feature flag is disabled). Throws
+ * ConflictingOperationInProgress if the configured retry budget is exhausted.
+ */
+bool tryRunMergeChunksCoordinator(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const ShardsvrMergeChunks& req) {
+    // If a conflicting merge coordinator is already running for this namespace,
+    // wait for it to complete and retry.
+    // TODO (SERVER-125033): Remove the retry-loop once this task gets done.
+    const int maxConflictRetries = shardsvrMergeChunksMaxConflictRetries.load();
+    Status lastConflictStatus = Status::OK();
+    for (int retries = 0; retries < maxConflictRetries; ++retries) {
+        boost::optional<FixedFCVRegion> optFixedFcvRegion{boost::in_place_init, opCtx};
+
+        if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                optFixedFcvRegion.get()->acquireFCVSnapshot())) {
+            return false;
+        }
+
+        auto coordinatorDoc = MergeChunksCoordinatorDocument();
+        coordinatorDoc.setShardsvrMergeChunksRequest(req.getShardsvrMergeChunksRequest());
+        coordinatorDoc.setShardingCoordinatorMetadata({{nss, CoordinatorTypeEnum::kMergeChunks}});
+
+        // Defer option conflict checking to the explicit checkIfOptionsConflict
+        // call below, allowing the retry loop to handle ConflictingOperationInProgress.
+        auto service = ShardingCoordinatorService::getService(opCtx);
+        auto coordinator =
+            checked_pointer_cast<MergeChunksCoordinator>(service->getOrCreateInstance(
+                opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
+
+        try {
+            coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON());
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+            LOGV2_DEBUG(12117904,
+                        1,
+                        "Merge chunks coordinator already running, waiting for completion",
+                        "namespace"_attr = nss,
+                        "error"_attr = ex);
+            lastConflictStatus = ex.toStatus();
+            optFixedFcvRegion.reset();
+            coordinator->getCompletionFuture().getNoThrow(opCtx).ignore();
+            continue;
+        }
+
+        optFixedFcvRegion.reset();
+        coordinator->getCompletionFuture().get(opCtx);
+        return true;
+    }
+
+    uasserted(ErrorCodes::ConflictingOperationInProgress,
+              str::stream() << "Failed to execute merge chunks for namespace "
+                            << nss.toStringForErrorMsg() << " after " << maxConflictRetries
+                            << " retries due to conflicting operations. Last conflict: "
+                            << lastConflictStatus.reason());
+}
 
 class ShardsvrMergeChunksCommand : public TypedCommand<ShardsvrMergeChunksCommand> {
 public:
@@ -93,38 +159,46 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            auto bounds = request().getBounds();
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
+            const auto& nss = ns();
+            const auto& req = request();
+
+            if (tryRunMergeChunksCoordinator(opCtx, nss, req)) {
+                return;
+            }
+
+            // Legacy path: precondition checks + merge via config server.
+            auto bounds = req.getBounds();
             uassertStatusOK(ChunkRange::validate(bounds));
 
             ChunkRange chunkRange(bounds[0], bounds[1]);
 
             auto scopedSplitOrMergeChunk(
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
-                    opCtx, ns(), chunkRange)));
+                    opCtx, nss, chunkRange)));
 
-            auto expectedEpoch = request().getEpoch();
-            auto expectedTimestamp = request().getTimestamp();
+            auto expectedEpoch = req.getEpoch();
+            auto expectedTimestamp = req.getTimestamp();
 
-            // Check that the preconditions for merge chunks are met and throw StaleShardVersion
-            // otherwise.
             const auto metadataBeforeMerge = [&]() {
                 uassertStatusOK(
                     FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                        opCtx, ns(), boost::none));
+                        opCtx, nss, boost::none));
                 const auto metadata =
-                    checkCollectionIdentity(opCtx, ns(), expectedEpoch, expectedTimestamp);
-                checkShardKeyPattern(opCtx, ns(), metadata, chunkRange);
-                checkRangeOwnership(opCtx, ns(), metadata, chunkRange);
+                    checkCollectionIdentity(opCtx, nss, expectedEpoch, expectedTimestamp);
+                checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
+                checkRangeOwnership(opCtx, nss, metadata, chunkRange);
                 return metadata;
             }();
 
             auto const shardingState = ShardingState::get(opCtx);
 
-            ConfigSvrMergeChunks request{
-                ns(), shardingState->shardId(), metadataBeforeMerge.getUUID(), chunkRange};
-            request.setEpoch(expectedEpoch);
-            request.setTimestamp(expectedTimestamp);
-            request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
+            ConfigSvrMergeChunks configRequest{
+                nss, shardingState->shardId(), metadataBeforeMerge.getUUID(), chunkRange};
+            configRequest.setEpoch(expectedEpoch);
+            configRequest.setTimestamp(expectedTimestamp);
+            configRequest.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
             auto cmdResponse =
                 uassertStatusOK(Grid::get(opCtx)
@@ -134,11 +208,10 @@ public:
                                         opCtx,
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         DatabaseName::kAdmin,
-                                        request.toBSON(),
+                                        configRequest.toBSON(),
                                         Shard::RetryPolicy::kIdempotent));
 
             auto chunkVersionReceived = [&]() -> boost::optional<ChunkVersion> {
-                // Old versions might not have the shardVersion field
                 if (cmdResponse.response[ChunkVersion::kChunkVersionField]) {
                     return ChunkVersion::parse(
                         cmdResponse.response[ChunkVersion::kChunkVersionField]);
@@ -147,7 +220,7 @@ public:
             }();
             uassertStatusOK(
                 FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    opCtx, ns(), std::move(chunkVersionReceived)));
+                    opCtx, nss, std::move(chunkVersionReceived)));
 
             uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk merge");
             uassertStatusOKWithContext(cmdResponse.writeConcernStatus,

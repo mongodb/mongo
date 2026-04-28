@@ -29,52 +29,36 @@
 
 #pragma once
 
-#include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/merge_chunks_coordinator_document_gen.h"
+#include "mongo/db/s/active_migrations_registry.h"
 
 namespace mongo {
 
-template <typename StateDoc>
-class MONGO_MOD_UNFORTUNATELY_OPEN ChunkOperationShardingCoordinator
-    : public RecoverableShardingCoordinator,
-      protected RecoverableTypedDocMixin<ChunkOperationShardingCoordinator<StateDoc>, StateDoc> {
+class MergeChunksCoordinator final
+    : public ChunkOperationShardingCoordinator<MergeChunksCoordinatorDocument> {
+public:
+    MergeChunksCoordinator(ShardingCoordinatorService* service, const BSONObj& initialStateDoc);
 
-    friend RecoverableTypedDocMixin<ChunkOperationShardingCoordinator<StateDoc>, StateDoc>;
+    void checkIfOptionsConflict(const BSONObj& doc) const final;
+
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
 protected:
-    explicit ChunkOperationShardingCoordinator(ShardingCoordinatorService* service,
-                                               std::string name,
-                                               const BSONObj& coorDoc)
-        : RecoverableShardingCoordinator(service, std::move(name), coorDoc),
-          RecoverableTypedDocMixin<ChunkOperationShardingCoordinator<StateDoc>, StateDoc>(coorDoc) {
-    }
-
-    const CoordinatorStateDoc& getDoc() const override {
-        return this->_docWrapper;
-    }
-
-    CoordinatorStateDoc& getDoc() override {
-        return this->_docWrapper;
-    }
+    bool isInCriticalSection(Phase phase) const override;
 
 private:
-    void _initialize(OperationContext* opCtx) override {}
-
-    void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {}
-
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                            const CancellationToken& token) override = 0;
+                                            const CancellationToken& token) override;
 
-    void _releaseLocks(OperationContext* opCtx) override {}
+    void _releaseLocks(OperationContext* opCtx) override;
 
-    StringData serializeGenericPhase(CoordinatorGenericPhase phase) const final {
-        return this->serializePhase(phase);
-    }
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
 
-    bool _isInCriticalSectionGeneric(CoordinatorGenericPhase phase) const final {
-        return this->isInCriticalSection(
-            CoordinatorStateDocImpl<StateDoc>::castToCoordinatorPhase(phase));
-    }
+    const ShardsvrMergeChunksRequest _request;
+    boost::optional<ScopedSplitMergeChunk> _scopedSplitMergeChunk;
 };
 
 }  // namespace mongo

@@ -684,6 +684,173 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     ASSERT_EQ(chunk2.getOnCurrentShardSince(), mergedChunk.getOnCurrentShardSince());
 }
 
+TEST_F(MergeChunkTest, StaleEpochFails) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(_shardId);
+
+    auto chunk2(chunk);
+    chunk2.setName(OID::gen());
+
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkBound = BSON("a" << 5);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setRange({chunkMin, chunkBound});
+    chunk2.setRange({chunkBound, chunkMax});
+
+    setupCollection(_nss1, _keyPattern, {chunk, chunk2});
+
+    ChunkRange rangeToBeMerged(chunkMin, chunkMax);
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunksMerge(operationContext(),
+                                               _nss1,
+                                               OID::gen(),
+                                               collTimestamp,
+                                               collUuid,
+                                               rangeToBeMerged,
+                                               _shardId),
+                       DBException,
+                       ErrorCodes::StaleEpoch);
+}
+
+TEST_F(MergeChunkTest, StaleTimestampFails) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(_shardId);
+
+    auto chunk2(chunk);
+    chunk2.setName(OID::gen());
+
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkBound = BSON("a" << 5);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setRange({chunkMin, chunkBound});
+    chunk2.setRange({chunkBound, chunkMax});
+
+    setupCollection(_nss1, _keyPattern, {chunk, chunk2});
+
+    ChunkRange rangeToBeMerged(chunkMin, chunkMax);
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunksMerge(operationContext(),
+                                               _nss1,
+                                               collEpoch,
+                                               Timestamp(99),
+                                               collUuid,
+                                               rangeToBeMerged,
+                                               _shardId),
+                       DBException,
+                       ErrorCodes::StaleEpoch);
+}
+
+TEST_F(MergeChunkTest, NonContiguousChunksFails) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(_shardId);
+
+    auto chunk2(chunk);
+    chunk2.setName(OID::gen());
+
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setRange({chunkMin, BSON("a" << 5)});
+    chunk2.setRange({BSON("a" << 7), chunkMax});
+
+    setupCollection(_nss1, _keyPattern, {chunk, chunk2});
+
+    ChunkRange rangeToBeMerged(chunkMin, chunkMax);
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunksMerge(operationContext(),
+                                               _nss1,
+                                               collEpoch,
+                                               collTimestamp,
+                                               collUuid,
+                                               rangeToBeMerged,
+                                               _shardId),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
+}
+
+TEST_F(MergeChunkTest, ChunkRangeNotFullyCoveredFails) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(_shardId);
+
+    auto chunk2(chunk);
+    chunk2.setName(OID::gen());
+
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkBound = BSON("a" << 5);
+    auto chunkMax = BSON("a" << 8);
+    chunk.setRange({chunkMin, chunkBound});
+    chunk2.setRange({chunkBound, chunkMax});
+
+    setupCollection(_nss1, _keyPattern, {chunk, chunk2});
+
+    ChunkRange rangeToBeMerged(chunkMin, BSON("a" << 10));
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunksMerge(operationContext(),
+                                               _nss1,
+                                               collEpoch,
+                                               collTimestamp,
+                                               collUuid,
+                                               rangeToBeMerged,
+                                               _shardId),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
+}
+
 class MergeAllChunksOnShardTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {

@@ -1269,7 +1269,8 @@ export let MongosAPIParametersUtil = (function () {
             run: {
                 inAPIVersion1: false,
                 shardCommandName: "_shardsvrMergeChunks",
-                configServerCommandName: "_configsvrCommitChunksMerge",
+                // TODO (SERVER-108802): Re-enable this test case after the api version is propagated to the config server.
+                // configServerCommandName: "_configsvrCommitChunksMerge",
                 runsAgainstAdminDb: true,
                 permittedInTxn: false,
                 requiresShardedCollection: true,

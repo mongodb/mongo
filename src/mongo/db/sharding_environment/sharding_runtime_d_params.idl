@@ -214,3 +214,16 @@ server_parameters:
         cpp_varname: enableQueryKilledByRangeDeletionLog
         default: true
         redact: false
+
+    # TODO (SERVER-125033): Remove this parameter once this task gets done.
+    shardsvrMergeChunksMaxConflictRetries:
+        description: >-
+            Maximum number of times _shardsvrMergeChunks will retry when a conflicting merge
+            chunks coordinator is already running for the same namespace.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: shardsvrMergeChunksMaxConflictRetries
+        validator:
+            gt: 0
+        default: 10
+        redact: false

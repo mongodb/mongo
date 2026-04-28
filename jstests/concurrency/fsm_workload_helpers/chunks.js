@@ -124,7 +124,13 @@ export var ChunkHelper = (function () {
 
     function mergeChunks(db, collName, bounds) {
         let cmd = {mergeChunks: db[collName].getFullName(), bounds: bounds};
-        return runCommandWithRetries(db, cmd, (res) => res.code === ErrorCodes.LockBusy);
+        // TODO (SERVER-125033): Accept this error until multiple merge chunks commands can
+        // instantiate concurrent coordinators.
+        return runCommandWithRetries(
+            db,
+            cmd,
+            (res) => res.code === ErrorCodes.LockBusy || res.code === ErrorCodes.ConflictingOperationInProgress,
+        );
     }
 
     // Take a set of connections to a shard (replica set or standalone mongod),

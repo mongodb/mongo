@@ -103,10 +103,11 @@ public:
             const auto firstChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
             ChunkVersion placementVersion = cm.getVersion(firstChunk.getShardId());
 
-            BSONObjBuilder cmdBuilder;
-            ShardsvrMergeChunks cmd(ns(), bounds, placementVersion.epoch());
-            cmd.setTimestamp(placementVersion.getTimestamp());
-            cmd.serialize(&cmdBuilder);
+            ShardsvrMergeChunks req(ns());
+            req.setDbName(DatabaseName::kAdmin);
+            req.setBounds(bounds);
+            req.setEpoch(placementVersion.epoch());
+            req.setTimestamp(placementVersion.getTimestamp());
 
             // Throws, but handled at level above.  Don't want to rewrap to preserve exception
             // formatting.
@@ -117,7 +118,7 @@ public:
                 shard->runCommand(opCtx,
                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                   DatabaseName::kAdmin,
-                                  cmdBuilder.obj(),
+                                  req.toBSON(),
                                   Shard::RetryPolicy::kNotIdempotent));
             uassertStatusOK(response.commandStatus);
 

@@ -612,6 +612,8 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:drop_indexes_coordinator_document_gen",
         "//src/mongo/db/global_catalog/ddl:initialize_placement_history_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:initialize_placement_history_coordinator_document_gen",
+        "//src/mongo/db/global_catalog/ddl:merge_chunks_coordinator.cpp",
+        "//src/mongo/db/global_catalog/ddl:merge_chunks_coordinator_document_gen",
         "//src/mongo/db/global_catalog/ddl:migration_blocking_operation_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:migration_blocking_operation_coordinator_gen",
         "//src/mongo/db/global_catalog/ddl:move_primary_coordinator.cpp",

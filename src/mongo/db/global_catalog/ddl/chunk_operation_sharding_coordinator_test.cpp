@@ -29,6 +29,7 @@
 
 #include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
 
+#include "mongo/db/global_catalog/ddl/merge_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/global_catalog/ddl/test_chunk_operation_sharding_coordinator_document_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
@@ -104,6 +105,22 @@ protected:
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
 
+    MergeChunksCoordinatorDocument makeMergeChunksCoordinatorDoc(std::vector<BSONObj> bounds,
+                                                                 OID epoch) {
+        MergeChunksCoordinatorDocument doc;
+        ShardsvrMergeChunksRequest req;
+        req.setBounds(bounds);
+        req.setEpoch(epoch);
+        ShardingCoordinatorMetadata metadata{
+            {NamespaceString::createNamespaceString_forTest("test.coll"),
+             CoordinatorTypeEnum::kMergeChunks}};
+        ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
+        metadata.setForwardableOpMetadata(forwardableOpMetadata);
+        doc.setShardingCoordinatorMetadata(std::move(metadata));
+        doc.setShardsvrMergeChunksRequest(req);
+        return doc;
+    }
+
     class TestChunkOperationShardingCoordinator
         : public ChunkOperationShardingCoordinator<TestChunkOperationShardingCoordinatorDocument> {
     public:
@@ -120,6 +137,13 @@ protected:
         }
 
         void checkIfOptionsConflict(const BSONObj& doc) const final {}
+
+        ExecutorFuture<void> _acquireLocksAsync(
+            OperationContext* opCtx,
+            std::shared_ptr<executor::ScopedTaskExecutor> executor,
+            const CancellationToken& token) override {
+            return ExecutorFuture<void>{**executor};
+        }
 
         ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                       const CancellationToken& token) noexcept override {
@@ -150,6 +174,62 @@ TEST_F(ChunkOperationShardingCoordinatorTest, SmokeTest) {
     auto future = (static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get()))
                       ->run(_scopedExecutor, cancellationSource.token());
     future.get();
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictSameParams) {
+    auto epoch = OID::gen();
+    std::vector<BSONObj> bounds = {BSON("a" << 1), BSON("a" << 10)};
+    auto coordinatorDoc = makeMergeChunksCoordinatorDoc(bounds, epoch);
+
+    auto coordinator = std::make_shared<MergeChunksCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Same parameters — should not throw.
+    ASSERT_DOES_NOT_THROW(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()));
+
+    // Satisfy destructor invariants by resolving internal promises.
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictDifferentBounds) {
+    auto epoch = OID::gen();
+    std::vector<BSONObj> bounds = {BSON("a" << 1), BSON("a" << 10)};
+    auto coordinatorDoc = makeMergeChunksCoordinatorDoc(bounds, epoch);
+
+    auto coordinator = std::make_shared<MergeChunksCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different bounds — should throw.
+    std::vector<BSONObj> differentBounds = {BSON("a" << 5), BSON("a" << 20)};
+    auto otherDoc = makeMergeChunksCoordinatorDoc(differentBounds, epoch);
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictDifferentEpoch) {
+    auto epoch = OID::gen();
+    std::vector<BSONObj> bounds = {BSON("a" << 1), BSON("a" << 10)};
+    auto coordinatorDoc = makeMergeChunksCoordinatorDoc(bounds, epoch);
+
+    auto coordinator = std::make_shared<MergeChunksCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different epoch — should throw.
+    auto differentEpoch = OID::gen();
+    auto otherDoc = makeMergeChunksCoordinatorDoc(bounds, differentEpoch);
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
 }
 
 }  // namespace mongo
