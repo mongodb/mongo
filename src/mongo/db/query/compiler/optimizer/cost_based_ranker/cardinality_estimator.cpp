@@ -885,9 +885,10 @@ CEResult CardinalityEstimator::estimate(const SkipNode* node) {
         CardinalityEstimate{CardinalityType{static_cast<double>(node->skip)}, childEst.source()};
 
     // If the skip node skips more than the estimate of the child, then this node will return no
-    // results.
+    // results. CardinalityEstimate comparators use approximate equality, so skip must be strictly
+    // less than childEst (as opposed to <=) in order for it to be safe to subtract.
     CardinalityEstimate card{CardinalityType{0}, childEst.source()};
-    if (skip <= childEst) {
+    if (skip < childEst) {
         card = childEst - skip;
     }
     _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(card));
