@@ -255,7 +255,7 @@ protected:
     absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
     value::SlotAccessorMap _scanFieldAccessorsMap;
 
-    CollectionRef _coll;
+    boost::optional<CollectionAcquisition> _coll;
 
     bool _open{false};
 

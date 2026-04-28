@@ -181,7 +181,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_sbe_storage",
     srcs = [
-        "//src/mongo/db/exec/sbe/stages:collection_helpers.cpp",
         "//src/mongo/db/exec/sbe/stages:generic_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:ix_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:random_scan.cpp",

@@ -85,7 +85,7 @@ public:
 
 private:
     inline void scanResetState(bool reOpen) {
-        _cursor = _coll.getPtr()->getCursor(_opCtx, _state->forward);
+        _cursor = _coll->getCollectionPtr()->getCursor(_opCtx, _state->forward);
     }
     inline RecordCursor* getActiveCursor() const {
         return _cursor.get();

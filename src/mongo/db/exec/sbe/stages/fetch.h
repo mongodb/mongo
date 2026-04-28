@@ -145,7 +145,7 @@ private:
 
     const std::shared_ptr<FetchStageState> _state;
 
-    CollectionRef _coll;
+    boost::optional<CollectionAcquisition> _coll;
 
     value::SlotAccessor* _seekRecordIdAccessor{nullptr};
 

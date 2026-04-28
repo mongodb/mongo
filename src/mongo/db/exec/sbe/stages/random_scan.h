@@ -106,7 +106,7 @@ public:
 
 private:
     void scanResetState(bool reOpen) {
-        _randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(
+        _randomCursor = _coll->getCollectionPtr()->getRecordStore()->getRandomCursor(
             _opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
     }
     inline RecordCursor* getActiveCursor() const {

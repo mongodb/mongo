@@ -164,7 +164,7 @@ protected:
 
     vm::ByteCode _bytecode;
 
-    CollectionRef _coll;
+    boost::optional<CollectionAcquisition> _coll;
 
     value::OwnedValueAccessor _recordAccessor;
     value::OwnedValueAccessor _recordIdAccessor;

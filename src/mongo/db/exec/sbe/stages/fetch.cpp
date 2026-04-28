@@ -113,7 +113,8 @@ void FetchStage::prepare(CompileCtx& ctx) {
                 insertedRename);
     }
 
-    _coll.acquireCollection(ctx.mca, _collectionUuid);
+    tassert(12546102, "MultipleCollectionAccessor must be set on CompileCtx", ctx.mca);
+    doAttachCollectionAcquisition(*ctx.mca);
 }
 
 value::SlotAccessor* FetchStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -151,13 +152,12 @@ void FetchStage::doSaveState() {
     }
 
     _indexCatalogEntryMap.clear();
-    _coll.reset();
 }
 
 void FetchStage::doRestoreState() {
     tassert(10794904, "Expected opCtx to be non-null", _opCtx);
 
-    tassert(12499904, "Expected collection to be an acquisition", _coll.isAcquisition());
+    tassert(12499904, "Expected collection to be an acquisition", _coll.has_value());
 
     if (_cursor) {
         const auto tolerateCappedCursorRepositioning = false;
@@ -183,18 +183,18 @@ void FetchStage::doAttachToOperationContext(OperationContext* opCtx) {
 }
 
 void FetchStage::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
-    _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_collectionUuid));
+    _coll = mca.getCollectionAcquisitionFromUuid(_collectionUuid);
 }
 
 void FetchStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
     _commonStats.opens++;
 
-    tassert(12499905, "Expected collection to be an acquisition", _coll.isAcquisition());
+    tassert(12499905, "Expected collection to be an acquisition", _coll.has_value());
 
     // Reuse existing cursor if possible.
     if (!reOpen) {
-        _cursor = _coll.getPtr()->getCursor(_opCtx, true /* forward */);
+        _cursor = _coll->getCollectionPtr()->getCursor(_opCtx, true /* forward */);
     }
     _children[0]->open(reOpen);
     _childOpened = true;
@@ -202,7 +202,7 @@ void FetchStage::open(bool reOpen) {
         false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_seekRid));
 
     if (_state->fetchCallbacks.scanOpenCallback) {
-        _state->fetchCallbacks.scanOpenCallback(_opCtx, _coll.getPtr());
+        _state->fetchCallbacks.scanOpenCallback(_opCtx, _coll->getCollectionPtr());
     }
 }
 
@@ -232,7 +232,7 @@ PlanState FetchStage::getNext() {
                         _snapshotIdAccessor,
                         _indexIdentAccessor,
                         _indexKeyAccessor,
-                        _coll.getPtr(),
+                        _coll->getCollectionPtr(),
                         *record);
     };
 
@@ -256,13 +256,14 @@ PlanState FetchStage::getNext() {
         record = _cursor->seekExact(_seekRid);
         if (!record) {
             if (_state->fetchCallbacks.indexKeyCorruptionCheckCallback) {
-                tassert(10794901, "Collection name should be initialized", _coll.getCollName());
-                _state->fetchCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
-                                                                       _snapshotIdAccessor,
-                                                                       _indexKeyAccessor,
-                                                                       _indexKeyPatternAccessor,
-                                                                       _seekRid,
-                                                                       *_coll.getCollName());
+                tassert(10794901, "Collection name should be initialized", _coll.has_value());
+                _state->fetchCallbacks.indexKeyCorruptionCheckCallback(
+                    _opCtx,
+                    _snapshotIdAccessor,
+                    _indexKeyAccessor,
+                    _indexKeyPatternAccessor,
+                    _seekRid,
+                    _coll->getCollectionPtr()->ns());
             }
         }
     } while (!record || !checkRecordConsistency());
@@ -286,7 +287,6 @@ void FetchStage::close() {
         _childOpened = false;
     }
     _cursor.reset();
-    _coll.reset();
 }
 
 std::unique_ptr<PlanStageStats> FetchStage::getStats(bool includeDebugInfo) const {

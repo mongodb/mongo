@@ -140,7 +140,8 @@ void ScanStageBase::prepareShared(CompileCtx& ctx) {
         _indexKeyPatternAccessor = ctx.getAccessor(*(_state->indexKeyPatternSlot));
     }
 
-    _coll.acquireCollection(ctx.mca, _state->collUuid);
+    tassert(12546101, "MultipleCollectionAccessor must be set on CompileCtx", ctx.mca);
+    doAttachCollectionAcquisition(*ctx.mca);
 }
 
 value::SlotAccessor* ScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -160,7 +161,7 @@ value::SlotAccessor* ScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId s
 }
 
 void ScanStageBase::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
-    _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_state->collUuid));
+    _coll = mca.getCollectionAcquisitionFromUuid(_state->collUuid);
 }
 
 void ScanStageBase::getStatsShared(BSONObjBuilder& bob) const {
@@ -309,14 +310,13 @@ void ScanStageBaseImpl<Derived>::doSaveState() {
     }
 
     _indexCatalogEntryMap.clear();
-    _coll.reset();
 }
 
 template <typename Derived>
 void ScanStageBaseImpl<Derived>::doRestoreState() {
     invariant(_opCtx);
 
-    tassert(12499902, "Expected collection to be an acquisition", _coll.isAcquisition());
+    tassert(12499902, "Expected collection to be an acquisition", _coll.has_value());
 
     if (auto cursor = self()->getActiveCursor(); cursor != nullptr) {
         const auto tolerateCappedCursorRepositioning = false;
@@ -363,7 +363,7 @@ void ScanStageBaseImpl<Derived>::doAttachToOperationContext(OperationContext* op
 void ScanStage::scanResetState(bool reOpen) {
     // Reuse existing cursor if possible in the reOpen case (i.e. when we will do a seek).
     if (!reOpen || (_state->forward ? !_minRecordIdAccessor : !_maxRecordIdAccessor)) {
-        _cursor = _coll.getPtr()->getCursor(_opCtx, _state->forward);
+        _cursor = _coll->getCollectionPtr()->getCursor(_opCtx, _state->forward);
     }
 
     if (_minRecordIdAccessor) {
@@ -417,10 +417,10 @@ void ScanStageBaseImpl<Derived>::open(bool reOpen) {
     // first time ever, or this stage is being opened for the first time after calling close().
     tassert(5071004, "first open to ScanStageBase but reOpen=true", !reOpen && !_open);
     tassert(5071005, "ScanStageBase is not open but has a cursor", !self()->getActiveCursor());
-    tassert(12499903, "Expected collection to be an acquisition", _coll.isAcquisition());
+    tassert(12499903, "Expected collection to be an acquisition", _coll.has_value());
 
     if (_state->scanOpenCallback) {
-        _state->scanOpenCallback(_opCtx, _coll.getPtr());
+        _state->scanOpenCallback(_opCtx, _coll->getCollectionPtr());
     }
 
     self()->scanResetState(reOpen);
@@ -623,7 +623,6 @@ void ScanStageBase::closeShared() {
 
     trackClose();
     _indexCatalogEntryMap.clear();
-    _coll.reset();
     _open = false;
 }
 
