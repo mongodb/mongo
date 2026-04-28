@@ -153,6 +153,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectTimesOut);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerDelayConnection);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangBeforeAcceptCallback);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangDuringAcceptCallback);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangAtListenerStart);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -771,6 +772,7 @@ void AsioTransportLayer::ListenerInterface::stopListenerWithLock(
 void AsioTransportLayer::ListenerInterface::_runListener(std::string threadName) {
     setThreadName(threadName);
 
+    asioTransportLayerHangAtListenerStart.pauseWhileSet();
     stdx::unique_lock lk(_sharedMutex);
     ON_BLOCK_EXIT([&] {
         if (!lk.owns_lock()) {
@@ -783,9 +785,13 @@ void AsioTransportLayer::ListenerInterface::_runListener(std::string threadName)
     // interface), we must hold the lock when accessing the shared state in the following
     // operations.  Currently, listener threads run for _listenerInterfaceMainPort and
     // _listenerInterfacePriorityPort.
-    _startListening(lk);
-
-    _listener.state = Listener::State::kActive;
+    if (_asioTransportLayer->_isShutdown.load() ||
+        _listener.state == Listener::State::kShuttingDown) {
+        LOGV2_DEBUG(9484000, 3, "Unable to start listening: transport layer in shutdown");
+    } else {
+        _startListening(lk);
+        _listener.state = Listener::State::kActive;
+    }
     _listener.cv.notify_all();
     while (!_asioTransportLayer->_isShutdown.load() &&
            (_listener.state == Listener::State::kActive)) {
@@ -826,12 +832,6 @@ AsioTransportLayer::Listener::State AsioTransportLayer::ListenerInterface::getLi
 }
 
 void AsioTransportLayer::ListenerInterface::_startListening(WithLock lk) {
-    if (_asioTransportLayer->_isShutdown.load() ||
-        _listener.state == Listener::State::kShuttingDown) {
-        LOGV2_DEBUG(9484000, 3, "Unable to start listening: transport layer in shutdown");
-        return;
-    }
-
     const int listenBacklog = serverGlobalParams.listenBacklog
         ? *serverGlobalParams.listenBacklog
         : ProcessInfo::getDefaultListenBacklog();
