@@ -108,7 +108,10 @@ def create_join_collection_template(
                 indexed=False,
             ),
         ],
-        compound_indexes=[],
+        # Need an index for multikeyness info
+        compound_indexes=[
+            ["dummy", "unique", "random", "uniform_16", "uniform_256", "uniform_4k", "uniform_64k"]
+        ],
         cardinalities=[COLLECTION_CARDINALITY],
     )
 

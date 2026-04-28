@@ -488,6 +488,8 @@ async def main():
             "internalMeasureQueryExecutionTimeInNanoseconds=true",
             "--setParameter",
             "internalEnableJoinOptimization=true",
+            "--setParameter",
+            "featureFlagPathArrayness=true",
         ],
     ) as manager:
         generator = DataGenerator(manager.database, join_data_generator)
