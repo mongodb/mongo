@@ -41,6 +41,13 @@ export class StandbyClusterTestFixture {
          */
         this.standbyRS = null;
 
+        /**
+         * Array of {pid, port} objects for mongosentry processes guarding retired ports.
+         * Available after transitionToStandby().
+         * @type {Array<{pid: number, port: number}>|null}
+         */
+        this._sentries = null;
+
         this._setup();
     }
 
@@ -64,6 +71,9 @@ export class StandbyClusterTestFixture {
     transitionToStandby() {
         const configRS = this.st.configRS;
         const numNodes = configRS.nodes.length;
+
+        // Capture shard ports before stopping shards so we can guard them with sentries.
+        const shardPorts = this.st._rs.flatMap((shard) => shard.test.ports);
 
         // Stop all mongos processes.
         this.st.stopAllMongos();
@@ -106,6 +116,7 @@ export class StandbyClusterTestFixture {
             const hostParts = newMember.host.split(":");
             hostParts[hostParts.length - 1] = String(newPorts[idx]);
             newMember.host = hostParts.join(":");
+            newMember.priority = idx === 0 ? 1 : 0;
             return newMember;
         });
 
@@ -113,6 +124,14 @@ export class StandbyClusterTestFixture {
         newConfig._id = "standby";
         newConfig.members = newMembers;
         delete newConfig.configsvr;
+
+        // We use a single electable member (priority set in newMembers above) and a very long
+        // cluster-wide election timeout so that after the forced stepdown no new primary is elected
+        // for the duration of the test.
+        if (!newConfig.settings) {
+            newConfig.settings = {};
+        }
+        newConfig.settings.electionTimeoutMillis = ReplSetTest.kForeverMillis;
 
         // Replace the hosts in each individual replSetConfig.
         for (let i = 0; i < numNodes; i++) {
@@ -148,18 +167,66 @@ export class StandbyClusterTestFixture {
         // startSet() launches the processes with --replSet standby but does NOT call
         // replSetInitiate. The nodes will self-elect using the config already in
         // local.system.replset from the previous step.
-        this.standbyRS.startSet();
-        this.standbyRS.awaitNodesAgreeOnPrimary();
+        let nodes = this.standbyRS.startSet();
+        this.standbyRS.asCluster(nodes, () => {
+            this.standbyRS.stepUp(nodes[0], {awaitReplicationBeforeStepUp: false});
+            this.standbyRS.awaitNodesAgreeOnPrimary();
+            // Write a majority-committed noop before stepping down to ensure the committed snapshot
+            // is established. The primary's drain-completion noop may not yet be journaled, and
+            // without a journaled entry the commit point (and thus the committed snapshot) never
+            // advances. Once the node steps down to secondary, the commit point can no longer
+            // advance, so majority reads would be permanently blocked.
+            const primary = this.standbyRS.getPrimary();
+            assert.commandWorked(
+                primary.adminCommand({
+                    appendOplogNote: 1,
+                    data: {msg: "standby transition commit point advance"},
+                    writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS},
+                }),
+            );
+            assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
+        });
+
+        // Start a mongosentry on every retired port (old shard ports and old config server ports).
+        // Any traffic to these ports indicates a bug - the sentry will invariant if it receives a
+        // MongoDB wire protocol message.
+        const retiredPorts = [...shardPorts, ...oldPorts];
+        this._sentries = retiredPorts.map((port) => {
+            const pid = _startMongoProgram("mongosentry", "--port", port.toString());
+            return {pid, port};
+        });
+        // Wait for each sentry process to be alive before continuing.
+        for (const {pid, port} of this._sentries) {
+            assert.soon(() => checkProgram(pid).alive, `mongosentry failed to start on retired port ${port}`);
+        }
     }
 
     /**
      * Shuts down the standby replica set (if transitioned) and cleans up.
+     *
+     * Checks that no mongosentry process received traffic on a retired port before stopping
+     * them. Throws if any sentry hit its invariant (i.e. received a command it should not have).
      */
     teardown() {
+        const failedPorts = [];
+        for (const {pid, port} of this._sentries || []) {
+            const {alive} = checkProgram(pid);
+            if (!alive) {
+                jsTest.log.info(`mongosentry on retired port ${port} received a command and hit an invariant`);
+                failedPorts.push(port);
+            } else {
+                stopMongoProgramByPid(pid);
+            }
+        }
+
         if (this.standbyRS) {
             this.standbyRS.stopSet();
         } else {
             this.st.stop();
+        }
+
+        if (failedPorts.length > 0) {
+            throw new Error(`Commands were sent to retired ports after standby transition: ` + failedPorts.join(", "));
         }
     }
 }
