@@ -88,6 +88,7 @@ struct QueryKnobBase {
     QueryKnobBase& operator=(const QueryKnobBase&) = delete;
 
     StringData paramName;
+    // TODO SERVER-125549: refactor to use a strongly typed KnobId.
     size_t index = ~size_t{0};  // Sentinel until QueryKnobRegistry assigns a dense index.
     ReadGlobalFn readGlobal;
     QueryKnobValue (*fromBSON)(const BSONElement&);

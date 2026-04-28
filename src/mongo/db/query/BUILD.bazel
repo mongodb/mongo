@@ -336,6 +336,44 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "query_knob_registry",
+    srcs = [
+        "query_knob_registry.cpp",
+    ],
+    hdrs = [
+        "query_knob_registry.h",
+    ],
+    deps = [
+        ":query_knob",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "query_knob_registry_test_gen",
+    src = "query_knob_registry_test.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_knob_registry_test",
+    srcs = [
+        "query_knob_registry_test.cpp",
+        ":query_knob_registry_test_gen",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":query_knob",
+        ":query_knob_registry",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "query_knob_test",
     srcs = [
