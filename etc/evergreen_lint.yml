@@ -205,6 +205,7 @@ rules:
             "streams_azure_blob_parallel",
             "streams_azure_blob_parallel_heavy",
             "streams_azure_blob_emit_benchmark",
+            "streams_azure_blob_gwproxy",
             "streams_kinesis",
             "streams_aspio",
             "streams_aspio_iceberg_0",
