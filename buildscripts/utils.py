@@ -53,19 +53,6 @@ def get_git_version():
     return open(git_ver, "r").read().strip()
 
 
-def get_git_describe():
-    """Return 'git describe --abbrev=7'."""
-    with open(os.devnull, "r+") as devnull:
-        proc = subprocess.Popen(
-            "git describe --abbrev=7",
-            stdout=subprocess.PIPE,
-            stderr=devnull,
-            stdin=devnull,
-            shell=True,
-        )
-        return proc.communicate()[0].strip().decode("utf-8")
-
-
 def execsys(args):
     """Execute a subprocess of 'args'."""
     if isinstance(args, str):

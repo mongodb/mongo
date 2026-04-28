@@ -26,11 +26,17 @@ if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
     echo "common --action_env=TMP=Z:/b" >>.bazelrc.evergreen
     echo "common --action_env=TEMP=Z:/b" >>.bazelrc.evergreen
     echo "BAZELISK_HOME=${abs_path}/bazelisk_home" >>.bazeliskrc
-    echo "common --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >>.bazelrc.git
+    GIT_REV=$(git rev-parse HEAD)
+    echo "common --define GIT_COMMIT_HASH=${GIT_REV}" >>.bazelrc.git
 else
     echo "startup --output_user_root=${TMPDIR}/bazel-output-root" >.bazelrc.evergreen
     echo "BAZELISK_HOME=${TMPDIR}/bazelisk_home" >>.bazeliskrc
-    echo "common --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >>.bazelrc.git
+    GIT_REV=$(git rev-parse HEAD)
+    echo "common --define GIT_COMMIT_HASH=${GIT_REV}" >>.bazelrc.git
+fi
+
+if [[ "${requester}" == "commit" ]]; then
+    echo "common --define MONGO_VERSION=$(grep -oP 'MONGO_VERSION=\K.*' .bazelrc.target_mongo_version)-${GIT_REV: -8}" >>.bazelrc.git
 fi
 
 if [[ "${evergreen_remote_exec}" != "on" ]]; then

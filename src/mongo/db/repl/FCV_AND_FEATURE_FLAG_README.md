@@ -642,14 +642,14 @@ The logic for determining our generic FCVs is:
 
 ## Branch Cut and Upgrading FCVs
 
-Since the FCV generation logic is entirely dependent on the git tag, the Server Triage and Release
-(STAR) team will upgrade the git tag on the master branch after every release. When this happens, to
-correctly build mongo after every release, developers will need to pull the new git tag.
+Since the FCV generation logic is entirely dependent on the version specified in
+`.bazelrc.target_mongo_version`, the Server Triage and Release (STAR) team will upgrade this version
+on the master branch after every release. When this happens, to correctly build mongo after every
+release, developers will need to pull the new git tag.
 
-This can be done by using the `--tags` option (i.e., running `git fetch --tags`) after the STAR team
-has introduced the new git tag. Developers may also see what their latest git tag is by running
-`git describe`. After fetching the latest git tag, it will be necessary to recompile so that the new
-`releases.h` file can be generated.
+Developers may see what the current version is by checking `.bazelrc.target_mongo_version`. After
+pulling the latest version changes, it will be necessary to recompile so that the new `releases.h`
+file can be generated.
 
 # Feature Flags
 

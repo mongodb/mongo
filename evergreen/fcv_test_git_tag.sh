@@ -1,13 +1,11 @@
 #!/bin/bash
 
 # For FCV testing only.
-# Tag the local branch with the new tag before running tests.
+# Output the version from .bazelrc.target_mongo_version before running tests.
 
 set -o errexit
 set -o verbose
 
 cd src
-git config user.name "Evergreen patch build"
-git config user.email "evergreen@mongodb.com"
-git tag -a r5.1.0-alpha -m 5.1.0-alpha
-git describe
+echo "common --define=MONGO_VERSION=5.1.0-alpha" >.bazelrc.target_mongo_version
+echo "r$(grep -oP '(?<=MONGO_VERSION=)[^\s]+' .bazelrc.target_mongo_version)"

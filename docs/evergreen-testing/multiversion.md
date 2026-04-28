@@ -40,8 +40,8 @@ For some of the versions we are using such generic names as `latest`, `last-lts`
 - `last-continuous` - the latest Rapid release version. In Evergreen, the version that was
   downloaded from the Rapid release branch project. It resolves to the entry in
   `featureCompatibilityVersions` of [releases.yml](../../src/mongo/util/version/releases.yml) that
-  looks older than the output of `git describe`. Will not be tested against if it is listed in
-  `eolVersions` as being end of life.
+  looks older than the version specified in `.bazelrc.target_mongo_version`. Will not be tested
+  against if it is listed in `eolVersions` as being end of life.
 
 Note: The latest release.yml file from master is always used, even fetched remotely when on another
 branch.

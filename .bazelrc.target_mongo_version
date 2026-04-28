@@ -1,0 +1,4 @@
+# Default Mongo Version if a version is not specified. This should point at the next release version
+# that master branch is targeting. The Server Triage and Release (STAR) team will upgrade this
+# version on the master branch after every release.
+common --define=MONGO_VERSION=9.0.0-alpha0

@@ -4,7 +4,7 @@ import glob
 import http
 import os
 import shutil
-from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
+from subprocess import DEVNULL, STDOUT, call, check_output
 
 import requests
 import structlog
@@ -35,18 +35,31 @@ MASTER_RELEASES_REMOTE_FILE = (
 LOGGER = structlog.getLogger(__name__)
 
 
+BAZELRC_DEFAULT_MONGO_VERSION = ".bazelrc.target_mongo_version"
+
+
 def generate_mongo_version_file():
     """Generate the mongo version data file. Should only be called in the root of the mongo directory."""
+    # Read the MONGO_VERSION from .bazelrc.target_mongo_version
+    # The file contains a line like: common --define=MONGO_VERSION=8.2.2
     try:
-        res = check_output("git describe", shell=True, text=True)
-    except CalledProcessError as exp:
-        raise ChildProcessError("Failed to run git describe to get the latest tag") from exp
+        with open(BAZELRC_DEFAULT_MONGO_VERSION, "r") as f:
+            for line in f:
+                if "MONGO_VERSION=" in line:
+                    # Extract the version after "MONGO_VERSION="
+                    version = line.split("MONGO_VERSION=")[1].strip()
+                    break
+            else:
+                raise ValueError(f"MONGO_VERSION not found in {BAZELRC_DEFAULT_MONGO_VERSION}")
+    except FileNotFoundError as exp:
+        raise FileNotFoundError(
+            f"Failed to read version from {BAZELRC_DEFAULT_MONGO_VERSION}"
+        ) from exp
 
     # Write the current MONGO_VERSION to a data file.
-    with open(_config.MONGO_VERSION_FILE, "w") as mongo_version_fh:
-        # E.g. res = 'r5.1.0-alpha-597-g8c345c6693\n'
-        res = res[1:]  # Remove the leading "r" character.
-        mongo_version_fh.write("mongo_version: " + res)
+    with open(_config.MONGO_VERSION_FILE, "w", encoding="utf-8") as mongo_version_fh:
+        # E.g. version = '8.2.2'
+        mongo_version_fh.write("mongo_version: " + version + "\n")
 
 
 @retry(tries=5, delay=3)

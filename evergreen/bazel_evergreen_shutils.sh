@@ -126,7 +126,9 @@ bazel_evergreen_shutils::extract_config_flags() {
 # Adds --config=public-release-rbe or --config=public-release-local if this is a release-ish build.
 bazel_evergreen_shutils::maybe_release_flag() {
     local local_arg="$1"
-    if [[ "${release_rbe:-}" == "true" ]]; then
+    if [[ -n "${MONGO_VERSION_OVERRIDE:-}" ]]; then
+        echo "$local_arg --config=public-release"
+    elif [[ "${release_rbe:-}" == "true" ]]; then
         echo "$local_arg --config=public-release-rbe" # release with RBE (Remote Build Execution)
     elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
         echo "$local_arg" # non-release
