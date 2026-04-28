@@ -37,20 +37,18 @@
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
-namespace {
-int parseNumDocs(const BSONObj& arguments) {
-    return arguments["numDocs"] && arguments["numDocs"].isNumber()
-        ? arguments["numDocs"].safeNumberInt()
-        : 1;
-}
-}  // namespace
-
+/**
+ * Execution stage that produces sequential integer _ids. When _produceScore is true (determined
+ * by whether the downstream pipeline suffix needs "score" metadata), each document also gets
+ * $score metadata set to _id * 5.
+ */
 class ProduceIdsExecStage : public sdk::ExecAggStageSource {
 public:
-    ProduceIdsExecStage(std::string_view stageName, const BSONObj& arguments)
+    ProduceIdsExecStage(std::string_view stageName, bool sortById, int numDocs, bool produceScore)
         : sdk::ExecAggStageSource(stageName),
-          _sortById(arguments["sortById"] && arguments["sortById"].booleanSafe()),
-          _numDocs(parseNumDocs(arguments)) {}
+          _sortById(sortById),
+          _numDocs(numDocs),
+          _produceScore(produceScore) {}
 
     extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                               ::MongoExtensionExecAggStage* execStage) override {
@@ -68,14 +66,19 @@ public:
         auto currentId = _currentDoc++;
         auto document = extension::ExtensionBSONObj::makeAsByteBuf(BSON("_id" << currentId));
 
-        if (!_sortById) {
-            // We haven't been asked for sorted results, no need to generate sort key metadata.
+        if (!_sortById && !_produceScore) {
+            // We haven't been asked for sorted results or a $score, no need to generate metadata.
             return extension::ExtensionGetNextResult::advanced(std::move(document));
         }
 
-        // Generate sort key metadata so that the sharded sort by id can be applied correctly.
-        auto metadata = extension::ExtensionBSONObj::makeAsByteBuf(
-            BSON("$sortKey" << BSON("_id" << currentId)));
+        BSONObjBuilder metaBuilder;
+        if (_sortById) {
+            metaBuilder.append("$sortKey", BSON("_id" << currentId));
+        }
+        if (_produceScore) {
+            metaBuilder.append("$score", static_cast<double>(currentId) * 5);
+        }
+        auto metadata = extension::ExtensionBSONObj::makeAsByteBuf(metaBuilder.obj());
         return extension::ExtensionGetNextResult::advanced(std::move(document),
                                                            std::move(metadata));
     }
@@ -95,20 +98,59 @@ public:
 private:
     const bool _sortById;
     const int _numDocs;
+    const bool _produceScore;
     int _currentDoc = 0;
 };
 
-class ProduceIdsLogicalStage : public sdk::TestLogicalStage<ProduceIdsExecStage> {
+/**
+ * Logical stage for $produceIds. Overrides applyPipelineSuffixDependencies() to conditionally
+ * enable $score metadata production: if the downstream pipeline suffix needs "score" metadata,
+ * _produceScore is set to true and the compiled exec stage will emit score = _id * 5.
+ */
+class ProduceIdsLogicalStage : public sdk::LogicalAggStage {
 public:
     ProduceIdsLogicalStage(std::string_view stageName, const BSONObj& arguments)
-        : sdk::TestLogicalStage<ProduceIdsExecStage>(stageName, arguments) {}
+        : ProduceIdsLogicalStage(stageName,
+                                 arguments["sortById"] && arguments["sortById"].booleanSafe(),
+                                 arguments["numDocs"] && arguments["numDocs"].isNumber()
+                                     ? arguments["numDocs"].safeNumberInt()
+                                     : 1,
+                                 arguments["produceScore"].booleanSafe()) {}
+
+    ProduceIdsLogicalStage(std::string_view stageName,
+                           bool sortById,
+                           int numDocs,
+                           bool produceScore)
+        : sdk::LogicalAggStage(stageName),
+          _sortById(sortById),
+          _numDocs(numDocs),
+          _produceScore(produceScore) {}
+
+    BSONObj serialize() const override {
+        BSONObjBuilder spec;
+        spec.append("numDocs", _numDocs);
+        if (_sortById)
+            spec.appendBool("sortById", true);
+        if (_produceScore)
+            spec.appendBool("produceScore", true);
+        return BSON(_name << spec.obj());
+    }
+
+    BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity) const override {
+        return serialize();
+    }
+
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
+        return std::make_unique<ProduceIdsExecStage>(_name, _sortById, _numDocs, _produceScore);
+    }
 
     std::unique_ptr<sdk::LogicalAggStage> clone() const override {
-        return std::make_unique<ProduceIdsLogicalStage>(_name, _arguments);
+        return std::make_unique<ProduceIdsLogicalStage>(_name, _sortById, _numDocs, _produceScore);
     }
 
     BSONObj getSortPattern() const override {
-        if (_arguments["sortById"] && _arguments["sortById"].booleanSafe()) {
+        if (_sortById) {
             return BSON("_id" << 1);
         }
         return BSONObj();
@@ -127,7 +169,7 @@ public:
             dpl.shardsPipeline = sdk::DPLArrayContainer(std::move(pipeline));
         }
 
-        if (_arguments["sortById"] && _arguments["sortById"].booleanSafe()) {
+        if (_sortById) {
             dpl.sortPattern = BSON("_id" << 1);
         }
 
@@ -137,9 +179,19 @@ public:
     BSONObj getFilter() const override {
         // We will generate _ids from [0, numDocs). We can turn this range into a filter that can be
         // used for shard targeting.
-        auto rangeFilter = BSON("$gte" << 0 << "$lt" << parseNumDocs(_arguments));
+        auto rangeFilter = BSON("$gte" << 0 << "$lt" << _numDocs);
         return BSON("_id" << rangeFilter);
     }
+
+    void applyPipelineSuffixDependencies(
+        const extension::PipelineDependenciesHandle& deps) override {
+        _produceScore = deps->needsMetadata("score");
+    }
+
+private:
+    const bool _sortById;
+    const int _numDocs;
+    bool _produceScore;
 };
 
 class ProduceIdsAstNode : public sdk::TestAstNode<ProduceIdsLogicalStage> {
@@ -152,6 +204,7 @@ public:
         properties.setPosition(extension::MongoExtensionPositionRequirementEnum::kFirst);
         properties.setRequiresInputDocSource(false);
         properties.setAllowedInFacet(false);
+        properties.setProvidedMetadataFields(std::vector<std::string>{"score"});
 
         BSONObjBuilder builder;
         properties.serialize(&builder);
