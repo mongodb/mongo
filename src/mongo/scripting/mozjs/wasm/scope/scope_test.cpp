@@ -39,6 +39,24 @@
 using namespace mongo;
 using namespace mongo::mozjs;
 
+namespace {
+// Tests that exercise WasmtimeImplScope::reset() need the global script engine to be set,
+// because reset() rebuilds its WasmEngineContext via getGlobalScriptEngine().
+// This guard does the same for the lifetime of a single test and clears it on destruction so
+// tests stay isolated.
+struct GlobalEngineGuard {
+    GlobalEngineGuard() {
+        setGlobalScriptEngine(new WasmtimeScriptEngine());
+    }
+    ~GlobalEngineGuard() {
+        setGlobalScriptEngine(nullptr);
+    }
+    WasmtimeScriptEngine& engine() {
+        return *static_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine());
+    }
+};
+}  // namespace
+
 TEST(WasmtimeScope, CreateAndInvoke_SimpleReturn_ProxyAndThreadLocal) {
     WasmtimeScriptEngine engine;
 
@@ -315,8 +333,8 @@ TEST(WasmtimeScope, Invoke_IgnoreReturn_FunctionIsStillInvoked) {
 
 // kill() flag is cleared by reset().
 TEST(WasmtimeScope, Lifecycle_Reset_ClearsKillFlag) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
 
     scope->kill();
     ASSERT_TRUE(scope->isKillPending());
@@ -326,8 +344,8 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsKillFlag) {
 
 // Emit state is cleared by reset(); the new bridge can accept a fresh injectNative("emit").
 TEST(WasmtimeScope, Lifecycle_Reset_ClearsEmitState) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
 
     std::vector<BSONObj> emitted;
     scope->injectNative(
@@ -359,8 +377,8 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsEmitState) {
 
 // Function handles created before reset() are invalidated; using one throws.
 TEST(WasmtimeScope, Lifecycle_Reset_InvalidatesHandles) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
 
     ScriptingFunction staleHandle = scope->createFunction("return 1;");
     scope->reset();
@@ -372,8 +390,8 @@ TEST(WasmtimeScope, Lifecycle_Reset_InvalidatesHandles) {
 
 // reset() re-initializes the bridge; globals from before reset are cleared.
 TEST(WasmtimeScope, Lifecycle_Reset_ClearsGlobals) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
 
     scope->setNumber("x", 99.0);
     scope->reset();
@@ -585,8 +603,8 @@ TEST(WasmtimeScope, MemoryLimit_RuntimeChangeAffectsNewScope) {
 // Note: the JS heap limit is cached per-scope at construction time, so only the store
 // limit changes on reset.
 TEST(WasmtimeScope, MemoryLimit_ResetPicksUpNewValue) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
     // Change the store limit after the scope was created, then reset.
@@ -700,8 +718,8 @@ TEST(WasmtimeScope, MemoryLimit_LargeHeapUsesPercentOverhead) {
 
 // reset() re-reads the server params; if the new combination is invalid it must fail.
 TEST(WasmtimeScope, MemoryLimit_ResetWithInvalidParamsFails) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
     auto savedHeap = gJSHeapLimitMB.load();
@@ -750,8 +768,8 @@ TEST(WasmtimeScope, OOM_SetOnJsHeapOom) {
 
 // reset() clears the OOM flag.
 TEST(WasmtimeScope, OOM_ResetClearsFlag) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    GlobalEngineGuard engineGuard;
+    std::unique_ptr<Scope> scope(engineGuard.engine().createScopeForCurrentThread(boost::none));
 
     ScriptingFunction fn = scope->createFunction(
         "function() {"
@@ -769,4 +787,86 @@ TEST(WasmtimeScope, OOM_ResetClearsFlag) {
 
     scope->reset();
     ASSERT_FALSE(scope->hasOutOfMemoryException());
+}
+
+// Test killing a process.
+TEST(WasmtimeScope, KillProcess) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    // Allocate until the JS heap runs out of memory.
+    ScriptingFunction fn = scope->createFunction(
+        "function() {"
+        "  var arr = [];"
+        "  var s = new Array(1024 * 1024 + 1).join('a');"
+        "  for (var i = 0; i < 10; i++) {"
+        "    arr.push(s);"
+        "    s = s + s;"
+        "  }"
+        "  return arr.length;"
+        "}");
+
+    ASSERT_THROWS(scope->invoke(fn, nullptr, nullptr, 0), DBException);
+    ASSERT_TRUE(scope->hasOutOfMemoryException());
+}
+
+// Test timeouts with a regular function.
+TEST(WasmtimeScope, TimeoutFunction) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+
+    ASSERT_THROWS_WITH_CHECK(scope->invoke(fn, nullptr, nullptr, 1),
+                             AssertionException,
+                             [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
+}
+
+// Test timeouts with predicate.
+TEST(WasmtimeScope, TimeoutPredicate) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction fn =
+        scope->createFunction("function() { while (true) {}; return this.age >= 18; }");
+    ASSERT(fn != 0);
+
+    BSONObj doc1 = BSON("age" << 25);
+    ASSERT_THROWS_WITH_CHECK(scope->invoke(fn, nullptr, &doc1, 1),
+                             AssertionException,
+                             [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
+}
+
+// Test timeouts with map.
+TEST(WasmtimeScope, TimeoutMap) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    std::vector<BSONObj> emitted2;
+    scope->injectNative(
+        "emit",
+        [](const BSONObj& args, void* data) -> BSONObj {
+            static_cast<std::vector<BSONObj>*>(data)->push_back(args.getOwned());
+            return BSONObj();
+        },
+        &emitted2);
+
+    ScriptingFunction mapFn =
+        scope->createFunction("function() { while(true) {}; emit(this.k, this.v); }");
+    BSONObj doc = BSON("k" << "x" << "v" << 1);
+    ASSERT_THROWS_WITH_CHECK(scope->invoke(mapFn, nullptr, &doc, 1, true),
+                             AssertionException,
+                             [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
+}
+
+// Test timeouts with sleep.
+TEST(WasmtimeScope, TimeoutSleep) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction fn = scope->createFunction("sleep(10000)");
+    ASSERT_THROWS_WITH_CHECK(scope->invoke(fn, nullptr, nullptr, 1),
+                             AssertionException,
+                             [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
 }

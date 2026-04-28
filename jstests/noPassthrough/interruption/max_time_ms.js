@@ -5,8 +5,6 @@
  * @tags: [
  *   requires_sharding,
  *   requires_scripting,
- *   # TODO SERVER-116054: Add support for $where.
- *   mozjs_wasm_unsupported,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -206,8 +204,8 @@ function executeTest(db, isMongos) {
 
     //
     // Many-batch negative test for getmore:
-    // - Issue a many-batch find() with a 20-second time limit where the results take 10 seconds to
-    //   generate; the find() should not hit the time limit.
+    // - Issue a many-batch find() with a 35-second time limit where the results take 10 seconds
+    // (+ overhead) to generate; the find() should not hit the time limit.
     //
     (function manyBatchNegativeGetMore() {
         const t = db.many_batch_negative_get_more;
@@ -225,7 +223,7 @@ function executeTest(db, isMongos) {
             })
             .sort({_id: 1});
         cursor.batchSize(3);
-        cursor.maxTimeMS(20 * 1000);
+        cursor.maxTimeMS(35 * 1000);
         assert.doesNotThrow(
             function () {
                 // SERVER-40305: Add some additional logging here in case this fails to help us track

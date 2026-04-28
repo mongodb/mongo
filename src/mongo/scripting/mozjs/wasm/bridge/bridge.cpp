@@ -161,6 +161,11 @@ bool MozJSWasmBridge::_callFuncNoArgs(wc::Func& func, wc::Val* results, size_t n
     wt::Result<std::monostate> callResult = func.call(getContext(), empty, resultsSpan);
     if (!callResult) {
         _state.store(State::Trapped);
+        // If we are pending a kill we either timed out or got killed.
+        // Throw interrupted to indicate this to the caller.
+        if (isKillPending()) {
+            uasserted(ErrorCodes::Interrupted, callResult.err().message());
+        }
         uasserted(kWasmtimeTrapErrorCode, callResult.err().message());
     }
     auto postResult = func.post_return(getContext());

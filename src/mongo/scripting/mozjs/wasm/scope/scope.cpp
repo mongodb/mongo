@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/scripting/config_engine_gen.h"
+#include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/util/str.h"
 
@@ -51,12 +52,32 @@ WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wa
     init(nullptr);
 }
 
+WasmtimeImplScope::~WasmtimeImplScope() {
+    // Must unregister before _bridge is destroyed, otherwise a concurrent interrupt() reading the
+    // OperationContext decoration could dereference a freed _bridge. This is because
+    // unregisterOperation() takes the Client lock, serialising with respect to interrupt().
+    unregisterOperation();
+}
+
 void WasmtimeImplScope::reset() {
+    // Clear the decoration under the Client lock before tearing down _bridge, so a racing
+    // interrupt() cannot call kill() on a dangling bridge.
+    unregisterOperation();
     if (_bridge && _bridge->isInitialized() && !_bridge->hasTrapped() && !_bridge->hasOomError() &&
         !_bridge->isKillPending()) {
         _bridge->shutdown();
     }
     _bridge = nullptr;
+
+    // Drop the old engine context and build a fresh one. kill() calls Engine::increment_epoch(),
+    // which is engine-wide state — reusing the same engine after a kill poisons any future Store
+    // created from it (new instantiations can fail outright, or be born past their epoch
+    // deadline). A fresh Engine+Component per reset() cycle keeps contamination bounded to the
+    // bridge that was actually killed.
+    _wasmEngineCtx.reset();
+    if (auto* engine = getGlobalScriptEngine()) {
+        _wasmEngineCtx = static_cast<WasmtimeScriptEngine*>(engine)->createWasmEngineContext();
+    }
 
     _cachedFunctions.clear();
 
@@ -105,9 +126,6 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                               bool ignoreReturn,
                               bool readOnlyArgs,
                               bool readOnlyRecv) {
-    // TODO(SERVER-122128): enforce timeoutMs by running the function in a separate thread and
-    // killing it if it runs too long.
-
     // TODO(SERVER-122738): readOnlyArgs and readOnlyRecv are silently ignored here. In the MozJS
     // implementation these flags cause SpiderMonkey to freeze the corresponding JS objects so that
     // JavaScript code cannot mutate them during execution.
@@ -116,21 +134,27 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
             uassert(ErrorCodes::BadValue,
                     "emit() cannot be used in a function that returns a value",
                     ignoreReturn);
+            _deadlineMonitor.startDeadline(this, timeoutMs);
             _bridge->invokeMap(func, *recv);
+            _deadlineMonitor.stopDeadline(this);
             _drainEmitToCallback();
             return 0;
         }
 
+        _deadlineMonitor.startDeadline(this, timeoutMs);
         bool predicateResult = _bridge->invokePredicate(func, *recv);
+        _deadlineMonitor.stopDeadline(this);
         if (!ignoreReturn) {
             _lastReturnValue = BSON(kReturnValueField << predicateResult);
         }
         return 0;
     }
 
+    _deadlineMonitor.startDeadline(this, timeoutMs);
     // Consider having invokeFunction return the value directly.
     // This would eliminate the extra round trip to the engine.
     auto result = _bridge->invokeFunction(func, args ? *args : BSONObj(), ignoreReturn);
+    _deadlineMonitor.stopDeadline(this);
     uassertStatusOK(result.getStatus());
     if (!ignoreReturn) {
         // invokeFunction's direct return goes through getGlobal which flattens JS arrays
@@ -298,7 +322,6 @@ std::string WasmtimeImplScope::getError() {
     return "";
 }
 
-// TODO (SERVER-122128): Implement interrupt support
 void WasmtimeImplScope::registerOperation(OperationContext* opCtx) {
     _opCtx = opCtx;
     if (auto* engine = getGlobalScriptEngine()) {
@@ -314,7 +337,8 @@ void WasmtimeImplScope::unregisterOperation() {
     }
 }
 void WasmtimeImplScope::kill() {
-    _bridge->kill();
+    if (_bridge)
+        _bridge->kill();
 }
 bool WasmtimeImplScope::isKillPending() const {
     return _bridge->isKillPending();

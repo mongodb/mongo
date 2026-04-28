@@ -83,8 +83,11 @@ public:
     void registerOperation(OperationContext* ctx, WasmtimeImplScope* scope);
     void unregisterOperation(OperationContext* opCtx);
 
-private:
-    std::shared_ptr<wasm::WasmEngineContext> _wasmEngineCtx;
+    // Builds a fresh Wasmtime Engine + deserialized Component from the embedded precompiled
+    // component bytes. Each scope (and each post-kill rebuild inside a scope) gets its own
+    // context so that engine-wide state (notably the interrupt-epoch counter bumped by kill())
+    // cannot leak across scopes or survive a reset().
+    std::shared_ptr<wasm::WasmEngineContext> createWasmEngineContext() const;
 };
 
 }  // namespace mozjs

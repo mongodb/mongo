@@ -83,14 +83,15 @@ auto operationWasmtimeScopeDecoration =
 
 namespace mozjs {
 
-WasmtimeScriptEngine::WasmtimeScriptEngine() {
-    size_t size =
-        static_cast<size_t>(_binary_mozjs_wasm_api_cwasm_end - _binary_mozjs_wasm_api_cwasm_start);
-    _wasmEngineCtx =
-        wasm::WasmEngineContext::createFromPrecompiled(_binary_mozjs_wasm_api_cwasm_start, size);
-}
+WasmtimeScriptEngine::WasmtimeScriptEngine() {}
 
 WasmtimeScriptEngine::~WasmtimeScriptEngine() {}
+
+std::shared_ptr<wasm::WasmEngineContext> WasmtimeScriptEngine::createWasmEngineContext() const {
+    size_t size =
+        static_cast<size_t>(_binary_mozjs_wasm_api_cwasm_end - _binary_mozjs_wasm_api_cwasm_start);
+    return wasm::WasmEngineContext::createFromPrecompiled(_binary_mozjs_wasm_api_cwasm_start, size);
+}
 
 mongo::Scope* WasmtimeScriptEngine::createScope() {
     return createScopeForCurrentThread(boost::none);
@@ -101,7 +102,7 @@ mongo::Scope* WasmtimeScriptEngine::createScopeForCurrentThread(
     // Resolve the heap limit: use passed value if provided, otherwise use global config.
     // If a limit is passed, cap it at the global limit (like MozJS does).
     const auto resolvedLimit = jsHeapLimitMB ? *jsHeapLimitMB : getJSHeapLimitMB();
-    return new WasmtimeImplScope(_wasmEngineCtx, resolvedLimit);
+    return new WasmtimeImplScope(createWasmEngineContext(), resolvedLimit);
 }
 
 // TODO (SERVER-122128): Implement interrupt support
@@ -123,9 +124,15 @@ void WasmtimeScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
     }
 }
 void WasmtimeScriptEngine::registerOperation(OperationContext* opCtx, WasmtimeImplScope* scope) {
+    std::lock_guard lk(*opCtx->getClient());
     (*opCtx)[operationWasmtimeScopeDecoration] = scope;
+
+    if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
+        scope->kill();
+    }
 }
 void WasmtimeScriptEngine::unregisterOperation(OperationContext* opCtx) {
+    std::lock_guard lk(*opCtx->getClient());
     (*opCtx)[operationWasmtimeScopeDecoration] = nullptr;
 }
 

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 #include "mongo/util/modules.h"
@@ -43,6 +44,7 @@ class WasmtimeImplScope : public Scope {
 public:
     WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wasmEngineCtx,
                       boost::optional<int> jsHeapLimitMB = boost::none);
+    ~WasmtimeImplScope() override;
 
     int invoke(ScriptingFunction func,
                const BSONObj* args,
@@ -112,10 +114,13 @@ protected:
     ScriptingFunction _createFunction(const char* code) override;
 
 private:
-    const std::shared_ptr<wasm::WasmEngineContext> _wasmEngineCtx;
+    // Rebuilt on reset() after a kill so engine-wide state (e.g. interrupt epoch) doesn't persist
+    // across the pool handoff. Owned solely by this scope.
+    std::shared_ptr<wasm::WasmEngineContext> _wasmEngineCtx;
     const boost::optional<int> _jsHeapLimitMB;
 
     std::unique_ptr<wasm::MozJSWasmBridge> _bridge;
+    DeadlineMonitor<WasmtimeImplScope> _deadlineMonitor;
     void _drainEmitToCallback();
     void _installHelpers();
     BSONObj _resolveGlobal(const char* field) const;
