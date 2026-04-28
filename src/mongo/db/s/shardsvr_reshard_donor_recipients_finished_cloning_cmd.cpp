@@ -72,9 +72,10 @@ public:
                 ReshardingDonorService,
                 ReshardingDonorService::DonorStateMachine,
                 ReshardingDonorDocument>(opCtx, uuid());
-            if (!machine) {
-                return;
-            }
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "No resharding donor found with id " << uuid(),
+                    machine);
 
             LOGV2(10758401,
                   "Resharding donor received recipientsFinishedCloning command",
@@ -123,6 +124,10 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
+    }
+
+    bool supportsRetryableWrite() const final {
+        return true;
     }
 };
 MONGO_REGISTER_COMMAND(ShardsvrReshardDonorRecipientsFinishedCloningCommand).forShard();

@@ -42,6 +42,10 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st
 
 // Feature is FCV-gated, so effective state is cluster-wide; one node is enough (config primary).
 const cloneNoRefreshEnabled = FeatureFlagUtil.isPresentAndEnabled(configPrimary, "ReshardingCloneNoRefresh");
+const noRefreshApplyingAndBlockingWritesEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    configPrimary,
+    "ReshardingNoRefreshApplyingAndBlockingWrites",
+);
 
 const testCriticalSectionTimeoutMS = 1000;
 const cmdBlockTimeoutMS = 60 * 60 * 1000;
@@ -128,10 +132,18 @@ function testAbortWhileWaiting(cmdName, numSkips) {
 // to donors in kApplying and kBlockingWrites (2 calls); use 2 skips to block the critical-section
 // one. When the flag is on, coordinator only sends to donors in kApplying and kBlockingWrites
 // but the cloning refresh is skipped, so we use 1 skip to block the kBlockingWrites flush.
+let expectedFlushCount = 2;
+if (cloneNoRefreshEnabled) {
+    expectedFlushCount -= 1;
+}
+if (noRefreshApplyingAndBlockingWritesEnabled) {
+    // TODO SERVER-124256: Instead of decrementing the flush count here, we should block on the newly added command instead of _flushReshardingStateChange when this feature flag is enabled.
+    expectedFlushCount -= 1;
+}
 const cmdsToBlock = [
     {
         cmdName: "_flushReshardingStateChange",
-        numSkips: cloneNoRefreshEnabled ? 1 : 2,
+        numSkips: expectedFlushCount,
     },
     {
         cmdName: "_shardsvrReshardingDonorFetchFinalCollectionStats",

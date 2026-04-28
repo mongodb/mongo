@@ -1142,6 +1142,7 @@ const allTestCases = {
                         _shardsvrReshardDonorRecipientsFinishedCloning: UUID(),
                     };
                 },
+                expectedFailureCode: ErrorCodes.IllegalOperation,
             },
         },
         _shardsvrReshardRecipientInitialize: {skip: "TODO"},

@@ -540,7 +540,15 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kApplying) {
                            auto span = _startSpan(telemetryCtx,
                                                   "ReshardingCoordinator::_tellAllDonorsToRefresh");
-                           _tellAllDonorsToRefresh(executor);
+                           if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
+                                   .isEnabled(resharding::getVersionContextOrDefault(
+                                                  _forwardableOpMetadata),
+                                              serverGlobalParams.featureCompatibility
+                                                  .acquireFCVSnapshot())) {
+                               _notifyDonorsCloningComplete(executor);
+                           } else {
+                               _tellAllDonorsToRefresh(executor);
+                           }
                        }
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
@@ -2121,6 +2129,19 @@ void ReshardingCoordinator::_tellAllRecipientsToClone(
                                          _coordinatorDoc,
                                          _ctHolder->getStepdownToken(),
                                          executor);
+}
+
+void ReshardingCoordinator::_notifyDonorsCloningComplete(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    auto opCtx = _makeOperationContext();
+    ShardsvrReshardDonorRecipientsFinishedCloning cmd(_coordinatorDoc.getReshardingUUID());
+    resharding::sendReshardingCommand(
+        opCtx.get(),
+        _getNewSession(opCtx.get()),
+        cmd,
+        _ctHolder->getAbortToken(),
+        executor,
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards()));
 }
 
 void ReshardingCoordinator::_tellAllRecipientsToRefresh(
