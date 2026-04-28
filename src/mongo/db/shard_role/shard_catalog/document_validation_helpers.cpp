@@ -60,12 +60,7 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                 "Validation action of 'warn' is not allowed when Validation level is 'constraint'");
         }
         if (opts.uuid) {  // existing collection
-            if (opts.validationLevel != ValidationLevelEnum::constraint) {
-                return Status(
-                    ErrorCodes::BadValue,
-                    "Validation level 'constraint' can not be set on existing collections.");
-            }
-            if (newValidator) {
+            if (opts.validationLevel == ValidationLevelEnum::constraint && newValidator) {
                 return Status(ErrorCodes::BadValue,
                               "Validator can not be changed when Validation level is 'constraint'");
             }
