@@ -11,16 +11,17 @@ import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // TODO (SERVER-124153): Remove the failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
 const st = new ShardingTest({
     mongos: 1,
     shards: 2,
     chunkSize: 1,
     other: {
-        shardOptions: {
-            setParameter: {
-                "failpoint.useInMemoryReplicatedSizeCount": "{'mode':'alwaysOn'}",
-            },
-        },
+        shardOptions: {setParameter: failpointSetParameter},
     },
 });
 const kDbName = "db";

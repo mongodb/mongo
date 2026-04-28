@@ -12,6 +12,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const dbName = jsTestName();
 const collName = "test";
 
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+// TODO (SERVER-124178 / SERVER-124153): Remove the failpoint.
+const failpointSetParameter = isMultiversion
+    ? {}
+    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
+
 function getShardCount(counts, shardName) {
     for (let i = 0; i < counts.length; i++) {
         if (counts[i]["shard"] == shardName) return counts[i];
@@ -24,14 +31,9 @@ function getShardCount(counts, shardName) {
  * on the i-th shard or no chunks assigned to that shard if shardDistribution[i] is null.
  */
 function runShardingTestExists(shardDistribution) {
-    // TODO (SERVER-124178): Remove the failpoint.
     const st = new ShardingTest({
         shards: shardDistribution.length,
-        rsOptions: {
-            setParameter: {
-                "failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"}),
-            },
-        },
+        rsOptions: {setParameter: failpointSetParameter},
     });
 
     const mongos = st.s0;
@@ -87,14 +89,9 @@ function runShardingTestExists(shardDistribution) {
 }
 
 function runUnshardedCollectionShardTestExists(shardNum, docsNum) {
-    // TODO (SERVER-124153): Remove the failpoint.
     const st = new ShardingTest({
         shards: shardNum,
-        rsOptions: {
-            setParameter: {
-                "failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"}),
-            },
-        },
+        rsOptions: {setParameter: failpointSetParameter},
     });
 
     const mongos = st.s0;
@@ -120,14 +117,9 @@ function runUnshardedCollectionShardTestExists(shardNum, docsNum) {
 
 function runReplicaSetTestExists(nodesNum, docsNum) {
     const namespace = dbName + "." + collName;
-    // TODO (SERVER-124153): Remove the failpoint.
     const rst = new ReplSetTest({
         nodes: nodesNum,
-        nodeOptions: {
-            setParameter: {
-                "failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"}),
-            },
-        },
+        nodeOptions: {setParameter: failpointSetParameter},
     });
 
     rst.startSet();
@@ -151,12 +143,7 @@ function runReplicaSetTestExists(nodesNum, docsNum) {
 
 function runStandaloneTestExists(docsNum) {
     const namespace = dbName + "." + collName;
-    // TODO (SERVER-124153): Remove the failpoint.
-    const conn = MongoRunner.runMongod({
-        setParameter: {
-            "failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"}),
-        },
-    });
+    const conn = MongoRunner.runMongod({setParameter: failpointSetParameter});
 
     const coll = conn.getCollection(namespace);
 

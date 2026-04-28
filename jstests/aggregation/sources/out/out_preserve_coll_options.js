@@ -6,10 +6,14 @@ import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_help
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // TODO (SERVER-124153): Remove the failpoint.
-FixtureHelpers.runCommandOnEachPrimary({
-    db: db.getSiblingDB("admin"),
-    cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
-});
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+if (!isMultiversion) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: db.getSiblingDB("admin"),
+        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
+    });
+}
 
 // Setup and populate input collection.
 const inputName = "out_preserve_coll_options";

@@ -8,8 +8,6 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  does_not_support_stepdowns,
- *  # TODO (SERVER-124037): Re-enable this test.
- *  featureFlagReplicatedFastCount_incompatible,
  *  ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
@@ -29,13 +27,29 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.bigString = "x".repeat(1024 * 128);
 
     $config.setup = function (db, collName, cluster) {
-        // Overridden methods should usually call the corresponding
-        // method on $super.
         $super.setup.apply(this, arguments);
+        // TODO (SERVER-124153): Remove the failpoint.
+        const isMultiversion =
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        if (!isMultiversion) {
+            cluster.executeOnMongodNodes(function (adminDb) {
+                assert.commandWorked(
+                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
+                );
+            });
+        }
     };
 
     $config.teardown = function (db, collName, cluster) {
-        // $super.setup.teardown(this, arguments);
+        const isMultiversion =
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        if (!isMultiversion) {
+            cluster.executeOnMongodNodes(function (adminDb) {
+                assert.commandWorked(
+                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "off"}),
+                );
+            });
+        }
     };
 
     $config.data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(db, collName, partition) {

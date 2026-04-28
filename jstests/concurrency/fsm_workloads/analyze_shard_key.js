@@ -1076,11 +1076,15 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
 
     $config.setup = function setup(db, collName, cluster) {
         // TODO (SERVER-124153): Remove the failpoint.
-        cluster.executeOnMongodNodes((adminDb) => {
-            assert.commandWorked(
-                adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
-            );
-        });
+        const isMultiversion =
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        if (!isMultiversion) {
+            cluster.executeOnMongodNodes((adminDb) => {
+                assert.commandWorked(
+                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
+                );
+            });
+        }
 
         // Look up the number of most common values and the number of ranges that the
         // analyzeShardKey command should return.
@@ -1145,11 +1149,15 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
 
     $config.teardown = function teardown(db, collName, cluster) {
         // TODO (SERVER-124153): Remove the failpoint.
-        cluster.executeOnMongodNodes((adminDb) => {
-            assert.commandWorked(
-                adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "off"}),
-            );
-        });
+        const isMultiversion =
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        if (!isMultiversion) {
+            cluster.executeOnMongodNodes((adminDb) => {
+                assert.commandWorked(
+                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "off"}),
+                );
+            });
+        }
 
         if (cluster.isSharded) {
             cluster.executeOnMongosNodes((adminDb) => {
