@@ -40,6 +40,13 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
+    ChangeStreamCursorInfo:
+        description: "Change stream metrics reported in a GenericCursor."
+        fields:
+            optime:
+                description: "The optime of the last document read by the change stream cursor."
+                type: timestamp
+
     GenericCursor:
         description: "A struct representing a cursor in either mongod or mongos"
         fields:
@@ -104,6 +111,10 @@ structs:
                     "The commit point known by the server at the time when the last batch was
                     returned."
                 type: optime
+                optional: true
+            changeStreams:
+                description: "Change stream metrics, including the optime of the last document read."
+                type: ChangeStreamCursorInfo
                 optional: true
             inUseTrackedMemBytes:
                 description: The number of bytes in use by the query associated with the cursor.

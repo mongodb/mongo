@@ -163,6 +163,13 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     if (_isChangeStreamQuery) {
         change_stream_metrics::gCursorsTotalOpened.add(1);
         change_stream_metrics::gCursorsOpenTotal.add(1);
+
+        // Initialize optime to the current high-watermark so $currentOp reflects a valid
+        // timestamp even before the first getMore.
+        auto ts = _exec->getLatestOplogTimestamp();
+        if (!ts.isNull()) {
+            _changeStreamsCursorOptime = ts;
+        }
     }
 
     if (isNoTimeout()) {
@@ -184,6 +191,10 @@ ClientCursor::~ClientCursor() {
     // If we are holding transaction resources we must dispose of them before destroying the object.
     // Not doing so is a programming failure.
     _transactionResources.dispose();
+}
+
+void ClientCursor::setChangeStreamsCursorOptime(Timestamp ts) {
+    _changeStreamsCursorOptime = ts;
 }
 
 void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now) {
@@ -239,6 +250,11 @@ GenericCursor ClientCursor::toGenericCursor() const {
         gc.setOperationUsingCursorId(opCtx->getOpID());
     }
     gc.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
+    if (_changeStreamsCursorOptime) {
+        ChangeStreamCursorInfo cursorInfo;
+        cursorInfo.setOptime(*_changeStreamsCursorOptime);
+        gc.setChangeStreams(std::move(cursorInfo));
+    }
     return gc;
 }
 

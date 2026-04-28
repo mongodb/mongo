@@ -1013,7 +1013,7 @@ export function cursorCommentFilter(comment) {
  * @param {Object} filter - Additional $match filter for selecting specific cursors
  * @param {Object} opts - $currentOp options override (default: {idleConnections: true})
  */
-function listIdleCursors(adminDB, filter = {}, opts = {idleConnections: true}) {
+export function listIdleCursors(adminDB, filter = {}, opts = {idleConnections: true}) {
     return adminDB
         .aggregate([
             {$currentOp: Object.assign({idleCursors: true, allUsers: true}, opts)},

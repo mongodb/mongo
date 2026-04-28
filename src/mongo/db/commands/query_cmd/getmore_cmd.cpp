@@ -669,6 +669,15 @@ public:
                                                         &nextBatch,
                                                         &numResults);
 
+            if (cursorPin->isChangeStreamQuery()) {
+                // Update optime after every getMore: reflects the last event's timestamp when
+                // events were returned, or the current high-watermark when the batch was empty.
+                auto ts = exec->getLatestOplogTimestamp();
+                if (!ts.isNull()) {
+                    cursorPin->setChangeStreamsCursorOptime(ts);
+                }
+            }
+
             PlanSummaryStats postExecutionStats;
             exec->getPlanExplainer().getSummaryStats(&postExecutionStats);
             postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;

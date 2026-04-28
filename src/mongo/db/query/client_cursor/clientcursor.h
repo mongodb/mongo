@@ -322,6 +322,12 @@ public:
         _lastKnownCommittedOpTime = std::move(lastCommittedOpTime);
     }
 
+    boost::optional<Timestamp> getChangeStreamsCursorOptime() const {
+        return _changeStreamsCursorOptime;
+    }
+
+    void setChangeStreamsCursorOptime(Timestamp ts);
+
     friend std::size_t partitionOf(const ClientCursor* cursor) {
         return cursor->cursorid();
     }
@@ -489,6 +495,10 @@ private:
     // Commit point at the time the last batch was returned. This is only used by internal exhaust
     // oplog fetching.
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
+
+    // Oplog timestamp of the last document read by this change stream cursor. Only set for
+    // change stream cursors.
+    boost::optional<Timestamp> _changeStreamsCursorOptime;
 
     // Passed along from the original query so that it can be logged if necessary in getMore
     // requests.
