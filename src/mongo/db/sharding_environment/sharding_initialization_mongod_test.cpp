@@ -637,5 +637,48 @@ TEST_F(
     ASSERT(!ShardingInitializationMongoD::getShardIdentityDoc(operationContext()));
 }
 
+using ShardCatalogIndexTest = ShardingMongoDTestFixture;
+
+/**
+ * Helper to get the list of indexes on a namespace using DBDirectClient.
+ */
+std::list<BSONObj> getIndexes(OperationContext* opCtx, const NamespaceString& nss) {
+    DBDirectClient client(opCtx);
+    const bool includeBuildUUIDs = false;
+    const int options = 0;
+    return client.getIndexSpecs(nss, includeBuildUUIDs, options);
+}
+
+TEST_F(ShardCatalogIndexTest, CreatesCollectionsAndIndexes) {
+    ASSERT_OK(ensureShardLocalCatalogIndexes(operationContext()));
+
+    // config.shard.catalog.collections should have the _id index only.
+    auto collectionsIndexes =
+        getIndexes(operationContext(), NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(1U, collectionsIndexes.size());
+
+    // config.shard.catalog.chunks should have _id + 4 custom indexes = 5 total.
+    auto chunksIndexes =
+        getIndexes(operationContext(), NamespaceString::kConfigShardCatalogChunksNamespace);
+    ASSERT_EQ(5U, chunksIndexes.size());
+}
+
+TEST_F(ShardCatalogIndexTest, IdempotentWhenCalledMultipleTimes) {
+    // First call.
+    ASSERT_OK(ensureShardLocalCatalogIndexes(operationContext()));
+
+    // Second call should also succeed without errors.
+    ASSERT_OK(ensureShardLocalCatalogIndexes(operationContext()));
+
+    // Verify index counts remain the same.
+    auto collectionsIndexes =
+        getIndexes(operationContext(), NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(1U, collectionsIndexes.size());
+
+    auto chunksIndexes =
+        getIndexes(operationContext(), NamespaceString::kConfigShardCatalogChunksNamespace);
+    ASSERT_EQ(5U, chunksIndexes.size());
+}
+
 }  // namespace
 }  // namespace mongo
