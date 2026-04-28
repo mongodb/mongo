@@ -2708,8 +2708,6 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         // abort oplog entry.
         OplogSlotReserver oplogSlotReserver(opCtx);
 
-        // TODO SERVER-113730: Determine if it's necessary to check the state is prepared here. It
-        // seems a non-prepared txn >16MB can reach this path, but we should confirm that.
         if (gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled() &&
             o().txnState.isPrepared()) {
             // TODO SERVER-113735: Revisit this for split transactions aborting after step up.

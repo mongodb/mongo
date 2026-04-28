@@ -2124,7 +2124,6 @@ repl::OpTime logApplyOps(
                 if (rss::ReplicatedStorageService::get(opCtx)
                         .getPersistenceProvider()
                         .supportsPreservingPreparedTxnInPreciseCheckpoints()) {
-                    // TODO SERVER-113730: Decide if kInProgress needs to include these fields too.
                     auto txnParticipant = TransactionParticipant::get(opCtx);
                     tassert(11372300,
                             "Tried to set state to prepared without an active transaction",
