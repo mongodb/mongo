@@ -303,6 +303,18 @@ Status ReshardingCoordinator::_getEffectiveStatus(Status status) const {
     return status;
 }
 
+void ReshardingCoordinator::_installCoordinatorDocFromCatalog() {
+    const HierarchicalCancelableOperationContextFactory opCtxFactory(_ctHolder->getStepdownToken(),
+                                                                     _markKilledExecutor);
+    auto diskDoc = resharding::getCoordinatorDoc(
+        opCtxFactory, _forwardableOpMetadata, _coordinatorDoc.getReshardingUUID());
+    auto installOpCtx = resharding::makeReshardingOperationContext(
+        opCtxFactory,
+        diskDoc.getState() >= CoordinatorStateEnum::kBlockingWrites,
+        _forwardableOpMetadata);
+    installCoordinatorDocOnStateTransition(installOpCtx.get(), std::move(diskDoc));
+}
+
 ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kPreparingToDonate) {
@@ -1227,78 +1239,85 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
         return;
     }
-    auto opCtx = _makeOperationContext();
-    auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
+    {
+        auto opCtx = _makeOperationContext();
+        auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
 
-    std::vector<ReshardingZoneType> zones;
-    if (resharding::isUnshardCollection(provenance)) {
-        // Since the resulting collection of an unshardCollection operation cannot have zones, we do
-        // not need to account for existing zones in the original collection. Existing zones from
-        // the original collection will be deleted after the unsharding operation commits.
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot specify zones when unsharding a collection.",
-                !_coordinatorDoc.getZones());
-    } else {
-        if (_coordinatorDoc.getZones()) {
-            zones = *_coordinatorDoc.getZones();
+        std::vector<ReshardingZoneType> zones;
+        if (resharding::isUnshardCollection(provenance)) {
+            // Since the resulting collection of an unshardCollection operation cannot have zones,
+            // we do not need to account for existing zones in the original collection. Existing
+            // zones from the original collection will be deleted after the unsharding operation
+            // commits.
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot specify zones when unsharding a collection.",
+                    !_coordinatorDoc.getZones());
+        } else {
+            if (_coordinatorDoc.getZones()) {
+                zones = *_coordinatorDoc.getZones();
 
-            ShardingCatalogManager& shardingCatalogManager =
-                *ShardingCatalogManager::get(opCtx.get());
+                ShardingCatalogManager& shardingCatalogManager =
+                    *ShardingCatalogManager::get(opCtx.get());
 
-            // This is a best effort check that all of the zones exist. It does not provide any
-            // guarantee that the zones will remain stable during the resharding operation.
-            for (const auto& zone : zones) {
-                shardingCatalogManager.checkZoneExists(opCtx.get(), std::string(zone.getZone()));
+                // This is a best effort check that all of the zones exist. It does not provide any
+                // guarantee that the zones will remain stable during the resharding operation.
+                for (const auto& zone : zones) {
+                    shardingCatalogManager.checkZoneExists(opCtx.get(),
+                                                           std::string(zone.getZone()));
+                }
+            } else if (_coordinatorDoc.getForceRedistribution() &&
+                       *_coordinatorDoc.getForceRedistribution()) {
+                // If zones are not provided by the user for same-key resharding, we should use the
+                // existing zones for this resharding operation.
+                zones = resharding::getZonesFromExistingCollection(opCtx.get(),
+                                                                   _coordinatorDoc.getSourceNss());
             }
-        } else if (_coordinatorDoc.getForceRedistribution() &&
-                   *_coordinatorDoc.getForceRedistribution()) {
-            // If zones are not provided by the user for same-key resharding, we should use the
-            // existing zones for this resharding operation.
-            zones = resharding::getZonesFromExistingCollection(opCtx.get(),
-                                                               _coordinatorDoc.getSourceNss());
         }
+
+        auto shardsAndChunks =
+            _reshardingCoordinatorExternalState->calculateParticipantShardsAndChunks(
+                opCtx.get(), _coordinatorDoc, zones);
+
+        // This is a best effort check to avoid dropping existing search indexes on the source
+        // collection. There is a known race condition where a new search index could be created
+        // after this check passes, in which case the index will be dropped when resharding commits.
+        // TODO: SERVER-125557 (resolve the index-creation race)
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream()
+                    << "Cannot reshard collection "
+                    << _coordinatorDoc.getSourceNss().toStringForErrorMsg()
+                    << " because it has MongoDB Search indexes which would be dropped. If you "
+                       "still want to reshard the collection, drop the search indexes first.",
+                !_reshardingCoordinatorExternalState->searchIndexExistsForCollection(
+                    opCtx.get(), _coordinatorDoc.getSourceNss()));
+
+        auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
+                                  opCtx.get(), _coordinatorDoc.getSourceNss()) ||
+            (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection);
+
+        resharding::PhaseTransitionFn phaseTransitionFn = [=, this](OperationContext* opCtx,
+                                                                    TxnNumber txnNumber) {
+            auto updatedDocument = _coordinatorDao.transitionToPreparingToDonatePhase(
+                opCtx, shardsAndChunks, txnNumber);
+            return updatedDocument;
+        };
+
+        resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
+                                                          _metrics.get(),
+                                                          _coordinatorDoc,
+                                                          std::move(phaseTransitionFn),
+                                                          std::move(shardsAndChunks.initialChunks),
+                                                          std::move(zones),
+                                                          isUnsplittable);
     }
 
-    auto shardsAndChunks = _reshardingCoordinatorExternalState->calculateParticipantShardsAndChunks(
-        opCtx.get(), _coordinatorDoc, zones);
+    _installCoordinatorDocFromCatalog();
 
-    // This is a best effort check to avoid dropping existing search indexes on the source
-    // collection. There is a known race condition where a new search index could be created after
-    // this check passes, in which case the index will be dropped when resharding commits.
-    // TODO: SERVER-125557 (resolve the index-creation race)
-    uassert(
-        ErrorCodes::IllegalOperation,
-        str::stream() << "Cannot reshard collection "
-                      << _coordinatorDoc.getSourceNss().toStringForErrorMsg()
-                      << " because it has MongoDB Search indexes which would be dropped. If you "
-                         "still want to reshard the collection, drop the search indexes first.",
-        !_reshardingCoordinatorExternalState->searchIndexExistsForCollection(
-            opCtx.get(), _coordinatorDoc.getSourceNss()));
-
-    auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
-                              opCtx.get(), _coordinatorDoc.getSourceNss()) ||
-        (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection);
-
-    resharding::PhaseTransitionFn phaseTransitionFn = [=, this](OperationContext* opCtx,
-                                                                TxnNumber txnNumber) {
-        auto updatedDocument =
-            _coordinatorDao.transitionToPreparingToDonatePhase(opCtx, shardsAndChunks, txnNumber);
-        return updatedDocument;
-    };
-
-    resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
-                                                      _metrics.get(),
-                                                      _coordinatorDoc,
-                                                      std::move(phaseTransitionFn),
-                                                      std::move(shardsAndChunks.initialChunks),
-                                                      std::move(zones),
-                                                      isUnsplittable);
-    installCoordinatorDocOnStateTransition(
-        opCtx.get(),
-        resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
-
-    reshardingPauseCoordinatorAfterPreparingToDonate.pauseWhileSetAndNotCanceled(
-        opCtx.get(), _ctHolder->getAbortToken());
+    {
+        auto opCtx = _makeOperationContext();
+        reshardingPauseCoordinatorAfterPreparingToDonate.pauseWhileSetAndNotCanceled(
+            opCtx.get(), _ctHolder->getAbortToken());
+    }
 }
 
 #endif  // RESHARDING_COORDINATOR_PART_1
@@ -1796,51 +1815,51 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitting);
 
-    auto opCtx = _makeOperationContext();
-    reshardingPauseCoordinatorBeforeDecisionPersisted.pauseWhileSetAndNotCanceled(
-        opCtx.get(), _ctHolder->getAbortToken());
+    {
+        auto opCtx = _makeOperationContext();
+        reshardingPauseCoordinatorBeforeDecisionPersisted.pauseWhileSetAndNotCanceled(
+            opCtx.get(), _ctHolder->getAbortToken());
 
-    // The new epoch and timestamp to use for the resharded collection to indicate that the
-    // collection is a new incarnation of the namespace
-    auto newCollectionEpoch = OID::gen();
-    auto newCollectionTimestamp = [&] {
-        const auto now = VectorClock::get(opCtx.get())->getTime();
-        return now.clusterTime().asTimestamp();
-    }();
+        // The new epoch and timestamp to use for the resharded collection to indicate that the
+        // collection is a new incarnation of the namespace
+        auto newCollectionEpoch = OID::gen();
+        auto newCollectionTimestamp = [&] {
+            const auto now = VectorClock::get(opCtx.get())->getTime();
+            return now.clusterTime().asTimestamp();
+        }();
 
-    // Retrieve the exact placement of the resharded collection from the routing table.
-    // The 'recipientShards' field of the coordinator doc cannot be used for this purpose as it
-    // always includes the primary shard for the parent database (even when it doesn't own any chunk
-    // under the new key pattern).
-    auto reshardedCollectionPlacement = [&] {
-        std::set<ShardId> collectionPlacement;
-        std::vector<ShardId> collectionPlacementAsVector;
+        // Retrieve the exact placement of the resharded collection from the routing table.
+        // The 'recipientShards' field of the coordinator doc cannot be used for this purpose as it
+        // always includes the primary shard for the parent database (even when it doesn't own any
+        // chunk under the new key pattern).
+        auto reshardedCollectionPlacement = [&] {
+            std::set<ShardId> collectionPlacement;
+            std::vector<ShardId> collectionPlacementAsVector;
 
-        const auto cm =
-            uassertStatusOK(RoutingInformationCache::get(opCtx.get())
-                                ->getCollectionPlacementInfoWithRefresh(
-                                    opCtx.get(), coordinatorDoc.getTempReshardingNss()));
+            const auto cm =
+                uassertStatusOK(RoutingInformationCache::get(opCtx.get())
+                                    ->getCollectionPlacementInfoWithRefresh(
+                                        opCtx.get(), coordinatorDoc.getTempReshardingNss()));
 
-        cm.getAllShardIds(&collectionPlacement);
+            cm.getAllShardIds(&collectionPlacement);
 
-        collectionPlacementAsVector.reserve(collectionPlacement.size());
-        for (auto& elem : collectionPlacement) {
-            collectionPlacementAsVector.emplace_back(elem);
-        }
-        return collectionPlacementAsVector;
-    }();
+            collectionPlacementAsVector.reserve(collectionPlacement.size());
+            for (auto& elem : collectionPlacement) {
+                collectionPlacementAsVector.emplace_back(elem);
+            }
+            return collectionPlacementAsVector;
+        }();
 
-    resharding::writeDecisionPersistedState(opCtx.get(),
-                                            _metrics.get(),
-                                            updatedCoordinatorDoc,
-                                            std::move(newCollectionEpoch),
-                                            std::move(newCollectionTimestamp),
-                                            reshardedCollectionPlacement);
+        resharding::writeDecisionPersistedState(opCtx.get(),
+                                                _metrics.get(),
+                                                updatedCoordinatorDoc,
+                                                std::move(newCollectionEpoch),
+                                                std::move(newCollectionTimestamp),
+                                                reshardedCollectionPlacement);
+    }
 
     // Update the in memory state
-    installCoordinatorDocOnStateTransition(
-        opCtx.get(),
-        resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
+    _installCoordinatorDocFromCatalog();
 }
 
 void ReshardingCoordinator::_generateCommitNotificationForChangeStreams(
@@ -2006,25 +2025,25 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     resharding::emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
     resharding::emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
-    auto opCtx = _makeOperationContext();
-    resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
-        opCtx.get(), _metrics.get(), updatedCoordinatorDoc, boost::none);
+    {
+        auto opCtx = _makeOperationContext();
+        resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+            opCtx.get(), _metrics.get(), updatedCoordinatorDoc, boost::none);
+    }
 
     // Update in-memory coordinator doc
-    installCoordinatorDocOnStateTransition(
-        opCtx.get(),
-        resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
+    _installCoordinatorDocFromCatalog();
 }
 
 void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     resharding::PhaseTransitionFn phaseTransitionFn) {
-    auto opCtx = _makeOperationContext();
-    resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
-        opCtx.get(), _metrics.get(), _coordinatorDoc, std::move(phaseTransitionFn));
+    {
+        auto opCtx = _makeOperationContext();
+        resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+            opCtx.get(), _metrics.get(), _coordinatorDoc, std::move(phaseTransitionFn));
+    }
 
-    installCoordinatorDocOnStateTransition(
-        opCtx.get(),
-        resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
+    _installCoordinatorDocFromCatalog();
 }
 
 void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(

@@ -256,6 +256,12 @@ private:
     CancelableOperationContext _makeOperationContext() const;
 
     /**
+     * Re-reads config.reshardingOperations into memory after the caller has completed a durable
+     * coordinator catalog write.
+     */
+    void _installCoordinatorDocFromCatalog();
+
+    /**
      * Construct the initial chunks splits and write down the initial coordinator state to storage.
      */
     ExecutorFuture<void> _initializeCoordinator(

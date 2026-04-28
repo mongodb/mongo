@@ -565,8 +565,21 @@ Date_t getCurrentTime();
 boost::optional<ReshardingCoordinatorDocument> tryGetCoordinatorDoc(OperationContext* opCtx,
                                                                     const UUID& reshardingUUID);
 
+/**
+ * Returns the resharding coordinator document for `reshardingUUID` from
+ * `config.reshardingOperations`. Throws if the document does not exist.
+ */
 ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
                                                 const UUID& reshardingUUID);
+
+/**
+ * Overload with the same result as getCoordinatorDoc(OperationContext*, UUID), but builds the
+ * underlying operation context from `opCtxFactory` and applies `fom` when present.
+ */
+ReshardingCoordinatorDocument getCoordinatorDoc(
+    const HierarchicalCancelableOperationContextFactory& opCtxFactory,
+    const boost::optional<ForwardableOperationMetadata>& fom,
+    const UUID& reshardingUUID);
 
 // Waits for majority replication of the latest opTime unless token is cancelled.
 SemiFuture<void> waitForMajority(const CancellationToken& token,

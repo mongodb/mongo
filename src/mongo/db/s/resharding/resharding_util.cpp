@@ -677,6 +677,14 @@ ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
     return *maybeDoc;
 }
 
+ReshardingCoordinatorDocument getCoordinatorDoc(
+    const HierarchicalCancelableOperationContextFactory& opCtxFactory,
+    const boost::optional<ForwardableOperationMetadata>& fom,
+    const UUID& reshardingUUID) {
+    auto readOpCtx = makeReshardingOperationContext(opCtxFactory, false, fom);
+    return getCoordinatorDoc(readOpCtx.get(), reshardingUUID);
+}
+
 SemiFuture<void> waitForMajority(const CancellationToken& token,
                                  const HierarchicalCancelableOperationContextFactory& factory) {
     auto opCtx = factory.makeOperationContext(&cc());
