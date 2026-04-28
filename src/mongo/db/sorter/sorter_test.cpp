@@ -237,8 +237,8 @@ TYPED_TEST_SUITE(MakeFromExistingRangesTest, MakeFromExistingRangesTypes);
 using SorterMakeFromExistingRangesFileBasedTypes = ::testing::Types<FileTraits>;
 TYPED_TEST_SUITE(FileBasedMakeFromExistingRangesTest, SorterMakeFromExistingRangesFileBasedTypes);
 
-// TODO SERVER-117323: Parameterize or otherwise gain equivalent coverage for the container-based
-// sorter that these tests provide for the file-based sorter.
+// Note that these tests use a spiller but do not exercise any of its behavior.
+namespace {
 using MakeFromExistingRangesDeathTest = MakeFromExistingRangesFixture;
 DEATH_TEST_F(
     MakeFromExistingRangesDeathTest,
@@ -311,6 +311,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSpiller, "this->_spiller != nu
         std::shared_ptr<FileBasedSpiller<IntWrapper, IntWrapper, IWComparator>>(nullptr),
         /*settings=*/{});
 }
+}  // namespace
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     auto storageIdentifier = "unused_sorter_storage";
@@ -650,7 +651,11 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, IncompleteReadDoesNotReportCheck
     // it's destructor doesn't check the checksum since we didn't use everything
 }
 
-DEATH_TEST_F(MakeFromExistingRangesDeathTest,
+// TODO SERVER-120078: Expand these tests to have equivalent container based coverage.
+namespace {
+using FileBasedMakeFromExistingRangesDeathTest = MakeFromExistingRangesFixture;
+
+DEATH_TEST_F(FileBasedMakeFromExistingRangesDeathTest,
              CompleteReadReportsChecksumError,
              "Data read from disk does not match what was written to disk.") {
     unittest::TempDir spillDir = makeSpillDir();
@@ -671,7 +676,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest,
     // it's destructor ends up checking the checksum and aborts due to it being wrong
 }
 
-DEATH_TEST_F(MakeFromExistingRangesDeathTest,
+DEATH_TEST_F(FileBasedMakeFromExistingRangesDeathTest,
              CompleteReadReportsChecksumErrorFromIncorrectChecksumVersion,
              "Data read from disk does not match what was written to disk.") {
     unittest::TempDir spillDir = makeSpillDir();
@@ -693,6 +698,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest,
     // it's destructor ends up checking the checksum and aborts due to it being wrong (because we
     // used the wrong checksum algorithm)
 }
+}  // namespace
 
 // TODO SERVER-117316: Create a typed bounded sorter suite.
 class BoundedSorterTest : public unittest::Test {
