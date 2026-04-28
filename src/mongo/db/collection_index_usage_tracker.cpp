@@ -71,12 +71,19 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) const 
 }
 
 void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) const {
-    _sharedStats->_collectionScans.fetchAndAdd(collectionScans);
+    // Skip the atomic RMW when there is nothing to add. For index-only reads this value is always
+    // zero, and `fetchAndAdd(0)` still emits a hardware exclusive-store on ARM64, invalidating the
+    // cache line across all cores sharing `_sharedStats`.
+    if (collectionScans > 0) {
+        _sharedStats->_collectionScans.fetchAndAdd(collectionScans);
+    }
 }
 
 void CollectionIndexUsageTracker::recordCollectionScansNonTailable(
     unsigned long long collectionScansNonTailable) const {
-    _sharedStats->_collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
+    if (collectionScansNonTailable > 0) {
+        _sharedStats->_collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
+    }
 }
 
 void CollectionIndexUsageTracker::registerIndex(StringData indexName,

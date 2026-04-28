@@ -88,14 +88,19 @@ void CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
         ._collectionIndexUsageTracker->recordCollectionIndexUsage(
             collectionScans, collectionScansNonTailable, indexesUsed);
 
-    if (coll->ns().isSystemDotProfile()) {
-        profilerScansCounter.increment(collectionScans);
-        profilerScansTailableCounter.increment(collectionScans - collectionScansNonTailable);
-        profilerScansNonTailableCounter.increment(collectionScansNonTailable);
-    }
+    // All five global `Counter64` increments below boil down to `fetchAndAdd(0)` for index-only
+    // reads (YCSB 100read, etc.), which still bounces the shared cache lines across every core.
+    // A single compound guard skips the whole block when there is nothing to record.
+    if (collectionScans > 0 || collectionScansNonTailable > 0) {
+        if (coll->ns().isSystemDotProfile()) {
+            profilerScansCounter.increment(collectionScans);
+            profilerScansTailableCounter.increment(collectionScans - collectionScansNonTailable);
+            profilerScansNonTailableCounter.increment(collectionScansNonTailable);
+        }
 
-    collectionScansCounter.increment(collectionScans);
-    collectionScansNonTailableCounter.increment(collectionScansNonTailable);
+        collectionScansCounter.increment(collectionScans);
+        collectionScansNonTailableCounter.increment(collectionScansNonTailable);
+    }
 }
 
 CollectionIndexUsageTracker::CollectionIndexUsageMap
