@@ -262,9 +262,7 @@ TEST_F(OrderedTicketSemaphoreTest, HighPriorityJumpsQueue) {
     for (int i = 0; i < 3; ++i) {
         sem->resize(1);
         expectedWaiters--;
-        waitWhile([&]() {
-            return sem->waiters() != expectedWaiters || acquireOrder != 3 - expectedWaiters;
-        });
+        waitWhile([&]() { return acquireOrder != 3 - expectedWaiters; });
     }
 
     lowPriorityFuture.get();
@@ -303,9 +301,11 @@ TEST_F(OrderedTicketSemaphoreTest, PriorityOrderingStillWorksAfterResize) {
     waitForQueuedThreads(sem, 3);
 
     // Release one at a time to verify priority ordering.
+    auto expectedWaiters = sem->waiters();
     for (int i = 0; i < 3; ++i) {
         sem->resize(1);
-        sleepFor(Milliseconds{10});
+        expectedWaiters--;
+        waitWhile([&]() { return acquireOrder != 3 - expectedWaiters; });
     }
 
     for (auto& future : finalFutures) {
