@@ -29,87 +29,34 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/config.h"
 #include "mongo/otel/metrics/metrics_attributes.h"
-#include "mongo/otel/metrics/metrics_metric.h"
-#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
-
-#include <string>
-
-#ifdef MONGO_CONFIG_OTEL
-#include <opentelemetry/metrics/meter.h>
-#endif
 
 namespace mongo::otel::metrics {
 
-/**
- * OpenTelemetry UpDownCounter: a sum that can increase or decrease (e.g. in-flight work).
- * Unlike Counter, add() accepts negative deltas.
- */
-template <typename T>
-class MONGO_MOD_PUBLIC UpDownCounter : public Metric {
+/** UpDownCounter interface with typed attributes. add() accepts any delta, including negative. */
+template <typename T, AttributeType... AttributeTs>
+class MONGO_MOD_PUBLIC UpDownCounter {
 public:
-    ~UpDownCounter() override = default;
+    using Attributes = std::tuple<AttributeTs...>;
+    virtual ~UpDownCounter() = default;
 
-    /**
-     * Adds delta to the cumulative sum. The delta may be negative (unlike Counter).
-     */
-    virtual void add(T value) = 0;
-
-    /**
-     * For each combination of attributes for which the counter has been incremented, returns the
-     * set of attributes and the counter value associated with this. Note that the result is valid
-     * only while this counter is valid.
-     * TODO SERVER-124075: Add attribute support.
-     */
-    virtual AttributesAndValues<T> values() const = 0;
+    virtual void add(T value, const Attributes& attributes) = 0;
 };
 
+/** Specialization when there are no attributes, adding a convenience add(T) overload. */
 template <typename T>
-class UpDownCounterImpl : public UpDownCounter<T> {
+class MONGO_MOD_PUBLIC UpDownCounter<T> {
 public:
-    void add(T value) override;
+    using Attributes = std::tuple<>;
+    virtual ~UpDownCounter() = default;
 
-    AttributesAndValues<T> values() const override;
+    void add(T value) {
+        add(value, {});
+    }
 
-    BSONObj serializeToBson(const std::string& key) const override;
-
-#ifdef MONGO_CONFIG_OTEL
-    void reset(opentelemetry::metrics::Meter* meter) override;
-#endif  // MONGO_CONFIG_OTEL
-
-private:
-    Atomic<T> _value;
+protected:
+    virtual void add(T value, const std::tuple<>& attributes) = 0;
 };
 
-///////////////////////////////////////////////////////////////////////////////
-// Implementation details
-///////////////////////////////////////////////////////////////////////////////
-
-template <typename T>
-void UpDownCounterImpl<T>::add(T value) {
-    _value.fetchAndAddRelaxed(value);
-}
-
-template <typename T>
-AttributesAndValues<T> UpDownCounterImpl<T>::values() const {
-    // TODO SERVER-121408: Return per-attribute values once attribute support is added.
-    return {{.attributes = AttributesKeyValueIterable(std::vector<AttributeNameAndValue>{}),
-             .value = _value.loadRelaxed()}};
-}
-
-template <typename T>
-BSONObj UpDownCounterImpl<T>::serializeToBson(const std::string& key) const {
-    return BSON(key << _value.loadRelaxed());
-}
-
-#ifdef MONGO_CONFIG_OTEL
-template <typename T>
-void UpDownCounterImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
-    invariant(!meter);
-    _value.store(0);
-}
-#endif  // MONGO_CONFIG_OTEL
 }  // namespace mongo::otel::metrics

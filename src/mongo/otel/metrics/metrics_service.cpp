@@ -115,72 +115,72 @@ void MetricsService::OwnedMetricVisitor::operator()(
 }
 
 void MetricsService::OwnedMetricVisitor::operator()(
-    std::unique_ptr<UpDownCounter<int64_t>>& upDownCounter) {
+    std::unique_ptr<ObservableUpDownCounter<int64_t>>& upDownCounter) {
     upDownCounter->reset();
-    auto observable =
-        makeObservableInstrument<UpDownCounter<int64_t>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<UpDownCounter, int64_t>, upDownCounter.get());
+    auto observable = makeObservableInstrument<ObservableUpDownCounter<int64_t>>(
+        provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableUpDownCounter, int64_t>,
+                            upDownCounter.get());
     newObservableInstruments.push_back(observable);
 }
 
 void MetricsService::OwnedMetricVisitor::operator()(
-    std::unique_ptr<UpDownCounter<double>>& upDownCounter) {
+    std::unique_ptr<ObservableUpDownCounter<double>>& upDownCounter) {
     upDownCounter->reset();
-    auto observable =
-        makeObservableInstrument<UpDownCounter<double>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<UpDownCounter, double>, upDownCounter.get());
+    auto observable = makeObservableInstrument<ObservableUpDownCounter<double>>(
+        provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableUpDownCounter, double>,
+                            upDownCounter.get());
     newObservableInstruments.push_back(observable);
 }
 
-void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<Gauge<int64_t>>& gauge) {
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<ObservableGauge<int64_t>>& gauge) {
     gauge->reset();
     auto observable =
-        makeObservableInstrument<Gauge<int64_t>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<Gauge, int64_t>, gauge.get());
+        makeObservableInstrument<ObservableGauge<int64_t>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableGauge, int64_t>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
-void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<Gauge<double>>& gauge) {
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<ObservableGauge<double>>& gauge) {
     gauge->reset();
     auto observable =
-        makeObservableInstrument<Gauge<double>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<Gauge, double>, gauge.get());
+        makeObservableInstrument<ObservableGauge<double>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableGauge, double>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
 void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MinGauge<int64_t>>& gauge) {
     gauge->reset();
     auto observable =
-        makeObservableInstrument<Gauge<int64_t>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<Gauge, int64_t>,
-                            static_cast<Gauge<int64_t>*>(gauge.get()));
+        makeObservableInstrument<ObservableGauge<int64_t>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<MinGauge, int64_t>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
 void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MinGauge<double>>& gauge) {
     gauge->reset();
     auto observable =
-        makeObservableInstrument<Gauge<double>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<Gauge, double>,
-                            static_cast<Gauge<double>*>(gauge.get()));
+        makeObservableInstrument<ObservableGauge<double>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<MinGauge, double>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
 void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MaxGauge<int64_t>>& gauge) {
     gauge->reset();
     auto observable =
-        makeObservableInstrument<Gauge<int64_t>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<Gauge, int64_t>,
-                            static_cast<Gauge<int64_t>*>(gauge.get()));
+        makeObservableInstrument<ObservableGauge<int64_t>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<MaxGauge, int64_t>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
 void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MaxGauge<double>>& gauge) {
     gauge->reset();
     auto observable =
-        makeObservableInstrument<Gauge<double>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<Gauge, double>,
-                            static_cast<Gauge<double>*>(gauge.get()));
+        makeObservableInstrument<ObservableGauge<double>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<MaxGauge, double>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
@@ -256,49 +256,13 @@ void MetricsService::_registerServerStatusTree(
         std::make_unique<OtelMetricServerStatusAdapter>(metricPtr));
 }
 
-template <typename T>
-UpDownCounter<T>& MetricsService::createUpDownCounter(MetricName name,
-                                                      std::string description,
-                                                      MetricUnit unit,
-                                                      const UpDownCounterOptions& options) {
-    MetricIdentifier identifier{.description = description,
-                                .unit = unit,
-                                .serverStatusOptions = options.serverStatusOptions,
-                                .histogramBucketBoundaries = boost::none};
-    return _createMetric<UpDownCounterImpl<T>, UpDownCounter<T>, UpDownCounterOptions>(
-        name,
-        options,
-        std::move(identifier),
-        /* makeInstrument= */
-        [](WithLock, const std::string&) { return std::make_unique<UpDownCounterImpl<T>>(); },
-#ifdef MONGO_CONFIG_OTEL
-        /* addObservable= */
-        [this, description, unit](
-            WithLock lock, const std::string& nameStr, UpDownCounter<T>* upDownCounter_ptr) {
-            (void)lock;
-            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-            std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableUpDownCounter =
-                makeObservableInstrument<UpDownCounter<T>>(*provider, nameStr, description, unit);
-            tassert(
-                ErrorCodes::InternalError,
-                fmt::format("Could not create observable up-down counter for metric: {}", nameStr),
-                observableUpDownCounter != nullptr);
-            observableUpDownCounter->AddCallback(observableCallback<UpDownCounter, T>,
-                                                 upDownCounter_ptr);
-            _observableInstruments.push_back(std::move(observableUpDownCounter));
-        }
-#else
-        [](WithLock, const std::string&, UpDownCounter<T>*) {}
-#endif
-    );
-}
-
 UpDownCounter<int64_t>& MetricsService::createInt64UpDownCounter(
     MetricName name,
     std::string description,
     MetricUnit unit,
     const UpDownCounterOptions& options) {
-    return createUpDownCounter<int64_t>(name, description, unit, options);
+    return _createScalarMetric<ObservableUpDownCounter, int64_t>(
+        name, std::move(description), unit, options);
 }
 
 UpDownCounter<double>& MetricsService::createDoubleUpDownCounter(
@@ -306,7 +270,8 @@ UpDownCounter<double>& MetricsService::createDoubleUpDownCounter(
     std::string description,
     MetricUnit unit,
     const UpDownCounterOptions& options) {
-    return createUpDownCounter<double>(name, description, unit, options);
+    return _createScalarMetric<ObservableUpDownCounter, double>(
+        name, std::move(description), unit, options);
 }
 
 template <template <typename> class GaugeTpl, typename T>
@@ -333,13 +298,14 @@ GaugeTpl<T>& MetricsService::createGaugeBase(MetricName name,
             WithLock lock, const std::string& nameStr, GaugeTpl<T>* gauge_ptr) {
             (void)lock;
             auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-            std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableGauge =
-                makeObservableInstrument<Gauge<T>>(*provider, nameStr, description, unit);
+            auto observableGauge =
+                metrics_service_detail::makeObservableInstrument<ObservableGauge<T>>(
+                    *provider, nameStr, description, unit);
             tassert(ErrorCodes::InternalError,
                     fmt::format("Could not create observable gauge for metric: {}", nameStr),
                     observableGauge != nullptr);
-            observableGauge->AddCallback(observableCallback<Gauge, T>,
-                                         static_cast<Gauge<T>*>(gauge_ptr));
+            observableGauge->AddCallback(metrics_service_detail::observableCallback<GaugeTpl, T>,
+                                         gauge_ptr);
             _observableInstruments.push_back(std::move(observableGauge));
         }
 #else
@@ -348,26 +314,20 @@ GaugeTpl<T>& MetricsService::createGaugeBase(MetricName name,
     );
 }
 
-template <typename T>
-Gauge<T>& MetricsService::createGauge(MetricName name,
-                                      std::string description,
-                                      MetricUnit unit,
-                                      const GaugeOptions& options) {
-    return createGaugeBase<Gauge, T>(name, description, unit, options, T{0});
-}
-
 Gauge<int64_t>& MetricsService::createInt64Gauge(MetricName name,
                                                  std::string description,
                                                  MetricUnit unit,
                                                  const GaugeOptions& options) {
-    return createGauge<int64_t>(name, description, unit, options);
+    return _createScalarMetric<ObservableGauge, int64_t>(
+        name, std::move(description), unit, options);
 }
 
 Gauge<double>& MetricsService::createDoubleGauge(MetricName name,
                                                  std::string description,
                                                  MetricUnit unit,
                                                  const GaugeOptions& options) {
-    return createGauge<double>(name, description, unit, options);
+    return _createScalarMetric<ObservableGauge, double>(
+        name, std::move(description), unit, options);
 }
 
 template <typename T>

@@ -76,7 +76,7 @@ mongo_cc_library(
     ],
     deps = [
         ":metric_unit",
-        ":metrics_counter",
+        ":metrics_scalar_metric",
         ":otel_metric_name_validation",
         ":server_status_metric_name_validation",
         "//src/mongo/db:server_base",
@@ -229,55 +229,19 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
-    name = "metrics_counter",
+    name = "metrics_scalar_metric",
     deps = [":metrics_attributes"],
 )
 
 mongo_cc_unit_test(
-    name = "metrics_counter_test",
+    name = "metrics_scalar_metric_test",
     srcs = [
-        "metrics_counter_test.cpp",
+        "metrics_scalar_metric_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_first_group"],
     deps = [
         ":metrics_attributes_test_utils",
-        ":metrics_counter",
-    ] + select(
-        {
-            "@//bazel/config:build_otel_enabled": [
-                "//src/third_party/opentelemetry-cpp/api",
-            ],
-            "//conditions:default": [],
-        },
-    ),
-)
-
-mongo_cc_unit_test(
-    name = "metrics_updown_counter_test",
-    srcs = [
-        "metrics_updown_counter_test.cpp",
-    ],
-    tags = ["mongo_unittest_seventh_group"],
-    deps = [
-        ":metrics_attributes_test_utils",
-    ] + select(
-        {
-            "@//bazel/config:build_otel_enabled": [
-                "//src/third_party/opentelemetry-cpp/api",
-            ],
-            "//conditions:default": [],
-        },
-    ),
-)
-
-mongo_cc_unit_test(
-    name = "metrics_gauge_test",
-    srcs = [
-        "metrics_gauge_test.cpp",
-    ],
-    tags = ["mongo_unittest_seventh_group"],
-    deps = [
-        ":metrics_attributes_test_utils",
+        ":metrics_scalar_metric",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
@@ -405,14 +369,12 @@ test_suite(
         ":metric_names_test",
         ":metric_unit_test",
         ":metrics_attributes_test",
-        ":metrics_counter_test",
-        ":metrics_gauge_test",
         ":metrics_histogram_test",
         ":metrics_initialization_test",
         ":metrics_prometheus_file_exporter_test",
+        ":metrics_scalar_metric_test",
         ":metrics_service_test",
         ":metrics_test_util_test",
-        ":metrics_updown_counter_test",
         ":otel_metric_name_validation_test",
         ":otel_metric_server_status_adapter_test",
         ":server_status_metric_name_validation_test",

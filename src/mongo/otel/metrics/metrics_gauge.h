@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/config.h"
 #include "mongo/otel/metrics/metrics_attributes.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
@@ -44,49 +43,65 @@
 
 namespace mongo::otel::metrics {
 
-template <typename T>
-class MONGO_MOD_PUBLIC Gauge : public Metric {
+/** Gauge interface with typed attributes. set() stores the current value (replaces, not adds). */
+template <typename T, AttributeType... AttributeTs>
+class MONGO_MOD_PUBLIC Gauge {
 public:
-    virtual void set(T value) = 0;
+    using Attributes = std::tuple<AttributeTs...>;
+    virtual ~Gauge() = default;
 
-    /**
-     * For each combination of attributes for which the gauge has been set, returns the set of
-     * attributes and the gauge value associated with this. Note that the result is valid only while
-     * this gauge is valid.
-     * TODO SERVER-124075: Add attribute support.
-     */
+    virtual void set(T value, const Attributes& attributes) = 0;
+};
+
+/** Specialization when there are no attributes, adding a convenience set(T) overload. */
+template <typename T>
+class MONGO_MOD_PUBLIC Gauge<T> {
+public:
+    using Attributes = std::tuple<>;
+    virtual ~Gauge() = default;
+
+    void set(T value) {
+        set(value, {});
+    }
+
+protected:
+    virtual void set(T value, const std::tuple<>& attributes) = 0;
+};
+
+/**
+ * A gauge that only updates when the new value is less than the current value. Useful for tracking
+ * the minimum of an observed quantity over time (e.g. the minimum available memory across a set of
+ * nodes). Initialized to numeric_limits<T>::max() so the first observation always wins.
+ */
+template <typename T>
+class MONGO_MOD_PUBLIC MinGauge : public virtual Gauge<T>, public virtual Metric {
+public:
+    virtual void setIfLess(T value) = 0;
     virtual AttributesAndValues<T> values() const = 0;
 };
 
 /**
- * A gauge that only updates when the new value is less than the current value. To be used for
- * tracking the minimum of an observed quantity over time.
+ * A gauge that only updates when the new value is greater than the current value. Useful for
+ * tracking the maximum of an observed quantity over time (e.g. peak memory usage). Initialized to
+ * numeric_limits<T>::lowest() so the first observation always wins.
  */
 template <typename T>
-class MONGO_MOD_PUBLIC MinGauge : public virtual Gauge<T> {
-public:
-    virtual void setIfLess(T value) = 0;
-};
-
-/**
- * A gauge that only updates when the new value is greater than the current value. To be used for
- * tracking the maximum of an observed quantity over time.
- */
-template <typename T>
-class MONGO_MOD_PUBLIC MaxGauge : public virtual Gauge<T> {
+class MONGO_MOD_PUBLIC MaxGauge : public virtual Gauge<T>, public virtual Metric {
 public:
     virtual void setIfGreater(T value) = 0;
+    virtual AttributesAndValues<T> values() const = 0;
 };
 
-// A single lock-free implementation used for Gauge, MinGauge, and MaxGauge. The initialValue
-// controls semantics: 0 for plain gauges, numeric_limits<T>::max() for min-tracking gauges, and
-// numeric_limits<T>::lowest() for max-tracking gauges.
+// A single lock-free implementation used for MinGauge and MaxGauge. The initialValue controls
+// semantics: numeric_limits<T>::max() for min-tracking gauges, numeric_limits<T>::lowest() for
+// max-tracking gauges.
 template <typename T>
 class GaugeImpl : public MinGauge<T>, public MaxGauge<T> {
 public:
     explicit GaugeImpl(T initialValue = T{0}) : _initialValue(initialValue), _value(initialValue) {}
 
-    void set(T value) override;
+    using Gauge<T>::set;
+    void set(T value, const std::tuple<>&) override;
 
     void setIfLess(T value) override;
 
@@ -110,22 +125,22 @@ private:
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void GaugeImpl<T>::set(T value) {
+void GaugeImpl<T>::set(T value, const std::tuple<>&) {
     _value.storeRelaxed(value);
 }
 
 template <typename T>
 void GaugeImpl<T>::setIfLess(T value) {
     T old = _value.load();
-    while (value < old && !_value.compareAndSwap(&old, value))
-        ;
+    while (value < old && !_value.compareAndSwap(&old, value)) {
+    }
 }
 
 template <typename T>
 void GaugeImpl<T>::setIfGreater(T value) {
     T old = _value.load();
-    while (value > old && !_value.compareAndSwap(&old, value))
-        ;
+    while (value > old && !_value.compareAndSwap(&old, value)) {
+    }
 }
 
 template <typename T>

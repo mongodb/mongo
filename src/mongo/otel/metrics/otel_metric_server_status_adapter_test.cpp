@@ -32,11 +32,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
-#include "mongo/otel/metrics/metrics_counter.h"
-#include "mongo/otel/metrics/metrics_gauge.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/otel/metrics/metrics_metric.h"
-#include "mongo/otel/metrics/metrics_updown_counter.h"
+#include "mongo/otel/metrics/metrics_scalar_metric.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -49,7 +47,6 @@
 #endif  // MONGO_CONFIG_OTEL
 
 namespace mongo::otel::metrics {
-
 namespace {
 
 /*
@@ -89,13 +86,14 @@ class OtelAdapterCounterScalarTest : public testing::Test {};
 TYPED_TEST_SUITE(OtelAdapterCounterScalarTest, ScalarNumericTypes);
 
 TYPED_TEST(OtelAdapterCounterScalarTest, AppendTo) {
-    CounterImpl<TypeParam> counter;
+    ScalarMetricImpl<TypeParam> impl;
+    Counter<TypeParam>& counter = impl;
     if constexpr (std::is_same_v<TypeParam, int64_t>) {
         counter.add(42);
     } else {
         counter.add(1.25);
     }
-    OtelMetricServerStatusAdapter adapter(&counter);
+    OtelMetricServerStatusAdapter adapter(&impl);
 
     BSONObjBuilder bob;
     adapter.appendTo(bob, "openConnections");
@@ -112,13 +110,14 @@ class OtelAdapterGaugeScalarTest : public testing::Test {};
 TYPED_TEST_SUITE(OtelAdapterGaugeScalarTest, ScalarNumericTypes);
 
 TYPED_TEST(OtelAdapterGaugeScalarTest, AppendTo) {
-    GaugeImpl<TypeParam> gauge;
+    ScalarMetricImpl<TypeParam> impl;
+    Gauge<TypeParam>& gauge = impl;
     if constexpr (std::is_same_v<TypeParam, int64_t>) {
         gauge.set(-3);
     } else {
         gauge.set(-1.5);
     }
-    OtelMetricServerStatusAdapter adapter(&gauge);
+    OtelMetricServerStatusAdapter adapter(&impl);
 
     BSONObjBuilder bob;
     adapter.appendTo(bob, "openConnections");
@@ -135,7 +134,8 @@ class OtelAdapterUpDownCounterScalarTest : public testing::Test {};
 TYPED_TEST_SUITE(OtelAdapterUpDownCounterScalarTest, ScalarNumericTypes);
 
 TYPED_TEST(OtelAdapterUpDownCounterScalarTest, AppendTo) {
-    UpDownCounterImpl<TypeParam> upDown;
+    ScalarMetricImpl<TypeParam> impl;
+    UpDownCounter<TypeParam>& upDown = impl;
     if constexpr (std::is_same_v<TypeParam, int64_t>) {
         upDown.add(5);
         upDown.add(-2);
@@ -143,7 +143,7 @@ TYPED_TEST(OtelAdapterUpDownCounterScalarTest, AppendTo) {
         upDown.add(2.5);
         upDown.add(-0.5);
     }
-    OtelMetricServerStatusAdapter adapter(&upDown);
+    OtelMetricServerStatusAdapter adapter(&impl);
 
     BSONObjBuilder bob;
     adapter.appendTo(bob, "openConnections");
@@ -186,9 +186,10 @@ TEST(OtelMetricServerStatusAdapter, ThrowsWhenAppendToOmitsLeafName) {
 }
 
 TEST(OtelMetricServerStatusAdapter, RespectsEnabledPredicate) {
-    CounterImpl<int64_t> counter;
+    ScalarMetricImpl<int64_t> impl;
+    Counter<int64_t>& counter = impl;
     counter.add(1);
-    OtelMetricServerStatusAdapter adapter(&counter);
+    OtelMetricServerStatusAdapter adapter(&impl);
     adapter.setEnabledPredicate([] { return false; });
 
     BSONObjBuilder bob;
@@ -197,9 +198,10 @@ TEST(OtelMetricServerStatusAdapter, RespectsEnabledPredicate) {
 }
 
 TEST(OtelMetricServerStatusAdapter, AppendsToNonEmptyBuilder) {
-    CounterImpl<int64_t> counter;
+    ScalarMetricImpl<int64_t> impl;
+    Counter<int64_t>& counter = impl;
     counter.add(99);
-    OtelMetricServerStatusAdapter adapter(&counter);
+    OtelMetricServerStatusAdapter adapter(&impl);
 
     BSONObjBuilder bob;
     bob.append("openConnections", 1);
@@ -208,9 +210,10 @@ TEST(OtelMetricServerStatusAdapter, AppendsToNonEmptyBuilder) {
 }
 
 TEST(OtelMetricServerStatusAdapter, MetricTreeAddAndAppendTo) {
-    CounterImpl<int64_t> counter;
+    ScalarMetricImpl<int64_t> impl;
+    Counter<int64_t>& counter = impl;
     counter.add(7);
-    auto adapter = std::make_unique<OtelMetricServerStatusAdapter>(&counter);
+    auto adapter = std::make_unique<OtelMetricServerStatusAdapter>(&impl);
 
     MetricTree tree;
     tree.add("ingress.openConnections", std::move(adapter));
@@ -222,5 +225,4 @@ TEST(OtelMetricServerStatusAdapter, MetricTreeAddAndAppendTo) {
 }
 
 }  // namespace
-
 }  // namespace mongo::otel::metrics
