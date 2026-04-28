@@ -1,5 +1,6 @@
 /**
- * Verifies that fast size and count is accurate after an unclean shutdown that ocurred before size and count deltas were persisted.
+ * Verifies that fast size and count is accurate after an unclean shutdown that occurred before size
+ * and count deltas were persisted.
  *
  * @tags: [
  *   featureFlagReplicatedFastCount,
