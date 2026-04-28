@@ -31,11 +31,15 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 #include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -203,18 +207,37 @@ StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEv
 }
 
 void BlockingResultsMerger::kill(OperationContext* opCtx) {
+    static StaticImmortal<logv2::SeveritySuppressor> logSeverity{
+        Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+
     auto future = _arm->kill(opCtx);
 
-    // Wait via the opCtx rather than a plain '.wait()'. The opCtx-based wait polls
-    // the baton, which is required because AsioNetworkingBaton::waitUntil schedules
-    // timer cancellation via '.thenRunOn(baton)'. If the ARM has a pending retry
-    // delay, the baton must be run for _cancellationSource.cancel() to actually
-    // cancel the timer and allow the retry callback to fire and complete the kill.
-    // Use 'runWithoutInterruptionExceptAtGlobalShutdown()' because 'kill()' is called
-    // from destructors where the opCtx may already be interrupted — a plain
-    // '.get(opCtx)' would throw before polling the baton, and throwing from a
-    // destructor would terminate the process.
-    opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { future.get(opCtx); });
+    // Wait via the opCtx rather than a plain '.wait()'. The opCtx-based wait polls the baton, which
+    // is required because AsioNetworkingBaton::waitUntil schedules timer cancellation via
+    // '.thenRunOn(baton)'. If the ARM has a pending retry delay, the baton must be run for
+    // '_cancellationSource.cancel()' to actually cancel the timer and allow the retry callback to
+    // fire and complete the kill.
+    // Use 'runWithoutInterruptionExceptAtGlobalShutdown()' because 'kill()' is called from
+    // destructors where the opCtx may already be interrupted — a plain '.get(opCtx)' would throw
+    // before polling the baton, and throwing from a destructor would terminate the process.
+    opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+        try {
+            future.get(opCtx);
+        } catch (const DBException& ex) {
+            // Shutdown errors are expected here, so we do not log them.
+            if (!ex.isA<ErrorCategory::ShutdownError>()) {
+                LOGV2_DEBUG(12562100,
+                            (*logSeverity)().toInt(),
+                            "Caught an unexpected exception while terminating results merger",
+                            "error"_attr = ex.toStatus());
+            }
+        } catch (const std::exception& ex) {
+            LOGV2_DEBUG(12562101,
+                        (*logSeverity)().toInt(),
+                        "Caught an unexpected default exception while terminating results merger",
+                        "error"_attr = ex.what());
+        }
+    });
 }
 
 }  // namespace mongo

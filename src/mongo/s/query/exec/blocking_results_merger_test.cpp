@@ -402,6 +402,54 @@ TEST_F(ResultsMergerTestFixture, KillShouldCompleteWithInterruptedOpCtx) {
     killFuture.default_timed_get();
 }
 
+// Regression test for SERVER-125621: without the fix, shutdown exceptions could escape from
+// 'BlockingResultsMerger::kill()'.
+TEST_F(ResultsMergerTestFixture, KillDoesNotLeakExceptions) {
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto params = makeARMParamsFromExistingCursors(std::move(cursors));
+    BlockingResultsMerger blockingMerger(
+        operationContext(), std::move(params), executor(), nullptr);
+
+    // Issue a blocking next() on a separate thread; this will schedule a getMore and block waiting
+    // for a response, leaving an outstanding request in flight.
+    auto nextFuture = launchAsync([&]() {
+        auto nextStatus = blockingMerger.next(operationContext());
+        ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::InterruptedAtShutdown);
+    });
+
+    // Give the background thread time to start blocking on the getMore response.
+    sleepmillis(500);
+
+    // Simulate a shutdown.
+    operationContext()->getServiceContext()->setKillAllOperations();
+
+    nextFuture.default_timed_get();
+
+    // kill() is now called while we are already in shutdown. The ARM still has an outstanding
+    // getMore request; kill() must wait for the kill future to be signalled (which happens when
+    // the cancelled-getMore callback eventually runs). Without the fix this could hang because
+    // the old wait(notInterruptible) did not drive the baton that the executor uses to deliver
+    // cancellation callbacks in production.
+    auto killFuture = launchAsync([&]() { blockingMerger.kill(operationContext()); });
+
+    // In the mock-network environment, cancellation callbacks are delivered when the network
+    // processes its queue. Wait until the ARM has scheduled the killCursors command (which proves
+    // it has progressed past the cancel step), then flush all pending callbacks so the kill future
+    // gets signalled and kill() can return.
+    while (!networkHasReadyRequests() || !getNthPendingRequest(0u).cmdObj["killCursors"]) {
+        // Spin until the ARM has issued the killCursors for the open cursor.
+    }
+
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
+
+    runReadyCallbacks();
+
+    // kill() must complete without hanging or throwing.
+    killFuture.default_timed_get();
+}
+
 TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenYielding) {
     class ThrowyResourceYielder : public ResourceYielder {
     public:

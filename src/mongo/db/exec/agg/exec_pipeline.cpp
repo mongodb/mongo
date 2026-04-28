@@ -49,10 +49,20 @@ Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionConte
 }
 
 Pipeline::~Pipeline() {
-    // 'dispose()' performs the actual disposal only once, so it is safe to call it unconditionally
-    // from here.
-    dispose();
-    tassert(10617100, "expecting the pipeline to be disposed at destruction", _disposed);
+    try {
+        // 'dispose()' performs the actual disposal only once, so it is safe to call it
+        // unconditionally from here.
+        dispose();
+        tassert(10617100, "expecting the pipeline to be disposed at destruction", _disposed);
+    } catch (const std::exception& ex) {
+        LOGV2_ERROR(12562102,
+                    "Caught an unexpected exception while in query execution pipeline destructor",
+                    "error"_attr = ex.what());
+
+        // The 'dassert()' will terminate the process in debug mode only. In release mode, we
+        // continue.
+        dassert(false, "unexpected exception in pipeline destructor");
+    }
 }
 
 boost::optional<Document> Pipeline::getNext() {
