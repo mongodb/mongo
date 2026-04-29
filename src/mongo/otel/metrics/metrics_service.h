@@ -146,53 +146,75 @@ public:
 
     /**
      * Creates an int64_t up-down counter with the provided parameters. The function will throw an
-     * exception if the instrument would collide with an existing metric (i.e., same name but
+     * exception if the up-down counter would collide with an existing metric (i.e., same name but
      * different type or other parameters). Metrics should be stashed once they are created to avoid
-     * taking a lock on the global list of metrics in performance-sensitive codepaths.
+     * taking a lock on the global list of metrics in performance-sensitive codepaths. Note that
+     * this will take storage proportional to all possible attribute combinations, and will throw an
+     * exception if there are too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    UpDownCounter<int64_t>& createInt64UpDownCounter(MetricName name,
-                                                     std::string description,
-                                                     MetricUnit unit,
-                                                     const UpDownCounterOptions& = {});
+    template <AttributeType... AttributeTs>
+    UpDownCounter<int64_t, AttributeTs...>& createInt64UpDownCounter(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const UpDownCounterOptions& = {});
 
     /**
      * Creates a double up-down counter with the provided parameters. The function will throw an
-     * exception if the instrument would collide with an existing metric (i.e., same name but
+     * exception if the up-down counter would collide with an existing metric (i.e., same name but
      * different type or other parameters). Metrics should be stashed once they are created to avoid
-     * taking a lock on the global list of metrics in performance-sensitive codepaths.
+     * taking a lock on the global list of metrics in performance-sensitive codepaths. Note that
+     * this will take storage proportional to all possible attribute combinations, and will throw an
+     * exception if there are too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    UpDownCounter<double>& createDoubleUpDownCounter(MetricName name,
-                                                     std::string description,
-                                                     MetricUnit unit,
-                                                     const UpDownCounterOptions& = {});
+    template <AttributeType... AttributeTs>
+    UpDownCounter<double, AttributeTs...>& createDoubleUpDownCounter(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const UpDownCounterOptions& = {});
 
     /**
-     * Creates or returns an existing gauge with the provided parameters. The function will throw an
-     * exception if the gauge would collide with an different metric (i.e., same name but different
-     * type or other parameters).
+     * Creates an int64_t gauge with the provided parameters. The function will throw an exception
+     * if the gauge would collide with an existing metric (i.e., same name but different type or
+     * other parameters). Metrics should be stashed once they are created to avoid taking a lock on
+     * the global list of metrics in performance-sensitive codepaths. Note that this will take
+     * storage proportional to all possible attribute combinations, and will throw an exception if
+     * there are too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    Gauge<int64_t>& createInt64Gauge(MetricName name,
-                                     std::string description,
-                                     MetricUnit unit,
-                                     const GaugeOptions& = {});
+    template <AttributeType... AttributeTs>
+    Gauge<int64_t, AttributeTs...>& createInt64Gauge(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const GaugeOptions& = {});
 
     /**
-     * Creates or returns an existing gauge with the provided parameters. The function will throw an
-     * exception if the gauge would collide with an different metric (i.e., same name but different
-     * type or other parameters).
+     * Creates a double gauge with the provided parameters. The function will throw an exception if
+     * the gauge would collide with an existing metric (i.e., same name but different type or other
+     * parameters). Metrics should be stashed once they are created to avoid taking a lock on the
+     * global list of metrics in performance-sensitive codepaths. Note that this will take storage
+     * proportional to all possible attribute combinations, and will throw an exception if there are
+     * too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    Gauge<double>& createDoubleGauge(MetricName name,
-                                     std::string description,
-                                     MetricUnit unit,
-                                     const GaugeOptions& = {});
+    template <AttributeType... AttributeTs>
+    Gauge<double, AttributeTs...>& createDoubleGauge(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const GaugeOptions& = {});
 
     /**
      * Creates a min gauge that atomically tracks the minimum value observed via setIfLess(). The
@@ -775,4 +797,47 @@ void MetricsService::_addObservable(WithLock,
 }
 #endif  // MONGO_CONFIG_OTEL
 
+template <AttributeType... AttributeTs>
+UpDownCounter<int64_t, AttributeTs...>& MetricsService::createInt64UpDownCounter(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const UpDownCounterOptions& options) {
+    return _createScalarMetric<ObservableUpDownCounter, int64_t, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
+
+template <AttributeType... AttributeTs>
+UpDownCounter<double, AttributeTs...>& MetricsService::createDoubleUpDownCounter(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const UpDownCounterOptions& options) {
+    return _createScalarMetric<ObservableUpDownCounter, double, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
+
+template <AttributeType... AttributeTs>
+Gauge<int64_t, AttributeTs...>& MetricsService::createInt64Gauge(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const GaugeOptions& options) {
+    return _createScalarMetric<ObservableGauge, int64_t, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
+
+template <AttributeType... AttributeTs>
+Gauge<double, AttributeTs...>& MetricsService::createDoubleGauge(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const GaugeOptions& options) {
+    return _createScalarMetric<ObservableGauge, double, AttributeTs...>(
+        name, std::move(description), unit, defs..., options);
+}
 }  // namespace mongo::otel::metrics

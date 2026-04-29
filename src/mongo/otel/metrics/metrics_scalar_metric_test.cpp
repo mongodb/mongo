@@ -137,6 +137,12 @@ TYPED_TEST(ScalarMetricImplTest, ThrowsIfAttributeNamesDuplicated) {
                        ErrorCodes::BadValue);
 }
 
+TYPED_TEST(ScalarMetricImplTest, ThrowsOnEmptyAttributeValues) {
+    ASSERT_THROWS_CODE((ScalarMetricImpl<TypeParam, StringData>({.name = "type", .values = {}})),
+                       DBException,
+                       ErrorCodes::BadValue);
+}
+
 TYPED_TEST(ScalarMetricImplTest, ThrowsOnInvalidAttributes) {
     ASSERT_THROWS_CODE(
         (ScalarMetricImpl<TypeParam, bool>({.name = "is_cool", .values = {true, true}})),
@@ -619,8 +625,45 @@ TYPED_TEST(ScalarMetricImplReportingPolicyGlobal,
 }
 #endif  // MONGO_CONFIG_OTEL
 
-// TODO SERVER-124075: Add tests for kIfEverNonZero once Gauge and UpDownCounter support
-// attributes.
+// kIfEverNonZero is meaningful for Gauge and UpDownCounter since their values can reach zero
+// without reset().
+
+TYPED_TEST(ScalarMetricImplReportingPolicyGlobal, KIfEverNonZeroIncludesGaugeAfterSetToZero) {
+    ScalarMetricImpl<TypeParam, bool> impl(ReportingPolicy::kIfEverNonZero,
+                                           {.name = "is_primary", .values = {true, false}});
+    Gauge<TypeParam, bool>& gauge = impl;
+    gauge.set(5, {true});
+    gauge.set(0, {true});
+    // {true} was ever non-zero so it is reported; {false} was never written so it is not.
+    EXPECT_THAT(impl.values(),
+                ElementsAre(IsAttributesAndValue(
+                    ElementsAre(AttributeNameAndValue{.name = "is_primary", .value = true}), 0)));
+}
+
+TYPED_TEST(ScalarMetricImplReportingPolicyGlobal,
+           KIfEverNonZeroIncludesUpDownCounterAfterReturningToZero) {
+    ScalarMetricImpl<TypeParam, bool> impl(ReportingPolicy::kIfEverNonZero,
+                                           {.name = "is_primary", .values = {true, false}});
+    UpDownCounter<TypeParam, bool>& counter = impl;
+    counter.add(5, {true});
+    counter.add(-5, {true});
+    // {true} was ever non-zero so it is reported; {false} was never written so it is not.
+    EXPECT_THAT(impl.values(),
+                ElementsAre(IsAttributesAndValue(
+                    ElementsAre(AttributeNameAndValue{.name = "is_primary", .value = true}), 0)));
+}
+
+#ifdef MONGO_CONFIG_OTEL
+TYPED_TEST(ScalarMetricImplReportingPolicyGlobal, KIfEverNonZeroExcludesAfterReset) {
+    ScalarMetricImpl<TypeParam, bool> impl(ReportingPolicy::kIfEverNonZero,
+                                           {.name = "is_primary", .values = {true, false}});
+    Gauge<TypeParam, bool>& gauge = impl;
+    gauge.set(5, {true});
+    impl.reset(nullptr);
+    // reset() clears everNonZero, so {true} is no longer reported.
+    EXPECT_THAT(impl.values(), IsEmpty());
+}
+#endif  // MONGO_CONFIG_OTEL
 
 TYPED_TEST(ScalarMetricImplReportingPolicyPerCombination,
            KUnconditionallyOverridesGlobalKIfCurrentlyNonZero) {
@@ -633,23 +676,62 @@ TYPED_TEST(ScalarMetricImplReportingPolicyPerCombination,
                     ElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true}), 0)));
 }
 
+TYPED_TEST(ScalarMetricImplReportingPolicyPerCombination,
+           KIfEverNonZeroOverridesGlobalKIfCurrentlyNonZero) {
+    ScalarMetricImpl<TypeParam, bool> impl(ReportingPolicy::kIfCurrentlyNonZero,
+                                           {.name = "is_primary", .values = {true, false}});
+    Gauge<TypeParam, bool>& gauge = impl;
+    gauge.setReportingPolicy({true}, ReportingPolicy::kIfEverNonZero);
+    gauge.set(5, {true});
+    gauge.set(3, {false});
+    gauge.set(0, {true});
+
+    // - {true} uses per-combination kIfEverNonZero and was set to non-zero, so it is reported
+    //   even after going back to zero.
+    // - {false} uses global kIfCurrentlyNonZero and is still 3, so it is reported.
+    EXPECT_THAT(
+        impl.values(),
+        UnorderedElementsAre(
+            IsAttributesAndValue(
+                ElementsAre(AttributeNameAndValue{.name = "is_primary", .value = true}), 0),
+            IsAttributesAndValue(
+                ElementsAre(AttributeNameAndValue{.name = "is_primary", .value = false}), 3)));
+}
+
 #ifdef MONGO_CONFIG_OTEL
 TYPED_TEST(ScalarMetricImplReportingPolicyPerCombination, MultiplePoliciesAreIndependent) {
+    // 4 combinations: {true,1}, {true,2}, {false,1}, {false,2}
+    // - {true,1} uses per-combination kUnconditionally so it is reported even though never written.
+    // - {true,2} uses per-combination kIfCurrentlyNonZero and is zero after going to zero, so not
+    //   reported.
+    // - {false,1} uses global kIfCurrentlyNonZero (default) and was never written, so not reported.
+    // - {false,2} uses per-combination kIfEverNonZero and was set non-zero, so reported after
+    //   going to zero (via gauge.set(0)).
     ScalarMetricImpl<TypeParam, bool, int64_t> impl({.name = "is_cool", .values = {true, false}},
                                                     {.name = "size", .values = {1, 2}});
-    Counter<TypeParam, bool, int64_t>& counter = impl;
-    counter.setReportingPolicy({true, 1}, ReportingPolicy::kUnconditionally);
-    counter.setReportingPolicy({true, 2}, ReportingPolicy::kIfCurrentlyNonZero);
-    counter.add(5, {true, 2});
-    counter.add(3, {false, 2});
-    impl.reset(nullptr);
+    Gauge<TypeParam, bool, int64_t>& gauge = impl;
+    gauge.setReportingPolicy({true, 1}, ReportingPolicy::kUnconditionally);
+    gauge.setReportingPolicy({true, 2}, ReportingPolicy::kIfCurrentlyNonZero);
+    gauge.setReportingPolicy({false, 2}, ReportingPolicy::kIfEverNonZero);
+    gauge.set(5, {true, 2});
+    gauge.set(3, {false, 2});
+    gauge.set(0, {false, 2});
 
     EXPECT_THAT(
         impl.values(),
-        ElementsAre(IsAttributesAndValue(
-            UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true},
-                                 AttributeNameAndValue{.name = "size", .value = int64_t{1}}),
-            0)));
+        UnorderedElementsAre(
+            IsAttributesAndValue(
+                UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true},
+                                     AttributeNameAndValue{.name = "size", .value = int64_t{1}}),
+                0),
+            IsAttributesAndValue(
+                UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = true},
+                                     AttributeNameAndValue{.name = "size", .value = int64_t{2}}),
+                5),
+            IsAttributesAndValue(
+                UnorderedElementsAre(AttributeNameAndValue{.name = "is_cool", .value = false},
+                                     AttributeNameAndValue{.name = "size", .value = int64_t{2}}),
+                0)));
 }
 #endif  // MONGO_CONFIG_OTEL
 

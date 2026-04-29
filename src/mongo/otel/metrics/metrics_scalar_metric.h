@@ -66,7 +66,8 @@ public:
     /**
      * For each combination of attributes for which the metric has been written, returns the
      * set of attributes and the value associated with it. Result is valid only while this metric
-     * is alive.
+     * is alive. Intended only for OTel reporting. The values may be transiently inaccurate under
+     * concurrent writes.
      */
     virtual AttributesAndValues<T> values() const = 0;
 };
@@ -176,6 +177,9 @@ ScalarMetricImpl<T, AttributeTs...>::ScalarMetricImpl(
         _metrics[t] = std::make_unique<MetricData>(globalReportingPolicy);
 
     massert(ErrorCodes::BadValue,
+            "Attribute values list cannot be empty",
+            ((!defs.values.empty()) && ...));
+    massert(ErrorCodes::BadValue,
             "Attribute names are duplicated",
             !containsDuplicates(_attributeNames));
 }
@@ -215,6 +219,8 @@ void ScalarMetricImpl<T, AttributeTs...>::set(T value, const Attributes& attribu
             "Called set using undeclared set of attributes",
             it != _metrics.end());
     it->second->value.storeRelaxed(value);
+    if (value != 0)
+        it->second->everNonZero.storeRelaxed(true);
 }
 
 template <typename T, typename... AttributeTs>
@@ -237,6 +243,10 @@ void ScalarMetricImpl<T, AttributeTs...>::reset(opentelemetry::metrics::Meter* m
 }
 #endif  // MONGO_CONFIG_OTEL
 
+// Uses relaxed atomics so a concurrent write may not be fully visible. For example, everNonZero
+// may be seen as true while value still reads as 0, causing a metric to be reported with value 0
+// when it should be non-zero. This self-corrects once the write becomes visible to the calling
+// thread.
 template <typename T, typename... AttributeTs>
 AttributesAndValues<T> ScalarMetricImpl<T, AttributeTs...>::values() const {
     AttributesAndValues<T> attributesAndValues;

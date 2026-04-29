@@ -256,24 +256,6 @@ void MetricsService::_registerServerStatusTree(
         std::make_unique<OtelMetricServerStatusAdapter>(metricPtr));
 }
 
-UpDownCounter<int64_t>& MetricsService::createInt64UpDownCounter(
-    MetricName name,
-    std::string description,
-    MetricUnit unit,
-    const UpDownCounterOptions& options) {
-    return _createScalarMetric<ObservableUpDownCounter, int64_t>(
-        name, std::move(description), unit, options);
-}
-
-UpDownCounter<double>& MetricsService::createDoubleUpDownCounter(
-    MetricName name,
-    std::string description,
-    MetricUnit unit,
-    const UpDownCounterOptions& options) {
-    return _createScalarMetric<ObservableUpDownCounter, double>(
-        name, std::move(description), unit, options);
-}
-
 template <template <typename> class GaugeTpl, typename T>
 GaugeTpl<T>& MetricsService::createGaugeBase(MetricName name,
                                              std::string description,
@@ -312,22 +294,6 @@ GaugeTpl<T>& MetricsService::createGaugeBase(MetricName name,
         [](WithLock, const std::string&, GaugeTpl<T>*) {}
 #endif
     );
-}
-
-Gauge<int64_t>& MetricsService::createInt64Gauge(MetricName name,
-                                                 std::string description,
-                                                 MetricUnit unit,
-                                                 const GaugeOptions& options) {
-    return _createScalarMetric<ObservableGauge, int64_t>(
-        name, std::move(description), unit, options);
-}
-
-Gauge<double>& MetricsService::createDoubleGauge(MetricName name,
-                                                 std::string description,
-                                                 MetricUnit unit,
-                                                 const GaugeOptions& options) {
-    return _createScalarMetric<ObservableGauge, double>(
-        name, std::move(description), unit, options);
 }
 
 template <typename T>

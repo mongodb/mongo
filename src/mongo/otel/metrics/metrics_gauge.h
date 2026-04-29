@@ -51,6 +51,13 @@ public:
     virtual ~Gauge() = default;
 
     virtual void set(T value, const Attributes& attributes) = 0;
+
+    /**
+     * Sets the reporting policy for a specific attribute combination, overriding the global
+     * reporting policy. Throws BadValue if the combination is not declared.
+     */
+    virtual void setReportingPolicy(const Attributes& attributes,
+                                    ReportingPolicy reportingPolicy) = 0;
 };
 
 /** Specialization when there are no attributes, adding a convenience set(T) overload. */
@@ -66,6 +73,9 @@ public:
 
 protected:
     virtual void set(T value, const std::tuple<>& attributes) = 0;
+
+    virtual void setReportingPolicy(const Attributes& attributes,
+                                    ReportingPolicy reportingPolicy) = 0;
 };
 
 /**
@@ -102,6 +112,8 @@ public:
 
     using Gauge<T>::set;
     void set(T value, const std::tuple<>&) override;
+
+    void setReportingPolicy(const std::tuple<>&, ReportingPolicy) override {}
 
     void setIfLess(T value) override;
 

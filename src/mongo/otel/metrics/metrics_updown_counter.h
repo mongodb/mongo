@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/otel/metrics/metrics_attributes.h"
+#include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::otel::metrics {
@@ -42,6 +43,13 @@ public:
     virtual ~UpDownCounter() = default;
 
     virtual void add(T value, const Attributes& attributes) = 0;
+
+    /**
+     * Sets the reporting policy for a specific attribute combination, overriding the global
+     * reporting policy. Throws BadValue if the combination is not declared.
+     */
+    virtual void setReportingPolicy(const Attributes& attributes,
+                                    ReportingPolicy reportingPolicy) = 0;
 };
 
 /** Specialization when there are no attributes, adding a convenience add(T) overload. */
@@ -57,6 +65,9 @@ public:
 
 protected:
     virtual void add(T value, const std::tuple<>& attributes) = 0;
+
+    virtual void setReportingPolicy(const Attributes& attributes,
+                                    ReportingPolicy reportingPolicy) = 0;
 };
 
 }  // namespace mongo::otel::metrics
