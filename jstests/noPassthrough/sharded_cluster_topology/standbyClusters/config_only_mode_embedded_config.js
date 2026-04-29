@@ -13,7 +13,7 @@ import {StandbyClusterTestFixture} from "jstests/noPassthrough/libs/sharded_clus
 const fixture = new StandbyClusterTestFixture({
     name: jsTestName(),
     shards: 2,
-    rs: {nodes: 1},
+    rs: {nodes: 3},
     configShard: true,
 });
 

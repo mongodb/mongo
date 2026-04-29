@@ -141,8 +141,16 @@ private:
 
     bool recencyFilter(const ReadPreferenceSetting& readPref, const ServerDescriptionPtr& s);
 
-    static bool excludedHostsFilter(const std::vector<HostAndPort>& excludedHosts,
-                                    const ServerDescriptionPtr& s) {
+    // Returns true when the server is allowed to be selected. Rejects:
+    //   - servers in the caller-provided excludedHosts list (e.g. retry blocklists), and
+    //   - servers tagged as injectors (processType: INJECTOR), which belong to a standby
+    //     cluster's replica set and are kept in the topology for replication/heartbeat
+    //     tracking but must never receive client commands.
+    static bool passesExclusionFilters(const std::vector<HostAndPort>& excludedHosts,
+                                       const ServerDescriptionPtr& s) {
+        if (s->isInjector()) {
+            return false;
+        }
         return std::find(excludedHosts.begin(), excludedHosts.end(), s->getAddress()) ==
             excludedHosts.end();
     }
@@ -155,11 +163,14 @@ private:
     using SelectionFilter = unique_function<std::function<bool(const ServerDescriptionPtr&)>(
         const ReadPreferenceSetting&, const std::vector<HostAndPort>&)>;
 
+    // Note that each replica-set filter below delegates to passesExclusionFilters(), so it will
+    // always skip injector-tagged servers. See ServerDescription::isInjector for additional
+    // details.
     const SelectionFilter secondaryFilter = [this](const ReadPreferenceSetting& readPref,
                                                    const std::vector<HostAndPort>& excludedHosts) {
         return [&](const ServerDescriptionPtr& s) {
             return (s->getType() == ServerType::kRSSecondary) && recencyFilter(readPref, s) &&
-                excludedHostsFilter(excludedHosts, s);
+                passesExclusionFilters(excludedHosts, s);
         };
     };
 
@@ -167,7 +178,7 @@ private:
                                                  const std::vector<HostAndPort>& excludedHosts) {
         return [&](const ServerDescriptionPtr& s) {
             return (s->getType() == ServerType::kRSPrimary) && recencyFilter(readPref, s) &&
-                excludedHostsFilter(excludedHosts, s);
+                passesExclusionFilters(excludedHosts, s);
         };
     };
 
@@ -176,7 +187,7 @@ private:
         return [&](const ServerDescriptionPtr& s) {
             return (s->getType() == ServerType::kRSPrimary ||
                     s->getType() == ServerType::kRSSecondary) &&
-                recencyFilter(readPref, s) && excludedHostsFilter(excludedHosts, s);
+                recencyFilter(readPref, s) && passesExclusionFilters(excludedHosts, s);
         };
     };
 

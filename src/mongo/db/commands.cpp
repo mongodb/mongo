@@ -695,7 +695,30 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         }
     }
 
-    if (data.hasField("failAllCommands")) {
+    if (data.hasField("failAllCommands") && data.getBoolField("failAllCommands")) {
+        // "failCommandsExcept" is an allowlist that only applies when "failAllCommands" is set:
+        // commands matching any entry are exempt from the failpoint. Aliases registered on the
+        // same command class are honored (e.g. listing "isMaster" also exempts "ismaster"), but
+        // "hello" and "isMaster" are separate command classes and must each be listed to exempt
+        // both.
+        if (auto exemptField = data["failCommandsExcept"]; exemptField.type() == BSONType::array) {
+            for (auto&& exemptCmd : exemptField.Array()) {
+                if (exemptCmd.type() == BSONType::string &&
+                    cmd->hasAlias(exemptCmd.valueStringData())) {
+                    LOGV2(12322200,
+                          "Skipping 'failCommand' failpoint for command exempt via "
+                          "'failCommandsExcept'",
+                          "data"_attr = data,
+                          "threadName"_attr = threadName,
+                          "appName"_attr = appName,
+                          logAttrs(nss),
+                          "isInternalClient"_attr = isInternalThreadOrClient,
+                          "isOnPriorityPort"_attr = isOnPriorityPort,
+                          "command"_attr = cmd->getName());
+                    return false;
+                }
+            }
+        }
         LOGV2(6348500,
               "Activating 'failCommand' failpoint for all commands",
               "data"_attr = data,

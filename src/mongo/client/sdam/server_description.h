@@ -94,6 +94,14 @@ public:
     const boost::optional<HostAndPort>& getMe() const;
     const boost::optional<std::string>& getSetName() const;
     const std::map<std::string, std::string>& getTags() const;
+    /**
+     * Returns true if this server is tagged as an injector (i.e. has the tag
+     * processType: INJECTOR). Injector-tagged servers belong to a standby cluster's
+     * replica set: they remain visible in the SDAM topology so heartbeats and replication
+     * tracking continue to work, but server selection (in ServerSelector) excludes them so
+     * external client traffic is routed to non-injector members.
+     */
+    bool isInjector() const;
     void appendBsonTags(BSONObjBuilder& builder) const;
 
     // network attributes
@@ -144,6 +152,8 @@ private:
     void saveTopologyVersion(BSONElement topologyVersionField);
 
     static inline const std::string kIsDbGrid = "isdbgrid";
+    static inline const std::string kProcessTypeTagKey = "processType";
+    static inline const std::string kInjectorTagValue = "INJECTOR";
     static inline const double kRttAlpha = 0.2;
 
     // address: the hostname or IP, and the port number, that the client connects to. Note that this

@@ -43,6 +43,7 @@
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_state_machine.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -149,6 +150,44 @@ public:
     };
 
     ServerSelector selector = ServerSelector(sdamConfiguration);
+
+    struct InjectorPrimaryTopology {
+        std::shared_ptr<TopologyDescription> topologyDescription;
+        TopologyStateMachine stateMachine;
+
+        InjectorPrimaryTopology(const SdamConfiguration& config)
+            : topologyDescription(std::make_shared<TopologyDescription>(config)),
+              stateMachine(config) {
+            const auto injector = ServerDescriptionBuilder()
+                                      .withAddress(HostAndPort("s0"))
+                                      .withType(ServerType::kRSPrimary)
+                                      .withLastUpdateTime(Date_t::now())
+                                      .withLastWriteDate(Date_t::now())
+                                      .withRtt(Milliseconds{1})
+                                      .withSetName("set")
+                                      .withHost(HostAndPort("s0"))
+                                      .withHost(HostAndPort("s1"))
+                                      .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                                      .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                                      .withTag("processType", "INJECTOR")
+                                      .withElectionId(kOidOne)
+                                      .withSetVersion(100)
+                                      .instance();
+            stateMachine.onServerDescription(*topologyDescription, injector);
+
+            const auto secondary = ServerDescriptionBuilder()
+                                       .withAddress(HostAndPort("s1"))
+                                       .withType(ServerType::kRSSecondary)
+                                       .withRtt(Milliseconds{1})
+                                       .withSetName("set")
+                                       .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                                       .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                                       .withLastUpdateTime(Date_t::now())
+                                       .withLastWriteDate(Date_t::now())
+                                       .instance();
+            stateMachine.onServerDescription(*topologyDescription, secondary);
+        }
+    };
 };
 
 TEST_F(ServerSelectorTestFixture, ShouldFilterCorrectlyByLatencyWindow) {
@@ -971,5 +1010,95 @@ TEST_F(ServerSelectorTestFixture, ShouldIgnoreMinClusterTimeIfNotSatisfiable) {
 
     ASSERT_EQ(result->size(), 1);
     ASSERT_EQ((*result)[0]->getAddress(), s0->getAddress());
+}
+
+class ConfigOnlyServerSelectorTest : public ServerSelectorTestFixture {
+public:
+    void setUp() override {
+        ServerSelectorTestFixture::setUp();
+        serverGlobalParams.configOnly = true;
+    }
+
+    void tearDown() override {
+        serverGlobalParams.configOnly = false;
+        ServerSelectorTestFixture::tearDown();
+    }
+};
+
+TEST_F(ConfigOnlyServerSelectorTest, ShouldExcludeInjectorFromPrimaryOnlySelection) {
+    InjectorPrimaryTopology topo(sdamConfiguration);
+
+    auto result = selector.selectServers(
+        topo.topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryOnly), {});
+    ASSERT_EQ(adaptForAssert(boost::none), adaptForAssert(result));
+}
+
+TEST_F(ConfigOnlyServerSelectorTest, ShouldExcludeInjectorFromNearestSelection) {
+    InjectorPrimaryTopology topo(sdamConfiguration);
+
+    std::map<HostAndPort, int> frequencyInfo{{HostAndPort("s0"), 0}, {HostAndPort("s1"), 0}};
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topo.topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), {});
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    ASSERT_FALSE(frequencyInfo[HostAndPort("s0")]);
+    ASSERT_EQ(frequencyInfo[HostAndPort("s1")], NUM_ITERATIONS);
+}
+
+TEST_F(ConfigOnlyServerSelectorTest, ShouldExcludeInjectorFromPrimaryPreferredSelection) {
+    InjectorPrimaryTopology topo(sdamConfiguration);
+
+    std::map<HostAndPort, int> frequencyInfo{{HostAndPort("s0"), 0}, {HostAndPort("s1"), 0}};
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topo.topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryPreferred), {});
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    ASSERT_FALSE(frequencyInfo[HostAndPort("s0")]);
+    ASSERT_EQ(frequencyInfo[HostAndPort("s1")], NUM_ITERATIONS);
+}
+
+TEST_F(ServerSelectorTestFixture, ShouldNotExcludeInjectorWhenNotConfigOnly) {
+    InjectorPrimaryTopology topo(sdamConfiguration);
+
+    auto result = selector.selectServers(
+        topo.topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryOnly), {});
+    ASSERT(result);
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(HostAndPort("s0"), (*result)[0]->getAddress());
+}
+
+TEST_F(ServerSelectorTestFixture, ShouldNotExcludeNonInjectorWithOtherTags) {
+    TopologyStateMachine stateMachine(sdamConfiguration);
+    auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
+
+    const auto primary = ServerDescriptionBuilder()
+                             .withAddress(HostAndPort("s0"))
+                             .withType(ServerType::kRSPrimary)
+                             .withLastUpdateTime(Date_t::now())
+                             .withLastWriteDate(Date_t::now())
+                             .withRtt(Milliseconds{1})
+                             .withSetName("set")
+                             .withHost(HostAndPort("s0"))
+                             .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                             .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                             .withTag("processType", "NORMAL")
+                             .withElectionId(kOidOne)
+                             .withSetVersion(100)
+                             .instance();
+    stateMachine.onServerDescription(*topologyDescription, primary);
+
+    auto result = selector.selectServers(
+        topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryOnly), {});
+    ASSERT(result);
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(HostAndPort("s0"), (*result)[0]->getAddress());
 }
 }  // namespace mongo::sdam

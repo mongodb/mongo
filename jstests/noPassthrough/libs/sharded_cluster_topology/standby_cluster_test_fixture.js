@@ -1,5 +1,11 @@
 /**
- * Test fixture for simulating a standby cluster's config server.
+ * Test fixture for simulating a standby cluster's config server. Construction launches a normal
+ * ShardingTest; `transitionToStandby()` then converts the config server replica set into a
+ * non-configsvr "standby" replica set with node 0 tagged `processType: INJECTOR`.
+ *
+ * After the transition, a `failCommand` failpoint is enabled on node 0 that fails every command
+ * except the small wire-protocol allowlist the real injector handles (hello, isMaster, ismaster,
+ * ping, etc.).
  *
  * Example usage:
  *
@@ -8,10 +14,11 @@
  *      fixture.st.s.getDB("test").foo.insert({_id: 1});
  *      fixture.transitionToStandby();
  *      // Interact with the standby config replica set via fixture.standbyRS.
- *      const primary = fixture.standbyRS.getPrimary();
+ *      const injector = fixture.standbyRS.nodes[0]; // INJECTOR-tagged, failpoint-active
  *      fixture.teardown();
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -47,6 +54,9 @@ export class StandbyClusterTestFixture {
          * @type {Array<{pid: number, port: number}>|null}
          */
         this._sentries = null;
+
+        /** @private Handle returned by configureFailPoint(); used to disable the failpoint. */
+        this._injectorFailpoint = null;
 
         this._setup();
     }
@@ -121,13 +131,21 @@ export class StandbyClusterTestFixture {
         MongoRunner.stopMongod(node0);
 
         // Build a new config: rename the set to "standby", replace all member ports with the
-        // newly-allocated ports, and remove the configsvr field.
+        // newly-allocated ports, and remove the configsvr field. Only node 0 is electable
+        // (priority 1; others priority 0), so it deterministically wins the election and becomes
+        // primary -- this mirrors a real standby cluster where the injector is always primary.
+        // Node 0 is tagged with processType: INJECTOR so the topology matches production: the
+        // RSM keeps the INJECTOR-tagged primary visible for replication purposes but excludes it
+        // from server selection, forcing client traffic to the secondaries.
         const newMembers = existingConfig.members.map((member, idx) => {
             const newMember = Object.extend({}, member, /*deep=*/ true);
             const hostParts = newMember.host.split(":");
             hostParts[hostParts.length - 1] = String(newPorts[idx]);
             newMember.host = hostParts.join(":");
             newMember.priority = idx === 0 ? 1 : 0;
+            if (idx === 0) {
+                newMember.tags = {processType: "INJECTOR"};
+            }
             return newMember;
         });
 
@@ -136,13 +154,11 @@ export class StandbyClusterTestFixture {
         newConfig.members = newMembers;
         delete newConfig.configsvr;
 
-        // We use a single electable member (priority set in newMembers above) and a very long
-        // cluster-wide election timeout so that after the forced stepdown no new primary is elected
-        // for the duration of the test.
-        if (!newConfig.settings) {
-            newConfig.settings = {};
-        }
-        newConfig.settings.electionTimeoutMillis = ReplSetTest.kForeverMillis;
+        // Node 0 is the only electable member (priority set in newMembers above) and remains
+        // primary for the duration of the test, mirroring a real standby cluster where the
+        // INJECTOR-tagged node is primary.
+        newConfig.settings = newConfig.settings || {};
+        newConfig.settings.electionTimeoutMillis = 10000;
 
         // Replace the hosts in each individual replSetConfig.
         for (let i = 0; i < numNodes; i++) {
@@ -182,20 +198,26 @@ export class StandbyClusterTestFixture {
         this.standbyRS.asCluster(nodes, () => {
             this.standbyRS.stepUp(nodes[0], {awaitReplicationBeforeStepUp: false});
             this.standbyRS.awaitNodesAgreeOnPrimary();
-            // Write a majority-committed noop before stepping down to ensure the committed snapshot
-            // is established. The primary's drain-completion noop may not yet be journaled, and
-            // without a journaled entry the commit point (and thus the committed snapshot) never
-            // advances. Once the node steps down to secondary, the commit point can no longer
-            // advance, so majority reads would be permanently blocked.
-            const primary = this.standbyRS.getPrimary();
-            assert.commandWorked(
-                primary.adminCommand({
-                    appendOplogNote: 1,
-                    data: {msg: "standby transition commit point advance"},
-                    writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS},
-                }),
-            );
-            assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
+            // Node 0 stays primary; the INJECTOR tag keeps client traffic from being routed to it
+            // via server selection, while the failpoint fails any command that does slip through
+            // (everything outside the wire-protocol allowlist the real injector handles).
+            this._injectorFailpoint = configureFailPoint(nodes[0], "failCommand", {
+                failAllCommands: true,
+                failCommandsExcept: [
+                    "hello",
+                    "isMaster",
+                    "ismaster",
+                    "ping",
+                    "find",
+                    "getMore",
+                    "killCursors",
+                    "replSetHeartbeat",
+                    "replSetUpdatePosition",
+                    "saslStart",
+                    "saslContinue",
+                ],
+                errorCode: 12319007,
+            });
         });
 
         // Start a mongosentry on every retired port (old shard ports and old config server ports).
@@ -233,6 +255,16 @@ export class StandbyClusterTestFixture {
         }
 
         if (this.standbyRS) {
+            // Disable the injector failpoint before stopSet (if it was enabled), otherwise the
+            // shutdown command (not on the allowlist) would be rejected.
+            if (this._injectorFailpoint) {
+                try {
+                    this._injectorFailpoint.off();
+                } catch (e) {
+                    jsTest.log.info(`Failed to disable injector failpoint during teardown: ${e}`);
+                }
+                this._injectorFailpoint = null;
+            }
             this.standbyRS.stopSet();
         } else {
             this.st.stop();
