@@ -107,13 +107,18 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId,
     }
 
     // Model the random IO performed by fetching documents from the collection.
-    CardinalityEstimate numRandIOs =
-        CardinalityEstimate{CardinalityType{estimateMackertLohmanRandIO(
-                                                numPagesAccessedColl,
-                                                _jCtx.catStats.numPagesInStorageEngineCache(nss),
-                                                numLogicalPageRequests)
-                                                .randIOPages},
-                            EstimationSource::Sampling};
+    auto [numRandIOsCollection, mlCase] =
+        estimateMackertLohmanRandIO(numPagesAccessedColl,
+                                    _jCtx.catStats.numPagesInStorageEngineCache(nss),
+                                    numLogicalPageRequests);
+    const auto sortedSparse =
+        estimateSortedSparseIO(numPagesAccessedColl, numLogicalPageRequests, mlCase);
+
+    numRandIOsCollection += sortedSparse.numRandIOs;
+    numSeqIOs =
+        CardinalityEstimate{CardinalityType{sortedSparse.numSeqIOs}, EstimationSource::Sampling};
+    CardinalityEstimate numRandIOs{CardinalityType{numRandIOsCollection},
+                                   EstimationSource::Sampling};
 
     return JoinCostEstimate(
         numDocsProcessedFromCpuCost(singleTableCpuCost), numDocsOutput, numSeqIOs, numRandIOs);
@@ -235,10 +240,15 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
         // In a MongoDB index, we append the RecordId (RID) to the index key. This means that a
         // single index probe will read index keys for the same join key in RID order. Because
         // MongoDB collections are clustered on RID, each fetch is not performing a truely
-        // random I/O but rather a sorted-sparse access pattern over the collection. For now, we
-        // ignore the I/O cost of this sorted-sparse and assume that each index probe only
-        // performs a single random I/O.
+        // random I/O but rather a sorted-sparse access pattern over the collection. For this
+        // calculation, we assume that each index probe performs a single random I/O and we model
+        // the sorted-sparse I/O cost separately.
         numProbes);
+
+    const auto sortedSparse = estimateSortedSparseIO(numPagesAccessedColl, numProbes, mlCase);
+    numRandIOsCollection += sortedSparse.numRandIOs;
+    numSeqIOs =
+        CardinalityEstimate{CardinalityType{sortedSparse.numSeqIOs}, EstimationSource::Sampling};
 
     return JoinCostEstimate(
         numDocsProcessed,
@@ -366,6 +376,42 @@ MackertLohmanResult estimateMackertLohmanRandIO(double numDistinctPagesNeededFro
                     (numDistinctPagesNeededFromBtree - numPagesInStorageEngineCache) /
                     numDistinctPagesNeededFromBtree,
             MackertLohmanCase::kPartialEviction};
+}
+
+SortedSparseIO estimateSortedSparseIO(double numPagesAccessedColl,
+                                      double numLogicalPageRequests,
+                                      MackertLohmanCase mlCase) {
+    tassert(12226500,
+            "estimateSortedSparseIO() expected numPagesAccessedColl >= 0",
+            numPagesAccessedColl >= 0);
+    tassert(12226501,
+            "estimateSortedSparseIO() expected numLogicalPageRequests >= 0",
+            numLogicalPageRequests >= 0);
+    double numSortedSparseIOs = std::max(0.0, numPagesAccessedColl - numLogicalPageRequests);
+
+    // The cost of sorted-sparse I/Os depends on whether the working set fits in cache:
+    //  * If the whole collection fits in cache, the data is likely already in memory; charging
+    //  extra I/O would overestimate INLJ cost, so we charge nothing.
+    //  * If only the fetched pages fit in cache, sorted-sparse pages will end up in the cache.
+    //  Model them as sequential I/Os with a small premium (1.5x) to reflect that they are
+    //  slightly more expensive than purely sequential reads.
+    //  * Under cache eviction pressure, sorted-sparse pages may have been evicted between
+    //  accesses, so conservatively treat them as additional random I/Os. This probably leads to
+    //  a cost overestimate, but we accept this because index-based plans which cause cache pressure
+    //  can have catastrophic performance.
+    switch (mlCase) {
+        case MackertLohmanCase::kCollectionFitsCache:
+            return {.numSeqIOs = 0.0, .numRandIOs = 0.0};
+        case MackertLohmanCase::kReturnedDocsFitCache: {
+            // Not calibrated: a small premium over sequential I/O to reflect that sorted-sparse
+            // access is slightly more expensive than purely sequential reads.
+            constexpr double sortedSparseIOMultiplier = 1.5;
+            return {.numSeqIOs = numSortedSparseIOs * sortedSparseIOMultiplier, .numRandIOs = 0.0};
+        }
+        case MackertLohmanCase::kPartialEviction:
+            return {.numSeqIOs = 0.0, .numRandIOs = numSortedSparseIOs};
+    }
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo::join_ordering

@@ -121,4 +121,27 @@ MackertLohmanResult estimateMackertLohmanRandIO(double numDistinctPagesNeededFro
                                                 double numPagesInStorageEngineCache,
                                                 double numLogicalPageRequests);
 
+/**
+ * Result of 'estimateSortedSparseIO', describing the additional I/Os to charge.
+ */
+struct SortedSparseIO {
+    double numSeqIOs;
+    double numRandIOs;
+};
+
+/**
+ * Models the I/O cost of the page accesses within each RID-ordered fetch group that follow the
+ * first random seek. A "group" is one index probe for INLJ or one distinct key for an IXSCAN.
+ * Within each group, the index returns RIDs in sorted order. Fetching documents by sorted RID is a
+ * "sorted-sparse" scan over the collection — not fully sequential, but not fully random either. The
+ * extra page accesses beyond the first random seek per probe are the sorted-sparse I/Os.
+ *
+ * 'numPagesAccessedColl' is the estimated number of distinct collection pages touched.
+ * 'numLogicalPageRequests' is the number of RID-ordered groups.
+ * 'mlCase' is the branch taken by 'estimateMackertLohmanRandIO'.
+ */
+SortedSparseIO estimateSortedSparseIO(double numPagesAccessedColl,
+                                      double numLogicalPageRequests,
+                                      MackertLohmanCase mlCase);
+
 }  // namespace mongo::join_ordering
