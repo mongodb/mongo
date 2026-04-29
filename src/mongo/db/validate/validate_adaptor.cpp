@@ -835,30 +835,39 @@ TimeseriesValidationStatus _validateTimeSeriesBucketRecord(
 }
 }  // namespace
 
-Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
-                                       const RecordId& recordId,
-                                       const RecordData& record,
-                                       long long& nNonCompliantDocuments,
-                                       long long& nInvalidDocuments,
-                                       size_t* dataSize,
-                                       ValidateResults* results,
-                                       ValidationVersion validationVersion) {
+auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
+                                     const RecordId& recordId,
+                                     const RecordData& record,
+                                     long long& nNonCompliantDocuments,
+                                     long long& nInvalidDocuments,
+                                     ValidateResults* results,
+                                     ValidationVersion validationVersion) -> ValidateRecordResult {
     {
-        Status bsonValidationStatus = validateBSON(
+        const Status bsonValidationStatus = validateBSON(
             record.data(), record.size(), _validateState->getBSONValidateMode(), validationVersion);
 
         if (!bsonValidationStatus.isOK()) {
-            if (bsonValidationStatus.code() == ErrorCodes::NonConformantBSON) {
-
-                LOGV2_WARNING_OPTIONS(6825900,
-                                      {logv2::LogTruncation::Disabled},
-                                      "Document is not conformant to BSON specifications",
-                                      "recordId"_attr = recordId,
-                                      "reason"_attr = bsonValidationStatus);
-                ++nNonCompliantDocuments;
-                results->addWarning(kBSONValidationNonConformantReason);
-            } else {
-                return bsonValidationStatus;  // Error is not related to BSON compliance
+            switch (bsonValidationStatus.code()) {
+                case ErrorCodes::NonConformantBSON:
+                    LOGV2_WARNING_OPTIONS(6825900,
+                                          {logv2::LogTruncation::Disabled},
+                                          "Document is not conformant to BSON specifications",
+                                          "recordId"_attr = recordId,
+                                          "reason"_attr = bsonValidationStatus);
+                    ++nNonCompliantDocuments;
+                    results->addWarning(kBSONValidationNonConformantReason);
+                    break;
+                default:
+                    LOGV2_ERROR_OPTIONS(12395400,
+                                        {logv2::LogTruncation::Disabled},
+                                        "Error occurred during BSON validation",
+                                        "recordId"_attr = recordId,
+                                        "reason"_attr = bsonValidationStatus);
+                    return {.status = bsonValidationStatus,
+                            .errorMessage = fmt::format(
+                                "BSON validation failed with error '{}'. For more info, see logs "
+                                "with log id 12395400",
+                                ErrorCodes::errorString(bsonValidationStatus.code()))};
             }
         } else if (!_validateState->nss().isOplog()) {
             // Additionally check size if the BSON object is compliant. Do not run this check on the
@@ -881,14 +890,15 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                     results->addError(kBSONValidationObjectTooLargeReason,
                                       /*stopValidation=*/false);
                 } else {
-                    return sizeValidationStatus;  // Error is not related to BSON size limitations
+                    return {.status = sizeValidationStatus,
+                            .errorMessage =
+                                boost::none};  // Error is not related to BSON size limitations
                 }
             }
         }
     }
 
     const BSONObj recordBson = record.toBson();
-    *dataSize = recordBson.objsize();
 
     if (MONGO_unlikely(_validateState->logDiagnostics())) {
         LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
@@ -917,7 +927,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
         this->traverseRecord(opCtx, coll, indexEntry, recordId, recordBson, results);
     }
-    return Status::OK();
+    return {.status = Status::OK(), .dataSize = recordBson.objsize()};
 }
 
 size_t CollectionValidation::getNumberOfAdditionalCharactersForHashDrillDown(
@@ -1158,15 +1168,14 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         auto dataSize = record->data.size();
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
-        size_t validatedSize = 0;
-        Status status = validateRecord(opCtx,
-                                       record->id,
-                                       record->data,
-                                       nNonCompliantDocuments,
-                                       nInvalid,
-                                       &validatedSize,
-                                       results,
-                                       validationVersion);
+        const auto [validateRecordStatus, validatedSize, maybeValidateRecordErrorMessage] =
+            validateRecord(opCtx,
+                           record->id,
+                           record->data,
+                           nNonCompliantDocuments,
+                           nInvalid,
+                           results,
+                           validationVersion);
 
         if (_validateState->isCollHashValidation()) {
             SHA256Block block = SHA256Block::computeHash(
@@ -1196,14 +1205,14 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
-        if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
+        if (!validateRecordStatus.isOK() || validatedSize != dataSize) {
             // If status is not okay, dataSize is not reliable.
-            if (!status.isOK()) {
+            if (!validateRecordStatus.isOK()) {
                 LOGV2_OPTIONS(4835001,
                               {logv2::LogTruncation::Disabled},
                               "Document corruption details - Document validation failed with error",
                               "recordId"_attr = record->id,
-                              "error"_attr = status);
+                              "error"_attr = validateRecordStatus);
             } else {
                 LOGV2_OPTIONS(
                     4835002,
@@ -1222,7 +1231,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 results->addNumRemovedCorruptRecords(1);
                 _numRecords--;
             } else {
-                results->addError(kInvalidDocumentError);
+                // If this is not set up to repair and remove the corrupt records, the error
+                // returned from record Validation should be logged if it exists.
+                if (!validateRecordStatus.isOK()) {
+                    results->addError(
+                        maybeValidateRecordErrorMessage.value_or(kInvalidDocumentError));
+                }
                 numCorruptRecordsSizeBytes += record->id.memUsage();
                 if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
                     results->addCorruptRecord(record->id);

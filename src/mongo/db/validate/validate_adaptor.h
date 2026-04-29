@@ -82,18 +82,24 @@ public:
 
         : _keyBasedIndexConsistency(opCtx, validateState), _validateState(validateState) {}
 
+    struct ValidateRecordResult {
+        Status status{Status::OK()};
+        int dataSize{0};
+        boost::optional<std::string> errorMessage{boost::none};
+    };
     /**
-     * Validates the record data and traverses through its key set to keep track of the
-     * index consistency.
+     * Validates the record data and traverses through its key set to keep track of the index
+     * consistency. Returns the status from the record validation, and if a specific error was added
+     * during record validation, returns that error as well.
      */
-    Status validateRecord(OperationContext* opCtx,
-                          const RecordId& recordId,
-                          const RecordData& record,
-                          long long& nNonCompliantDocuments,
-                          long long& nInvalidDocuments,
-                          size_t* dataSize,
-                          ValidateResults* results,
-                          ValidationVersion validationVersion = currentValidationVersion);
+    auto validateRecord(OperationContext* opCtx,
+                        const RecordId& recordId,
+                        const RecordData& record,
+                        long long& nNonCompliantDocuments,
+                        long long& nInvalidDocuments,
+                        ValidateResults* results,
+                        ValidationVersion validationVersion = currentValidationVersion)
+        -> ValidateRecordResult;
     /**
      * Traverses the record store to retrieve every record and go through its document key
      * set to keep track of the index consistency during a validation.
