@@ -69,9 +69,6 @@ protected:
 private:
     bool _mustAlwaysMakeProgress() override;
 
-    std::vector<ShardId> _getDataShardsAndConfigServer(OperationContext* opCtx,
-                                                       const NamespaceString& nss);
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

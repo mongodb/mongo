@@ -340,7 +340,7 @@ void commitCreateCollectionLocally(OperationContext* opCtx, const NamespaceStrin
     updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
 }
 
-void commitCreateCollectionChunklessLocally(OperationContext* opCtx, const NamespaceString& nss) {
+void commitChunklessCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
     auto coll = fetchCollection(opCtx, nss);
 
     // Drop all existing chunk entries for this collection to start from a clean slate. This removes

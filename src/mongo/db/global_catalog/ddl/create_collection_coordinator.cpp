@@ -2378,7 +2378,7 @@ void CreateCollectionCoordinator::_commitOnShardCatalog(
     // logic, and (2) CheckMetadataConsistency can verify the DB primary always has an entry.
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     if (involvedShards.find(primaryShardId) == involvedShards.end()) {
-        shard_catalog_commit::commitCreateCollectionChunklessLocally(opCtx, nss());
+        shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss());
     }
 }
 

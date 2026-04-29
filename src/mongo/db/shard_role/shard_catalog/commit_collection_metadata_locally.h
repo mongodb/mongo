@@ -72,14 +72,13 @@ void commitDropCollectionLocally(OperationContext* opCtx,
 void commitCreateCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
- * Fetches the collection metadata from the global catalog (without chunks), persists only the
- * collection document to the shard catalog (config.shard.catalog.collections), writes an oplog
- * entry to invalidate collection metadata on secondaries, and updates the in-memory
- * CollectionShardingRuntime (CSR) with a chunkless tracked metadata. This is used for shards that
- * participate on a tracked collection but do not own any chunks (e.g., the DB primary shard after
- * create collection).
+ * Fetches the collection metadata from the global catalog, removes any existing chunk entries for
+ * this collection UUID, persists a chunkless placeholder chunk and the updated collection document
+ * to the shard catalog, writes an oplog entry to invalidate secondaries, and refreshes the
+ * in-memory CollectionShardingRuntime. Used for shards that participate in a tracked collection
+ * but own no chunks.
  */
-void commitCreateCollectionChunklessLocally(OperationContext* opCtx, const NamespaceString& nss);
+void commitChunklessCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace shard_catalog_commit
 }  // namespace mongo

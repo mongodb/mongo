@@ -52,6 +52,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -59,6 +60,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -96,6 +98,27 @@ std::vector<ShardId> getShardsWithDataForCollection(OperationContext* opCtx,
     cm.getAllShardIds(&vecsSet);
     return std::vector<ShardId>(vecsSet.begin(), vecsSet.end());
 }
+
+std::vector<ShardId> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
+                                                    const NamespaceString& nss) {
+    auto shards = getShardsWithDataForCollection(opCtx, nss);
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    if (std::find(shards.begin(), shards.end(), primaryShardId) == shards.end()) {
+        shards.push_back(primaryShardId);
+    }
+    return shards;
+}
+
+std::vector<ShardId> getDataShardsAndConfigServer(OperationContext* opCtx,
+                                                  const NamespaceString& nss) {
+    auto shards = getShardsWithDataForCollection(opCtx, nss);
+    const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+    if (std::find(shards.begin(), shards.end(), configShardId) == shards.end()) {
+        shards.push_back(configShardId);
+    }
+    return shards;
+}
+
 }  // namespace
 
 RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
@@ -132,12 +155,6 @@ bool RefineCollectionShardKeyCoordinator::_mustAlwaysMakeProgress() {
     return _doc.getPhase() >= Phase::kRemoteIndexValidation;
 }
 
-std::vector<ShardId> RefineCollectionShardKeyCoordinator::_getDataShardsAndConfigServer(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    auto shards = getShardsWithDataForCollection(opCtx, nss);
-    shards.push_back(Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId());
-    return shards;
-}
 
 ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -214,7 +231,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     ParticipantCausalityBarrier barrier{
-                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
                     performCausalityBarrier(opCtx, barrier);
                 }
 
@@ -250,7 +267,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     ParticipantCausalityBarrier barrier{
-                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
                     performCausalityBarrier(opCtx, barrier);
                 }
 
@@ -276,7 +293,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
                     **executor, token, blockCRUDOperationsRequest);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, opts, getShardsWithDataForCollection(opCtx, nss()));
+                    opCtx, opts, getDataShardsAndDbPrimaryShard(opCtx, nss()));
 
                 // Once there are no writes in the cluster, select an epoch and a timestamp.
                 if (!_doc.getNewEpoch()) {
@@ -301,7 +318,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     ParticipantCausalityBarrier barrier{
-                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
                     performCausalityBarrier(opCtx, barrier);
                 }
 
@@ -328,14 +345,20 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    const auto involvedShards = getShardsWithDataForCollection(opCtx, nss());
                     const auto session = getNewSession(opCtx);
                     sharding_ddl_util::commitRefineCollectionShardKeyToShardCatalog(
-                        opCtx,
-                        nss(),
-                        getShardsWithDataForCollection(opCtx, nss()),
-                        session,
-                        executor,
-                        token);
+                        opCtx, nss(), involvedShards, session, executor, token);
+
+                    // The DB primary shard must always know that a collection is tracked, even when
+                    // it does not own any chunks. We persist a placeholder chunk locally so that
+                    // disk recovery can distinguish a chunkless-tracked collection from an
+                    // untracked one.
+                    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                    if (std::find(involvedShards.begin(), involvedShards.end(), primaryShardId) ==
+                        involvedShards.end()) {
+                        shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss());
+                    }
                 }
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
@@ -348,7 +371,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     ParticipantCausalityBarrier barrier{
-                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
                     performCausalityBarrier(opCtx, barrier);
                 }
 
@@ -458,7 +481,7 @@ void RefineCollectionShardKeyCoordinator::_exitCriticalSection(
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
         **executor, token, unblockCRUDOperationsRequest);
     sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, getShardsWithDataForCollection(opCtx, nss()));
+        opCtx, opts, getDataShardsAndDbPrimaryShard(opCtx, nss()));
 }
 
 }  // namespace mongo

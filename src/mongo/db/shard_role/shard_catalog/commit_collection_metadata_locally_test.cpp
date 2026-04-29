@@ -273,11 +273,11 @@ TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionReplacesStaleChunksO
     }
 }
 
-TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionChunklessPersistsTokenToDisk) {
+TEST_F(CommitCollectionMetadataLocallyTest, ChunklessCollectionPersistsTokenToDisk) {
     auto [collType, chunks] = makeCollectionMetadata(0);
     mockCatalogClient()->setCollectionMetadata(collType, {});
 
-    shard_catalog_commit::commitCreateCollectionChunklessLocally(operationContext(), kTestNss);
+    shard_catalog_commit::commitChunklessCollectionLocally(operationContext(), kTestNss);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
 
@@ -292,30 +292,63 @@ TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionChunklessPersistsTok
               collType.getUuid());
 }
 
-TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionChunklessUpdatesCSR) {
+TEST_F(CommitCollectionMetadataLocallyTest, ChunklessCollectionUpdatesCSR) {
     auto [collType, chunks] = makeCollectionMetadata(0);
     mockCatalogClient()->setCollectionMetadata(collType, {});
 
-    shard_catalog_commit::commitCreateCollectionChunklessLocally(operationContext(), kTestNss);
+    shard_catalog_commit::commitChunklessCollectionLocally(operationContext(), kTestNss);
 
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     auto metadata = scopedCsr->getCurrentMetadataIfKnown();
     ASSERT_TRUE(metadata);
     ASSERT_TRUE(metadata->isSharded());
+    ASSERT_EQ(metadata->getChunkManager()->getUUID(), collType.getUuid());
+    // The DB primary owns no real chunks for this collection, so its placement version is unset.
     ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
 }
 
-TEST_F(CommitCollectionMetadataLocallyTest, CreateCollectionChunklessIsIdempotent) {
+TEST_F(CommitCollectionMetadataLocallyTest, ChunklessCollectionIsIdempotent) {
     auto [collType, _] = makeCollectionMetadata(0);
     mockCatalogClient()->setCollectionMetadata(collType, {});
 
-    shard_catalog_commit::commitCreateCollectionChunklessLocally(operationContext(), kTestNss);
-    shard_catalog_commit::commitCreateCollectionChunklessLocally(operationContext(), kTestNss);
+    shard_catalog_commit::commitChunklessCollectionLocally(operationContext(), kTestNss);
+    shard_catalog_commit::commitChunklessCollectionLocally(operationContext(), kTestNss);
 
     // Repeated calls must not accumulate placeholder rows; each call generates a fresh OID, so
     // this only holds if the helper deletes the prior placeholder before inserting.
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyChunklessPersistsCollectionWithNewEpoch) {
+    // Seed a chunkless tracked collection at (epoch1, ts1).
+    auto [collType1, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType1, {});
+    shard_catalog_commit::commitChunklessCollectionLocally(operationContext(), kTestNss);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
+
+    // Simulate a refine to (epoch2, ts2) on the same UUID with an extended key pattern.
+    const OID epoch2 = OID::gen();
+    const Timestamp ts2(Date_t::now());
+    const BSONObj newKeyPattern = BSON("_id" << 1 << "extra" << 1);
+    CollectionType collType2{
+        kTestNss, epoch2, ts2, Date_t::now(), collType1.getUuid(), newKeyPattern};
+    mockCatalogClient()->setCollectionMetadata(collType2, {});
+
+    shard_catalog_commit::commitChunklessCollectionLocally(operationContext(), kTestNss);
+
+    // The collection doc reflects the new triple and exactly one placeholder chunk persists.
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
+
+    auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_BSONOBJ_EQ(collDocs[0].getObjectField("key"), newKeyPattern);
+
+    auto chunkDocs = findLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace);
+    ASSERT_EQ(UUID::fromCDR(chunkDocs[0].getField(ChunkType::collectionUUID.name()).uuid()),
+              collType1.getUuid());
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyRemovesStaleChunks) {
