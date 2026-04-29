@@ -867,6 +867,13 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     const auto [coll, version] = std::move(swCollAndVersion.getValue());
     auto collPlacementVersion = version;
 
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't execute splitChunk because chunk operations for this "
+                             "collection are disallowed. 'allowMigrations' flag is "
+                          << coll.getAllowMigrations() << "; 'permitMigrations' flag is "
+                          << coll.getPermitMigrations(),
+            coll.getAllowMigrations() && coll.getPermitMigrations());
+
     if (coll.getUnsplittable()) {
         return {
             ErrorCodes::NamespaceNotSharded,
@@ -1091,6 +1098,13 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
             "Collection changed",
             (!epoch || collPlacementVersion.epoch() == epoch) &&
                 (!timestamp || collPlacementVersion.getTimestamp() == timestamp));
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't execute mergeChunks because chunk operations for this "
+                             "collection are disallowed. 'allowMigrations' flag is "
+                          << coll.getAllowMigrations() << "; 'permitMigrations' flag is "
+                          << coll.getPermitMigrations(),
+            coll.getAllowMigrations() && coll.getPermitMigrations());
 
     if (coll.getUuid() != requestCollectionUUID) {
         return {
@@ -1437,13 +1451,24 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
 
             // Precondition for merges to be safely committed: make sure the current collection
             // placement version fits the one retrieved before acquiring the lock.
-            const auto [_, versionRetrievedUnderLock] =
+            const auto [collUnderLock, versionRetrievedUnderLock] =
                 uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
 
             if (originalVersion != versionRetrievedUnderLock) {
                 nRetries++;
                 continue;
             }
+
+            // The allowMigrations flag is updated without bumping the placement version, so it
+            // must be re-read under the chunk-op lock to be sure no concurrent setAllowMigrations
+            // has just disallowed migrations.
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream()
+                        << "Can't execute mergeAllChunksOnShard because chunk operations for this "
+                           "collection are disallowed. 'allowMigrations' flag is "
+                        << collUnderLock.getAllowMigrations() << "; 'permitMigrations' flag is "
+                        << collUnderLock.getPermitMigrations(),
+                    collUnderLock.getAllowMigrations() && collUnderLock.getPermitMigrations());
 
             // 4. Commit the new routing table changes to the sharding catalog.
             mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
