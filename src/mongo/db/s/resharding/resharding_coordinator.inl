@@ -734,12 +734,21 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                                    resharding::getCurrentTime());
 
+                               if (resharding::
+                                       gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
+                                           .isEnabled(resharding::getVersionContextOrDefault(
+                                                          _forwardableOpMetadata),
+                                                      serverGlobalParams.featureCompatibility
+                                                          .acquireFCVSnapshot())) {
+                                   return;
+                               }
+
                                // Best-effort attempt to trigger a refresh on the participant shards
                                // so they see the collection metadata without reshardingFields and
                                // no longer throw ReshardCollectionInProgress. There is no guarantee
                                // this logic ever runs if the config server primary steps down after
                                // having removed the coordinator state document.
-                               return _tellAllRecipientsToRefresh(executor);
+                               _tellAllRecipientsToRefresh(executor);
                            });
                    })
                 .onTransientError([](const Status& status) {
