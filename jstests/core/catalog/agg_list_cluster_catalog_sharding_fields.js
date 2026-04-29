@@ -34,6 +34,8 @@ const kCollUnsharded = "collUnsharded";
 const kCollTimeseries = "collTimeseries";
 const kView = "view";
 const kCollSharded = "collSharded";
+
+// If adding new sharded timeseries collection, include them in rawShardKeysByTimeseriesCollection
 const kCollTimeseriesSharded = "collTimeseriesSharded";
 const kCollTimeseriesShardedByMeta = "collTimeseriesShardedByMeta";
 const kCollTimeseriesShardedByMetaSubfield = "collTimeseriesShardedByMetaSubfield";
@@ -197,7 +199,7 @@ function checkCollectionEntry(collName, expectedResult) {
 
 // Raw (buckets-format) shard keys for timeseries collections. system.buckets namespaces are
 // treated as "raw" and always show the untranslated shard key.
-const rawShardKeys = {
+const rawShardKeysByTimeseriesCollection = {
     [kCollTimeseriesSharded]: {"control.min.time": 1},
     [kCollTimeseriesShardedByMeta]: {meta: 1},
     [kCollTimeseriesShardedByMetaSubfield]: {"meta.sensorId": 1},
@@ -206,7 +208,7 @@ const rawShardKeys = {
 for (const [collName, expectedResult] of Object.entries(expectedResults[serverType])) {
     // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
     // TODO SERVER-97061: Remove once $listClusterCatalog returns a consistent state for the local and global catalog.
-    if (collName == kCollTimeseriesSharded && runningWithViewlessTimeseriesUpgradeDowngrade(dbTest)) {
+    if (collName in rawShardKeysByTimeseriesCollection && runningWithViewlessTimeseriesUpgradeDowngrade(dbTest)) {
         // Skip since the values of global catalog based fields (e.g. 'shards') can be inconsistent due to SERVER-97061.
         continue;
     }
@@ -235,8 +237,8 @@ for (const [collName, expectedResult] of Object.entries(expectedResults[serverTy
         // For system.buckets namespaces the shard key is returned in raw (buckets) format,
         // consistent with listCollections and listIndexes.
         const bucketsExpected = Object.assign({}, expectedResult);
-        if (collName in rawShardKeys) {
-            bucketsExpected.shardKey = rawShardKeys[collName];
+        if (collName in rawShardKeysByTimeseriesCollection) {
+            bucketsExpected.shardKey = rawShardKeysByTimeseriesCollection[collName];
         }
         checkCollectionEntry(getTimeseriesBucketsColl(collName), bucketsExpected);
         continue;
