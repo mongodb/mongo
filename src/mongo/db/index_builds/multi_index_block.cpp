@@ -35,6 +35,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/feature_flag.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/sorter/container_based_spiller.h"
 #include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/file_based_spiller.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -1468,22 +1470,34 @@ void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {
 void MultiIndexBlock::persistResumeState(OperationContext* opCtx,
                                          const CollectionPtr& collection,
                                          bool isResumable) {
-    if (!isResumable || _method != IndexBuildMethodEnum::kHybrid) {
+    const bool useContainerWrite = _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
+        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (!isResumable || (_method != IndexBuildMethodEnum::kHybrid && !useContainerWrite)) {
         return;
     }
 
     invariant(!_buildIsCleanedUp);
     invariant(_buildUUID);
 
-    _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore->getOrCreateTable(opCtx));
+    if (useContainerWrite) {
+        _writeStateToContainer(opCtx);
+    } else {
+        _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore->getOrCreateTable(opCtx));
+    }
 }
 
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                           const CollectionPtr& collection,
                                           bool isResumable) {
     invariant(!_buildIsCleanedUp);
+    const bool useContainerWrite = _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
+        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    if (isResumable && _method == IndexBuildMethodEnum::kHybrid) {
+    if (isResumable && (_method == IndexBuildMethodEnum::kHybrid || useContainerWrite)) {
         invariant(_buildUUID && collection);
         // Aborting without cleanup is done during shutdown. At this point the operation context is
         // killed, but acquiring locks must succeed.
@@ -1502,7 +1516,12 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
             index.block->createDeferredTables(opCtx);
         }
 
-        _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore->getOrCreateTable(opCtx));
+        if (useContainerWrite) {
+            _writeStateToContainer(opCtx);
+        } else {
+            _writeStateToDisk(
+                opCtx, collection, _resumeStateTempRecordStore->getOrCreateTable(opCtx));
+        }
     }
 
     _buildIsCleanedUp = true;
@@ -1557,6 +1576,38 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
           "collectionUUID"_attr = _collectionUUID,
           logAttrs(collection->ns()),
           "details"_attr = obj);
+}
+
+void MultiIndexBlock::_writeStateToContainer(OperationContext* opCtx) const {
+    auto obj = _constructStateObject();
+    auto& rs = _resumeStateTempRecordStore->getTableOrThrow();
+    invariant(rs.keyFormat() == KeyFormat::Long);
+    IntegerKeyedContainer& container =
+        std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
+
+    static constexpr int64_t kResumeStateKey = 0;
+
+    WriteUnitOfWork wuow(opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    std::span<const char> value(obj.objdata(), obj.objsize());
+    const bool keyExists = container.getCursor(ru)->find(kResumeStateKey).has_value();
+    auto status = keyExists
+        ? container_write::update(opCtx, ru, container, kResumeStateKey, value)
+        : container_write::insert(
+              opCtx, ru, container, kResumeStateKey, value, container::ExistingKeyPolicy::reject);
+    massertStatusOK(status.withContext(
+        str::stream() << "Index build: failed to write resumable state via container write. "
+                      << "buildUUID: " << _buildUUID << ", collectionUUID: " << _collectionUUID
+                      << ", details: " << obj.toString()));
+
+    wuow.commit();
+
+    LOGV2_DEBUG(12558700,
+                1,
+                "Index build: wrote resumable state to disk via container write",
+                "buildUUID"_attr = _buildUUID,
+                "collectionUUID"_attr = _collectionUUID,
+                "details"_attr = obj);
 }
 
 BSONObj MultiIndexBlock::_constructStateObject() const {

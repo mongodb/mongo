@@ -220,6 +220,7 @@ mongo_cc_library(
         "//src/mongo/db:query_exec",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query:collection_query_info",
         "//src/mongo/db/query/query_stats",

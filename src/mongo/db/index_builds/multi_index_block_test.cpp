@@ -33,6 +33,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -1072,5 +1074,336 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
+// OpObserver that records integer-keyed onContainerInsert/onContainerUpdate calls so tests can
+// verify that _writeStateToContainer went through the container_write path (which
+// fires the observer).
+class ResumeStateContainerInsertObserver : public OpObserverNoop {
+public:
+    using OpObserverNoop::onContainerInsert;
+    using OpObserverNoop::onContainerUpdate;
+
+    void onContainerInsert(OperationContext*,
+                           StringData ident,
+                           int64_t key,
+                           std::span<const char> value) override {
+        intInserts.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
+    }
+
+    void onContainerUpdate(OperationContext*,
+                           StringData ident,
+                           int64_t key,
+                           std::span<const char> value) override {
+        intUpdates.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
+    }
+
+    struct Op {
+        std::string ident;
+        int64_t key;
+        std::string value;
+    };
+    std::vector<Op> intInserts;
+    std::vector<Op> intUpdates;
+
+    size_t countInsertsForIdent(StringData ident) const {
+        return std::count_if(
+            intInserts.begin(), intInserts.end(), [&](const Op& op) { return op.ident == ident; });
+    }
+
+    size_t countUpdatesForIdent(StringData ident) const {
+        return std::count_if(
+            intUpdates.begin(), intUpdates.end(), [&](const Op& op) { return op.ident == ident; });
+    }
+};
+
+ResumeStateContainerInsertObserver& installResumeStateContainerObserver(OperationContext* opCtx) {
+    auto observer = std::make_unique<ResumeStateContainerInsertObserver>();
+    auto* ptr = observer.get();
+    opCtx->getServiceContext()->resetOpObserver_forTest(std::move(observer));
+    return *ptr;
+}
+
+// Reads the single resume-state record persisted at fixed key 0 in the per-build internal record
+// store created by init() for primary-driven index builds. Returns boost::none if the table has
+// no records. ASSERTS that the table contains at most one record.
+boost::optional<BSONObj> readReplicatedResumeState(OperationContext* opCtx, const UUID& buildUUID) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    auto rs = storageEngine->getEngine()->getInternalRecordStore(
+        *shard_role_details::getRecoveryUnit(opCtx), indexBuildIdent, KeyFormat::Long);
+    invariant(rs->keyFormat() == KeyFormat::Long);
+    auto& container =
+        std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
+    auto cursor = container.getCursor(*shard_role_details::getRecoveryUnit(opCtx));
+    auto record = cursor->next();
+    if (!record) {
+        return boost::none;
+    }
+    // The container-write path always writes at key 0.
+    ASSERT_EQUALS(0, record->first);
+    BSONObj obj(record->second.data());
+    auto owned = obj.getOwned();
+    // Confirm there is no second record at any key.
+    ASSERT_FALSE(cursor->next());
+    return owned;
+}
+
+// container_write::insert requires the node to be primary so the OpObserver fires for the
+// container namespace.
+void promoteMockReplCoordToPrimary(ServiceContext* service) {
+    auto* replCoord =
+        dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(service));
+    ASSERT(replCoord);
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+}
+
+// State produced by setUpKReplicatePrimaryDrivenBuild. Owned by the test body so assertions can
+// reference the input spec idents and the per-build resume-state ident.
+struct KReplicateBuildHandle {
+    UUID buildUUID;
+    IndexBuildInfo indexBuildInfo;
+    std::string indexBuildIdent;
+};
+
+// Setup for a primary-driven (kReplicate) build: assigns a build UUID, flips the container-write
+// behavior, inserts one document into the collection (so the scan doesn't short-circuit on
+// emptiness), constructs a single-spec IndexBuildInfo, runs init and the collection scan so
+// index.bulk is populated for _constructStateObject. Caller still owns the AutoGetCollection /
+// CollectionWriter and the feature-flag scope.
+KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
+                                                        MultiIndexBlock* indexer,
+                                                        AutoGetCollection& autoColl,
+                                                        CollectionWriter& coll,
+                                                        const NamespaceString& nss) {
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, *autoColl, BSON("_id" << 0 << "a" << 1)));
+        wuow.commit();
+    }
+
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    ASSERT_OK(indexer->init(opCtx,
+                            coll,
+                            {indexBuildInfo},
+                            MultiIndexBlock::kNoopOnInitFn,
+                            MultiIndexBlock::InitMode::SteadyState,
+                            boost::none));
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx, nss));
+
+    return {buildUUID, std::move(indexBuildInfo), ident::generateNewIndexBuildIdent(buildUUID)};
+}
+
+// persistResumeState for a primary-driven build with kReplicate goes through the container_write
+// API: a single record is written at key 0, the OpObserver sees one onContainerInsert against the
+// per-build ident, and the persisted document parses as ResumeIndexInfo with the expected fields.
+TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle =
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), handle.indexBuildIdent));
+
+    indexer->persistResumeState(operationContext(), coll.get(), /*isResumable=*/true);
+
+    // Exactly one container insert against the resume-state ident, at fixed key 0.
+    ASSERT_EQUALS(1U, observer.countInsertsForIdent(handle.indexBuildIdent));
+    auto resumeIt =
+        std::find_if(observer.intInserts.begin(), observer.intInserts.end(), [&](const auto& ins) {
+            return ins.ident == handle.indexBuildIdent;
+        });
+    ASSERT_NOT_EQUALS(resumeIt, observer.intInserts.end());
+    ASSERT_EQUALS(0, resumeIt->key);
+
+    auto persisted = readReplicatedResumeState(operationContext(), handle.buildUUID);
+    ASSERT_TRUE(persisted);
+    auto resumeInfo = ResumeIndexInfo::parse(*persisted, IDLParserContext("ResumeIndexInfo"));
+    ASSERT_EQUALS(handle.buildUUID, resumeInfo.getBuildUUID());
+    ASSERT_EQUALS(autoColl->uuid(), resumeInfo.getCollectionUUID());
+
+    // Per-index IndexStateInfo round-trips with the input spec / idents.
+    ASSERT_EQUALS(1U, resumeInfo.getIndexes().size());
+    const auto& indexState = resumeInfo.getIndexes()[0];
+    ASSERT_EQUALS("a_1", indexState.getSpec()["name"].String());
+    ASSERT_EQUALS(*handle.indexBuildInfo.sideWritesIdent, indexState.getSideWritesTable());
+
+    // The observer's recorded value should be the same BSON we read back.
+    ASSERT_EQUALS(persisted->objsize(), static_cast<int>(resumeIt->value.size()));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// Calling persistResumeState twice must overwrite the prior state at the same fixed key, so the
+// table still contains exactly one record. This is what makes the container-write path safe
+// without a separate truncate.
+TEST_F(MultiIndexBlockTest, PersistResumeStateOverwritesPriorState) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle =
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+
+    indexer->persistResumeState(operationContext(), coll.get(), /*isResumable=*/true);
+    indexer->persistResumeState(operationContext(), coll.get(), /*isResumable=*/true);
+
+    // The first write inserts at key 0; the second sees an existing key and updates in place.
+    ASSERT_EQUALS(1U, observer.countInsertsForIdent(handle.indexBuildIdent));
+    ASSERT_EQUALS(1U, observer.countUpdatesForIdent(handle.indexBuildIdent));
+    for (const auto& op : observer.intInserts) {
+        if (op.ident == handle.indexBuildIdent) {
+            ASSERT_EQUALS(0, op.key);
+        }
+    }
+    for (const auto& op : observer.intUpdates) {
+        if (op.ident == handle.indexBuildIdent) {
+            ASSERT_EQUALS(0, op.key);
+        }
+    }
+
+    // ...and the table still has a single record at key 0 (overwrite, not append).
+    auto persisted = readReplicatedResumeState(operationContext(), handle.buildUUID);
+    ASSERT_TRUE(persisted);
+    auto resumeInfo = ResumeIndexInfo::parse(*persisted, IDLParserContext("ResumeIndexInfo"));
+    ASSERT_EQUALS(handle.buildUUID, resumeInfo.getBuildUUID());
+    ASSERT_EQUALS(1U, resumeInfo.getIndexes().size());
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// abortWithoutCleanup persists the resume state via the container-write path for primary-driven
+// builds, identical to persistResumeState.
+TEST_F(MultiIndexBlockTest, AbortWithoutCleanupUsesContainerWrites) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle =
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+
+    indexer->abortWithoutCleanup(operationContext(), coll.get(), /*isResumable=*/true);
+
+    ASSERT_EQUALS(1U, observer.countInsertsForIdent(handle.indexBuildIdent));
+
+    auto persisted = readReplicatedResumeState(operationContext(), handle.buildUUID);
+    ASSERT_TRUE(persisted);
+    auto resumeInfo = ResumeIndexInfo::parse(*persisted, IDLParserContext("ResumeIndexInfo"));
+    ASSERT_EQUALS(handle.buildUUID, resumeInfo.getBuildUUID());
+    ASSERT_EQUALS(autoColl->uuid(), resumeInfo.getCollectionUUID());
+    ASSERT_EQUALS(1U, resumeInfo.getIndexes().size());
+
+    // After abortWithoutCleanup the per-build table must still exist (resumable shutdown).
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), handle.indexBuildIdent));
+}
+
+// persistResumeState is a no-op when the build is not resumable, regardless of method. The
+// container-write path must not run.
+TEST_F(MultiIndexBlockTest, PersistResumeStateNoOpWhenNotResumable) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle =
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+
+    indexer->persistResumeState(operationContext(), coll.get(), /*isResumable=*/false);
+
+    ASSERT_EQUALS(0U, observer.countInsertsForIdent(handle.indexBuildIdent));
+    ASSERT_FALSE(readReplicatedResumeState(operationContext(), handle.buildUUID));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// When the build is hybrid (kDoNotReplicate), persistResumeState must not go through the
+// container-write path even if the resumable PDIB feature flag is on.
+TEST_F(MultiIndexBlockTest, HybridBuildDoesNotUseContainerWrites) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    // No setContainerWriteBehavior — defaults to kDoNotReplicate (hybrid).
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    ASSERT_OK(indexer->init(operationContext(),
+                            coll,
+                            {indexBuildInfo},
+                            MultiIndexBlock::kNoopOnInitFn,
+                            MultiIndexBlock::InitMode::SteadyState,
+                            boost::none));
+
+    indexer->persistResumeState(operationContext(), coll.get(), /*isResumable=*/true);
+
+    // Hybrid builds use the regular RecordStore path, so the OpObserver sees no container ops.
+    ASSERT_EQUALS(0U, observer.intInserts.size());
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
 }  // namespace
 }  // namespace mongo

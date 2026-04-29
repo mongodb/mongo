@@ -361,6 +361,11 @@ private:
                            const CollectionPtr& collection,
                            RecordStore& rs) const;
 
+    /**
+     * Performs a container write to persist build state to the resumable table.
+     */
+    void _writeStateToContainer(OperationContext* opCtx) const;
+
     BSONObj _constructStateObject() const;
 
     Status _failPointHangDuringBuild(OperationContext* opCtx,
