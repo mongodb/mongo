@@ -33,6 +33,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/demangle.h"
 
 #include <list>
 #include <utility>

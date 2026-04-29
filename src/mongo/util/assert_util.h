@@ -808,8 +808,6 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T invariantStatusOKWithContextA
     ::mongo::error_details::invariantStatusOKWithContextAndLocation( \
         status, [&]() -> std::string { return (contextExpr); }, MONGO_SOURCE_LOCATION())
 
-std::string demangleName(const std::type_info& typeinfo);
-
 /**
  * A utility function that converts an exception to a Status.
  * Only call this function when there is an active exception

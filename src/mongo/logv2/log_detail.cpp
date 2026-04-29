@@ -27,6 +27,31 @@
  *    it in the license file.
  */
 
+#include "mongo/logv2/log_detail.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"
+#include "mongo/logv2/attribute_storage.h"
+#include "mongo/logv2/attributes.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_domain_internal.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_source.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/demangle.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/testing_proctor.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -47,35 +72,10 @@
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <fmt/args.h>
 #include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #ifdef _WIN32
 #include <io.h>
 #endif
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/logv2/attribute_storage.h"
-#include "mongo/logv2/attributes.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_detail.h"
-#include "mongo/logv2/log_domain.h"
-#include "mongo/logv2/log_domain_internal.h"
-#include "mongo/logv2/log_options.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_source.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/static_immortal.h"
-#include "mongo/util/testing_proctor.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

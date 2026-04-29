@@ -33,6 +33,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/active_exception_witness.h"
 #include "mongo/util/debugger.h"
+#include "mongo/util/demangle.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
@@ -328,22 +329,6 @@ std::string causedBy(StringData e) {
     out += prefix;
     out += e;
     return out;
-}
-
-std::string demangleName(const std::type_info& typeinfo) {
-#ifdef _WIN32
-    return typeinfo.name();
-#else
-    int status;
-
-    char* niceName = abi::__cxa_demangle(typeinfo.name(), nullptr, nullptr, &status);
-    if (!niceName)
-        return typeinfo.name();
-
-    std::string s = niceName;
-    free(niceName);
-    return s;
-#endif
 }
 
 Status exceptionToStatus() {

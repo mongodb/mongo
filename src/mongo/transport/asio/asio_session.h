@@ -35,6 +35,7 @@
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/demangle.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo::transport {

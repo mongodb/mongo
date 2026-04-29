@@ -48,6 +48,7 @@
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/demangle.h"
 #include "mongo/util/timer.h"
 
 #include <iostream>

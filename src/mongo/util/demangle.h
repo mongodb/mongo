@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/stringify.h"
+#pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/util/demangle.h"
-#include "mongo/util/hex.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <typeinfo>
 
-#include <fmt/format.h>
+MONGO_MOD_PUBLIC;
 
-namespace mongo::unittest::stringify {
+namespace mongo {
 
-std::string formatTypedObj(const std::type_info& ti, StringData s) {
-    return fmt::format("[{}={}]", demangleName(ti), s);
-}
+std::string demangleName(const std::type_info& typeinfo);
 
-std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz) {
-    return formatTypedObj(ti, hexdump(p, sz));
-}
-
-}  // namespace mongo::unittest::stringify
+}  // namespace mongo

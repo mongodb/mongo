@@ -30,6 +30,7 @@
 #include "mongo/util/duration.h"
 
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/demangle.h"
 
 #include <memory>
 

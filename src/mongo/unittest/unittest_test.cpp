@@ -47,6 +47,7 @@
 #include "mongo/unittest/stringify.h"
 #include "mongo/unittest/unittest_main_core.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/demangle.h"
 
 #include <array>
 #include <cstddef>

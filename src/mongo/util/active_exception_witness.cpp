@@ -31,6 +31,7 @@
 
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/demangle.h"
 
 #include <exception>
 

@@ -68,8 +68,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/source_location.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/demangle.h"
 #include "mongo/util/modules.h"
 
 #include <functional>

@@ -186,6 +186,7 @@ mongo_cc_library(
         "//src/mongo/util:assert_util.cpp",
         "//src/mongo/util:base64.cpp",
         "//src/mongo/util:boost_assert_impl.cpp",
+        "//src/mongo/util:demangle.cpp",
         "//src/mongo/util:duration.cpp",
         "//src/mongo/util:errno_util.cpp",
         "//src/mongo/util:exception_filter_win32.cpp",

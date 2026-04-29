@@ -36,6 +36,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/demangle.h"
 #include "mongo/util/options_parser/constraints.h"
 
 #include <iostream>

@@ -63,6 +63,7 @@
 #include "mongo/logv2/shared_access_fstream.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/demangle.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"

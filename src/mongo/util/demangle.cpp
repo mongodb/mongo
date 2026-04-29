@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/stringify.h"
-
-#include "mongo/base/string_data.h"
 #include "mongo/util/demangle.h"
-#include "mongo/util/hex.h"
 
+#include <cstdlib>
 #include <string>
 #include <typeinfo>
 
-#include <fmt/format.h>
+#ifndef _WIN32
+#include <cxxabi.h>
+#endif
 
-namespace mongo::unittest::stringify {
+namespace mongo {
 
-std::string formatTypedObj(const std::type_info& ti, StringData s) {
-    return fmt::format("[{}={}]", demangleName(ti), s);
+std::string demangleName(const std::type_info& typeinfo) {
+#ifdef _WIN32
+    return typeinfo.name();
+#else
+    int status;
+
+    char* niceName = abi::__cxa_demangle(typeinfo.name(), nullptr, nullptr, &status);
+    if (!niceName)
+        return typeinfo.name();
+
+    std::string s = niceName;
+    free(niceName);
+    return s;
+#endif
 }
 
-std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz) {
-    return formatTypedObj(ti, hexdump(p, sz));
-}
-
-}  // namespace mongo::unittest::stringify
+}  // namespace mongo

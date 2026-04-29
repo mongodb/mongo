@@ -31,6 +31,7 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/demangle.h"
 #include "mongo/util/scopeguard.h"
 
 #include <exception>
