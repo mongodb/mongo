@@ -1,6 +1,6 @@
 /**
  * Tests that commands that accept write concern correctly return write concern errors when run
- * through mongos on timeseries views.
+ * through mongos on timeseries collections.
  *
  * @tags: [
  * assumes_balancer_off,
@@ -13,7 +13,6 @@
  * ]
  */
 
-import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkWriteConcernBehaviorAdditionalCRUDOps,
@@ -33,8 +32,6 @@ const stOtherOptions = {
 };
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, other: stOtherOptions});
-// TODO SERVER-110187 enable this test for viewless timeseries collection
-skipTestIfViewlessTimeseriesEnabled(st.s.getDB("admin"), () => st.stop());
 
 assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
 
@@ -72,7 +69,7 @@ checkWriteConcernBehaviorForAllCommands(
     "sharded" /* clusterType */,
     precmdShardKeyTimeseriesSubFieldX,
     true /* shardedCollection */,
-    true /* limitToTimeseriesViews */,
+    true /* limitToTimeseries */,
 );
 
 jsTest.log("Testing all commands on a sharded timeseries collection with meta.z shard key.");
@@ -82,7 +79,7 @@ checkWriteConcernBehaviorForAllCommands(
     "sharded" /* clusterType */,
     precmdShardKeyTimeseriesSubFieldZ,
     true /* shardedCollection */,
-    true /* limitToTimeseriesViews */,
+    true /* limitToTimeseries */,
 );
 
 jsTest.log("Testing all commands on an unsharded timeseries collection.");
@@ -92,7 +89,7 @@ checkWriteConcernBehaviorForAllCommands(
     "sharded" /* clusterType */,
     precmdUnshardedTimeseries,
     false /* shardedCollection */,
-    true /* limitToTimeseriesViews */,
+    true /* limitToTimeseries */,
 );
 
 jsTest.log(
@@ -106,7 +103,7 @@ checkWriteConcernBehaviorAdditionalCRUDOps(
     precmdShardKeyTimeseriesSubFieldZ,
     true /* shardedCollection */,
     true /* writeWithoutSk */,
-    true /* limitToTimeseriesViews */,
+    true /* limitToTimeseries */,
 );
 
 jsTest.log(
@@ -120,7 +117,7 @@ checkWriteConcernBehaviorAdditionalCRUDOps(
     precmdShardKeyTimeseriesSubFieldX,
     true /* shardedCollection */,
     false /* writeWithoutSk */,
-    true /* limitToTimeseriesViews */,
+    true /* limitToTimeseries */,
 );
 
 jsTest.log("Testing additional CRUD commands on an unsharded timeseries collection.");
@@ -132,7 +129,7 @@ checkWriteConcernBehaviorAdditionalCRUDOps(
     precmdUnshardedTimeseries,
     false /* shardedCollection */,
     true /* writeWithoutSk */,
-    true /* limitToTimeseriesViews */,
+    true /* limitToTimeseries */,
 );
 
 st.stop();

@@ -1,6 +1,6 @@
 /**
  * Tests that commands that accept write concern correctly return write concern errors when run
- * through mongos on timeseries views.
+ * on timeseries collections.
  *
  * @tags: [
  * multiversion_incompatible,
@@ -9,7 +9,6 @@
  * ]
  */
 
-import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkWriteConcernBehaviorAdditionalCRUDOps,
@@ -24,9 +23,6 @@ const replTest = new ReplSetTest({
 replTest.startSet();
 replTest.initiate();
 
-// TODO SERVER-110187 re-enable this test in viewless timeseries suites
-skipTestIfViewlessTimeseriesEnabled(replTest.getPrimary().getDB("admin"), () => replTest.stopSet());
-
 const preSetupTimeseries = function (conn, cluster, dbName, collName) {
     let db = conn.getDB(dbName);
     assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}));
@@ -38,7 +34,7 @@ checkWriteConcernBehaviorForAllCommands(
     "rs" /* clusterType */,
     preSetupTimeseries,
     false /* shardedCollection */,
-    true /*limitToTimeseriesViews*/,
+    true /*limitToTimeseries*/,
 );
 checkWriteConcernBehaviorAdditionalCRUDOps(
     replTest.getPrimary(),
@@ -47,7 +43,7 @@ checkWriteConcernBehaviorAdditionalCRUDOps(
     preSetupTimeseries,
     false /* shardedCollection */,
     false /* writeWithoutShardKey */,
-    true /*limitToTimeseriesViews*/,
+    true /*limitToTimeseries*/,
 );
 
 replTest.stopSet();

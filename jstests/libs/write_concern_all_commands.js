@@ -16,6 +16,7 @@ import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 
 const dbName = "testDB";
@@ -791,6 +792,10 @@ const wcCommandsTests = {
     create: {
         noop: {
             // Coll already exists
+            //
+            // This test case is actually skipped in sharded cluster.
+            // TODO SERVER-112609 Re-enable create command noop test in sharded clusters once
+            // no-op operations honor a 'majority' write concern.
             req: {create: collName},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.getDB().runCommand({create: collName}));
@@ -818,6 +823,10 @@ const wcCommandsTests = {
         },
         failure: {
             // Attempt to create a view and output to a nonexistent collection
+            //
+            // This test case is actually skipped in sharded cluster.
+            // TODO SERVER-112609 Re-enable create command failure test in sharded clusters once
+            // no-op operations honor a 'majority' write concern.
             req: {create: "viewWithOut", viewOn: collName, pipeline: [{$out: "nonexistentColl"}]},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({a: 1}));
@@ -3289,9 +3298,9 @@ const wcCommandsTests = {
     whatsmyuri: {skip: "internal command"},
 };
 
-// All commands applicable on timeseries views in the server.
+// All commands applicable on timeseries collections in the server.
 
-const wcTimeseriesViewsCommandsTests = {
+const wcTimeseriesCommandsTests = {
     _addShard: {skip: "internal command"},
     _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
@@ -3451,6 +3460,7 @@ const wcTimeseriesViewsCommandsTests = {
     abortMoveCollection: {skip: "does not accept write concern"},
     abortReshardCollection: {skip: "does not accept write concern"},
     abortRewriteCollection: {skip: "does not accept write concern"},
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     abortTransaction: {skip: "not supported on timeseries views"},
     abortUnshardCollection: {skip: "does not accept write concern"},
     addShard: {skip: "unrelated"},
@@ -3539,50 +3549,43 @@ const wcTimeseriesViewsCommandsTests = {
     },
     applyOps: {
         noop: {
-            // 'applyOps' where the update is a no-op
-            req: {applyOps: [{op: "u", ns: fullNs, o: {meta: 1, _id: 0}, o2: {meta: 1}}]},
+            // 'applyOps' delete targeting an _id that doesn't exist -> no-op
+            req: {applyOps: [{op: "d", ns: fullNs, o: {_id: ObjectId()}}]},
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
             },
-            confirmFunc: (res, coll, cluster, clusterType) => {
-                if (clusterType == "sharded") {
-                    assert.commandWorkedIgnoringWriteConcernErrors(res);
-                    assert.eq(res.results[0], true);
-                } else {
-                    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupportedOnView);
-                }
+            confirmFunc: (res, coll) => {
+                assert.commandWorkedIgnoringWriteConcernErrors(res);
                 assert.eq(res.applied, 1);
+                assert.eq(res.results[0], true);
                 assert.eq(coll.find().itcount(), 1);
                 assert.eq(coll.count({meta: 1}), 1);
             },
         },
         success: {
-            // 'applyOps' basic insert
-            req: {applyOps: [{op: "i", ns: fullNs, o: {meta: 2, time: timeValue}}]},
+            // 'applyOps' delete of the bucket that backs the inserted measurement
             setupFunc: (coll) => {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
             },
-            confirmFunc: (res, coll, cluster, clusterType) => {
-                if (clusterType == "sharded") {
-                    assert.commandWorkedIgnoringWriteConcernErrors(res);
-                    assert.eq(res.results[0], true);
-                    assert.eq(coll.find().itcount(), 2);
-                    assert.eq(coll.count({time: timeValue}), 2);
-                } else {
-                    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupportedOnView);
-                    assert.eq(coll.find().itcount(), 1);
-                    assert.eq(coll.count({time: timeValue}), 1);
-                }
+            req: (cluster, coll) => {
+                const buckets = getTimeseriesCollForRawOps(coll.getDB(), coll).find().rawData().toArray();
+                assert.eq(buckets.length, 1);
+                return {applyOps: [{op: "d", ns: fullNs, o: {_id: buckets[0]._id}}]};
+            },
+            confirmFunc: (res, coll) => {
+                assert.commandWorkedIgnoringWriteConcernErrors(res);
                 assert.eq(res.applied, 1);
+                assert.eq(res.results[0], true);
+                assert.eq(coll.find().itcount(), 0);
             },
         },
         failure: {
-            // 'applyOps' attempt to update to bad value
+            // 'applyOps' update whose o2 lacks an _id -> per-op failure
             req: {
-                applyOps: [{op: "u", ns: fullNs, o: {time: timeValue, _id: 0}, o2: {time: "deadbeef"}}],
+                applyOps: [{op: "u", ns: fullNs, o: {time: timeValue}, o2: {time: "deadbeef"}}],
             },
             setupFunc: (coll) => {
-                assert.commandWorked(coll.insert({meta: 1, time: timeValue, _id: 0}));
+                assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
             },
             confirmFunc: (res, coll) => {
                 assert.eq(res.applied, 1);
@@ -3674,6 +3677,7 @@ const wcTimeseriesViewsCommandsTests = {
     cleanupStructuredEncryptionData: {skip: "does not accept write concern"},
     clearJumboFlag: {skip: "does not accept write concern"},
     clearLog: {skip: "does not accept write concern"},
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     cloneCollectionAsCapped: {skip: "not supported on timeseries views"},
     clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},
     clusterAggregate: {skip: "already tested by 'aggregate' tests on mongos"},
@@ -3744,6 +3748,7 @@ const wcTimeseriesViewsCommandsTests = {
     collStats: {skip: "does not accept write concern"},
     commitReshardCollection: {skip: "does not accept write concern"},
     commitShardRemoval: {skip: "unrelated"},
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     commitTransaction: {skip: "not supported on timeseries views"},
     commitTransitionToDedicatedConfigServer: {skip: "unrelated"},
     compact: {skip: "does not accept write concern"},
@@ -3754,6 +3759,7 @@ const wcTimeseriesViewsCommandsTests = {
     connPoolStats: {skip: "does not accept write concern"},
     connPoolSync: {skip: "internal command"},
     connectionStatus: {skip: "does not accept write concern"},
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     convertToCapped: {skip: "not supported on timeseries views"},
     coordinateCommitTransaction: {skip: "internal command"},
     count: {skip: "does not accept write concern"},
@@ -3761,6 +3767,10 @@ const wcTimeseriesViewsCommandsTests = {
     create: {
         noop: {
             // Coll already exists
+            //
+            // This test case is actually skipped in sharded cluster.
+            // TODO SERVER-112609 Re-enable create command noop test in sharded clusters once
+            // no-op operations honor a 'majority' write concern.
             req: {create: collName, timeseries: {timeField: "time", metaField: "meta"}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 coll.insert({meta: 1, time: ISODate()});
@@ -3786,22 +3796,28 @@ const wcTimeseriesViewsCommandsTests = {
             },
         },
         failure: {
-            // Attempt to create a view and output to a nonexistent collection
-            req: {create: "viewWithOut", viewOn: collName, pipeline: [{$out: "nonexistentColl"}]},
+            // Attempt to re-create the existing timeseries collection with incompatible options
+            // (different metaField).
+            //
+            // This test case is actually skipped in sharded cluster.
+            // TODO SERVER-112609 Re-enable create command failure test in sharded clusters once
+            // no-op operations honor a 'majority' write concern.
+            req: {create: collName, timeseries: {timeField: "time", metaField: "differentMeta"}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
                 assert.eq(coll.find().itcount(), 1);
-                assert.commandWorked(coll.getDB().runCommand({drop: "nonexistentColl"}));
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                if (clusterType == "sharded") {
+                if (
+                    clusterType == "sharded" &&
+                    !FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
                 } else {
-                    assert.commandFailedWithCode(res, ErrorCodes.OptionNotSupportedOnView);
+                    assert.commandFailedWithCode(res, ErrorCodes.NamespaceExists);
                 }
                 assert.eq(coll.find().itcount(), 1);
-                assert(!coll.getDB().getCollectionNames().includes("nonexistentColl"));
 
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
@@ -4174,6 +4190,7 @@ const wcTimeseriesViewsCommandsTests = {
     mapReduce: {skip: "deprecated"},
     mergeAllChunksOnShard: {skip: "does not accept write concern"},
     mergeChunks: {skip: "does not accept write concern"},
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     moveChunk: {skip: "not applicable on timeseries views"},
     moveCollection: {skip: "does not accept write concern"},
     movePrimary: {
@@ -4218,6 +4235,7 @@ const wcTimeseriesViewsCommandsTests = {
             admin: true,
         },
     },
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     moveRange: {skip: "not applicable on timeseries views"},
     multicast: {skip: "does not accept write concern"},
     netstat: {skip: "internal command"},
@@ -4231,6 +4249,7 @@ const wcTimeseriesViewsCommandsTests = {
     planCacheListFilters: {skip: "does not accept write concern"},
     planCacheSetFilter: {skip: "does not accept write concern"},
     prepareTransaction: {skip: "internal command"},
+    blockReplicaSetWrites: {skip: "does not accept write concern"},
     profile: {skip: "does not accept write concern"},
     reIndex: {skip: "does not accept write concern"},
     reapLogicalSessionCacheNow: {skip: "does not accept write concern"},
@@ -4302,6 +4321,7 @@ const wcTimeseriesViewsCommandsTests = {
     releaseMemory: {skip: "does not accept write concern"},
     removeShard: {skip: "unrelated"},
     removeShardFromZone: {skip: "does not accept write concern"},
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     renameCollection: {skip: "not supported on timeseries views"},
     repairShardedCollectionChunksHistory: {skip: "does not accept write concern"},
     replicateSearchIndexCommand: {skip: "internal command for testing only"},
@@ -4341,6 +4361,7 @@ const wcTimeseriesViewsCommandsTests = {
     setDefaultRWConcern: wcCommandsTests["setDefaultRWConcern"],
     setFeatureCompatibilityVersion: wcCommandsTests["setFeatureCompatibilityVersion"],
     setProfilingFilterGlobally: {skip: "does not accept write concern"},
+    // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     setIndexCommitQuorum: {skip: "not supported on timeseries views"},
     setParameter: {skip: "does not accept write concern"},
     setShardVersion: {skip: "internal command"},
@@ -4447,7 +4468,7 @@ const wcTimeseriesViewsCommandsTests = {
 
 // A list of additional CRUD ops which exercise different write paths, and do error handling
 // differently than the basic write path exercised in wcCommandsTestsT.
-const additionalCRUDOpsTimeseriesViews = {
+const additionalCRUDOpsTimeseries = {
     "deleteMany": {
         noop: {
             req: {delete: collName, deletes: [{q: {"meta.x": {$lt: 0}}, limit: 0}]},
@@ -4602,15 +4623,9 @@ const additionalCRUDOpsTimeseriesViews = {
             },
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
-                    assert.commandWorkedIgnoringWriteConcernErrors(res);
-                    assert.eq(res.value.meta.x, 1);
-                    assert.eq(coll.find().itcount(), 0);
-                } else {
-                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
-                    assert.eq(coll.find().itcount(), 1);
-                }
+                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                assert.eq(res.value.meta.x, 1);
+                assert.eq(coll.find().itcount(), 0);
             },
         },
     },
@@ -4687,7 +4702,11 @@ const additionalCRUDOpsTimeseriesViews = {
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(res.n, 3);
                     assert.eq(res.nModified, 3);
@@ -4731,7 +4750,11 @@ const additionalCRUDOpsTimeseriesViews = {
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                     assert(res.writeErrors && res.writeErrors.length == 1);
                     assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.writeErrors[0].code);
@@ -4802,7 +4825,11 @@ const additionalCRUDOpsTimeseriesViews = {
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(res.nModified, 3);
                     assert.eq(coll.find({"meta.y": 1}).toArray().length, 3);
@@ -4844,7 +4871,11 @@ const additionalCRUDOpsTimeseriesViews = {
             confirmFunc: (res, coll, cluster, clusterType) => {
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
                     assert(res.writeErrors && res.writeErrors.length == 1);
                     assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.writeErrors[0].code);
@@ -4892,7 +4923,11 @@ const additionalCRUDOpsTimeseriesViews = {
 
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.eq(res.cursor.firstBatch[1].ok, 1);
                     assert.eq(res.nErrors, 0);
                 } else {
@@ -4940,7 +4975,11 @@ const additionalCRUDOpsTimeseriesViews = {
 
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.eq(res.cursor.firstBatch[1].ok, 1);
                     assert.eq(res.nErrors, 0);
                     assert.eq(res.nModified, 1);
@@ -5007,7 +5046,11 @@ const additionalCRUDOpsTimeseriesViews = {
 
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.eq(res.cursor.firstBatch[2].ok, 1);
                     assert.eq(res.cursor.firstBatch[2].n, 1);
                     assert.eq(res.nErrors, 1);
@@ -5054,8 +5097,12 @@ const additionalCRUDOpsTimeseriesViews = {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
 
                 let sk = getShardKey(coll, fullNs);
-                let writeWithoutSkOrId = bsonWoCompare(sk, {"meta": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                let writeWithoutSkOrId = bsonWoCompare(sk, {meta: 1}) != 0 && bsonWoCompare(sk, {}) != 0;
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.eq(res.cursor.firstBatch.length, 3);
 
                     assert.eq(res.cursor.firstBatch[0].ok, 1);
@@ -5124,7 +5171,11 @@ const additionalCRUDOpsTimeseriesViews = {
 
                 let sk = getShardKey(coll, fullNs);
                 let writeWithoutSkOrId = bsonWoCompare(sk, {"meta.x": 1}) != 0 && bsonWoCompare(sk, {}) != 0;
-                if (clusterType != "sharded" || !writeWithoutSkOrId) {
+                if (
+                    clusterType != "sharded" ||
+                    !writeWithoutSkOrId ||
+                    FeatureFlagUtil.isEnabled(coll.getDB(), "CreateViewlessTimeseriesCollections")
+                ) {
                     assert.eq(res.cursor.firstBatch[1].ok, 1);
                     assert.eq(res.nErrors, 0);
                     assert.eq(res.nModified, 2);
@@ -6018,7 +6069,7 @@ const shardedDDLCommandsRequiringMajorityCommit = [
     "shardCollection",
 ];
 
-function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, writeWithoutSk, timeseriesViews, coll) {
+function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, writeWithoutSk, timeseries, coll) {
     if (
         !shardedCollection &&
         (command == "moveChunk" ||
@@ -6082,7 +6133,13 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
     }
 
     if (testCase == "failure") {
-        if (clusterType == "sharded" && shardedDDLCommandsRequiringMajorityCommit.includes(command)) {
+        if (
+            clusterType == "sharded" &&
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
+                // TODO SERVER-112609 Re-enable create command failure test in sharded clusters once
+                // no-op operations honor a 'majority' write concern.
+                command == "create")
+        ) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
@@ -6092,14 +6149,18 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
             return true;
         }
 
-        // When UWE is enabled, a findAndModify update on sharded viewful timeseries collection
-        // may fail on mongos directly, so there's no write concern error to check.
+        // When UWE is enabled, a findAndModify update on a sharded timeseries collection may
+        // fail on mongos directly, so there's no write concern error to check. This skip was
+        // originally added for viewful timeseries (SERVER-114844); whether it still applies to
+        // viewless timeseries has not been verified.
+        // TODO SERVER-125423: confirm whether this skip is still needed on viewless timeseries
+        // and either remove the branch or update this comment.
         if (
             FeatureFlagUtil.isEnabled(coll.getDB(), "UnifiedWriteExecutor") &&
             clusterType == "sharded" &&
             ["findAndModify", "findOneAndUpdate"].includes(command) &&
             shardedCollection &&
-            timeseriesViews
+            timeseries
         ) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
@@ -6136,7 +6197,7 @@ function executeWriteConcernBehaviorTests(
     secondariesRunning,
     shardedCollection,
     writeWithoutSk,
-    timeseriesViews,
+    timeseries,
 ) {
     commandsToRun.forEach((command) => {
         let cmd = masterCommandsList[command];
@@ -6150,17 +6211,7 @@ function executeWriteConcernBehaviorTests(
         let forceUseMajorityWC = clusterType == "sharded" && umcRequireMajority.includes(command);
 
         if (cmd.noop) {
-            if (
-                !shouldSkipTestCase(
-                    clusterType,
-                    command,
-                    "noop",
-                    shardedCollection,
-                    writeWithoutSk,
-                    timeseriesViews,
-                    coll,
-                )
-            )
+            if (!shouldSkipTestCase(clusterType, command, "noop", shardedCollection, writeWithoutSk, timeseries, coll))
                 runCommandTest(
                     cmd.noop,
                     conn,
@@ -6181,7 +6232,7 @@ function executeWriteConcernBehaviorTests(
                     "success",
                     shardedCollection,
                     writeWithoutSk,
-                    timeseriesViews,
+                    timeseries,
                     coll,
                 )
             )
@@ -6205,7 +6256,7 @@ function executeWriteConcernBehaviorTests(
                     "failure",
                     shardedCollection,
                     writeWithoutSk,
-                    timeseriesViews,
+                    timeseries,
                     coll,
                 )
             )
@@ -6230,10 +6281,10 @@ export function checkWriteConcernBehaviorForAllCommands(
     clusterType,
     preSetup,
     shardedCollection,
-    limitToTimeseriesViews = false,
+    limitToTimeseries = false,
 ) {
     jsTestLog("Checking write concern behavior for all commands");
-    const commandsToTest = limitToTimeseriesViews ? wcTimeseriesViewsCommandsTests : wcCommandsTests;
+    const commandsToTest = limitToTimeseries ? wcTimeseriesCommandsTests : wcCommandsTests;
     const commandsList = AllCommandsTest.checkCommandCoverage(conn, commandsToTest);
 
     let coll = conn.getDB(dbName).getCollection(collName);
@@ -6254,7 +6305,7 @@ export function checkWriteConcernBehaviorForAllCommands(
             [] /* secondariesRunning */,
             shardedCollection,
             false /* writeWithoutSk */,
-            limitToTimeseriesViews,
+            limitToTimeseries,
         );
 
         restartSecondaries(cluster, clusterType);
@@ -6308,7 +6359,7 @@ export function checkWriteConcernBehaviorForAllCommands(
             [csrsSecondaries[1]],
             shardedCollection,
             false /* writeWithoutSk */,
-            limitToTimeseriesViews,
+            limitToTimeseries,
         );
 
         cluster.configRS.restart(csrsSecondaries[0]);
@@ -6331,7 +6382,7 @@ export function checkWriteConcernBehaviorForAllCommands(
             secondariesRunning,
             shardedCollection,
             false /* writeWithoutSk */,
-            limitToTimeseriesViews,
+            limitToTimeseries,
         );
 
         restartSecondaries(cluster, clusterType);
@@ -6347,13 +6398,13 @@ export function checkWriteConcernBehaviorAdditionalCRUDOps(
     preSetup,
     shardedCollection,
     writeWithoutSk,
-    limitToTimeseriesViews = false,
+    limitToTimeseries = false,
 ) {
     jsTestLog("Checking write concern behavior for additional CRUD commands");
 
     let coll = conn.getDB(dbName).getCollection(collName);
 
-    const commandsToTest = limitToTimeseriesViews ? additionalCRUDOpsTimeseriesViews : additionalCRUDOps;
+    const commandsToTest = limitToTimeseries ? additionalCRUDOpsTimeseries : additionalCRUDOps;
 
     stopSecondaries(cluster, clusterType);
 
@@ -6368,7 +6419,7 @@ export function checkWriteConcernBehaviorAdditionalCRUDOps(
         [] /* secondariesRunning */,
         shardedCollection,
         writeWithoutSk,
-        limitToTimeseriesViews,
+        limitToTimeseries,
     );
 
     restartSecondaries(cluster, clusterType);
@@ -6383,7 +6434,7 @@ export function checkWriteConcernBehaviorUpdatingDocShardKey(
     preSetup,
     shardedCollection,
     writeWithoutSk,
-    limitToTimeseriesViews = false,
+    limitToTimeseries = false,
 ) {
     jsTestLog("Checking write concern behavior for updating a document's shard key");
 
@@ -6467,7 +6518,7 @@ export function checkWriteConcernBehaviorUpdatingDocShardKey(
         [] /* secondariesRunning */,
         shardedCollection,
         writeWithoutSk,
-        limitToTimeseriesViews,
+        limitToTimeseries,
     );
 
     restartSecondaries(cluster, clusterType);
