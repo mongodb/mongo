@@ -255,8 +255,46 @@ void abortTransaction(OperationContext* opCtx,
 }
 
 Status createIndexesForConfigChunks(OperationContext* opCtx) {
-    return ensureCollectionIndexes(
-        opCtx, NamespaceString::kConfigsvrChunksNamespace, getChunkCollectionIndexSpecs());
+    const bool unique = true;
+    Status result = createIndexOnConfigCollection(
+        opCtx,
+        NamespaceString::kConfigsvrChunksNamespace,
+        BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create uuid_1_min_1 index on config.chunks");
+    }
+
+    result = createIndexOnConfigCollection(
+        opCtx,
+        NamespaceString::kConfigsvrChunksNamespace,
+        BSON(ChunkType::collectionUUID() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create uuid_1_shard_1_min_1 index on config.chunks");
+    }
+
+    result = createIndexOnConfigCollection(
+        opCtx,
+        NamespaceString::kConfigsvrChunksNamespace,
+        BSON(ChunkType::collectionUUID() << 1 << ChunkType::lastmod() << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create uuid_1_lastmod_1 index on config.chunks");
+    }
+
+    result = createIndexOnConfigCollection(opCtx,
+                                           NamespaceString::kConfigsvrChunksNamespace,
+                                           BSON(ChunkType::collectionUUID()
+                                                << 1 << ChunkType::shard() << 1
+                                                << ChunkType::onCurrentShardSince() << 1),
+                                           false /* unique */);
+    if (!result.isOK()) {
+        return result.withContext(
+            "couldn't create uuid_1_shard_1_onCurrentShardSince_1 index on config.chunks");
+    }
+
+    return Status::OK();
 }
 
 // creates a vector of a vector of BSONObj (one for each batch) from the docs vector
