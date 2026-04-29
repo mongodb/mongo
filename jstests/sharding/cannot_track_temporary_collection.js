@@ -8,6 +8,8 @@
  *   assumes_unsharded_collection,
  *   # Temporary collections are dropped on stepdowns.
  *   does_not_support_stepdowns,
+ *   # moveCollection is not available pre 8.0 versions
+ *   multiversion_incompatible,
  * ]
  */
 
@@ -36,7 +38,8 @@ assert.commandFailedWithCode(
     ErrorCodes.IllegalOperation,
 );
 
-// Since the collection isn't tracked, it can be dropped locally without causing a MissingLocalCollection inconsistency.
+// Since the collection isn't tracked, it can be dropped locally without causing a
+// MissingLocalCollection inconsistency.
 assert(primaryShardConn.getDB(db.getName()).getCollection(coll.getName()).drop());
 const inconsistencies = db.checkMetadataConsistency().toArray();
 assert.eq(0, inconsistencies.length, tojson(inconsistencies));
