@@ -61,6 +61,7 @@ mongo_cc_unit_test(
     srcs = [
         "debug_string_test.cpp",
         "doc_validation_error_json_schema_test.cpp",
+        "doc_validation_error_redaction_test.cpp",
         "doc_validation_error_test.cpp",
         "doc_validation_error_test.h",
         "doc_validation_util.h",
