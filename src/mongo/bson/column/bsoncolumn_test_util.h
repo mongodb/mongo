@@ -41,8 +41,17 @@ bool areSBEBinariesEqual(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual
                          sbe::bsoncolumn::SBEColumnMaterializer::Element& expected);
 
 /**
- * Helper to return min and max elements from a vector of elements.
+ * The expected min and max of a BSONColumn, each paired with the logical index of the first
+ * occurrence. If first.eoo(), the column had no defined values and second is undefined.
  */
-std::pair<BSONElement, BSONElement> expectedMinMax(std::vector<BSONElement>& elems);
+struct ExpectedMinMax {
+    std::pair<BSONElement, size_t> min;
+    std::pair<BSONElement, size_t> max;
+};
+
+/**
+ * Compute the expected min and max from a vector of elements.
+ */
+ExpectedMinMax expectedMinMax(std::vector<BSONElement>& elems);
 
 }  // namespace mongo::bsoncolumn

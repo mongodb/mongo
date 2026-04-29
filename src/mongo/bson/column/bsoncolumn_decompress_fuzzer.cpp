@@ -118,30 +118,44 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         invariant(bsoncolumn::count(Data, Size) == iteratorElems.size());
 
         // Compute expected min/max from iterator elements.
-        auto [expectedMin, expectedMax] = bsoncolumn::expectedMinMax(iteratorElems);
+        auto expected = bsoncolumn::expectedMinMax(iteratorElems);
 
-        auto minElem = bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
-        invariant(minElem.binaryEqualValues(expectedMin),
+        auto minResult =
+            bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        invariant(minResult.first.binaryEqualValues(expected.min.first),
                   str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
-                                << ". min() returned: " << minElem.toString()
-                                << " but expected: " << expectedMin.toString());
+                                << ". min() returned: " << minResult.first.toString()
+                                << " but expected: " << expected.min.first.toString());
+        if (!minResult.first.eoo()) {
+            invariant(minResult.second == expected.min.second,
+                      str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                    << ". min() returned index " << minResult.second
+                                    << " but expected index " << expected.min.second);
+        }
 
-        auto maxElem = bsoncolumn::max<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
-        invariant(maxElem.binaryEqualValues(expectedMax),
+        auto maxResult =
+            bsoncolumn::max<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        invariant(maxResult.first.binaryEqualValues(expected.max.first),
                   str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
-                                << ". max() returned: " << maxElem.toString()
-                                << " but expected: " << expectedMax.toString());
+                                << ". max() returned: " << maxResult.first.toString()
+                                << " but expected: " << expected.max.first.toString());
+        if (!maxResult.first.eoo()) {
+            invariant(maxResult.second == expected.max.second,
+                      str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                    << ". max() returned index " << maxResult.second
+                                    << " but expected index " << expected.max.second);
+        }
 
         auto [minmaxMin, minmaxMax] =
             bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
-        invariant(minmaxMin.binaryEqualValues(expectedMin),
+        invariant(minmaxMin.binaryEqualValues(expected.min.first),
                   str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
                                 << ". minmax().first returned: " << minmaxMin.toString()
-                                << " but expected: " << expectedMin.toString());
-        invariant(minmaxMax.binaryEqualValues(expectedMax),
+                                << " but expected: " << expected.min.first.toString());
+        invariant(minmaxMax.binaryEqualValues(expected.max.first),
                   str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
                                 << ". minmax().second returned: " << minmaxMax.toString()
-                                << " but expected: " << expectedMax.toString());
+                                << " but expected: " << expected.max.first.toString());
     }
 
     // Verify dense: should be true iff no decompressed elements are EOO (missing).

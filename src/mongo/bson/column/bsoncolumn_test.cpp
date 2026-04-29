@@ -734,19 +734,25 @@ public:
             }
 
             // Compute expected min/max.
-            auto [expectedMin, expectedMax] = bsoncolumn::expectedMinMax(elems);
+            auto expected = bsoncolumn::expectedMinMax(elems);
             boost::intrusive_ptr allocator{new BSONElementStorage()};
 
             // Verify optimized min, max and minmax expressions against expected values.
-            BSONElement minElem = min<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(minElem.binaryEqualValues(expectedMin));
+            auto minResult = min<BSONElementMaterializer>(columnBinary, allocator);
+            ASSERT_TRUE(minResult.first.binaryEqualValues(expected.min.first));
+            if (!minResult.first.eoo()) {
+                ASSERT_EQ(minResult.second, expected.min.second);
+            }
 
-            BSONElement maxElem = max<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(maxElem.binaryEqualValues(expectedMax));
+            auto maxResult = max<BSONElementMaterializer>(columnBinary, allocator);
+            ASSERT_TRUE(maxResult.first.binaryEqualValues(expected.max.first));
+            if (!maxResult.first.eoo()) {
+                ASSERT_EQ(maxResult.second, expected.max.second);
+            }
 
             auto [minmaxMin, minmaxMax] = minmax<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(minmaxMin.binaryEqualValues(expectedMin));
-            ASSERT_TRUE(minmaxMax.binaryEqualValues(expectedMax));
+            ASSERT_TRUE(minmaxMin.binaryEqualValues(expected.min.first));
+            ASSERT_TRUE(minmaxMax.binaryEqualValues(expected.max.first));
         }
     }
 
@@ -1069,11 +1075,19 @@ public:
             BSONElement lastElem = last<BSONElementMaterializer>(columnBinary, allocator);
             ASSERT_TRUE(lastElem.binaryEqualValues(actualLast));
 
-            BSONElement minElem = min<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(minElem.binaryEqualValues(actualMin));
+            auto minResult = min<BSONElementMaterializer>(columnBinary, allocator);
+            ASSERT_TRUE(minResult.first.binaryEqualValues(actualMin));
+            if (!minResult.first.eoo()) {
+                ASSERT_LT(minResult.second, expected.size());
+                ASSERT_TRUE(expected[minResult.second].binaryEqualValues(minResult.first));
+            }
 
-            BSONElement maxElem = max<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(maxElem.binaryEqualValues(actualMax));
+            auto maxResult = max<BSONElementMaterializer>(columnBinary, allocator);
+            ASSERT_TRUE(maxResult.first.binaryEqualValues(actualMax));
+            if (!maxResult.first.eoo()) {
+                ASSERT_LT(maxResult.second, expected.size());
+                ASSERT_TRUE(expected[maxResult.second].binaryEqualValues(maxResult.first));
+            }
 
             auto minmaxElems = minmax<BSONElementMaterializer>(columnBinary, allocator);
             ASSERT_TRUE(minmaxElems.first.binaryEqualValues(actualMin));
@@ -9984,6 +9998,159 @@ TEST_F(BSONColumnTest, TestCollector) {
     ASSERT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
 }
 
+TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
+
+    // Dense column [5, 7, 3]: min is 3 at index 2; max is 7 at index 1.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(5));
+        col.append(createElementInt32(7));
+        col.append(createElementInt32(3));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 3);
+        ASSERT_EQ(minResult.second, 2u);
+
+        auto maxResult = max<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(maxResult.first.eoo());
+        ASSERT_EQ(maxResult.first.Int(), 7);
+        ASSERT_EQ(maxResult.second, 1u);
+    }
+
+    // Sparse column [10, skip, skip, 4]: missing slots count toward the index, so 4 is at index 3.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(10));
+        col.skip();
+        col.skip();
+        col.append(createElementInt32(4));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 4);
+        ASSERT_EQ(minResult.second, 3u);
+    }
+
+    // Single element [42]: min at index 0.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(42));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 42);
+        ASSERT_EQ(minResult.second, 0u);
+    }
+
+    // Type transition [int32(50), string("abc"), int32(10)]: canonical type ordering puts numerics
+    // before strings, so min is int32(10) at index 2. Exercises _workingIndex correctness across
+    // a type change in the BSONElement-template append path.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(50));
+        col.append(createElementString("abc"));
+        col.append(createElementInt32(10));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 10);
+        ASSERT_EQ(minResult.second, 2u);
+    }
+
+    // All-missing column: min/max return eoo element.
+    {
+        BSONColumnBuilder<> col;
+        col.skip();
+        col.skip();
+        col.skip();
+        auto bin = col.finalize();
+
+        ASSERT_TRUE(min<BSONElementMaterializer>(bin, allocator).first.eoo());
+        ASSERT_TRUE(max<BSONElementMaterializer>(bin, allocator).first.eoo());
+    }
+
+    // Empty column: min/max return eoo element.
+    {
+        BSONColumnBuilder<> col;
+        auto bin = col.finalize();
+
+        ASSERT_TRUE(min<BSONElementMaterializer>(bin, allocator).first.eoo());
+        ASSERT_TRUE(max<BSONElementMaterializer>(bin, allocator).first.eoo());
+    }
+
+    // Leading skips: index of the only value must include them.
+    {
+        BSONColumnBuilder<> col;
+        col.skip();
+        col.skip();
+        col.append(createElementInt32(7));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 7);
+        ASSERT_EQ(minResult.second, 2u);
+    }
+
+    // Trailing skips do not shift the index of the extreme.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(9));
+        col.append(createElementInt32(2));
+        col.skip();
+        col.skip();
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 2);
+        ASSERT_EQ(minResult.second, 1u);
+    }
+
+    // Skips on both sides of the extreme.
+    {
+        BSONColumnBuilder<> col;
+        col.skip();
+        col.append(createElementInt32(5));
+        col.skip();
+        col.append(createElementInt32(3));
+        col.skip();
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 3);
+        ASSERT_EQ(minResult.second, 3u);
+
+        auto maxResult = max<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(maxResult.first.eoo());
+        ASSERT_EQ(maxResult.first.Int(), 5);
+        ASSERT_EQ(maxResult.second, 1u);
+    }
+
+    // Ties: when the same minimum appears more than once, the index of the first occurrence wins.
+    // The collector uses strict less-than, so equal candidates do not displace the current working
+    // value.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(8));
+        col.append(createElementInt32(3));
+        col.append(createElementInt32(5));
+        col.append(createElementInt32(3));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.first.eoo());
+        ASSERT_EQ(minResult.first.Int(), 3);
+        ASSERT_EQ(minResult.second, 1u);
+    }
+}
 
 TEST(DenseTest, EmptyColumn) {
     BSONColumnBuilder<> cb;

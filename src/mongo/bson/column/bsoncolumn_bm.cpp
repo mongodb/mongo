@@ -497,6 +497,25 @@ void benchmarkDense(benchmark::State& state, const BSONElement& compressedElemen
     state.SetBytesProcessed(totalBytes);
 }
 
+void benchmarkMin(benchmark::State& state, const BSONElement& compressedElement) {
+    int size = 0;
+    const char* binary = compressedElement.binData(size);
+    BSONBinData bin(binary, size, Column);
+
+    uint64_t totalBytes = 0;
+    uint64_t totalCalls = 0;
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
+        benchmark::DoNotOptimize(
+            bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(bin, allocator));
+        totalBytes += size;
+        ++totalCalls;
+    }
+    state.SetItemsProcessed(totalCalls);
+    state.SetBytesProcessed(totalBytes);
+}
+
 void benchmarkReopen(benchmark::State& state, const BSONElement& compressedElement, int skipSize) {
     int size;
     const char* binary = compressedElement.binData(size);
@@ -743,6 +762,11 @@ void BM_denseInterleaved(benchmark::State& state, int numObjects, int numElement
     BSONObj compressed =
         buildCompressedWithObjs(generateObjectsWithSkip(numObjects, numElements, skipAt));
     benchmarkDense(state, compressed.firstElement());
+}
+
+void BM_minIntegers(benchmark::State& state, int skipPercentage) {
+    BSONObj compressed = buildCompressed(generateIntegers(10000, skipPercentage));
+    benchmarkMin(state, compressed.firstElement());
 }
 
 void BM_reopenIntegers(benchmark::State& state, int skipPercentage, int num) {
@@ -1033,6 +1057,10 @@ BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Dense, 10000, 10, -1);
 BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Skip at 1 %, 10000, 10, 100);
 BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Skip at 50 %, 10000, 10, 5000);
 BENCHMARK_CAPTURE(BM_denseInterleaved, Interleaved Skip at 99 %, 10000, 10, 9900);
+
+BENCHMARK_CAPTURE(BM_minIntegers, Min Integers Skip = 0 %, 0);
+BENCHMARK_CAPTURE(BM_minIntegers, Min Integers Skip = 50 %, 50);
+BENCHMARK_CAPTURE(BM_minIntegers, Min Integers Skip = 99 %, 99);
 
 }  // namespace
 }  // namespace mongo

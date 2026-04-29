@@ -32,6 +32,7 @@
 #include "mongo/bson/column/bsoncolumn_expressions_internal.h"
 #include "mongo/util/modules.h"
 
+
 MONGO_MOD_PUBLIC;
 
 namespace mongo::bsoncolumn {
@@ -94,42 +95,50 @@ typename CMaterializer::Element last(BSONBinData bin,
 }
 
 /**
- * Return 'min' element in this BSONColumn.
+ * Return the 'min' element of a BSONColumn paired with its logical row index (counting missing
+ * slots). If the column has no defined values, the element is the materializer's missing
+ * representation and the index is undefined.
  */
 template <class CMaterializer>
 requires Materializer<CMaterializer>
-typename CMaterializer::Element min(const char* buffer,
-                                    size_t size,
-                                    boost::intrusive_ptr<BSONElementStorage> allocator,
-                                    const StringDataComparator* comparator = nullptr) {
+std::pair<typename CMaterializer::Element, size_t> min(
+    const char* buffer,
+    size_t size,
+    boost::intrusive_ptr<BSONElementStorage> allocator,
+    const StringDataComparator* comparator = nullptr) {
     return internal::min<CMaterializer>(buffer, size, std::move(allocator), comparator);
 }
 template <class CMaterializer>
 requires Materializer<CMaterializer>
-typename CMaterializer::Element min(BSONBinData bin,
-                                    boost::intrusive_ptr<BSONElementStorage> allocator,
-                                    const StringDataComparator* comparator = nullptr) {
+std::pair<typename CMaterializer::Element, size_t> min(
+    BSONBinData bin,
+    boost::intrusive_ptr<BSONElementStorage> allocator,
+    const StringDataComparator* comparator = nullptr) {
     tassert(9095602, "Invalid BSON type for column", bin.type == BinDataType::Column);
     return internal::min<CMaterializer>(
         reinterpret_cast<const char*>(bin.data), bin.length, std::move(allocator), comparator);
 }
 
 /**
- * Return 'max' element in this BSONColumn.
+ * Return the 'max' element of a BSONColumn paired with its logical row index (counting missing
+ * slots). If the column has no defined values, the element is the materializer's missing
+ * representation and the index is undefined.
  */
 template <class CMaterializer>
 requires Materializer<CMaterializer>
-typename CMaterializer::Element max(const char* buffer,
-                                    size_t size,
-                                    boost::intrusive_ptr<BSONElementStorage> allocator,
-                                    const StringDataComparator* comparator = nullptr) {
+std::pair<typename CMaterializer::Element, size_t> max(
+    const char* buffer,
+    size_t size,
+    boost::intrusive_ptr<BSONElementStorage> allocator,
+    const StringDataComparator* comparator = nullptr) {
     return internal::max<CMaterializer>(buffer, size, std::move(allocator), comparator);
 }
 template <class CMaterializer>
 requires Materializer<CMaterializer>
-typename CMaterializer::Element max(BSONBinData bin,
-                                    boost::intrusive_ptr<BSONElementStorage> allocator,
-                                    const StringDataComparator* comparator = nullptr) {
+std::pair<typename CMaterializer::Element, size_t> max(
+    BSONBinData bin,
+    boost::intrusive_ptr<BSONElementStorage> allocator,
+    const StringDataComparator* comparator = nullptr) {
     tassert(9095603, "Invalid BSON type for column", bin.type == BinDataType::Column);
     return internal::max<CMaterializer>(
         reinterpret_cast<const char*>(bin.data), bin.length, std::move(allocator), comparator);
