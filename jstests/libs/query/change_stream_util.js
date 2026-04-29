@@ -356,6 +356,10 @@ export function ChangeStreamTest(_db, options) {
         if (!cursorInfo || !cursorInfo.resumeToken) {
             throw new Error("Cannot resume change stream - no resume token available for cursor");
         }
+        jsTest.log.info("ChangeStreamTest.restartChangeStream: restarting change stream", {
+            oldCursorId: cursorId,
+            resumeToken: cursorInfo.resumeToken,
+        });
         const pipeline = addResumeToken(cursorInfo.pipeline, cursorInfo.resumeToken);
 
         const newCursor = self.startWatchingChanges({
@@ -365,6 +369,17 @@ export function ChangeStreamTest(_db, options) {
             doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs,
         });
         Object.assign(cursor, newCursor);
+        jsTest.log.info("ChangeStreamTest.restartChangeStream: restart complete", {
+            oldCursorId: cursorId,
+            newCursorId: String(cursor.id),
+        });
+        assert.neq(
+            String(cursor.id),
+            cursorId,
+            `Expected cursor ID to change after restart but got the same ID: ${cursorId}. ` +
+                `This may indicate the server reused the cursor ID or Object.assign failed to ` +
+                `update cursor.id.`,
+        );
     };
 
     /**
@@ -389,6 +404,11 @@ export function ChangeStreamTest(_db, options) {
         for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
             try {
                 let collName = getCollectionNameFromFullNamespace(cursor.ns);
+                jsTest.log.info("ChangeStreamTest.getNextBatch: sending getMore", {
+                    attempt: attemptNumber,
+                    cursorId: cursor.id,
+                    collection: collName,
+                });
                 const res = assert.commandWorked(
                     _db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
                 );
@@ -400,6 +420,12 @@ export function ChangeStreamTest(_db, options) {
                 updateResumeToken(cursor, getBatchFromCursorDocument(cursor));
                 return cursor;
             } catch (e) {
+                jsTest.log.info("ChangeStreamTest.getNextBatch: getMore failed", {
+                    attempt: attemptNumber,
+                    cursorId: cursor.id,
+                    code: e.code,
+                    error: e.message,
+                });
                 if (attemptNumber === maxRetries || !_isRetryableError(e)) {
                     throw e;
                 }
