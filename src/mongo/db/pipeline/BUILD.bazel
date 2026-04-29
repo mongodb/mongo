@@ -1081,6 +1081,7 @@ mongo_cc_library(
         ":document_source_internal_apply_oplog_update",
         ":pipeline",
         ":pipeline_visitor",
+        "//src/mongo/db/extension/host:extension_host",
     ],
 )
 

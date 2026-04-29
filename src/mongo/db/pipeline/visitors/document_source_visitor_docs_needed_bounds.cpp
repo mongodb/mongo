@@ -28,6 +28,8 @@
  */
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 
+#include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
@@ -354,6 +356,24 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSequentialDocumentC
     // each document to the cache (no change to result stream). If the cache is in the "abandoned"
     // state, it acts as a pure no-op. If the cache is in the "serving" state, this stage must be
     // the first in the pipeline, where it populates the result stream.
+}
+
+void visitExtensionStage(DocsNeededBoundsContext* ctx,
+                         const extension::host::DocumentSourceExtensionOptimizable& source) {
+    // We can't make any assumptions about the bounds of an extension stage, so we conservatively
+    // set bounds to unknown.
+    // TODO SERVER-118423: Allow extension stages to implement DocsNeededBounds.
+    ctx->applyUnknownStage();
+}
+
+void visitExtensionStage(DocsNeededBoundsContext* ctx,
+                         const extension::host::DocumentSourceExtensionForQueryShape& source) {
+    // extractDocsNeededBounds() runs after LiteParsedDesugarer::desugar(), so pre-desugar extension
+    // stages should have already been expanded into DocumentSourceExtensionOptimizable by the time
+    // this visitor runs.
+    tasserted(11628000,
+              "DocsNeededBounds visitor should not encounter a pre-desugar "
+              "DocumentSourceExtensionForQueryShape");
 }
 
 const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{

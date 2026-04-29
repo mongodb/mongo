@@ -37,6 +37,11 @@
 
 #include <fmt/format.h>
 
+namespace mongo::extension::host {
+class DocumentSourceExtensionForQueryShape;
+class DocumentSourceExtensionOptimizable;
+}  // namespace mongo::extension::host
+
 namespace mongo {
 
 /**
@@ -157,10 +162,21 @@ private:
  * void visit(DocumentSourceVisitorContextBase*, const DocumentSource&);
  * which would require them to cast the parameters.
  */
+template <typename U>
+concept IsExtensionStage = std::is_same_v<U, extension::host::DocumentSourceExtensionOptimizable> ||
+    std::is_same_v<U, extension::host::DocumentSourceExtensionForQueryShape>;
+
 template <typename T, typename U>
 void visit(DocumentSourceVisitorContextBase* ctx, const DocumentSource& ds) {
-    // The visit() function below is defined by visitor implementers outside this file.
-    visit(static_cast<T*>(ctx), static_cast<const U&>(ds));
+    if constexpr (IsExtensionStage<U>) {
+        // Extension stages require explicit handling via visitExtensionStage(). Using a different
+        // function name prevents generic catch-all visit() templates from silently matching,
+        // ensuring each visitor consciously considers extension stage behavior.
+        visitExtensionStage(static_cast<T*>(ctx), static_cast<const U&>(ds));
+    } else {
+        // The visit() function below is defined by visitor implementers outside this file.
+        visit(static_cast<T*>(ctx), static_cast<const U&>(ds));
+    }
 }
 
 // Base case of recursive template defined below.
