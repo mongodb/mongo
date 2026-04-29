@@ -923,6 +923,8 @@ last-continuous:
     ticket: SERVER-106239
   - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
     ticket: SERVER-116089
+  - test_file: jstests/replsets/reconfig_waits_for_config_majority.js
+    ticket: SERVER-117353
   - test_file: jstests/replsets/sync_source_override_secondary_read_preference.js
     ticket: SERVER-104343
   - test_file: jstests/aggregation/expressions/trim.js
@@ -1912,6 +1914,8 @@ last-lts:
     ticket: SERVER-106239
   - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
     ticket: SERVER-116089
+  - test_file: jstests/replsets/reconfig_waits_for_config_majority.js
+    ticket: SERVER-117353
   - test_file: jstests/replsets/sync_source_override_secondary_read_preference.js
     ticket: SERVER-104343
   - test_file: jstests/aggregation/expressions/trim.js
