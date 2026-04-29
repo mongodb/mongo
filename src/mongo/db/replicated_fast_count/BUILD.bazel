@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -365,6 +365,22 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:recovery_unit_base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "replicated_fast_count_delta_utils_bm",
+    srcs = [
+        "replicated_fast_count_delta_utils_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+        "replicated_fast_count_bm",
+    ],
+    deps = [
+        "replicated_fast_count_delta_utils",
+        ":durable_size_metadata_idl",
+        "//src/mongo/db/repl:oplog_entry",
     ],
 )
 
