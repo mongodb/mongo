@@ -235,6 +235,15 @@ function makeMoveChunkEntryTemplate(nss, donor, recipient, noMoreChunksOnDonor) 
     };
 }
 
+function makeMovePrimaryEntryTemplate(dbName, fromPrimary, toPrimary) {
+    return {
+        op: "n",
+        ns: dbName,
+        o: {msg: {movePrimary: dbName}},
+        o2: {movePrimary: dbName, from: fromPrimary, to: toPrimary},
+    };
+}
+
 function makeChunkOnNewShardEntryTemplate(nss, donor, recipient) {
     return {
         op: "n",
@@ -632,6 +641,22 @@ function testMovePrimary(dbName, fromPrimaryShardName, toPrimaryShardName) {
     // Verify that the new primary shard is the one specified in the command.
     const newDbInfo = getValidatedPlacementInfoForDB(dbName);
     assert.sameMembers(newDbInfo.shards, [toPrimaryShardName]);
+
+    // Verify that the old primary shard a single op entry marking the DDL commit.
+    const expectedEntryTemplatesOnOldPrimary = [
+        makeMovePrimaryEntryTemplate(dbName, fromPrimaryShardName, toPrimaryShardName),
+    ];
+
+    const [movePrimaryEntry] = verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnOldPrimary, [
+        fromPrimaryShardName,
+    ])[fromPrimaryShardName];
+
+    // The commit entry must not be hidden to change stream readers.
+    assert(!movePrimaryEntry.fromMigrate || movePrimaryEntry.fromMigrate === false);
+
+    // The op entry represents a control event for change stream readers,
+    //  so that it must be emitted after inserting the related placement change doc.
+    assert(timestampCmp(movePrimaryEntry.ts, newDbInfo.timestamp) > 0);
 }
 
 function testDropCollection() {
