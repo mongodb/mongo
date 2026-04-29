@@ -79,6 +79,13 @@ constexpr uint8_t kProxyProtocolTypeAuthority = 0x02;
 constexpr uint8_t kProxyProtocolSSLTlvType = 0x20;
 
 /**
+ * Maximum TLV entries parsed from a single proxy protocol TLV vector, including SSL sub-TLV
+ * vectors. This bounds per-connection allocations on the proxy unix-socket path while remaining
+ * well above expected production metadata usage.
+ */
+constexpr size_t kMaxProxyProtocolTLVEntriesPerVector = 64;
+
+/**
  * MongoDB custom PP2 TLV type as per MongoDB Proxy Protocol Technical Design document.
  * The kProxyProtocolSSLTlvDN TLV is used to indicate the distinguished name (DN) from the client's
  * SSL certificate. The value of this TLV is a string representing the distinguished name, such as
