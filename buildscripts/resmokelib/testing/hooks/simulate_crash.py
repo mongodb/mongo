@@ -25,6 +25,11 @@ def validate(mdb, logger, acceptable_err_codes):
     """Return true if all collections are valid."""
     for db in mdb.list_database_names():
         for coll in mdb.get_database(db).list_collection_names():
+            # TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+            # Filter out system.buckets.* collections
+            # timeseries collections will be tested through their main namespace
+            if coll.startswith("system.buckets."):
+                continue
             res = mdb.get_database(db).command({"validate": coll}, check=False)
 
             if res["ok"] != 1.0 or res["valid"] is not True:
