@@ -980,7 +980,7 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
     ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
     ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getTerm());
 
     // Schedule and deliver the heartbeat response containing the newer config.
     auto response = makePrimaryHeartbeatResponseFrom(rsConfig);
@@ -1008,7 +1008,7 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
     ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
     ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getTerm());
 
     // Schedule and deliver the heartbeat response containing the new config.
     auto response = makePrimaryHeartbeatResponseFrom(rsConfig);
@@ -1045,7 +1045,7 @@ TEST_F(
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
     ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
     ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getTerm());
 
     // Schedule and deliver the heartbeat response containing the newer config.
     auto response = makePrimaryHeartbeatResponseFrom(rsConfig);
@@ -1075,7 +1075,7 @@ TEST_F(
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
     ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
     ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getTerm());
 
     // Schedule and deliver the heartbeat response containing the newer config.
     auto response = makePrimaryHeartbeatResponseFrom(rsConfig);
@@ -1104,7 +1104,7 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
     ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
     ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getTerm());
 
     auto origResObj = makePrimaryHeartbeatResponseFrom(rsConfig);
 
@@ -1156,7 +1156,7 @@ TEST_F(ReplCoordHBV1ReconfigTest, ConfigWithTermAndVersionChangeOnlyDoesntCallIs
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
     ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
     ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getTerm());
 
     // Make isSelf not work.
     getExternalState()->clearSelfHosts();
@@ -1196,7 +1196,7 @@ TEST_F(ReplCoordHBV1ReconfigTest, ConfigWithSignificantChangeDoesCallIsSelf) {
     ASSERT_EQUALS("mySet", hbArgs.getSetName());
     ASSERT_EQUALS(initConfigVersion, hbArgs.getConfigVersion());
     ASSERT_EQUALS(initConfigTerm, hbArgs.getConfigTerm());
-    ASSERT_EQUALS(OpTime::kInitialTerm, hbArgs.getTerm());
+    ASSERT_EQUALS(initConfigTerm, hbArgs.getTerm());
 
     // Schedule and deliver the heartbeat response containing the newer config.
     auto response = makePrimaryHeartbeatResponseFrom(rsConfig);

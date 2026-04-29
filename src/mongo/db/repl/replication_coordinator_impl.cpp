@@ -679,7 +679,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
 
     const auto lastOpTime = lastOpTimeAndWallTime.opTime;
-    // Restore the current term according to the terms of last oplog entry and last vote.
+    // Restore the current term according to the terms of last oplog entry, last vote, and config.
     // The initial term of OpTime() is 0.
     long long term = lastOpTime.getTerm();
     if (lastVoteStatus.isOK()) {
@@ -687,6 +687,10 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         if (term < lastVoteTerm) {
             term = lastVoteTerm;
         }
+    }
+    auto configTerm = localConfig.getConfigTerm();
+    if (term < configTerm) {
+        term = configTerm;
     }
 
     auto opCtx = cc().makeOperationContext();

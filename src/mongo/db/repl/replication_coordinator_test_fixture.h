@@ -33,6 +33,9 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -100,6 +103,15 @@ protected:
      * ReplicationCoordinator under test.
      */
     virtual void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
+
+    /**
+     * Asserts that calling start with data (such as a populated oplog or last vote document)
+     * successfully initiates the ReplicationCoordinator under test.
+     */
+    virtual void assertStartSuccessWithData(const BSONObj& configDoc,
+                                            const HostAndPort& selfHost,
+                                            const LastVote& lastVote,
+                                            const OpTime& topOfOplog);
 
     /**
      * Gets the network mock.
