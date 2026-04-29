@@ -395,9 +395,16 @@ mongo_cc_unit_test(
     ],
     deps = [
         "replicated_fast_count_delta_utils",
+        "replicated_fast_count_enabled",
         "replicated_fast_count_init",
+        "replicated_fast_count_manager",
         "replicated_fast_count_test_helpers",
+        "replicated_fast_count_uncommitted_changes",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/repl:mock_repl_coord_server_fixture",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:recovery_unit_base",
     ],
 )
 
