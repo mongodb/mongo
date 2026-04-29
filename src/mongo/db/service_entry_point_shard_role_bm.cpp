@@ -62,6 +62,7 @@ BENCHMARK_DEFINE_F(ServiceEntryPointShardRoleBenchmarkFixture, BM_SEP_PING)
 }
 
 BENCHMARK_REGISTER_F(ServiceEntryPointShardRoleBenchmarkFixture, BM_SEP_PING)
-    ->ThreadRange(1, kCommandBMMaxThreads);
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
 
 }  // namespace mongo
