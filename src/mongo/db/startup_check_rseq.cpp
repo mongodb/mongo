@@ -43,7 +43,7 @@
 #endif
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
-#include <tcmalloc/internal/percpu.h>
+#include <tcmalloc/malloc_extension.h>
 #endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -86,7 +86,7 @@ bool isKernelSafeForTCMallocPerCPUCache() {
 
 bool isTCMallocPerCPUCacheActive() {
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
-    return tcmalloc::tcmalloc_internal::subtle::percpu::IsFast();
+    return tcmalloc::MallocExtension::PerCpuCachesActive();
 #else
     return false;
 #endif
