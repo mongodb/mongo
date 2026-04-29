@@ -132,12 +132,23 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   resmoke_env_options="${gcov_environment} ${lang_environment} ${san_options}"
   echo $resmoke_env_options > resmoke_env_options.txt
 
+  # Windows Python cannot reliably infer the Cygwin home directory used by
+  # remote_credentials_setup.sh, so pass boto3 the exact credential files.
+  aws_config_file="$HOME/.aws/config"
+  aws_credentials_file="$HOME/.aws/credentials"
+  if [ "Windows_NT" = "$OS" ]; then
+    aws_config_file=$(cygpath -w "$aws_config_file")
+    aws_credentials_file=$(cygpath -w "$aws_credentials_file")
+  fi
+
   # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
   # invocation. It doesn't set any environment variables and should therefore come last in
   # this list of expansions.
   set +o errexit
   PATH="$path_value" \
     AWS_PROFILE=${aws_profile_remote} \
+    AWS_CONFIG_FILE="$aws_config_file" \
+    AWS_SHARED_CREDENTIALS_FILE="$aws_credentials_file" \
     eval \
     $resmoke_env_options \
     ${resmoke_wrapper} \
