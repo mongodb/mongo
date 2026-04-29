@@ -317,6 +317,18 @@ void commitCreateCollectionLocally(OperationContext* opCtx, const NamespaceStrin
     auto coll = fetchCollection(opCtx, nss);
     auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
 
+    // Drop any prior chunk entries for this collection so repeated calls (e.g. when an unsplittable
+    // collection is sharded) don't accumulate stale rows. The new chunk documents may carry
+    // different OIDs, in which case writeCollectionMetadataLocally's upsert-by-OID would insert
+    // rather than replace.
+    {
+        DBDirectClient dbClient(opCtx);
+        executeLocalDelete(dbClient,
+                           NamespaceString::kConfigShardCatalogChunksNamespace,
+                           BSON(ChunkType::collectionUUID() << coll.getUuid()),
+                           true /* multi */);
+    }
+
     // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
     writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
 
@@ -330,6 +342,16 @@ void commitCreateCollectionLocally(OperationContext* opCtx, const NamespaceStrin
 
 void commitCreateCollectionChunklessLocally(OperationContext* opCtx, const NamespaceString& nss) {
     auto coll = fetchCollection(opCtx, nss);
+
+    // Drop all existing chunk entries for this collection to start from a clean slate. This removes
+    // both real chunks and any prior chunkless placeholder.
+    {
+        DBDirectClient dbClient(opCtx);
+        executeLocalDelete(dbClient,
+                           NamespaceString::kConfigShardCatalogChunksNamespace,
+                           BSON(ChunkType::collectionUUID() << coll.getUuid()),
+                           true /* multi */);
+    }
 
     // This shard does not own any chunks, but we still need the CSS to know the collection is
     // tracked. Persist a single placeholder chunk so that disk recovery can distinguish a
