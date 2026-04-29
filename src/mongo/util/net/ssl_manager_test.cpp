@@ -42,6 +42,7 @@
 #include "mongo/util/net/ssl/stream.hpp"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
+#include "mongo/util/scopeguard.h"
 
 #include <fstream>
 
@@ -958,6 +959,197 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+
+// Test that TLS 1.3 protocol flags are enabled by default on Windows SChannel
+TEST(SSLManager, WindowsTLS13EnabledByDefault) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    // Test server-side (incoming) context includes TLS 1.3
+    TLS_PARAMETERS serverTLSParams = {};
+    SCH_CREDENTIALS serverCred = {};
+    serverCred.pTlsParameters = &serverTLSParams;
+    auto serverStatus = manager->initSSLContext(
+        &serverCred, params, SSLManagerInterface::ConnectionDirection::kIncoming);
+    ASSERT_OK(serverStatus);
+    // Verify TLS 1.3 is enabled (not in disabled protocols)
+    ASSERT_FALSE(serverCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_3_SERVER);
+    // Also verify TLS 1.2 is enabled
+    ASSERT_FALSE(serverCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_2_SERVER);
+
+    // Test client-side (outgoing) context includes TLS 1.3
+    TLS_PARAMETERS clientTLSParams = {};
+    SCH_CREDENTIALS clientCred = {};
+    clientCred.pTlsParameters = &clientTLSParams;
+    auto clientStatus = manager->initSSLContext(
+        &clientCred, params, SSLManagerInterface::ConnectionDirection::kOutgoing);
+    ASSERT_OK(clientStatus);
+    // Verify TLS 1.3 is enabled (not in disabled protocols)
+    ASSERT_FALSE(clientCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_3_CLIENT);
+    // Also verify TLS 1.2 is enabled
+    ASSERT_FALSE(clientCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_2_CLIENT);
+}
+
+// Test that TLS 1.3 can be disabled via sslDisabledProtocols on Windows SChannel
+TEST(SSLManager, WindowsTLS13CanBeDisabled) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslDisabledProtocols = {SSLParams::Protocols::TLS1_3};
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    // Test server-side (incoming) context has TLS 1.3 disabled
+    TLS_PARAMETERS serverTLSParams = {};
+    SCH_CREDENTIALS serverCred = {};
+    serverCred.pTlsParameters = &serverTLSParams;
+    auto serverStatus = manager->initSSLContext(
+        &serverCred, params, SSLManagerInterface::ConnectionDirection::kIncoming);
+    ASSERT_OK(serverStatus);
+    // Verify TLS 1.3 is disabled (in disabled protocols)
+    ASSERT_TRUE(serverCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_3_SERVER);
+    // Verify TLS 1.2 is still enabled
+    ASSERT_FALSE(serverCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_2_SERVER);
+
+    // Test client-side (outgoing) context has TLS 1.3 disabled
+    TLS_PARAMETERS clientTLSParams = {};
+    SCH_CREDENTIALS clientCred = {};
+    clientCred.pTlsParameters = &clientTLSParams;
+    auto clientStatus = manager->initSSLContext(
+        &clientCred, params, SSLManagerInterface::ConnectionDirection::kOutgoing);
+    ASSERT_OK(clientStatus);
+    // Verify TLS 1.3 is disabled (in disabled protocols)
+    ASSERT_TRUE(clientCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_3_CLIENT);
+    // Verify TLS 1.2 is still enabled
+    ASSERT_FALSE(clientCred.pTlsParameters->grbitDisabledProtocols & SP_PROT_TLS1_2_CLIENT);
+}
+
+// Test that disabling all TLS protocols (including TLS 1.3) throws an error
+TEST(SSLManager, WindowsDisableAllTLSProtocolsFails) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslDisabledProtocols = {SSLParams::Protocols::TLS1_0,
+                                   SSLParams::Protocols::TLS1_1,
+                                   SSLParams::Protocols::TLS1_2,
+                                   SSLParams::Protocols::TLS1_3};
+
+    ASSERT_THROWS_CODE_AND_WHAT(SSLManagerInterface::create(params, true /* isSSLServer */),
+                                DBException,
+                                ErrorCodes::InvalidSSLConfiguration,
+                                "All supported TLS protocols have been disabled.");
+}
+
+// Tests for the TLS 1.3 post-handshake record boundary logic added for SERVER-79980.
+//
+// decryptBuffer parses the 5-byte TLS record header to locate trailing bytes when
+// DecryptMessage returns 0x80090317 without populating SECBUFFER_EXTRA.  The record
+// header layout is: ContentType(1) | LegacyVersion(2) | PayloadLength(2), so the
+// total record size is 5 + big-endian(bytes[3..4]).
+
+TEST(SSLManager, WindowsTLS13RecordHeaderParsing) {
+    auto tlsRecordTotalSize = [](const uint8_t* buf, size_t bufLen) -> uint32_t {
+        if (bufLen < 5)
+            return 0;
+        return 5u + ((static_cast<uint32_t>(buf[3]) << 8) | buf[4]);
+    };
+
+    // Buffer shorter than one header — no parse possible.
+    {
+        const uint8_t buf[4] = {};
+        ASSERT_EQ(tlsRecordTotalSize(buf, sizeof(buf)), 0u);
+    }
+
+    // Zero-payload record: 5-byte header only.
+    {
+        const uint8_t buf[5] = {23, 3, 3, 0, 0};
+        ASSERT_EQ(tlsRecordTotalSize(buf, sizeof(buf)), 5u);
+    }
+
+    // Max TLS record payload (16384 = 0x4000).
+    {
+        const uint8_t hdr[5] = {23, 3, 3, 0x40, 0x00};
+        ASSERT_EQ(tlsRecordTotalSize(hdr, sizeof(hdr)), 5u + 16384u);
+    }
+
+    // NST record (250-byte payload) immediately followed by KMIP response (168-byte payload).
+    // This is the exact scenario fixed in SERVER-79980: both records arrive in one recv(),
+    // DecryptMessage returns 0x80090317 for the NST without setting SECBUFFER_EXTRA, and
+    // the fallback must locate the KMIP response start via the TLS header.
+    {
+        constexpr uint32_t kNstPayload = 250;
+        constexpr uint32_t kAppPayload = 168;
+        constexpr uint32_t kNstTotal = 5 + kNstPayload;
+        constexpr uint32_t kAppTotal = 5 + kAppPayload;
+
+        uint8_t buf[kNstTotal + kAppTotal] = {};
+        buf[3] = static_cast<uint8_t>(kNstPayload >> 8);
+        buf[4] = static_cast<uint8_t>(kNstPayload & 0xFF);
+
+        const uint32_t recordSize = tlsRecordTotalSize(buf, sizeof(buf));
+        ASSERT_EQ(recordSize, kNstTotal);
+        ASSERT_LT(recordSize, static_cast<uint32_t>(sizeof(buf)));
+
+        const uint32_t extraBytes = static_cast<uint32_t>(sizeof(buf)) - recordSize;
+        ASSERT_EQ(extraBytes, kAppTotal);
+    }
+}
+
+TEST(SSLManager, WindowsReusableBufferOps) {
+    using asio::ssl::detail::ReusableBuffer;
+
+    ReusableBuffer buf(64);
+    ASSERT_TRUE(buf.empty());
+    ASSERT_EQ(buf.size(), 0u);
+
+    const uint8_t src[] = {1, 2, 3, 4, 5};
+    buf.append(src, sizeof(src));
+    ASSERT_EQ(buf.size(), 5u);
+    ASSERT_FALSE(buf.empty());
+
+    // Partial read leaves buffer non-empty.
+    uint8_t out[8] = {};
+    std::size_t nRead = 0;
+    buf.readInto(out, 3, nRead);
+    ASSERT_EQ(nRead, 3u);
+    ASSERT_EQ(out[0], 1);
+    ASSERT_EQ(out[2], 3);
+    ASSERT_FALSE(buf.empty());
+
+    // Over-read drains the buffer.
+    buf.readInto(out, sizeof(out), nRead);
+    ASSERT_EQ(nRead, 2u);
+    ASSERT_EQ(out[0], 4);
+    ASSERT_EQ(out[1], 5);
+    ASSERT_TRUE(buf.empty());
+
+    // swap transfers ownership.
+    ReusableBuffer a(16), b(16);
+    const uint8_t aData[] = {10, 20};
+    a.append(aData, sizeof(aData));
+    ASSERT_EQ(a.size(), 2u);
+    ASSERT_TRUE(b.empty());
+
+    a.swap(b);
+    ASSERT_TRUE(a.empty());
+    ASSERT_EQ(b.size(), 2u);
+
+    // reset empties the buffer.
+    b.reset();
+    ASSERT_TRUE(b.empty());
+}
+
+#endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+
 #ifdef MONGO_CONFIG_SSL
 
 TEST(SSLManager, CheckCertificateInTransientManager) {
@@ -1117,18 +1309,52 @@ public:
                 serverConn->sslSocket->handshake(asio::ssl::stream_base::server);
             } catch (const DBException& ex) {
                 serverStatus = ex.toStatus().withContext("Server handshake failed");
+            } catch (const std::exception& ex) {
+                serverStatus = Status(ErrorCodes::SSLHandshakeFailed, ex.what())
+                                   .withContext("Server handshake failed");
             }
         });
 
+
+        bool clientHandshakeThrewStdException = false;
         try {
             clientConn->sslSocket->handshake(asio::ssl::stream_base::client);
         } catch (const DBException& ex) {
             clientStatus = ex.toStatus().withContext("Client handshake failed");
+        } catch (const std::exception& ex) {
+            clientStatus = Status(ErrorCodes::SSLHandshakeFailed,
+                                  str::stream() << "Client handshake failed: " << ex.what());
+            clientHandshakeThrewStdException = true;
+        }
+
+        // If the client handshake threw a std::exception (not DBException), it means the
+        // ASIO handshake failed at the protocol level. In this case, close both sockets to
+        // unblock the server thread, which may still be blocked in its handshake call.
+        // This is necessary on Windows where the server doesn't automatically fail when the
+        // client's handshake throws at the ASIO level.
+        if (clientHandshakeThrewStdException) {
+            asio::error_code ec;
+            if (serverConn && serverConn->sslSocket) {
+                serverConn->sslSocket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both,
+                                                               ec);
+                serverConn->sslSocket->lowest_layer().close(ec);
+            }
+            if (clientConn && clientConn->sslSocket) {
+                clientConn->sslSocket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both,
+                                                               ec);
+                clientConn->sslSocket->lowest_layer().close(ec);
+            }
         }
         serverThread.join();
 
-        // rethrow any handshake errors with context
-        uassertStatusOK(serverStatus);
+        // Rethrow any handshake errors with context. When we've intentionally closed the socket
+        // to unblock the server (clientHandshakeThrewStdException is true), the server may report
+        // a "WSACancelBlockingCall" error on Windows. This is expected behavior from closing the
+        // socket, so we should prioritize the client error which represents the actual failure.
+        // Only throw the server error if we didn't intentionally close the socket.
+        if (!clientHandshakeThrewStdException) {
+            uassertStatusOK(serverStatus);
+        }
         uassertStatusOK(clientStatus);
     }
 
@@ -1788,6 +2014,491 @@ TEST(SSLManager, revocationWithCRLsIntermediateTests) {
 }
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_APPLE
+
+// Helper function to configure SSLParams for TLS 1.3 only mode.
+// Disables TLS 1.0, TLS 1.1, and TLS 1.2.
+void enableOnlyTLS13(SSLParams& params) {
+    params.sslDisabledProtocols = {
+        SSLParams::Protocols::TLS1_0,
+        SSLParams::Protocols::TLS1_1,
+        SSLParams::Protocols::TLS1_2,
+    };
+}
+
+// TLS 1.3 mutation tests.
+// These tests re-run the handshake tests with TLS 1.3 only mode enabled on both ingress and egress.
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL || \
+    MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+
+TEST(SSLManager, basicEgressValidationTestsTLS13Only) {
+    constexpr auto validCaFile = caFile;
+    constexpr auto badCaFile = trustedCaFile;
+
+    std::vector<CertValidationTestCase> testCases = {
+        {"", "", false},
+        {validCaFile, "", true},
+        {badCaFile, "", false},
+        {badCaFile, validCaFile, false},
+        {validCaFile, badCaFile, true},
+    };
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslAllowInvalidHostnames = true;
+    enableOnlyTLS13(serverParams);
+
+    for (auto& test : testCases) {
+        SSLParams clientParams;
+        clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+        clientParams.sslPEMKeyFile = clientKeyFile;
+        clientParams.sslAllowInvalidHostnames = true;
+        clientParams.sslCAFile = test.cafile;
+        clientParams.sslClusterCAFile = test.clusterCaFile;
+        enableOnlyTLS13(clientParams);
+
+        for (auto weak : {false, true}) {
+            test.allowInvalidCerts = weak;
+            clientParams.sslAllowInvalidCertificates = weak;
+
+            LOGV2(9476800, "Running TLS1.3-only test case", "test"_attr = test);
+
+            SSLTestFixture tf(serverParams, clientParams);
+            tf.doHandshake();
+            auto result = tf.runIngressEgressValidation();
+            checkValidationResults(result, true /*expectIngressPass*/, test.pass || weak);
+        }
+    }
+}
+
+TEST(SSLManager, basicIngressValidationTestsTLS13Only) {
+    constexpr auto validCaFile = caFile;
+    constexpr auto badCaFile = trustedCaFile;
+
+    std::vector<CertValidationTestCase> testCases = {
+        {"", "", false},
+        {validCaFile, "", true},
+        {badCaFile, "", false},
+        {badCaFile, validCaFile, true},
+        {validCaFile, badCaFile, false},
+    };
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslAllowInvalidHostnames = true;
+    enableOnlyTLS13(clientParams);
+
+    for (auto& test : testCases) {
+        SSLParams serverParams;
+        serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+        serverParams.sslPEMKeyFile = serverKeyFile;
+        serverParams.sslAllowInvalidHostnames = true;
+        serverParams.sslCAFile = test.cafile;
+        serverParams.sslClusterCAFile = test.clusterCaFile;
+        enableOnlyTLS13(serverParams);
+
+        for (auto weak : {false, true}) {
+            test.allowInvalidCerts = weak;
+            serverParams.sslAllowInvalidCertificates = weak;
+
+            LOGV2(9476801, "Running TLS1.3-only test case", "test"_attr = test);
+            SSLTestFixture tf(serverParams, clientParams);
+            tf.doHandshake();
+            auto result = tf.runIngressEgressValidation();
+            checkValidationResults(result, test.pass || weak, true /*expectEgressPass*/);
+        }
+    }
+}
+
+TEST(SSLManager, keyFileUsageTestsTLS13Only) {
+    struct TestCase {
+        std::string clientPemKeyFile;
+        std::string clientClusterFile;
+        std::string serverPemKeyFile;
+        std::string serverClusterFile;
+        bool clientPass;
+        bool serverPass;
+        void serialize(BSONObjBuilder* bob) const {
+            bob->append("clientPemKeyFile", clientPemKeyFile);
+            bob->append("clientClusterFile", clientClusterFile);
+            bob->append("serverPemKeyFile", serverPemKeyFile);
+            bob->append("serverClusterFile", serverClusterFile);
+            bob->append("clientPass", clientPass);
+            bob->append("serverPass", serverPass);
+        }
+    };
+
+    std::vector<TestCase> testCases = {
+        {clientKeyFile, "", serverKeyFile, "", true, true},
+        {trustedClientKeyFile, "", serverKeyFile, "", true, false},
+        {clientKeyFile, "", trustedServerKeyFile, "", false, true},
+        {trustedClientKeyFile, "", trustedServerKeyFile, "", false, false},
+        {trustedClientKeyFile, clientKeyFile, serverKeyFile, "", true, true},
+        {clientKeyFile, trustedClientKeyFile, serverKeyFile, "", true, false},
+        {clientKeyFile, "", trustedServerKeyFile, serverKeyFile, false, true},
+        {clientKeyFile, "", serverKeyFile, trustedServerKeyFile, true, true},
+    };
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslCAFile = caFile;
+    serverParams.sslAllowInvalidHostnames = true;
+    enableOnlyTLS13(serverParams);
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslCAFile = caFile;
+    clientParams.sslAllowInvalidHostnames = true;
+    enableOnlyTLS13(clientParams);
+
+    for (auto& test : testCases) {
+        LOGV2(9476802, "Running TLS1.3-only test case", "test"_attr = test);
+
+        serverParams.sslPEMKeyFile = test.serverPemKeyFile;
+        serverParams.sslClusterFile = test.serverClusterFile;
+
+        clientParams.sslPEMKeyFile = test.clientPemKeyFile;
+        clientParams.sslClusterFile = test.clientClusterFile;
+
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, test.serverPass, test.clientPass);
+    }
+}
+
+TEST(SSLManager, noCertificatePresentedByPeerTestsTLS13Only) {
+    SSLParams clientParams, serverParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.tlsWithholdClientCertificate = true;
+    enableOnlyTLS13(clientParams);
+
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslAllowInvalidHostnames = true;
+    enableOnlyTLS13(serverParams);
+
+    for (auto weak : {false, true}) {
+        LOGV2(9476803,
+              "Running TLS1.3-only with sslWeakCertificateValidation=weak",
+              "weak"_attr = weak);
+
+        serverParams.sslWeakCertificateValidation = weak;
+
+        SSLTestFixture tf(
+            serverParams, clientParams, true /*ingressIsServer*/, true /*egressIsServer*/);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, weak /*expectIngressPass*/, true /*expectEgressPass*/);
+    }
+}
+
+TEST(SSLManager, transientSSLParamsOverrideGlobalParamsTestsTLS13Only) {
+    SSLParams clientParams, serverParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslAllowInvalidHostnames = true;
+    enableOnlyTLS13(clientParams);
+
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslCAFile = trustedCaFile;
+    serverParams.sslPEMKeyFile = trustedServerKeyFile;
+    serverParams.sslAllowInvalidHostnames = true;
+    enableOnlyTLS13(serverParams);
+
+    struct TestCase {
+        std::string caFile;
+        std::string keyFile;
+        bool clientPass;
+        bool serverPass;
+        void serialize(BSONObjBuilder* bob) const {
+            bob->append("caFile", caFile);
+            bob->append("keyFile", keyFile);
+            bob->append("clientPass", clientPass);
+            bob->append("serverPass", serverPass);
+        }
+    };
+    std::vector<TestCase> testCases{
+        {trustedCaFile, trustedClientKeyFile, true, true},
+        {caFile, trustedClientKeyFile, false, true},
+        {trustedCaFile, clientKeyFile, true, false},
+        {trustedCaFile, "", true, false},
+    };
+
+    // First, test that validation fails on both sides without the transient params.
+    SSLTestFixture tf(
+        serverParams, clientParams, true /*ingressIsServer*/, false /*egressIsServer*/);
+    tf.doHandshake();
+    auto result = tf.runIngressEgressValidation();
+    checkValidationResults(result, false, false);
+
+    for (auto& test : testCases) {
+        LOGV2(9476804, "Running TLS1.3-only test case", "test"_attr = test);
+
+        TLSCredentials creds;
+        creds.tlsAllowInvalidHostnames = true;
+        creds.tlsCAFile = test.caFile;
+        creds.tlsPEMKeyFile = test.keyFile;
+        creds.tlsDisabledProtocols = {
+            SSLParams::Protocols::TLS1_0,
+            SSLParams::Protocols::TLS1_1,
+            SSLParams::Protocols::TLS1_2,
+        };
+        TransientSSLParams transientParams(creds);
+
+        SSLTestFixture tf(serverParams, clientParams, true, false, transientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, test.serverPass, test.clientPass);
+    }
+}
+
+TEST(SSLManager, intermediateCATestsTLS13Only) {
+    struct TestCase {
+        std::string clientCAFile;
+        std::string serverKeyFile;
+        bool clientPass;
+        void serialize(BSONObjBuilder* bob) const {
+            bob->append("clientCAFile", clientCAFile);
+            bob->append("serverKeyFile", serverKeyFile);
+            bob->append("clientPass", clientPass);
+        }
+    };
+
+    const std::string intermediateALeafWithIssuerCertKeyFile = combinePEMFiles(
+        {{intermediateALeafKeyFile, true /*includePrivKey*/}, {intermediateACaFile}});
+    const std::string intermediateALeafWithAllIssuerCertsKeyFile = combinePEMFiles(
+        {{intermediateALeafWithIssuerCertKeyFile, true /*includePrivKey*/}, {caFile}});
+    const std::string intermediateAWithRootCaFile =
+        combinePEMFiles({{intermediateACaFile}, {caFile}});
+    const std::string intermediateBLeafWithIssuerCertKeyFile = combinePEMFiles(
+        {{intermediateBLeafKeyFile, true /*includePrivKey*/}, {intermediateBCaFile}});
+
+    std::vector<TestCase> testCases = {
+        {intermediateACaFile, intermediateALeafKeyFile, false},
+        {intermediateACaFile, serverKeyFile, false},
+        {intermediateACaFile, intermediateALeafWithIssuerCertKeyFile, false},
+        {intermediateACaFile, intermediateALeafWithAllIssuerCertsKeyFile, false},
+        {intermediateAWithRootCaFile, intermediateALeafKeyFile, true},
+        {intermediateAWithRootCaFile, serverKeyFile, true},
+        {intermediateAWithRootCaFile, intermediateBLeafWithIssuerCertKeyFile, true},
+        {intermediateAWithRootCaFile, intermediateBLeafKeyFile, false},
+        {caFile, intermediateALeafKeyFile, false},
+        {caFile, intermediateBLeafKeyFile, false},
+        {caFile, intermediateALeafWithIssuerCertKeyFile, true},
+        {caFile, intermediateBLeafWithIssuerCertKeyFile, true},
+    };
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslPEMKeyFile = trustedClientKeyFile;
+    enableOnlyTLS13(clientParams);
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = trustedCaFile;
+    enableOnlyTLS13(serverParams);
+
+    for (auto& test : testCases) {
+        clientParams.sslCAFile = test.clientCAFile;
+        serverParams.sslPEMKeyFile = test.serverKeyFile;
+
+        LOGV2(9476805, "Running TLS1.3-only test case", "test"_attr = test);
+
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, true /*expectIngressPass*/, test.clientPass);
+    }
+}
+
+TEST(SSLManager, expiredCRLTestTLS13Only) {
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslCRLFile = expiredCRL;
+    enableOnlyTLS13(clientParams);
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslCRLFile = expiredCRL;
+    enableOnlyTLS13(serverParams);
+
+    SSLTestFixture tf(serverParams, clientParams);
+    tf.doHandshake();
+    auto result = tf.runIngressEgressValidation();
+    checkValidationResults(result, false /*expectIngressPass*/, false /*expectEgressPass*/);
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+    constexpr const char* cause = "revocation server was offline";
+#else
+    constexpr const char* cause = "expired";
+#endif
+    ASSERT_NE(result.ingress.getStatus().reason().find(cause), std::string::npos);
+    ASSERT_NE(result.egress.getStatus().reason().find(cause), std::string::npos);
+}
+
+TEST(SSLManager, multipleCRLsFromSameIssuerTestsTLS13Only) {
+    const auto expiredCRLWithNonExpiredCRL = combinePEMFiles({{clientRevokedCRL}, {expiredCRL}});
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslCRLFile = expiredCRLWithNonExpiredCRL;
+    enableOnlyTLS13(serverParams);
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+    enableOnlyTLS13(clientParams);
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+    ASSERT_THROWS_CODE_AND_WHAT(
+        SSLManagerInterface::create(serverParams, true),
+        DBException,
+        ErrorCodes::InvalidSSLConfiguration,
+        "CertAddCRLContextToStore Failed: The object or property already exists.");
+#else
+    {
+        clientParams.sslPEMKeyFile = clientKeyFile;
+        LOGV2(9476806, "Running TLS1.3-only with client key file", "keyfile"_attr = clientKeyFile);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, true /*expectIngressPass*/, true);
+    }
+    {
+        clientParams.sslPEMKeyFile = revokedClientKeyFile;
+        LOGV2(9476807,
+              "Running TLS1.3-only with client key file",
+              "keyfile"_attr = revokedClientKeyFile);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, false, true);
+        ASSERT_NE(result.ingress.getStatus().reason().find("revoked"), std::string::npos);
+    }
+#endif
+}
+
+TEST(SSLManager, basicCRLRevocationTestsTLS13Only) {
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = trustedCaFile;
+    clientParams.sslPEMKeyFile = revokedClientKeyFile;
+    enableOnlyTLS13(clientParams);
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = trustedServerKeyFile;
+    enableOnlyTLS13(serverParams);
+
+    {
+        serverParams.sslCRLFile = emptyCRL;
+        LOGV2(9476808,
+              "Running TLS1.3-only test case",
+              "CRLFile"_attr = emptyCRL,
+              "pass"_attr = true);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, true, true /*expectEgressPass*/);
+    }
+    {
+        serverParams.sslCRLFile = clientRevokedCRL;
+        LOGV2(9476809,
+              "Running TLS1.3-only test case",
+              "CRLFile"_attr = clientRevokedCRL,
+              "pass"_attr = false);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, false, true /*expectEgressPass*/);
+        ASSERT_NE(result.ingress.getStatus().reason().find("revoked"), std::string::npos);
+    }
+}
+
+TEST(SSLManager, noCRLFoundTestsTLS13Only) {
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslCRLFile = trustedEmptyCRL;  // CRL issued by trusted-ca.pem, not ca.pem
+    enableOnlyTLS13(clientParams);
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslCRLFile = trustedEmptyCRL;
+    enableOnlyTLS13(serverParams);
+
+    SSLTestFixture tf(serverParams, clientParams);
+    tf.doHandshake();
+    auto result = tf.runIngressEgressValidation();
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+    checkValidationResults(result, true, true);
+#else
+    checkValidationResults(result, false, false);
+    constexpr const char* expectedError = "unable to get certificate CRL";
+    ASSERT_NE(result.ingress.getStatus().reason().find(expectedError), std::string::npos);
+    ASSERT_NE(result.egress.getStatus().reason().find(expectedError), std::string::npos);
+#endif
+}
+
+TEST(SSLManager, revocationWithCRLsIntermediateTestsTLS13Only) {
+    const std::string intermediateBLeafWithIssuerCertKeyFile = combinePEMFiles(
+        {{intermediateBLeafKeyFile, true /*includePrivKey*/}, {intermediateBCaFile}});
+    const std::string crlsFromRootAndIntermediateB =
+        combinePEMFiles({{intermediateBRevokedCRL}, {intermediateBCRL}});
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslCRLFile = crlsFromRootAndIntermediateB;
+    enableOnlyTLS13(clientParams);
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = intermediateBLeafWithIssuerCertKeyFile;
+    enableOnlyTLS13(serverParams);
+
+    SSLTestFixture tf(serverParams, clientParams);
+    tf.doHandshake();
+    auto result = tf.runIngressEgressValidation();
+    checkValidationResults(result, true, false);
+    ASSERT_NE(result.egress.getStatus().reason().find("revoked"), std::string::npos);
+}
+
+#endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL ||
+        // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
 
 #endif  // MONGO_CONFIG_SSL
 }  // namespace

@@ -33,6 +33,8 @@ implementations of TLS:
      configurations anymore.
 2. [SChannel](https://docs.microsoft.com/en-us/windows-server/security/tls/tls-ssl-schannel-ssp-overview)
    which is made by Microsoft and is avialable exclusively on _Windows_.
+   > **Windows TLS 1.3**: For a detailed description of Windows-specific TLS 1.3 support, design
+   > choices, and known limitations, see [README-windowstls.md](README-windowstls.md).
 3. [Secure Transport](https://developer.apple.com/documentation/security/secure_transport) which is
    made by Apple and is available exclusively on _MacOS_.
 

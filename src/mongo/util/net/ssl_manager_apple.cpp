@@ -1448,7 +1448,7 @@ StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(
         } else if (protocol == SSLParams::Protocols::TLS1_2) {
             tls12 = false;
         } else if (protocol == SSLParams::Protocols::TLS1_3) {
-            // SERVER-98279: support tls 1.3 for windows & apple
+            // SERVER-121261: support tls 1.3 for apple
             // By ignoring this value, we are disabling support until we have access to the
             // modern library.
         } else {
@@ -1583,7 +1583,7 @@ StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
             return TLSVersion::kTLS12;
         default:  // Some system headers may define additional protocols, so suppress warnings.
             return TLSVersion::kUnknown;
-            // SERVER-98279: support tls 1.3 for windows & apple
+            // SERVER-121261: support tls 1.3 for apple
     }
 }
 

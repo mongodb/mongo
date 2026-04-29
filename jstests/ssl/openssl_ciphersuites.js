@@ -3,13 +3,18 @@
 
 import {detectDefaultTLSProtocol, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-// Short circuits for system configurations that do not support this setParameter, (i.e. OpenSSL
-// that don't support TLS 1.3)
-if (determineSSLProvider() !== "openssl") {
-    jsTestLog("SSL provider is not OpenSSL; skipping test.");
+// Short circuit for system configurations that do not support this setParameter.
+// This test is OpenSSL-only: opensslCipherSuiteConfig maps directly to
+// SSL_CTX_set_ciphersuites(), which allows configuring TLS 1.3 cipher suites including
+// ones that are compiled in but disabled by default (e.g. TLS_AES_128_CCM_8_SHA256).
+// Windows SChannel does not expose equivalent per-cipher-suite TLS 1.3 configuration, so
+// this test is skipped on Windows.
+const _provider = determineSSLProvider();
+if (_provider !== "openssl") {
+    jsTest.log.info("SSL provider does not support this test; skipping.");
     quit();
 } else if (detectDefaultTLSProtocol() !== "TLS1_3") {
-    jsTestLog("Platform does not support TLS 1.3; skipping test.");
+    jsTest.log.info("Platform does not support TLS 1.3; skipping test.");
     quit();
 }
 
@@ -39,7 +44,7 @@ function testConn() {
 }
 
 // test a successful connection when setting cipher suites
-jsTestLog("Testing for successful connection with valid cipher suite config");
+jsTest.log.info("Testing for successful connection with valid cipher suite config");
 let mongod = MongoRunner.runMongod(
     Object.merge(baseParams, {setParameter: {opensslCipherSuiteConfig: "TLS_AES_256_GCM_SHA384"}}),
 );
@@ -47,7 +52,7 @@ assert.soon(testConn, "Client could not connect to server with valid ciphersuite
 MongoRunner.stopMongod(mongod);
 
 // test an unsuccessful connection when mandating a cipher suite which OpenSSL disables by default
-jsTestLog("Testing for unsuccessful connection with cipher suite config which OpenSSL disables by default.");
+jsTest.log.info("Testing for unsuccessful connection with cipher suite config which OpenSSL disables by default.");
 mongod = MongoRunner.runMongod(
     Object.merge(baseParams, {setParameter: {opensslCipherSuiteConfig: "TLS_AES_128_CCM_8_SHA256"}}),
 );

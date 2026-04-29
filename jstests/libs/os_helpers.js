@@ -230,3 +230,43 @@ BUG_REPORT_URL="https://github.com/amazonlinux/amazon-linux-2022"
 export function isAmazon2023() {
     return isDistroVersion("amzn", "2022") || isDistroVersion("amzn", "2023");
 }
+
+/**
+ * Determine whether the Windows host supports TLS 1.3 for clients.
+ * Prefer querying the registry key created for TLS 1.3 support and fall
+ * back to parsing `systeminfo` for Windows 11 / Windows Server 2022.
+ */
+export function windowsSupportsTLS13() {
+    if (!_isWindows()) {
+        return false;
+    }
+
+    // First, try to query the registry key for TLS 1.3 client settings.
+    try {
+        clearRawMongoProgramOutput();
+        const regPath =
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.3\\Client";
+        const rc = runProgram("cmd.exe", "/c", "reg", "query", regPath);
+        clearRawMongoProgramOutput();
+        if (rc === 0) {
+            return true;
+        }
+    } catch (e) {
+        // ignore and fall back to systeminfo parsing
+    }
+
+    // Fallback: parse `systeminfo` output for Windows 11 / Windows Server 2022.
+    try {
+        clearRawMongoProgramOutput();
+        runProgram("cmd.exe", "/c", "systeminfo");
+        const sysinfo = rawMongoProgramOutput(".*");
+        clearRawMongoProgramOutput();
+        if (sysinfo.includes("Windows 11") || sysinfo.includes("Windows Server 2022")) {
+            return true;
+        }
+    } catch (e) {
+        // If we can't determine, conservatively return false.
+    }
+
+    return false;
+}

@@ -1,6 +1,6 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
-import {isDebian, isRHEL8, isUbuntu, isUbuntu2004} from "jstests/libs/os_helpers.js";
+import {isDebian, isRHEL8, isUbuntu, isUbuntu2004, windowsSupportsTLS13} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {basicReplsetTest} from "jstests/replsets/libs/basic_replset_test.js";
 
@@ -404,9 +404,12 @@ export function clientSupportsTLS1_2() {
 }
 
 export function clientSupportsTLS1_3() {
-    // SERVER-98279: support tls 1.3 for windows & apple
-    if (determineSSLProvider() === "apple" || determineSSLProvider() === "windows") {
+    // SERVER-121261: support tls 1.3 for apple
+    if (determineSSLProvider() === "apple") {
         return false;
+    }
+    if (determineSSLProvider() === "windows") {
+        return windowsSupportsTLS13();
     }
     const opensslVersion = opensslVersionAsInt();
     return opensslVersion === undefined ? true : opensslVersion >= 0x1010100; // 1.1.1

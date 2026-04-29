@@ -35,7 +35,6 @@
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
@@ -53,8 +52,8 @@
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
-#include "mongo/util/uuid.h"
 
+#include <atomic>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -62,6 +61,7 @@
 #include <vector>
 
 #include <asio.hpp>
+#include <ncrypt.h>
 #include <winhttp.h>
 
 #include <boost/algorithm/string/replace.hpp>
@@ -77,6 +77,10 @@ namespace {
 
 // This failpoint is a no-op on Windows.
 MONGO_FAIL_POINT_DEFINE(disableStapling);
+
+// Bitmask representing all TLS protocol bits supported by SChannel.
+constexpr uint32_t kAllTLSProtocols =
+    SP_PROT_TLS1_0 | SP_PROT_TLS1_1 | SP_PROT_TLS1_2 | SP_PROT_TLS1_3;
 
 /**
  * Free a Certificate Context.
@@ -166,7 +170,7 @@ private:
 };
 
 /**
- * Free a HCRYPTPROV  Handle
+ * Free a HCRYPTPROV Handle (legacy CAPI, used when acquiring keys from the Windows cert store).
  */
 struct CryptProviderFree {
     void operator()(HCRYPTPROV const h) noexcept {
@@ -179,17 +183,33 @@ struct CryptProviderFree {
 using UniqueCryptProvider = AutoHandle<HCRYPTPROV, CryptProviderFree>;
 
 /**
- * Free a HCRYPTKEY  Handle
+ * Free an NCrypt handle (provider or key).
  */
-struct CryptKeyFree {
-    void operator()(HCRYPTKEY const h) noexcept {
+struct NcryptFree {
+    void operator()(NCRYPT_HANDLE const h) noexcept {
         if (h) {
-            ::CryptDestroyKey(h);
+            ::NCryptFreeObject(h);
         }
     }
 };
 
-using UniqueCryptKey = AutoHandle<HCRYPTKEY, CryptKeyFree>;
+using UniqueNcryptProvider = AutoHandle<NCRYPT_PROV_HANDLE, NcryptFree>;
+using UniqueNcryptKey = AutoHandle<NCRYPT_KEY_HANDLE, NcryptFree>;
+
+/**
+ * Permanently delete a named NCrypt key container from persistent storage.
+ * NCryptDeleteKey both removes the on-disk container and releases the in-memory handle, so
+ * NCryptFreeObject must NOT be called separately.
+ */
+struct NcryptKeyDeleter {
+    void operator()(NCRYPT_KEY_HANDLE const h) noexcept {
+        if (h) {
+            ::NCryptDeleteKey(h, 0);
+        }
+    }
+};
+
+using UniqueNcryptKeyWithDeletion = AutoHandle<NCRYPT_KEY_HANDLE, NcryptKeyDeleter>;
 
 /**
  * Free a CERTSTORE Handle
@@ -221,11 +241,49 @@ struct CertChainEngineFree {
 using UniqueCertChainEngine = AutoHandle<HCERTCHAINENGINE, CertChainEngineFree>;
 
 /**
- * The lifetime of a private key of a certificate loaded from a PEM is bound to the CryptContext's
- * lifetime
- * so we treat the certificate and cryptcontext as a pair.
+ * A certificate loaded from a PEM file with its CNG private key stored in a named key container.
+ * The certificate context's CERT_KEY_PROV_INFO_PROP_ID references the container by name and
+ * provider; Schannel opens the container by name at handshake time rather than enumerating all
+ * containers in the KSP.  When this struct is destroyed, NCryptDeleteKey removes the named
+ * container from persistent storage, cleaning up the ephemeral key material.
  */
-using UniqueCertificateWithPrivateKey = std::tuple<UniqueCertificate, UniqueCryptProvider>;
+struct CertificateWithKey {
+    UniqueCertificate cert;
+    UniqueNcryptKeyWithDeletion key;
+
+    CertificateWithKey() = default;
+    CertificateWithKey(UniqueCertificate c, UniqueNcryptKeyWithDeletion k)
+        : cert(std::move(c)), key(std::move(k)) {}
+
+    // AutoHandle's move assignment deliberately skips freeing the old handle (it is designed
+    // for "give away ownership" patterns).  For certificate rotation we need the old named key
+    // container to be deleted, so we save the old handle, transfer the new one, then delete.
+    CertificateWithKey& operator=(CertificateWithKey&& other) noexcept {
+        if (this != &other) {
+            cert = std::move(other.cert);
+            NCRYPT_KEY_HANDLE oldHandle = static_cast<NCRYPT_KEY_HANDLE>(key);
+            key = std::move(other.key);
+            if (oldHandle) {
+                NcryptKeyDeleter()(oldHandle);
+            }
+        }
+        return *this;
+    }
+    CertificateWithKey(CertificateWithKey&&) = default;
+    CertificateWithKey(const CertificateWithKey&) = delete;
+    CertificateWithKey& operator=(const CertificateWithKey&) = delete;
+
+    explicit operator bool() const {
+        return static_cast<bool>(cert);
+    }
+    PCCERT_CONTEXT get() const {
+        return cert.get();
+    }
+    const CERT_CONTEXT* operator->() const {
+        return cert.get();
+    }
+};
+using UniqueCertificateWithPrivateKey = CertificateWithKey;
 
 
 StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(PCCERT_CONTEXT cert) {
@@ -249,13 +307,13 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(PCCERT_CONTEXT cert) {
  */
 class SSLConnectionWindows : public SSLConnectionInterface {
 public:
-    SCHANNEL_CRED* _cred;
+    SCH_CREDENTIALS* _cred;
     Socket* socket;
     asio::ssl::detail::engine _engine;
 
     std::vector<char> _tempBuffer;
 
-    SSLConnectionWindows(SCHANNEL_CRED* cred, Socket* sock, const char* initialBytes, int len);
+    SSLConnectionWindows(SCH_CREDENTIALS* cred, Socket* sock, const char* initialBytes, int len);
 
     void* getConnection() final {
         return _engine.native_handle();
@@ -271,11 +329,13 @@ public:
                                const boost::optional<TransientSSLParams>& transientSSLParams,
                                bool isServer);
 
+    ~SSLManagerWindows() override;
+
     /**
      * Initializes an OpenSSL context according to the provided settings. Only settings which are
      * acceptable on non-blocking connections are set.
      */
-    Status initSSLContext(SCHANNEL_CRED* cred,
+    Status initSSLContext(SCH_CREDENTIALS* cred,
                           const SSLParams& params,
                           ConnectionDirection direction) final;
 
@@ -296,7 +356,7 @@ public:
                                                         const HostAndPort& hostForLogging,
                                                         const ExecutorPtr& reactor) final;
 
-    Status stapleOCSPResponse(SCHANNEL_CRED* cred, bool asyncOCSPStaple) final;
+    Status stapleOCSPResponse(SCH_CREDENTIALS* cred, bool asyncOCSPStaple) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -343,8 +403,10 @@ private:
     // If set, this parameters are used to create new transient SSL connection.
     const boost::optional<TransientSSLParams> _transientSSLParams;
 
-    SCHANNEL_CRED _clientCred;
-    SCHANNEL_CRED _serverCred;
+    TLS_PARAMETERS _clientTLSCred;
+    SCH_CREDENTIALS _clientCred;
+    TLS_PARAMETERS _serverTLSCred;
+    SCH_CREDENTIALS _serverCred;
 
     UniqueCertificateWithPrivateKey _pemCertificate;
     UniqueCertificateWithPrivateKey _clusterPEMCertificate;
@@ -370,6 +432,15 @@ private:
     // Weak pointer to verify that this manager is still owned by this context.
     // Will be used if stapling is implemented.
     synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
+
+    // Thumbprints of intermediate CA certs we added to the Windows system "CA" store.
+    // Each entry is the CERT_SHA1_HASH_PROP_ID value: a SHA1 hash of the raw DER-encoded cert
+    // bytes, computed by Windows CryptoAPI as a content fingerprint.  This is independent of
+    // the certificate's own signature algorithm (which may be SHA256, etc.).
+    // Schannel TLS 1.3 (SCH_CREDENTIALS) only searches system stores when building the
+    // Certificate message chain, so we install intermediate CAs there and remove them on
+    // destruction.
+    std::vector<std::array<BYTE, 20>> _addedIntermediateCAThumbprints;
 };
 
 GlobalInitializerRegisterer sslManagerInitializer(
@@ -388,7 +459,7 @@ GlobalInitializerRegisterer sslManagerInitializer(
     {"EndStartupOptionHandling"},
     {});
 
-SSLConnectionWindows::SSLConnectionWindows(SCHANNEL_CRED* cred,
+SSLConnectionWindows::SSLConnectionWindows(SCH_CREDENTIALS* cred,
                                            Socket* sock,
                                            const char* initialBytes,
                                            int len)
@@ -433,6 +504,10 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params,
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
       _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning),
       _transientSSLParams(transientSSLParams) {
+    memset(&_clientTLSCred, 0, sizeof(_clientTLSCred));
+    memset(&_serverTLSCred, 0, sizeof(_serverTLSCred));
+    _clientCred.pTlsParameters = &_clientTLSCred;
+    _serverCred.pTlsParameters = &_serverTLSCred;
 
     if (MONGO_unlikely(getSSLManagerMode() == SSLManagerMode::TransientWithOverride)) {
         uassert(ErrorCodes::InvalidSSLConfiguration,
@@ -494,6 +569,25 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params,
 
     uassertStatusOK(_initChainEngines(&_serverEngine));
     uassertStatusOK(_initChainEngines(&_clientEngine));
+}
+
+SSLManagerWindows::~SSLManagerWindows() {
+    if (_addedIntermediateCAThumbprints.empty()) {
+        return;
+    }
+    HCERTSTORE hSystemCAStore = CertOpenSystemStoreW(NULL, L"CA");
+    if (!hSystemCAStore) {
+        return;
+    }
+    for (auto& thumbprint : _addedIntermediateCAThumbprints) {
+        CRYPT_HASH_BLOB hashBlob = {20, const_cast<BYTE*>(thumbprint.data())};
+        PCCERT_CONTEXT pCert = CertFindCertificateInStore(
+            hSystemCAStore, X509_ASN_ENCODING, 0, CERT_FIND_SHA1_HASH, &hashBlob, NULL);
+        if (pCert) {
+            CertDeleteCertificateFromStore(pCert);  // consumes pCert
+        }
+    }
+    CertCloseStore(hSystemCAStore, 0);
 }
 
 StatusWith<UniqueCertChainEngine> initChainEngine(CERT_CHAIN_ENGINE_CONFIG* chainEngineConfig,
@@ -567,9 +661,30 @@ int SSLManagerWindows::SSL_read(SSLConnectionInterface* connInterface, void* buf
                     conn->socket->handleRecvError(ret, num);
                 }
 
+                LOGV2_DEBUG(
+                    7998036, 0, "TLS SSL_read: recv returned encrypted data", "bytes"_attr = ret);
+
                 conn->_engine.put_input(asio::const_buffer(conn->_tempBuffer.data(), ret));
 
                 continue;
+            }
+            case asio::ssl::detail::engine::want_output:
+            case asio::ssl::detail::engine::want_output_and_retry: {
+                // TLS 1.3 post-handshake response (e.g. KeyUpdate acknowledgement):
+                // send the queued output, then retry the read if needed.
+                asio::mutable_buffer outBuf = conn->_engine.get_output(
+                    asio::mutable_buffer(conn->_tempBuffer.data(), conn->_tempBuffer.size()));
+                int ret = send(conn->socket->rawFD(),
+                               reinterpret_cast<const char*>(outBuf.data()),
+                               outBuf.size(),
+                               portSendFlags);
+                if (ret == SOCKET_ERROR) {
+                    conn->socket->handleSendError(ret, "");
+                }
+                if (want == asio::ssl::detail::engine::want_output_and_retry) {
+                    continue;
+                }
+                return bytes_transferred;
             }
             case asio::ssl::detail::engine::want_nothing: {
                 // ASIO wants nothing, return to caller with anything transfered.
@@ -752,6 +867,51 @@ StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
     return {std::move(certs)};
 }
 
+// Returns true if pCert has CA:TRUE in its Basic Constraints extension.
+static bool isCACertificate(PCCERT_CONTEXT pCert) {
+    // Check Basic Constraints v2 (most common for modern certs)
+    PCERT_EXTENSION pExt = CertFindExtension(
+        szOID_BASIC_CONSTRAINTS2, pCert->pCertInfo->cExtension, pCert->pCertInfo->rgExtension);
+    if (pExt) {
+        CERT_BASIC_CONSTRAINTS2_INFO* pInfo = nullptr;
+        DWORD cbInfo = 0;
+        if (CryptDecodeObjectEx(X509_ASN_ENCODING,
+                                szOID_BASIC_CONSTRAINTS2,
+                                pExt->Value.pbData,
+                                pExt->Value.cbData,
+                                CRYPT_DECODE_ALLOC_FLAG,
+                                nullptr,
+                                &pInfo,
+                                &cbInfo)) {
+            bool isCA = (pInfo->fCA != FALSE);
+            LocalFree(pInfo);
+            return isCA;
+        }
+    }
+
+    // Fallback: Basic Constraints v1 (older certs)
+    pExt = CertFindExtension(
+        szOID_BASIC_CONSTRAINTS, pCert->pCertInfo->cExtension, pCert->pCertInfo->rgExtension);
+    if (pExt) {
+        CERT_BASIC_CONSTRAINTS_INFO* pInfo = nullptr;
+        DWORD cbInfo = 0;
+        if (CryptDecodeObjectEx(X509_ASN_ENCODING,
+                                szOID_BASIC_CONSTRAINTS,
+                                pExt->Value.pbData,
+                                pExt->Value.cbData,
+                                CRYPT_DECODE_ALLOC_FLAG,
+                                nullptr,
+                                &pInfo,
+                                &cbInfo)) {
+            bool isCA = (pInfo->SubjectType.cbData > 0 &&
+                         (pInfo->SubjectType.pbData[0] & CERT_CA_SUBJECT_FLAG));
+            LocalFree(pInfo);
+            return isCA;
+        }
+    }
+    return false;
+}
+
 Status addCertificatesToStore(HCERTSTORE certStore, std::vector<UniqueCertificate>& certificates) {
     for (auto& cert : certificates) {
         if (!CertAddCertificateContextToStore(certStore, cert.get(), CERT_STORE_ADD_NEW, NULL)) {
@@ -816,39 +976,18 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
     auto certBuf = swCert.getValue();
 
+    // Use CertCreateCertificateContext rather than CertAddEncodedCertificateToStore.
+    // The latter routes through CertAddCertificateContextToStore, which allocates a property-table
+    // slot for CERT_NCRYPT_KEY_HANDLE_TRANSFER_PROP_ID (propId 99) without initialising it,
+    // leaving pbData = NULL with cbData != 0.  CertCreateCertificateContext never copies
+    // properties, so the table is clean and the property can be set safely.
     PCCERT_CONTEXT cert =
         CertCreateCertificateContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
-
     if (!cert) {
         auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertCreateCertificateContext failed to decode cert: "
-                                    << errorMessage(ec));
+                      str::stream() << "CertCreateCertificateContext failed: " << errorMessage(ec));
     }
-
-    UniqueCertificate tempCertHolder(cert);
-
-    HCERTSTORE store = CertOpenStore(
-        CERT_STORE_PROV_MEMORY, 0, NULL, CERT_STORE_DEFER_CLOSE_UNTIL_LAST_FREE_FLAG, NULL);
-    if (!store) {
-        auto ec = lastSystemError();
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream()
-                          << "CertOpenStore failed to create memory store: " << errorMessage(ec));
-    }
-
-    UniqueCertStore storeHolder(store);
-
-    // Add the newly created certificate to the memory store, this makes a copy
-    if (!CertAddCertificateContextToStore(store, cert, CERT_STORE_ADD_NEW, NULL)) {
-        auto ec = lastSystemError();
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertAddCertificateContextToStore Memory Failed  "
-                                    << errorMessage(ec));
-    }
-
-    // Get the certificate from the store so we attach the private key to the cert in the store
-    cert = CertEnumCertificatesInStore(store, NULL);
 
     UniqueCertificate certHolder(cert);
 
@@ -917,103 +1056,113 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     }
 
 
-    HCRYPTPROV hProv;
-    std::wstring wstr;
+    // Generate a container name that is unique per import to avoid cross-process and
+    // intra-process contention on the MS_KEY_STORAGE_PROVIDER.
+    //
+    // Why uniqueness matters:
+    //   If we used a deterministic name (e.g. the cert thumbprint), concurrent processes
+    //   loading the same certificate (common in Evergreen CI where many test tasks run in
+    //   parallel on the same host) would all try to NCryptImportKey into the same named
+    //   container.  NCryptImportKey with NCRYPT_OVERWRITE_KEY_FLAG blocks until it can
+    //   acquire an exclusive lock on the container — if another process has the container
+    //   open, the call hangs indefinitely, causing the "HIT EVERGREEN TIMEOUT" failures.
+    //
+    // Container name format: "mongod_<PID>_<counter>" where counter is a process-global
+    // atomic that increments on every call.  This guarantees uniqueness within a process
+    // (across certificate rotations) and across processes (different PIDs), with no locking.
+    //
+    // Why NCRYPT_OVERWRITE_KEY_FLAG is safe here:
+    //   PIDs are unique among *running* processes, so no two live processes share a
+    //   container name.  The only scenario in which a "mongod_<PID>_<N>" container
+    //   already exists is when a previous process with the same recycled PID was
+    //   force-killed (e.g. by the Evergreen hang-analyser) before NCryptDeleteKey ran,
+    //   leaving a stale orphan on disk.  Because that process is dead, no handle is open
+    //   on the container, so NCRYPT_OVERWRITE_KEY_FLAG overwrites it instantly without
+    //   blocking.  Without this flag, NCryptImportKey would return NTE_EXISTS
+    //   (0x8009000F) and the server would fail to start.
+    static std::atomic<uint64_t> keyContainerCounter{0};
+    wchar_t containerName[64] = {};
+    _snwprintf_s(containerName,
+                 static_cast<int>(std::size(containerName)),
+                 _TRUNCATE,
+                 L"mongod_%lu_%llu",
+                 static_cast<unsigned long>(GetCurrentProcessId()),
+                 static_cast<unsigned long long>(keyContainerCounter.fetch_add(1)));
 
-    // Create the right Crypto context depending on whether we running in a server or outside.
-    // See https://msdn.microsoft.com/en-us/library/windows/desktop/aa375195(v=vs.85).aspx
-    if (isSSLServer) {
-        // Generate a unique name for each key container
-        // Use the the log file if possible
-        if (!serverGlobalParams.logpath.empty()) {
-            static AtomicWord<int> counter{0};
-            std::string keyContainerName = str::stream()
-                << serverGlobalParams.logpath << counter.fetchAndAdd(1);
-            wstr = toNativeString(keyContainerName.c_str());
-        } else {
-            auto us = UUID::gen().toString();
-            wstr = toNativeString(us.c_str());
-        }
+    LOGV2_DEBUG(7998007,
+                2,
+                "Importing private key into CNG key storage provider",
+                "containerName"_attr = toUtf8String(containerName));
 
-        // Use a new key container for the key. We cannot use the default container since the
-        // default
-        // container is shared across processes owned by the same user.
-        // Note: Server side Schannel requires CRYPT_VERIFYCONTEXT off
-        if (!CryptAcquireContextW(&hProv,
-                                  wstr.c_str(),
-                                  MS_ENHANCED_PROV,
-                                  PROV_RSA_FULL,
-                                  CRYPT_NEWKEYSET | CRYPT_SILENT)) {
-            auto ec = lastSystemError();
-            if (ec == systemError(NTE_EXISTS)) {
-                if (!CryptAcquireContextW(
-                        &hProv, wstr.c_str(), MS_ENHANCED_PROV, PROV_RSA_FULL, CRYPT_SILENT)) {
-                    auto ec = lastSystemError();
-                    return Status(ErrorCodes::InvalidSSLConfiguration,
-                                  str::stream()
-                                      << "CryptAcquireContextW failed " << errorMessage(ec));
-                }
-
-            } else {
-                return Status(ErrorCodes::InvalidSSLConfiguration,
-                              str::stream() << "CryptAcquireContextW failed " << errorMessage(ec));
-            }
-        }
-    } else {
-        // Use a transient key container for the key
-        if (!CryptAcquireContextW(&hProv,
-                                  NULL,
-                                  MS_ENHANCED_PROV,
-                                  PROV_RSA_FULL,
-                                  CRYPT_VERIFYCONTEXT | CRYPT_SILENT)) {
-            auto ec = lastSystemError();
-            return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CryptAcquireContextW failed  " << errorMessage(ec));
-        }
-    }
-    UniqueCryptProvider cryptProvider(hProv);
-
-    HCRYPTKEY hkey;
-    if (!CryptImportKey(hProv, privateKey.data(), privateKey.size(), 0, 0, &hkey)) {
-        auto ec = lastSystemError();
+    // Open the Microsoft Software Key Storage Provider (CNG). SCH_CREDENTIALS (version 5),
+    // required for TLS 1.3, needs a CNG key rather than a legacy CAPI key.
+    NCRYPT_PROV_HANDLE hProvider = 0;
+    SECURITY_STATUS ss = NCryptOpenStorageProvider(&hProvider, MS_KEY_STORAGE_PROVIDER, 0);
+    if (ss != ERROR_SUCCESS) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CryptImportKey failed  " << errorMessage(ec));
+                      str::stream() << "NCryptOpenStorageProvider failed with error: " << ss);
     }
-    UniqueCryptKey keyHolder(hkey);
+    UniqueNcryptProvider providerGuard(hProvider);
 
-    if (isSSLServer) {
-        // Server-side SChannel requires a different way of attaching the private key to the
-        // certificate
-        CRYPT_KEY_PROV_INFO keyProvInfo;
-        memset(&keyProvInfo, 0, sizeof(keyProvInfo));
-        keyProvInfo.pwszContainerName = const_cast<wchar_t*>(wstr.c_str());
-        keyProvInfo.pwszProvName = const_cast<wchar_t*>(MS_ENHANCED_PROV);
-        keyProvInfo.dwFlags = CERT_SET_KEY_PROV_HANDLE_PROP_ID | CERT_SET_KEY_CONTEXT_PROP_ID;
-        keyProvInfo.dwProvType = PROV_RSA_FULL;
-        keyProvInfo.dwKeySpec = AT_KEYEXCHANGE;
+    // Import the private key into a named container.
+    //
+    // Use CERT_KEY_PROV_INFO_PROP_ID (propId 2) to associate the key with the certificate rather
+    // than CERT_NCRYPT_KEY_HANDLE_PROP_ID (propId 78) or CERT_NCRYPT_KEY_HANDLE_TRANSFER_PROP_ID
+    // (propId 99).  Setting propId 78 or 99 triggers an internal CertGetCertificateContextProperty
+    // call that, if the handle is not yet cached, enumerates all key containers in the KSP to find
+    // a matching public key — an unnecessary and potentially slow operation.  Setting propId 2
+    // stores only a name/provider blob; when Schannel needs the private key for the TLS handshake
+    // it resolves propId 78 from propId 2 by opening the named container directly (NCryptOpenKey
+    // by name), which is both simpler and more predictable.
+    //
+    // NCRYPT_OVERWRITE_KEY_FLAG is safe here because each container name is PID-scoped:
+    // no two *running* processes share a name, so the flag only ever overwrites orphaned
+    // containers left by previously force-killed processes (see comment above).
+    NCryptBuffer nameBuffer = {};
+    nameBuffer.cbBuffer = static_cast<ULONG>((wcslen(containerName) + 1) * sizeof(wchar_t));
+    nameBuffer.BufferType = NCRYPTBUFFER_PKCS_KEY_NAME;
+    nameBuffer.pvBuffer = containerName;
+    NCryptBufferDesc paramList = {};
+    paramList.ulVersion = NCRYPTBUFFER_VERSION;
+    paramList.cBuffers = 1;
+    paramList.pBuffers = &nameBuffer;
 
-        if (!CertSetCertificateContextProperty(
-                certHolder.get(), CERT_KEY_PROV_INFO_PROP_ID, 0, &keyProvInfo)) {
-            auto ec = lastSystemError();
-            return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream()
-                              << "CertSetCertificateContextProperty Failed  " << errorMessage(ec));
-        }
+    NCRYPT_KEY_HANDLE hKey = 0;
+    ss = NCryptImportKey(hProvider,
+                         NULL,
+                         LEGACY_RSAPRIVATE_BLOB,
+                         &paramList,
+                         &hKey,
+                         privateKey.data(),
+                         static_cast<ULONG>(privateKey.size()),
+                         NCRYPT_SILENT_FLAG | NCRYPT_OVERWRITE_KEY_FLAG);
+    if (ss != ERROR_SUCCESS) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "NCryptImportKey failed with error: " << ss);
     }
+    // keyGuard calls NCryptDeleteKey on destruction, removing the named container from disk.
+    UniqueNcryptKeyWithDeletion keyGuard(hKey);
 
-    // NOTE: This is used to set the certificate for client side SChannel
+    // Point the cert context at the named container via CERT_KEY_PROV_INFO_PROP_ID.
+    // This is a plain blob write; it never dereferences a key handle or enumerates the KSP.
+    CRYPT_KEY_PROV_INFO provInfo = {};
+    provInfo.pwszContainerName = containerName;
+    provInfo.pwszProvName = const_cast<LPWSTR>(MS_KEY_STORAGE_PROVIDER);
+    provInfo.dwProvType = 0;  // 0 = CNG provider, not legacy CAPI
+    provInfo.dwKeySpec = AT_KEYEXCHANGE;
     if (!CertSetCertificateContextProperty(
-            cert, CERT_KEY_PROV_HANDLE_PROP_ID, 0, (const void*)hProv)) {
+            certHolder.get(), CERT_KEY_PROV_INFO_PROP_ID, 0, &provInfo)) {
         auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream()
-                          << "CertSetCertificateContextProperty failed  " << errorMessage(ec));
+                      str::stream() << "CertSetCertificateContextProperty "
+                                       "(CERT_KEY_PROV_INFO_PROP_ID) failed: "
+                                    << errorMessage(ec));
     }
 
-    // Add the extra certificates into the same certificate store as the certificate
+    // Add the extra certificates into the same certificate store as the certificate.
     uassertStatusOK(addCertificatesToStore(certHolder->hCertStore, extraCertificates));
 
-    return UniqueCertificateWithPrivateKey{std::move(certHolder), std::move(cryptProvider)};
+    return CertificateWithKey{std::move(certHolder), std::move(keyGuard)};
 }
 
 Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
@@ -1297,13 +1446,13 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         _clusterPEMCertificate = std::move(swCertificate.getValue());
     }
 
-    if (std::get<0>(_pemCertificate)) {
-        _clientCertificates[0] = std::get<0>(_pemCertificate).get();
-        _serverCertificates[0] = std::get<0>(_pemCertificate).get();
+    if (_pemCertificate) {
+        _clientCertificates[0] = _pemCertificate.get();
+        _serverCertificates[0] = _pemCertificate.get();
     }
 
-    if (std::get<0>(_clusterPEMCertificate)) {
-        _clientCertificates[0] = std::get<0>(_clusterPEMCertificate).get();
+    if (_clusterPEMCertificate) {
+        _clientCertificates[0] = _clusterPEMCertificate.get();
     }
 
     // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
@@ -1317,9 +1466,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
         // Dump the CA cert chain into the memory store for the client cert. This ensures Windows
         // can build a complete chain to send to the remote side.
-        if (std::get<0>(_pemCertificate)) {
-            auto status =
-                readCAPEMFile(std::get<0>(_pemCertificate).get()->hCertStore, sslConfig.cafile);
+        if (_pemCertificate) {
+            auto status = readCAPEMFile(_pemCertificate.get()->hCertStore, sslConfig.cafile);
             if (!status.isOK()) {
                 return status;
             }
@@ -1341,9 +1489,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
         // Dump the CA cert chain into the memory store for the cluster cert. This ensures Windows
         // can build a complete chain to send to the remote side.
-        if (std::get<0>(_clusterPEMCertificate)) {
-            auto status = readCAPEMFile(std::get<0>(_clusterPEMCertificate).get()->hCertStore,
-                                        sslConfig.cafile);
+        if (_clusterPEMCertificate) {
+            auto status = readCAPEMFile(_clusterPEMCertificate.get()->hCertStore, sslConfig.cafile);
             if (!status.isOK()) {
                 return status;
             }
@@ -1352,6 +1499,123 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         _serverEngine.CAstore = std::move(swChain.getValue());
     }
     _serverEngine.hasCRL = !crlfile.empty();
+
+    // Schannel TLS 1.3 (SCH_CREDENTIALS) only searches Windows system stores when building the
+    // Certificate message chain — it ignores the cert's hCertStore even with
+    // SCH_CRED_MEMORY_STORE_CERT set.  Install any intermediate CA certs (non-self-signed) into the
+    // user-level system "CA" store so Schannel can find them.  We track the SHA1 thumbprints so we
+    // can remove the certs in the destructor.
+    auto addIntermediateCAsToSystemStore = [&](HCERTSTORE sourceCertStore) {
+        if (!sourceCertStore) {
+            return;
+        }
+        HCERTSTORE hSystemCAStore = CertOpenSystemStoreW(NULL, L"CA");
+        if (!hSystemCAStore) {
+            LOGV2_DEBUG(
+                7998018, 2, "addIntermediateCAsToSystemStore: failed to open user CA system store");
+            return;
+        }
+        DWORD addedCount = 0;
+        PCCERT_CONTEXT pCert = NULL;
+        while ((pCert = CertEnumCertificatesInStore(sourceCertStore, pCert)) != NULL) {
+            // Skip self-signed (root) certs — only install intermediate CAs.
+            if (CertCompareCertificateName(
+                    X509_ASN_ENCODING, &pCert->pCertInfo->Issuer, &pCert->pCertInfo->Subject)) {
+                continue;
+            }
+            // Skip leaf certs (certs without CA:TRUE in Basic Constraints).
+            if (!isCACertificate(pCert)) {
+                continue;
+            }
+            char subjectBuf[256] = {};
+            CertNameToStrA(X509_ASN_ENCODING,
+                           &pCert->pCertInfo->Subject,
+                           CERT_X500_NAME_STR,
+                           subjectBuf,
+                           sizeof(subjectBuf));
+            PCCERT_CONTEXT pNewCert = NULL;
+            BOOL added = CertAddCertificateContextToStore(
+                hSystemCAStore, pCert, CERT_STORE_ADD_NEW, &pNewCert);
+            LOGV2_DEBUG(7998011,
+                        2,
+                        "addIntermediateCAsToSystemStore: intermediate CA cert",
+                        "subject"_attr = subjectBuf,
+                        "addedToSystemStore"_attr = (bool)added);
+            if (added && pNewCert) {
+                ++addedCount;
+                std::array<BYTE, 20> sha1{};
+                DWORD cbHash = 20;
+                if (CertGetCertificateContextProperty(
+                        pNewCert, CERT_SHA1_HASH_PROP_ID, sha1.data(), &cbHash)) {
+                    _addedIntermediateCAThumbprints.push_back(sha1);
+                }
+                CertFreeCertificateContext(pNewCert);
+            }
+        }
+        LOGV2_DEBUG(7998019,
+                    2,
+                    "addIntermediateCAsToSystemStore: complete",
+                    "addedCount"_attr = addedCount);
+        CertCloseStore(hSystemCAStore, 0);
+    };
+    if (_pemCertificate) {
+        addIntermediateCAsToSystemStore(_pemCertificate.get()->hCertStore);
+    }
+    if (_clusterPEMCertificate) {
+        addIntermediateCAsToSystemStore(_clusterPEMCertificate.get()->hCertStore);
+    }
+
+    // The hCertStore path above only picks up certs explicitly added via addCertificatesToStore.
+    // Read ALL certs from each PEM key file directly so that any intermediate CA embedded in the
+    // key file (after the leaf cert) is also installed into the system "CA" store.  Schannel TLS
+    // 1.3 needs the intermediate CA in the system store to include it in the Certificate message.
+    auto addIntermediateCAFromPEMFile = [&](StringData pemFile) {
+        if (pemFile.empty()) {
+            return;
+        }
+        auto swBuf = ssl_util::readPEMFile(pemFile);
+        if (!swBuf.isOK()) {
+            LOGV2_DEBUG(7998020,
+                        2,
+                        "addIntermediateCAFromPEMFile: failed to read PEM file",
+                        "file"_attr = pemFile,
+                        "error"_attr = swBuf.getStatus().reason());
+            return;
+        }
+        auto swCerts = readCAPEMBuffer(swBuf.getValue());
+        if (!swCerts.isOK()) {
+            LOGV2_DEBUG(7998021,
+                        2,
+                        "addIntermediateCAFromPEMFile: failed to parse PEM certs",
+                        "file"_attr = pemFile,
+                        "error"_attr = swCerts.getStatus().reason());
+            return;
+        }
+        auto& certs = swCerts.getValue();
+        LOGV2_DEBUG(7998022,
+                    2,
+                    "addIntermediateCAFromPEMFile: parsed certs from key file",
+                    "file"_attr = pemFile,
+                    "count"_attr = certs.size());
+        if (certs.empty()) {
+            return;
+        }
+        HCERTSTORE hTempStore = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, NULL, 0, NULL);
+        if (!hTempStore) {
+            return;
+        }
+        for (auto& cert : certs) {
+            CertAddCertificateContextToStore(
+                hTempStore, cert.get(), CERT_STORE_ADD_REPLACE_EXISTING, NULL);
+        }
+        addIntermediateCAsToSystemStore(hTempStore);
+        CertCloseStore(hTempStore, 0);
+    };
+    addIntermediateCAFromPEMFile(sslConfig.clientPEM);
+    addIntermediateCAFromPEMFile(sslConfig.cafile);
+    if (managerMode != SSLManagerMode::TransientWithOverride) {
+        addIntermediateCAFromPEMFile(params.sslClusterFile);
+    }
 
     if (hasCertificateSelector(*certificateSelector)) {
         auto swCert = loadAndValidateCertificateSelector(*certificateSelector);
@@ -1392,15 +1656,17 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     return Status::OK();
 }
 
-Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
+Status SSLManagerWindows::initSSLContext(SCH_CREDENTIALS* cred,
                                          const SSLParams& params,
                                          ConnectionDirection direction) {
 
-    memset(cred, 0, sizeof(*cred));
-    cred->dwVersion = SCHANNEL_CRED_VERSION;
-    cred->dwFlags = SCH_USE_STRONG_CRYPTO;  // Use strong crypto;
-
-    uint32_t supportedProtocols = 0;
+    auto* tlsParams = cred->pTlsParameters;
+    *tlsParams = {};
+    // SCH_USE_STRONG_CRYPTO is a legacy flag intended for SCHANNEL_CRED (version 4) and must not
+    // be set on SCH_CREDENTIALS (version 5).  On Windows Server 2022 and later it causes
+    // AcquireCredentialsHandle to fail with SEC_E_NO_LSA.  Protocol/cipher strength is already
+    // controlled via TLS_PARAMETERS.grbitDisabledProtocols below.
+    *cred = {.dwVersion = SCH_CREDENTIALS_VERSION, .pTlsParameters = tlsParams};
 
     const auto [disabledProtocols, cipherConfig] =
         [&]() -> std::pair<const std::vector<SSLParams::Protocols>*, const std::string&> {
@@ -1413,9 +1679,6 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     }();
 
     if (direction == ConnectionDirection::kIncoming) {
-        supportedProtocols = SP_PROT_TLS1_SERVER | SP_PROT_TLS1_0_SERVER | SP_PROT_TLS1_1_SERVER |
-            SP_PROT_TLS1_2_SERVER;
-
         cred->hRootStore = _serverEngine.CAstore;
         cred->dwFlags = cred->dwFlags          // flags
             | SCH_CRED_REVOCATION_CHECK_CHAIN  // Check certificate revocation
@@ -1426,9 +1689,6 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
             | SCH_CRED_DISABLE_RECONNECTS;     // Do not support reconnects
 
     } else {
-        supportedProtocols = SP_PROT_TLS1_CLIENT | SP_PROT_TLS1_0_CLIENT | SP_PROT_TLS1_1_CLIENT |
-            SP_PROT_TLS1_2_CLIENT;
-
         cred->hRootStore = _clientEngine.CAstore;
         cred->dwFlags = cred->dwFlags           // Flags
             | SCH_CRED_REVOCATION_CHECK_CHAIN   // Check certificate revocation
@@ -1440,19 +1700,22 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     }
 
     // Set the supported TLS protocols. Allow --sslDisabledProtocols to disable selected ciphers.
+    uint32_t disabledProtocolsFlag = 0;
     for (const SSLParams::Protocols& protocol : *disabledProtocols) {
         if (protocol == SSLParams::Protocols::TLS1_0) {
-            supportedProtocols &= ~(SP_PROT_TLS1_0_CLIENT | SP_PROT_TLS1_0_SERVER);
+            disabledProtocolsFlag |= SP_PROT_TLS1_0;
         } else if (protocol == SSLParams::Protocols::TLS1_1) {
-            supportedProtocols &= ~(SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_1_SERVER);
+            disabledProtocolsFlag |= SP_PROT_TLS1_1;
         } else if (protocol == SSLParams::Protocols::TLS1_2) {
-            supportedProtocols &= ~(SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_2_SERVER);
+            disabledProtocolsFlag |= SP_PROT_TLS1_2;
+        } else if (protocol == SSLParams::Protocols::TLS1_3) {
+            disabledProtocolsFlag |= SP_PROT_TLS1_3;
         }
-        // SERVER-98279: support tls 1.3 for windows & apple
     }
 
-    cred->grbitEnabledProtocols = supportedProtocols;
-    if (supportedProtocols == 0) {
+    cred->cTlsParameters = 1;
+    cred->pTlsParameters->grbitDisabledProtocols = disabledProtocolsFlag;
+    if (cred->pTlsParameters->grbitDisabledProtocols == kAllTLSProtocols) {
         return {ErrorCodes::InvalidSSLConfiguration,
                 "All supported TLS protocols have been disabled."};
     }
@@ -1506,12 +1769,22 @@ void SSLManagerWindows::_handshake(SSLConnectionWindows* conn, bool client) {
                                    client ? SSLManagerInterface::ConnectionDirection::kOutgoing
                                           : SSLManagerInterface::ConnectionDirection::kIncoming));
 
+    LOGV2_DEBUG(7998009, 2, "TLS handshake starting", "role"_attr = (client ? "client" : "server"));
+
+    int iteration = 0;
     while (true) {
         asio::error_code ec;
         asio::ssl::detail::engine::want want =
             conn->_engine.handshake(client ? asio::ssl::stream_base::handshake_type::client
                                            : asio::ssl::stream_base::handshake_type::server,
                                     ec);
+        LOGV2_DEBUG(7998010,
+                    2,
+                    "TLS handshake iteration",
+                    "role"_attr = (client ? "client" : "server"),
+                    "iteration"_attr = iteration++,
+                    "want"_attr = static_cast<int>(want),
+                    "ecMessage"_attr = (ec ? ec.message() : std::string{}));
         if (ec) {
             throwSocketError(SocketErrorKind::RECV_ERROR, ec.message());
         }
@@ -1793,12 +2066,62 @@ Status validatePeerCertificate(const std::string& remoteHost,
 
     certChainPara.dwUrlRetrievalTimeout = gTLSOCSPVerifyTimeoutSecs * 1000;
 
+    // Build a flat memory store combining all candidate intermediate CA certs from:
+    //   (a) the certs from the peer's TLS Certificate message (cert->hCertStore),
+    //   (b) the current-user "CA" store (populated with intermediate CAs at startup), and
+    //   (c) the local-machine "CA" store.
+    // This is required because CertGetCertificateChain with hExclusiveRoot set does NOT
+    // search system CA stores for intermediate certificates — it only looks in the
+    // hAdditionalStore argument and hExclusiveRoot itself.
+    //
+    // We use a flat MEMORY store (not a collection store) because CertGetCertificateChain
+    // does not enumerate sibling stores when the hAdditionalStore argument is a collection
+    // store — it only searches the collection store's own in-memory contents.
+    auto copyStoreToFlat = [](HCERTSTORE dst, HCERTSTORE src) -> DWORD {
+        DWORD count = 0;
+        for (PCCERT_CONTEXT pCert = nullptr;
+             (pCert = CertEnumCertificatesInStore(src, pCert)) != nullptr;) {
+            if (CertAddCertificateContextToStore(dst, pCert, CERT_STORE_ADD_USE_EXISTING, nullptr))
+                ++count;
+        }
+        return count;
+    };
+    UniqueCertStore additionalStoreHolder;
+    HCERTSTORE hAdditionalStore = cert->hCertStore;
+    if (HCERTSTORE hFlatStore = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, NULL, 0, NULL)) {
+        additionalStoreHolder = hFlatStore;
+        DWORD fromPeer = copyStoreToFlat(hFlatStore, cert->hCertStore);
+        DWORD fromUserCA = 0;
+        if (HCERTSTORE hUserCA = CertOpenSystemStoreW(NULL, L"CA")) {
+            fromUserCA = copyStoreToFlat(hFlatStore, hUserCA);
+            CertCloseStore(hUserCA, 0);
+        }
+        DWORD fromMachineCA = 0;
+        if (HCERTSTORE hMachineCA =
+                CertOpenStore(CERT_STORE_PROV_SYSTEM,
+                              0,
+                              NULL,
+                              CERT_SYSTEM_STORE_LOCAL_MACHINE | CERT_STORE_READONLY_FLAG,
+                              L"CA")) {
+            fromMachineCA = copyStoreToFlat(hFlatStore, hMachineCA);
+            CertCloseStore(hMachineCA, 0);
+        }
+        hAdditionalStore = hFlatStore;
+        LOGV2_DEBUG(7998017,
+                    2,
+                    "validatePeerCertificate: flat intermediate-CA store populated",
+                    "fromPeerTLSMessage"_attr = fromPeer,
+                    "fromUserCAStore"_attr = fromUserCA,
+                    "fromMachineCAStore"_attr = fromMachineCA,
+                    "total"_attr = fromPeer + fromUserCA + fromMachineCA);
+    }
+
     auto before = Date_t::now();
     PCCERT_CHAIN_CONTEXT chainContext;
     if (!CertGetCertificateChain(certChainEngine,
                                  cert,
                                  NULL,
-                                 cert->hCertStore,
+                                 hAdditionalStore,
                                  &certChainPara,
                                  CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT,
                                  NULL,
@@ -1815,6 +2138,15 @@ Status validatePeerCertificate(const std::string& remoteHost,
     }
 
     UniqueCertChain certChainHolder(chainContext);
+
+    LOGV2_DEBUG(7998013,
+                2,
+                "CertGetCertificateChain result",
+                "trustErrorStatus"_attr = unsignedHex(chainContext->TrustStatus.dwErrorStatus),
+                "trustInfoStatus"_attr = unsignedHex(chainContext->TrustStatus.dwInfoStatus),
+                "chainCount"_attr = chainContext->cChain,
+                "chainLength"_attr =
+                    (chainContext->cChain > 0 ? chainContext->rgpChain[0]->cElement : 0));
 
     SSL_EXTRA_CERT_CHAIN_POLICY_PARA sslCertChainPolicy;
     memset(&sslCertChainPolicy, 0, sizeof(sslCertChainPolicy));
@@ -2006,7 +2338,6 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
                           << "QueryContextAttributes for connection info failed with" << ss);
     }
 
-    // SERVER-98279: support tls 1.3 for windows & apple
     switch (connInfo.dwProtocol) {
         case SP_PROT_TLS1_CLIENT:
         case SP_PROT_TLS1_SERVER:
@@ -2017,12 +2348,15 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
         case SP_PROT_TLS1_2_CLIENT:
         case SP_PROT_TLS1_2_SERVER:
             return TLSVersion::kTLS12;
+        case SP_PROT_TLS1_3_CLIENT:
+        case SP_PROT_TLS1_3_SERVER:
+            return TLSVersion::kTLS13;
         default:
             return TLSVersion::kUnknown;
     }
 }
 
-Status SSLManagerWindows::stapleOCSPResponse(SCHANNEL_CRED* cred, bool asyncOCSPStaple) {
+Status SSLManagerWindows::stapleOCSPResponse(SCH_CREDENTIALS* cred, bool asyncOCSPStaple) {
     return Status::OK();
 }
 

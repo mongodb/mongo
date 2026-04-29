@@ -164,6 +164,10 @@ mongo_cc_library(
     srcs = [
         "sock.cpp",
     ],
+    linkopts = select({
+        "//bazel/config:ssl_provider_windows": ["ncrypt.lib"],
+        "//conditions:default": [],
+    }),
     srcs_select = [
         {
             "//bazel/config:ssl_enabled": [

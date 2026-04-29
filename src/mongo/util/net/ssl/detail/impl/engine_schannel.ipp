@@ -30,6 +30,9 @@
 
 #pragma once
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
+#include "mongo/logv2/log.h"
 #include "mongo/platform/shared_library.h"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/error.hpp"
@@ -46,8 +49,10 @@ namespace asio {
 namespace ssl {
 namespace detail {
 
+// Bring in the _attr UDL (defined in mongo::literals) needed by LOGV2_DEBUG.
+using namespace mongo::literals;
 
-engine::engine(SCHANNEL_CRED* context, const std::string& remoteHostName)
+engine::engine(SCH_CREDENTIALS* context, const std::string& remoteHostName)
     : _pCred(context),
       _remoteHostName(mongo::toNativeString(remoteHostName.c_str())),
       _inBuffer(kDefaultBufferSize),
@@ -55,7 +60,7 @@ engine::engine(SCHANNEL_CRED* context, const std::string& remoteHostName)
       _extraBuffer(kDefaultBufferSize),
       _handshakeManager(
           &_hcxt, &_hcred, _remoteHostName, &_inBuffer, &_outBuffer, &_extraBuffer, _pCred),
-      _readManager(&_hcxt, &_hcred, &_inBuffer, &_extraBuffer),
+      _readManager(&_hcxt, &_hcred, &_inBuffer, &_extraBuffer, &_outBuffer, &_remoteHostName),
       _writeManager(&_hcxt, &_outBuffer) {
     SecInvalidateHandle(&_hcxt);
     SecInvalidateHandle(&_hcred);
@@ -101,8 +106,23 @@ engine::want engine::handshake(stream_base::handshake_type type, asio::error_cod
                                   : SSLHandshakeManager::HandshakeMode::Server);
     SSLHandshakeManager::HandshakeState state;
     auto w = _handshakeManager.nextHandshake(ec, &state);
-    if (w == ssl_want::want_nothing || state == SSLHandshakeManager::HandshakeState::Done) {
+    if (!ec &&
+        (w == ssl_want::want_nothing || state == SSLHandshakeManager::HandshakeState::Done)) {
         _state = EngineState::InProgress;
+
+        // TLS 1.3: the peer may bundle application data alongside its final handshake
+        // flight (e.g. the client's Certificate+Finished + first MongoDB message arrive in
+        // one TCP segment).  AcceptSecurityContext / InitializeSecurityContext leaves those
+        // encrypted bytes in _inBuffer, but the SSLReadManager is still in its initial
+        // NeedMoreEncryptedData state and will stall waiting for more network data.  Signal
+        // it so readDecryptedData processes the leftover bytes immediately.
+        if (!_inBuffer.empty()) {
+            LOGV2_DEBUG(7998008,
+                        2,
+                        "TLS handshake complete with leftover application data in input buffer",
+                        "bytes"_attr = _inBuffer.size());
+            _readManager.notifyHandshakeLeftoverData();
+        }
     }
 
     return ssl_want_to_engine(w);

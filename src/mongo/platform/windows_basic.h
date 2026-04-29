@@ -96,12 +96,13 @@
 
 #define CERT_CHAIN_PARA_HAS_EXTRA_FIELDS
 
-#include <schannel.h>
-
 #undef WIN32_NO_STATUS
 
 // Obtain a definition for the ntstatus type.
 #include <winternl.h>
+
+#define SCHANNEL_USE_BLACKLISTS
+#include <schannel.h>
 
 // Add back in the status definitions so that macro expansions for
 // things like STILL_ACTIVE and WAIT_OBJECT_O can be resolved (they

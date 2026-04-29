@@ -48,6 +48,9 @@ namespace ssl {
 
 context::context(context::method m) : handle_(&_cred) {
     memset(&_cred, 0, sizeof(_cred));
+    memset(&_tlsParams, 0, sizeof(_tlsParams));
+    _cred.cTlsParameters = 1;
+    _cred.pTlsParameters = &_tlsParams;
 }
 
 #if defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
