@@ -150,6 +150,8 @@ public:
         "replicated_fast_count.checkpoint.oplog_entries_skipped"};
     static constexpr MetricName kReplicatedFastCountCheckpointSizeCountEntriesProcessed = {
         "replicated_fast_count.checkpoint.size_count_entries_processed"};
+    static constexpr MetricName kReplicatedFastCountOplogLagSecs = {
+        "replicated_fast_count.oplog_lag_secs"};
 
     static constexpr MetricName kIndexBuildKeysInsertedFromScan = {
         "index_builds.keys_inserted_from_scan"};

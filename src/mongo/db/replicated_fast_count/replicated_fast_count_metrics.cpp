@@ -29,12 +29,15 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 
+#include "mongo/db/repl/optime_observer.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/server_status_options.h"
+#include "mongo/util/assert_util.h"
 
-#include <algorithm>
+#include <memory>
 
 namespace mongo {
 namespace {
@@ -111,6 +114,30 @@ auto& writeTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.writeTime.total",
                                                 .role = ClusterRole::None}});
 
+// Gauge for the number of seconds between the most recently applied oplog entry and the most
+// recently persisted fastcount checkpoint. A large value indicates the fastcount checkpoint is
+// falling behind replication.
+auto& oplogLagSecsGauge = MetricsService::instance().createInt64Gauge(
+    MetricNames::kReplicatedFastCountOplogLagSecs,
+    "Seconds between the last applied oplog entry and the last persisted fastcount checkpoint",
+    MetricUnit::kSeconds,
+    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.oplogLagSecs",
+                                                .role = ClusterRole::None}});
+
+// Hold the seconds field of the last observed applied and persisted checkpoint Timestamps. Zero
+// means "not yet observed"; the gauge stays at 0 until both are populated at least once.
+Atomic<uint32_t> lastAppliedSecs{0};
+Atomic<uint32_t> checkpointSecs{0};
+
+void refreshOplogLagGauge() {
+    const auto applied = lastAppliedSecs.loadRelaxed();
+    const auto checkpoint = checkpointSecs.loadRelaxed();
+    if (applied == 0 || checkpoint == 0) {
+        return;
+    }
+    oplogLagSecsGauge.set(static_cast<int64_t>(applied) - static_cast<int64_t>(checkpoint));
+}
+
 }  // namespace
 
 void ReplicatedFastCountMetrics::setIsRunning(bool running) {
@@ -139,6 +166,39 @@ void ReplicatedFastCountMetrics::incrementUpdateCount() {
 
 void ReplicatedFastCountMetrics::addWriteTimeMsTotal(int64_t ms) {
     writeTimeMsTotalCounter.add(ms);
+}
+
+void recordAppliedOpTime(const Timestamp& ts) {
+    tassert(12397401, "applied opTime fed into oplog_lag_secs must be non-null", !ts.isNull());
+    lastAppliedSecs.storeRelaxed(ts.getSecs());
+    refreshOplogLagGauge();
+}
+
+void recordCheckpointAdvanced(const Timestamp& ts) {
+    tassert(
+        12397402, "checkpoint timestamp fed into oplog_lag_secs must be non-null", !ts.isNull());
+    checkpointSecs.storeRelaxed(ts.getSecs());
+    refreshOplogLagGauge();
+}
+
+namespace {
+class FastCountAppliedOpTimeObserver : public repl::OpTimeObserver {
+public:
+    void onOpTime(const Timestamp& ts) override {
+        recordAppliedOpTime(ts);
+    }
+};
+}  // namespace
+
+void registerAppliedOpTimeObserver(ServiceContext* svcCtx) {
+    repl::ReplicationCoordinator::get(svcCtx)->addAppliedOpTimeObserver(
+        std::make_unique<FastCountAppliedOpTimeObserver>());
+}
+
+void resetOplogLagState_ForTest() {
+    lastAppliedSecs.storeRelaxed(0);
+    checkpointSecs.storeRelaxed(0);
+    oplogLagSecsGauge.set(0);
 }
 
 namespace {

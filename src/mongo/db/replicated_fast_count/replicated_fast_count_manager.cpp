@@ -162,6 +162,14 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
 
     const int numRecordsScanned = _hydrateMetadataFromDisk(opCtx, *acquisition);
 
+    // Seed the in-memory checkpoint timestamp from disk so the `oplog_lag_secs` gauge has a real
+    // baseline on warm restart. Without this, the gauge would stay at 0 until the first post-boot
+    // checkpoint flush (primary) or the first oplog-applied write to the timestamp store
+    // (secondary).
+    if (const auto persistedCheckpoint = _timestampStore.read(opCtx)) {
+        recordCheckpointAdvanced(*persistedCheckpoint);
+    }
+
     LOGV2(11648801,
           "ReplicatedFastCountManager initialization complete",
           "numRecordsScanned"_attr = numRecordsScanned,

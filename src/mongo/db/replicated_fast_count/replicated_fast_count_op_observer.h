@@ -29,31 +29,19 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::repl {
+namespace MONGO_MOD_PUBLIC mongo {
+
+class ServiceContext;
 
 /**
- * Observer interface for opTime advances. Implementations must be fast (a single atomic store is
- * ideal).
- *
- * Callbacks are invoked from a dedicated dispatcher thread outside of any replication lock.
- * Observers are registered once before startup and are never removed.
+ * Adds an OpObserver that watches writes to `config.fast_count_metadata_store_timestamps` and feeds
+ * the observed valid-as-of timestamp into the `replicated_fast_count.oplog_lag_secs` gauge. Fires
+ * on both primary writes (via the fastcount flush path) and on secondary oplog application of
+ * those same writes. Should be called once per ServiceContext; calling more than once just adds
+ * extra (idempotent) observer instances.
  */
-class MONGO_MOD_OPEN OpTimeObserver {
-public:
-    virtual ~OpTimeObserver() = default;
+void registerReplicatedFastCountOpObserver(ServiceContext* svcCtx);
 
-    /**
-     * Called whenever the observed opTime advances to a new non-null value.
-     *
-     * NOTE: Intermediate values may be skipped. If the opTime advances multiple times before this
-     * observer can be notified, only the most recent value will be delivered. Implementations must
-     * not assume they will observe every opTime. The only guarantee is that this method will
-     * eventually be called with the most recently applied opTime.
-     */
-    virtual void onOpTime(const Timestamp& ts) = 0;
-};
-
-}  // namespace mongo::repl
+}  // namespace MONGO_MOD_PUBLIC mongo

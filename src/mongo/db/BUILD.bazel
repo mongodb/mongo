@@ -2759,6 +2759,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:wait_for_majority_service",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_op_observer",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/stats:system_buckets_metrics",
         "//src/mongo/db/s:query_analysis_writer",

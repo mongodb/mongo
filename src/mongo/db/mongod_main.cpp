@@ -137,6 +137,8 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_op_observer.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -1468,6 +1470,9 @@ void setUpObservers(ServiceContext* serviceContext) {
     }
 
     serviceContext->setOpObserver(std::move(opObserverRegistry));
+
+    registerReplicatedFastCountOpObserver(serviceContext);
+    registerAppliedOpTimeObserver(serviceContext);
 }
 
 void setUpSharding(ServiceContext* service) {

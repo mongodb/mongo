@@ -58,6 +58,7 @@ mongo_cc_library(
         "replicated_fast_count_metrics.h",
     ],
     deps = [
+        "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
@@ -153,6 +154,24 @@ mongo_cc_library(
         "replicated_fast_count_delta_utils",
         "size_count_store",
         "size_count_timestamp_store",
+    ],
+)
+
+mongo_cc_library(
+    name = "replicated_fast_count_op_observer",
+    srcs = [
+        "replicated_fast_count_op_observer.cpp",
+    ],
+    hdrs = [
+        "replicated_fast_count_op_observer.h",
+    ],
+    deps = [
+        "replicated_fast_count_delta_utils",
+        "replicated_fast_count_metrics",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/storage:recovery_unit_base",
     ],
 )
 
@@ -425,6 +444,7 @@ mongo_cc_unit_test(
         "replicated_fast_count_advance_checkpoint",
         "replicated_fast_count_init",
         "replicated_fast_count_metrics",
+        "replicated_fast_count_op_observer",
         "replicated_fast_count_test_helpers",
         "size_count_store",
         "size_count_timestamp_store",

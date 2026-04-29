@@ -32,6 +32,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_op_observer.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
@@ -54,6 +55,7 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
 
     for (const auto& gaugeName : {
              MetricNames::kReplicatedFastCountIsRunning,
+             MetricNames::kReplicatedFastCountOplogLagSecs,
          }) {
         EXPECT_EQ(capturer.readInt64Gauge(gaugeName), 0);
     }
@@ -301,6 +303,68 @@ TEST(ReplicatedFastCountMetricsTest, CheckpointCountersInitializedToZero) {
               0);
 }
 
+TEST(ReplicatedFastCountMetricsTest, OplogLagSecsStaysZeroWhenCheckpointNeverAdvances) {
+    OtelMetricsCapturer capturer;
+    resetOplogLagState_ForTest();
+
+    // With fastcount disabled, the AppliedOpTime observer still fires (it's registered
+    // unconditionally), but no writes ever land on `config.fast_count_metadata_store_timestamps`,
+    // so `recordCheckpointAdvanced` never runs. The gauge must stay at 0 regardless of how many
+    // applied opTimes flow through.
+    recordAppliedOpTime(Timestamp{1000, 1});
+    recordAppliedOpTime(Timestamp{2000, 5});
+    recordAppliedOpTime(Timestamp{3000, 17});
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
+}
+
+TEST(ReplicatedFastCountMetricsTest, OplogLagSecsGoesNegativeWhenCheckpointAheadOfApplied) {
+    OtelMetricsCapturer capturer;
+    resetOplogLagState_ForTest();
+
+    // The OpTimeObserver dispatcher is async, so the observed applied opTime (lastAppliedSecs)
+    // can transiently lag a just-recorded checkpoint timestamp. The gauge reflects the raw
+    // (negative) difference rather than clamping. A sustained negative value signals a real bug
+    // (e.g., the AppliedOpTime observer not being registered) rather than the brief dispatcher
+    // window, so it's worth surfacing.
+    recordAppliedOpTime(Timestamp{100, 1});
+    recordCheckpointAdvanced(Timestamp{150, 1});
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), -50);
+}
+
+TEST(ReplicatedFastCountMetricsTest, OplogLagSecsComputesAppliedMinusCheckpoint) {
+    OtelMetricsCapturer capturer;
+
+    recordCheckpointAdvanced(Timestamp{100, 1});
+    recordAppliedOpTime(Timestamp{130, 5});
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 30);
+}
+
+TEST(ReplicatedFastCountMetricsTest, OplogLagSecsUpdatesOnNewAppliedOpTime) {
+    OtelMetricsCapturer capturer;
+
+    recordCheckpointAdvanced(Timestamp{100, 1});
+    recordAppliedOpTime(Timestamp{110, 1});
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 10);
+
+    recordAppliedOpTime(Timestamp{145, 1});
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 45);
+}
+
+TEST(ReplicatedFastCountMetricsTest, OplogLagSecsUpdatesOnNewCheckpoint) {
+    OtelMetricsCapturer capturer;
+
+    recordAppliedOpTime(Timestamp{200, 1});
+    recordCheckpointAdvanced(Timestamp{100, 1});
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 100);
+
+    // A new checkpoint catches up; lag shrinks.
+    recordCheckpointAdvanced(Timestamp{190, 1});
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 10);
+}
+
 // Fixture that wires OtelMetricsCapturer with the same CatalogTestFixture used by the
 // advance-checkpoint tests, allowing end-to-end verification that advanceCheckpoint fires
 // the checkpoint scan counters.
@@ -311,6 +375,7 @@ protected:
         opCtx = operationContext();
         ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), opCtx));
         ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), opCtx));
+        registerReplicatedFastCountOpObserver(opCtx->getServiceContext());
     }
 
     OperationContext* opCtx;
@@ -382,6 +447,24 @@ TEST_F(CheckpointScanMetricsTest, SkippedFiresForFastCountInternalEntries) {
     EXPECT_GT(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesSkipped),
         0);
+}
+
+TEST_F(CheckpointScanMetricsTest, CheckpointAdvancePopulatesOplogLagSecs) {
+    // Seed an applied oplog timestamp that is ahead of the checkpoint we're about to persist so the
+    // gauge has a meaningful non-zero value.
+    recordAppliedOpTime(Timestamp{1000, 1});
+
+    const test_helpers::NsAndUUID collA{
+        .nss = NamespaceString::createNamespaceString_forTest("db", "collA"), .uuid = UUID::gen()};
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp{500, 1}, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    // applied=1000, checkpoint=500 -> lag=500.
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 500);
 }
 
 TEST_F(CheckpointScanMetricsTest, NoCountersFireWhenOplogIsEmpty) {
