@@ -261,8 +261,13 @@ private:
 class SymmetricDecryptorOpenSSL : public SymmetricDecryptor {
 public:
     SymmetricDecryptorOpenSSL(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
-        : _ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free), _mode(mode) {
-        initCipherContext(_ctx.get(), key, mode, iv, EVP_DecryptInit_ex);
+        : _ctx(getThreadLocalCtx()), _mode(mode) {
+        // Safe to share the thread-local CTX because aesDecrypt() creates one decryptor
+        // per call and drives it to completion synchronously — at most one decryptor is
+        // live per thread at any instant. Reset discards any partial state from a prior
+        // call that threw mid-sequence, restoring the invariant of a clean context.
+        EVP_CIPHER_CTX_reset(_ctx);
+        initCipherContext(_ctx, key, mode, iv, EVP_DecryptInit_ex);
     }
 
     StatusWith<std::size_t> update(ConstDataRange in, DataRange out) final {
@@ -274,7 +279,7 @@ public:
         } else {
 
             size_t minimumOutputSize = in.length();
-            size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx.get());
+            size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx);
             if (in.length() % cipherBlockSize) {
                 minimumOutputSize += cipherBlockSize;
             }
@@ -288,7 +293,7 @@ public:
 
         if (1 !=
             EVP_DecryptUpdate(
-                _ctx.get(), out.data<std::uint8_t>(), &len, in.data<std::uint8_t>(), in.length())) {
+                _ctx, out.data<std::uint8_t>(), &len, in.data<std::uint8_t>(), in.length())) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -317,14 +322,14 @@ public:
     StatusWith<std::size_t> finalize(DataRange out) final {
         int len = 0;
 
-        size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx.get());
+        size_t cipherBlockSize = EVP_CIPHER_CTX_block_size(_ctx);
         if (cipherBlockSize > 1 && out.length() < cipherBlockSize) {
             return Status(ErrorCodes::Overflow,
                           str::stream() << "Write buffer too small for Encryptor finalize: "
                                         << static_cast<int>(out.length()));
         }
 
-        if (1 != EVP_DecryptFinal_ex(_ctx.get(), out.data<std::uint8_t>(), &len)) {
+        if (1 != EVP_DecryptFinal_ex(_ctx, out.data<std::uint8_t>(), &len)) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -337,7 +342,7 @@ public:
         if (_mode == aesMode::gcm) {
 #ifdef EVP_CTRL_GCM_GET_TAG
             if (1 !=
-                EVP_CIPHER_CTX_ctrl(_ctx.get(),
+                EVP_CIPHER_CTX_ctrl(_ctx,
                                     EVP_CTRL_GCM_SET_TAG,
                                     tag.length(),
                                     const_cast<std::uint8_t*>(tag.data<std::uint8_t>()))) {
@@ -357,7 +362,15 @@ public:
     }
 
 private:
-    std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> _ctx;
+    // Amortizes the per-decrypt CRYPTO_zalloc / EVP_CIPHER_CTX_free that
+    // dominated the disk-block decrypt path.
+    static EVP_CIPHER_CTX* getThreadLocalCtx() {
+        thread_local const std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx{
+            EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free};
+        return ctx.get();
+    }
+
+    EVP_CIPHER_CTX* _ctx;
     const aesMode _mode;
 };
 

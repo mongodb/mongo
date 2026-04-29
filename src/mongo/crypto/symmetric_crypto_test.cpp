@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/block_packer.h"
 #include "mongo/crypto/symmetric_key.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
@@ -549,6 +550,134 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
 TEST(AES, GCMAdditionalAuthenticatedData) {
     GCMAdditionalAuthenticatedDataHelper(true);
     GCMAdditionalAuthenticatedDataHelper(false);
+}
+
+namespace {
+// One-shot CBC helpers shared by the cipher-context-reuse tests below. Each
+// returns the byte count written into `out`.
+size_t cbcEncrypt(const SymmetricKey& key, ConstDataRange iv, StringData plaintext, DataRange out) {
+    auto encryptor = uassertStatusOK(SymmetricEncryptor::create(key, aesMode::cbc, iv));
+    DataRangeCursor cursor(out);
+    size_t len = uassertStatusOK(encryptor->update({plaintext.data(), plaintext.size()}, cursor));
+    cursor.advance(len);
+    return len + uassertStatusOK(encryptor->finalize(cursor));
+}
+
+size_t cbcDecrypt(const SymmetricKey& key,
+                  ConstDataRange iv,
+                  ConstDataRange cipher,
+                  DataRange out) {
+    auto decryptor = uassertStatusOK(SymmetricDecryptor::create(key, aesMode::cbc, iv));
+    DataRangeCursor cursor(out);
+    size_t len = uassertStatusOK(decryptor->update(cipher, cursor));
+    cursor.advance(len);
+    return len + uassertStatusOK(decryptor->finalize(cursor));
+}
+}  // namespace
+
+// Covers the thread-local EVP_CIPHER_CTX reuse path: the second decryptor's
+// reset must wipe all state from the first decryption.
+TEST(SymmetricDecryptor, SequentialReuseOnSameThread) {
+    SymmetricKey key = crypto::aesGenerate(crypto::sym256KeySize, "SequentialReuseTest");
+    const std::array<std::uint8_t, 16> iv = {};
+
+    constexpr auto kMessageA = "first plaintext"_sd;
+    constexpr auto kMessageB = "second plaintext, slightly longer"_sd;
+
+    std::array<std::uint8_t, 64> cipherA, cipherB;
+    auto cipherALen = cbcEncrypt(key, iv, kMessageA, cipherA);
+    auto cipherBLen = cbcEncrypt(key, iv, kMessageB, cipherB);
+
+    std::array<std::uint8_t, 64> plainA, plainB;
+    auto plainALen = cbcDecrypt(key, iv, {cipherA.data(), cipherALen}, plainA);
+    auto plainBLen = cbcDecrypt(key, iv, {cipherB.data(), cipherBLen}, plainB);
+
+    ASSERT_EQ(StringData(asChar(plainA.data()), plainALen), kMessageA);
+    ASSERT_EQ(StringData(asChar(plainB.data()), plainBLen), kMessageB);
+}
+
+// Verifies the thread-local CTX reset wipes leftover GCM tag/key/IV state from
+// a decryptor whose finalize() failed mid-sequence.
+TEST(SymmetricDecryptor, RecoverAfterFailedDecrypt) {
+    const auto mode = aesMode::gcm;
+    if (!getSupportedSymmetricAlgorithms().count(getStringFromCipherMode(mode))) {
+        return;
+    }
+
+    constexpr auto kKey = "abcdefghijklmnopABCDEFGHIJKLMNOP"_sd;
+    SymmetricKey key = aesGeneratePredictableKey256(kKey, "testID");
+
+    constexpr auto kIV = "FOOBARbazqux"_sd;
+    std::array<std::uint8_t, 12> iv;
+    std::copy(kIV.begin(), kIV.end(), iv.begin());
+
+    constexpr auto kPlaintext = "the quick brown fox"_sd;
+    std::array<std::uint8_t, 64> cipher;
+    size_t cipherLen = 0;
+    std::array<std::uint8_t, 12> tag;
+    {
+        auto encryptor = uassertStatusOK(SymmetricEncryptor::create(key, mode, iv));
+        DataRangeCursor cursor(cipher);
+        cipherLen =
+            uassertStatusOK(encryptor->update({kPlaintext.data(), kPlaintext.size()}, cursor));
+        cursor.advance(cipherLen);
+        cipherLen += uassertStatusOK(encryptor->finalize(cursor));
+        uassertStatusOK(encryptor->finalizeTag(tag));
+    }
+
+    {
+        auto decryptor = uassertStatusOK(SymmetricDecryptor::create(key, mode, iv));
+        auto badTag = tag;
+        badTag[0]++;
+        ASSERT_OK(decryptor->updateTag(badTag));
+        std::array<std::uint8_t, 64> plain;
+        DataRangeCursor cursor(plain);
+        auto size = uassertStatusOK(decryptor->update({cipher.data(), cipherLen}, cursor));
+        cursor.advance(size);
+        ASSERT_NOT_OK(decryptor->finalize(cursor));
+    }
+
+    {
+        auto decryptor = uassertStatusOK(SymmetricDecryptor::create(key, mode, iv));
+        ASSERT_OK(decryptor->updateTag(tag));
+        std::array<std::uint8_t, 64> plain;
+        DataRangeCursor cursor(plain);
+        auto size = uassertStatusOK(decryptor->update({cipher.data(), cipherLen}, cursor));
+        cursor.advance(size);
+        size += uassertStatusOK(decryptor->finalize(cursor));
+        ASSERT_EQ(StringData(asChar(plain.data()), size), kPlaintext);
+    }
+}
+
+// Verifies the thread_local CTX is per-thread, not shared.
+TEST(SymmetricDecryptor, ParallelDecryptOnMultipleThreads) {
+    SymmetricKey key = crypto::aesGenerate(crypto::sym256KeySize, "ParallelDecryptTest");
+    const std::array<std::uint8_t, 16> iv = {};
+
+    constexpr auto kPlaintext = "thread-local cipher context smoke test payload"_sd;
+
+    std::array<std::uint8_t, 64> cipher;
+    auto cipherLen = cbcEncrypt(key, iv, kPlaintext, cipher);
+
+    constexpr int kNumThreads = 8;
+    constexpr int kIterationsPerThread = 32;
+
+    unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
+        std::vector<stdx::thread> threads;
+        threads.reserve(kNumThreads);
+        for (int t = 0; t < kNumThreads; ++t) {
+            threads.emplace_back(monitor.spawn([&] {
+                for (int i = 0; i < kIterationsPerThread; ++i) {
+                    std::array<std::uint8_t, 64> plain;
+                    auto plainLen = cbcDecrypt(key, iv, {cipher.data(), cipherLen}, plain);
+                    ASSERT_EQ(StringData(asChar(plain.data()), plainLen), kPlaintext);
+                }
+            }));
+        }
+        for (auto& thread : threads) {
+            thread.join();
+        }
+    });
 }
 
 class AESTestVectors : public unittest::Test {
