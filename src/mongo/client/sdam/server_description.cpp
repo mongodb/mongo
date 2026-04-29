@@ -46,9 +46,11 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 
@@ -283,6 +285,14 @@ const std::set<HostAndPort>& ServerDescription::getArbiters() const {
 
 const std::map<std::string, std::string>& ServerDescription::getTags() const {
     return _tags;
+}
+
+bool ServerDescription::isInjector() const {
+    if (MONGO_unlikely(serverGlobalParams.configOnly)) {
+        auto it = _tags.find(kProcessTypeTagKey);
+        return it != _tags.end() && it->second == kInjectorTagValue;
+    }
+    return false;
 }
 
 const boost::optional<std::string>& ServerDescription::getSetName() const {

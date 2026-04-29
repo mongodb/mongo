@@ -80,10 +80,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             topologyDescription->findServers([excludedHosts](const ServerDescriptionPtr& s) {
                 auto isPrimaryOrSecondary = (s->getType() == ServerType::kRSPrimary ||
                                              s->getType() == ServerType::kRSSecondary);
-                auto isNotExcluded =
-                    (std::find(excludedHosts.begin(), excludedHosts.end(), s->getAddress()) ==
-                     excludedHosts.end());
-                return (isPrimaryOrSecondary && isNotExcluded);
+                return isPrimaryOrSecondary && passesExclusionFilters(excludedHosts, s);
             });
 
         auto beginIt = eligibleServers.begin();

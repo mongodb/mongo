@@ -17,7 +17,7 @@ const fixture = new StandbyClusterTestFixture({
     name: "mongos_start_with_standby_config",
     shards: 1,
     rs: {nodes: 1},
-    config: {nodes: 1},
+    config: 3,
     keyFile: KEY_FILE,
 });
 

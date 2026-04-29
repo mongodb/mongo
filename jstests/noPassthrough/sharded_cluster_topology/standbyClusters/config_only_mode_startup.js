@@ -18,7 +18,7 @@ describe("config-only mode startup", function () {
             name: "config_only_mode_startup",
             shards: 1,
             rs: {nodes: 1},
-            config: {nodes: 1},
+            config: 3,
         });
         this.fixture.transitionToStandby();
         this.rs = this.fixture.standbyRS;
