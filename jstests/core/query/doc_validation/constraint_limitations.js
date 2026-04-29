@@ -1,24 +1,26 @@
 /**
- * Test that constraints on collections with validation level 'validated' are correctly enforced.
+ * Test that constraints on collections with validation level 'constraint' are correctly enforced.
  *
  * @tags: [
- *   # 'validated' level was introduced in 8.3.
+ *   # 'constraint' level was introduced in 8.3.
  *   requires_fcv_83,
- *   featureFlagValidatedValidationLevel,
+ *   featureFlagConstraintValidationLevel,
  * ]
  */
 
-const dbName = "validated_tests";
+const dbName = "constraint_tests";
 const collName = "test";
-const validator = {a: {$exists: true}};
+const validator = {
+    a: {$exists: true},
+};
 const myDb = db.getSiblingDB(dbName);
 
-function createValidatedCollection() {
+function createConstraintCollection() {
     myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(
         myDb.createCollection(collName, {
             validator: validator,
-            validationLevel: "validated",
+            validationLevel: "constraint",
             validationAction: "error",
             writeConcern: {w: "majority"},
         }),
@@ -30,13 +32,13 @@ function validationActionMustNotBeWarn() {
     assert.commandFailed(
         myDb.createCollection(collName, {
             validator: validator,
-            validationLevel: "validated",
+            validationLevel: "constraint",
             validationAction: "warn",
             writeConcern: {w: "majority"},
         }),
     );
 
-    createValidatedCollection();
+    createConstraintCollection();
     assert.commandFailed(myDb.runCommand({"collMod": collName, validationAction: "warn"}));
     assert.commandWorked(myDb.runCommand({"collMod": collName, validationAction: "errorAndLog"}));
 
@@ -75,14 +77,14 @@ function validationActionMustNotBeWarn() {
     assert.commandWorked(myDb.runCommand({"collMod": collName, validationAction: "warn"}));
 }
 
-function noValidatedOnExisting() {
+function noConstraintOnExisting() {
     myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(myDb.createCollection(collName, {writeConcern: {w: "majority"}}));
     assert.commandFailed(
         myDb.runCommand({
             "collMod": collName,
             validator: validator,
-            validationLevel: "validated",
+            validationLevel: "constraint",
             validationAction: "error",
             writeConcern: {w: "majority"},
         }),
@@ -90,7 +92,7 @@ function noValidatedOnExisting() {
     assert.commandFailed(
         myDb.runCommand({
             "collMod": collName,
-            validationLevel: "validated",
+            validationLevel: "constraint",
             validationAction: "warn",
             writeConcern: {w: "majority"},
         }),
@@ -98,14 +100,14 @@ function noValidatedOnExisting() {
     assert.commandFailed(
         myDb.runCommand({
             "collMod": collName,
-            validationLevel: "validated",
+            validationLevel: "constraint",
             writeConcern: {w: "majority"},
         }),
     );
 }
 
 function noSchemaRuleChanges() {
-    createValidatedCollection();
+    createConstraintCollection();
     assert.commandFailed(
         myDb.runCommand({"collMod": collName, writeConcern: {w: "majority"}, validator: {b: {$exists: true}}}),
     );
@@ -120,8 +122,8 @@ function noSchemaRuleChanges() {
     );
 }
 
-function downgradeValidatedToStrict() {
-    createValidatedCollection();
+function downgradeConstraintToStrict() {
+    createConstraintCollection();
     assert.commandWorked(
         myDb.runCommand({
             "collMod": collName,
@@ -132,7 +134,7 @@ function downgradeValidatedToStrict() {
 }
 
 function noNonConformingDocs() {
-    createValidatedCollection();
+    createConstraintCollection();
     assert.commandFailed(
         myDb.runCommand({
             insert: collName,
@@ -143,8 +145,8 @@ function noNonConformingDocs() {
 }
 
 function noBypassDocValidation() {
-    createValidatedCollection();
-    // conforming doc (bypassDocumentValidation:true always fails on validated collections)
+    createConstraintCollection();
+    // conforming doc (bypassDocumentValidation:true always fails with constraint validationLevel)
     assert.commandFailed(
         myDb.runCommand({
             insert: collName,
@@ -184,11 +186,11 @@ function noBypassDocValidation() {
 }
 
 validationActionMustNotBeWarn();
-downgradeValidatedToStrict();
+downgradeConstraintToStrict();
 noSchemaRuleChanges();
-noValidatedOnExisting();
+noConstraintOnExisting();
 noNonConformingDocs();
 noBypassDocValidation();
 
-// avoid downgrade problems (validated collections can't be downgraded)
+// avoid downgrade problems (collections with constraint validationLevel can't be downgraded)
 myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});

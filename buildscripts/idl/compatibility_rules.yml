@@ -291,6 +291,13 @@ ALLOW_FIELD_VALUE_REMOVAL_LIST:
   # so it does not represent a real compatiblity change.
   explain_param_verbosity_type_Verbosity:
     - "kQueryPlannerDebug"
+  # The 'validated' validation level was renamed to 'constraint' in 9.0, but it was always gated
+  # behind a feature flag and never available to users prior to that, so it does not represent a
+  # real compatibility change.
+  create_param_validationLevel_type_ValidationLevel:
+    - "validated"
+  collMod_param_validationLevel_type_ValidationLevel:
+    - "validated"
 
 CHANGED_ACCESS_CHECKS_TYPE:
   # Changed access checks of update command from 'simple' to 'complex' in 8.1.

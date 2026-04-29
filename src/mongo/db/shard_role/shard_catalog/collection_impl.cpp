@@ -571,10 +571,12 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     }
 
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
-        if (_metadata->options.validationLevel == ValidationLevelEnum::validated) {
-            return {SchemaValidationResult::kError,
-                    Status(ErrorCodes::BadValue,
-                           "bypassDocumentValidation is not permitted on 'validated' collections")};
+        if (_metadata->options.validationLevel == ValidationLevelEnum::constraint) {
+            return {
+                SchemaValidationResult::kError,
+                Status(
+                    ErrorCodes::BadValue,
+                    "bypassDocumentValidation is not permitted with 'constraint' validationLevel")};
         } else {
             return {SchemaValidationResult::kPass, Status::OK()};
         }
@@ -607,8 +609,8 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     switch (validationActionOrDefault(_metadata->options.validationAction)) {
         case ValidationActionEnum::warn:
             if (validationLevelOrDefault(_metadata->options.validationLevel) ==
-                ValidationLevelEnum::validated) {
-                // Warn is prohibited for validated collections
+                ValidationLevelEnum::constraint) {
+                // Warn is prohibited for constraint validationLevel.
                 return {SchemaValidationResult::kError, status};
             }
             return {SchemaValidationResult::kWarn, status};
@@ -1249,9 +1251,9 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
 
     auto validationLevel = validationLevelOrCurrent(_metadata->options, newLevel);
-    if (validationLevel == ValidationLevelEnum::validated) {
+    if (validationLevel == ValidationLevelEnum::constraint) {
         return Status(ErrorCodes::BadValue,
-                      "Validator can not be changed on 'validated' collections");
+                      "Validator can not be changed with 'constraint' validationLevel");
     }
     tassert(11738200,
             fmt::format("Illegal attempt to set a non-empty validator on viewless timeseries "
