@@ -263,10 +263,7 @@ class _AddRemoveShardThread(threading.Thread):
                 self.logger.info(f"Waiting {wait_secs} seconds before " + msg)
                 self.__lifecycle.wait_for_action_interval(wait_secs)
 
-                succeeded = self._transition_to_dedicated_or_remove_shard(shard_id)
-                if not succeeded:
-                    # The transition failed with a retryable error, so loop around and try again.
-                    continue
+                self._transition_to_dedicated_or_remove_shard(shard_id)
 
                 shard_obj = None
                 removed_shard_fixture = None
@@ -492,13 +489,13 @@ class _AddRemoveShardThread(threading.Thread):
         return False
 
     def _decomission_removed_shard(self, shard_obj):
-        start_time = time.time()
+        start_time = time.monotonic()
 
         direct_shard_conn = pymongo.MongoClient(shard_obj.get_driver_connection_url())
 
         with shard_obj.removeshard_teardown_mutex:
             while True:
-                if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
+                if time.monotonic() - start_time > self.TRANSITION_TIMEOUT_SECS:
                     msg = "Timed out waiting for removed shard to finish data clean up"
                     self.logger.error(msg)
                     raise errors.ServerFailure(msg)
@@ -810,7 +807,7 @@ class _AddRemoveShardThread(threading.Thread):
             self.logger.info("Starting removal of " + shard_id)
 
         res = None
-        start_time = time.time()
+        start_time = time.monotonic()
         last_balancer_status = None
         prev_round_interrupted = False
         num_draining_rounds = -1
@@ -829,13 +826,13 @@ class _AddRemoveShardThread(threading.Thread):
 
                 if res["state"] == "completed":
                     self.logger.info(
-                        "Completed " + msg + " in %0d ms", (time.time() - start_time) * 1000
+                        "Completed " + msg + " in %0d ms", (time.monotonic() - start_time) * 1000
                     )
                     return True
 
                 # Check whether the transition timeout has elapsed. Performing the check at this point
                 # ensures that the most updated transition state is logged if the timeout is reached.
-                if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
+                if time.monotonic() - start_time > self.TRANSITION_TIMEOUT_SECS:
                     msg = "Could not " + msg + " with last response: " + str(res)
                     self.logger.error(msg)
                     self._dump_stacks_on_timeout(msg)
@@ -856,7 +853,8 @@ class _AddRemoveShardThread(threading.Thread):
                 if err.code in [self._ILLEGAL_OPERATION] and "would remove the last shard" in str(
                     err
                 ):
-                    # Abort the transition attempt and make the hook try again later.
+                    # Signal to the caller that the transition could not proceed yet.
+                    # The caller (_transition_to_dedicated_or_remove_shard) will retry.
                     return False
 
                 # Some suites run with forced failovers, if transitioning fails with a retryable
@@ -904,7 +902,7 @@ class _AddRemoveShardThread(threading.Thread):
                             "Did not find entry for "
                             + shard_id
                             + " in config.shards after detecting a "
-                            "change in repl set term or after transition was interrutped. Assuming "
+                            "change in repl set term or after transition was interrupted. Assuming "
                             + msg
                             + " finished on previous transition request."
                         )
@@ -916,9 +914,9 @@ class _AddRemoveShardThread(threading.Thread):
                 prev_round_interrupted = True
                 self.logger.info("Ignoring error when " + msg + " : " + str(err))
 
-    def _check_new_api_timeout(self, start_time, step_name, shard_id=None):
+    def _check_transition_timeout(self, start_time, step_name, shard_id=None):
         """Raise ServerFailure if transition timeout exceeded. step_name and shard_id used for log."""
-        if time.time() - start_time <= self.TRANSITION_TIMEOUT_SECS:
+        if time.monotonic() - start_time <= self.TRANSITION_TIMEOUT_SECS:
             return
         msg = f"Timed out during {step_name}" + (
             f" for {shard_id}" if shard_id and shard_id != "config" else ""
@@ -994,7 +992,7 @@ class _AddRemoveShardThread(threading.Thread):
     def _execute_phase_command(self, command, cmd_name, shard_id, start_time, **error_flags):
         """Execute a single-shot command phase (start or commit) with retry logic."""
         while True:
-            self._check_new_api_timeout(start_time, cmd_name, shard_id)
+            self._check_transition_timeout(start_time, cmd_name, shard_id)
             try:
                 self._client.admin.command(command)
                 return None
@@ -1036,7 +1034,7 @@ class _AddRemoveShardThread(threading.Thread):
         else:
             self.logger.info("Starting removal of " + shard_id + " (new API)")
 
-        start_time = time.time()
+        start_time = time.monotonic()
 
         # Step 1: start draining
         cmd_name = next(iter(commands["start"]))
@@ -1051,7 +1049,7 @@ class _AddRemoveShardThread(threading.Thread):
         cmd_name = next(iter(commands["status"]))
         num_draining_rounds = 0
         while True:
-            self._check_new_api_timeout(start_time, cmd_name, shard_id)
+            self._check_transition_timeout(start_time, cmd_name, shard_id)
             try:
                 res = self._client.admin.command(commands["status"])
                 if "state" in res and res["state"] == "drainingComplete":
@@ -1091,14 +1089,33 @@ class _AddRemoveShardThread(threading.Thread):
         return True
 
     def _transition_to_dedicated_or_remove_shard(self, shard_id):
-        """Choose between old and new API based on use_new_api flag."""
-        # Adds random choice to use new API or old API
-        use_new_api = self._is_fcv_at_least("8.3") and random.random() > 0.5
+        """Choose between old and new API based on use_new_api flag.
 
-        if use_new_api:
-            return self._transition_to_dedicated_or_remove_shard_new_api(shard_id)
-        else:
-            return self._transition_to_dedicated_or_remove_shard_old_api(shard_id)
+        Retries until the transition succeeds or TRANSITION_TIMEOUT_SECS is exceeded, so that
+        the hook stays committed to completing the full remove-add cycle. This ensures the hook
+        cannot silently loop across test boundaries while stuck on a transient condition such as
+        being asked to remove the last shard.
+        """
+        # Pick the API once for this transition attempt so we don't switch mid-retry.
+        use_new_api = self._is_fcv_at_least("8.3") and random.random() > 0.5
+        start_time = time.monotonic()
+        while True:
+            if use_new_api:
+                succeeded = self._transition_to_dedicated_or_remove_shard_new_api(shard_id)
+            else:
+                succeeded = self._transition_to_dedicated_or_remove_shard_old_api(shard_id)
+
+            if succeeded:
+                return
+
+            # The transition returned False because it would remove the last shard; retry in
+            # case another shard has since been added. Bound the total wait with the standard
+            # timeout.
+            self._check_transition_timeout(start_time, "remove/transition shard", shard_id)
+            self.logger.info(
+                f"Remove/transition attempt for {shard_id} could not proceed yet, retrying."
+            )
+            time.sleep(1)
 
     def _transition_to_config_shard_or_add_shard(self, shard_id, shard_host):
         if shard_id == "config":
@@ -1106,11 +1123,13 @@ class _AddRemoveShardThread(threading.Thread):
         else:
             self.logger.info("Starting to add shard " + shard_id)
 
-        start_time = time.time()
+        start_time = time.monotonic()
 
         msg = "transitioning from dedicated" if shard_id == "config" else "adding shard"
 
         while True:
+            # Ensure the hook doesn't get stuck in a silent retry loop.
+            self._check_transition_timeout(start_time, msg, shard_id)
             try:
                 if shard_id == "config":
                     self._client.admin.command({"transitionFromDedicatedConfigServer": 1})
@@ -1124,7 +1143,7 @@ class _AddRemoveShardThread(threading.Thread):
                     self._shard_name_suffix = self._shard_name_suffix + 1
 
                 self.logger.info(
-                    "Completed " + msg + " in %0d ms", (time.time() - start_time) * 1000
+                    "Completed " + msg + " in %0d ms", (time.monotonic() - start_time) * 1000
                 )
                 return
             except pymongo.errors.AutoReconnect:
@@ -1213,7 +1232,12 @@ class _AddRemoveShardThread(threading.Thread):
         return res[0]["num_ongoing_txns"] if res else 0
 
     def _run_post_remove_shard_checks(self, removed_shard_fixture, removed_shard_name):
+        start_time = time.monotonic()
         while True:
+            # Ensure the hook doesn't get stuck in a silent retry loop.
+            self._check_transition_timeout(
+                start_time, "post-remove-shard checks", removed_shard_name
+            )
             try:
                 # Configsvr metadata checks:
                 ## Check that the removed shard no longer exists on config.shards.

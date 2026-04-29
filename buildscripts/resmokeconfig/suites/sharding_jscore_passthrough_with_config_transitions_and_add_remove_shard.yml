@@ -10,6 +10,7 @@ selector:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js
     - jstests/fle2/**/*.js
+    - jstests/libs/sharded_cluster_topology/continuous_add_remove_shard_suite_selftest.js
     # TODO SERVER-124527 Reenable these tests
     # - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
