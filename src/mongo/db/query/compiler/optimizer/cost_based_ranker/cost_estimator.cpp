@@ -303,7 +303,12 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             auto skipNode = static_cast<const SkipNode*>(node);
             auto skipCE = CardinalityEstimate{CardinalityType{static_cast<double>(skipNode->skip)},
                                               EstimationSource::Metadata};
-            auto adjSkipCE = std::min(skipCE, inCE);
+            // < must be used instead of std::min() because std::min() returns the first argument if
+            // it is <= the second argument. CardinalityEstimate overloads these operators with an
+            // approximate implementation of equality, which can lead to a tassert due to a negative
+            // value during the subtraction operation below.
+            auto adjSkipCE = skipCE < inCE ? skipCE : inCE;
+
             auto passCE = inCE - adjSkipCE;
             nodeCost += skipIncrement * adjSkipCE + passIncrement * passCE;
             break;
