@@ -62,8 +62,9 @@ export class StandbyClusterTestFixture {
     /**
      * Transitions the fixture into a standby cluster simulation:
      *  1. Stops all mongos processes.
-     *  2. Stops all shard replica sets (data cleaned up).
-     *  3. Stops the config server replica set (data preserved).
+     *  2. Stops all shard replica sets (data cleaned up). In embedded config server mode,
+     *     the config shard (shard 0) is stopped last with its data preserved.
+     *  3. If not in embedded config server mode, stops the config server RS (data preserved).
      *  4. For each config server node: starts it as a standalone on its old port, rewrites
      *     local.system.replset to use the new ports and remove configsvr, then shuts it down.
      *  5. Starts all nodes back up as a new "standby" replica set on the fresh ports.
@@ -78,13 +79,23 @@ export class StandbyClusterTestFixture {
         // Stop all mongos processes.
         this.st.stopAllMongos();
 
-        // Stop all shards (we don't need them anymore, data can be cleaned).
-        // TODO (SERVER-123326): handle the embedded config server case to ensure we don't clear up
-        // the config server without preserving data on disk.
-        this.st.stopAllShards();
+        if (this.st.isConfigShardMode) {
+            // In embedded config server mode one of the shards is the config server. Stop the non-config
+            // shards first (allowing data cleanup), then stop the config shard while preserving
+            // its data on disk.
+            for (const rs of this.st._rs) {
+                if (rs.test !== configRS) {
+                    rs.test.stopSet();
+                }
+            }
+            configRS.stopSet(undefined, undefined, {noCleanData: true});
+        } else {
+            // Stop all shards (we don't need them anymore, data can be cleaned).
+            this.st.stopAllShards();
 
-        // Stop config server RS, preserving data on disk.
-        this.st.stopAllConfigServers({noCleanData: true});
+            // Stop config server RS, preserving data on disk.
+            this.st.stopAllConfigServers({noCleanData: true});
+        }
 
         // Snapshot dbPaths before nodes are shut down.
         const dbPaths = Array.from({length: numNodes}, (_, i) => configRS.getDbPath(i));
@@ -190,7 +201,9 @@ export class StandbyClusterTestFixture {
         // Start a mongosentry on every retired port (old shard ports and old config server ports).
         // Any traffic to these ports indicates a bug - the sentry will invariant if it receives a
         // MongoDB wire protocol message.
-        const retiredPorts = [...shardPorts, ...oldPorts];
+        // In config shard mode, shardPorts already includes the config server ports (since shard 0
+        // IS the config server), so we deduplicate to avoid binding sentries to the same port.
+        const retiredPorts = [...new Set([...shardPorts, ...oldPorts])];
         this._sentries = retiredPorts.map((port) => {
             const pid = _startMongoProgram("mongosentry", "--port", port.toString());
             return {pid, port};
