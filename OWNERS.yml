@@ -107,3 +107,6 @@ filters:
   - ".bazelrc.fuzztest":
     approvers:
       - 10gen/platsec-server
+  - ".bazelrc.target_mongo_version":
+    approvers:
+      - 10gen/server-release
