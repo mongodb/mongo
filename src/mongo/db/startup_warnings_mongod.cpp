@@ -46,9 +46,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/config.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/startup_warnings_common.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/errno_util.h"
@@ -563,6 +565,19 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                       {logv2::LogTag::kStartupWarnings},
                       "Running with --magicRestore. This should only be used when restoring from a "
                       "backup using magic restore.");
+    }
+
+    if (static_cast<long long>(gTimeseriesBucketMinCount + 1) * BSONObjMaxUserSize >
+        bsonMaxExpandedMemUsage.load()) {
+        LOGV2_OPTIONS(
+            11761701,
+            {logv2::LogTag::kStartupWarnings},
+            "Configuration of 'timeseriesBucketMinCount' combined with 'bsonMaxExpandedMemUsage' "
+            "risks timeseries collections not being restorable or migratable. Either decrease "
+            "'timeseriesBucketMinCount' or increase 'bsonMaxExpandedMemUsage' to ensure that "
+            "internal buckets do not exceed expanded memory usage.",
+            "timeseriesBucketMinCount"_attr = gTimeseriesBucketMinCount,
+            "bsonMaxExpandedMemUsage"_attr = bsonMaxExpandedMemUsage.load());
     }
 }
 

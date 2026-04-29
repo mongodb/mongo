@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/util/modules.h"
 
 #include <boost/container/small_vector.hpp>
