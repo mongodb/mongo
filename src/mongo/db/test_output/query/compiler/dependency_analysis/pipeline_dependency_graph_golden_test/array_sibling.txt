@@ -1,0 +1,80 @@
+VARIATION ArraySibling
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": [
+                    {
+                        "b": {
+                            "$const": 99
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$set": {
+                "a": {
+                    "c": {
+                        "$const": 1
+                    }
+                }
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "a:3": {
+                    "declaringScope": "scope:1",
+                    "scope:2": {
+                        "exhaustiveScope": "scope:2",
+                        "fields": {
+                            "<missing>:4": {
+                                "declaringScope": "scope:2",
+                                "dependencies": []
+                            },
+                            "c:5": {
+                                "declaringScope": "scope:2",
+                                "metadata": {
+                                    "array": false
+                                },
+                                "dependencies": []
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "c:5"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "a:1"
+        ]
+    }
+}
+

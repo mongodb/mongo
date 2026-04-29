@@ -1796,5 +1796,32 @@ TEST_F(PipelineDependencyGraphTest, TruncateWithSwappedStages) {
     ASSERT_DOES_NOT_THROW(graph->resize(container.end()));
 }
 
+TEST_F(PipelineDependencyGraphTest, ArrayLeafSiblingRedeclared) {
+    pathArrayness->addPath("a.b", {}, true);
+    setPipeline(
+        "[{$set: {a: [{b: 99}]}},"
+        " {$set: {'a.c': 1}}]");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[0].get(), "a"));
+        ASSERT_FALSE(graph->canPathBeArray(stages[0].get(), "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, LeafRedeclaredAsDottedPath) {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {'a.b.c': 1}}]");
+
+    runTest([&] {
+        // Before stage 1: 'a.unknown' is shadowed by a:1, declared by stage 0.
+        ASSERT_EQUALS(graph->getDeclaringStage(stages[1].get(), "a.unknown"), stages[0]);
+        // After stage 1: 'a.unknown' is now attributed to stage 1.
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.unknown"), stages[1]);
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

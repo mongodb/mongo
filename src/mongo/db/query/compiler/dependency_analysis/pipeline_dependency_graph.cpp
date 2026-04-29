@@ -756,13 +756,16 @@ private:
             newBaseField = _fields.append(Field{scope, embeddedScope});
             auto parentEmbeddedScope =
                 existingBaseField ? _fields[existingBaseField].embeddedScope : ScopeId::none();
-            // We should only set the exhaustiveScope as ScopeId::none() if we can verify the field
-            // comes from the document and cannot be modified elsewhere. If baseField ==
-            // FieldId::none(), it comes from the document. If baseField == <missing>, it is
-            // modified by the scope definining it.
+            // Where unknown subfields originate:
+            //  - no previous field -> base collection.
+            //  - previous field's scope is exhaustive -> inherit it.
+            //  - previous field is a leaf in a non-exhaustive scope -> this new scope.
             auto exhaustiveEmbeddedScope = existingBaseField
                 ? _scopes[_fields[existingBaseField].declaringScope].exhaustiveScope
                 : ScopeId::none();
+            if (existingBaseField && !parentEmbeddedScope && !exhaustiveEmbeddedScope) {
+                exhaustiveEmbeddedScope = embeddedScope;
+            }
             if (parentEmbeddedScope) {
                 // The new field depends on the previous field, since it inherits paths.
                 _fields[newBaseField].dependencies.insert(existingBaseField);

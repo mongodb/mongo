@@ -121,7 +121,7 @@ output: {
                 "a:7": {
                     "declaringScope": "scope:2",
                     "scope:3": {
-                        "exhaustiveScope": "scope:-1",
+                        "exhaustiveScope": "scope:3",
                         "fields": {
                             "<missing>:8": {
                                 "declaringScope": "scope:3",
@@ -154,7 +154,7 @@ output: {
                 "b:11": {
                     "declaringScope": "scope:2",
                     "scope:4": {
-                        "exhaustiveScope": "scope:-1",
+                        "exhaustiveScope": "scope:4",
                         "fields": {
                             "<missing>:12": {
                                 "declaringScope": "scope:4",
@@ -163,7 +163,7 @@ output: {
                             "b:13": {
                                 "declaringScope": "scope:4",
                                 "scope:5": {
-                                    "exhaustiveScope": "scope:-1",
+                                    "exhaustiveScope": "scope:4",
                                     "fields": {
                                         "<missing>:14": {
                                             "declaringScope": "scope:5",
@@ -226,7 +226,7 @@ output: {
                             "b:20": {
                                 "declaringScope": "scope:7",
                                 "scope:8": {
-                                    "exhaustiveScope": "scope:-1",
+                                    "exhaustiveScope": "scope:3",
                                     "fields": {
                                         "<missing>:21": {
                                             "declaringScope": "scope:8",

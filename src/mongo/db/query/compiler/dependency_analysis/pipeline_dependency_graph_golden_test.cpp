@@ -461,6 +461,15 @@ TEST_F(PipelineDependencyGraphGoldenTest, NonExpressionModificationDependencies)
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, RedeclaredArraySibling) {
+    runVariation({
+        .name = "RedeclaredArraySibling",
+        .pipeline = "[{$set: {a: [{b: 99}]}},"
+                    " {$set: {'a.c': 1}},"
+                    " {$match: {'a.b': 1}}]",
+    });
+}
+
 TEST_F(PipelineDependencyGraphGoldenTest, ExpressionWholeDocumentDependencyInLaterStage) {
     runVariation({
         .name = "ExpressionWholeDocumentDependencyInLaterStage",
