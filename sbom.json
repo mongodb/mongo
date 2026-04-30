@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:7f691d0b-ee37-4e49-9bf2-b8f19ec04144",
-  "version": 1,
+  "version": 2,
   "metadata": {
-    "timestamp": "2026-04-01T06:29:09Z",
+    "timestamp": "2026-04-21T15:57:03Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.870"
+          "version": "v1.7.932"
         }
       ]
     }
@@ -2232,11 +2232,11 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/veorq/siphash@eee7d0d84dc7731df2359b243aa5e75d85f6eaef",
+      "bom-ref": "pkg:github/veorq/siphash@32d067603b93b47828700880649198e0bfbbcffa",
       "author": "Jean-Philippe Aumasson, Daniel J. Bernstein",
       "group": "veorq",
       "name": "siphash",
-      "version": "eee7d0d84dc7731df2359b243aa5e75d85f6eaef",
+      "version": "32d067603b93b47828700880649198e0bfbbcffa",
       "description": "High-speed secure pseudorandom function for short messages",
       "scope": "required",
       "licenses": [
@@ -2257,7 +2257,7 @@
         }
       ],
       "copyright": "This code is copyright (c) 2014-2023 Jean-Philippe Aumasson, Daniel J. Bernstein.",
-      "purl": "pkg:github/veorq/siphash@eee7d0d84dc7731df2359b243aa5e75d85f6eaef",
+      "purl": "pkg:github/veorq/siphash@32d067603b93b47828700880649198e0bfbbcffa",
       "externalReferences": [
         {
           "url": "https://github.com/veorq/siphash/",
@@ -2601,7 +2601,7 @@
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
         "pkg:github/snowballstem/snowball@1.0.0",
         "pkg:github/unicode-org/icu@icu-release-57-1",
-        "pkg:github/veorq/siphash@eee7d0d84dc7731df2359b243aa5e75d85f6eaef",
+        "pkg:github/veorq/siphash@32d067603b93b47828700880649198e0bfbbcffa",
         "pkg:github/wiredtiger/wiredtiger@12.0.0",
         "pkg:pypi/ocspbuilder@0.10.2",
         "pkg:pypi/ocspresponder@0.5.0"
@@ -2648,7 +2648,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/veorq/siphash@eee7d0d84dc7731df2359b243aa5e75d85f6eaef",
+      "ref": "pkg:github/veorq/siphash@32d067603b93b47828700880649198e0bfbbcffa",
       "dependsOn": []
     },
     {

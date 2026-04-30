@@ -63,6 +63,92 @@
   "components": [
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/monguard@{{VERSION}}",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "group": "10gen",
+      "name": "monguard",
+      "version": "{{VERSION}}",
+      "description": "A pingora-based proxy for MongoDB, focusing on hardening against malicious pre-auth external clients.",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "name": "Internal Use Only"
+          }
+        }
+      ],
+      "copyright": "MongoDB, Inc.",
+      "purl": "pkg:cargo/monguard@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/10gen/mongo/tree/master/monguard",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "monguard/"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:private",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/tracing-logv2@{{VERSION}}",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "group": "10gen",
+      "name": "tracing-logv2",
+      "version": "{{VERSION}}",
+      "description": "logV2 structured logging for monguard",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "name": "Internal Use Only"
+          }
+        }
+      ],
+      "copyright": "MongoDB, Inc.",
+      "purl": "pkg:cargo/tracing-logv2@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/10gen/mongo/tree/master/monguard/src/tracing-logv2",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "monguard/src/tracing-logv2"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:private",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:deb/debian/firefox-esr@{{VERSION}}-1?arch=source",
       "supplier": {
         "name": "Mozilla Corporation",
@@ -1995,54 +2081,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/json-c/json-c@{{VERSION}}",
-      "supplier": {
-        "name": "json-c project",
-        "url": [
-          "https://github.com/json-c/json-c"
-        ]
-      },
-      "author": "Eric Haszlakiewicz",
-      "group": "json-c",
-      "name": "json-c",
-      "version": "{{VERSION}}",
-      "description": "A JSON implementation in C.",
-      "scope": "required",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2009-2012 Eric Haszlakiewicz; Copyright (c) 2004, 2005 Metaparadigm Pte Ltd",
-      "purl": "pkg:github/json-c/json-c@{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/json-c/json-c",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/json-c"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/json-c/scripts/import.sh"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
       "supplier": {
         "name": "JSON Schema",
@@ -2164,54 +2202,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}",
-      "supplier": {
-        "name": "bzip2 project",
-        "url": [
-          "https://sourceware.org/bzip2/"
-        ]
-      },
-      "author": "Julian Seward",
-      "group": "libarchive",
-      "name": "bzip2",
-      "version": "{{VERSION}}",
-      "description": "A high-quality data compression program and library.",
-      "scope": "required",
-      "licenses": [
-        {
-          "license": {
-            "id": "bzip2-1.0.6"
-          }
-        }
-      ],
-      "copyright": "Copyright (C) 1996-2010 Julian Seward <jseward@acm.org>; Copyright (C) 2019-2020 Federico Mena Quintero <federico@gnome.org>; Copyright (C) 2021 Micah Snyder.",
-      "purl": "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/libarchive/bzip2",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/bzip2"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/bzip2/scripts/import.sh"
         }
       ]
     },
@@ -2800,64 +2790,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/rnpgp/rnp@{{VERSION}}",
-      "supplier": {
-        "name": "Ribose Group Inc.",
-        "url": [
-          "https://www.rnpgp.org/"
-        ]
-      },
-      "author": "Ribose Group Inc.",
-      "group": "rnpgp",
-      "name": "rnp",
-      "version": "{{VERSION}}",
-      "description": "A high performance C++ OpenPGP library, fully compliant to RFC 4880.",
-      "scope": "required",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-2-Clause"
-          }
-        },
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        },
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2017-2024, Ribose Inc. All rights reserved.",
-      "purl": "pkg:github/rnpgp/rnp@{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/rnpgp/rnp",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/rnp"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/rnp/scripts/import.sh"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/roaringbitmap/croaring@{{VERSION}}",
       "supplier": {
         "name": "Roaring Bitmaps",
@@ -3268,6 +3200,49 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:maven/com.mongodb.streams/aspio@{{VERSION}}",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "group": "com.mongodb.streams",
+      "name": "aspio (Mongostream External IO)",
+      "version": "{{VERSION}}",
+      "description": "The External IO module allows Mongostream to interact with external data sources and sinks through a standardized gRPC interface. It provides bidirectional streaming capabilities to transfer data between Mongostream and external systems.",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "name": "Internal Use Only"
+          }
+        }
+      ],
+      "copyright": "MongoDB, Inc.",
+      "purl": "pkg:maven/com.mongodb.streams/aspio@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/10gen/mongo/tree/master/src/mongo/db/modules/enterprise/src/streams/aspio",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/mongo/db/modules/enterprise/src/streams/aspio"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:private",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:pypi/ocspbuilder@0.10.2",
       "author": "Will Bond",
       "group": "wbond",
@@ -3510,19 +3485,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/json-c/json-c@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
       "dependsOn": []
     },
     {
       "ref": "pkg:github/jupp0r/prometheus-cpp@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -3606,7 +3573,6 @@
         "pkg:github/open-telemetry/opentelemetry-proto@{{VERSION}}",
         "pkg:github/pcre2project/pcre2@{{VERSION}}",
         "pkg:github/protocolbuffers/protobuf@{{VERSION}}",
-        "pkg:github/rnpgp/rnp@{{VERSION}}",
         "pkg:github/roaringbitmap/croaring@{{VERSION}}",
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
         "pkg:github/snowballstem/snowball@{{VERSION}}",
@@ -3640,13 +3606,6 @@
     {
       "ref": "pkg:github/protocolbuffers/protobuf@{{VERSION}}",
       "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/rnpgp/rnp@{{VERSION}}",
-      "dependsOn": [
-        "pkg:github/json-c/json-c@{{VERSION}}",
-        "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}"
-      ]
     },
     {
       "ref": "pkg:github/roaringbitmap/croaring@{{VERSION}}",

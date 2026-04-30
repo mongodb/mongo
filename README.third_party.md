@@ -60,7 +60,7 @@ a notice will be included in
 | [re2]                                                | BSD-3-Clause                                   | 2025-08-05                               |                      | ✗                               |
 | [S2 Geometry Library]                                | Apache-2.0                                     | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
 | [SafeInt]                                            | MIT                                            | 3.0.28a                                  |                      | ✗                               |
-| [siphash]                                            | CC0-1.0, MIT, Apache 2.0 with LLVM exception   | eee7d0d84dc7731df2359b243aa5e75d85f6eaef |                      | ✗                               |
+| [siphash]                                            | CC0-1.0, MIT, Apache 2.0 with LLVM exception   | 32d067603b93b47828700880649198e0bfbbcffa |                      | ✗                               |
 | [snappy]                                             | BSD-3-Clause                                   | 1.1.10                                   | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                                   | 1.0.0                                    | ✗                    | ✗                               |
 | [tcmalloc]                                           | Apache-2.0                                     | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
