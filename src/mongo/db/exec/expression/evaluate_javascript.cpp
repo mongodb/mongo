@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/make_js_function.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -125,21 +126,21 @@ BSONObj emitFromJS(const BSONObj& args, void* data) {
     BSONElement elts[2];
     extract2Args(args, elts);
 
-    auto emitState = static_cast<EmitState*>(data);
-    uassert(9712400, "Misplaced call to 'emit'", emitState);
+    auto** emitState = static_cast<EmitState**>(data);
+    uassert(9712400, "Misplaced call to 'emit'", emitState && *emitState);
+
+    MutableDocument md;
     if (elts[0].type() == BSONType::undefined) {
-        MutableDocument md;
         // Note: Using MutableDocument::addField() is considerably faster than using
         // MutableDocument::setField() or building a document by hand with the DOC() macros.
         md.addField("k", Value(BSONNULL));
         md.addField("v", Value(elts[1]));
-        emitState->emit(md.freeze());
     } else {
-        MutableDocument md;
         md.addField("k", Value(elts[0]));
         md.addField("v", Value(elts[1]));
-        emitState->emit(md.freeze());
     }
+
+    (*emitState)->emit(md.freeze());
     return BSONObj();
 }
 }  // namespace
@@ -158,6 +159,9 @@ Value evaluate(const ExpressionInternalJsEmit& expr, const Document& root, Varia
     EmitState emitState{{}, internalQueryMaxJsEmitBytes.load(), 0};
     jsExec->injectEmit(emitFromJS, &emitState);
 
+    // Invalidate the pointer to the local emitState variable on scope cleanup.
+    ON_BLOCK_EXIT([&] { jsExec->injectEmit(emitFromJS, nullptr); });
+
     // Although inefficient to "create" a new function every time we evaluate, this will usually end
     // up being a simple cache lookup. This is needed because the JS Scope may have been recreated
     // on a new thread if the expression is evaluated across getMores.
@@ -166,9 +170,6 @@ Value evaluate(const ExpressionInternalJsEmit& expr, const Document& root, Varia
     BSONObj thisBSON = thisVal.getDocument().toBson();
     BSONObj params;
     jsExec->callFunctionWithoutReturn(func, params, thisBSON);
-    // Invalidate the pointer to the local emitState variable.
-    jsExec->injectEmit(emitFromJS, nullptr);
-
     return Value(std::move(emitState.emittedObjects));
 }
 
