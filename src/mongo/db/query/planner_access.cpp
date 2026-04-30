@@ -28,6 +28,9 @@
  */
 
 
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 
@@ -669,8 +672,18 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         csn->minRecord = recordRange.getMin();
         csn->maxRecord = recordRange.getMax();
 
-        csn->boundInclusion = CollectionScanParams::makeInclusion(recordRange.isMinInclusive(),
-                                                                  recordRange.isMaxInclusive());
+        switch (csn->direction) {
+            case CollectionScanParams::Direction::FORWARD:
+                csn->boundInclusion = CollectionScanParams::makeInclusion(
+                    recordRange.isMinInclusive(), recordRange.isMaxInclusive());
+                break;
+            case CollectionScanParams::Direction::BACKWARD:
+                csn->boundInclusion = CollectionScanParams::makeInclusion(
+                    recordRange.isMaxInclusive(), recordRange.isMinInclusive());
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 
     if (canSimplifyFilter) {
