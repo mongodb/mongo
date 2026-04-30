@@ -51,6 +51,18 @@ REGEX_PURL = {
         r"[a-z0-9_-]+"  # Name, letters must be lowercase, dashes, underscore
         + REGEX_STR_PURL_OPTIONAL
     ),
+    # Cargo PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/cargo-definition.md
+    "cargo": re.compile(
+        r"^pkg:cargo/"  # Scheme and type
+        r"[a-zA-Z0-9_-]+" + REGEX_STR_PURL_OPTIONAL  # Name (no namespace)
+    ),
+    # Maven PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/maven-definition.md
+    "maven": re.compile(
+        r"^pkg:maven/"  # Scheme and type
+        r"[a-zA-Z0-9._-]+"  # Namespace (group ID, required)
+        r"/"
+        r"[a-zA-Z0-9._-]+" + REGEX_STR_PURL_OPTIONAL  # Name (artifact ID)
+    ),
 }
 
 # Metadata SBOM requirements
@@ -114,7 +126,8 @@ def convert_sbom_to_public(sbom_dict: dict):
             for occurence in c.get("evidence", {}).get("occurrences", [])
         )
         or any(
-            property.get("name", "") == "internal:as-is_component"
+            property.get("name", "") in ["internal:as-is_component", "internal:private"]
+            and property.get("value") == "true"
             for property in c.get("properties", [])
         )
     ]
@@ -134,6 +147,24 @@ def convert_sbom_to_public(sbom_dict: dict):
         "PUBLIC SBOM: Removed %d internal components",
         original_components_len - len(sbom_dict["components"]),
     )
+
+    # Remove orphaned dependency entries — refs that are not present in the final component set.
+    # This covers entries added from Endor Labs that reference components which were filtered out
+    # at earlier stages (e.g. sub-packages, removed components) and are not internal-flagged.
+    valid_refs = {sbom_dict["metadata"]["component"]["bom-ref"]} | {
+        c["bom-ref"] for c in sbom_dict["components"]
+    }
+    original_deps_len = len(sbom_dict["dependencies"])
+    sbom_dict["dependencies"] = [
+        d for d in sbom_dict["dependencies"] if d["ref"] in valid_refs
+    ]
+    for dependency in sbom_dict["dependencies"]:
+        dependency["dependsOn"] = [
+            d for d in dependency["dependsOn"] if d in valid_refs
+        ]
+    removed_deps = original_deps_len - len(sbom_dict["dependencies"])
+    if removed_deps:
+        logger.info("PUBLIC SBOM: Removed %d orphaned dependency entries", removed_deps)
     # Remove internal properties from public components
     original_properties_len = sum(
         len(c.get("properties", [])) for c in sbom_dict["components"]
@@ -166,7 +197,7 @@ def is_valid_purl(purl: str) -> bool:
     return False
 
 
-def read_sbom_json_file(file_path: str) -> dict:
+def read_sbom_json_file(file_path: str) -> dict | None:
     """Load a JSON SBOM file (schema is not validated)"""
     try:
         with open(file_path, "r", encoding="utf-8") as input_json:
@@ -202,7 +233,10 @@ def remove_sbom_component(sbom_dict: dict, component_key: str) -> None:
 
 
 def set_component_version(
-    component: dict, version: str, purl_version: str = None, cpe_version: str = None
+    component: dict,
+    version: str,
+    purl_version: str | None = None,
+    cpe_version: str | None = None,
 ) -> None:
     """Update the appropriate version fields in a component from the metadata SBOM"""
     if not purl_version:
@@ -298,7 +332,7 @@ def write_sbom_json_file(sbom_dict: dict, file_path: str) -> None:
     try:
         file_path = os.path.abspath(file_path)
         with open(file_path, "w", encoding="utf-8") as output_json:
-            formatted_sbom = json.dumps(sbom_dict, indent=2) + "\n"
+            formatted_sbom = json.dumps(sbom_dict, indent=2)
             output_json.write(formatted_sbom)
     except OSError as e:
         logger.error("Error writing SBOM file to %s", file_path)

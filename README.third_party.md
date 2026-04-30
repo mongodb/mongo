@@ -31,17 +31,16 @@ a notice will be included in
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer   | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                               | 7.1.3                                    |                      | ✗                               |
 | [folly]                                              | Apache-2.0                        | 2025.04.21.00                            |                      | ✗                               |
-| [gperftools]                                         | BSD-3-Clause                      | 003775aa816cb3fe01215455825245089d423a7c |                      | ✗                               |
+| [gperftools]                                         | BSD-3-Clause                      | 2.9.1                                    |                      | ✗                               |
 | [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                       | 57.1                                     | ✗                    | ✗                               |
 | [immer]                                              | BSL-1.0                           | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                      | 2.0.1                                    |                      | ✗                               |
 | [JSON Schema Store]                                  | Apache-2.0                        | 6847cfc3a17a04a7664474212db50c627e1e3408 |                      |                                 |
 | [JSON-Schema-Test-Suite]                             | MIT                               | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
-| [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | full-integration-tests                   |                      | ✗                               |
+| [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | 2.0.2                                    |                      | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                         | 1.18.2                                   | ✗                    | ✗                               |
 | [libunwind]                                          | MIT                               | 1.8.1                                    |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                      | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
-| [MongoDB C Driver]                                   | Apache-2.0                        | 1.27.6                                   | ✗                    | ✗                               |
 | [Mozilla Firefox ESR]                                | MPL-2.0                           | 140.9.0esr                               |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                     | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception | 10.40                                    |                      | ✗                               |
@@ -52,7 +51,7 @@ a notice will be included in
 | [snappy]                                             | BSD-3-Clause                      | 1.1.10                                   | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 1.0.0                                    | ✗                    | ✗                               |
 | [tcmalloc]                                           | Apache-2.0                        | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
-| [timelib]                                            | MIT                               | b7e3db4b43ec45235eeacf80b197de43d3c1d114 |                      | ✗                               |
+| [timelib]                                            | MIT                               | 2022.10                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                  | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                      | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |

@@ -166,7 +166,7 @@ class TestSbom(unittest.TestCase):
             test_file, test_file, third_party_libs, False
         )
         # print(error_manager.errors)
-        self.assert_message_in_errors(error_manager, "ExpressionInfo")
+        self.assert_message_in_errors(error_manager, "Invalid license expression")
 
     def test_named_license(self):
         test_file = os.path.join(self.input_dir, "sbom_named_license.json")

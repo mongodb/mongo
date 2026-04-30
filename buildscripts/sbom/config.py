@@ -47,6 +47,15 @@ third_party_folders_remove = [
     "src/third_party/private",  # this is not a real third-party folder, but rather a place for MongoDB to store private forks of third-party code. The actual SBOM components in this folder are still included.
 ]
 
+# ################ License Expression/ID Replacements ################
+# Some package repositories provide invalid SPDX license identifiers.
+# Define string replacements for .components[].licenses[].expression and
+# .components[].licenses[].license.id values here.
+license_replacements = [
+    # "LicenseRef-The-BSD-License" is not a valid SPDX identifier; replace with BSD-2-Clause
+    ["LicenseRef-The-BSD-License", "BSD-2-Clause"],
+]
+
 # ################ Component Renaming ################
 # Endor does not always have syntactically valid PURLs for C/C++ packages.
 # e.g.,
@@ -54,14 +63,10 @@ third_party_folders_remove = [
 #  Valid: pkg:github/abseil/abseil-cpp@20250512.1
 # Run string replacements to correct for this:
 endor_components_rename = [
-    ["pkg:c/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
     ["pkg:generic/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
     ["pkg:generic/zlib", "pkg:github/madler/zlib"],
-    ["pkg:generic/zlib.net/zlib", "pkg:github/madler/zlib"],
     ["pkg:generic/libstemmer", "pkg:github/snowballstem/snowball"],
-    ["pkg:generic/tartarus.org/libstemmer", "pkg:github/snowballstem/snowball"],
     ["pkg:generic/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
-    ["pkg:generic/intel.com/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
     ["pkg:c/git.openldap.org/openldap/openldap", "pkg:generic/openldap/openldap"],
     ["pkg:generic/gitlab.gnome.org/gnome/libxml2", "pkg:generic/gnome/libxml2"],
     ["pkg:generic/gitlab.com/bzip2/bzip2", "pkg:github/libarchive/bzip2"],

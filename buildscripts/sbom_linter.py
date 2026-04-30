@@ -40,9 +40,6 @@ MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR = "Component must include a license."
 COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR = (
     "Could not find or read the import script file"
 )
-VERSION_MISMATCH_ERROR = (
-    "Version mismatch (may simply be an artifact of SBOM automation): "
-)
 
 
 # A class for managing error messages for components
@@ -120,12 +117,6 @@ def get_script_version(
     return result
 
 
-# A version string sometimes contains an extra prefix like "v1.2" instead of "1.2"
-# This function strips that extra prefix.
-def strip_extra_prefixes(string_with_prefix: str) -> str:
-    return string_with_prefix.removeprefix("mongo/").removeprefix("v")
-
-
 def validate_license(component: dict, error_manager: ErrorManager) -> None:
     if "licenses" not in component:
         error_manager.append_full_error_message(MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR)
@@ -158,7 +149,9 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
                 not licensing_validate.errors or not licensing_validate.invalid_symbols
             )
             if not valid_license:
-                error_manager.append_full_error_message(licensing_validate)
+                error_manager.append_full_error_message(
+                    f"Invalid license expression: {expression}"
+                )
                 return
 
 
@@ -195,16 +188,6 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
     if comp_version == "Unknown" or script_path == "":
         return
 
-    # Include the .pedigree.descendants[0] version for version matching
-    if (
-        "pedigree" in component
-        and "descendants" in component["pedigree"]
-        and "version" in component["pedigree"]["descendants"][0]
-    ):
-        comp_pedigree_version = component["pedigree"]["descendants"][0]["version"]
-    else:
-        comp_pedigree_version = ""
-
     # At this point a version is attempted to be read from the import script file
     script_version_key = "VERSION"
     if "properties" in component:
@@ -216,14 +199,6 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
     if script_version == "":
         error_manager.append_full_error_message(
             MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path
-        )
-    elif strip_extra_prefixes(script_version) != strip_extra_prefixes(
-        comp_version
-    ) and strip_extra_prefixes(script_version) != strip_extra_prefixes(
-        comp_pedigree_version
-    ):
-        print(
-            f"WARNING: {VERSION_MISMATCH_ERROR}\n  script version:{script_version}\n  sbom component version:{comp_version}\n  sbom component pedigree version:{comp_pedigree_version}"
         )
 
 
@@ -302,7 +277,7 @@ def lint_sbom(
             error_manager.append(f"    {lib}")
 
     formatted_sbom = json.dumps(sbom, indent=2) + "\n"
-    if formatted_sbom != sbom_text:
+    if sbom_text not in (formatted_sbom, formatted_sbom.rstrip("\n")):
         error_manager.append(f"{input_file} {FORMATTING_ERROR}")
 
     if should_format:
