@@ -39,6 +39,7 @@ env.CppUnitTest(
         'match_expression_util_test.cpp',
         'debug_string_test.cpp',
         'doc_validation_error_json_schema_test.cpp',
+        'doc_validation_error_redaction_test.cpp',
         'doc_validation_error_test.cpp',
         'expression_algo_test.cpp',
         'expression_always_boolean_test.cpp',

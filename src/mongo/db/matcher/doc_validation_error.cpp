@@ -63,6 +63,8 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/logv2/log_util.h"
+#include "mongo/logv2/redaction.h"
 
 namespace mongo::doc_validation_error {
 namespace {
@@ -2438,6 +2440,45 @@ void DocumentValidationFailureInfo::serialize(BSONObjBuilder* bob) const {
 }
 const BSONObj& DocumentValidationFailureInfo::getDetails() const {
     return _details;
+}
+
+namespace {
+// Search the object recursively and redact the content of "consideredValue" and "consideredValues"
+// fields wherever they are.
+BSONObj redactConsideredValues(const BSONObj& obj) {
+    BSONObjBuilder bob;
+    for (auto&& elem : obj) {
+        StringData fieldName = elem.fieldNameStringData();
+        if (fieldName == "consideredValue"_sd || fieldName == "consideredValues"_sd) {
+            // use temp object to recycle redact() behavior.
+            BSONObjBuilder temp;
+            temp.append(elem);
+            const BSONObj redacted = redact(temp.obj());
+            bob.append(redacted.firstElement());
+        } else if (elem.type() == BSONType::Object) {
+            bob.append(fieldName, redactConsideredValues(elem.Obj()));
+        } else if (elem.type() == BSONType::Array) {
+            BSONArrayBuilder arrayBuilder(bob.subarrayStart(fieldName));
+            for (auto&& arrElem : elem.Obj()) {
+                if (arrElem.type() == BSONType::Object) {
+                    arrayBuilder.append(redactConsideredValues(arrElem.Obj()));
+                } else {
+                    arrayBuilder.append(arrElem);
+                }
+            }
+        } else {
+            bob.append(elem);
+        }
+    }
+    return bob.obj();
+}
+}  // namespace
+
+BSONObj DocumentValidationFailureInfo::getRedactedDetails() const {
+    if (!logv2::shouldRedactLogs() && !logv2::shouldRedactBinDataEncrypt()) {
+        return getDetails();
+    }
+    return redactConsideredValues(getDetails());
 }
 
 BSONObj generateError(const MatchExpression& validatorExpr,
