@@ -165,6 +165,8 @@ last-continuous:
       ticket: SERVER-119413
     - test_file: jstests/core/timeseries/query/timeseries_lookup_index_use.js
       ticket: SERVER-95352
+    - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
+      ticket: SERVER-121822
   suites: null
 last-lts:
   all:
@@ -828,4 +830,6 @@ last-lts:
       ticket: SERVER-119413
     - test_file: jstests/core/timeseries/query/timeseries_lookup_index_use.js
       ticket: SERVER-95352
+    - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
+      ticket: SERVER-121822
   suites: null
