@@ -159,7 +159,6 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
     StringData path,
     BSONElementSet& elements,
     bool expandArrayOnTrailingField,
-    bool isCompressed,
     BSONDepthIndex depth,
     MultikeyComponents* arrayComponents) {
     switch (depth) {
@@ -174,10 +173,9 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                                                                   next,
                                                                   elements,
                                                                   expandArrayOnTrailingField,
-                                                                  isCompressed,
                                                                   depth + 1,
                                                                   arrayComponents);
-                    } else if (isCompressed && e.type() == BinData) {
+                    } else if (e.type() == BinData) {
                         // Unbucketing happens here for nested measurement fields (i.e. data.a.b) in
                         // compressed buckets. We know that 'e' corresponds to the top-level
                         // measurement field (i.e. data.a) and we need to iterate over each of the
@@ -187,7 +185,10 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                         // dot at this depth (e.g. '1.b'), so we can skip that field lookup, but
                         // it's possible that the element e2 stores an object, array, or other type,
                         // and we need to figure out how to resolve the rest of the path based on
-                        // the type.
+                        // the type. During logical initial sync, the bucket version can
+                        // temporarily disagree with an individual column's storage representation,
+                        // so we decode based on the actual BSON type we see here rather than the
+                        // bucket-wide version.
                         BSONColumn storage{e};
                         for (const BSONElement& e2 : storage) {
                             if (!e2.eoo()) {
@@ -212,15 +213,16 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                                                        StringData(),
                                                        elements,
                                                        expandArrayOnTrailingField,
-                                                       isCompressed,
                                                        depth + 1,
                                                        arrayComponents);
-                } else if (isCompressed && BinData == e.type()) {
-                    // Unbucketing happens here for top-level measurement fields (i.e. data.a) in
-                    // compressed buckets. We know that 'e' corresponds to the top-level
+                } else if (BinData == e.type()) {
+                    // Unbucketing happens here for top-level measurement fields (i.e. data.a)
+                    // stored in BSONColumn form. We know that 'e' corresponds to the top-level
                     // measurement field (i.e. data.a) and we need to iterate over each of the
                     // numerically-indexed entries (i.e. data.a.1, data.a.5, etc.) to extract
-                    // the actual field we want.
+                    // the actual field we want. During logical initial sync, the bucket version
+                    // can temporarily disagree with an individual column's storage
+                    // representation, so we decode based on the actual BSON type we see here.
                     massert(11388801,
                             "Malformed measurement field in compressed timeseries bucket",
                             depth == 1);
@@ -245,7 +247,6 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
             // numerically-indexed entries (i.e. data.a.1, data.a.5, etc.) to extract the actual
             // field we want. If we are after a top-level field, then we already have the element we
             // want in 'e'. If we are after a nested field, then we need to recurse.
-            massert(11388802, "Expected uncompressed bucket", !isCompressed);
             for (const BSONElement& e : obj) {
                 if (path.empty()) {
                     // The top-level measurement field (i.e. data.a) is the indexed field we are
@@ -312,10 +313,7 @@ bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
     return _handleTerminalElementForHaveArrayAlongBucketDataPath(obj.getField(path));
 }
 
-bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
-                                   StringData path,
-                                   bool isCompressed,
-                                   BSONDepthIndex depth) {
+bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth) {
     switch (depth) {
         case 0:
         case 1: {
@@ -324,9 +322,8 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
                 BSONElement e = obj.getField(left);
                 if (depth > 0 || left == timeseries::kBucketDataFieldName) {
                     if (e.type() == Object) {
-                        return _haveArrayAlongBucketDataPath(
-                            e.embeddedObject(), next, isCompressed, depth + 1);
-                    } else if (isCompressed && BinData == e.type()) {
+                        return _haveArrayAlongBucketDataPath(e.embeddedObject(), next, depth + 1);
+                    } else if (BinData == e.type()) {
                         // Unbucketing happens here for nested measurement fields (i.e. data.a.b) in
                         // compressed buckets. We know that 'e' corresponds to the top-level
                         // measurement field (i.e. data.a) and we need to iterate over each of the
@@ -336,7 +333,10 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
                         // dot at this depth (e.g. '1.b'), so we can skip that field lookup, but
                         // it's possible that the element e2 stores an object, array, or other type,
                         // and we need to figure out how to resolve the rest of the path based on
-                        // the type.
+                        // the type. During logical initial sync, the bucket version can
+                        // temporarily disagree with an individual column's storage representation,
+                        // so we decode based on the actual BSON type we see here rather than the
+                        // bucket-wide version.
                         BSONColumn column{e};
                         for (const BSONElement& e2 : column) {
                             const bool foundArray =
@@ -352,14 +352,17 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
                 BSONElement e = obj.getField(path);
                 if (Object == e.type()) {
                     return _haveArrayAlongBucketDataPath(
-                        e.embeddedObject(), StringData(), isCompressed, depth + 1);
+                        e.embeddedObject(), StringData(), depth + 1);
                 } else if (BinData == e.type()) {
                     // Unbucketing happens here for top-level measurement fields (i.e. data.a) in
                     // compressed buckets. We know that 'e' corresponds to the top-level
                     // measurement field (i.e. data.a) and we need to iterate over each of the
                     // numerically-indexed entries (i.e. data.a.1, data.a.5, etc.) to decide whether
-                    // we have any arrays.
-                    invariant(isCompressed && depth == 1);
+                    // we have any arrays. During logical initial sync, the bucket version can
+                    // temporarily disagree with an individual column's storage representation, so
+                    // we decode based on the actual BSON type we see here rather than the
+                    // bucket-wide version.
+                    invariant(depth == 1);
                     BSONColumn column{e};
                     for (const BSONElement& e2 : column) {
                         if (_handleTerminalElementForHaveArrayAlongBucketDataPath(e2)) {
@@ -376,7 +379,6 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
             // numerically-indexed entries (i.e. data.a.1, data.a.5, etc.) to extract the actual
             // field we want. If we are after a top-level field, then we already have the element we
             // want in 'e'. If we are after a nested field, then we need recurse.
-            invariant(!isCompressed);
             for (const BSONElement& e : obj) {
                 bool foundArray = false;
                 if (path.empty()) {
@@ -518,15 +520,10 @@ boost::optional<BSONColumn> extractAllElementsAlongBucketPath(const BSONObj& obj
                                                               BSONElementSet& elements,
                                                               bool expandArrayOnTrailingField,
                                                               MultikeyComponents* arrayComponents) {
+    validateBucketControlVersion(obj);
     constexpr BSONDepthIndex initialDepth = 0;
-    const bool isCompressed = timeseries::isCompressedBucket(obj);
-    return _extractAllElementsAlongBucketPath(obj,
-                                              path,
-                                              elements,
-                                              expandArrayOnTrailingField,
-                                              isCompressed,
-                                              initialDepth,
-                                              arrayComponents);
+    return _extractAllElementsAlongBucketPath(
+        obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
 }
 
 bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path) {
@@ -535,9 +532,9 @@ bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path) {
         return false;
     }
 
+    validateBucketControlVersion(bucketObj);
     constexpr BSONDepthIndex initialDepth = 0;
-    const bool isCompressed = timeseries::isCompressedBucket(bucketObj);
-    return _haveArrayAlongBucketDataPath(bucketObj, path, isCompressed, initialDepth);
+    return _haveArrayAlongBucketDataPath(bucketObj, path, initialDepth);
 }
 
 std::ostream& operator<<(std::ostream& s, const Decision& i) {

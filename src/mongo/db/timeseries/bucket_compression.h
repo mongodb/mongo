@@ -73,6 +73,11 @@ struct DecompressionResult {
 boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc);
 
 /**
+ * Validates that a timeseries bucket document has a control object with a numeric version field.
+ */
+void validateBucketControlVersion(const BSONObj& bucketDoc);
+
+/**
  * Returns whether a timeseries bucket has been compressed to the v2 format.
  */
 bool isCompressedBucket(const BSONObj& bucketDoc);

@@ -393,7 +393,7 @@ boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) {
     return builder.obj();
 }
 
-bool isCompressedBucket(const BSONObj& bucketDoc) {
+void validateBucketControlVersion(const BSONObj& bucketDoc) {
     auto&& controlField = bucketDoc[timeseries::kBucketControlFieldName];
     uassert(6540600,
             "Time-series bucket documents must have 'control' object present",
@@ -403,7 +403,14 @@ bool isCompressedBucket(const BSONObj& bucketDoc) {
     uassert(6540601,
             "Time-series bucket documents must have 'control.version' field present",
             versionField && isNumericBSONType(versionField.type()));
-    auto version = versionField.Number();
+}
+
+bool isCompressedBucket(const BSONObj& bucketDoc) {
+    validateBucketControlVersion(bucketDoc);
+
+    const auto version = bucketDoc[timeseries::kBucketControlFieldName]
+                             .Obj()[timeseries::kBucketControlVersionFieldName]
+                             .Number();
 
     if (version == 1) {
         return false;

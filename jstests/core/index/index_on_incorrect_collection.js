@@ -31,15 +31,15 @@ before();
 }
 after();
 
-// Prevents updating 2dsphere_bucket indices for nested measurements.
+// TODO SERVER-125649: this test will need to be updated when index maintenance of
+// 2dsphere_bucket indices on non-timeseries collections is banned on v7.0.
 before();
 {
     const indexSpec = {"data.a.b.c": "2dsphere_bucket"};
     // TODO SERVER-118911 index creation should not be possible
     assert.commandWorked(coll.createIndex(indexSpec));
     const sampleDoc = {control: {version: 2}, data: {a: {b: {c: [0, 0]}}}};
-    assert.commandFailed(coll.insert(sampleDoc));
-    // Ensure the index can be dropped, allowing the sampleDoc to be inserted
+    assert.commandWorked(coll.insert(sampleDoc));
     const res = assert.commandWorked(coll.dropIndex(indexSpec));
     assert.commandWorked(coll.insert(sampleDoc));
 }

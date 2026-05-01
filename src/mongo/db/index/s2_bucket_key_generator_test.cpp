@@ -39,6 +39,7 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
@@ -250,6 +251,96 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubFieldSomeMissing) {
 
     PointSet set{{0, 0}, {3, 3}, {5, 5}};
     verifySetIsCoveredByKeys(actualKeys, set);
+}
+
+TEST_F(S2BucketKeyGeneratorTest, LogsGeoKeysForCoherentAndMixedCompressionBuckets) {
+    const BSONObj keyPattern = fromjson(R"({"data.location": "2dsphere_bucket"})");
+    const BSONObj infoObj =
+        fromjson(R"({key: {"data.location": "2dsphere_bucket"}, "2dsphereIndexVersion": 3})");
+    S2IndexingParams params;
+    CollatorInterfaceMock* collator = nullptr;
+    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+
+    const auto v1Bucket = fromjson(R"({
+        control: {version: 1},
+        data: {
+            time: {
+                "0": {"$date": "2024-01-01T00:00:00.000Z"},
+                "1": {"$date": "2024-01-01T00:00:01.000Z"},
+                "2": {"$date": "2024-01-01T00:00:02.000Z"},
+                "3": {"$date": "2024-01-01T00:00:03.000Z"}
+            },
+            location: {
+                "0": {type: "Point", coordinates: [0, 0]},
+                "1": {type: "Point", coordinates: [3, 3]},
+                "2": {type: "Point", coordinates: [3, 3]},
+                "3": {type: "Point", coordinates: [5, 5]}
+            },
+            sensor: {
+                "0": "alpha",
+                "2": "beta",
+                "3": "gamma"
+            }
+        }
+    })");
+
+    const auto compressionResult = timeseries::compressBucket(
+        v1Bucket,
+        "time"_sd,
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.geo"),
+        true);
+    ASSERT_TRUE(compressionResult.compressedBucket.has_value());
+    ASSERT_FALSE(compressionResult.decompressionFailed);
+    const auto v2Bucket = compressionResult.compressedBucket.value();
+
+    const auto mixedV2Bucket = std::invoke([&] {
+        BSONObjBuilder mixedV2Builder;
+        mixedV2Builder.append("control", v2Bucket.getField("control").Obj());
+        {
+            BSONObjBuilder data(mixedV2Builder.subobjStart("data"));
+            data.append(v2Bucket.getObjectField("data").getField("time"));
+            data.append(v1Bucket.getObjectField("data").getField("location"));
+            data.append(v2Bucket.getObjectField("data").getField("sensor"));
+        }
+        return mixedV2Builder.obj();
+    });
+
+    BSONObjBuilder mixedV1Builder;
+    mixedV1Builder.append(
+        "control",
+        BSON("version" << 1 << "count" << v2Bucket.getObjectField("control").getIntField("count")));
+    mixedV1Builder.append("data", v2Bucket.getField("data").Obj());
+    const auto mixedV1Bucket = mixedV1Builder.obj();
+
+    auto generateKeys = [&](const BSONObj& bucket) {
+        KeyStringSet keys;
+        MultikeyPaths multikeyPaths;
+        ExpressionKeysPrivate::getS2Keys(allocator,
+                                         bucket,
+                                         keyPattern,
+                                         params,
+                                         &keys,
+                                         &multikeyPaths,
+                                         KeyString::Version::kLatestVersion,
+                                         SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                                         Ordering::make(BSONObj()));
+        return keys;
+    };
+
+    const auto v1Keys = generateKeys(v1Bucket);
+    const auto v2Keys = generateKeys(v2Bucket);
+    const auto mixedV2Keys = generateKeys(mixedV2Bucket);
+    const auto mixedV1Keys = generateKeys(mixedV1Bucket);
+
+    ASSERT_TRUE(areKeysetsEqual(v1Keys, v2Keys));
+    ASSERT_TRUE(areKeysetsEqual(v1Keys, mixedV2Keys));
+    ASSERT_TRUE(areKeysetsEqual(v1Keys, mixedV1Keys));
+
+    PointSet set{{0, 0}, {3, 3}, {5, 5}};
+    verifySetIsCoveredByKeys(v1Keys, set);
+    verifySetIsCoveredByKeys(v2Keys, set);
+    verifySetIsCoveredByKeys(mixedV2Keys, set);
+    verifySetIsCoveredByKeys(mixedV1Keys, set);
 }
 
 }  // namespace

@@ -55,6 +55,80 @@ protected:
     }
 };
 
+namespace {
+
+BSONObj makeMixedCompressionArrayBucketV1() {
+    return fromjson(R"({
+    control: {version: 1},
+    data: {
+        time: {
+            "0": {"$date": "2024-01-01T00:00:00.000Z"},
+            "1": {"$date": "2024-01-01T00:00:01.000Z"},
+            "2": {"$date": "2024-01-01T00:00:02.000Z"}
+        },
+        arr: {
+            "0": [1, 2],
+            "1": 5,
+            "2": [6]
+        },
+        nested: {
+            "0": {a: [true, false]},
+            "1": {a: false},
+            "2": {a: [false]}
+        },
+        scalar: {
+            "0": 1,
+            "1": 2,
+            "2": 3
+        }
+    }
+})");
+}
+
+BSONObj makeMixedCompressionArrayBucketV2() {
+    auto v1Bucket = makeMixedCompressionArrayBucketV1();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+    auto compressionResult = timeseries::compressBucket(v1Bucket, "time"_sd, nss, true);
+    ASSERT_TRUE(compressionResult.compressedBucket.has_value());
+    ASSERT_FALSE(compressionResult.decompressionFailed);
+    return compressionResult.compressedBucket.value();
+}
+
+BSONObj makeV2BucketWithUncompressedArrayColumn() {
+    auto v1Bucket = makeMixedCompressionArrayBucketV1();
+    auto v2Bucket = makeMixedCompressionArrayBucketV2();
+
+    BSONObjBuilder mixedV2Builder;
+    mixedV2Builder.append("control", v2Bucket.getField("control").Obj());
+    {
+        BSONObjBuilder data(mixedV2Builder.subobjStart("data"));
+        data.append(v2Bucket.getObjectField("data").getField("time"));
+        data.append(v1Bucket.getObjectField("data").getField("arr"));
+        data.append(v1Bucket.getObjectField("data").getField("nested"));
+        data.append(v2Bucket.getObjectField("data").getField("scalar"));
+    }
+    return mixedV2Builder.obj();
+}
+
+BSONObj makeV1BucketWithCompressedArrayColumn() {
+    auto v2Bucket = makeMixedCompressionArrayBucketV2();
+
+    BSONObjBuilder mixedV1Builder;
+    mixedV1Builder.append(
+        "control",
+        BSON("version" << 1 << "count" << v2Bucket.getObjectField("control").getIntField("count")));
+    mixedV1Builder.append("data", v2Bucket.getField("data").Obj());
+    return mixedV1Builder.obj();
+}
+
+void assertArrayShapeMatches(const BSONObj& bucket) {
+    ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(bucket, "data.arr"));
+    ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(bucket, "data.nested.a"));
+    ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(bucket, "data.scalar"));
+}
+
+}  // namespace
+
 TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPath) {
     BSONObj input = ::mongo::fromjson(R"(
 {
@@ -140,6 +214,19 @@ TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPath) {
         // Should not check dotted field names
         ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.j.k.a"));
     });
+}
+
+TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPathCoherentCompressionBuckets) {
+    assertArrayShapeMatches(makeMixedCompressionArrayBucketV1());
+    assertArrayShapeMatches(makeMixedCompressionArrayBucketV2());
+}
+
+TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPathMixedV2WithObjectColumn) {
+    assertArrayShapeMatches(makeV2BucketWithUncompressedArrayColumn());
+}
+
+TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPathMixedV1WithBinDataColumn) {
+    assertArrayShapeMatches(makeV1BucketWithCompressedArrayColumn());
 }
 
 TEST_F(TimeseriesDottedPathSupportTest, fieldContainsArrayData) {
