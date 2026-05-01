@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/s/range_deletion_task_gen.h"
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <climits>
@@ -116,7 +115,6 @@ struct RemoveShardProgress {
     boost::optional<DrainingShardUsage> remainingCounts;
     boost::optional<long long> pendingRangeDeletions;
     boost::optional<NamespaceString> firstNonEmptyCollection;
-    boost::optional<RangeDeletionTask> pendingRangeDeletionTask;
 };
 
 /**
