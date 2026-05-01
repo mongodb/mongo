@@ -1814,7 +1814,9 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
                 // For now, we pick one and put the other in rejected plans.
                 rejectedSoln.push_back(std::move(soln));
 
-                numPlansTiedCostEstimation.increment();
+                if (curCost == bestCost) {
+                    numPlansTiedCostEstimation.increment();
+                }
             }
         }
     }
