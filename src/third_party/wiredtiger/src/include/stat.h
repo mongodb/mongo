@@ -622,8 +622,10 @@ struct __wt_connection_stats {
     int64_t cache_eviction_blocked_recently_modified;
     int64_t cache_reverse_splits;
     int64_t cache_reverse_splits_skipped_vlcs;
+    int64_t cache_hs_key_processed;
     int64_t cache_hs_insert_full_update;
     int64_t cache_hs_insert_reverse_modify;
+    int64_t cache_hs_update_processed;
     int64_t cache_reentry_hs_eviction_milliseconds;
     int64_t cache_bytes_internal;
     int64_t cache_bytes_leaf;
@@ -1250,8 +1252,10 @@ struct __wt_dsrc_stats {
     int64_t cache_eviction_blocked_recently_modified;
     int64_t cache_reverse_splits;
     int64_t cache_reverse_splits_skipped_vlcs;
+    int64_t cache_hs_key_processed;
     int64_t cache_hs_insert_full_update;
     int64_t cache_hs_insert_reverse_modify;
+    int64_t cache_hs_update_processed;
     int64_t cache_bytes_dirty;
     int64_t cache_bytes_dirty_internal;
     int64_t cache_bytes_dirty_leaf;

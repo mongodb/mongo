@@ -1391,10 +1391,11 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
         WT_PAGE *page = queue->evict_queue[candidates].ref->page;
         if (__wt_page_is_modified(page))
             WT_STAT_CONN_DATA_INCR(session, cache_eviction_pages_queued_dirty);
-        else if (page->modify != NULL)
-            WT_STAT_CONN_DATA_INCR(session, cache_eviction_pages_queued_updates);
         else
             WT_STAT_CONN_DATA_INCR(session, cache_eviction_pages_queued_clean);
+
+        if (page->modify != NULL)
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_pages_queued_updates);
     }
 
     queue->evict_current = queue->evict_queue;
@@ -2145,10 +2146,11 @@ rand_next:
 
         if (__wt_page_is_modified(page))
             ++pages_seen_dirty;
-        else if (page->modify != NULL)
-            ++pages_seen_updates;
         else
             ++pages_seen_clean;
+
+        if (page->modify != NULL)
+            ++pages_seen_updates;
 
         /* Count internal pages seen. */
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))

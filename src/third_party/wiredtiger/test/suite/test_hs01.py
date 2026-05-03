@@ -142,7 +142,11 @@ class test_hs01(wttest.WiredTigerTestCase):
         # Checkpoint and then assert that the (nrows-1) insertions were moved to history store from data store.
         self.session.checkpoint()
         hs_writes = self.get_stat(stat.conn.cache_hs_insert)
+        cache_hs_key_processed = self.get_stat(stat.conn.cache_hs_key_processed)
+        cache_hs_update_processed = self.get_stat(stat.conn.cache_hs_update_processed)
         self.assertEqual(hs_writes, nrows-1)
+        self.assertEqual(cache_hs_key_processed, nrows - 1)
+        self.assertEqual(cache_hs_update_processed, nrows - 1)
 
         # Check to see the latest updated value after recovery.
         self.durable_check(bigvalue2, uri, ds)
