@@ -41,7 +41,7 @@
  * separate SQLite database file:
  *  - globals.db
  *  - checkpoints.db
- *  - pages_[N].db  - one per WT table (N is the table ID)
+ *  - pages_[N].db  - one per shard (N is the shard index, table_id % NUM_SHARDS)
  *
  * -= Concurrency model =-
  *
@@ -49,9 +49,16 @@
  * database connections, possibly in separate threads or processes, but only one
  * simultaneous write transaction.
  *
- * As a result, PALite uses a readers-writer lock at the table level to ensure
- * that read operations can occur concurrently while write operations are
- * serialized.
+ * As a result, PALite uses a readers-writer lock at the table level, with
+ * exception of pages, to ensure that read operations can occur concurrently
+ * while write operations are serialized.
+ *
+ * Pages are sharded across multiple database files to allow for concurrent
+ * writes to different shards, so each page shard has its own readers-writer lock.
+ * This allows for higher concurrency when multiple threads are accessing
+ * different page shards simultaneously. At the same time, the overall number of
+ * database connections remains low. It is essential for tests that open many
+ * tables.
  *
  * In addition, there is a storage-wide lock that is used for operations that
  * require exclusive access to the entire storage. E.g., abandoning a checkpoint.
@@ -159,6 +166,7 @@
 #include <system_error>
 #include <thread>
 #include <type_traits>
+#include <unordered_map>
 
 using namespace std::chrono_literals;
 
@@ -1577,9 +1585,9 @@ struct Pages : public Table<Pages> {
 
     ~Pages() = default;
     Pages(Config &cfg, std::shared_mutex &store_access, const std::filesystem::path &home,
-      uint64_t table_id)
+      size_t shard_id)
         : Table<Pages>(
-            cfg, store_access, home / std::format("{}_{:06}.db", Pages::prefix, table_id))
+            cfg, store_access, home / std::format("{}_{:02}.db", Pages::prefix, shard_id))
     {
     }
 
@@ -1957,18 +1965,29 @@ class Storage {
     Config &config;
     const std::filesystem::path db_home;
 
+    /* Enables exclusive access to entire storage */
+    std::shared_mutex store_access;
+
     Globals globals;
     Checkpoints checkpoints;
 
-    std::unordered_map<uint64_t, std::unique_ptr<Pages>> pages;
-    std::shared_mutex pages_access; /* protects 'pages' map */
-
-    /* Enables exclusive access to entire storage */
-    std::shared_mutex store_access;
+    /*
+     * Pages data is spread across NUM_SHARDS database files. Each table_id is mapped to a shard via
+     * table_id % NUM_SHARDS, so all records for a given table reside in one shard.
+     */
+    static constexpr size_t NUM_SHARDS = 17; /* A prime number to reduce collisions. */
+    std::array<std::unique_ptr<Pages>, NUM_SHARDS> shards;
+    std::shared_mutex shard_access; /* protects 'shards' collection */
 
     /* Stats */
     std::atomic_ullong object_puts; /* (What would be) network writes */
     std::atomic_ullong object_gets; /* (What would be) network requests for data */
+
+    static size_t
+    get_shard_id(uint64_t table_id)
+    {
+        return table_id % NUM_SHARDS;
+    }
 
 public:
     ~Storage() = default;
@@ -1982,25 +2001,57 @@ public:
     Storage &operator=(const Storage &) = delete;
 
 private:
+    /*-
+     * Deletes records up to the specified checkpoint LSN.
+     * Note: Requires a unique lock on the store_access mutex.
+     */
+    void
+    delete_records(uint64_t checkpoint_lsn)
+    {
+        checkpoints.delete_many(checkpoint_lsn, Checkpoints::AccessMode::BYPASS);
+
+        /* To avoid opening the same shard multiple times */
+        std::array<bool, NUM_SHARDS> shard_updated{};
+
+        for (auto table_id : globals.get_table_ids(Globals::AccessMode::BYPASS)) {
+            const size_t shard_id = get_shard_id(table_id);
+            if (shard_updated[shard_id])
+                continue;
+
+            shard_updated[shard_id] = true;
+
+            /*
+             * Table ID's may be recorded in the 'globals' table, however connection to their
+             * 'pages' table may have never been opened. For example, on restart. Therefore, we use
+             * get_or_open_table().
+             */
+            auto &pages = get_or_open_table(table_id);
+            pages.delete_many(checkpoint_lsn, Pages::AccessMode::BYPASS);
+        }
+    }
+
     Pages &
     get_or_open_table(uint64_t table_id)
     {
-        std::unique_lock write_lock(pages_access);
-        auto [it, inserted] = pages.try_emplace(
-          table_id, std::make_unique<Pages>(config, store_access, db_home, table_id));
-        return *(it->second);
+        const size_t shard_id = get_shard_id(table_id);
+        std::unique_lock write_lock(shard_access);
+        if (shards[shard_id] == nullptr) {
+            shards[shard_id] = std::make_unique<Pages>(config, store_access, db_home, shard_id);
+        }
+
+        return *(shards[shard_id]);
     }
 
     Pages &
     get_table(uint64_t table_id)
     {
-        std::shared_lock read_lock(pages_access);
-        auto it = pages.find(table_id);
-        if (it == pages.end()) {
+        const size_t shard_id = get_shard_id(table_id);
+        std::shared_lock read_lock(shard_access);
+        if (shards[shard_id] == nullptr) {
             LOG_AND_THROW("Pages table not found for table ID {}", table_id);
         }
 
-        return *(it->second);
+        return *(shards[shard_id]);
     }
 
 public:
@@ -2008,8 +2059,12 @@ public:
     close()
     {
         std::unique_lock write_lock(store_access);
-        std::ranges::for_each(pages, [](auto &kv) { kv.second->close(); });
-        pages.clear();
+        std::ranges::for_each(shards, [](auto &sh) {
+            if (sh) {
+                sh->close();
+                sh.reset();
+            }
+        });
 
         checkpoints.close();
         globals.close();
@@ -2135,19 +2190,10 @@ public:
             return;
         }
 
-        /* Note: global LSN counter is not decremented */
+        /* Note: global LSN counter is not decremented. */
 
-        checkpoints.delete_many(checkpoint_lsn, Checkpoints::AccessMode::BYPASS);
-
-        for (auto table_id : globals.get_table_ids(Globals::AccessMode::BYPASS)) {
-            /*
-             * Table ID's may be recorded in the 'globals' table, however connection to their
-             * 'pages' table may have never been opened. For example, on restart. Therefore, we use
-             * get_or_open_table().
-             */
-            auto &pages_tbl = get_or_open_table(table_id);
-            pages_tbl.delete_many(checkpoint_lsn, Pages::AccessMode::BYPASS);
-        }
+        /* Proceed to delete records up to the checkpoint LSN. */
+        delete_records(checkpoint_lsn);
     }
 };
 

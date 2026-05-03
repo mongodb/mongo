@@ -88,8 +88,6 @@ Crt
 Crummey
 CustomersPhone
 Cygwin
-DBI
-DEK
 DESC
 DEST
 DHANDLE
@@ -215,7 +213,6 @@ Kounavis
 LANGID
 LF
 LLVMFuzzerTestOneInput
-LMDB
 LOGOP
 LOGREC
 LOGSCAN
@@ -241,7 +238,6 @@ LogSink
 LogSystemInterface
 MADV
 MALLOC
-MDB
 MEM
 MERCHANTABILITY
 MONGODB
@@ -265,7 +261,6 @@ Multithreaded
 Mutex
 Mutexes
 MySecret
-NAMESPACE
 NNN
 NOLINT
 NOLINTNEXTLINE
@@ -386,7 +381,6 @@ Strobed
 Su
 Subdirectory
 Subprocess
-Synchronize
 TAILQ
 TCMalloc
 TESTUTIL
@@ -475,7 +469,6 @@ WiredTigerShared
 WiredTigerSharedHS
 WiredTigerTmplog
 WithSeeds
-Wmissing
 WriteFile
 Wundef
 Wuninitialized
@@ -701,7 +694,6 @@ decryptor
 decrypts
 deflateEnd
 deflateInit
-dek
 del
 dequeued
 der
@@ -853,7 +845,6 @@ gettimeofday
 ggg
 gid
 github
-globals
 globfree
 gobare
 goesc
@@ -926,7 +917,6 @@ isalnum
 isalpha
 isascii
 isb
-isd
 isdigit
 ish
 ishld
@@ -957,7 +947,6 @@ las
 lazyfs
 lbrace
 lbracket
-lc
 ld
 ldapr
 ldaprb
@@ -1079,7 +1068,6 @@ nextprev
 nf
 nfilename
 nhex
-nilly
 nlohmann
 nlpo
 nocase
@@ -1094,7 +1082,6 @@ nonoverlapping
 noop
 nop
 noraw
-noreturn
 notsup
 novalue
 nowait
@@ -1148,7 +1135,6 @@ pfx
 pid
 pindexp
 plh
-plhandle
 pluggable
 pmem
 poptable
@@ -1413,7 +1399,6 @@ unallocated
 unbare
 unbuffered
 uncached
-unclosed
 unconfigured
 uncustomized
 undef
@@ -1464,7 +1449,6 @@ valuev
 variadic
 vd
 vdata
-ve
 vec
 vectorized
 verifier
@@ -1486,7 +1470,6 @@ waker
 wakeup
 wakeups
 warmup
-wc
 whitespace
 wiredTiger
 wiredTigerTables

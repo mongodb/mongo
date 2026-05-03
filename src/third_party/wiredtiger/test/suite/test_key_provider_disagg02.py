@@ -28,7 +28,7 @@
 import re, os, subprocess, json
 import wttest
 from run import wt_builddir
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages, get_shard_id
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -52,6 +52,9 @@ class test_key_provider_disagg02(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(disagg_storages, crash_points)
     nentries = 1000
     uri = "layered:test_key_provider_disagg02"
+
+    WT_SPECIAL_PALI_TURTLE_FILE_ID = 2
+    turtle_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_TURTLE_FILE_ID):02d}.db'
 
     # Load the storage store extension.
     def conn_extensions(self, extlist):
@@ -95,10 +98,16 @@ class test_key_provider_disagg02(wttest.WiredTigerTestCase, suite_subprocess):
     # Fetch the latest metadata and perform read/write validation. Use the builtin sqlite3 to
     # match Palites SQLite version; some system SQLite builds are too old and may fail.
     def sqlite_fetch_shared_meta(self, write):
-        sqlite_exe = os.path.join(wt_builddir, "sqlite3")
-        database_home = os.path.join(self.dir, 'kv_home', "pages_000002.db") # table for WT_SPECIAL_PALI_TURTLE_FILE_ID
+        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
+        database_home = os.path.join(self.dir, 'kv_home', self.turtle_table)
         result = subprocess.run(
-            [sqlite_exe, "-json", database_home, "SELECT * FROM pages ORDER BY lsn DESC LIMIT 1;"],
+            [sqlite_exe,
+             '-json',
+             database_home,
+             f'''SELECT * FROM pages
+                 WHERE table_id={self.WT_SPECIAL_PALI_TURTLE_FILE_ID}
+                 ORDER BY lsn DESC LIMIT 1;'''
+             ],
             capture_output=True,
             text=True,
             check=True

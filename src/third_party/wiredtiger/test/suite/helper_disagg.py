@@ -65,6 +65,15 @@ def gen_disagg_storages(test_name='', disagg_only = False):
 def disagg_ignore_expected_output(testcase):
     testcase.ignoreStdoutPattern('WT_VERB_RTS')
 
+# Several tests access pages data directly by table id.
+# This function computes the shard id for a given table id, which is needed to
+# find the right database file in kv_home directory.
+def get_shard_id(table_id):
+    # See Storage.NUM_SHARDS in ext/page_log/palite/palite.cpp.
+    # This must be kept in sync with that value.
+    NUM_SHARDS = 17
+    return int(table_id) % NUM_SHARDS
+
 # A decorator for a disaggregated test class, that ignores verbose warnings about RTS at shutdown.
 # The class decorator takes a class as input, and returns a class to take its place.
 def disagg_test_class(cls):
