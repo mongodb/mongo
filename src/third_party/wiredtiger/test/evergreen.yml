@@ -5607,10 +5607,10 @@ buildvariants:
     - name: long-test
     - name: configure-combinations
 
-- name: windows-64
-  display_name: "! Windows 64-bit"
+- name: windows
+  display_name: "! Windows"
   run_on:
-  - windows-64-vs2017-test
+  - windows-2022-small
   expansions:
     # Remove the default configurations for the toolchain and install prefix.
     CMAKE_TOOLCHAIN_FILE:
