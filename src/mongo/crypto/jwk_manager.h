@@ -81,29 +81,16 @@ public:
         return _isKeyModified;
     }
 
+    Date_t getLastAttemptedFetchTime() const {
+        return _fetcher->getLastAttemptedFetchTime();
+    }
+
     /**
      * Serialize the JWKs stored in this key manager into the BSONObjBuilder.
      */
     void serialize(BSONObjBuilder* bob) const;
 
-    /**
-     * Returns TRUE if a fetch to IDP SHOULD NOT be performed at this time.
-     * e.g. If a fetch was performed too recently.
-     */
-    bool quiesce() const {
-        return _fetcher->quiesce();
-    }
-
-    /**
-     * Sets a date to be used as the latest time a fetch happened.
-     */
-    void setQuiesce(Date_t quiesce) {
-        _fetcher->setQuiesce(quiesce);
-    }
-
 private:
-    bool _haveKeysBeenModified(const KeyMap& newKeyMaterial) const;
-
     std::unique_ptr<JWKSFetcher> _fetcher;
 
     // Stores the current key material of the manager, which may have been refreshed.
@@ -114,6 +101,13 @@ private:
     // If an existing key got deleted or modified while doing a just in time refresh, we activate
     // this flag to indicate that a refresh occurred during this JWKManager's lifetime.
     bool _isKeyModified;
+
+private:
+    /**
+     * Helper function to check whether a just-in-time refresh caused keys to be
+     * modified after JWKManager initialization.
+     */
+    bool _haveKeysBeenModified(const KeyMap& newKeyMaterial) const;
 };
 
 }  // namespace mongo::crypto

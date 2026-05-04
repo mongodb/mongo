@@ -38,6 +38,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/crypto/jws_validator.h"
+#include "mongo/crypto/jwt_parameters_gen.h"
 #include "mongo/crypto/jwt_types_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -45,6 +46,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -106,7 +108,12 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
 }
 
 Status JWKManager::loadKeys() try {
-    if (_fetcher->quiesce()) {
+    bool isQuiesced = [this]() {
+        auto* clockSource = _fetcher->getClockSource();
+        return clockSource->now() <
+            (getLastAttemptedFetchTime() + Seconds(gJWKSMinimumQuiescePeriodSecs.load()));
+    }();
+    if (isQuiesced) {
         return {ErrorCodes::OperationFailed, "Skipping refresh due to IdP quiesce"};
     }
 

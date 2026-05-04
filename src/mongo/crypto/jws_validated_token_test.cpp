@@ -349,6 +349,33 @@ TEST_F(JWKManagerTest, parsingErrors) {
         ErrorCodes::IDLFailedToParse);
 }
 
+TEST_F(JWKManagerTest, getLastAttemptedFetchTime) {
+    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+
+    // Load just the second key (custom-key-2) from testJWKSet into the JWKManager.
+    auto key = [this]() {
+        BSONObjBuilder singleKeySetBuilder;
+        BSONArrayBuilder keysBuilder(singleKeySetBuilder.subarrayStart("keys"_sd));
+
+        auto fullJWKSet = getTestJWKSet();
+        keysBuilder.append(fullJWKSet.getField("keys").Array()[1]);
+        keysBuilder.doneFast();
+
+        return singleKeySetBuilder.obj();
+    }();
+    jwksFetcher()->setKeys(key);
+
+    // Validating a JWSValidatedToken signed by custom-key-2 should trigger a successful
+    // just-in-time refresh. Validation should succeed and the lastAttemptedFetchTime should
+    // advance.
+    auto initialLastAttemptedFetchTime = jwksFetcher()->getLastAttemptedFetchTime();
+    getClock()->advance(Seconds{3});
+    auto validCustomKey2Token =
+        validTokenHeaderRS + "."_sd + validTokenBodyRS + "."_sd + validTokenSignatureRS;
+    ASSERT_DOES_NOT_THROW(JWSValidatedToken(jwkManager(), validCustomKey2Token));
+    ASSERT_LT(initialLastAttemptedFetchTime, jwksFetcher()->getLastAttemptedFetchTime());
+}
+
 #endif
 }  // namespace mongo::crypto::test
 
