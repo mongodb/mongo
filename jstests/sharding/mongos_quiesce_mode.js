@@ -5,8 +5,6 @@
  * begin re-routing operations.
  * @tags: [
  *   # This test requires shutting down mongos alone.
- *   # TODO (SERVER-88401): adapt this test for embedded router or create a new one supporting it.
- *   embedded_router_incompatible,
  * ]
  */
 

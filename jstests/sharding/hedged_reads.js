@@ -2,7 +2,6 @@
  * Tests hedging metrics in the serverStatus output.
  * @tags: [
  *    requires_fcv_80,
- *    temp_disabled_embedded_router_uncategorized,
  *    # Disable windows testing as this feature is deprecated in v8.0.
  *    incompatible_with_windows_tls,
  * ]

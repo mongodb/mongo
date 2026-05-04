@@ -3,7 +3,6 @@
  * are behind the majority opTime.
  * @tags: [
  *   config_shard_incompatible,
- *   temp_disabled_embedded_router_known_issues,
  * ]
  */
 

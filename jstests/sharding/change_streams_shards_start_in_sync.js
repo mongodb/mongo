@@ -9,7 +9,6 @@
 //   does_not_support_stepdowns,
 //   requires_majority_read_concern,
 //   uses_change_streams,
-//   temp_disabled_embedded_router_mongo_bridge,
 // ]
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 

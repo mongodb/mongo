@@ -2,7 +2,6 @@
  * Tests that shard removal triggers an update of the catalog cache so that routers don't continue
  * to target shards that have been removed.
  * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
  *   # Incremental metadata refresh following shard removal is protected by a server parameter in
  *   # the 7.0 branch.
  *   multiversion_incompatible,

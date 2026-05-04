@@ -3,7 +3,6 @@
  * the local participant.
  *
  * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
  *   uses_multi_shard_transaction,
  *   uses_prepare_transaction,
  *   uses_transactions,

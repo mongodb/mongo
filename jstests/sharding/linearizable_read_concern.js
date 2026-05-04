@@ -19,9 +19,6 @@
  * document. This test is mainly trying to ensure that system behavior is
  * reasonable when executing linearizable reads in a sharded cluster, so as to
  * exercise possible (invalid) user behavior.
- * @tags: [
- *   temp_disabled_embedded_router_mongo_bridge,
- * ]
  */
 
 import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";

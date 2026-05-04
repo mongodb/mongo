@@ -4,7 +4,6 @@
  *
  *  @tags: [
  *    multiversion_incompatible,
- *    temp_disabled_embedded_router_health_monitor,
  * ]
  */
 const params = {

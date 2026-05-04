@@ -6,7 +6,6 @@
  * @tags: [
  *   config_shard_incompatible,
  *   requires_fcv_63,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";

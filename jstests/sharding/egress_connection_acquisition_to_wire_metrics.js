@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_63,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 function getConnAcquiredToWireMicros(conn) {

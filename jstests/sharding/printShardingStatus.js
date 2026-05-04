@@ -1,10 +1,6 @@
 // Check that the output from printShardingStatus() (aka sh.status())
 // contains important information that it should, like the major section
 // headings and the names of sharded collections and their shard keys.
-// @tags: [
-//   # Test doesn't start enough mongods to have num_mongos routers
-//   temp_disabled_embedded_router_num_routers,
-// ]
 
 const MONGOS_COUNT = 2;
 

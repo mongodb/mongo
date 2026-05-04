@@ -7,7 +7,6 @@
  *   requires_persistence,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

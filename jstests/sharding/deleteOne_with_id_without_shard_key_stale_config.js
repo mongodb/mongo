@@ -1,7 +1,7 @@
 /**
  * Tests deleteOne with id without shard key works with StaleConfigError.
  *
- * @tags: [requires_fcv_80, temp_disabled_embedded_router_uncategorized]
+ * @tags: [requires_fcv_80]
  */
 
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";

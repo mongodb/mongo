@@ -5,7 +5,6 @@
  * @tags: [
  *   featureFlagReshardingImprovements,
  *   requires_fcv_72,
- *   temp_disabled_embedded_router_uncategorized,
  *   uses_atclustertime,
  * ]
  */

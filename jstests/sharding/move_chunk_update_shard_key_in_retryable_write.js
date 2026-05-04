@@ -9,7 +9,6 @@
  * @tags: [
  *    uses_transactions,
  *    uses_multi_shard_transaction,
- *    temp_disabled_embedded_router_uncategorized,
  * ]
  */
 import {

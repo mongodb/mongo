@@ -5,7 +5,6 @@
  * Requires no shards so there can't be a config shard.
  * @tags: [
  *   config_shard_incompatible,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 const st = new ShardingTest({shards: 0});

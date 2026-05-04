@@ -1,9 +1,6 @@
 //
 // Tests cleanup of sharded and unsharded cursors
 //
-// @tags: [
-//   temp_disabled_embedded_router_uncategorized,
-// ]
 
 var st = new ShardingTest({shards: 2, mongos: 1});
 

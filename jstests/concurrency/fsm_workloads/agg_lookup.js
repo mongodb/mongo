@@ -2,11 +2,6 @@
  * agg_lookup.js
  *
  * Runs a $lookup aggregation simultaneously with updates.
- *
- * TODO SERVER-90385 Enable this test in embedded router suites
- * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
- * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

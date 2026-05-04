@@ -10,7 +10,6 @@
  *   requires_profiling,
  *   # Needed to run createUnsplittableCollection
  *   featureFlagAuthoritativeShardCollection,
- *   temp_disabled_embedded_router_uncategorized,
  *   requires_fcv_80,
  * ]
  */

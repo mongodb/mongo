@@ -1,7 +1,6 @@
 /**
  * @tags: [
  *   requires_sharding,
- *   temp_disabled_embedded_router_uncategorized,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
  *   requires_fcv_80,

@@ -4,7 +4,6 @@
  * @tags: [
  *   multiversion_incompatible,
  *   requires_fcv_80,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

@@ -16,7 +16,6 @@
  *
  * @tags: [
  *   resource_intensive,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

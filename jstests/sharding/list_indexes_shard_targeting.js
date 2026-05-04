@@ -2,9 +2,6 @@
  * Test that for an unsharded collection the listIndexes command targets the database's primary
  * shard, and for a sharded collection the command sends and checks shard versions and only
  * targets the shard that owns the MinKey chunk.
- * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
- * ]
  */
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 

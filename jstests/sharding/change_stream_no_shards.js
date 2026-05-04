@@ -6,8 +6,6 @@
  * @tags: [
  *   config_shard_incompatible,
  *   uses_change_streams,
- *   # Test doesn't start enough mongods to have num_mongos routers
- *   temp_disabled_embedded_router_num_routers,
  * ]
  */
 const st = new ShardingTest({shards: 0});

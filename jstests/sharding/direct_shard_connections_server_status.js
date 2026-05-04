@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_fcv_73,
- *   temp_disabled_embedded_router_metrics,
  * ]
  */
 

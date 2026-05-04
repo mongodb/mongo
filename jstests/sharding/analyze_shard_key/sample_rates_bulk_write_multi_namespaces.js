@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   temp_disabled_embedded_router_known_issues,
  * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";

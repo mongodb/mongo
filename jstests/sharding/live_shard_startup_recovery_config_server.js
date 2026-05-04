@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_persistence,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

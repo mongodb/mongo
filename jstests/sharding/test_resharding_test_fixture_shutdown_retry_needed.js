@@ -10,7 +10,6 @@
  * @tags: [
  *   config_shard_incompatible,
  *   requires_persistence,
- *   temp_disabled_embedded_router_uncategorized,
  *   uses_atclustertime,
  * ]
  */

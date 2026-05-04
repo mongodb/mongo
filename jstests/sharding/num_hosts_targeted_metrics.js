@@ -1,7 +1,6 @@
 /**
  * @tags: [
  *   multiversion_incompatible,
- *   temp_disabled_embedded_router_metrics,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
  * ]

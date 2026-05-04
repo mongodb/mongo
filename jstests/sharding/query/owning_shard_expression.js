@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_63,
- *   temp_disabled_embedded_router_known_issues,
  * ]
  */
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";

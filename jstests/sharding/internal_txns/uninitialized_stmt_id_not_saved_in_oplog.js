@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_fcv_60,
  *   requires_persistence,
- *   temp_disabled_embedded_router_known_issues,
  *   uses_transactions,
  * ]
  */

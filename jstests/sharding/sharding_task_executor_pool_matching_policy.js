@@ -4,7 +4,6 @@
 //
 // @tags: [
 //   sets_replica_set_matching_strategy,
-//   temp_disabled_embedded_router_uncategorized,
 // ]
 
 // Helper function to check the matching policy of a node, given the output of the connPoolStats

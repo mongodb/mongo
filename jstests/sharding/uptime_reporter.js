@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_fcv_52,
- *   temp_disabled_embedded_router_known_issues,
  * ]
  */
 

@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_sharding,
- *   temp_disabled_embedded_router_known_issues,
  *   uses_transactions,
  * ]
  */

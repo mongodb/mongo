@@ -1,8 +1,4 @@
 // Tests propagation of RWC defaults across a sharded cluster.
-// @tags: [
-//   # Test doesn't start enough mongods to have num_mongos routers
-//   temp_disabled_embedded_router_num_routers,
-// ]
 import {
     ReadWriteConcernDefaultsPropagation
 } from "jstests/libs/read_write_concern_defaults_propagation_common.js";

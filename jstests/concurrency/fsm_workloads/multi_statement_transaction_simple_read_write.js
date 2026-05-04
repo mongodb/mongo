@@ -4,13 +4,9 @@
  * This is meant to exercise the single write shard commit optimization for sharded clusters.
  *
  * The base workload assumes transactions run at snapshot read concern, so the tag is copied here.
- *
- * TODO (SERVER-88902): Investigate why multi_statement_transaction_simple_read_write.js hang when
- * run in concurrency_embedded_router_* suites on config shard build variant.
  * @tags: [
  *    uses_transactions,
- *    assumes_snapshot_transactions,
- *    config_shard_incompatible
+ *    assumes_snapshot_transactions
  * ]
  */
 

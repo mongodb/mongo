@@ -3,9 +3,7 @@
  *
  * Runs a $graphLookup aggregation simultaneously with updates.
  *
- * TODO SERVER-90385 Enable this test in embedded router suites
  * @tags: [
- *   temp_disabled_embedded_router_uncategorized,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
  * ]

@@ -1,7 +1,0 @@
-base_suite: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
-overrides:
-  - "embedded_router.embedded_router"
-  - "embedded_router.concurrency_embedded_router"
-excludes:
-  - "embedded_router.exclude_collection_defragmentation"
-  - "embedded_router.exclude_disabled_embedded_router_tests"

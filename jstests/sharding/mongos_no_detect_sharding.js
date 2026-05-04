@@ -1,8 +1,4 @@
 // Tests whether new sharding is detected on insert by mongos
-// @tags: [
-//   # Test doesn't start enough mongods to have num_mongos routers
-//   temp_disabled_embedded_router_num_routers,
-// ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var st = new ShardingTest({name: "mongos_no_detect_sharding", shards: 1, mongos: 2});

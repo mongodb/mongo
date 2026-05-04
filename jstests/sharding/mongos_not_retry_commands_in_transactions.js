@@ -1,8 +1,5 @@
 /**
  * Tests that mongos doesn't retry commands with startTransaction=true.
- * @tags: [
- *     temp_disabled_embedded_router_uncategorized,
- * ]
  */
 const setCommandToFail = (nodeConnection, command, namespace) => {
     return nodeConnection.adminCommand({

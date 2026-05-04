@@ -17,7 +17,6 @@
 // @tags: [
 //   requires_fcv_51,
 //   requires_sharding,
-//   temp_disabled_embedded_router_metrics,
 // ]
 // This test manually simulates a session, which is not compatible with implicit sessions.
 TestData.disableImplicitSessions = true;

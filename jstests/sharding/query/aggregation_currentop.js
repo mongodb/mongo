@@ -16,7 +16,6 @@
  * @tags: [
  *   requires_fcv_70,
  *   requires_persistence,
- *   temp_disabled_embedded_router_metrics,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

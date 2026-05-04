@@ -2,7 +2,6 @@
 // after restarting.
 // @tags: [
 //   requires_persistence,
-//   temp_disabled_embedded_router_uncategorized,
 // ]
 
 var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});

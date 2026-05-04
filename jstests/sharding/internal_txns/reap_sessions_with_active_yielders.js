@@ -5,7 +5,6 @@
  * @tags: [
  *    requires_fcv_60,
  *    uses_transactions,
- *    temp_disabled_embedded_router_known_issues,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -2,7 +2,6 @@
  * Validate we can connect over the proxy protocol port with the protocol appended.
  * @tags: [
  *   requires_fcv_52,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

@@ -1,9 +1,5 @@
 // Tests whether profiling can trigger stale config errors and interfere with write batches
 // SERVER-13413
-// @tags: [
-//   # Test doesn't start enough mongods to have num_mongos routers
-//   temp_disabled_embedded_router_num_routers,
-// ]
 
 var st = new ShardingTest({shards: 1, mongos: 2});
 st.stopBalancer();
