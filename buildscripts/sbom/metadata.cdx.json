@@ -802,10 +802,6 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/gperftools/scripts/import.sh"
-        },
-        {
-          "name": "internal:generate_sbom:priority_version_source",
-          "value": "import_script"
         }
       ],
       "evidence": {
@@ -859,10 +855,6 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/grpc/scripts/import.sh"
-        },
-        {
-          "name": "internal:generate_sbom:priority_version_source",
-          "value": "import_script"
         }
       ],
       "evidence": {
@@ -1286,10 +1278,6 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/unwind/scripts/import.sh"
-        },
-        {
-          "name": "internal:generate_sbom:priority_version_source",
-          "value": "import_script"
         }
       ],
       "evidence": {
@@ -1661,7 +1649,7 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf-cpp:{{VERSION}}:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:google:protobuf:{{VERSION}}:*:*:*:*:*:*:*",
       "purl": "pkg:github/protocolbuffers/protobuf@{{VERSION}}",
       "externalReferences": [
         {
