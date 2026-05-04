@@ -183,8 +183,8 @@ server_parameters:
 
     proxyUnixSocketCheckPermissions:
         description: >-
-            Check whether the connecting process is running under a specified UID. Closes connection
-            if check fails.
+            Check whether the connecting process is running under the GID specified in 
+            proxyUnixSocketFileGroupId. Closes connection if check fails.
         set_at: [startup, runtime]
         cpp_varname: gProxyUnixSocketCheckPermissions
         cpp_vartype: Atomic<bool>

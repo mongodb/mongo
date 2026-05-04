@@ -132,6 +132,14 @@ configs:
         default: ""
         condition:
             preprocessor: "!defined(_WIN32)"
+    "net.proxyUnixDomainSocket.fileGroupId":
+        short_name: proxyUnixSocketFileGroupId
+        description: >-
+            The group id that will be assigned to the proxy UNIX domain socket. If unset, the socket
+            group defaults to the server's effective group id."
+        arg_vartype: Unsigned
+        condition:
+            preprocessor: "!defined(_WIN32)"
     "net.unixDomainSocket.enabled":
         description: "Disable listening on unix sockets"
         arg_vartype: Bool

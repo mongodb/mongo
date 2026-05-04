@@ -302,7 +302,8 @@ Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {
     if (!peerCreds.isOK())
         return peerCreds.getStatus();
     gid_t remoteGid = peerCreds.getValue();
-    gid_t expectedGid = ::getegid();
+    gid_t expectedGid =
+        serverGlobalParams.proxySocketGid ? *serverGlobalParams.proxySocketGid : ::getegid();
 
     if (auto fp = proxyUnixDomainSocketPeerCredentialValidationOverride.scoped();
         MONGO_unlikely(fp.isActive()))
@@ -311,8 +312,6 @@ Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {
                 return Status(static_cast<ErrorCodes::Error>(code.numberInt()), "Failpoint result");
             if (auto gid = data["remoteGid"]; gid.ok())
                 remoteGid = gid.Int();
-            if (auto gid = data["expectedGid"]; gid.ok())
-                expectedGid = gid.Int();
         }
 
     if (expectedGid != remoteGid)

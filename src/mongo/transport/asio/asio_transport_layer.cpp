@@ -701,6 +701,9 @@ AsioTransportLayer::ListenerInterface::_createAcceptorRecords(
 #ifndef _WIN32
         if (isProxyUnixDomainSocket) {
             setUnixDomainSocketPermissions(addr.toString(), kProxyUnixDomainSocketPerms);
+            if (serverGlobalParams.proxySocketGid) {
+                setUnixDomainSocketGroup(addr.toString(), *serverGlobalParams.proxySocketGid);
+            }
         } else if (addr.family() == AF_UNIX) {
             setUnixDomainSocketPermissions(addr.toString(),
                                            serverGlobalParams.unixSocketPermissions);
