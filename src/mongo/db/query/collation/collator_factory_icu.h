@@ -51,8 +51,6 @@ namespace MONGO_MOD_PUBLIC mongo {
 class CollatorFactoryICU : public CollatorFactoryInterface {
 public:
     StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) final;
-    StatusWith<std::unique_ptr<CollatorInterface>> makeFromCollation(
-        const Collation& collation) final;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

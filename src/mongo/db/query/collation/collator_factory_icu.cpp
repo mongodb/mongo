@@ -504,7 +504,17 @@ Status validateCollationSpec(const Collation& collation, const BSONObj& spec) {
     return Status::OK();
 }
 
-StatusWith<std::unique_ptr<CollatorInterface>> makeFrom(Collation collation, const BSONObj& spec) {
+}  // namespace
+
+StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
+    const BSONObj& spec) {
+
+    Collation collation;
+    try {
+        collation = Collation::parse(spec, IDLParserContext{"collation"});
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 
     if (collation.getLocale().find('\0') != std::string::npos) {
         return {ErrorCodes::BadValue,
@@ -558,26 +568,6 @@ StatusWith<std::unique_ptr<CollatorInterface>> makeFrom(Collation collation, con
     auto mongoCollator =
         std::make_unique<CollatorInterfaceICU>(std::move(collation), std::move(icuCollator));
     return {std::move(mongoCollator)};
-}
-}  // namespace
-
-StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromCollation(
-    const Collation& collation) {
-
-    return makeFrom(collation, collation.toBSON());
-}
-
-StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
-    const BSONObj& spec) {
-
-    Collation collation;
-    try {
-        collation = Collation::parse(spec, IDLParserContext{"collation"});
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-
-    return makeFrom(std::move(collation), spec);
 }
 
 }  // namespace mongo

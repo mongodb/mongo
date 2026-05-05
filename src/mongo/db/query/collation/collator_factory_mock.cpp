@@ -51,9 +51,4 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromBSON
     return {std::move(collator)};
 }
 
-StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromCollation(
-    const Collation& collation) {
-    MONGO_UNIMPLEMENTED;
-};
-
 }  // namespace mongo

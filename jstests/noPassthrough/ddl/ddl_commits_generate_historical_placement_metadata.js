@@ -352,7 +352,7 @@ function verifyCommitOpEntriesOnShards(
         if (orderStrict) {
             assert.eq(expectedOpEntryTemplates.length, redactedOpEntries.length);
             for (let i = 0; i < foundOpEntries.length; ++i) {
-                assert.docEq(expectedOpEntryTemplates[i], redactedOpEntries[i]);
+                assert.eq(expectedOpEntryTemplates[i], redactedOpEntries[i]);
             }
         } else {
             assert.sameMembers(expectedOpEntryTemplates, redactedOpEntries);

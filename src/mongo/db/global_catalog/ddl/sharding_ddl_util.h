@@ -201,7 +201,7 @@ MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CreateCollectionResponse>
 checkIfCollectionAlreadyTrackedWithOptions(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const BSONObj& key,
-                                           const Collation& collation,
+                                           const BSONObj& collation,
                                            bool unique,
                                            bool unsplittable);
 

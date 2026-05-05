@@ -86,6 +86,9 @@ MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<InitialSplitPolicy> createPolicy(
  * Generates, using a ShardsvrCreateCollectionRequest as source, a CreateCommand that
  * can be used with the command execution framework to create a collection on this
  * shard server.
+ *
+ * TODO(SERVER-81447): build CreateCommand by simply extracting CreateCollectionRequest
+ * from ShardsvrCreateCollectionRequest. Also, see SERVER-65865.
  */
 MONGO_MOD_NEEDS_REPLACEMENT CreateCommand
 makeCreateCommand(OperationContext* opCtx,

@@ -80,8 +80,6 @@ public:
      * version requested in 'spec'.
      */
     virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
-    virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromCollation(
-        const Collation& collation) = 0;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

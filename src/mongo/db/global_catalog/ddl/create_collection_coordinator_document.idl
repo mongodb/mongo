@@ -32,27 +32,12 @@
 global:
     mod_visibility: private
     cpp_namespace: "mongo"
-    # TODO SERVER-125792: Remove this once 10.0 is LTS
-    cpp_includes:
-        - "mongo/db/global_catalog/ddl/create_collection_coordinator_document_compatibility_util.h"
 
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
     - "mongo/db/global_catalog/ddl/sharded_ddl_commands.idl"
     - "mongo/db/global_catalog/type_collection_common_types.idl"
-
-# TODO SERVER-125792: Remove this once 10.0 is LTS
-types:
-    BackwardCompatibleCollation:
-        description: >-
-            Collation type that handles legacy {} documents written by pre-9.0 binaries, where
-            simple collation was persisted as an empty object rather than {locale: "simple"}.
-        cpp_type: "mongo::Collation"
-        bson_serialization_type: any
-        serializer: "::mongo::serializeBackwardCompatibleCollation"
-        deserializer: "mongo::deserializeBackwardCompatibleCollation"
-        is_view: false
 
 enums:
     CreateCollectionCoordinatorPhase:
@@ -86,8 +71,7 @@ structs:
                 description: "The shard key that will be used by the DDL while accessing the Sharding Catalog"
                 optional: false
             collation:
-                # TODO SERVER-125792: Change this to Collation once 10.0 is LTS
-                type: BackwardCompatibleCollation
+                type: object_owned
                 description: "Collation value from the targeted unsharded collection if this exists; otherwise, simple-collation"
                 optional: false
             timeseries:

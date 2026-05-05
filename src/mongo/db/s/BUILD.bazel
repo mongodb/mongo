@@ -927,7 +927,6 @@ mongo_cc_unit_test(
         "split_vector_test.cpp",
         "start_chunk_clone_request_test.cpp",
         "//src/mongo/db/global_catalog/ddl:chunk_operation_sharding_coordinator_test.cpp",
-        "//src/mongo/db/global_catalog/ddl:create_collection_coordinator_document_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_coordinator_service_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_recovery_service_test.cpp",

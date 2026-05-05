@@ -226,8 +226,35 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
 CreateCommand makeCreateCommand(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const ShardsvrCreateCollectionRequest& request) {
+    // TODO SERVER-81447: build CreateCommand by simply extracting CreateCollectionRequest
+    // from ShardsvrCreateCollectionRequest
     CreateCommand cmd(nss);
-    cmd.setCreateCollectionRequest(request.getCreateRequest());
+    CreateCollectionRequest createRequest;
+    createRequest.setCapped(request.getCapped());
+    createRequest.setTimeseries(request.getTimeseries());
+    createRequest.setSize(request.getSize());
+    createRequest.setClusteredIndex(request.getClusteredIndex());
+    if (request.getCollation() && !request.getCollation()->isEmpty()) {
+        auto collation = Collation::parse(*request.getCollation(), IDLParserContext("collation"));
+        createRequest.setCollation(collation);
+    }
+    createRequest.setEncryptedFields(request.getEncryptedFields());
+    createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
+    createRequest.setMax(request.getMax());
+    createRequest.setFlags(request.getFlags());
+    createRequest.setTemp(request.getTemp());
+    createRequest.setIdIndex(request.getIdIndex());
+    createRequest.setViewOn(request.getViewOn());
+    createRequest.setIndexOptionDefaults(request.getIndexOptionDefaults());
+    createRequest.setExpireAfterSeconds(request.getExpireAfterSeconds());
+    createRequest.setValidationAction(request.getValidationAction());
+    createRequest.setValidationLevel(request.getValidationLevel());
+    createRequest.setValidator(request.getValidator());
+    createRequest.setPipeline(request.getPipeline());
+    createRequest.setStorageEngine(request.getStorageEngine());
+    createRequest.setStorageTier(request.getStorageTier());
+
+    cmd.setCreateCollectionRequest(createRequest);
     return cmd;
 }
 
@@ -310,44 +337,42 @@ void assertTimeseriesLocalCatalogConsistency(OperationContext* opCtx, const Coll
 // 5. In case of unsplittable collection, simply return the same collator as specified in the
 // request
 
-static const Collation kSimpleCollationSpec = Collation::parse(CollationSpec::kSimpleSpec);
-
 /*
- * Normalize the provided collation in order to convert simple collations to the same value.
+ * Parse + serialization of the input bson to apply the Collation's class default values. This
+ * ensure both sharding and local catalog to store the same collation's values.
  */
-Collation normalizeCollation(OperationContext* opCtx, const Collation& collation) {
+BSONObj normalizeCollation(OperationContext* opCtx, const BSONObj& collation) {
     auto collator = uassertStatusOK(
-        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromCollation(collation));
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     if (!collator) {
-        // In case of simple collation, makeFromCollation returns a null pointer.
-        return kSimpleCollationSpec;
+        // In case of simple collation, makeFromBSON returns a null pointer.
+        return BSONObj();
     }
-    return collator->getSpec();
+    return collator->getSpec().toBSON();
 }
 
-Collation resolveCollationForUserQueries(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const boost::optional<Collation>& collationInRequest,
-                                         bool isUnsplittable,
-                                         bool isRegisterExistingCollectionInGlobalCatalog) {
+BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const boost::optional<BSONObj>& collationInRequest,
+                                       bool isUnsplittable,
+                                       bool isRegisterExistingCollectionInGlobalCatalog) {
     if (isUnsplittable && !isRegisterExistingCollectionInGlobalCatalog) {
         if (collationInRequest) {
             return normalizeCollation(opCtx, *collationInRequest);
         } else {
-            return kSimpleCollationSpec;
+            return BSONObj();
         }
     }
 
     // Ensure the collation is valid. Currently we only allow the simple collation.
     auto requestedCollator = CollatorInterface::cloneCollator(kSimpleCollator);
     if (collationInRequest) {
-        const auto& collation = collationInRequest.value();
-        requestedCollator =
-            uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                ->makeFromCollation(collation));
+        const auto& collationBson = collationInRequest.value();
+        requestedCollator = uassertStatusOK(
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationBson));
         uassert(ErrorCodes::BadValue,
                 str::stream() << "The collation for shardCollection must be {locale: 'simple'}, "
-                              << "but found: " << collation.toBSON(),
+                              << "but found: " << collationBson,
                 CollatorInterface::isSimpleCollator(requestedCollator.get()));
     }
 
@@ -363,22 +388,22 @@ Collation resolveCollationForUserQueries(OperationContext* opCtx,
     }();
 
     if (!requestedCollator && !actualCollator) {
-        return kSimpleCollationSpec;
+        return BSONObj();
     }
 
-    auto actualCollatorSpec = actualCollator->getSpec();
+    auto actualCollatorBSON = actualCollator->getSpec().toBSON();
 
     if (!collationInRequest && !isRegisterExistingCollectionInGlobalCatalog) {
         auto actualCollatorFilter =
             uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                ->makeFromCollation(actualCollatorSpec));
+                                ->makeFromBSON(actualCollatorBSON));
         uassert(ErrorCodes::BadValue,
                 str::stream() << "If no collation was specified, the collection collation must be "
                                  "{locale: 'simple'}, "
-                              << "but found: " << actualCollatorSpec.toBSON(),
+                              << "but found: " << actualCollatorBSON,
                 CollatorInterface::isSimpleCollator(actualCollatorFilter.get()));
     }
-    return normalizeCollation(opCtx, actualCollatorSpec);
+    return normalizeCollation(opCtx, actualCollatorBSON);
 }
 
 /*
@@ -725,9 +750,9 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
             fmt::format("Collection '{}' already exists with a different 'unique' option. "
                         "Requested '{}' but found '{}'",
                         targetNss.toStringForErrorMsg(),
-                        request.getUnique(),
+                        request.getUnique().value_or(false),
                         cm.isUnique()),
-            cm.isUnique() == request.getUnique());
+            cm.isUnique() == request.getUnique().value_or(false));
 
     if (request.getDataShard()) {
 
@@ -772,14 +797,14 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                                            request.getUnsplittable(),
                                            request.getRegisterExistingCollectionInGlobalCatalog());
         const auto defaultCollator =
-            cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec() : kSimpleCollationSpec;
+            cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
         uassert(ErrorCodes::AlreadyInitialized,
                 fmt::format("Collection '{}' already exists with a different 'collator' option. "
-                            "Requested '{}' but found '{}'",
+                            "Requested {} but found {}",
                             targetNss.toStringForErrorMsg(),
-                            requestedCollator.toBSON().toString(),
-                            defaultCollator.toBSON().toString()),
-                defaultCollator == requestedCollator);
+                            requestedCollator.toString(),
+                            defaultCollator.toString()),
+                SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == requestedCollator));
     }
 
     {
@@ -1001,14 +1026,14 @@ void checkCommandArguments(OperationContext* opCtx,
     uassert(ErrorCodes::InvalidOptions,
             "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
             "the hashed field by declaring an additional (non-hashed) unique index on the field.",
-            !shardKeyPattern.isHashedPattern() || !request.getUnique());
+            !shardKeyPattern.isHashedPattern() || !request.getUnique().value_or(false));
 
     if (request.getUnsplittable()) {
         // Create unsharded collection
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "presplitHashedZones can't be specified for unsharded collection",
-                !request.getPresplitHashedZones());
+                !request.getPresplitHashedZones().value_or(false));
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "Found non-trivial shard key while creating unsharded collection",
@@ -1296,9 +1321,7 @@ boost::optional<UUID> createCollectionAndIndexes(
     }
 
     auto translatedRequest = request;
-    if (translatedRequestParams.getCollation() != kSimpleCollationSpec) {
-        translatedRequest.setCollation(translatedRequestParams.getCollation());
-    }
+    translatedRequest.setCollation(translatedRequestParams.getCollation());
 
     if (const auto& timeseriesFields = translatedRequestParams.getTimeseries()) {
         translatedRequest.setTimeseries(timeseriesFields->getTimeseriesOptions());
@@ -1331,8 +1354,8 @@ boost::optional<UUID> createCollectionAndIndexes(
             opCtx,
             translatedNss,
             shardKeyPattern,
-            translatedRequestParams.getCollation().toBSON(),
-            request.getUnique(),
+            translatedRequestParams.getCollation(),
+            request.getUnique().value_or(false),
             request.getEnforceUniquenessCheck().value_or(true),
             shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard),
             (translatedRequestParams.getTimeseries()
@@ -1346,8 +1369,9 @@ boost::optional<UUID> createCollectionAndIndexes(
                     opCtx,
                     translatedNss,
                     shardKeyPattern,
-                    translatedRequestParams.getCollation().toBSON(),
-                    request.getUnique() && request.getEnforceUniquenessCheck().value_or(true),
+                    translatedRequestParams.getCollation(),
+                    request.getUnique().value_or(false) &&
+                        request.getEnforceUniquenessCheck().value_or(true),
                     shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard)));
     }
 
@@ -1412,12 +1436,13 @@ void commit(OperationContext* opCtx,
         coll.setTimeseriesFields(timeseriesFields);
     }
 
-    if (auto collationSpec = translatedRequestParams.getCollation();
-        collationSpec != kSimpleCollationSpec) {
-        coll.setDefaultCollation(collationSpec.toBSON());
+    if (auto collationBSON = translatedRequestParams.getCollation(); !collationBSON.isEmpty()) {
+        coll.setDefaultCollation(collationBSON);
     }
 
-    coll.setUnique(request.getUnique());
+    if (request.getUnique()) {
+        coll.setUnique(*request.getUnique());
+    }
 
     auto ops = sharding_ddl_util::getOperationsToCreateOrShardCollectionOnShardingCatalog(
         coll, initialChunks->chunks, placementVersion, shardsHoldingData);
@@ -1971,8 +1996,10 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
     }
 
     if (isSharded(_request)) {
-        audit::logShardCollection(
-            opCtx->getClient(), nss(), *_request.getShardKey(), _request.getUnique());
+        audit::logShardCollection(opCtx->getClient(),
+                                  nss(),
+                                  *_request.getShardKey(),
+                                  _request.getUnique().value_or(false));
     }
 
     auto dataShardForPolicy =
@@ -1987,7 +2014,7 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
     const auto splitPolicy = create_collection_util::createPolicy(
         opCtx,
         shardKeyPattern,
-        _request.getPresplitHashedZones(),
+        _request.getPresplitHashedZones().value_or(false),
         getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON(), _request.getUnsplittable()),
         getNumShards(opCtx),
         *_doc.getCollectionIsEmpty(),
@@ -2239,7 +2266,7 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
                     nss(),
                     shardKeyPattern.toBSON(),
                     _doc.getTranslatedRequestParams()->getCollation(),
-                    _request.getUnique(),
+                    _request.getUnique().value_or(false),
                     _request.getUnsplittable().value_or(false));
             committedSpecs.has_value()) {
 
@@ -2265,7 +2292,7 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
             const auto splitPolicy = create_collection_util::createPolicy(
                 opCtx,
                 shardKeyPattern,
-                _request.getPresplitHashedZones(),
+                _request.getPresplitHashedZones().value_or(false),
                 getTagsAndValidate(
                     opCtx, nss(), shardKeyPattern.toBSON(), _request.getUnsplittable()),
                 getNumShards(opCtx),

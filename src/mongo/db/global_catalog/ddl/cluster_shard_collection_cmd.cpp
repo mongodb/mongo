@@ -39,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/db/global_catalog/ddl/shard_collection_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -119,7 +120,7 @@ public:
         ShardsvrCreateCollectionRequest serverRequest;
         serverRequest.setShardKey(clusterRequest.getKey());
         serverRequest.setUnique(clusterRequest.getUnique());
-        serverRequest.setNumInitialChunks(clusterRequest.getNumInitialChunks().get_value_or(0));
+        serverRequest.setNumInitialChunks(clusterRequest.getNumInitialChunks());
         serverRequest.setPresplitHashedZones(clusterRequest.getPresplitHashedZones());
         serverRequest.setCollation(clusterRequest.getCollation());
         serverRequest.setTimeseries(clusterRequest.getTimeseries());
