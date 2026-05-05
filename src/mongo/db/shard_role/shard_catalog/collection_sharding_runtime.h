@@ -350,6 +350,7 @@ public:
         kAuthoritative
     };
     AuthoritativeState getAuthoritativeState() const;
+    void setNonAuthoritative();
 
     void setCollectionRecoverer(std::shared_ptr<CollectionCacheRecoverer> recoverer);
     std::shared_ptr<CollectionCacheRecoverer> getCollectionCacheRecoverer() const;

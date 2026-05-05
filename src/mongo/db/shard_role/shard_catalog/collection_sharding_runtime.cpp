@@ -831,6 +831,10 @@ CollectionShardingRuntime::AuthoritativeState CollectionShardingRuntime::getAuth
     return _authoritativeState;
 }
 
+void CollectionShardingRuntime::setNonAuthoritative() {
+    _authoritativeState = AuthoritativeState::kNonAuthoritative;
+}
+
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
                                                      NamespaceString nss,
                                                      BSONObj reason)
