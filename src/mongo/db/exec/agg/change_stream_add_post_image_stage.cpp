@@ -125,7 +125,7 @@ boost::optional<Document> ChangeStreamAddPostImageStage::lookupLatestPostImage(
 
     // Extract the resume token data from the input event.
     auto resumeTokenData =
-        ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument()).getData();
+        ResumeToken::parse(updateOp.metadata().getSortKey().getDocument()).getData();
 
     auto readConcern = BSON("level" << "majority"
                                     << "afterClusterTime" << resumeTokenData.clusterTime);

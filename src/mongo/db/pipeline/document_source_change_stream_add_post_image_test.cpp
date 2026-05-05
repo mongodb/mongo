@@ -73,22 +73,26 @@ public:
         return *uuid_gen;
     }
 
-    Document makeResumeToken(ImplicitValue id = Value()) {
-        const Timestamp ts(100, 1);
-        if (id.missing()) {
-            ResumeTokenData tokenData(ts,
-                                      ResumeTokenData::kDefaultTokenVersion,
-                                      /* txnOpIndex */ 0,
-                                      /* uuid */ boost::none,
-                                      /* eventIdentifier */ Value());
-            return ResumeToken(tokenData).toDocument();
-        }
-        ResumeTokenData tokenData(ts,
-                                  /* version */ 0,
+    Document createDocumentWithIdAndResumeToken(int idValue, Document&& doc) {
+        MutableDocument combined;
+
+        // Sort key comes first, then _id, then all other fields.
+        ResumeTokenData tokenData(Timestamp(100, 1),
+                                  ResumeTokenData::kDefaultTokenVersion,
                                   /* txnOpIndex */ 0,
                                   testUuid(),
-                                  /* eventIdentifier */ Value(Document{{"_id", id}}));
-        return ResumeToken(tokenData).toDocument();
+                                  /* eventIdentifier */ Value(Document{{"_id", idValue}}));
+
+        combined.metadata().setSortKey(Value(ResumeToken(tokenData).toDocument()), true);
+        combined.addField("_id", Value(idValue));
+
+        FieldIterator it(doc);
+        while (it.more()) {
+            auto current = it.next();
+            combined.addField(current.first, current.second);
+        }
+
+        return combined.freeze();
     }
 
     DocumentSourceChangeStreamSpec getSpec(
@@ -142,12 +146,13 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
 
     // Mock its input with a document without a "documentKey" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        Document{{"_id", makeResumeToken(0)},
-                 {"operationType", "update"_sd},
-                 {"fullDocument", Document{{"_id", 0}}},
-                 {"ns",
-                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                           {"coll", expCtx->getNamespaceString().coll()}}}},
+        {createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"operationType", "update"_sd},
+                     {"fullDocument", Document{{"_id", 0}}},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}})},
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -167,12 +172,13 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        Document{{"_id", makeResumeToken(0)},
-                 {"documentKey", Document{{"_id", 0}}},
-                 {"fullDocument", Document{{"_id", 0}}},
-                 {"ns",
-                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                           {"coll", expCtx->getNamespaceString().coll()}}}},
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"fullDocument", Document{{"_id", 0}}},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -192,11 +198,11 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        Document{
-            {"_id", makeResumeToken(0)},
-            {"documentKey", Document{{"_id", 0}}},
-            {"operationType", "update"_sd},
-        },
+        createDocumentWithIdAndResumeToken(0,
+                                           Document{
+                                               {"documentKey", Document{{"_id", 0}}},
+                                               {"operationType", "update"_sd},
+                                           }),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -215,12 +221,12 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalStage =
-        exec::agg::MockStage::createForTest(Document{{"_id", makeResumeToken(0)},
-                                                     {"documentKey", Document{{"_id", 0}}},
-                                                     {"operationType", "update"_sd},
-                                                     {"ns", 4}},
-                                            expCtx);
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(0,
+                                           Document{{"documentKey", Document{{"_id", 0}}},
+                                                    {"operationType", "update"_sd},
+                                                    {"ns", 4}}),
+        expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
@@ -239,11 +245,13 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        Document{{"_id", makeResumeToken(0)},
-                 {"documentKey", Document{{"_id", 0}}},
-                 {"operationType", "update"_sd},
-                 {"ns",
-                  Document{{"db", "DIFFERENT"_sd}, {"coll", expCtx->getNamespaceString().coll()}}}},
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{
+                {"documentKey", Document{{"_id", 0}}},
+                {"operationType", "update"_sd},
+                {"ns",
+                 Document{{"db", "DIFFERENT"_sd}, {"coll", expCtx->getNamespaceString().coll()}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -267,10 +275,11 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        Document{{"_id", makeResumeToken(0)},
-                 {"documentKey", Document{{"_id", 0}}},
-                 {"operationType", "update"_sd},
-                 {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", "irrelevant"_sd}}}},
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"_sd},
+                     {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", "irrelevant"_sd}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -296,12 +305,13 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
     expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
 
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        Document{{"_id", makeResumeToken(0)},
-                 {"documentKey", Document{{"_id", 0}}},
-                 {"operationType", "update"_sd},
-                 {"ns",
-                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                           {"coll", "irrelevant"_sd}}}},
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"_sd},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", "irrelevant"_sd}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -309,13 +319,14 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
     auto next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                       (Document{{"_id", makeResumeToken(0)},
-                                 {"documentKey", Document{{"_id", 0}}},
-                                 {"operationType", "update"_sd},
-                                 {"ns",
-                                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                                           {"coll", "irrelevant"_sd}}},
-                                 {"fullDocument", Document{{"_id", 0}}}}));
+                       createDocumentWithIdAndResumeToken(
+                           0,
+                           Document{{"documentKey", Document{{"_id", 0}}},
+                                    {"operationType", "update"_sd},
+                                    {"ns",
+                                     Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                                              {"coll", "irrelevant"_sd}}},
+                                    {"fullDocument", Document{{"_id", 0}}}}));
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNotUnique) {
@@ -326,12 +337,13 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
 
     // Mock its input with an update document.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        Document{{"_id", makeResumeToken(0)},
-                 {"documentKey", Document{{"_id", 0}}},
-                 {"operationType", "update"_sd},
-                 {"ns",
-                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                           {"coll", expCtx->getNamespaceString().coll()}}}},
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"_sd},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
@@ -354,20 +366,22 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
 
     // Mock its input, pausing every other result.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        {Document{{"_id", makeResumeToken(0)},
-                  {"documentKey", Document{{"_id", 0}}},
-                  {"operationType", "insert"_sd},
-                  {"ns",
-                   Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                            {"coll", expCtx->getNamespaceString().coll()}}},
-                  {"fullDocument", Document{{"_id", 0}}}},
+        {createDocumentWithIdAndResumeToken(
+             0,
+             Document{{"documentKey", Document{{"_id", 0}}},
+                      {"operationType", "insert"_sd},
+                      {"ns",
+                       Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                                {"coll", expCtx->getNamespaceString().coll()}}},
+                      {"fullDocument", Document{{"_id", 0}}}}),
          DocumentSource::GetNextResult::makePauseExecution(),
-         Document{{"_id", makeResumeToken(1)},
-                  {"documentKey", Document{{"_id", 1}}},
-                  {"operationType", "update"_sd},
-                  {"ns",
-                   Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                            {"coll", expCtx->getNamespaceString().coll()}}}},
+         createDocumentWithIdAndResumeToken(
+             1,
+             Document{{"documentKey", Document{{"_id", 1}}},
+                      {"operationType", "update"_sd},
+                      {"ns",
+                       Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                                {"coll", expCtx->getNamespaceString().coll()}}}}),
          DocumentSource::GetNextResult::makePauseExecution()},
         expCtx);
 
@@ -382,26 +396,28 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
     auto next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                       (Document{{"_id", makeResumeToken(0)},
-                                 {"documentKey", Document{{"_id", 0}}},
-                                 {"operationType", "insert"_sd},
-                                 {"ns",
-                                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                                           {"coll", expCtx->getNamespaceString().coll()}}},
-                                 {"fullDocument", Document{{"_id", 0}}}}));
+                       createDocumentWithIdAndResumeToken(
+                           0,
+                           Document{{"documentKey", Document{{"_id", 0}}},
+                                    {"operationType", "insert"_sd},
+                                    {"ns",
+                                     Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                                              {"coll", expCtx->getNamespaceString().coll()}}},
+                                    {"fullDocument", Document{{"_id", 0}}}}));
 
     ASSERT_TRUE(lookupChangeStage->getNext().isPaused());
 
     next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                       (Document{{"_id", makeResumeToken(1)},
-                                 {"documentKey", Document{{"_id", 1}}},
-                                 {"operationType", "update"_sd},
-                                 {"ns",
-                                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
-                                           {"coll", expCtx->getNamespaceString().coll()}}},
-                                 {"fullDocument", Document{{"_id", 1}}}}));
+                       createDocumentWithIdAndResumeToken(
+                           1,
+                           Document{{"documentKey", Document{{"_id", 1}}},
+                                    {"operationType", "update"_sd},
+                                    {"ns",
+                                     Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                                              {"coll", expCtx->getNamespaceString().coll()}}},
+                                    {"fullDocument", Document{{"_id", 1}}}}));
 
     ASSERT_TRUE(lookupChangeStage->getNext().isPaused());
 

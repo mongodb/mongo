@@ -45,6 +45,7 @@
 #include "mongo/util/modules.h"
 
 #include <set>
+#include <string>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -123,10 +124,10 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         // The namespace is not technically needed yet, but we will if there is more than one
         // collection involved.
+        deps->setNeedsMetadata(DocumentMetadataFields::MetaType::kSortKey);
         deps->fields.insert(std::string{DocumentSourceChangeStream::kNamespaceField});
         deps->fields.insert(std::string{DocumentSourceChangeStream::kDocumentKeyField});
         deps->fields.insert(std::string{DocumentSourceChangeStream::kOperationTypeField});
-        deps->fields.insert(std::string{DocumentSourceChangeStream::kIdField});
 
         // Fields needed for post-image computation.
         if (_fullDocumentMode != FullDocumentModeEnum::kUpdateLookup) {
