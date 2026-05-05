@@ -126,6 +126,11 @@ public:
         return boost::none;
     }
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kOperationTypeField});
+        return DepsTracker::State::SEE_NEXT;
+    }
+
     Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
