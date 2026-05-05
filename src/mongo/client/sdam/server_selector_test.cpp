@@ -179,7 +179,8 @@ public:
                                       .withHost(HostAndPort("s1"))
                                       .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                                       .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
-                                      .withTag("processType", "INJECTOR")
+                                      .withTag(ServerDescription::kProcessTypeTagKey,
+                                               ServerDescription::kInjectorTagValue)
                                       .withElectionId(kOidOne)
                                       .withSetVersion(100)
                                       .instance();
@@ -891,7 +892,7 @@ TEST_F(ServerSelectorTestFixture, ShouldNotExcludeNonInjectorWithOtherTags) {
                              .withHost(HostAndPort("s0"))
                              .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                              .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
-                             .withTag("processType", "NORMAL")
+                             .withTag(ServerDescription::kProcessTypeTagKey, "NORMAL")
                              .withElectionId(kOidOne)
                              .withSetVersion(100)
                              .instance();
