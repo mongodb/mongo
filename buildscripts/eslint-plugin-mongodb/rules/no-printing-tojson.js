@@ -1,4 +1,4 @@
-const print_fns = [
+const printFunctions = [
     "jsTestLog",
     "jsTest.log",
     "jsTest.log.info",
@@ -8,14 +8,39 @@ const print_fns = [
     "print",
 ];
 
-function flattenMemberExpressionName(expr) {
-    if (expr.object.type == "MemberExpression") {
-        return flattenMemberExpressionName(expr.object) + "." + expr.property.name;
-    } else if (expr.object.type == "Identifier") {
-        return expr.object.name + "." + expr.property.name;
-    } else {
+function getPropertyName(expr) {
+    if (!expr.computed && expr.property.type == "Identifier") {
+        return expr.property.name;
+    }
+
+    if (expr.computed && expr.property.type == "Literal" && typeof expr.property.value == "string") {
+        return expr.property.value;
+    }
+
+    return "";
+}
+
+function flattenCallTargetName(expr) {
+    if (expr.type == "ChainExpression") {
+        return flattenCallTargetName(expr.expression);
+    }
+
+    if (expr.type == "Identifier") {
+        return expr.name;
+    }
+
+    if (expr.type != "MemberExpression") {
         return "";
     }
+
+    const objectName = flattenCallTargetName(expr.object);
+    const propertyName = getPropertyName(expr);
+
+    if (!objectName || !propertyName) {
+        return "";
+    }
+
+    return `${objectName}.${propertyName}`;
 }
 
 export default {
@@ -30,11 +55,9 @@ export default {
     create(context) {
         return {
             CallExpression: function (node) {
-                if (node.callee.type == "MemberExpression") {
-                    node.callee.name = flattenMemberExpressionName(node.callee);
-                } else if (node.callee.type != "Identifier") return;
+                const calleeName = flattenCallTargetName(node.callee);
 
-                if (print_fns.every((name) => name != node.callee.name)) return;
+                if (printFunctions.every((name) => name != calleeName)) return;
 
                 node.arguments.forEach((arg) => {
                     if (arg.type != "CallExpression") return;
@@ -46,7 +69,7 @@ export default {
                     context.report({
                         node,
                         message: `Calling ${arg.callee.name}() as a parameter of ${
-                            node.callee.name
+                            calleeName
                         }(). Consider using toJsonForLog() instead or disable this rule by adding '// eslint-disable-next-line mongodb/no-printing-tojson'`,
                         fix(fixer) {
                             return fixer.replaceTextRange([arg.callee.start, arg.callee.end], "toJsonForLog");
