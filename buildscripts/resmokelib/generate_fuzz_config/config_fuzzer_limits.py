@@ -162,8 +162,8 @@ config_fuzzer_params = {
             "fuzz_at": ["startup"],
         },
         "maxShardMetadataDiskRecoveryAttempts": {
-            "min": 10,
-            "max": 100,
+            "min": 100,
+            "max": 1000,
             "fuzz_at": ["startup"],
         },
         "operationMemoryPoolBlockMaxSizeKB": {

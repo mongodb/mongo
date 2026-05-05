@@ -73,6 +73,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -944,8 +945,10 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
     }
 }
 
-void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
+void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<ChunkVersion> chunkVersionReceived) {
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     const auto dbName = nss.dbName();
 
@@ -1171,11 +1174,15 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(OperationContext
         return;
     }
 
-    tasserted(12332300,
-              str::stream() << "Exhausted maximum number (" << maxAttempts
-                            << ") of authoritative collection metadata recovery attempts for "
-                            << nss.toStringForErrorMsg()
-                            << "; last retry reason: " << lastRetryReason);
+    tasserted(
+        StaleConfigInfo(nss,
+                        ShardVersionFactory::make(chunkVersionReceived ? *chunkVersionReceived
+                                                                       : ChunkVersion::IGNORED()),
+                        boost::none /* wantedVersion */,
+                        ShardingState::get(opCtx)->shardId()),
+        str::stream() << "Exhausted maximum number (" << maxAttempts
+                      << ") of authoritative collection metadata recovery attempts for "
+                      << nss.toStringForErrorMsg() << "; last retry reason: " << lastRetryReason);
 }
 
 void FilteringMetadataCache::_tryNoopWriteToAdvanceMajorityCommitPoint(OperationContext* opCtx) {
@@ -1375,7 +1382,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
 
     // Step 2: Recover the shard's current metadata from the authoritative on-disk catalog. This
     // ensures the CSS reflects the current disk durable state.
-    _recoverCollectionMetadataFromDisk(opCtx, nss);
+    _recoverCollectionMetadataFromDisk(opCtx, nss, receivedShardVersion);
 
     // No specific version requested. The caller just wanted a forced recovery from disk, which has
     // already completed above.

@@ -98,7 +98,7 @@ server_parameters:
         cpp_varname: maxShardMetadataDiskRecoveryAttempts
         validator:
             gte: 1
-        default: 10
+        default: 100
         redact: false
 
     # TODO (SERVER-112793) Remove once v9.0 branches out

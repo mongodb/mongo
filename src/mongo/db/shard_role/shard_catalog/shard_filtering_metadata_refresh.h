@@ -222,7 +222,9 @@ private:
      * recover the shard's current state from the durable catalog so that subsequent version
      * comparisons operate on up-to-date metadata.
      */
-    void _recoverCollectionMetadataFromDisk(OperationContext* opCtx, const NamespaceString& nss);
+    void _recoverCollectionMetadataFromDisk(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            boost::optional<ChunkVersion> chunkVersionReceived);
 
     /**
      * Joins any ongoing placement version operations and checks whether the shard's current shard
