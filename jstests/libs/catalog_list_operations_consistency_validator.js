@@ -750,6 +750,15 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             if (ex.code === ErrorCodes.InterruptedDueToReplStateChange) {
                 return false;
             }
+            // When the BlockDirectSystemBucketsAccess feature flag is enabled, the server rejects
+            // all commands on legacy system.buckets timeseries collections, including `listIndexes`.
+            // This is transient: on retry, either the upgrade to viewless completes and
+            // listCollections stops returning the buckets namespace, or the feature flag is
+            // detected as enabled and `skipLegacyBucketsForListIndexes` filters it out.
+            // TODO(SERVER-106164): Remove this workaround once legacy buckets namespaces are gone.
+            if (ex.code === ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace) {
+                return false;
+            }
             throw ex;
         }
 
