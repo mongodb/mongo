@@ -197,6 +197,9 @@ private:
     // Check memory usage of the stage.
     SimpleMemoryUsageTracker _memoryTracker;
 
+    // Tracks memory usage of the record ID deduplicator and reports metrics to serverStatus.
+    DeduplicatorReporter _dedupReporter;
+
     /**
      * This member is used to check whether the write should be performed, and if so, any other
      * behavior that should be done as part of the write (e.g. skipping it because it affects an

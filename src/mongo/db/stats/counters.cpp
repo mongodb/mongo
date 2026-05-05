@@ -345,6 +345,9 @@ SortMergeCounters sortMergeCounters;
 IxScanCounters ixScanCounters;
 UniqueCounters uniqueCounters;
 UniqueRoaringCounters uniqueRoaringCounters;
+CountScanCounters countScanCounters;
+NearCounters nearCounters;
+UpdateCounters updateCounters;
 PlanCacheCounters planCacheCounters;
 FastPathQueryCounters fastPathQueryCounters;
 

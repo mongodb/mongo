@@ -71,7 +71,12 @@ NearStage::NearStage(ExpressionContext* expCtx,
       _stageType(type),
       _nextInterval(nullptr),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *expCtx, loadMemoryLimit(StageMemoryLimit::NearStageMaxMemoryBytes))) {}
+          *expCtx, loadMemoryLimit(StageMemoryLimit::NearStageMaxMemoryBytes))),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              nearCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {}
 
 NearStage::~NearStage() {}
 
@@ -194,9 +199,11 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
         if (!_seenDocuments.insert(nextMember.recordId)) {
             return PlanStage::NEED_TIME;
         }
-        uint64_t dedupBytesAfter = _seenDocuments.getApproximateSize();
-        _memoryTracker.add(static_cast<int64_t>(dedupBytesAfter) -
-                           static_cast<int64_t>(dedupBytesBefore));
+        const uint64_t dedupBytesAfter = _seenDocuments.getApproximateSize();
+        const int64_t dedupBytesAdditional =
+            static_cast<int64_t>(dedupBytesAfter) - static_cast<int64_t>(dedupBytesBefore);
+        _dedupReporter.add(dedupBytesAdditional);
+        _memoryTracker.add(dedupBytesAdditional);
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         dedupBytesBefore = dedupBytesAfter;
     }
@@ -205,8 +212,11 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     if (memberDistance < _nextInterval->minDistance) {
         if (nextMember.hasRecordId()) {
             _seenDocuments.freeMemory(nextMember.recordId);
-            _memoryTracker.add(static_cast<int64_t>(_seenDocuments.getApproximateSize()) -
-                               static_cast<int64_t>(dedupBytesBefore));
+            const uint64_t dedupBytesAfter = _seenDocuments.getApproximateSize();
+            const int64_t dedupBytesDiff =
+                static_cast<int64_t>(dedupBytesAfter) - static_cast<int64_t>(dedupBytesBefore);
+            _dedupReporter.add(dedupBytesDiff, -1);
+            _memoryTracker.add(dedupBytesDiff);
             _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         }
         return PlanStage::NEED_TIME;
@@ -216,7 +226,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
 
     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
     nextMember.makeObjOwnedIfNeeded();
-    uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
+    const uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
     _resultBuffer.add(SorterKey{memberDistance}, std::move(nextMember));
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
                        static_cast<int64_t>(bufferBytesBefore));
@@ -239,18 +249,23 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     WorkingSetID resultID = WorkingSet::INVALID_ID;
     if (_resultBuffer.getState() == ResultBufferSorter::State::kReady) {
         // _resultBuffer.next() removes an element from the buffer.
-        uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
+        uint64_t bytesBefore = _resultBuffer.stats().memUsage();
         auto [memberDistance, member] = _resultBuffer.next();
-        _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
-                           static_cast<int64_t>(bufferBytesBefore));
-        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+        uint64_t bytesAfter = _resultBuffer.stats().memUsage();
+
         if (member->hasRecordId()) {
-            uint64_t dedupBytesBefore = _seenDocuments.getApproximateSize();
+            const uint64_t dedupBytesBefore = _seenDocuments.getApproximateSize();
             _seenDocuments.freeMemory(member->recordId);
-            _memoryTracker.add(static_cast<int64_t>(_seenDocuments.getApproximateSize()) -
-                               static_cast<int64_t>(dedupBytesBefore));
-            _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+            const uint64_t dedupBytesAfter = _seenDocuments.getApproximateSize();
+            _dedupReporter.add(
+                static_cast<int64_t>(dedupBytesAfter) - static_cast<int64_t>(dedupBytesBefore), -1);
+
+            bytesBefore += dedupBytesBefore;
+            bytesAfter += dedupBytesAfter;
         }
+
+        _memoryTracker.add(static_cast<int64_t>(bytesAfter) - static_cast<int64_t>(bytesBefore));
+        _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
 
         const bool inInterval = _nextInterval->isLastInterval
             ? memberDistance.value <= _nextInterval->maxDistance
@@ -304,11 +319,10 @@ void NearStage::spill() {
                           << " stage exceeded memory limit and can't spill to disk. Set "
                              "allowDiskUse: true to allow spilling",
             expCtx()->getAllowDiskUse());
-    uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
+    const uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
     _resultBuffer.forceSpill();
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
                        static_cast<int64_t>(bufferBytesBefore));
-    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
     updateSpillingStats();
 }
 

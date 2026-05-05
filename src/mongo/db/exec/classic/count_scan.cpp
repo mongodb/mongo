@@ -33,8 +33,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/assert_util.h"
 
@@ -99,7 +101,12 @@ CountScan::CountScan(ExpressionContext* expCtx,
       _endKeyInclusive(params.endKeyInclusive),
       _recordIdDeduplicator(expCtx),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *expCtx, loadMemoryLimit(StageMemoryLimit::CountScanStageMaxMemoryBytes))) {
+          *expCtx, loadMemoryLimit(StageMemoryLimit::CountScanStageMaxMemoryBytes))),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              countScanCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {
     _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
@@ -178,8 +185,11 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
             // *loc has been returned already
             return PlanStage::NEED_TIME;
         }
-        _memoryTracker.add(static_cast<int64_t>(_recordIdDeduplicator.getApproximateSize()) -
-                           static_cast<int64_t>(dedupBytesBefore));
+        const int64_t dedupBytesAdditional =
+            static_cast<int64_t>(_recordIdDeduplicator.getApproximateSize()) -
+            static_cast<int64_t>(dedupBytesBefore);
+        _dedupReporter.add(dedupBytesAdditional);
+        _memoryTracker.add(dedupBytesAdditional);
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         uassert(
             12227901, "CountScan stage exceeded memory limit", _memoryTracker.withinMemoryLimit());

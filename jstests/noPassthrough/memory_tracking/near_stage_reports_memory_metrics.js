@@ -59,6 +59,15 @@ runMemoryStatsTest({
     expectedNumGetMores: kDocCount / kBatchSize - 1,
     // near stage still holds the memory used for the record id deduplication at the last batch.
     checkInUseTrackedMemBytesResets: false,
+    // The serverStatus counter key is "NEAR" (shared by GEO_NEAR_2DSPHERE and GEO_NEAR_2D since
+    // _dedupReporter lives in the NearStage base class), which does not match stageName
+    // "GEO_NEAR_2DSPHERE". We pass serverStatusStageName explicitly to check the correct counter.
+    skipServerStatusStageCheck: false,
+    serverStatusStageName: "NEAR",
+    // The near stage frees every record it inserts into _seenDocuments (via early-free or
+    // result-free), so each insert (+1) is always cancelled by a free (-1). The net delta
+    // is 0 regardless of the data, which verifies the counter does not leak.
+    expectedServerStatusRecords: 0,
 });
 
 // Test that in-use memory decreases as buffered documents are returned across batches.

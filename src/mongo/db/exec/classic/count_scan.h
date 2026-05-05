@@ -155,6 +155,9 @@ private:
 
     // Check memory usage of the stage.
     SimpleMemoryUsageTracker _memoryTracker;
+
+    // Tracks memory usage of the record ID deduplicator and reports metrics to serverStatus.
+    DeduplicatorReporter _dedupReporter;
 };
 
 }  // namespace mongo

@@ -17,7 +17,6 @@
  */
 
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {runPipelineAndGetDiagnostics} from "jstests/libs/query/memory_tracking_utils.js";
 
 const conn = MongoRunner.runMongod();
@@ -37,38 +36,23 @@ assert.commandWorked(coll.insertMany(docs));
 // the deduplicator.
 assert.commandWorked(coll.createIndex({x: 1}));
 
-const updateCommand = {
-    update: collName,
-    updates: [{q: {x: {$gte: 0}}, u: {$inc: {x: kDocCount}}, multi: true}],
-};
+const updateEntry = {q: {x: {$gte: 0}}, u: {$inc: {x: kDocCount}}};
+const updateCommand = {update: collName, updates: [updateEntry]};
+const multiUpdateCommand = {...updateCommand, updates: [{...updateEntry, multi: true}]};
 
-const explainExecStats = assert.commandWorked(db.runCommand({explain: updateCommand, verbosity: "executionStats"}));
+const explainExecStats = assert.commandWorked(
+    db.runCommand({explain: multiUpdateCommand, verbosity: "executionStats"}),
+);
 const updateStage = getPlanStage(explainExecStats.executionStats.executionStages, "UPDATE");
 
-assert.neq(null, updateStage, "Expected classic UPDATE stage with forceClassicEngine");
+assert.neq(null, updateStage, "Expected query to use the classic UPDATE stage with forceClassicEngine ");
 
-const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
-
-//Test that memory usage metrics appear in the explain output when the verbosity is executionStats.
-if (featureFlagEnabled) {
-    assert(
-        updateStage.hasOwnProperty("peakTrackedMemBytes"),
-        "Expected peakTrackedMemBytes in UPDATE stage: " + tojson(explainExecStats),
-    );
-    // In explain there is no actual update performed. So,  peakTrackedMemBytes is always 0.
-    assert.eq(updateStage.peakTrackedMemBytes, 0, "Expected zero peakTrackedMemBytes: " + tojson(explainExecStats));
-} else {
-    assert(
-        !updateStage.hasOwnProperty("peakTrackedMemBytes"),
-        "Unexpected peakTrackedMemBytes: " + tojson(explainExecStats),
-    );
-}
-
-// Test that memory usage metrics do not appear in the explain output when the verbosity is lower than executionStats.
-const explainQueryPlannerRes = assert.commandWorked(db.runCommand({explain: updateCommand, verbosity: "queryPlanner"}));
+// peakTrackedMemBytes is not reported in explain output for the UPDATE stage. In explain mode the
+// update is not actually written, so indexesAffected is never set, no record IDs are inserted into
+// the deduplicator, and the value would always be 0.
 assert(
-    !explainQueryPlannerRes.hasOwnProperty("peakTrackedMemBytes"),
-    "Unexpected peakTrackedMemBytes: " + tojson(explainQueryPlannerRes),
+    !updateStage.hasOwnProperty("peakTrackedMemBytes"),
+    "Unexpected peakTrackedMemBytes in UPDATE explain: " + tojson(explainExecStats),
 );
 
 const peakTrackedMemBytesRegex = /peakTrackedMemBytes"?:([0-9]+)/;
@@ -76,7 +60,7 @@ const peakTrackedMemBytesRegex = /peakTrackedMemBytes"?:([0-9]+)/;
 // Log every operation.
 db.setProfilingLevel(2, {slowms: -1});
 
-const updateCommandWithComment = Object.assign({}, updateCommand, {comment: "memory stats update stage test"});
+const updateCommandWithComment = {...multiUpdateCommand, comment: "memory stats update stage test"};
 
 // Collect slow query log entries for the update. An update command produces two slow query log
 // entries: one from the COMMAND component (the outer update command) and one from the WRITE
@@ -87,6 +71,8 @@ const logLines = runPipelineAndGetDiagnostics({
     commandObj: updateCommandWithComment,
     source: "log",
 }).filter((line) => line.includes('"c":"WRITE"'));
+
+const dedupBefore = db.serverStatus().metrics.query.recordIdDeduplication.UPDATE;
 
 // Collect profiler entries for the update. An update command produces two profiler entries: one
 // with op "command" (the outer update command) and one with op "update" (the actual write
@@ -101,37 +87,53 @@ const profilerEntries = runPipelineAndGetDiagnostics({
 // --- Slow query log check ---
 // Test that memory usage metrics appear in the slow query log.
 assert.eq(1, logLines.length, "Expected exactly one slow query log entry: " + tojson(logLines));
-if (featureFlagEnabled) {
-    const match = logLines[0].match(peakTrackedMemBytesRegex);
-    assert(match, "Expected peakTrackedMemBytes in slow query log: " + logLines[0]);
-    assert.gt(parseInt(match[1]), 0, "Expected positive peakTrackedMemBytes in slow query log: " + logLines[0]);
-} else {
-    assert(
-        !peakTrackedMemBytesRegex.test(logLines[0]),
-        "Unexpected peakTrackedMemBytes in slow query log: " + logLines[0],
-    );
-}
+const match = logLines[0].match(peakTrackedMemBytesRegex);
+assert(match, "Expected peakTrackedMemBytes in slow query log: " + logLines[0]);
+assert.gt(parseInt(match[1]), 0, "Expected positive peakTrackedMemBytes in slow query log: " + logLines[0]);
 
 // --- Profiler check ---
 // Test that memory usage metrics appear in the profiler.
 assert.eq(1, profilerEntries.length, "Expected exactly one profiler entry: " + tojson(profilerEntries));
 const profilerEntry = profilerEntries[0];
-if (featureFlagEnabled) {
-    assert(
-        profilerEntry.hasOwnProperty("peakTrackedMemBytes"),
-        "Expected peakTrackedMemBytes in profiler: " + tojson(profilerEntry),
-    );
-    assert.gt(
-        profilerEntry.peakTrackedMemBytes,
-        0,
-        "Expected positive peakTrackedMemBytes in profiler: " + tojson(profilerEntry),
-    );
-} else {
-    assert(
-        !profilerEntry.hasOwnProperty("peakTrackedMemBytes"),
-        "Unexpected peakTrackedMemBytes in profiler: " + tojson(profilerEntry),
-    );
-}
+assert(
+    profilerEntry.hasOwnProperty("peakTrackedMemBytes"),
+    "Expected peakTrackedMemBytes in profiler: " + tojson(profilerEntry),
+);
+assert.gt(
+    profilerEntry.peakTrackedMemBytes,
+    0,
+    "Expected positive peakTrackedMemBytes in profiler: " + tojson(profilerEntry),
+);
+
+// Verify DeduplicatorReporter serverStatus metrics for the UPDATE stage.
+// dedupBefore was captured after the log pipeline, so the diff reflects only the profiler run,
+// which inserts all kDocCount record IDs into a fresh deduplicator.
+const updateDedupStats = db.serverStatus().metrics.query.recordIdDeduplication.UPDATE;
+assert.gt(
+    updateDedupStats.deduplicatedBytes - dedupBefore.deduplicatedBytes,
+    0,
+    "Expected positive deduplicatedBytes diff for UPDATE stage: " + tojson(updateDedupStats),
+);
+assert.eq(
+    updateDedupStats.deduplicatedRecords - dedupBefore.deduplicatedRecords,
+    kDocCount,
+    "Expected deduplicatedRecords diff of kDocCount for UPDATE stage: " + tojson(updateDedupStats),
+);
+
+// Verify that a non-multi update does not increment the deduplication counters, since
+// _updatedRecordIds is only allocated for multi updates.
+assert.commandWorked(db.runCommand({...updateCommand, updates: [{...updateEntry, multi: false}]}));
+const dedupAfter = db.serverStatus().metrics.query.recordIdDeduplication.UPDATE;
+assert.eq(
+    dedupAfter.deduplicatedBytes,
+    updateDedupStats.deduplicatedBytes,
+    "Single update should not increment deduplicatedBytes",
+);
+assert.eq(
+    dedupAfter.deduplicatedRecords,
+    updateDedupStats.deduplicatedRecords,
+    "Single update should not increment deduplicatedRecords",
+);
 
 // Clean up.
 coll.drop();

@@ -536,6 +536,24 @@ public:
 };
 extern UniqueRoaringCounters uniqueRoaringCounters;
 
+class CountScanCounters : public RecordIdDeduplicationCounters {
+public:
+    CountScanCounters() : RecordIdDeduplicationCounters("COUNT_SCAN") {}
+};
+extern CountScanCounters countScanCounters;
+
+class NearCounters : public RecordIdDeduplicationCounters {
+public:
+    NearCounters() : RecordIdDeduplicationCounters("NEAR") {}
+};
+extern NearCounters nearCounters;
+
+class UpdateCounters : public RecordIdDeduplicationCounters {
+public:
+    UpdateCounters() : RecordIdDeduplicationCounters("UPDATE") {}
+};
+extern UpdateCounters updateCounters;
+
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.
  */

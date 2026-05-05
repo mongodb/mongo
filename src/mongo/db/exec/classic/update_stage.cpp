@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
@@ -123,6 +125,11 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
                                                   : nullptr),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
           *expCtx, loadMemoryLimit(StageMemoryLimit::UpdateStageMaxMemoryBytes))),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              updateCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())),
       _preWriteFilter(opCtx(), collection.nss()) {
 
     // Should the modifiers validate their embedded docs via storage_validation::scanDocument()?
@@ -337,8 +344,11 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             }
 
             if (_updatedRecordIds) {
-                _memoryTracker.add(static_cast<int64_t>(_updatedRecordIds->getApproximateSize()) -
-                                   static_cast<int64_t>(dedupBytesBefore));
+                const int64_t dedupBytesAdditional =
+                    static_cast<int64_t>(_updatedRecordIds->getApproximateSize()) -
+                    static_cast<int64_t>(dedupBytesBefore);
+                _memoryTracker.add(dedupBytesAdditional);
+                _dedupReporter.add(dedupBytesAdditional);
                 _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
                 uassert(12227902,
                         "UpdateStage exceeded memory limit",

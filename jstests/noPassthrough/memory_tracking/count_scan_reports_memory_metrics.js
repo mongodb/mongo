@@ -59,6 +59,11 @@ runMemoryStatsTest({
     // Without getMore calls there are no non-exhausted entries in which to check
     // inUseTrackedMemBytes.
     skipInUseTrackedMemBytesCheck: true,
+    skipServerStatusStageCheck: false,
+    // COUNT_SCAN calls add() only on successful inserts into the deduplicator, so exactly
+    // kDocCount unique record IDs are counted (one per document, even though the multikey
+    // index produces two entries per document).
+    expectedServerStatusRecords: kDocCount,
 });
 
 // Clean up.
