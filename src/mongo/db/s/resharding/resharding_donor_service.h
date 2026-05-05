@@ -55,6 +55,7 @@
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/modules.h"
@@ -142,9 +143,18 @@ public:
     void onReadDuringCriticalSection();
     void onWriteDuringCriticalSection();
 
-    void notifyAllRecipientsDoneCloning();
-
-    void notifyAllRecipientsDoneApplying();
+    /**
+     * Fulfills the subset of donor promises that are driven by the coordinator advancing through
+     * its state machine. Shared entry point for command handlers and onReshardingFieldsChanges.
+     * Idempotent and cascading: invoking with a later state also fulfills promises associated with
+     * all earlier coordinator states.
+     *
+     * Promises fulfilled here:
+     *   newState >= kApplying        -> _allRecipientsDoneCloning
+     *   newState >= kBlockingWrites  -> _allRecipientsDoneApplying
+     *   newState >= kCommitting      -> _coordinatorHasDecisionPersisted
+     */
+    void onCoordinatorStateAdvanced(CoordinatorStateEnum newState);
 
     SharedSemiFuture<void> awaitCriticalSectionAcquired();
 
@@ -180,6 +190,14 @@ public:
         return _inDonatingOplogEntries.getFuture();
     }
 
+    SharedSemiFuture<void> awaitAllRecipientsDoneCloningForTest() {
+        return _allRecipientsDoneCloning.getFuture();
+    }
+
+    SharedSemiFuture<void> awaitAllRecipientsDoneApplyingForTest() {
+        return _allRecipientsDoneApplying.getFuture();
+    }
+
     /**
      * Returns a Future fulfilled once the donor locally persists its final state before the
      * coordinator makes its decision to commit or abort (DonorStateEnum::kError or
@@ -206,6 +224,17 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
 private:
+    /**
+     * Fulfills in-memory promises that can be inferred from the persisted donor state on step-up.
+     */
+    void _fulfillPromisesOnStepup();
+
+    /**
+     * With-lock implementation of onCoordinatorStateAdvanced. Used by callers that already hold
+     * _mutex.
+     */
+    void _onCoordinatorStateAdvanced(WithLock lk, CoordinatorStateEnum newState);
+
     /**
      * Helper to construct an opCtx and set non-deprioritizable state if needed.
      */

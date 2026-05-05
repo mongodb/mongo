@@ -897,11 +897,14 @@ public:
         while (true) {
             try {
                 auto recipientFields = _makeRecipientFields(recipientDoc);
-                return recipient.fulfillAllDonorsPreparedToDonate(
-                    {recipientFields.getCloneTimestamp().get(),
-                     recipientFields.getApproxDocumentsToCopy().get(),
-                     recipientFields.getApproxBytesToCopy().get(),
-                     recipientFields.getDonorShards()});
+                recipient.onCoordinatorStateAdvanced(
+                    CoordinatorStateEnum::kCloning,
+                    RecipientStateMachine::CloneDetails{
+                        recipientFields.getCloneTimestamp().get(),
+                        recipientFields.getApproxDocumentsToCopy().get(),
+                        recipientFields.getApproxBytesToCopy().get(),
+                        recipientFields.getDonorShards()});
+                return recipient.awaitTransitionedToCreateCollection();
             } catch (const ExceptionFor<ErrorCodes::PrimaryOnlyServiceInitializing>&) {
                 sleepmillis(100);
             }
@@ -3456,6 +3459,72 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
         runUnrecoverableErrorTest(
             testOptions, RecipientStateEnum::kApplying, kEnsureReshardingStashCollectionsEmpty);
     }
+}
+
+TEST_F(ReshardingRecipientServiceTest, OnCoordinatorStateAdvancedThrowsWhenUninitialized) {
+    auto fpBeforeInit =
+        globalFailPointRegistry().find("reshardingPauseRecipientBeforeInitCancelState");
+
+    auto testOptions = makeBasicTestOptions().front();
+    setupFeatureFlags(testOptions);
+
+    auto fpBaseline = fpBeforeInit->setMode(FailPoint::alwaysOn);
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    if (testOptions.isAlsoDonor) {
+        createSourceCollection(opCtx.get(), doc);
+    }
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    fpBeforeInit->waitForTimesEntered(fpBaseline + 1);
+
+    ASSERT_THROWS_CODE(
+        recipient->onCoordinatorStateAdvanced(
+            CoordinatorStateEnum::kCloning,
+            RecipientStateMachine::CloneDetails{Timestamp(10, 0), 0, 0, doc.getDonorShards()}),
+        DBException,
+        ErrorCodes::PrimaryOnlyServiceInitializing);
+
+    // Cleanup.
+    fpBeforeInit->setMode(FailPoint::off);
+    stepDown();
+    ASSERT_NOT_OK(recipient->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientServiceTest,
+       OnCoordinatorStateAdvancedSkipsAllDonorsPreparedWithoutCloneDetails) {
+    auto testOptions = makeBasicTestOptions().front();
+    setupFeatureFlags(testOptions);
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    if (testOptions.isAlsoDonor) {
+        createSourceCollection(opCtx.get(), doc);
+    }
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    // Wait until past initialization. Without cloneDetails the call must not fulfill
+    // _allDonorsPreparedToDonate.
+    while (true) {
+        try {
+            recipient->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
+            break;
+        } catch (const ExceptionFor<ErrorCodes::PrimaryOnlyServiceInitializing>&) {
+            sleepmillis(10);
+        }
+    }
+    ASSERT_FALSE(recipient->awaitAllDonorsPreparedToDonateForTest().isReady());
+
+    // A repeat call must not throw and must not change the state.
+    recipient->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
+    ASSERT_FALSE(recipient->awaitAllDonorsPreparedToDonateForTest().isReady());
+
+    // Cleanup.
+    stepDown();
+    ASSERT_NOT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
 }  // namespace

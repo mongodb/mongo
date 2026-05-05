@@ -315,12 +315,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       }()) {
     invariant(_externalState);
 
-    {
-        std::lock_guard<std::mutex> lk(_mutex);
-        if (_donorCtx.getState() >= DonorStateEnum::kDonatingOplogEntries) {
-            ensureFulfilledPromise(lk, _inDonatingOplogEntries);
-        }
-    }
+    _fulfillPromisesOnStepup();
 
     if (_changeStreamsMonitorCtx) {
         invariant(_metadata.getPerformVerification());
@@ -715,20 +710,47 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
         return;
     }
 
-    const CoordinatorStateEnum coordinatorState = reshardingFields.getState();
-    {
-        std::lock_guard<std::mutex> lk(_mutex);
-        if (coordinatorState >= CoordinatorStateEnum::kApplying) {
-            ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
-        }
+    std::lock_guard<std::mutex> lk(_mutex);
+    _onCoordinatorStateAdvanced(lk, reshardingFields.getState());
+}
 
-        if (coordinatorState >= CoordinatorStateEnum::kBlockingWrites) {
-            ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
-        }
+void ReshardingDonorService::DonorStateMachine::_fulfillPromisesOnStepup() {
+    std::lock_guard<std::mutex> lk(_mutex);
 
-        if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
-            ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
+    if (_donorCtx.getState() >= DonorStateEnum::kDonatingOplogEntries) {
+        ensureFulfilledPromise(lk, _inDonatingOplogEntries);
+        // Fulfill coordinator-state-driven promises based on the inferred coordinator state.
+        // The coordinator must have reached at least kApplying before the donor could enter
+        // kDonatingOplogEntries, kBlockingWrites before kPreparingToBlockWrites, and kCommitting
+        // before kDone.
+        if (_donorCtx.getState() == DonorStateEnum::kDone) {
+            _onCoordinatorStateAdvanced(lk, CoordinatorStateEnum::kCommitting);
+        } else if (_donorCtx.getState() >= DonorStateEnum::kPreparingToBlockWrites) {
+            _onCoordinatorStateAdvanced(lk, CoordinatorStateEnum::kBlockingWrites);
+        } else {
+            _onCoordinatorStateAdvanced(lk, CoordinatorStateEnum::kApplying);
         }
+    }
+}
+
+void ReshardingDonorService::DonorStateMachine::onCoordinatorStateAdvanced(
+    CoordinatorStateEnum newState) {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _onCoordinatorStateAdvanced(lk, newState);
+}
+
+void ReshardingDonorService::DonorStateMachine::_onCoordinatorStateAdvanced(
+    WithLock lk, CoordinatorStateEnum newState) {
+    if (newState >= CoordinatorStateEnum::kApplying) {
+        ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
+    }
+
+    if (newState >= CoordinatorStateEnum::kBlockingWrites) {
+        ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
+    }
+
+    if (newState >= CoordinatorStateEnum::kCommitting) {
+        ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
 }
 
@@ -738,16 +760,6 @@ void ReshardingDonorService::DonorStateMachine::onWriteDuringCriticalSection() {
 
 void ReshardingDonorService::DonorStateMachine::onReadDuringCriticalSection() {
     _metrics->onReadDuringCriticalSection();
-}
-
-void ReshardingDonorService::DonorStateMachine::notifyAllRecipientsDoneCloning() {
-    std::lock_guard<std::mutex> lk(_mutex);
-    ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
-}
-
-void ReshardingDonorService::DonorStateMachine::notifyAllRecipientsDoneApplying() {
-    std::lock_guard<std::mutex> lk(_mutex);
-    ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
 }
 
 SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalSectionAcquired() {

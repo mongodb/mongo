@@ -81,7 +81,7 @@ public:
                   "Resharding donor received recipientsFinishedCloning command",
                   "reshardingUUID"_attr = uuid());
 
-            (*machine)->notifyAllRecipientsDoneCloning();
+            (*machine)->onCoordinatorStateAdvanced(CoordinatorStateEnum::kApplying);
             (*machine)->awaitInDonatingOplogEntries().get(opCtx);
         }
 

@@ -377,7 +377,7 @@ public:
                                      const ReshardingDonorDocument& donorDoc) {
         if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
                 .isEnabledAndIgnoreFCVUnsafe()) {
-            donor.notifyAllRecipientsDoneCloning();
+            donor.onCoordinatorStateAdvanced(CoordinatorStateEnum::kApplying);
             ASSERT_OK(donor.awaitInDonatingOplogEntries().waitNoThrow(opCtx));
         } else {
             _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kApplying);
@@ -396,7 +396,7 @@ public:
                                            const ReshardingDonorDocument& donorDoc) {
         if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
                 .isEnabledAndIgnoreFCVUnsafe()) {
-            donor.notifyAllRecipientsDoneApplying();
+            donor.onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
         } else {
             _onReshardingFieldsChanges(
                 opCtx, donor, donorDoc, CoordinatorStateEnum::kBlockingWrites);
@@ -1527,6 +1527,32 @@ TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToBlockWrite
 
         runUnrecoverableErrorTest(test, DonorStateEnum::kPreparingToBlockWrites);
     }
+}
+
+TEST_F(ReshardingDonorServiceTest, OnCoordinatorStateAdvancedCascadesPromisesIdempotently) {
+    auto testOptions = TestOptions{.isAlsoRecipient = false, .performVerification = false};
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    createSourceCollection(opCtx.get(), doc);
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    // A single call with kBlockingWrites fulfills both _allRecipientsDoneCloning and
+    // _allRecipientsDoneApplying promises. Models the step-up case where the coordinator is already
+    // past kApplying.
+    donor->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
+    ASSERT_TRUE(donor->awaitAllRecipientsDoneCloningForTest().isReady());
+    ASSERT_TRUE(donor->awaitAllRecipientsDoneApplyingForTest().isReady());
+
+    // Calling again with the same state must not throw and must not change state.
+    donor->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
+    ASSERT_TRUE(donor->awaitAllRecipientsDoneCloningForTest().isReady());
+    ASSERT_TRUE(donor->awaitAllRecipientsDoneApplyingForTest().isReady());
+
+    // Advance to kCommitting -> fulfills _coordinatorHasDecisionPersisted -> donor completes.
+    donor->onCoordinatorStateAdvanced(CoordinatorStateEnum::kCommitting);
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
 }
 
 MONGO_FAIL_POINT_DEFINE(failFinishOpWithWCE);

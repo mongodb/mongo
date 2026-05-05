@@ -80,7 +80,7 @@ public:
                   "Resharding donor received criticalSectionStarted command",
                   "reshardingUUID"_attr = uuid());
 
-            (*machine)->notifyAllRecipientsDoneApplying();
+            (*machine)->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
             (*machine)->awaitCriticalSectionAcquired().get(opCtx);
         }
 

@@ -59,6 +59,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -221,6 +222,10 @@ public:
      */
     SharedSemiFuture<int64_t> awaitChangeStreamsMonitorCompletedForTest();
 
+    SharedSemiFuture<CloneDetails> awaitAllDonorsPreparedToDonateForTest() {
+        return _allDonorsPreparedToDonate.getFuture();
+    }
+
     inline const CommonReshardingMetadata& getMetadata() const {
         return _metadata;
     }
@@ -242,6 +247,29 @@ public:
     void onReshardingFieldsChanges(OperationContext* opCtx,
                                    const TypeCollectionReshardingFields& reshardingFields,
                                    bool noChunksToCopy);
+
+    /**
+     * Fulfills the subset of recipient promises that are driven by the coordinator advancing
+     * through its state machine. Shared entry point for command handlers and
+     * onReshardingFieldsChanges. Idempotent and cascading: invoking with a later state also
+     * fulfills promises associated with all earlier coordinator states.
+     *
+     * Throws PrimaryOnlyServiceInitializing if the recipient is not yet initialized.
+     *
+     * Promises fulfilled here:
+     *   newState >= kCloning && cloneDetails -> _allDonorsPreparedToDonate (with cloneDetails)
+     *   newState >= kBlockingWrites          -> _dataReplication->prepareForCriticalSection()
+     *   newState >= kBlockingWrites          -> _coordinatorHasEngagedCriticalSection
+     *   newState >= kCommitting              -> _coordinatorHasDecisionPersisted
+     */
+    void onCoordinatorStateAdvanced(CoordinatorStateEnum newState,
+                                    boost::optional<CloneDetails> cloneDetails = boost::none);
+
+    /**
+     * Returns a future that becomes ready once the recipient has transitioned to creating the
+     * temporary resharding collection.
+     */
+    SemiFuture<void> awaitTransitionedToCreateCollection();
 
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingRecipientDocument& recipientDoc);
@@ -265,9 +293,15 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
-    SemiFuture<void> fulfillAllDonorsPreparedToDonate(CloneDetails cloneDetails);
-
 private:
+    /**
+     * With-lock implementation of onCoordinatorStateAdvanced. Used by callers that already hold
+     * _mutex (e.g. onReshardingFieldsChanges).
+     */
+    void _onCoordinatorStateAdvanced(WithLock lk,
+                                     CoordinatorStateEnum newState,
+                                     boost::optional<CloneDetails> cloneDetails);
+
     class CloningMetrics {
     public:
         void add(int64_t documentsCopied, int64_t bytesCopied);

@@ -811,6 +811,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         resharding::getVersionContextOrDefault(_forwardableOpMetadata),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
+    boost::optional<CloneDetails> cloneDetails;
     if (driveCloneViaRefresh && coordinatorState >= CoordinatorStateEnum::kCloning) {
         auto recipientFields = *reshardingFields.getRecipientFields();
         invariant(recipientFields.getCloneTimestamp());
@@ -823,27 +824,49 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         int64_t approxDocumentsToCopy =
             noChunksToCopy ? 0 : *recipientFields.getApproxDocumentsToCopy();
         int64_t approxBytesToCopy = noChunksToCopy ? 0 : *recipientFields.getApproxBytesToCopy();
-        ensureFulfilledPromise(lk,
-                               _allDonorsPreparedToDonate,
-                               {*recipientFields.getCloneTimestamp(),
-                                approxDocumentsToCopy,
-                                approxBytesToCopy,
-                                recipientFields.getDonorShards()});
+        cloneDetails = CloneDetails{*recipientFields.getCloneTimestamp(),
+                                    approxDocumentsToCopy,
+                                    approxBytesToCopy,
+                                    recipientFields.getDonorShards()};
     }
 
-    if (coordinatorState == CoordinatorStateEnum::kBlockingWrites) {
+    _onCoordinatorStateAdvanced(lk, coordinatorState, std::move(cloneDetails));
+}
+
+void ReshardingRecipientService::RecipientStateMachine::onCoordinatorStateAdvanced(
+    CoordinatorStateEnum newState, boost::optional<CloneDetails> cloneDetails) {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _assertRecipientInitialized(lk);
+    _onCoordinatorStateAdvanced(lk, newState, std::move(cloneDetails));
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_onCoordinatorStateAdvanced(
+    WithLock lk, CoordinatorStateEnum newState, boost::optional<CloneDetails> cloneDetails) {
+    if (cloneDetails && newState >= CoordinatorStateEnum::kCloning) {
+        ensureFulfilledPromise(lk, _allDonorsPreparedToDonate, std::move(*cloneDetails));
+    }
+
+    if (newState == CoordinatorStateEnum::kBlockingWrites) {
         if (_dataReplication) {
             _dataReplication->prepareForCriticalSection();
         }
     }
 
-    if (coordinatorState >= CoordinatorStateEnum::kBlockingWrites) {
+    if (newState >= CoordinatorStateEnum::kBlockingWrites) {
         ensureFulfilledPromise(lk, _coordinatorHasEngagedCriticalSection);
     }
 
-    if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
+    if (newState >= CoordinatorStateEnum::kCommitting) {
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
+}
+
+SemiFuture<void>
+ReshardingRecipientService::RecipientStateMachine::awaitTransitionedToCreateCollection() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _assertRecipientInitialized(lk);
+    return future_util::withCancellation(_transitionedToCreateCollection.getFuture(),
+                                         _cancelState->getAbortOrStepdownToken());
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
@@ -887,19 +910,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 ensureFulfilledPromise(lk, _transitionedToCreateCollection);
             }
         });
-}
-
-SemiFuture<void>
-ReshardingRecipientService::RecipientStateMachine::fulfillAllDonorsPreparedToDonate(
-    CloneDetails cloneDetails) {
-    {
-        std::lock_guard<std::mutex> lk(_mutex);
-        _assertRecipientInitialized(lk);
-        ensureFulfilledPromise(lk, _allDonorsPreparedToDonate, cloneDetails);
-    }
-
-    return future_util::withCancellation(_transitionedToCreateCollection.getFuture(),
-                                         _cancelState->getAbortOrStepdownToken());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::
@@ -2338,6 +2348,14 @@ void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup
     }
     if (_recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency) {
         ensureFulfilledPromise(lk, _inStrictConsistencyOrError);
+        // Fulfill coordinator-state-driven promises based on the inferred coordinator state.
+        // The coordinator must have reached at least kBlockingWrites before the recipient could
+        // enter kStrictConsistency, and at least kCommitting before kDone.
+        if (_recipientCtx.getState() == RecipientStateEnum::kDone) {
+            _onCoordinatorStateAdvanced(lk, CoordinatorStateEnum::kCommitting, boost::none);
+        } else {
+            _onCoordinatorStateAdvanced(lk, CoordinatorStateEnum::kBlockingWrites, boost::none);
+        }
     }
 
     if (!resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
