@@ -160,7 +160,7 @@ public:
     }
 };
 
-static const RecoveryPolicyForPrimary recoveryPolicyForSecondary;
+static const RecoveryPolicyForSecondary recoveryPolicyForSecondary;
 
 template <class Plan>
 class PlanExecutorExpress final : public PlanExecutor {
