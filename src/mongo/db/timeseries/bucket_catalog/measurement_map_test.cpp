@@ -263,6 +263,27 @@ TEST_F(MeasurementMapTest, InitBuilders) {
     invariant(measurementMap.numFields() == 3);
 }
 
+TEST_F(MeasurementMapTest, DuplicateFieldNameThrows) {
+    BSONObjBuilder builder;
+    builder.append("a", 1);
+    builder.append("a", 2);
+
+    ASSERT_THROWS_CODE(
+        measurementMap.insertOne(builder.obj(), /*metaField=*/boost::none), DBException, 12602102);
+}
+
+TEST_F(MeasurementMapTest, DuplicateFieldNameInSubsequentThrows) {
+    const BSONObj m = BSON("a" << 1);
+    measurementMap.insertOne(m, /*metaField=*/boost::none);
+
+    BSONObjBuilder builder;
+    builder.append("a", 2);
+    builder.append("a", 3);
+
+    ASSERT_THROWS_CODE(
+        measurementMap.insertOne(builder.obj(), /*metaField=*/boost::none), DBException, 12602102);
+}
+
 using MeasurementMapTestDeathTest = MeasurementMapTest;
 DEATH_TEST_REGEX_F(MeasurementMapTestDeathTest, GetTimeForNonexistentField, "Invariant failure.*") {
     measurementMap.timeOfLastMeasurement(_timeField);
