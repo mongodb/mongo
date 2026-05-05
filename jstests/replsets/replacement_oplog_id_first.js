@@ -4,6 +4,7 @@
  * is reordered to put _id first, but the oplog entry retains the client's order.
  *
  * @tags: [
+ *     requires_fcv_90,
  * ]
  */
 
