@@ -104,6 +104,7 @@ class JiraClient:
         priority: str = "3",
         components: Optional[Sequence[str]] = None,
         labels: Optional[Sequence[str]] = None,
+        security_level: Optional[SecurityLevel] = None,
     ) -> Optional[Issue]:
         assigned_teams_mapped = list(map(lambda x: {"value": x}, assigned_teams))
         fields = {
@@ -122,6 +123,9 @@ class JiraClient:
 
         if components:
             fields["components"] = components
+
+        if security_level:
+            fields["security"] = {"name": security_level.value}
 
         logger.info({"message": "Creating JIRA issue", "fields": fields})
 
