@@ -332,6 +332,13 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
                 uuid = UUID::parse(idElem).getValue();
                 break;
             }
+            case repl::OpTypeEnum::kDelete: {
+                observedType = FastCountOpType::kDelete;
+                const auto& obj = innerEntry.getObject();
+                auto idElem = obj["_id"];
+                uuid = UUID::parse(idElem).getValue();
+                break;
+            }
             default: {
                 FAIL(std::string("Unexpected opType for observed fast-count applyOps entry: ") +
                      std::string{idl::serialize(innerEntry.getOpType())});
@@ -430,6 +437,11 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
 
                 const auto& o2 = innerEntry.getObject2();
                 ASSERT_BSONOBJ_EQ(o2.get(), BSON("_id" << uuid));
+                break;
+            }
+            case FastCountOpType::kDelete: {
+                const auto& obj = innerEntry.getObject();
+                ASSERT_BSONOBJ_EQ(obj, BSON("_id" << uuid));
                 break;
             }
             default: {

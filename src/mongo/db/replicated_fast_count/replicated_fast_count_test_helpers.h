@@ -248,8 +248,7 @@ repl::OplogEntry getLatestApplyOpsForNss(OperationContext* opCtx, const Namespac
 enum class FastCountOpType {
     kInsert,
     kUpdate,
-    // TODO SERVER-118821: Add test cases for delete operations once we delete entries for dropped
-    // collections.
+    kDelete,
 };
 
 struct ExpectedFastCountOp {

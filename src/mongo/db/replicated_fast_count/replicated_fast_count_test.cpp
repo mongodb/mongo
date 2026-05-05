@@ -77,11 +77,14 @@ protected:
 
         ASSERT_OK(createCollection(_opCtx, _nss1.dbName(), BSON("create" << _nss1.coll())));
         ASSERT_OK(createCollection(_opCtx, _nss2.dbName(), BSON("create" << _nss2.coll())));
+        ASSERT_OK(createCollection(_opCtx, _nss3.dbName(), BSON("create" << _nss3.coll())));
         {
             AutoGetCollection coll1(_opCtx, _nss1, LockMode::MODE_IS);
             AutoGetCollection coll2(_opCtx, _nss2, LockMode::MODE_IS);
+            AutoGetCollection coll3(_opCtx, _nss3, LockMode::MODE_IS);
             _uuid1 = coll1->uuid();
             _uuid2 = coll2->uuid();
+            _uuid3 = coll3->uuid();
         }
     }
 
@@ -106,9 +109,12 @@ protected:
         NamespaceString::createNamespaceString_forTest("replicated_fast_count_test", "coll1");
     NamespaceString _nss2 =
         NamespaceString::createNamespaceString_forTest("replicated_fast_count_test", "coll2");
+    NamespaceString _nss3 =
+        NamespaceString::createNamespaceString_forTest("replicated_fast_count_test", "coll3");
 
     UUID _uuid1 = UUID::gen();
     UUID _uuid2 = UUID::gen();
+    UUID _uuid3 = UUID::gen();
 
     BSONObj sampleDocForInsert = BSON("_id" << 0 << "x" << 0);
     BSONObj sampleDocForUpdate = BSON("_id" << 0 << "x" << 0 << "y" << 0);
@@ -392,7 +398,7 @@ TEST_F(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
         });
 }
 
-TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
+TEST_F(ReplicatedFastCountTest, MixedOperationsInApplyOps) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 25;
@@ -434,6 +440,8 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
                                                    sampleDocForInsert,
                                                    sampleDocForUpdate);
 
+    ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss3));
+
     _fastCountManager->flushSync(_opCtx);
 
     auto applyOpsEntry = replicated_fast_count_test_helpers::getLatestApplyOpsForNss(
@@ -455,7 +463,79 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
              replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
              /*expectedCount=*/boost::none,
              /*expectedSize=*/numDocsColl2 * sampleDocForInsert.objsize()},
+            {_uuid3, replicated_fast_count_test_helpers::FastCountOpType::kDelete},
         });
+}
+
+TEST_F(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    const int numDocs = 5;
+
+    replicated_fast_count_test_helpers::insertDocs(_opCtx,
+                                                   _fastCountManager,
+                                                   _nss1,
+                                                   numDocs,
+                                                   /*startingCount=*/0,
+                                                   /*startingSize=*/0,
+                                                   docGeneratorForInsert,
+                                                   sampleDocForInsert);
+
+    _fastCountManager->flushSync(_opCtx);
+
+    ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
+
+    // We should detect that we dropped the collection _nss1 and delete the fast count entry for it.
+    _fastCountManager->flushSync(_opCtx);
+
+    auto applyOpsEntry = replicated_fast_count_test_helpers::getLatestApplyOpsForNss(
+        _opCtx, replicatedFastCountStoreNss);
+
+    replicated_fast_count_test_helpers::assertFastCountApplyOpsMatches(
+        applyOpsEntry,
+        replicatedFastCountStoreNss,
+        {{_uuid1, replicated_fast_count_test_helpers::FastCountOpType::kDelete}});
+}
+
+TEST_F(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    const int numDocs = 5;
+
+    replicated_fast_count_test_helpers::insertDocs(_opCtx,
+                                                   _fastCountManager,
+                                                   _nss1,
+                                                   numDocs,
+                                                   /*startingCount=*/0,
+                                                   /*startingSize=*/0,
+                                                   docGeneratorForInsert,
+                                                   sampleDocForInsert);
+
+    _fastCountManager->flushSync(_opCtx);
+
+    replicated_fast_count_test_helpers::insertDocs(_opCtx,
+                                                   _fastCountManager,
+                                                   _nss1,
+                                                   numDocs,
+                                                   /*startingCount=*/numDocs,
+                                                   /*startingSize=*/sampleDocForInsert.objsize() *
+                                                       numDocs,
+                                                   docGeneratorForInsert,
+                                                   sampleDocForInsert);
+
+    ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
+
+    _fastCountManager->flushSync(_opCtx);
+
+    auto applyOpsEntry = replicated_fast_count_test_helpers::getLatestApplyOpsForNss(
+        _opCtx, replicatedFastCountStoreNss);
+
+    // We should only see the oplog entry removing the fast count entry for the collection we
+    // dropped, and not any entries for the inserts we did before dropping the collection.
+    replicated_fast_count_test_helpers::assertFastCountApplyOpsMatches(
+        applyOpsEntry,
+        replicatedFastCountStoreNss,
+        {{_uuid1, replicated_fast_count_test_helpers::FastCountOpType::kDelete}});
 }
 
 TEST_F(ReplicatedFastCountTest, StartupFailsIfFastCountCollectionNotPresent) {
