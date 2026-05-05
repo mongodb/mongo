@@ -29,8 +29,15 @@ export var ClusterIndexConsistencyChecker = (function () {
                         // ShardRegistry reloads after choosing which shards to target and a chosen
                         // shard is no longer in the cluster. This error should be transient, so it
                         // can be retried on.
-                        if (e.code === ErrorCodes.ShardNotFound) {
-                            jsTest.log.info("Retrying $indexStats aggregation on ShardNotFound error", {error: e});
+                        //
+                        // Getting the indexes can also fail with HostUnreachable if the mongos
+                        // routes to a node that stepped down since the mongos last polled its SDAM
+                        // state (e.g. after replSetStepUp). The mongos intentionally rewrites
+                        // NotPrimary shard errors as HostUnreachable so that the client retries
+                        // without triggering an SDAM state change. Once the mongos refreshes its
+                        // topology the retry will succeed.
+                        if (e.code === ErrorCodes.ShardNotFound || e.code === ErrorCodes.HostUnreachable) {
+                            jsTest.log.info("Retrying $indexStats aggregation on transient error", {error: e});
                             continue;
                         }
                         throw e;
