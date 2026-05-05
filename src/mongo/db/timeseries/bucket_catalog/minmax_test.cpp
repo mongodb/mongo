@@ -261,6 +261,37 @@ TEST(MinMax, SearchLookupMap) {
     ASSERT_EQ(obj.search(obj.begin(), "50")->fieldName(), "50");
 }
 
+TEST(MinMax, DuplicateFieldNamesWithLookupMap) {
+    MinMaxStore minmax;
+    auto obj = minmax.root();
+
+    // Insert 12 (kMaxLinearSearchLength) distinct fields ("0".."11") followed by two duplicate "a"
+    // entries. This will trigger the lookup map internally in flat_bson.
+    for (int i = 0; i < 12; ++i) {
+        obj.insert(obj.end(), std::to_string(i));
+    }
+    obj.insert(obj.end(), "a");
+    obj.insert(obj.end(), "a");
+
+    // Try to search for "a", this will trigger the lookup map internally in flat_bson as we fail to
+    // find it within 'kMaxLinearSearchLength' attempts. The map cannot contain duplicates so this
+    // search is well defined and throws.
+    ASSERT_THROWS(obj.search(obj.begin(), "a"), AssertionException);
+
+    // Try to insert another duplicate which will throw earlier as the lookup map exists and needs
+    // to be maintained.
+    obj.insert(obj.begin(), "x");
+    ASSERT_THROWS(obj.insert(obj.begin(), "x"), AssertionException);
+
+    // Searching for "a" or "x" is possible as we inserted one of them into the map.
+    auto found = obj.search(obj.begin(), "a");
+    ASSERT(found != obj.end());
+    ASSERT_EQ(found->fieldName(), "a");
+
+    found = obj.search(obj.begin(), "x");
+    ASSERT(found != obj.end());
+    ASSERT_EQ(found->fieldName(), "x");
+}
 
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
