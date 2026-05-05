@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/modules.h"
 
@@ -100,6 +101,11 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) final {
         return boost::none;
+    }
+
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        deps->setNeedsMetadata(DocumentMetadataFields::MetaType::kSortKey);
+        return DepsTracker::State::SEE_NEXT;
     }
 
     Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const override;
