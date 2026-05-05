@@ -229,8 +229,9 @@ private:
     }
 
     struct PrepMemoContext {
-        PrepMemoContext() : elemMatchExpr(nullptr) {}
+        PrepMemoContext() : elemMatchExpr(nullptr), notExpr(nullptr) {}
         MatchExpression* elemMatchExpr;
+        MatchExpression* notExpr;
 
         // Maps from indexable predicates that can be pushed into the current node to the route
         // through ORs that they have taken to get to this node.

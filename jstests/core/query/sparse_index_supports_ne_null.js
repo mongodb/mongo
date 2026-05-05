@@ -26,6 +26,8 @@ function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) 
     if (shouldUseIndex) {
         assert.gte(ixScans.length, 1, explain);
         assert.eq(ixScans[0].keyPattern, indexKeyPattern);
+        // We should get the same results with/without index use.
+        assert.eq(coll.find(query).hint({$natural: 1}).itcount(), nResultsExpected, explain);
     } else {
         assert.eq(ixScans.length, 0, explain);
     }
@@ -180,11 +182,22 @@ function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) 
     const elemMatchValueQuery = {
         "a.b.c.d": {$elemMatch: {$ne: null}},
     };
+    // $elemMatch object can only use the index when none of the paths below the $elemMatch is
+    // not multikey.
+    const elemMatchObjectQuery = {
+        "a.b": {$elemMatch: {"c.d": {$ne: null}}},
+    };
 
     // 'a.b' is multikey, so the index isn't used.
     checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPattern: keyPattern});
     // Since the multikey portion is above the $elemMatch, the $elemMatch query may use the
     // index.
+    checkQuery({
+        query: elemMatchObjectQuery,
+        shouldUseIndex: true,
+        nResultsExpected: 3,
+        indexKeyPattern: keyPattern,
+    });
     checkQuery({
         query: elemMatchValueQuery,
         shouldUseIndex: true,
@@ -198,6 +211,12 @@ function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) 
     // The only multikey paths are still above the $elemMatch, queries which use a $elemMatch
     // should still be able to use the index.
     checkQuery({
+        query: elemMatchObjectQuery,
+        shouldUseIndex: true,
+        nResultsExpected: 4,
+        indexKeyPattern: keyPattern,
+    });
+    checkQuery({
         query: elemMatchValueQuery,
         shouldUseIndex: true,
         nResultsExpected: 0,
@@ -207,6 +226,12 @@ function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) 
     // Make the index multikey for 'a.b.c'. Now the $elemMatch query may not use the index.
     assert.commandWorked(coll.insert({a: {b: [{c: [{d: 1}]}]}}));
     checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 5, indexKeyPattern: keyPattern});
+    checkQuery({
+        query: elemMatchObjectQuery,
+        shouldUseIndex: false,
+        nResultsExpected: 5,
+        indexKeyPattern: keyPattern,
+    });
     checkQuery({
         query: elemMatchValueQuery,
         shouldUseIndex: true,

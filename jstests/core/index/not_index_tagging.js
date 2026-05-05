@@ -5,6 +5,7 @@
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {describe, it} from "jstests/libs/mochalite.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.not_index_tagging;
 coll.drop();
@@ -19,6 +20,10 @@ describe("Index-ineligible predicates under $not do not get tagged with an index
     const assertUsesCollScan = (pred, collation = {}) => {
         const explain = assert.commandWorked(coll.find(pred).collation(collation).explain());
         assert(isCollscan(db, getWinningPlanFromExplain(explain)), tojson(explain));
+        assertArrayEq({
+            expected: coll.find(pred).collation(collation).hint({$natural: 1}).toArray(),
+            actual: coll.find(pred).collation(collation).toArray(),
+        });
     };
 
     it("should not use a multikey index with $expr", function () {
@@ -64,10 +69,6 @@ describe("Index-ineligible predicates under $not do not get tagged with an index
         assertUsesCollScan({$or: [{b: {$eq: 5}}, {a: {$elemMatch: {$not: {$_internalEqHash: NumberLong(2)}}}}]});
     });
 
-    it("should not use index with $not under object $elemMatch", function () {
-        assertUsesCollScan({a: {$elemMatch: {b: {$not: {$eq: 2}}}}});
-    });
-
     // These hit uassert 40353 with SBE fully enabled.
     if (!isSbeEnabled) {
         it("should not use an index with $elemMatch + $not + $_internalExprEq-null", function () {
@@ -108,14 +109,18 @@ describe("Index-eligible predicates under $not do get tagged with an index", fun
     const assertDoesNotUseCollScan = (pred) => {
         const explain = assert.commandWorked(coll.find(pred).explain());
         assert(!isCollscan(db, getWinningPlanFromExplain(explain)), tojson(explain));
+        assertArrayEq({expected: coll.find(pred).hint({$natural: 1}).toArray(), actual: coll.find(pred).toArray()});
     };
+
+    it("should use index with $not under object $elemMatch", function () {
+        assertDoesNotUseCollScan({a: {$elemMatch: {b: {$not: {$eq: 2}}}}});
+    });
 
     it("should use an index with $not + $eq-null", function () {
         assertDoesNotUseCollScan({b: {$not: {$eq: null}}});
     });
 
-    // *value* $elemMatch + $not with index-eligible predicates *is* eligible. Unlike the $not +
-    // elemMatch case above, we can build bounds for an index on "a" by inverting the $gt:1 bounds.
+    // *value* $elemMatch + $not with index-eligible predicates *is* eligible; we can build bounds for an index on "a" by inverting the $gt:1 bounds.
     it("should use an index with value $elemMatch + $not", function () {
         // Value $elemMatch.
         assertDoesNotUseCollScan({a: {$elemMatch: {$not: {$gt: 1}}}});

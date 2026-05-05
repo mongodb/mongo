@@ -167,6 +167,10 @@ last-continuous:
       ticket: SERVER-95352
     - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
       ticket: SERVER-121822
+    - test_file: jstests/core/index/not_index_tagging.js
+      ticket: SERVER-125555
+    - test_file: jstests/core/query/sparse_index_supports_ne_null.js
+      ticket: SERVER-125555
   suites: null
 last-lts:
   all:
@@ -832,4 +836,8 @@ last-lts:
       ticket: SERVER-95352
     - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
       ticket: SERVER-121822
+    - test_file: jstests/core/index/not_index_tagging.js
+      ticket: SERVER-125555
+    - test_file: jstests/core/query/sparse_index_supports_ne_null.js
+      ticket: SERVER-125555
   suites: null
