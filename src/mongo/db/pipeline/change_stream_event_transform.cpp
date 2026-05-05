@@ -763,8 +763,9 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // the 'fromMigrate' field is set for the oplog entry.
     if (_emitFromMigrateField) {
         if (auto value = input.getField(DocumentSourceChangeStream::kFromMigrateField);
-            value.getType() == BSONType::boolean) {
-            doc.addField(DocumentSourceChangeStream::kFromMigrateField, Value{value.getBool()});
+            value.getType() == BSONType::boolean && value.getBool()) {
+            // 'fromMigrate' is only ever emitted if the oplog entry has 'fromMigrate: true' set.
+            doc.addField(DocumentSourceChangeStream::kFromMigrateField, Value{true});
         }
     }
 

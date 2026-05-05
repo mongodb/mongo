@@ -2014,7 +2014,6 @@ TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
             {DSChangeStream::kWallTimeField, Date_t()},
             {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
             {DSChangeStream::kOperationDescriptionField, opDesc},
-            {DSChangeStream::kFromMigrateField, false},
         };
 
         if (eventType == DSChangeStream::kNewShardDetectedOpType) {
@@ -4835,6 +4834,35 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrationsDontEmit
 
     // Delete
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
+    Document expectedDelete{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+
+    checkTransformation(deleteEntry, expectedDelete, spec);
+}
+
+
+TEST_F(ChangeStreamStageDBTest, TransformEventWithFromMigrateSetToFalseInOplog) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+
+    bool fromMigrate = false;
+    BSONObj o = BSON("_id" << 1 << "x" << 2);
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      fromMigrate,          // fromMigrate
+                                      boost::none);         // o2
+
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
+
+    // The transformed change event should not have a 'fromMigrate' field set in it.
     Document expectedDelete{
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
