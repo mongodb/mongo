@@ -16,6 +16,12 @@ selector:
     - jstests/sharding/query/change_streams/change_stream_collection_v2_strict_whitebox.js
     - jstests/sharding/query/change_streams/change_stream_database_v2_strict_whitebox.js
 
+    # These tests need to be excluded because they enable ignoreRemovedShards mode, which enables
+    # unexpected state transitions in the ChangeStreamHandleTopologyChangeV2Stage.
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_collection.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_cluster.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
+
 executor:
   archive:
     tests:

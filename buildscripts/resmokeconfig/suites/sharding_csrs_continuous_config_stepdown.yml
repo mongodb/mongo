@@ -306,6 +306,12 @@ selector:
     # TODO (SERVER-115616): Enable after retrying addShard cmd on retriable network errors.
     - jstests/sharding/add_shard_4.js
 
+    # The following tests count the number of change stream cursors on the config server, which can
+    # make tests fail when the config server steps down.
+    - jstests/sharding/query/change_streams/change_stream_cluster_v2_ignore_removed_shards_smoke.js
+    - jstests/sharding/query/change_streams/change_stream_collection_v2_ignore_removed_shards_smoke.js
+    - jstests/sharding/query/change_streams/change_stream_database_v2_ignore_removed_shards_smoke.js
+
     # These tests shutdown shard or kill shard and expect FailedToSatisfyReadPreference errors
     # implicitly or explicitly. We have a retry override for this error in
     # implicitly_retry_on_config_stepdowns.js and it fails to reach the test control flow.

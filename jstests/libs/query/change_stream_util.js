@@ -4,6 +4,7 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 /**
@@ -981,6 +982,37 @@ export function getNextClusterTime(clusterTime) {
 }
 
 /**
+ * Records and returns the current time, and waits for the cluster time to advance past it. This
+ * ensures that any change stream opened with startAtOperationTime equal to the recorded time will
+ * have its cluster time observed by the change stream's initialization logic, and thus will not be
+ * considered a future cluster time.
+ * Requires a config server, thus can only be used in sharded cluster tests. Also requires the
+ * no-op oplog writer to be running, as it relies on the cluster time frequently advancing.
+ */
+export function waitForClusterTime(db, conn) {
+    const currentTime = getNextClusterTime(getClusterTime(db));
+
+    // Wait until the current cluster time on the config server passes the initially recorded
+    // cluster time, so that the placement history is actually able to respond for that time.
+    assert.soon(() => {
+        // Return values of the API are:
+        // - OK: 0
+        // - NotAvailable: 1
+        // - FutureClusterTime: 2
+        const res = conn.configRS.getPrimary().getDB("admin").runCommand({
+            _configsvrGetHistoricalPlacement: "",
+            at: currentTime,
+            targetWholeCluster: true,
+            ignoreRemovedShards: false,
+            checkIfPointInTimeIsInFuture: true,
+        }).historicalPlacement.status;
+        return res == 0;
+    }, "Timed out waiting for cluster time to pass current time");
+
+    return currentTime;
+}
+
+/**
  * Distributes collection data across multiple shards by splitting and moving chunks.
  *
  * @param {Object} db - The database object to execute admin commands on
@@ -1011,6 +1043,30 @@ export function distributeCollectionDataOverShards(db, collection, distributionC
 }
 
 /**
+ * If the balancer is not running, starts the balancer, executes the callback and stops the balancer
+ * again. If the balancer is already running, simply executes the callback.
+ */
+export function withBalancerEnabled(conn, cb) {
+    const balancerStatus = assert.commandWorked(
+        conn.adminCommand({
+            balancerStatus: 1,
+        }),
+    );
+    if (balancerStatus.mode == "full") {
+        // If the balancer is already enabled, just run the callback.
+        return cb();
+    } else {
+        // If the balancer is not enabled, start it, run the callback, and then stop it again.
+        assert.commandWorked(conn.adminCommand({balancerStart: 1}));
+        try {
+            return cb();
+        } finally {
+            assert.commandWorked(conn.adminCommand({balancerStop: 1}));
+        }
+    }
+}
+
+/**
  * Helper function to add a new ReplSetTest shard into the cluster.
  */
 export function addShardToCluster(st, shardName, numNodes, rsNodeOptions) {
@@ -1019,6 +1075,20 @@ export function addShardToCluster(st, shardName, numNodes, rsNodeOptions) {
     replTest.initiate();
     assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: shardName}));
     return replTest;
+}
+
+/**
+ * Removes the specified shard from the cluster (starting the balancer for the removal and stopping
+ * it afterwards).
+ * 'st' must be a ShardingTest instance.
+ */
+export function removeShardFromCluster(st, shardName, before) {
+    withBalancerEnabled(st.s, () => {
+        if (before) {
+            before();
+        }
+        removeShard(st, shardName);
+    });
 }
 
 /**
@@ -1121,6 +1191,14 @@ export const V2TargeterLogCodes = Object.freeze({
     kClusterPlacementRefresh: 11138117,
 });
 
+function tryParseJson(line) {
+    try {
+        return JSON.parse(line);
+    } catch (e) {
+        return null;
+    }
+}
+
 /**
  * Capture logs from `conn` while repeatedly calling `fn`, polling until all `expectedCodes`
  * appear in order. When `expectedCodes` is empty, `fn` is called once with no polling.
@@ -1134,14 +1212,6 @@ export const V2TargeterLogCodes = Object.freeze({
  * @param {Object} [codeAssertionFnMap] - Optional map of {code: (attr) => {...}} callbacks
  */
 export function awaitLogMessageCodes(conn, expectedCodes, fn, codeAssertionFnMap = {}) {
-    const tryParseJson = (line) => {
-        try {
-            return JSON.parse(line);
-        } catch (e) {
-            return null;
-        }
-    };
-
     const offsetBefore = checkLog.getGlobalLog(conn).length;
     let logs = [];
 
@@ -1183,6 +1253,59 @@ export function awaitLogMessageCodes(conn, expectedCodes, fn, codeAssertionFnMap
         assert(numCode in matchedLogAttrs, `Code ${code} not found in captured logs`);
         assertFn(matchedLogAttrs[numCode]);
     }
+}
+
+/**
+ * Returns all state transitions of the 'ChangeStreamHandleTopologyChangeV2Stage' stage logged on
+ * `conn` since log offset `offsetBefore`.
+ */
+function collectV2StageStateTransitions(conn, logOffset) {
+    return checkLog
+        .getGlobalLog(conn)
+        .slice(logOffset)
+        .map(tryParseJson)
+        .filter((e) => e !== null && e.id === V2TargeterLogCodes.kTopologyHandlerStageStateTransition)
+        .map((e) => ({from: e.attr.previous, to: e.attr.new}));
+}
+
+/**
+ * Asserts that no transition *from* `state` appears in the logs on `conn` since `offsetBefore`.
+ */
+export function assertNoV2StageStateTransitionFrom(conn, offsetBefore, state) {
+    const transitions = collectV2StageStateTransitions(conn, offsetBefore);
+    assert(
+        !transitions.some((t) => t.from === state),
+        `Expected no transition from state '${state}', found: ${tojsononeline(transitions)}`,
+    );
+}
+
+/**
+ * Polls `fn` until the logs on `conn` contain a subsequence of
+ * 'ChangeStreamHandleTopologyChangeV2Stage' state transitions that matches every element of
+ * `expectedTransitions` (each `{from: string, to: string}`) in order.
+ * Interleaved unrelated transitions are tolerated via subsequence matching.
+ */
+export function awaitV2StageStateTransitions(conn, logOffset, expectedTransitions, fn) {
+    assert.soon(
+        () => {
+            fn();
+            const observed = collectV2StageStateTransitions(conn, logOffset);
+            let idx = 0;
+            for (const t of observed) {
+                if (
+                    idx < expectedTransitions.length &&
+                    t.from === expectedTransitions[idx].from &&
+                    t.to === expectedTransitions[idx].to
+                ) {
+                    idx++;
+                }
+            }
+            return idx === expectedTransitions.length;
+        },
+        () =>
+            `Timed out waiting for transitions ${tojsononeline(expectedTransitions)}, ` +
+            `observed: ${tojsononeline(collectV2StageStateTransitions(conn, logOffset))}`,
+    );
 }
 
 /**

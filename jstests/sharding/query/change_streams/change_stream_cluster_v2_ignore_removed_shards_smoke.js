@@ -25,6 +25,7 @@ import {
     ChangeStreamTest,
     distributeCollectionDataOverShards,
     getClusterTime,
+    withBalancerEnabled,
 } from "jstests/libs/query/change_stream_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
@@ -95,30 +96,6 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         st.stop();
         shardsAdded = [];
     });
-
-    // Start the balancer.
-    function startBalancer() {
-        jsTest.log.info("Starting balancer");
-        assert.commandWorked(st.s.adminCommand({balancerStart: 1}));
-        jsTest.log.info("Balancer successfully started");
-    }
-
-    // Stop the balancer.
-    function stopBalancer() {
-        jsTest.log.info("Stopping balancer");
-        assert.commandWorked(st.s.adminCommand({balancerStop: 1}));
-        jsTest.log.info("Balancer successfully stopped");
-    }
-
-    // Start the balancer, execute the callback and stop the balancer again.
-    function withBalancerEnabled(cb) {
-        startBalancer();
-        try {
-            return cb();
-        } finally {
-            stopBalancer();
-        }
-    }
 
     // Query the current data distribution of the collection across the shards.
     function getCollDataDistribution(coll) {
@@ -205,7 +182,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Enable the balancer for the following operations, as it is needed for certain operations
         // that need move data between the shards, such as the 'removeShard' command.
         // The test will hang forever if the balancer is not enabled.
-        withBalancerEnabled(() => {
+        withBalancerEnabled(st.s, () => {
             distributeCollectionDataOverShards(db, coll, {
                 middle: {_id: 0},
                 chunks: [
@@ -309,7 +286,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Enable the balancer for the following operations, as it is needed for certain operations
         // that need move data between the shards, such as the 'removeShard' command.
         // The test will hang forever if the balancer is not enabled.
-        withBalancerEnabled(() => {
+        withBalancerEnabled(st.s, () => {
             distributeCollectionDataOverShards(db, coll1, {
                 middle: {_id: 0},
                 chunks: [
