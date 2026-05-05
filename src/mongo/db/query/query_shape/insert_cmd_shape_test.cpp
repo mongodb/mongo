@@ -74,7 +74,6 @@ TEST_F(InsertCmdShapeTest, DefaultInsertShape) {
 
     const auto expectedRepresentativeShape = fromjson(R"({
         cmdNs: { db: "testdb", coll: "testcoll" },
-        command: "insert",
         documents: [ { "?": "?" } ]
     })");
     ASSERT_BSONOBJ_EQ(expectedRepresentativeShape,
@@ -84,7 +83,6 @@ TEST_F(InsertCmdShapeTest, DefaultInsertShape) {
 
     const auto expectedDebugShape = fromjson(R"({
         cmdNs: { db: "testdb", coll: "testcoll" },
-        command: "insert",
         documents: "?array<?object>"
     })");
     ASSERT_BSONOBJ_EQ(expectedDebugShape,

@@ -562,26 +562,7 @@ inline boost::optional<query_shape::DeferredQueryShape> computeInsertQueryShape(
 }
 
 /**
- * Stores the query shape hash for the insert command in CurOp so that it is reported in slow
- * query logs. Mirrors storeQueryShapeHash() for updates, but uses the OperationContext overload
- * of shape_helpers::computeQueryShapeHash (insert has no ExpressionContext; IDHACK does not
- * apply, and FLE is already screened earlier via wholeOp.getEncryptionInformation()). Internal
- * clients are included (skipInternalClientCheck = true) so that sharded cluster writes still
- * record the hash on the shard side.
- */
-inline void storeInsertQueryShapeHash(OperationContext* opCtx,
-                                      const write_ops::InsertCommandRequest& wholeOp,
-                                      const query_shape::DeferredQueryShape& deferredShape) {
-    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
-        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
-            return shape_helpers::computeQueryShapeHash(
-                opCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
-        });
-}
-
-/**
- * Computes the insert query shape, records its hash in CurOp (for slow query logs), and
- * registers it with the query stats store.
+ * Computes the insert query shape and registers it with the query stats store.
  */
 void computeInsertShapeAndRegisterQueryStats(OperationContext* opCtx,
                                              const write_ops::InsertCommandRequest& wholeOp,
@@ -591,9 +572,6 @@ void computeInsertShapeAndRegisterQueryStats(OperationContext* opCtx,
         return;
     }
     const auto& deferredShape = maybeDeferredShape.get();
-
-    storeInsertQueryShapeHash(opCtx, wholeOp, deferredShape);
-
     query_stats::registerWriteRequest(opCtx, wholeOp.getNamespace(), [&]() {
         uassertStatusOKWithContext(deferredShape->getStatus(),
                                    "Failed to compute insert query shape");
@@ -1430,20 +1408,20 @@ WriteResult performInserts(
     const bool bypassEmptyTsReplacement = (source == OperationSource::kFromMigrate) ||
         static_cast<bool>(wholeOp.getBypassEmptyTsReplacement());
 
-    // Register query stats once before the batch loop.
-    //
-    // We deliberately do NOT report kNonExistent for inserts even when 'preConditions.exists()' is
-    // false. An insert either targets an existing collection or creates one as a side effect, so
-    // from the user's perspective two sequential inserts against the same namespace belong to the
-    // same query stats entry. Threading kNonExistent through for only the first insert would split
-    // the entry along a boundary ("was the collection there yet?") that the user cannot observe
-    // and did not intend. So we always use kCollection for a regular collection and kTimeseries for
-    // a timeseries target; we read from 'preConditions' rather than calling
-    // acquireCollection(MODE_IS) to avoid lock acquisition on the hot path.
+    // Register query stats once before the batch loop. We read the collection type from
+    // 'preConditions' rather than calling acquireCollection(MODE_IS). This avoids lock acquisition.
     if (source != OperationSource::kTimeseriesInsert) {
-        const query_shape::CollectionType collType = preConditions.isTimeseriesCollection()
-            ? query_shape::CollectionType::kTimeseries
-            : query_shape::CollectionType::kCollection;
+        query_shape::CollectionType collType;
+        if (!preConditions.exists()) {
+            collType = query_shape::CollectionType::kNonExistent;
+        } else if (preConditions.isTimeseriesCollection()) {
+            collType = query_shape::CollectionType::kTimeseries;
+        } else {
+            collType = query_shape::CollectionType::kCollection;
+        }
+        tassert(12205200,
+                "Expected collType to be set to a known value before registering query stats",
+                collType != query_shape::CollectionType::kUnknown);
         computeInsertShapeAndRegisterQueryStats(opCtx, wholeOp, collType);
     }
 
@@ -1532,17 +1510,6 @@ WriteResult performInserts(
         }
     }
     tassert(11052014, "Expected empty batch", batch.empty());
-
-    // Collect query stats for the insert operation if a QueryStats key was registered.
-    if (source != OperationSource::kTimeseriesInsert) {
-        auto key = std::move(curOp.debug().getQueryStatsInfo().key);
-        if (key || curOp.debug().getQueryStatsInfo().metricsRequested) {
-            curOp.setEndOfOpMetrics(0 /* no documents returned */);
-        }
-        if (key) {
-            collectQueryStatsMongod(opCtx, nullptr, std::move(key));
-        }
-    }
 
     return out;
 }

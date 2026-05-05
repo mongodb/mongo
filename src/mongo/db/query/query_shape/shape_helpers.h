@@ -118,32 +118,9 @@ void appendNamespaceShape(BSONObjBuilder& bob,
 /**
  * Evaluates the 'deferredShape' and computes a QueryShapeHash if both the shape and the client
  * are eligible. If not eligible, returns boost::none.
- *
- * Both overloads share the same core eligibility checks:
- *   - Skip internal clients (unless 'skipInternalClientCheck' is true — passed by callers that
- *     want the hash recorded on the shard side of a sharded write).
- *   - Skip direct clients (DBDirectClient).
- *   - Skip queries against internal databases or system collections.
- *   - Return boost::none if the deferred shape failed to evaluate.
- *
- * The ExpressionContext overload additionally short-circuits for:
- *   - IDHACK fast-path queries (find / update by _id).
- *   - FLE queries (flagged on the ExpressionContext).
- * Use this overload from find / update / distinct / count / agg paths, which already construct
- * an ExpressionContext as part of query parsing.
- *
- * The OperationContext overload runs only the core checks. Use it from commands that don't
- * construct an ExpressionContext — notably insert, where IDHACK does not apply and FLE queries
- * are screened earlier (via 'wholeOp.getEncryptionInformation()' at the insert entry point).
  */
 boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const query_shape::DeferredQueryShape& deferredShape,
-    const NamespaceString& nss,
-    bool skipInternalClientCheck = false);
-
-boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
-    OperationContext* opCtx,
     const query_shape::DeferredQueryShape& deferredShape,
     const NamespaceString& nss,
     bool skipInternalClientCheck = false);
