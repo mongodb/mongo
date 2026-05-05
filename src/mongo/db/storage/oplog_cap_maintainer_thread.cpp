@@ -40,6 +40,7 @@
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
@@ -364,6 +365,14 @@ void OplogCapMaintainerThread::run() {
                     invariant(oplogTruncateMarkers);
                     LocalOplogInfo::get(_uniqueCtx->get())
                         ->setTruncateMarkers(std::move(oplogTruncateMarkers));
+
+                    if (gFeatureFlagSizeBasedOplogTruncationForDisagg.isEnabled()) {
+                        tassert(12216900,
+                                "Truncate markers were not installed on step-up but DSC size-based "
+                                "oplog truncation is enabled",
+                                LocalOplogInfo::get(_uniqueCtx->get())->getTruncateMarkers() !=
+                                    nullptr);
+                    }
                     break;
                 }
 
