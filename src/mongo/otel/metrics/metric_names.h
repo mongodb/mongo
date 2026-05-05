@@ -99,6 +99,10 @@ public:
         MetricNameMaker::make("metrics.prometheus_file_exporter.failed_writes");
     static constexpr MetricName kPrometheusFileExporterWritesSkipped =
         MetricNameMaker::make("metrics.prometheus_file_exporter.skipped_writes");
+    static constexpr MetricName kPrometheusFileExporterWriteDuration =
+        MetricNameMaker::make("metrics.prometheus_file_exporter.write_duration");
+    static constexpr MetricName kPrometheusFileExporterWriteSize =
+        MetricNameMaker::make("metrics.prometheus_file_exporter.write_size");
     static constexpr MetricName kConnectionsProcessed =
         MetricNameMaker::make("network.connections_processed");
     static constexpr MetricName kIngressTLSHandshakeLatency =

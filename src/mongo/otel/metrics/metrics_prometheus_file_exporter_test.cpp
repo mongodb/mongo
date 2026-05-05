@@ -61,6 +61,8 @@ using ::opentelemetry::sdk::instrumentationscope::InstrumentationScope;
 using testing::_;
 using testing::AllOf;
 using testing::ContainsRegex;
+using testing::Ge;
+using testing::Gt;
 using testing::HasSubstr;
 using testing::Not;
 using unittest::match::StatusIs;
@@ -158,6 +160,37 @@ TEST_F(PrometheusFileExporterTest, ExportWritesMetricsToFile) {
               0);
     EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kPrometheusFileExporterWritesSkipped),
               0);
+}
+
+TEST_F(PrometheusFileExporterTest, WriteRecordsDurationHistogram) {
+    OtelMetricsCapturer metricsCapturer;
+    // makeExporter triggers one initialization write; Export+ForceFlush triggers one more.
+    std::unique_ptr<PushMetricExporter> exporter = makeExporter();
+    ASSERT_EQ(exporter->Export(makeResourceMetrics("requests_total", 42)), ExportResult::kSuccess);
+    ASSERT_TRUE(exporter->ForceFlush());
+
+    HistogramData<int64_t> data =
+        metricsCapturer.readInt64Histogram(MetricNames::kPrometheusFileExporterWriteDuration);
+    EXPECT_EQ(data.count, 2u);
+    EXPECT_THAT(data.sum, Ge(0));
+}
+
+TEST_F(PrometheusFileExporterTest, WriteRecordsSizeHistogram) {
+    OtelMetricsCapturer metricsCapturer;
+    // makeExporter triggers one initialization write (empty, size 0); Export+ForceFlush triggers
+    // one more with the actual metric content.
+    std::unique_ptr<PushMetricExporter> exporter = makeExporter();
+    ASSERT_EQ(exporter->Export(makeResourceMetrics("requests_total", 42)), ExportResult::kSuccess);
+    ASSERT_TRUE(exporter->ForceFlush());
+
+    std::string fileContents = readFileContents(filepath());
+    ASSERT_THAT(fileContents, ContainsRegex("requests_total.*42"));
+
+    HistogramData<int64_t> data =
+        metricsCapturer.readInt64Histogram(MetricNames::kPrometheusFileExporterWriteSize);
+    EXPECT_EQ(data.count, 2u);
+    // sum = init write size (0) + actual write size (== file content size)
+    EXPECT_EQ(data.sum, static_cast<int64_t>(fileContents.size()));
 }
 
 TEST_F(PrometheusFileExporterTest, ExportEmptyMetrics) {
