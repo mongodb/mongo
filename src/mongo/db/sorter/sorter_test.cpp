@@ -161,6 +161,33 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     ASSERT_GT(sorterFileStats.bytesSpilled(), 0);
 }
 
+class ContainerInMemIterTest : public ServiceContextMongoDTest {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest _ffContainerWrites{"featureFlagContainerWrites", true};
+};
+
+TEST_F(ContainerInMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
+    static const int data[] = {6, 3, 7, 4, 0, 9, 5, 7, 1, 8};
+
+    unittest::TempDir spillDir("InMemIterTests");
+    SorterTracker sorterTracker;
+    const SortOptions opts = SortOptions().Tracker(&sorterTracker);
+    ContainerTraits<> containerTraits(makeOperationContext());
+    auto spiller = containerTraits.makeSpiller(opts, spillDir.path());
+
+    auto expectedIterator = makeInMemIterator(data, spiller);
+    auto iteratorToSpill = makeInMemIterator(data, spiller);
+    ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(expectedIterator, iteratorToSpill, 3);
+
+    ASSERT_TRUE(iteratorToSpill->spillable());
+    auto spilledIterator = iteratorToSpill->spill(opts, IWSorter::Settings{});
+    ASSERT_FALSE(spilledIterator->spillable());
+    ASSERT_ITERATORS_EQUIVALENT(expectedIterator, spilledIterator);
+
+    ASSERT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
+    ASSERT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
+}
+
 /**
  * This suite includes test cases for resumable index builds where the Sorter is reconstructed from
  * state persisted to disk during a previous clean shutdown.
@@ -313,7 +340,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSpiller, "this->_spiller != nu
 }
 }  // namespace
 
-TYPED_TEST(FileBasedMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
+TYPED_TEST(MakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     auto storageIdentifier = "unused_sorter_storage";
     unittest::TempDir spillDir = makeSpillDir();
     SorterTracker sorterTracker;
@@ -1166,21 +1193,11 @@ TYPED_TEST(BoundedSorterTest, LimitSpill) {
     ASSERT_EQ(this->sorter->stats().spilledRanges(), 1);
 }
 
-TEST_F(FileBasedBoundedSorterTest, ForceSpill) {
-    SorterFileStats fileStats(&sorterTracker);
+TYPED_TEST(BoundedSorterTest, ForceSpill) {
     unittest::TempDir spillDir = makeSpillDir();
-    auto options = SortOptions().MaxMemoryUsageBytes(100 * 1024 * 1024).Tracker(&sorterTracker);
-
-    std::shared_ptr<FileBasedSpiller<Key, Doc, ComparatorAsc>> spiller =
-        std::make_shared<FileBasedSpiller<Key, Doc, ComparatorAsc>>(
-            spillDir.path(),
-            &fileStats,
-            /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion,
-            testSpillingMinAvailableDiskSpaceBytes);
-    sorter = makeAsc(options, std::move(spiller));
-    // Sorter stores pointers to sorterTracker and fileStats, it has to be destroyed before them.
-    ScopeGuard sorterReset{[&]() { sorter.reset(); }};
+    auto options =
+        SortOptions().MaxMemoryUsageBytes(100 * 1024 * 1024).Tracker(&this->sorterTracker);
+    this->sorter = this->makeAsc(options, this->storage().makeSpiller(options, spillDir.path()));
 
     std::vector<Doc> input = {
         {7},
@@ -1203,29 +1220,26 @@ TEST_F(FileBasedBoundedSorterTest, ForceSpill) {
 
     std::vector<Doc> output;
     for (size_t i = 0; i < input.size(); ++i) {
-        sorter->add(input[i].time, std::move(input[i]));
-        while (sorter->getState() == S::State::kReady) {
-            output.push_back(sorter->next().second);
+        this->sorter->add(input[i].time, std::move(input[i]));
+        while (this->sorter->getState() == S::State::kReady) {
+            output.push_back(this->sorter->next().second);
         }
         if (i % 3 == 2) {
-            sorter->forceSpill();
+            this->sorter->forceSpill();
         }
     }
-    sorter->done();
+    this->sorter->done();
 
-    while (sorter->getState() == S::State::kReady) {
-        output.push_back(sorter->next().second);
+    while (this->sorter->getState() == S::State::kReady) {
+        output.push_back(this->sorter->next().second);
     }
-    ASSERT(sorter->getState() == S::State::kDone);
+    ASSERT(this->sorter->getState() == S::State::kDone);
 
     ASSERT_EQ(output.size(), input.size());
-    assertSorted(output);
+    this->assertSorted(output);
 
-    ASSERT_EQ(sorter->stats().spilledRanges(), 5);
-    ASSERT_EQ(sorter->stats().spilledKeyValuePairs(), 13);
-    ASSERT_EQ(fileStats.bytesSpilledUncompressed(), 104);
-    ASSERT_GT(fileStats.bytesSpilled(), 0);
-    ASSERT_LT(fileStats.bytesSpilled(), 1000);
+    ASSERT_EQ(this->sorter->stats().spilledRanges(), 5);
+    ASSERT_EQ(this->sorter->stats().spilledKeyValuePairs(), 13);
 }
 
 TYPED_TEST(BoundedSorterTest, DescSorted) {

@@ -242,12 +242,13 @@ struct ContainerTraits {
 
     // The helpers below are fixed to <IntWrapper, IntWrapper, IWComparator>; they only make
     // sense on the default instantiation.
-    static std::shared_ptr<Spiller<IntWrapper, IntWrapper, IWComparator>> makeSpillerForResume(
+    // TODO SERVER-120078: implement a real resume by scanning the container for the max key.
+    std::shared_ptr<Spiller<IntWrapper, IntWrapper, IWComparator>> makeSpillerForResume(
         const SortOptions& opts,
         const boost::filesystem::path& spillDir,
-        const SorterChecksumVersion,
-        const std::string& storageIdentifier) {
-        MONGO_UNIMPLEMENTED;
+        const SorterChecksumVersion checksumVersion,
+        const std::string& /*storageIdentifier*/) {
+        return makeSpiller(opts, spillDir, checksumVersion);
     }
 
     std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> makeWriter(
