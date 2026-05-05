@@ -64,6 +64,8 @@ runMemoryStatsTest({
     // This stage does not release memory on EOF.
     checkInUseTrackedMemBytesResets: false,
     skipServerStatusStageCheck: false,
+    // 10 unique docs from a=5 scan + 45 new docs from b=1 scan (5 overlap).
+    expectedServerStatusRecords: 55,
 });
 
 // Clean up.

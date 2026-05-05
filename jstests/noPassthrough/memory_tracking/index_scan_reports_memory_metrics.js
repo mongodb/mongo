@@ -55,6 +55,8 @@ runMemoryStatsTest({
     // This stage does not release memory on EOF.
     checkInUseTrackedMemBytesResets: false,
     skipServerStatusStageCheck: false,
+    // 10 docs each appear once in the a=5 index entry.
+    expectedServerStatusRecords: 10,
 });
 
 // Clean up.

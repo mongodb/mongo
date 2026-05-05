@@ -164,6 +164,8 @@ runMemoryStatsTest({
     stageName: "unique",
     expectedNumGetMores: 2,
     skipServerStatusStageCheck: false,
+    // 3 from category/priority index + 2 new from status/value index (_id 5 is a duplicate).
+    expectedServerStatusRecords: 5,
 });
 
 // Test UniqueRoaringStage with normal collection.
@@ -181,6 +183,8 @@ runMemoryStatsTest({
     stageName: "unique_roaring",
     expectedNumGetMores: 2,
     skipServerStatusStageCheck: false,
+    // 3 from category/priority index + 2 new from status/value index (_id 5 is a duplicate).
+    expectedServerStatusRecords: 5,
 });
 
 // Clean up.

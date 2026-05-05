@@ -452,10 +452,25 @@ function verifyExplainMetrics({
     }
 }
 
-function verifyServerStatusMetrics({db, stageName}) {
-    const dedupStats = db.serverStatus().metrics.query.recordIdDeduplication[stageName];
-    assert.gt(dedupStats.deduplicatedBytes, 0);
-    assert.gt(dedupStats.deduplicatedRecords, 0);
+// Captures the recordIdDeduplication metrics for a stage.
+function snapshotServerStatusMetrics({db, stageName}) {
+    return db.serverStatus().metrics.query.recordIdDeduplication[stageName];
+}
+
+// Asserts that the recordIdDeduplication counters for `stageName` changed as expected since
+// `before` was captured. deduplicatedBytes is only checked to be > 0 (implementation-dependent
+// size). deduplicatedRecords counts unique RecordIds inserted and is checked for exact equality.
+function verifyServerStatusMetrics({db, stageName, featureFlagEnabled, before, expectedRecords}) {
+    const after = db.serverStatus().metrics.query.recordIdDeduplication[stageName];
+    const deltaBytes = after.deduplicatedBytes - before.deduplicatedBytes;
+    const deltaRecords = after.deduplicatedRecords - before.deduplicatedRecords;
+    if (featureFlagEnabled) {
+        assert.gt(deltaBytes, 0);
+        assert.eq(deltaRecords, expectedRecords);
+    } else {
+        assert.eq(deltaBytes, 0);
+        assert.eq(deltaRecords, 0);
+    }
 }
 
 /**
@@ -473,6 +488,9 @@ export function runMemoryStatsTest({
     skipExplainStageCheck = false,
     explainStageSubpipelinePath = {},
     skipServerStatusStageCheck = true,
+    // The key in db.serverStatus().metrics.query.recordIdDeduplication. Override when it is different from stageName.
+    serverStatusStageName = stageName,
+    expectedServerStatusRecords,
 }) {
     assert("pipeline" in commandObj, "Command object must include a pipeline field.");
     assert("comment" in commandObj, "Command object must include a comment field.");
@@ -489,6 +507,9 @@ export function runMemoryStatsTest({
     // Log every operation.
     db.setProfilingLevel(2, {slowms: -1});
 
+    const serverStatusBefore = skipServerStatusStageCheck
+        ? null
+        : snapshotServerStatusMetrics({db, stageName: serverStatusStageName});
     const logLines = runPipelineAndGetDiagnostics({db: db, collName: collName, commandObj: commandObj, source: "log"});
     const verifyOptions = {
         expectedNumGetMores: expectedNumGetMores,
@@ -503,7 +524,13 @@ export function runMemoryStatsTest({
     });
 
     if (!skipServerStatusStageCheck) {
-        verifyServerStatusMetrics({db, stageName});
+        verifyServerStatusMetrics({
+            db,
+            stageName: serverStatusStageName,
+            featureFlagEnabled,
+            before: serverStatusBefore,
+            expectedRecords: expectedServerStatusRecords,
+        });
     }
 
     const profilerEntries = runPipelineAndGetDiagnostics({
@@ -548,6 +575,9 @@ export function runShardedMemoryStatsTest({
     // not appear in the shards' explain output.
     skipInUseTrackedMemBytesCheck = false,
     skipServerStatusStageCheck = true,
+    // The key in db.serverStatus().metrics.query.recordIdDeduplication. Override when it is different from stageName.
+    serverStatusStageName = stageName,
+    expectedServerStatusRecords,
 }) {
     assert("pipeline" in commandObj, "Command object must include a pipeline field.");
     assert("comment" in commandObj, "Command object must include a comment field.");
@@ -560,6 +590,9 @@ export function runShardedMemoryStatsTest({
 
     // Record every operation in the slow query log.
     db.setProfilingLevel(0, {slowms: -1});
+    const serverStatusBefore = skipServerStatusStageCheck
+        ? null
+        : snapshotServerStatusMetrics({db, stageName: serverStatusStageName});
     const logLines = runPipelineAndGetDiagnostics({db: db, collName: collName, commandObj: commandObj, source: "log"});
     const verifyOptions = {
         expectedNumGetMores: expectedNumGetMores,
@@ -573,7 +606,13 @@ export function runShardedMemoryStatsTest({
     });
 
     if (!skipServerStatusStageCheck) {
-        verifyServerStatusMetrics({db, stageName});
+        verifyServerStatusMetrics({
+            db,
+            stageName: serverStatusStageName,
+            featureFlagEnabled,
+            before: serverStatusBefore,
+            expectedRecords: expectedServerStatusRecords,
+        });
     }
 
     if (skipExplain) {

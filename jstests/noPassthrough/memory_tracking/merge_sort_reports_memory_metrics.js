@@ -65,6 +65,8 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
         // This stage does not release memory on EOF.
         checkInUseTrackedMemBytesResets: false,
         skipServerStatusStageCheck: false,
+        // 5 unique docs from a=1 scan; the only b=1 doc (i=1) is already in the set.
+        expectedServerStatusRecords: 5,
     });
 }
 
@@ -84,6 +86,9 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
         expectedNumGetMores: 2,
         checkInUseTrackedMemBytesResets: false,
         skipServerStatusStageCheck: false,
+        // $limit: 3 causes SORT_MERGE to stop early. Child2 (b=1) seeds the priority queue with
+        // i=1 before any output, giving 4 unique RecordIds inserted total (i=9, i=1, i=7, i=5).
+        expectedServerStatusRecords: 4,
     });
 }
 
