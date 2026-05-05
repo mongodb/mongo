@@ -42,7 +42,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -56,6 +55,81 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+
+// Wraps a child stage and injects a saveState/restoreState on the root plan on the Nth call to
+// getNext(). This simulates a storage-layer yield that fires at a precise point deep inside the
+// execution tree, which cannot be reproduced by simply calling saveState()/restoreState() between
+// getNext() calls from the test body.
+class YieldInjectingStage final : public PlanStage {
+public:
+    YieldInjectingStage(std::unique_ptr<PlanStage> child, int yieldOnCallN, PlanNodeId nodeId)
+        : PlanStage("yield_inject"_sd, nullptr, nodeId, false), _yieldOnCallN(yieldOnCallN) {
+        _children.emplace_back(std::move(child));
+    }
+
+    void setRoot(PlanStage* root) {
+        _root = root;
+    }
+
+    std::unique_ptr<PlanStage> clone() const final {
+        auto c = std::make_unique<YieldInjectingStage>(
+            _children[0]->clone(), _yieldOnCallN, _commonStats.nodeId);
+        c->_root = _root;
+        return c;
+    }
+
+    void prepare(CompileCtx& ctx) final {
+        _children[0]->prepare(ctx);
+    }
+
+    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final {
+        return _children[0]->getAccessor(ctx, slot);
+    }
+
+    void open(bool reOpen) final {
+        _commonStats.opens++;
+        _children[0]->open(reOpen);
+    }
+
+    PlanState getNext() final {
+        if (++_callCount == _yieldOnCallN && _root) {
+            _root->saveState();
+            _root->restoreState();
+        }
+        return trackPlanState(_children[0]->getNext());
+    }
+
+    void close() final {
+        trackClose();
+        _children[0]->close();
+    }
+
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final {
+        auto ret = std::make_unique<PlanStageStats>(_commonStats);
+        ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+        return ret;
+    }
+
+    const SpecificStats* getSpecificStats() const final {
+        return nullptr;
+    }
+
+    void doDebugPrint(std::vector<DebugPrinter::Block>&, DebugPrintInfo&) const final {}
+
+    size_t estimateCompileTimeSize() const final {
+        return sizeof(*this);
+    }
+
+protected:
+    void doSaveState() final {}
+    void doRestoreState() final {}
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor&) override {}
+
+private:
+    int _yieldOnCallN;
+    int _callCount = 0;
+    PlanStage* _root = nullptr;
+};
 
 using HashJoinStageTest = PlanStageTestFixture;
 
@@ -831,6 +905,103 @@ TEST_F(HashJoinStageTest, HashJoinMultipleJoinKeys) {
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+}
+
+// Test for nested HashJoinStage use-after-free on yield.
+//
+// ChildHashJoin._probeProject holds a non-owned VIEW into ParentHashJoin's _probeProject (HJ_1).
+// When ParentHashJoin advances to the next outer row it frees HJ_1 via _probeProject.reset().
+// ChildHashJoin._probeProject is now dangling. If a storage-layer yield fires before
+// ChildHashJoin gets a new outer row, doSaveState() calls _probeProject.makeOwned() →
+// copyValue() → memcpy on the freed buffer → heap-use-after-free.
+TEST_F(HashJoinStageTest, NestedHashJoinNoUseAfterFreeOnYield) {
+    auto ctx = makeCompileCtx();
+
+    // Use strings > 7 bytes so values are heap-allocated (StringBig). StringSmall is stored
+    // inline in the Value word and is never freed to the heap, so it cannot exhibit a UaF.
+
+    // scan1: outer (probe) side of ParentHashJoin.
+    //   Row 1: "k1_long_key" — 2 matches in scan2 (keeps cursor alive across the safe yield).
+    //   Row 2: "k_no_match_long" — no match; this row causes ParentHashJoin to free HJ_1.
+    auto [scan1Tag, scan1Val] =
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key" << "proj_A_long")
+                             << BSON_ARRAY("k_no_match_long" << "proj_B_long")));
+    value::ValueGuard scan1Guard{scan1Tag, scan1Val};
+
+    // scan2: inner (build) side of ParentHashJoin.
+    auto [scan2Tag, scan2Val] =
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key" << "inner_1_long")
+                             << BSON_ARRAY("k1_long_key" << "inner_2_long")));
+    value::ValueGuard scan2Guard{scan2Tag, scan2Val};
+
+    // scan3: inner (build) side of ChildHashJoin.
+    auto [scan3Tag, scan3Val] = makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key" << "child_1_long")));
+    value::ValueGuard scan3Guard{scan3Tag, scan3Val};
+
+    scan1Guard.reset();
+    auto [scan1Slots, scan1Stage] = generateVirtualScanMulti(2, scan1Tag, scan1Val);
+
+    // YieldInjectingStage fires on call 3 of scan1.getNext():
+    //   Call 1 → "k1_long_key"      (Match 1 and Match 2 setup)
+    //   Call 2 → "k_no_match_long"  (ParentHashJoin frees HJ_1; ChildHashJoin._probeProject
+    //                                dangles)
+    //   Call 3 → IS_EOF             (yield fires: saveState() → makeOwned() on dangling ptr)
+    auto yieldStage = std::make_unique<YieldInjectingStage>(
+        std::move(scan1Stage), 3 /* yieldOnCallN */, kEmptyPlanNodeId);
+    auto* yieldStagePtr = yieldStage.get();
+
+    scan2Guard.reset();
+    auto [scan2Slots, scan2Stage] = generateVirtualScanMulti(2, scan2Tag, scan2Val);
+
+    auto [parentOutputSlots, parentStage] = makeHashJoinStage(this,
+                                                              std::move(yieldStage),
+                                                              std::move(scan2Stage),
+                                                              makeSV(scan1Slots[0]),
+                                                              makeSV(scan1Slots[1]),
+                                                              makeSV(scan2Slots[0]),
+                                                              makeSV(scan2Slots[1]));
+
+    auto childOuterKeySlot = parentOutputSlots[1];
+    value::SlotVector childOuterProjSlots = {
+        parentOutputSlots[0], parentOutputSlots[2], parentOutputSlots[3]};
+
+    scan3Guard.reset();
+    auto [scan3Slots, scan3Stage] = generateVirtualScanMulti(2, scan3Tag, scan3Val);
+
+    auto [childOutputSlots, childStage] = makeHashJoinStage(this,
+                                                            std::move(parentStage),
+                                                            std::move(scan3Stage),
+                                                            makeSV(childOuterKeySlot),
+                                                            childOuterProjSlots,
+                                                            makeSV(scan3Slots[0]),
+                                                            makeSV(scan3Slots[1]));
+
+    prepareTree(ctx.get(), childStage.get(), childOutputSlots);
+    yieldStagePtr->setRoot(childStage.get());
+
+    // Match 1: "k1_long_key" → inner_1.
+    ASSERT_EQ(childStage->getNext(), PlanState::ADVANCED);
+
+    // Safe yield: both stages make owned copies of their probe rows.
+    //   ParentHashJoin: HJ_1 = owned copy of "proj_A_long".
+    //   ChildHashJoin:  HJ_2 = owned copy of "proj_A_long".
+    childStage->saveState();
+    childStage->restoreState();
+
+    // Match 2: ParentHashJoin cursor advances to inner_2 (cursor was still live from Match 1).
+    //   ChildHashJoin._probeProject.reset() releases HJ_2 and loads a VIEW into HJ_1.
+    ASSERT_EQ(childStage->getNext(), PlanState::ADVANCED);
+
+    // This getNext() triggers the bug:
+    //   - ChildHashJoin cursor exhausted → calls ParentHashJoin->getNext()
+    //   - ParentHashJoin cursor exhausted → calls YieldInjectingStage (call 2)
+    //     → returns "k_no_match_long" → ParentHashJoin._probeProject.reset() frees HJ_1
+    //     → ChildHashJoin._probeProject[2] is now a dangling pointer
+    //   - ParentHashJoin: no match → calls YieldInjectingStage (call 3)
+    //     → yield fires: saveState() → ChildHashJoin.doSaveState() → makeOwned()
+    //     → copyValue(StringBig, dangling_ptr) → heap-use-after-free (caught by ASAN)
+    ASSERT_EQ(childStage->getNext(), PlanState::IS_EOF);
+    childStage->close();
 }
 
 }  // namespace mongo::sbe

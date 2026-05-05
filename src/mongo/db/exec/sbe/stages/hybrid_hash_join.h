@@ -140,6 +140,7 @@ public:
     [[nodiscard]] boost::optional<MatchResult> next();
 
     void saveState();
+    void restoreState();
 
     bool tryReprobe();
 

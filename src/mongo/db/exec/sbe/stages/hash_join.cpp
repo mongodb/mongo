@@ -365,5 +365,9 @@ size_t HashJoinStage::estimateCompileTimeSize() const {
 void HashJoinStage::doSaveState() {
     _cursor.saveState();
 }
+
+void HashJoinStage::doRestoreState() {
+    _cursor.restoreState();
+}
 }  // namespace sbe
 }  // namespace mongo

@@ -57,6 +57,7 @@ public:
     virtual ~Impl() = default;
     virtual boost::optional<MatchResult> next() = 0;
     virtual void saveState() {}
+    virtual void restoreState() {}
     virtual bool tryReprobe() {
         return false;
     }
@@ -78,6 +79,12 @@ void JoinCursor::saveState() {
     }
 }
 
+void JoinCursor::restoreState() {
+    if (_impl) {
+        _impl->restoreState();
+    }
+}
+
 void JoinCursor::reset() {
     _impl = nullptr;
 }
@@ -96,7 +103,11 @@ public:
     InMemoryJoinCursor(HHJTableType& ht,
                        value::MaterializedRow& probeKey,
                        value::MaterializedRow& probeProject)
-        : _ht(ht), _probeKey(probeKey), _probeProject(probeProject) {
+        : _ht(ht),
+          _probeKey(probeKey),
+          _probeProject(probeProject),
+          _savedProbeKey(probeKey.size()),
+          _savedProbeProject(probeProject.size()) {
         // Probe the hash table for matches into the cursor to stream them.
         std::tie(_htIt, _htItEnd) = _ht.equal_range(_probeKey);
     }
@@ -110,14 +121,41 @@ public:
     }
 
     void saveState() override {
-        _probeKey.makeOwned();
-        _probeProject.makeOwned();
+        // Deep-copy slot by slot
+        for (size_t i = 0; i < _probeKey.size(); ++i) {
+            auto [tag, val] = _probeKey.getViewOfValue(i);
+            auto [newTag, newVal] = value::copyValue(tag, val);
+            _savedProbeKey.reset(i, true, newTag, newVal);
+        }
+        for (size_t i = 0; i < _probeProject.size(); ++i) {
+            auto [tag, val] = _probeProject.getViewOfValue(i);
+            auto [newTag, newVal] = value::copyValue(tag, val);
+            _savedProbeProject.reset(i, true, newTag, newVal);
+        }
+    }
+
+    void restoreState() override {
+        // Restore _probeKey/_probeProject from the saved copies, setting ownership to false so
+        // that the next call to HashJoinStage::getNext() - which resets these rows for the new
+        // outer probe row - does not release the underlying buffers. A nested child may hold views
+        // into these buffers via its outer accessor; releasing them would leave those views
+        // dangling.
+        for (size_t i = 0; i < _savedProbeKey.size(); ++i) {
+            auto [tag, val] = _savedProbeKey.getViewOfValue(i);
+            _probeKey.reset(i, false, tag, val);
+        }
+        for (size_t i = 0; i < _savedProbeProject.size(); ++i) {
+            auto [tag, val] = _savedProbeProject.getViewOfValue(i);
+            _probeProject.reset(i, false, tag, val);
+        }
     }
 
 private:
     HHJTableType& _ht;
     value::MaterializedRow& _probeKey;
     value::MaterializedRow& _probeProject;
+    value::MaterializedRow _savedProbeKey;
+    value::MaterializedRow _savedProbeProject;
     HHJTableType::iterator _htIt{};
     HHJTableType::iterator _htItEnd{};
 };
