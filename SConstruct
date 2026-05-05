@@ -1262,6 +1262,15 @@ env_vars.Add(
 
 VSINSTALLDIR = 'C:/Program Files/Microsoft Visual Studio/2022/Professional'
 MSVC_TOOLSET_VERSION = "14.31.31103"
+DEFAULT_WINDOWS_SDK_VERSION = "10.0.17763.0"
+WINDOWS_KITS_10_LIB_ROOT = "C:/Program Files (x86)/Windows Kits/10/Lib"
+# Keep the vcvars args symbolic so env.subst() picks up command-line overrides.
+DEFAULT_MSVC_USE_SCRIPT_ARGS = "x64 $MSVC_SDK_VERSION -vcvars_ver=$MSVC_TOOLSET_VERSION"
+
+
+def get_windows_sdk_libdir(sdk_version):
+    return os.path.join(WINDOWS_KITS_10_LIB_ROOT, sdk_version)
+
 
 env_vars.Add('MSVC_USE_SCRIPT', help='Sets the script used to setup Visual Studio.',
              default=f'{VSINSTALLDIR}/VC/Auxiliary/Build/vcvarsall.bat')
@@ -1269,13 +1278,19 @@ env_vars.Add('MSVC_USE_SCRIPT', help='Sets the script used to setup Visual Studi
 env_vars.Add('VSINSTALLDIR', help='The path where Visual Studio is installed.',
              default=VSINSTALLDIR)
 
-env_vars.Add('MSVC_USE_SCRIPT_ARGS', help='Sets the script used to setup Visual Studio.',
-             default=f'x64 -vcvars_ver={MSVC_TOOLSET_VERSION}')
+env_vars.Add('MSVC_USE_SCRIPT_ARGS', help='Sets the arguments used to setup Visual Studio.',
+             default=DEFAULT_MSVC_USE_SCRIPT_ARGS)
 
 env_vars.Add(
     'MSVC_TOOLSET_VERSION',
     help='Sets the full toolset version of Visual C++ to use.',
     default=MSVC_TOOLSET_VERSION,
+)
+
+env_vars.Add(
+    'MSVC_SDK_VERSION',
+    help='Sets the Windows 10 SDK version used by Visual C++.',
+    default=DEFAULT_WINDOWS_SDK_VERSION,
 )
 
 env_vars.Add(
@@ -1573,6 +1588,22 @@ if GetOption('help'):
 
     Return()
 
+selected_windows_sdk_version = variables_only_env.get("MSVC_SDK_VERSION")
+if variables_only_env.get("TARGET_OS") == "windows":
+    if not selected_windows_sdk_version:
+        fatal_error(
+            None,
+            "MSVC_SDK_VERSION must name a Windows 10 SDK version. Override it on the SCons command line with MSVC_SDK_VERSION=<sdk version>.",
+        )
+
+    selected_windows_sdk_libdir = get_windows_sdk_libdir(selected_windows_sdk_version)
+    if not os.path.isdir(selected_windows_sdk_libdir):
+        fatal_error(
+            None,
+            "Pinned Windows SDK not found at '{}'. Install that SDK or override it on the SCons command line with MSVC_SDK_VERSION=<sdk version>.",
+            selected_windows_sdk_libdir,
+        )
+
 if ('CC' in variables_only_env) != ('CXX' in variables_only_env):
     print('Cannot customize C compiler without customizing C++ compiler, and vice versa')
     Exit(1)
@@ -1654,6 +1685,7 @@ envDict = dict(
     LIBDEPS_TAG_EXPANSIONS=[],
     MSVC_VERSION=variables_only_env.get("MSVC_VERSION"),
     MSVC_TOOLSET_VERSION=variables_only_env.get("MSVC_TOOLSET_VERSION"),
+    MSVC_SDK_VERSION=variables_only_env.get("MSVC_SDK_VERSION"),
     VSINSTALLDIR=variables_only_env.get("VSINSTALLDIR"),
     MSVC_USE_SCRIPT=variables_only_env.get("MSVC_USE_SCRIPT"),
     MSVC_USE_SCRIPT_ARGS=variables_only_env.get("MSVC_USE_SCRIPT_ARGS"),
@@ -3973,19 +4005,19 @@ def doConfigure(myenv):
                              "C++ libraries.")
         myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"])
 
-    # Check if we have a modern Windows SDK
+    # Check if we have a Windows 10 SDK.
     if env.TargetOSIs('windows'):
 
         def CheckWindowsSDKVersion(context):
 
             test_body = """
             #include <windows.h>
-            #if !defined(NTDDI_WINBLUE)
-            #error Need Windows SDK Version 8.1 or higher
+            #if !defined(NTDDI_WIN10)
+            #error Need Windows SDK Version 10 or higher
             #endif
             """
 
-            context.Message('Checking Windows SDK is 8.1 or newer... ')
+            context.Message('Checking Windows SDK is 10 or newer... ')
             ret = context.TryCompile(textwrap.dedent(test_body), ".c")
             context.Result(ret)
             return ret
@@ -3999,7 +4031,7 @@ def doConfigure(myenv):
         )
 
         if not conf.CheckWindowsSDKVersion():
-            myenv.ConfError('Windows SDK Version 8.1 or higher is required to build MongoDB')
+            myenv.ConfError('Windows SDK Version 10 or higher is required to build MongoDB')
 
         conf.Finish()
 
