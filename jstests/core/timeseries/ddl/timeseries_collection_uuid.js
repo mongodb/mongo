@@ -144,11 +144,7 @@ for (const uuid of [nonexistentUUID, bucketsCollUUID]) {
     testCreateIndex(uuid, "m");
     testCreateIndex(uuid, "a");
 
-    if (
-        FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport") &&
-        // TODO SERVER-112063 re-enable this in viewless timeseries suites with retriable writes
-        (isViewfulTimeseriesOnlySuite(db) || !db.getSession().getOptions().shouldRetryWrites())
-    ) {
+    if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
         testUpdate(uuid, "m");
         testUpdate(uuid, "a");
     }

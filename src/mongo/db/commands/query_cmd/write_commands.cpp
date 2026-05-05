@@ -72,6 +72,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -516,17 +517,20 @@ public:
                 timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
                     opCtx, ns(), request(), request().getCollectionUUID());
 
-            OperationSource source = isTimeseriesLogicalRequest ? OperationSource::kTimeseriesUpdate
-                                                                : OperationSource::kStandard;
-
             long long nModified = 0;
 
             write_ops_exec::WriteResult reply;
             // For retryable updates on time-series collections, we needs to run them in
             // transactions to ensure the multiple writes are replicated atomically.
-            bool isTimeseriesRetryableUpdate = isTimeseriesLogicalRequest &&
+            const bool isTimeseriesRetryableUpdate = isTimeseriesLogicalRequest &&
                 opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction();
-            if (isTimeseriesRetryableUpdate) {
+
+            // If the command is already wrapped by a sharding operation, atomicity is provided at
+            // that level. Do not reenter the transaction path as it will be rejected by the
+            // transaction wrapper.
+            const bool wrappedByShardingRouter = OperationShardingState::isShardingAware(opCtx);
+
+            if (isTimeseriesRetryableUpdate && !wrappedByShardingRouter) {
                 auto executor = getLocalExecutor(opCtx);
                 ON_BLOCK_EXIT([&] {
                     // Increments the counter if the command contains retries. This is normally done
@@ -548,6 +552,9 @@ public:
                     hangUpdateBeforeWrite.pauseWhileSet();
                 }
 
+                const OperationSource source = isTimeseriesLogicalRequest
+                    ? OperationSource::kTimeseriesUpdate
+                    : OperationSource::kStandard;
                 reply = write_ops_exec::performUpdates(opCtx, request(), preConditions, source);
             }
 
