@@ -32,25 +32,37 @@
 namespace mongo {
 namespace primary_only_service_helpers {
 
-CancelState::CancelState(const CancellationToken& stepdownToken)
-    : _stepdownToken{stepdownToken},
-      _abortOrStepdownSource{stepdownToken},
-      _abortOrStepdownToken{_abortOrStepdownSource.token()} {}
-
-const CancellationToken& CancelState::getStepdownToken() const {
-    return _stepdownToken;
+CancelState::CancelState(boost::optional<CancellationToken> stepdownToken) {
+    if (stepdownToken) {
+        attachStepdownToken(*stepdownToken);
+    }
 }
 
-const CancellationToken& CancelState::getAbortOrStepdownToken() const {
-    return _abortOrStepdownToken;
+void CancelState::attachStepdownToken(const CancellationToken& stepdownToken) {
+    stepdownToken.onCancel()
+        .unsafeToInlineFuture()
+        .then([stepdownSource = _stepdownSource,
+               abortOrStepdownSource = _abortOrStepdownSource]() mutable {
+            stepdownSource.cancel();
+            abortOrStepdownSource.cancel();
+        })
+        .getAsync([](auto) {});
+}
+
+CancellationToken CancelState::getStepdownToken() const {
+    return _stepdownSource.token();
+}
+
+CancellationToken CancelState::getAbortOrStepdownToken() const {
+    return _abortOrStepdownSource.token();
 }
 
 bool CancelState::isSteppingDown() const {
-    return _stepdownToken.isCanceled();
+    return _stepdownSource.token().isCanceled();
 }
 
 bool CancelState::isAbortedOrSteppingDown() const {
-    return _abortOrStepdownToken.isCanceled();
+    return _abortOrStepdownSource.token().isCanceled();
 }
 
 void CancelState::abort() {
