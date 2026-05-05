@@ -32,11 +32,13 @@
 namespace mongo::rss::consensus {
 IntentGuard::IntentGuard(IntentRegistry::Intent intent, OperationContext* opctx)
     : _opCtx(opctx),
-      _token(IntentRegistry::get(_opCtx->getServiceContext()).registerIntent(intent, _opCtx)) {}
+      _svcCtx(_opCtx->getClient()->getServiceContext()),
+      _token(IntentRegistry::get(_svcCtx).registerIntent(intent, _opCtx)) {}
 
 void IntentGuard::reset() {
-    if (_opCtx) {
-        IntentRegistry::get(_opCtx->getServiceContext()).deregisterIntent(_token);
+    if (_svcCtx) {
+        IntentRegistry::get(_svcCtx).deregisterIntent(_token);
+        _svcCtx = nullptr;
         _opCtx = nullptr;
     }
 }

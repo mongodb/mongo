@@ -1771,6 +1771,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":intent_registry_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )
 
@@ -2374,10 +2375,12 @@ mongo_cc_library(
         "local_oplog_info.cpp",
     ],
     deps = [
+        ":intent_registry",
         ":oplog_visibility_manager",
         ":optime",
         ":repl_coordinator_interface",
         "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/admission:flow_control",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:oplog_truncate_markers",

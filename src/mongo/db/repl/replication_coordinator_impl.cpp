@@ -3902,7 +3902,21 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 rss::consensus::ReplicationStateTransitionGuard
 ReplicationCoordinatorImpl::_killConflictingOperations(
     rss::consensus::IntentRegistry::InterruptionType interrupt, OperationContext* opCtx) {
-    return _intentRegistry.killConflictingOperations(interrupt, opCtx).get();
+    auto svcCtx = opCtx->getServiceContext();
+    auto callback = [svcCtx] {
+        // Kill unprepared transactions to release intents whose lifetimes were extended by the WUOW
+        // but do not belong to an active opCtx.
+        auto client =
+            svcCtx->getService()->makeClient("KillSessionsForStepDown", Client::noSession());
+        AlternativeClientRegion acr(client);
+        auto killOpCtx = cc().makeOperationContext();
+        shard_role_details::getRecoveryUnit(killOpCtx.get())->setNoEvictionAfterCommitOrRollback();
+        SessionKiller::Matcher matcher(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(killOpCtx.get())});
+        killSessionsAbortUnpreparedTransactions(
+            killOpCtx.get(), matcher, ErrorCodes::InterruptedDueToReplStateChange);
+    };
+    return _intentRegistry.killConflictingOperations(interrupt, opCtx, std::move(callback)).get();
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,

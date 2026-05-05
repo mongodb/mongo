@@ -398,7 +398,24 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
                                  .killConflictingOperations(
                                      rss::consensus::IntentRegistry::InterruptionType::Rollback,
                                      opCtx,
-                                     0 /* no timeout */)
+                                     [svcCtx = opCtx->getServiceContext()] {
+                                         // Kill unprepared transactions to release intents whose
+                                         // lifetimes were extended by the WUOW but do not belong to
+                                         // an active opCtx.
+                                         auto client = svcCtx->getService()->makeClient(
+                                             "KillSessionsForRollback", Client::noSession());
+                                         AlternativeClientRegion acr(client);
+                                         auto killOpCtx = cc().makeOperationContext();
+                                         shard_role_details::getRecoveryUnit(killOpCtx.get())
+                                             ->setNoEvictionAfterCommitOrRollback();
+                                         SessionKiller::Matcher matcher(KillAllSessionsByPatternSet{
+                                             makeKillAllSessionsByPattern(killOpCtx.get())});
+                                         killSessionsAbortUnpreparedTransactions(
+                                             killOpCtx.get(),
+                                             matcher,
+                                             ErrorCodes::InterruptedDueToReplStateChange);
+                                     },
+                                     boost::optional<uint32_t>{0} /* no timeout */)
                                  .get());
         }
         rstlLock.emplace(opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());

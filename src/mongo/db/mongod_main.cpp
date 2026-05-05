@@ -185,6 +185,7 @@
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/shard_catalog_history_cleanup.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/config_server_op_observer.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
@@ -1783,12 +1784,27 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                       "Enqueuing the ReplicationStateTransitionLock for shutdown");
         boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
         if (gFeatureFlagIntentRegistration.isEnabled()) {
-            rstg.emplace(rss::consensus::IntentRegistry::get(serviceContext)
-                             .killConflictingOperations(
-                                 rss::consensus::IntentRegistry::InterruptionType::Shutdown,
-                                 opCtx,
-                                 0 /* no timeout */)
-                             .get());
+            rstg.emplace(
+                rss::consensus::IntentRegistry::get(serviceContext)
+                    .killConflictingOperations(
+                        rss::consensus::IntentRegistry::InterruptionType::Shutdown,
+                        opCtx,
+                        [svcCtx = serviceContext] {
+                            // Kill unprepared transactions to release intents whose lifetimes were
+                            // extended by the WUOW but do not belong to an active opCtx.
+                            auto client = svcCtx->getService()->makeClient(
+                                "KillSessionsForShutdown", Client::noSession());
+                            AlternativeClientRegion acr(client);
+                            auto killOpCtx = cc().makeOperationContext();
+                            shard_role_details::getRecoveryUnit(killOpCtx.get())
+                                ->setNoEvictionAfterCommitOrRollback();
+                            SessionKiller::Matcher matcher(KillAllSessionsByPatternSet{
+                                makeKillAllSessionsByPattern(killOpCtx.get())});
+                            killSessionsAbortUnpreparedTransactions(
+                                killOpCtx.get(), matcher, ErrorCodes::InterruptedAtShutdown);
+                        },
+                        boost::optional<uint32_t>{0} /* no timeout */)
+                    .get());
         }
         repl::ReplicationStateTransitionLockGuard rstl(
             opCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());

@@ -36,7 +36,6 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/kill_sessions_local.h"
-#include "mongo/db/session/session_killer.h"
 #include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"

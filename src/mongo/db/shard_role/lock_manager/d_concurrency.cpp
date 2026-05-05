@@ -222,10 +222,29 @@ Lock::GlobalLock::~GlobalLock() {
         // prevent lock release.
         const bool willReleaseLock =
             !locker->isGlobalLockedRecursively() && !locker->inAWriteUnitOfWork();
+
+        // The lock will be two-phase deferred when we are in a WUOW and this is not a recursive
+        // unlock. Computed before _unlock() modifies lock state.
+        const bool lockWillBeDeferred =
+            !locker->isGlobalLockedRecursively() && locker->inAWriteUnitOfWork();
+
         if (willReleaseLock) {
             shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         }
         _unlock();
+
+        // Mirror the lock deferral for the intent: keep the IntentGuard alive until the WUOW
+        // ends so the intent lifetime matches the global lock lifetime. The guard is wrapped in a
+        // shared_ptr because the Change lambdas must be copyable.
+        if (lockWillBeDeferred && _guard) {
+            auto sharedGuard = std::make_shared<rss::consensus::IntentGuard>(std::move(*_guard));
+            _guard = boost::none;
+            shard_role_details::getRecoveryUnit(_opCtx)->registerChange(
+                [sharedGuard](OperationContext*, boost::optional<Timestamp>) noexcept {
+                    sharedGuard->reset();
+                },
+                [sharedGuard](OperationContext*) noexcept { sharedGuard->reset(); });
+        }
     }
 
     if (!_skipRSTLLock && (lockResult == LOCK_OK || lockResult == LOCK_WAITING)) {

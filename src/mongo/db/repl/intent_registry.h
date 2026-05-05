@@ -35,10 +35,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/rwmutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <chrono>
+#include <functional>
 #include <future>
 #include <mutex>
 #include <vector>
@@ -83,8 +85,20 @@ public:
     }
 };
 
+// Defined in intent_registry.cpp. Removes the per-opCtx write-intent counter from IntentRegistry
+// when an OperationContext is destroyed so deferred deregistrations cannot corrupt a new opCtx
+// that has been allocated at the same memory address.
+class WriteIntentCleanup;
+
+// Defined in intent_registry.cpp. Deregisters all tokens for a Client when that Client is
+// destroyed while a stashed WUOW still holds write-intent tokens, preventing
+// _killOperationsByIntent from dereferencing the freed client pointer.
+class ClientIntentCleanup;
+
 class IntentRegistry {
     friend class IntentRegistryTest;
+    friend class WriteIntentCleanup;
+    friend class ClientIntentCleanup;
 
 public:
     enum class Intent {
@@ -116,6 +130,7 @@ public:
         Intent intent() const;
 
     private:
+        IntentToken(Intent intent, idType id) : _intent(intent), _id(id) {}
         static inline AtomicWord<idType> _currentTokenId = {};
         Intent _intent;
         idType _id;
@@ -179,10 +194,14 @@ public:
      * that conflict with the ongoing state transtion from registering their
      * intent, except those that originate from the same OperationContext to allow transition
      * threads to perform necessary work.
+     *
+     * postInterruptionCallback, if provided, is invoked on the async drain thread after active
+     * conflicting operations are killed, before waiting for the drain to complete.
      */
     std::future<ReplicationStateTransitionGuard> killConflictingOperations(
         InterruptionType interruption,
         OperationContext* opCtx,
+        std::function<void()> postInterruptionCallback = nullptr,
         boost::optional<uint32_t> timeout_sec = boost::none);
 
     /**
@@ -212,16 +231,39 @@ public:
 
     std::vector<size_t> getTotalIntentsDeclared() const;
 
+    /**
+     * Deregisters all intent tokens registered by the given client.
+     */
+    void deregisterTokensForClient(Client* client);
+
+    // Deregisters all intent tokens associated with the given session. Called from
+    // prepareTransaction so prepared transactions don't block the stepdown/shutdown drain.
+    void deregisterTokensForSession(OperationContext* opCtx, const LogicalSessionId& lsid);
+
 private:
+    struct TokenMapEntry {
+        OperationContext* opCtx;
+        Client* client;
+        ServiceContext* svcCtx;
+        uint64_t opId;
+        boost::optional<LogicalSessionId> lsid;
+    };
+
     struct tokenMap {
         mutable std::mutex lock;
         stdx::condition_variable cv;
-        absl::flat_hash_map<IntentToken::idType, OperationContext*> map;
+        absl::flat_hash_map<IntentToken::idType, TokenMapEntry> map;
     };
 
     bool _validIntent(Intent intent) const;
     void _killOperationsByIntent(Intent intent, InterruptionType interruption);
-    void _waitForDrain(Intent intent, std::chrono::milliseconds timeout);
+    void _waitForDrain(Intent intent,
+                       std::chrono::milliseconds timeout,
+                       InterruptionType interruption);
+
+    // Called by WriteIntentCleanup when an opCtx with active write intents is destroyed.
+    // Removes the mapping so deferred deregistration callbacks skip the decrement.
+    void _unregisterWriteCountForOpId(uint64_t opId);
 
     bool _enabled = true;
     RWMutex _stateMutex;
@@ -231,6 +273,11 @@ private:
     std::vector<tokenMap> _tokenMaps;
     Atomic<int> _pendingStateChange = 0;
     stdx::condition_variable _pendingStateChangeCV;
+
+    // Maps opCtx opId -> write intent counter pointer. Removed when the opCtx is destroyed
+    // (via WriteIntentCleanup) so deferred callbacks don't corrupt a new opCtx's counter.
+    mutable std::mutex _opIdMutex;
+    absl::flat_hash_map<uint64_t, AtomicWord<int32_t>*> _opIdToWriteCountPtr;
 
     // Tracks number of operations killed on state transition.
     size_t _totalOpsKilled = 0;

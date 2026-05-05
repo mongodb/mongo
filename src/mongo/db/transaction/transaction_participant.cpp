@@ -2088,6 +2088,9 @@ TransactionParticipant::Participant::prepareTransaction(
     // RSTL.
     const bool unlocked = shard_role_details::getLocker(opCtx)->unlockRSTLforPrepare();
     invariant(unlocked || gFeatureFlagIntentRegistration.isEnabled());
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rss::consensus::IntentRegistry::get(opCtx).deregisterTokensForSession(opCtx, _sessionId());
+    }
 
     return {prepareOplogSlot.getTimestamp(), o().affectedNamespaces};
 }
@@ -2145,6 +2148,9 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
 
     const bool unlocked = shard_role_details::getLocker(opCtx)->unlockRSTLforPrepare();
     invariant(unlocked || gFeatureFlagIntentRegistration.isEnabled());
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rss::consensus::IntentRegistry::get(opCtx).deregisterTokensForSession(opCtx, _sessionId());
+    }
 }
 
 void TransactionParticipant::Participant::setPrepareOpTimeForRecovery(OperationContext* opCtx,
@@ -2221,6 +2227,11 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     uassert(ErrorCodes::InvalidOptions,
             "commitTransaction must provide commitTimestamp to prepared transaction.",
             !o().txnState.isPrepared());
+
+    boost::optional<rss::consensus::IntentGuard> txnGuard;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+    }
 
     auto* txnOps = retrieveCompletedTransactionOperations(opCtx);
     auto opObserver = opCtx->getServiceContext()->getOpObserver();

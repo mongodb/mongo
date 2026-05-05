@@ -51,11 +51,15 @@ public:
     IntentGuard(const IntentGuard&) = delete;
     IntentGuard& operator=(const IntentGuard&) = delete;
 
-    IntentGuard(IntentGuard&& o) noexcept : _opCtx(std::exchange(o._opCtx, {})), _token(o._token) {}
+    IntentGuard(IntentGuard&& o) noexcept
+        : _opCtx(std::exchange(o._opCtx, {})),
+          _svcCtx(std::exchange(o._svcCtx, {})),
+          _token(o._token) {}
 
     IntentGuard& operator=(IntentGuard&& o) noexcept {
         if (this != &o) {
             _opCtx = std::exchange(o._opCtx, {});
+            _svcCtx = std::exchange(o._svcCtx, {});
             _token = o._token;
         }
         return *this;
@@ -84,6 +88,9 @@ public:
 
 private:
     OperationContext* _opCtx;
+    // Stored separately so reset() can find the registry even when _opCtx is stale (e.g.,
+    // when this guard is deferred to WUOW end and the original opCtx has been destroyed).
+    ServiceContext* _svcCtx = nullptr;
     IntentRegistry::IntentToken _token;
 };
 

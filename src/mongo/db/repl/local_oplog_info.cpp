@@ -35,10 +35,13 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/admission/flow_control.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/repl/always_allow_non_local_writes.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/record_store.h"
@@ -52,6 +55,8 @@
 #include <memory>
 #include <mutex>
 #include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 
 namespace mongo {
@@ -143,6 +148,15 @@ void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& n
 std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
                                                       std::size_t count,
                                                       std::size_t opTimeOffset) {
+    if (gFeatureFlagIntentRegistration.isEnabled() &&
+        !rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+             .hasWriteIntentDeclared(opCtx) &&
+        !repl::alwaysAllowNonLocalWrites(opCtx)) {
+        LOGV2_FATAL(12436504,
+                    "Attempted to reserve optime without a declared write intent",
+                    "opCtx"_attr = opCtx->getOpID());
+    }
+
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     long long term = repl::OpTime::kUninitializedTerm;
 
