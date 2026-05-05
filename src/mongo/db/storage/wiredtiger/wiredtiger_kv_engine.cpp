@@ -148,6 +148,20 @@ boost::filesystem::path getOngoingBackupPath() {
         WiredTigerBackup::kOngoingBackupFile;
 }
 
+/**
+ * Queries the WiredTiger global timestamp state for the timestamp specified in "config".
+ * Refer to WT_CONNECTION::query_timestamp() for valid config strings.
+ */
+std::uint64_t getWiredTigerGlobalTimestamp(WT_CONNECTION* connection, const char* config) {
+    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
+    invariantWTOK(connection->query_timestamp(connection, buf, config), /*session=*/nullptr);
+
+    std::uint64_t tmp;
+    fassert(12605100, NumberParser().base(16)(buf, &tmp));
+
+    return tmp;
+}
+
 }  // namespace
 
 // There are a few delicate restore scenarios where untimestamped writes are still required.
@@ -736,32 +750,16 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         setLastMaterializedLsn(provider.getSentinelDataTimestamp().value().asULL());
     }
 
-    {
-        char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-        invariantWTOK(_conn->query_timestamp(_conn, buf, "get=recovery"), nullptr);
+    _recoveryTimestamp = Timestamp(getWiredTigerGlobalTimestamp(_conn, "get=recovery"));
+    LOGV2_FOR_RECOVERY(
+        23987, 0, "WiredTiger recoveryTimestamp", "recoveryTimestamp"_attr = _recoveryTimestamp);
 
-        std::uint64_t tmp;
-        fassert(50758, NumberParser().base(16)(buf, &tmp));
-        _recoveryTimestamp = Timestamp(tmp);
-        LOGV2_FOR_RECOVERY(23987,
-                           0,
-                           "WiredTiger recoveryTimestamp",
-                           "recoveryTimestamp"_attr = _recoveryTimestamp);
-    }
-
-    {
-        char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-        invariantWTOK(_conn->query_timestamp(_conn, buf, "get=oldest_timestamp"), nullptr);
-        std::uint64_t tmp;
-        fassert(5380107, NumberParser().base(16)(buf, &tmp));
-
-        if (tmp != 0) {
-            LOGV2_FOR_RECOVERY(
-                5380106, 0, "WiredTiger oldestTimestamp", "oldestTimestamp"_attr = Timestamp(tmp));
-            // The oldest timestamp is set in WT. Only set the in-memory variable.
-            _oldestTimestamp.store(tmp);
-            setInitialDataTimestamp(Timestamp(tmp));
-        }
+    if (auto tmp = getWiredTigerGlobalTimestamp(_conn, "get=oldest_timestamp"); tmp != 0) {
+        LOGV2_FOR_RECOVERY(
+            5380106, 0, "WiredTiger oldestTimestamp", "oldestTimestamp"_attr = Timestamp(tmp));
+        // The oldest timestamp is set in WT. Only set the in-memory variable.
+        _oldestTimestamp.store(tmp);
+        setInitialDataTimestamp(Timestamp(tmp));
     }
 
     int32_t sessionCacheMax =
@@ -2701,12 +2699,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(Interruptible
 uint64_t WiredTigerKVEngine::getRawAllDurableTimestamp() const {
     // Fetch the latest all_durable value from the storage engine. This value will be a
     // timestamp that has no holes (uncommitted transactions with lower timestamps) behind it.
-    char buf[(2 * 8 /* bytes in hex */) + 1 /* null terminator */];
-    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=all_durable"), nullptr);
-
-    uint64_t ts;
-    fassert(38002, NumberParser{}.base(16)(buf, &ts));
-    return ts;
+    return getWiredTigerGlobalTimestamp(_conn, "get=all_durable");
 }
 
 Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
@@ -3143,23 +3136,11 @@ Timestamp WiredTigerKVEngine::getCheckpointTimestamp() const {
 }
 
 std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
-    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=last_checkpoint"), nullptr);
-
-    std::uint64_t tmp;
-    fassert(50963, NumberParser().base(16)(buf, &tmp));
-    return tmp;
+    return getWiredTigerGlobalTimestamp(_conn, "get=last_checkpoint");
 }
 
 Timestamp WiredTigerKVEngine::getBackupCheckpointTimestamp() {
-    // Buffer must be large enough to hold a NUL terminated, hex-encoded 8 byte timestamp.
-    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-
-    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=backup_checkpoint"), nullptr);
-    std::uint64_t backup_checkpoint_timestamp;
-    fassert(8120800, NumberParser().base(16)(buf, &backup_checkpoint_timestamp));
-
-    return Timestamp(backup_checkpoint_timestamp);
+    return Timestamp(getWiredTigerGlobalTimestamp(_conn, "get=backup_checkpoint"));
 }
 
 void WiredTigerKVEngine::dump() const {
