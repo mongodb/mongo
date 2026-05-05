@@ -39,6 +39,8 @@
 #include <utility>
 #include <vector>
 
+#include <absl/strings/str_split.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::pipeline::dependency_graph {
@@ -1473,7 +1475,7 @@ private:
      */
     ParsedPath internPath(PathRef path) {
         ParsedPath vec;
-        for (auto s : std::views::split(path, '.')) {
+        for (auto s : absl::StrSplit(toStdStringViewForInterop(path), absl::ByChar('.'))) {
             vec.push_back(_strings.intern({s.begin(), s.end()}));
         }
         return vec;
@@ -1485,7 +1487,8 @@ private:
      */
     ParsedPath parsePath(PathRef path) const {
         ParsedPath vec;
-        for (auto s : std::views::split(path, '.')) {
+
+        for (auto s : absl::StrSplit(toStdStringViewForInterop(path), absl::ByChar('.'))) {
             auto id = _strings.lookup({s.begin(), s.end()});
             vec.push_back(id);
         }

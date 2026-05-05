@@ -49,6 +49,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/strings/str_split.h"
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -72,7 +73,7 @@ protected:
         stages.assign(pipeline->getSources().begin(), pipeline->getSources().end());
         canPathBeArray = [this](StringData path) -> bool {
             return pipeline->getContext()->canPathBeArrayForNss(
-                FieldPath(path), pipeline->getContext()->getNamespaceString());
+                FieldRef(path), pipeline->getContext()->getNamespaceString());
         };
         graph = std::make_unique<DependencyGraph>(pipeline->getSources(), canPathBeArray);
     }
@@ -1843,6 +1844,203 @@ TEST_F(PipelineDependencyGraphTest, MissingRenameChecksPrefixArrayness) {
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "y"));
     });
+}
+
+// Tests for malformed/edge-case paths
+
+TEST_F(PipelineDependencyGraphTest, PathEmptyString) {
+    // Empty string field names are rejected by $set because FieldPath construction
+    // requires non-empty path components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {"": 1}}])"), DBException);
+
+    ASSERT_THROWS(pathArrayness->addPath("", {}, true), DBException);
+
+    // $match accepts empty string field names as its using FieldRef.
+    setPipeline(R"([{$match: {"": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage with empty string returns nullptr (comes from base collection)
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, ""), nullptr);
+
+        // canPathBeArray uses FieldRef.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, ""));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithLeadingDot) {
+    // Field name ".a" has a leading dot which creates an empty path component before 'a'.
+    // $set rejects this because FieldPath construction requires non-empty components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {".a": 1}}])"), DBException);
+
+    // $match accepts ".a" as a literal field name since we can have field names containing dots.
+    setPipeline(R"([{$set: {"a": 1}}, {$match: {".a": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, ".a"), nullptr);
+
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a"), stages[0]);
+
+        // canPathBeArray uses FieldRef.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, ".a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithLeadingDotInExpression) {
+    // Field path expression "$.a" has a dollar sign followed by a dot, creating an empty
+    // path component. $set rejects this because FieldPath construction requires non-empty
+    // components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {b: "$.a"}}])"), DBException);
+
+    // $match interprets field names starting with '$' as operators (e.g., $gt, $eq).
+    // Since "$.a" is not a recognized operator, it fails.
+    ASSERT_THROWS(setPipeline(R"([{$match: {"$.a": 1}}])"), DBException);
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithTrailingDot) {
+    // Field name "a." has a trailing dot which creates an empty path component after 'a'.
+    // $set rejects this because FieldPath construction requires non-empty components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {"a.": 1}}])"), DBException);
+
+    // $match accepts "a." as a literal field name since MongoDB documents can have
+    // field names containing dots.
+    setPipeline(R"([{$set: {"a": 1}}, {$match: {"a.": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns stage[0] (field comes from the preceding stage)
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a."), stages[0]);
+
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a"), stages[0]);
+
+        // canPathBeArray accepts both FieldPath and FieldRef.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a."));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithBareDot) {
+    // Field name "." is a bare dot which represents an empty path component.
+    // $set rejects this because FieldPath construction requires non-empty components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {".": 1}}])"), DBException);
+
+    // $match accepts "." as a literal field name since MongoDB documents can have
+    // field names containing dots.
+    setPipeline(R"([{$match: {".": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "."), nullptr);
+
+        // canPathBeArray uses FieldRef which is less restrictive.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "."));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithDoubleDot) {
+    // Field name "a..b" has consecutive dots which create an empty path component between
+    // 'a' and 'b'. $set rejects this because FieldPath construction requires non-empty
+    // components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {"a..b": 1}}])"), DBException);
+
+    // $match accepts "a..b" as a literal field name since MongoDB documents can have
+    // field names containing dots.
+    setPipeline(R"([{$match: {"a..b": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a..b"), nullptr);
+
+        // canPathBeArray uses FieldRef which is less restrictive.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a..b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithDoubleDotInExpression) {
+    // Field path expression "$a..b" has consecutive dots which create an empty path
+    // component between 'a' and 'b'. $set rejects this because FieldPath construction
+    // requires non-empty components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {"result": "$a..b"}}])"), DBException);
+
+    // $match interprets field names starting with '$' as operators (e.g., $gt, $eq).
+    // Since "$a..b" is not a recognized operator, it fails.
+    ASSERT_THROWS(setPipeline(R"([{$match: {"$a..b": 1}}])"), DBException);
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithManyDotsInExpression) {
+    // Test a very long path with 257 components to ensure we properly reject extremely long
+    // paths. FieldPath has a maximum depth limit and should throw an exception when exceeded.
+    std::string longPath = "a";
+    for (int i = 1; i < 257; ++i) {
+        longPath += ".a";
+    }
+
+    // $set with a field path expression containing 257 components should fail with
+    // "FieldPath is too long" error.
+    std::string setStage = R"([{$set: {"result": "$)" + longPath + R"("}}])";
+    ASSERT_THROWS_WITH_CHECK(setPipeline(setStage), DBException, [](const DBException& ex) {
+        ASSERT_STRING_CONTAINS(ex.what(), "FieldPath is too long");
+    });
+
+    // Very long path as a target field name should also fail
+    std::string setStageTarget = R"([{$set: {")" + longPath + R"(": 1}}])";
+    ASSERT_THROWS_WITH_CHECK(setPipeline(setStageTarget), DBException, [](const DBException& ex) {
+        ASSERT_STRING_CONTAINS(ex.what(), "FieldPath is too long");
+    });
+
+    // $match also rejects the long path, even though it uses FieldRef which is generally
+    // more permissive. Both FieldPath and FieldRef have depth limits.
+    std::string matchStage = R"([{$match: {")" + longPath + R"(": 1}}])";
+    ASSERT_THROWS_WITH_CHECK(setPipeline(matchStage), DBException, [](const DBException& ex) {
+        ASSERT_STRING_CONTAINS(ex.what(), "FieldPath is too long");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithEmptyComponentInMiddle) {
+    // Field name "a..b.c" has consecutive dots in the middle which create an empty path
+    // component. $set rejects this because FieldPath construction requires non-empty
+    // components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {"a..b.c": 1}}])"), DBException);
+
+    // $match accepts "a..b.c" as a literal field name since MongoDB documents can have
+    // field names containing dots.
+    setPipeline(R"([{$match: {"a..b.c": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a..b.c"), nullptr);
+
+        // canPathBeArray accepts both FieldPath and FieldRef.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a..b.c"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithMultipleEmptyComponents) {
+    // Field name "a...b" has three consecutive dots which create multiple empty path
+    // components. $set rejects this because FieldPath construction requires non-empty
+    // components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {"a...b": 1}}])"), DBException);
+
+    // $match accepts "a...b" as a literal field name since MongoDB documents can have
+    // field names containing dots.
+    setPipeline(R"([{$match: {"a...b": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a...c"), nullptr);
+
+        // canPathBeArray accepts both FieldPath and FieldRef.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a...c"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, PathWithDollarPrefixEmptyComponent) {
+    // Field path expression "$." has a dollar sign followed by a dot, creating an empty
+    // path component. $set rejects this because FieldPath construction requires non-empty
+    // components.
+    ASSERT_THROWS(setPipeline(R"([{$set: {result: "$."}}])"), DBException);
+
+    // $match interprets field names starting with '$' as operators (e.g., $gt, $eq).
+    // Since "$." is not a recognized operator, it fails.
+    ASSERT_THROWS(setPipeline(R"([{$match: {"$.": 1}}])"), DBException);
 }
 
 }  // namespace
