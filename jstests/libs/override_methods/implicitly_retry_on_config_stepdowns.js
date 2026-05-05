@@ -1,14 +1,12 @@
 /**
- * Overrides runCommand to retry operations that encounter FailedToSatisfyReadPreference,
- * PrimarySteppedDown, or HostUnreachable errors, which can occur when the config server primary
- * is stepped down.
+ * Overrides runCommand to retry operations that encounter FailedToSatisfyReadPreference or PrimarySteppedDown errors,
+ * which can occur when the config server primary is stepped down.
  *
  * This override is intended to be used with the sharding_csrs_continuous_config_stepdown suite.
  *
- * NOTE: Tests that deliberately stop shards and expect FailedToSatisfyReadPreference,
- * PrimarySteppedDown, or HostUnreachable errors from them should be excluded from the suite in
- * the yml file, not handled here. See the exclusion list in
- * sharding_csrs_continuous_config_stepdown.yml for examples.
+ * NOTE: Tests that deliberately stop shards and expect FailedToSatisfyReadPreference or PrimarySteppedDown errors from
+ * them should be excluded from the suite in the yml file, not handled here. See the exclusion
+ * list in sharding_csrs_continuous_config_stepdown.yml for examples.
  */
 
 import {getCommandName} from "jstests/libs/cmd_object_utils.js";
@@ -21,24 +19,19 @@ const kInterval = 200;
 const kNoRetry = true;
 const kRetry = false;
 
-// Commands that should not be retried on config server stepdown errors.
+// Commands that should not be retried on FailedToSatisfyReadPreference.
 const kNonRetryableCommands = new Set([
     // getMore errors cannot be retried since a client may not know if previous getMore advanced
     // the cursor.
     "getMore",
-    // We do not retry checkMetadataConsistency on config server stepdown errors
+    // We do not retry checkMetadataConsistency on FailedToSatisfyReadPreference
     // from check_metadata_consistency_helpers.js
     "checkMetadataConsistency",
 ]);
 
 function isRetryableException(e) {
-    // Check if exception or error object has FailedToSatisfyReadPreference, PrimarySteppedDown,
-    // or HostUnreachable error.
-    return [
-        ErrorCodes.FailedToSatisfyReadPreference,
-        ErrorCodes.PrimarySteppedDown,
-        ErrorCodes.HostUnreachable,
-    ].includes(e.code);
+    // Check if exception or error object has FailedToSatisfyReadPreference or PrimarySteppedDown error.
+    return e.code === ErrorCodes.FailedToSatisfyReadPreference || e.code === ErrorCodes.PrimarySteppedDown;
 }
 
 function isRetryableError(res) {
