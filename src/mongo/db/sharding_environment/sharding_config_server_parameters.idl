@@ -128,10 +128,34 @@ server_parameters:
 
     autoMergerMaxTimeProcessingChunksMS:
         description: >-
-            Maximum time in milliseconds the command mergeAllChunksOnShard scheduled by the 
+            Maximum time in milliseconds the command mergeAllChunksOnShard scheduled by the
             autoMerger will spend looking for mergeable chunks.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: autoMergerMaxTimeProcessingChunksMS
         default: 500 # 500 milliseconds
+        redact: false
+
+    placementHistoryCleanerMinEntries:
+        description: >-
+            Minimum number of entries in config.placementHistory before the periodic cleaner
+            attempts to remove stale documents.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: placementHistoryCleanerMinEntries
+        default: 100000 # 100k entries
+        validator:
+            gte: 0
+        redact: false
+
+    placementHistoryCleanerJobIntervalSecs:
+        description: >-
+            Interval in seconds between successive runs of the placement history cleanup job.
+            Changes take effect after the next primary step-up.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: placementHistoryCleanerJobIntervalSecs
+        default: 86400 # 1 day
+        validator:
+            gte: 1
         redact: false

@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/remote_command_response.h"
@@ -69,9 +70,6 @@
 
 namespace mongo {
 namespace {
-
-static constexpr int kminPlacementHistoryEntries = 100 * 1000;  // 100k entries
-static constexpr Seconds kJobExecutionPeriod{60 * 60 * 24};     // 1 day
 
 const auto placementHistoryCleanerDecorator =
     ServiceContext::declareDecoration<PlacementHistoryCleaner>();
@@ -208,8 +206,8 @@ void PlacementHistoryCleaner::_start(OperationContext* opCtx, bool steppingUp) {
 
         PeriodicRunner::PeriodicJob placementHistoryCleanerJob(
             "PlacementHistoryCleanUpJob",
-            [](Client* client) { runOnce(client, kminPlacementHistoryEntries); },
-            kJobExecutionPeriod,
+            [](Client* client) { runOnce(client, placementHistoryCleanerMinEntries.load()); },
+            Seconds(placementHistoryCleanerJobIntervalSecs.load()),
             true);
 
         _anchor = periodicRunner->makeJob(std::move(placementHistoryCleanerJob));
