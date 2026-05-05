@@ -93,6 +93,14 @@ public:
         return DistributedPlanLogic{nullptr, this, change_stream_constants::kSortSpec};
     }
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kOperationTypeField});
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kNamespaceField});
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kFullDocumentField});
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kClusterTimeField});
+        return DepsTracker::State::SEE_NEXT;
+    }
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
     static const Id& id;

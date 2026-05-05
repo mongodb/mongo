@@ -87,11 +87,12 @@ bool isShardConfigEvent(const Document& eventDoc) {
 
     // Check whether this event occurred on the config.shards collection.
     auto nsObj = eventDoc[DocumentSourceChangeStream::kNamespaceField];
-    const bool isConfigDotShardsEvent = nsObj["db"_sd].getType() == BSONType::string &&
-        nsObj["db"_sd].getStringData() ==
-            NamespaceString::kConfigsvrShardsNamespace.db(omitTenant) &&
-        nsObj["coll"_sd].getType() == BSONType::string &&
-        nsObj["coll"_sd].getStringData() == NamespaceString::kConfigsvrShardsNamespace.coll();
+    auto nsDB = nsObj["db"_sd];
+    auto nsColl = nsObj["coll"_sd];
+    const bool isConfigDotShardsEvent = nsDB.getType() == BSONType::string &&
+        nsDB.getStringData() == NamespaceString::kConfigsvrShardsNamespace.db(omitTenant) &&
+        nsColl.getType() == BSONType::string &&
+        nsColl.getStringData() == NamespaceString::kConfigsvrShardsNamespace.coll();
 
     // If it isn't from config.shards, treat it as a normal user event.
     if (!isConfigDotShardsEvent) {
@@ -101,7 +102,7 @@ bool isShardConfigEvent(const Document& eventDoc) {
     // We need to validate that this event hasn't been faked by a user projection in a way that
     // would cause us to tassert. Check the clusterTime field, which is needed to determine the
     // point from which the new shard should start reporting change events.
-    if (eventDoc["clusterTime"].getType() != BSONType::timestamp) {
+    if (eventDoc[DocumentSourceChangeStream::kClusterTimeField].getType() != BSONType::timestamp) {
         return false;
     }
     // Check the fullDocument field, which should contain details of the new shard's name and hosts.
