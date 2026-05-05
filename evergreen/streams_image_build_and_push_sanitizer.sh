@@ -4,7 +4,11 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 set -o errexit
 set -o pipefail
 
-# Variant: streams_image_build_and_push_sanitizer.sh. Keep in sync.
+# Sanitizer-flavoured streams_image_build_and_push.sh. Builds install-devcore
+# with --config=dbg_aubsan/dbg_tsan, bundles toolchain sanitizer runtime libs
+# and llvm-symbolizer, uses Dockerfile.al2023.sanitizer; no multi-arch manifest.
+# Variant: streams_image_build_and_push.sh. Keep in sync.
+
 REGISTRY="664315256653.dkr.ecr.us-east-1.amazonaws.com"
 REPO="${streams_ecr_repo:-mongo/mongostream-testing}"
 IMAGE="$REGISTRY/$REPO"
@@ -12,6 +16,16 @@ GITSHA="$github_commit"
 ARCH="$packager_arch"
 DISTRO="$packager_distro"
 PATCH="$is_patch"
+
+if [ "$DISTRO" != "amazon2023" ]; then
+    echo "Sanitizer streams image build is only supported on amazon2023; got $DISTRO" >&2
+    exit 1
+fi
+# Required so the ECR image tag can't collide with the release image.
+if [ -z "$streams_variant_tag" ]; then
+    echo "ERROR: streams_variant_tag must be set for sanitizer builds" >&2
+    exit 1
+fi
 
 if [ "$ARCH" == "aarch64" ]; then
     ARCH="arm64"
@@ -21,36 +35,13 @@ if [ "$ARCH" == "x86_64" ]; then
     ARCH="amd64"
 fi
 
-TAG_SUFFIX="$ARCH"
-
-if [ "$DISTRO" == "amazon2023" ]; then
-    TAG_SUFFIX="$ARCH-al2023"
-fi
-
-# Optional variant-specific suffix to avoid ECR tag collisions when multiple
-# variants run streams_build_and_push with the same arch/distro/patch.
-if [ -n "$streams_variant_tag" ]; then
-    TAG_SUFFIX="$TAG_SUFFIX$streams_variant_tag"
-fi
+TAG_SUFFIX="$ARCH-al2023$streams_variant_tag"
 
 if [ "$PATCH" ]; then
     TAG_SUFFIX="$TAG_SUFFIX-$revision_order_id"
 fi
 
 cd src
-
-if [ "$DISTRO" != "amazon2023" ]; then
-    echo "Skipping Docker build for distro: $DISTRO"
-    bash "$DIR/bazel_compile.sh"
-    mkdir -p ./dist-test/bin
-    cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
-    cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
-    cp -L ./bazel-bin/src/mongo/s/mongos ./dist-test/bin/mongos
-    mkdir -p ./dist-test/bin/x509
-    cp -L ./bazel-bin/x509/*.pem ./dist-test/bin/x509/
-    tar -czvf streams-binaries.tgz dist-test/
-    exit 0
-fi
 
 SRC_DIR="$(pwd)"
 LOGS_DIR="${workdir}/parallel_build_logs"
@@ -69,8 +60,7 @@ wait_for_job() {
     echo "=== $name completed ==="
 }
 
-# Start bazel and venv first — they don't need the system deps.
-if [ ! -f "$SRC_DIR/bazel-bin/src/mongo/db/mongod" ]; then
+if [ ! -f "$SRC_DIR/bazel-bin/install/bin/mongod" ]; then
     cd "$workdir"
     bash "$DIR/bazel_compile.sh" >"$LOGS_DIR/bazel.log" 2>&1 &
     BAZEL_PID=$!
@@ -82,12 +72,10 @@ FORCE_CREATE=true bash "$DIR/functions/venv_setup.sh" >"$LOGS_DIR/venv.log" 2>&1
 VENV_PID=$!
 cd "$SRC_DIR"
 
-# Install system deps for maven/js engine (runs in parallel with bazel/venv).
 if ! command -v javac >/dev/null 2>&1; then
     sudo dnf -y install java-17-amazon-corretto-devel wget unzip
 fi
 
-# Ensure externaljs dir exists for Docker COPY even if JS engine build hasn't finished.
 mkdir -p "$SRC_DIR/externaljs"
 
 bash "$DIR/streams_build_aspio.sh" \
@@ -111,12 +99,12 @@ wait_for_job $MAVEN_PID "Maven build" "$LOGS_DIR/maven.log"
 wait_for_job $JSENGINE_PID "JS engine build" "$LOGS_DIR/jsengine.log"
 wait_for_job $VENV_PID "Full venv setup" "$LOGS_DIR/venv.log"
 
-mkdir -p ./dist-test/bin
-cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
-cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
-cp -L ./bazel-bin/src/mongo/s/mongos ./dist-test/bin/mongos
-mkdir -p ./dist-test/bin/x509
-cp -L ./bazel-bin/x509/*.pem ./dist-test/bin/x509/
+rm -rf ./dist-test
+mkdir -p ./dist-test
+cp -RL ./bazel-bin/install/. ./dist-test/
+# bazel's install outputs are read-only; restore write perms so subsequent
+# build steps can write into the tree.
+chmod -R u+w ./dist-test
 
 attempts=0
 max_attempts=4
@@ -129,22 +117,59 @@ if [ "$1" == "--push" ]; then
     done
 fi
 
-mkdir -p ./bin
+rm -rf ./bin ./lib ./sanlib
+mkdir -p ./bin ./lib ./sanlib
 cp ./dist-test/bin/mongod ./bin/mongod
 cp ./dist-test/bin/mongo ./bin/mongo
+if [ -d ./dist-test/lib ]; then
+    cp -r ./dist-test/lib/. ./lib/
+fi
 
-# Build docker build args array
+# Copy sanitizer runtime libs and llvm-symbolizer from the toolchain.
+TOOLCHAIN_DIR=/opt/mongodbtoolchain/v5
+# clang's compiler-rt sanitizer libs (e.g. libclang_rt.tsan-x86_64.so).
+shopt -s nullglob
+for d in "$TOOLCHAIN_DIR"/lib/clang/*/lib/*; do
+    for f in "$d"/libclang_rt.asan*.so* \
+        "$d"/libclang_rt.ubsan*.so* \
+        "$d"/libclang_rt.lsan*.so* \
+        "$d"/libclang_rt.tsan*.so*; do
+        cp -L "$f" ./sanlib/
+    done
+done
+# gcc-style sanitizer libs (libasan.so.X etc.) — used by some toolchains.
+for d in "$TOOLCHAIN_DIR/lib64" "$TOOLCHAIN_DIR/lib"; do
+    for f in "$d"/libasan.so* "$d"/libubsan.so* "$d"/liblsan.so* "$d"/libtsan.so*; do
+        cp -L "$f" ./sanlib/
+    done
+done
+shopt -u nullglob
+
+if [ -z "$(ls -A ./sanlib 2>/dev/null)" ]; then
+    echo "ERROR: no sanitizer runtime libs found under $TOOLCHAIN_DIR" >&2
+    exit 1
+fi
+echo "Bundled sanitizer runtime libs:"
+ls -la ./sanlib
+
+cp -L "$TOOLCHAIN_DIR/bin/llvm-symbolizer" ./llvm-symbolizer
+chmod 755 ./llvm-symbolizer
+
 BUILD_ARGS=(--build-arg "BUILD_VERSION=$GITSHA-$TAG_SUFFIX")
 BUILD_ARGS+=(--build-arg "ASPIO_JAR_PATH=aspio.jar")
 BUILD_ARGS+=(--build-arg "EXTERNALJS_PATH=externaljs")
+BUILD_ARGS+=(--build-arg "MONGO_LIBS_PATH=lib")
+BUILD_ARGS+=(--build-arg "SAN_RUNTIME_LIBS_PATH=sanlib")
+BUILD_ARGS+=(--build-arg "LLVM_SYMBOLIZER_PATH=llvm-symbolizer")
+BUILD_ARGS+=(--build-arg "LSAN_SUPPRESSIONS_PATH=etc/lsan.suppressions")
+BUILD_ARGS+=(--build-arg "TSAN_SUPPRESSIONS_PATH=etc/tsan.suppressions")
 
-docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
+docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023.sanitizer .
 
 docker tag "$IMAGE" "$IMAGE:$GITSHA-$TAG_SUFFIX"
 
 docker images
 
-# Export image tag for downstream test tasks to pull from ECR
 FULL_IMAGE_TAG="$IMAGE:$GITSHA-$TAG_SUFFIX"
 echo "$FULL_IMAGE_TAG" >streams-image-tag.txt
 echo "Exported image tag: $FULL_IMAGE_TAG"
@@ -155,31 +180,4 @@ tar -tzvf streams-binaries.tgz
 
 if [ "$1" == "--push" ]; then
     docker push "$FULL_IMAGE_TAG"
-
-    # Only the amd64 build creates the multi-arch manifest
-    if [ "$ARCH" != "amd64" ] || [ -n "${streams_variant_tag:-}" ]; then
-        exit 0
-    fi
-
-    # Create and push a docker manifest so the image can be pulled without
-    # specifying the architecture tag explicitly.
-    MANIFEST_SUFFIX=""
-
-    if [ "$DISTRO" == "amazon2023" ]; then
-        MANIFEST_SUFFIX="-al2023"
-    fi
-
-    if [ "$PATCH" ]; then
-        MANIFEST_SUFFIX="$MANIFEST_SUFFIX-$revision_order_id"
-    fi
-
-    MANIFEST_TAG="$IMAGE:$GITSHA$MANIFEST_SUFFIX"
-
-    docker manifest create "$MANIFEST_TAG" \
-        "$IMAGE:$GITSHA-amd64$MANIFEST_SUFFIX"
-
-    docker manifest annotate "$MANIFEST_TAG" \
-        "$IMAGE:$GITSHA-amd64$MANIFEST_SUFFIX" --os linux --arch amd64
-
-    docker manifest push "$MANIFEST_TAG"
 fi
