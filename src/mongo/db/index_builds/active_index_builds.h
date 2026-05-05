@@ -35,6 +35,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
+#include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
@@ -115,6 +116,9 @@ public:
     void unregisterIndexBuild(IndexBuildsManager* indexBuildsManager,
                               std::shared_ptr<ReplIndexBuildState> replIndexBuildState,
                               IndexBuildOutcome outcome);
+
+    void incrementResumeSucceeded(IndexBuildPhaseEnum phase);
+    void incrementResumeFailed();
 
     /**
      * Returns a list of index builds matching the criteria 'indexBuildFilter'.

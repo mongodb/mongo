@@ -48,6 +48,7 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
+#include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -2144,7 +2145,9 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
                 auto resumeInfo =
                     index_builds::primary_driven::resumeInfo(opCtx, *build.indexBuildIdent);
                 resumeSucceeded = true;
+                activeIndexBuilds.incrementResumeSucceeded(resumeInfo.getPhase());
             } catch (const DBException& e) {
+                activeIndexBuilds.incrementResumeFailed();
                 LOGV2(12500301,
                       "Index build: failed to resume, aborting instead",
                       "buildUUID"_attr = buildUUID,

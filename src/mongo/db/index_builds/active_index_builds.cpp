@@ -35,6 +35,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/index_builds/active_index_builds.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -76,6 +77,25 @@ auto& failedIndexBuildsCounter = otel::metrics::MetricsService::instance().creat
 auto& startedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsStarted,
     "Number of index builds started",
+    otel::metrics::MetricUnit::kOperations);
+
+auto& resumeSucceededCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<StringData>(
+        otel::metrics::MetricNames::kIndexBuildResumeSucceeded,
+        "Number of primary-driven index builds successfully resumed",
+        otel::metrics::MetricUnit::kOperations,
+        otel::metrics::AttributeDefinition<StringData>{
+            .name = "phase",
+            .values = {
+                idl::serialize(IndexBuildPhaseEnum::kInitialized),
+                idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
+                idl::serialize(IndexBuildPhaseEnum::kBulkLoad),
+                idl::serialize(IndexBuildPhaseEnum::kDrainWrites),
+            }});
+
+auto& resumeFailedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildResumeFailed,
+    "Number of primary-driven index builds that failed to resume",
     otel::metrics::MetricUnit::kOperations);
 
 void recordIndexBuildOutcome(IndexBuildOutcome outcome) {
@@ -216,6 +236,14 @@ void ActiveIndexBuilds::unregisterIndexBuild(
     indexBuildsManager->tearDownAndUnregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCompletedGen++;
     _indexBuildsCondVar.notify_all();
+}
+
+void ActiveIndexBuilds::incrementResumeSucceeded(IndexBuildPhaseEnum phase) {
+    resumeSucceededCounter.add(1, {idl::serialize(phase)});
+}
+
+void ActiveIndexBuilds::incrementResumeFailed() {
+    resumeFailedCounter.add(1);
 }
 
 std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::filterIndexBuilds(

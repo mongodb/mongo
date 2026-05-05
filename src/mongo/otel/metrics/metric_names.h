@@ -177,6 +177,10 @@ public:
         MetricNameMaker::make("index_builds.docs_scanned");
     static constexpr MetricName kIndexBuildKeysGeneratedFromScan =
         MetricNameMaker::make("index_builds.keys_generated_from_scan");
+    static constexpr MetricName kIndexBuildResumeSucceeded =
+        MetricNameMaker::make("index_builds.resume.succeeded");
+    static constexpr MetricName kIndexBuildResumeFailed =
+        MetricNameMaker::make("index_builds.resume.failed");
 
     // Replication Team Metrics
     static constexpr MetricName kOplogApplyBytes = MetricNameMaker::make("oplog.apply.bytes");
