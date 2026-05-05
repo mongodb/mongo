@@ -1101,12 +1101,15 @@ Command::Command(StringData name, std::vector<StringData> aliases)
     : _name(std::string{name}), _aliases(std::move(aliases)) {}
 
 void Command::initializeClusterRole(ClusterRole role) {
-    for (auto&& [ptr, stat] : {
-             std::pair{&_commandsExecuted, "total"},
-             std::pair{&_commandsFailed, "failed"},
-             std::pair{&_commandsRejected, "rejected"},
-         })
-        *ptr = &*MetricBuilder<Counter64>{fmt::format("commands.{}.{}", _name, stat)}.setRole(role);
+    if (includeInCommandStats()) {
+        for (auto&& [ptr, stat] : {
+                 std::pair{&_commandsExecuted, "total"},
+                 std::pair{&_commandsFailed, "failed"},
+                 std::pair{&_commandsRejected, "rejected"},
+             })
+            *ptr = &*MetricBuilder<Counter64>{fmt::format("commands.{}.{}", _name, stat)}.setRole(
+                role);
+    }
     doInitializeClusterRole(role);
 }
 

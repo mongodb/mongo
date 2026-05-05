@@ -425,9 +425,6 @@ boost::optional<BSONObj> CleanupStructuredEncryptionDataCoordinator::reportForCu
 
 void CleanupStructuredEncryptionDataCoordinator::updateCleanupStats(const ECOCStats& phaseEcocStats,
                                                                     const ECStats& phaseEscStats) {
-    // update stats in server status
-    FLEStatusSection::get().updateCleanupStats(CleanupStats(phaseEcocStats, phaseEscStats));
-
     // update stats in state document
     std::lock_guard lg(_docMutex);
     auto docEscStats = _doc.getEscStats().value_or(ECStats{});

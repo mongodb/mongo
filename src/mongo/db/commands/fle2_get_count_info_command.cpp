@@ -236,6 +236,10 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {GetQueryableEncryptionCountInfo::kTokensFieldName};
     }
+
+    bool includeInCommandStats() const final {
+        return false;
+    }
 };
 MONGO_REGISTER_COMMAND(GetQueryableEncryptionCountInfoCmd).forShard();
 }  // namespace

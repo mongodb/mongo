@@ -551,6 +551,19 @@ public:
     }
 
     /**
+     * Override and return false if the per-command serverStatus metrics
+     * `metrics.commands.<name>.{total,failed,rejected}` should NOT be published for this
+     * command. When false, the counters are not registered in the serverStatus metric tree,
+     * and the `incrementCommands*` methods become no-ops for this command.
+     *
+     * Currently used by FLE2 commands whose invocation rate has not been analyzed for
+     * information-leakage safety (SERVER-114172).
+     */
+    virtual bool includeInCommandStats() const {
+        return true;
+    }
+
+    /**
       Returns true if this command collects operation resource consumption metrics.
      */
     virtual bool collectsResourceConsumptionMetrics() const {
@@ -657,7 +670,8 @@ public:
      * due to query settings.
      */
     void incrementCommandsRejected() const {
-        _commandsRejected->increment();
+        if (_commandsRejected)
+            _commandsRejected->increment();
     }
 
     /**

@@ -374,20 +374,18 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
                                      _doc.setEcocRenameUuid(_ecocRenameUuid);
                                      _doc.setEscStats(_escStats);
                                  }))
-        .then(_buildPhaseHandler(
-            Phase::kCompactStructuredEncryptionData,
-            [this, anchor = shared_from_this()](auto* opCtx) {
-                _escStats = _doc.getEscStats().value_or(ECStats{});
-                _ecocStats = _doc.getEcocStats().value_or(ECOCStats{});
+        .then(_buildPhaseHandler(Phase::kCompactStructuredEncryptionData,
+                                 [this, anchor = shared_from_this()](auto* opCtx) {
+                                     _escStats = _doc.getEscStats().value_or(ECStats{});
+                                     _ecocStats = _doc.getEcocStats().value_or(ECOCStats{});
 
-                doCompactOperation(opCtx, _doc, _escDeleteSet, &_escStats, &_ecocStats);
+                                     doCompactOperation(
+                                         opCtx, _doc, _escDeleteSet, &_escStats, &_ecocStats);
 
-                FLEStatusSection::get().updateCompactionStats(CompactStats(_ecocStats, _escStats));
-
-                std::lock_guard lg(_docMutex);
-                _doc.setEscStats(_escStats);
-                _doc.setEcocStats(_ecocStats);
-            }))
+                                     std::lock_guard lg(_docMutex);
+                                     _doc.setEscStats(_escStats);
+                                     _doc.setEcocStats(_ecocStats);
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kDropTempCollection, [this, anchor = shared_from_this()](auto* opCtx) {
                 _escStats = _doc.getEscStats().value_or(ECStats{});
