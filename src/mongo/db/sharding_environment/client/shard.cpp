@@ -407,7 +407,8 @@ bool Shard::remoteIsRetriableError(const Status& status,
         } break;
 
         case RetryPolicy::kNotIdempotent: {
-            return DefaultRetryStrategy::unconditionallyRetryableCriteria(status, errorLabels);
+            return ErrorCodes::isNotPrimaryError(code) ||
+                DefaultRetryStrategy::unconditionallyRetryableCriteria(status, errorLabels);
         } break;
 
         case RetryPolicy::kStrictlyNotIdempotent: {

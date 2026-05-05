@@ -741,11 +741,64 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
         ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
 
-    onCommand([](const RemoteCommandRequest& request) {
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
+        onCommand([](const RemoteCommandRequest& request) {
+            BSONObjBuilder responseBuilder;
+            CommandHelpers::appendCommandStatusNoThrow(
+                responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not primary"));
+            return responseBuilder.obj();
+        });
+    }
+
+    // Now wait for the runUserManagementWriteCommand call to return
+    future.default_timed_get();
+}
+
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimaryRetrySuccess) {
+    HostAndPort host1("TestHost1");
+    HostAndPort host2("TestHost2");
+
+    configTargeter()->setFindHostReturnValue(host1);
+
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        auto status = catalogClient()->runUserManagementWriteCommand(
+            operationContext(),
+            "dropUser",
+            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+            BSON("dropUser" << "test"),
+            &responseBuilder);
+        ASSERT_OK(status);
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(host1, request.target);
+
         BSONObjBuilder responseBuilder;
         CommandHelpers::appendCommandStatusNoThrow(
             responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not primary"));
+
+        // Ensure that when the catalog manager tries to retarget after getting the
+        // NotWritablePrimary response, it will get back a new target.
+        configTargeter()->setFindHostReturnValue(host2);
         return responseBuilder.obj();
+    });
+
+    onCommand([host2](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(host2, request.target);
+        ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                      request.dbname);
+        // Since no write concern was sent we will add w:majority
+        ASSERT_BSONOBJ_EQ(BSON("dropUser" << "test"
+                                          << "writeConcern"
+                                          << BSON("w" << "majority"
+                                                      << "wtimeout" << 0)
+                                          << "maxTimeMS" << 30000),
+                          request.cmdObj);
+
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+
+        return BSON("ok" << 1);
     });
 
     // Now wait for the runUserManagementWriteCommand call to return
