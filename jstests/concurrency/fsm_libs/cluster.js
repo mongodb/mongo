@@ -378,7 +378,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
     this.getSecondaryHost = function getSecondaryHost(dbName) {
         assert(initialized, "cluster must be initialized first");
 
-        if (this.isReplication() && !this.isSharded()) {
+        if (this.isReplication() && !this.isSharded() && secondaryConns.length > 0) {
             return secondaryConns[nextConn++ % secondaryConns.length].host;
         }
         return undefined;
