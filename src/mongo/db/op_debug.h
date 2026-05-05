@@ -750,19 +750,10 @@ public:
     // Stores storage statistics from the spill engine.
     std::unique_ptr<StorageStats> spillStorageStats;
 
-    // True if the query had applicable query settings that failed to produce a plan,
-    // causing a fallback to multi-planning without query settings.
-    bool failedPlanningWithQuerySettings{false};
-
-    bool waitingForFlowControl{false};
-
     // Records the WC that was waited on during the operation. (The WC in opCtx can't be used
     // because it's only set while the Command itself executes.)
     boost::optional<WriteConcernOptions> writeConcern;
     boost::optional<BSONObj> writeConcernError;
-
-    // Whether this is an oplog getMore operation for replication oplog fetching.
-    bool isReplOplogGetMore{false};
 
     // The type of collection on which the operation operates.
     boost::optional<query_shape::CollectionType> collectionType;
@@ -777,6 +768,15 @@ public:
     // these stats are opaque to the MongoDB host - this object allows extensions to implement their
     // own custom aggregation and serialization logic.
     extension::host::OperationMetricsRegistry extensionMetrics;
+
+    // True if the query had applicable query settings that failed to produce a plan,
+    // causing a fallback to multi-planning without query settings.
+    bool failedPlanningWithQuerySettings{false};
+
+    bool waitingForFlowControl{false};
+
+    // Whether this is an oplog getMore operation for replication oplog fetching.
+    bool isReplOplogGetMore{false};
 
 private:
     /**
