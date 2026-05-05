@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/tracking/context.h"
 
 #include <string>
@@ -261,6 +262,27 @@ TEST_F(MeasurementMapTest, InitBuilders) {
 
     measurementMap.initBuilders(dataBuilder.done(), 3);
     invariant(measurementMap.numFields() == 3);
+}
+
+TEST_F(MeasurementMapTest, DuplicateFieldNameThrows) {
+    BSONObjBuilder builder;
+    builder.append("a", 1);
+    builder.append("a", 2);
+
+    ASSERT_THROWS(measurementMap.insertOne(builder.obj(), /*metaField=*/boost::none),
+                  AssertionException);
+}
+
+TEST_F(MeasurementMapTest, DuplicateFieldNameInSubsequentThrows) {
+    const BSONObj m = BSON("a" << 1);
+    measurementMap.insertOne(m, /*metaField=*/boost::none);
+
+    BSONObjBuilder builder;
+    builder.append("a", 2);
+    builder.append("a", 3);
+
+    ASSERT_THROWS(measurementMap.insertOne(builder.obj(), /*metaField=*/boost::none),
+                  AssertionException);
 }
 
 DEATH_TEST_REGEX_F(MeasurementMapTest, GetTimeForNonexistentField, "Invariant failure.*") {

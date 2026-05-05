@@ -271,9 +271,14 @@ typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::
     auto it = begin();
     auto itEnd = end();
     for (; it != itEnd; ++it) {
-        _pos->_fieldNameToIndex->try_emplace(
-            tracking::make_string(_trackingContext, it->fieldName().data(), it->fieldName().size()),
-            it._pos->_offsetParent);
+        uassert(12602100,
+                "Duplicate field names cannot be present in the same FlatBSON object",
+                _pos->_fieldNameToIndex
+                    ->try_emplace(tracking::make_string(_trackingContext,
+                                                        it->fieldName().data(),
+                                                        it->fieldName().size()),
+                                  it._pos->_offsetParent)
+                    .second);
     }
 
     // Retry the search now when the map is created.
@@ -303,11 +308,14 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
 
     // Also store our offset in the fast lookup map if it is available.
     if (_pos->_fieldNameToIndex) {
-        _pos->_fieldNameToIndex->try_emplace(
-            tracking::make_string(_trackingContext,
-                                  inserted->_element.fieldName().data(),
-                                  inserted->_element.fieldName().size()),
-            inserted->_offsetParent);
+        uassert(12602101,
+                "Duplicate field names cannot be present in the same FlatBSON object",
+                _pos->_fieldNameToIndex
+                    ->try_emplace(tracking::make_string(_trackingContext,
+                                                        inserted->_element.fieldName().data(),
+                                                        inserted->_element.fieldName().size()),
+                                  inserted->_offsetParent)
+                    .second);
     }
 
     // We need to traverse the hiearchy up to the root and modify stored offsets to account for
