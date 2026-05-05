@@ -412,4 +412,19 @@ TEST_F(OtelMetricsCapturerTest, CreateDoubleHistogramWithTwoCapturers) {
         }
     }
 }
+
+TEST_F(OtelMetricsCapturerTest, MetricsRemainValidAfterCapturerIsDestroyed) {
+    auto& metric1 = metricsService->createDoubleHistogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    auto& metric2 = metricsService->createInt64Counter(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric1.record(1.5);
+        metric2.add(1);
+    }
+    // These will fail somehow if anything is invalid after the capturer is destroyed.
+    metric1.record(20.5);
+    metric2.add(2);
+}
 }  // namespace mongo::otel::metrics

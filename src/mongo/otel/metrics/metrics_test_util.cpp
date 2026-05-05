@@ -65,6 +65,16 @@ OtelMetricsCapturer::OtelMetricsCapturer(MetricsService& metricsService)
 #endif  // MONGO_CONFIG_OTEL
 }
 
+#ifdef MONGO_CONFIG_OTEL
+OtelMetricsCapturer::~OtelMetricsCapturer() {
+    auto provider = std::make_shared<opentelemetry::metrics::NoopMeterProvider>();
+    // Re-initialize the metrics service so that any metrics relying on the old meter provider can
+    // continue to function correctly.
+    _metricsService.initialize(*provider);
+    opentelemetry::metrics::Provider::SetMeterProvider(std::move(provider));
+}
+#endif  // MONGO_CONFIG_OTEL
+
 int64_t OtelMetricsCapturer::readInt64Counter(MetricName name) {
     return readInt64Counter(name, /*attributes=*/{});
 }

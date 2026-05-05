@@ -168,11 +168,7 @@ public:
     MONGO_MOD_PRIVATE OtelMetricsCapturer(MetricsService& metricsService);
 
 #ifdef MONGO_CONFIG_OTEL
-    ~OtelMetricsCapturer() {
-        opentelemetry::metrics::Provider::SetMeterProvider(
-            opentelemetry::nostd::shared_ptr<opentelemetry::metrics::MeterProvider>(
-                new opentelemetry::metrics::NoopMeterProvider()));
-    }
+    ~OtelMetricsCapturer();
 #endif  // MONGO_CONFIG_OTEL
 
     /**
