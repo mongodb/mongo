@@ -285,7 +285,7 @@ public:
     }
 
 private:
-    TsCellBlockForTopLevelField(size_t count, std::unique_ptr<TsBlock> tsBlock);
+    TsCellBlockForTopLevelField(std::unique_ptr<TsBlock> tsBlock);
 
     std::unique_ptr<TsBlock> _ownedTsBlock;
     // If _ownedTsBlock is non-null, this points to _ownedTsBlock.

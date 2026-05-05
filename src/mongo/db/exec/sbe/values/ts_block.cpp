@@ -753,23 +753,22 @@ ValueBlock& TsCellBlockForTopLevelField::getValueBlock() {
 }
 
 std::unique_ptr<CellBlock> TsCellBlockForTopLevelField::clone() const {
-    auto precomputedCount = _unownedTsBlock->count();
     auto tsBlockClone = _unownedTsBlock->cloneStrongTyped();
 
     // Using raw new to access private constructor.
     return std::unique_ptr<TsCellBlockForTopLevelField>(
-        new TsCellBlockForTopLevelField(precomputedCount, std::move(tsBlockClone)));
+        new TsCellBlockForTopLevelField(std::move(tsBlockClone)));
 }
 
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(TsBlock* block) : _unownedTsBlock(block) {
-    // Position info of 1111...
-    _positionInfo.resize(block->count(), 1);
+    // We leave '_positionInfo' default-constructed (empty) here. Top-level fields are scalars (one
+    // value per row), so the position info is conceptually all 1s. We represent this with an empty
+    // vector by convention. This avoids materializing N int32_t entries per block (and the
+    // corresponding O(N) all-of check on every fold/extract) for a value that is statically known.
 }
 
-TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
-                                                         std::unique_ptr<TsBlock> tsBlock)
+TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(std::unique_ptr<TsBlock> tsBlock)
     : _ownedTsBlock(std::move(tsBlock)), _unownedTsBlock(_ownedTsBlock.get()) {
-    // Position info of 1111...
-    _positionInfo.resize(count, 1);
+    // See comment above: empty `_positionInfo` denotes "all-1's" by convention.
 }
 }  // namespace mongo::sbe::value
