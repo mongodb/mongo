@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -1778,6 +1779,9 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                 0ULL,  /* numMatched */
                 BSONObj::kEmptyObject /* upsertedObject */};
     }
+
+    auto validBSON = validateBSON(record->data.data(), record->data.size());
+    uassertStatusOKWithContext(validBSON, "Received an invalid BSON object from cursor");
 
     record->data.makeOwned();
     auto obj = Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),

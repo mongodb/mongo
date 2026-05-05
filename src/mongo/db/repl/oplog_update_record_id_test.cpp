@@ -33,15 +33,27 @@
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/update_result.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
+#include "mongo/db/shard_role/shard_role_mock.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstring>
+#include <memory>
+#include <string>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -49,6 +61,19 @@
 
 namespace mongo {
 namespace repl {
+
+// Forward declaration so we can call this under test. updateObjectByRid is defined
+// at namespace-scope inside oplog.cpp but isn't exposed via oplog.h.
+UpdateResult updateObjectByRid(OperationContext* opCtx,
+                               const OplogEntry& op,
+                               CollectionAcquisition& coll,
+                               OpCounters* opCounters,
+                               const BSONElement& idField,
+                               OplogApplication::Mode mode,
+                               UpdateRequest request,
+                               bool recordChangeStreamPreImage,
+                               BSONObj& preImage);
+
 namespace {
 
 /**
@@ -741,6 +766,120 @@ TEST_F(CappedUpdateWithRecordIdTestEnableSteadyStateConstraints,
     auto op = makeUpdateOplogEntryWithRecordId(
         nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("a" << 1)), nonExistentRid);
     ASSERT_EQ(runOpSteadyState(op).code(), 11902401);
+}
+
+
+// Builds a corrupted BSON buffer, with intentional garbage at the end. The length prefix of the
+// string is malformed; if an iterator incorrectly uses this, we'll end up reading beyond the BSON
+// buffer and into the memory area after. For the test, filling this with 0x77 (an invalid BSON
+// type) so walking the structure fails if we ever reach that point.
+//
+// Shape of the buffer:
+//
+//   [ valid BSON document {x: "ab"}  | trap suffix ]
+//   <----- declared size = 15 ------><-- 4 bytes -->
+//
+// Setting this in the oplog test to confirm that we catch this type of corruption at the repl
+// boundary rather than proceeding with bad data.
+const std::string& corruptedBsonBytes() {
+    static const std::string buf = [] {
+        // { x: "ab" }
+        const BSONObj validDoc = BSON("x" << "ab");
+        std::string b(validDoc.objdata(), validDoc.objsize());
+
+        // doc size header + string type byte + 2-byte field name "x\0"
+        constexpr size_t lenPrefixOffset = 4 + 1 + 2;
+        // One more than the real string length ("ab\0")
+        const int32_t lyingLen = 4;
+        // Rewrite the byte in-memory
+        std::memcpy(b.data() + lenPrefixOffset, &lyingLen, sizeof(lyingLen));
+
+        // 0x77 is not a valid BSON type. If we're iterating over the document and obey the
+        // corrupted string length, we'll end up trying to parse this area of memory as a BSON type.
+        const char trapSuffix[] = {0x77, 0x77, 0x77, 0x00};
+        b.append(trapSuffix, sizeof(trapSuffix));
+        return b;
+    }();
+    return buf;
+}
+
+class CorruptedRecordCursor : public SeekableRecordCursor {
+public:
+    explicit CorruptedRecordCursor(const char* data, int len) : _data(data), _len(len) {}
+
+    boost::optional<Record> seekExact(const RecordId& id) override {
+        return Record{id, RecordData(_data, _len)};
+    }
+
+    // Unused by updateObjectByRid; stubbed so the class is concrete.
+    boost::optional<Record> seek(const RecordId&, BoundInclusion) override {
+        return boost::none;
+    }
+    boost::optional<Record> next() override {
+        return boost::none;
+    }
+    void save() override {}
+    bool restore(RecoveryUnit&, bool) override {
+        return true;
+    }
+    void detachFromOperationContext() override {}
+    void reattachToOperationContext(OperationContext*) override {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
+
+private:
+    const char* _data;
+    int _len;
+};
+
+// Minimal Collection mock that hands out our CorruptedRecordCursor. Everything
+// else is inherited from CollectionMock (whose stubs are MONGO_UNREACHABLE);
+// updateObjectByRid only calls getCursor() before throwing on the bad BSON, so
+// no other Collection method is reached.
+class CollectionWithCorruptedCursor : public CollectionMock {
+public:
+    using CollectionMock::CollectionMock;
+
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
+                                                    bool /*forward*/) const override {
+        const auto& buf = corruptedBsonBytes();
+        return std::make_unique<CorruptedRecordCursor>(buf.data(), static_cast<int>(buf.size()));
+    }
+};
+
+TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
+       UpdateObjectByRidRejectsMalformedBSONFromSeekExact) {
+    // Wrap our corrupt-cursor-returning Collection in a CollectionAcquisition via
+    // shard_role_mock so updateObjectByRid sees it through the standard interface.
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.corruptedBson");
+    auto mockColl = std::make_shared<CollectionWithCorruptedCursor>(UUID::gen(), nss);
+    CollectionPtr collPtr = CollectionPtr::CollectionPtr_UNSAFE(mockColl.get());
+    auto coll = shard_role_mock::acquireCollectionMocked(_opCtx.get(), nss, std::move(collPtr));
+
+    const RecordId rid(1);
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), nss, BSON("_id" << 1), BSON("$set" << BSON("a" << 1)), rid);
+
+    UpdateRequest request;
+    request.setNamespaceString(nss);
+    request.setQuery(BSON("_id" << 1));
+    request.setUpsert(false);
+
+    BSONObj preImage;
+    const auto idField = op.getObject2().value()["_id"];
+
+    // Without pre-validation, this will fail on hitting the bad BSON type 0x77. With validation,
+    // we'll get an InvalidBSON status.
+    ASSERT_THROWS_CODE(updateObjectByRid(_opCtx.get(),
+                                         op,
+                                         coll,
+                                         &globalOpCounters(),
+                                         idField,
+                                         OplogApplication::Mode::kSecondary,
+                                         std::move(request),
+                                         /*recordChangeStreamPreImage=*/false,
+                                         preImage),
+                       DBException,
+                       ErrorCodes::InvalidBSON);
 }
 
 }  // namespace

@@ -852,6 +852,7 @@ mongo_cc_library(
         ":set_multikey_metadata_oplog_entry_idl",
         ":timestamp_block",
         ":truncate_range_oplog_entry_idl",
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/crypto:oplog_key_entry_handler",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:dbdirectclient",
@@ -2076,6 +2077,7 @@ mongo_cc_unit_test(
         ":storage_interface_impl",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/dbtests:mocklib",
     ],
 )
