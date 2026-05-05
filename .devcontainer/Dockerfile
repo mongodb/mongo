@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG BASE_IMAGE=quay.io/mongodb/bazel-remote-execution:ubuntu24-2025_09_05-17_18_29
+ARG BASE_IMAGE=quay.io/mongodb/bazel-remote-execution:ubuntu24-2026_03_26-16_42_59
 FROM $BASE_IMAGE
 ARG BASE_IMAGE
 
@@ -10,21 +10,22 @@ ARG USER_GID=$USER_UID
 # Create the user
 RUN groupadd $USERNAME && useradd -s /bin/bash --gid $USER_GID -m $USERNAME
 
-RUN apt-get update && apt-get install -y \
-    sudo \
-    curl \
-    ca-certificates \
-    xdg-utils \
-    wget \
-    less \
-    jq \
-    vim-tiny \
-    procps \
-    lsof \
-    zip \
-    unzip \
-    openssh-client \
-    git \
+RUN apt-get update \
+    && apt-get install -y \
+        sudo \
+        curl \
+        ca-certificates \
+        xdg-utils \
+        wget \
+        less \
+        jq \
+        vim-tiny \
+        procps \
+        lsof \
+        zip \
+        unzip \
+        openssh-client \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install xdg-open wrapper for browser integration
