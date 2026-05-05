@@ -281,6 +281,9 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 bob->append("numDocsEstimate", ce);
             }
         }
+        if (est.indexSeekCE.has_value()) {
+            bob->append("indexSeekEstimate", est.indexSeekCE->toDouble());
+        }
     }
 
     // Display the BSON representation of the filter, if there is one.

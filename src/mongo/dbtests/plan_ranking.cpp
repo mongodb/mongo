@@ -700,9 +700,8 @@ public:
         const std::string bestPlan("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
-        // TODO SERVER-100611: re-enable these tests.
-        // auto cbrSoln = bestCBRPlan(cq.get(), static_cast<size_t>(docCount));
-        // ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), static_cast<size_t>(docCount));
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 

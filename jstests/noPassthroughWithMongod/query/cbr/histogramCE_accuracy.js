@@ -129,7 +129,6 @@ for (const indexes of [[], [{a: 1}]]) {
 
 // Multi-field predicates
 
-// TODO SERVER-100611: re-enable these tests.
-for (const indexes of [/*[{a: 1, b: 1}], */ [{a: 1}, {b: 1}]]) {
+for (const indexes of [[{a: 1, b: 1}], [{a: 1}, {b: 1}]]) {
     runOneTest({dataset: new TwoFieldDataset(), indexes: indexes, analyze: ["a", "b"]});
 }

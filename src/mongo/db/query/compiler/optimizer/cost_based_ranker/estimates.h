@@ -41,6 +41,7 @@
 #include <limits>
 
 #include <boost/functional/hash.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::cost_based_ranker {
 
@@ -582,6 +583,7 @@ struct QSNEstimate {
     // A QSN may have three estimates:
     // - the number of processed data items (docs or keys): 'inCE'
     // - the number of produced data items: 'outCE'
+    // - the number of index seeks: 'indexSeekCE'
     // Only leaf QSN nodes have both 'inCE' and 'outCE' estimates. All other nodes have an
     // 'out' CE since their input size is equal to the number of produced items by their child.
     // For instance:
@@ -589,8 +591,10 @@ struct QSNEstimate {
     //   and 'outCE' is the number of documents after applying the filter.
     // - For an IndexScan node 'inCE' is the number of scanned keys, 'outCE' is the number of
     //   keys after applying a possible filter expression to the matching keys.
+    // Only IndexScanNodes will have a corresponding indexSeekCE
     boost::optional<CardinalityEstimate> inCE;
     CardinalityEstimate outCE{CardinalityType{0}, EstimationSource::Code};
+    boost::optional<CardinalityEstimate> indexSeekCE;
     CostEstimate cost{CostType::maxValue(), EstimationSource::Code};
 
     QSNEstimate() = default;

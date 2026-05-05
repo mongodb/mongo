@@ -4,7 +4,7 @@
 
 "use strict";
 
-import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerMode, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -194,23 +194,29 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
     const filter = {a: {$gt: 1}, b: "hello"};
     assert.commandWorked(coll.createIndexes(indexes));
 
-    // Index pruning would have removed the a/b/c index for us already, so a/b would win.
     if (indexPruningActive) {
+        // Index pruning removes the a/b/c index, so a/b wins regardless of heuristic.
         assertIndexScan(false, filter, [{a: 1, b: 1}]);
+        assertIndexScan(true, filter, [{a: 1, b: 1}]);
     } else {
         const explain = setParamsAndRunCommand(false, filter);
 
-        // If we fall back to CBR, we will choose the smaller index regardless of whether index pruning is used or not.
-
-        // TODO SERVER-100611: re-enable these tests.
-        // const winningPlan = getWinningPlanFromExplain(explain);
-        // if (isPlanCosted(winningPlan) && !checkSbeFullyEnabled(db)) {
-        //     assertIndexScan(false, filter, [{a: 1, b: 1}], explain);
-        // } else {
+        // With this filter, no docs match {a > 1, b = "hello"} in the test data, so runtime
+        // cost is equal for both indexes. Without the heuristic, plan generation order decides
+        // ({a:1,b:1,c:1} first, since it was created first).
         assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}], explain);
-        // }
+
+        if (getPlanRankerMode(db) !== "multiPlanning" && getEngine(explain) === "classic") {
+            // Classic CBR: CBR already chose a single winner by plan generation order (both
+            // indexes have equal cost). The tie-breaking heuristic has no effect on CBR's
+            // decision.
+            assertIndexScan(true, filter, [{a: 1, b: 1, c: 1}]);
+        } else {
+            // Multiplanning or SBE plan selection: the tie-breaking heuristic prefers the
+            // shorter index.
+            assertIndexScan(true, filter, [{a: 1, b: 1}]);
+        }
     }
-    assertIndexScan(true, filter, [{a: 1, b: 1}]);
 
     for (const index of indexes) {
         assert.commandWorked(coll.dropIndex(index));

@@ -13814,7 +13814,7 @@ export const pipelines = [
         {"$limit": 93},
         {"$project": {"a_idx": 1}},
     ],
-    // TODO SERVER-100611: [CE Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // [CE Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
     // Once we estimate the number of seeks, we should be able to choose the better plan here which
     // does an IXSCAN on 'z_compound_1' instead of 'i_compound_1_z_compound_1'. It should also
     // drastically reduce the number of examined keys.

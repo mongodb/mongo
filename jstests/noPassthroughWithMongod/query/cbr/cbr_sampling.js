@@ -95,9 +95,8 @@ try {
     assert.commandWorked(coll.createIndex({c: 1}));
     assertAllPlansUseSampling({a: {$lt: 100}});
     assertAllPlansUseSampling({b: {$lt: 100}});
-    // TODO SERVER-100611: re-enable these tests.
-    // assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}});
-    // assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}, c: {$exists: true}});
+    assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}});
+    assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}, c: {$exists: true}});
 
     // Test that invalid query does not error during Sampling CE. 0 ce is returned because the query
     // always fails.
