@@ -889,6 +889,14 @@ typedef enum MongoExtensionGetNextResultCode : uint8_t {
 } MongoExtensionGetNextResultCode;
 
 /**
+ * Identifies which stream a multi-stream extension source document belongs to.
+ */
+typedef enum MongoExtensionStreamType : uint8_t {
+    kMongoExtensionStreamTypeDocResult = 0,
+    kMongoExtensionStreamTypeMetaResult = 1,
+} MongoExtensionStreamType;
+
+/**
  * MongoExtensionGetNextResult is a container used to fetch results (with or without metadata) from
  * an ExecutableStage's get_next() function. Callers of ExecutableStage::get_next() are responsible
  * for instantiating this struct and passing the corresponding pointer to the function invocation.
