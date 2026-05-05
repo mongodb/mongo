@@ -758,7 +758,8 @@ DocumentSourceGroupBase::distributedPlanLogicWithoutContext() {
     /* the merger will use the same grouping key */
     auto mergerGroupByExpression = ExpressionFieldPath::parse(getExpCtx().get(), "$$ROOT._id", vps);
 
-    auto clone = this->clone(getExpCtx());
+    auto clone = boost::dynamic_pointer_cast<DocumentSourceGroupBase>(this->clone(getExpCtx()));
+    tassert(12595200, "Type mismatch between original and cloned DocumentSourceGroupBase", clone);
 
     std::vector<AccumulationStatement> mergerAccumulators;
     const auto& accumulatedFields = _groupProcessor->getAccumulationStatements();
@@ -782,7 +783,7 @@ DocumentSourceGroupBase::distributedPlanLogicWithoutContext() {
             tassert(9158201,
                     "casting AccumulatorState* to AccumulatorPercentile* failed",
                     accumPercentile);
-            static_cast<DocumentSourceGroup*>(clone.get())->_groupProcessor->setWillBeMerged(false);
+            clone->_groupProcessor->setWillBeMerged(false);
             if (accumPercentile->getMethod() != PercentileMethodEnum::kApproximate) {
                 return DistributedPlanLogic{nullptr, std::move(clone), boost::none};
             }
@@ -795,7 +796,7 @@ DocumentSourceGroupBase::distributedPlanLogicWithoutContext() {
         getExpCtx(), std::move(mergerGroupByExpression), std::move(mergerAccumulators), false);
     mergingGroup->_groupProcessor->setDoingMerge(true);
 
-    static_cast<DocumentSourceGroup*>(clone.get())->_groupProcessor->setWillBeMerged(true);
+    clone->_groupProcessor->setWillBeMerged(true);
 
     // {shardsStage, mergingStage, sortPattern}
     return DistributedPlanLogic{std::move(clone), mergingGroup, boost::none};
