@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/tenant_id.h"
@@ -229,18 +230,7 @@ void addTransactionIdFieldsIfPresent(const Document& input, MutableDocument& out
 ChangeStreamEventTransformation::ChangeStreamEventTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
-    : _changeStreamSpec(spec), _expCtx(expCtx), _resumeToken(resolveResumeToken(expCtx, spec)) {
-    // Determine whether the user requested a point-in-time pre-image, which will affect this
-    // stage's output.
-    _preImageRequested =
-        _changeStreamSpec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff;
-
-    // Determine whether the user requested a point-in-time post-image, which will affect this
-    // stage's output.
-    _postImageRequested =
-        _changeStreamSpec.getFullDocument() == FullDocumentModeEnum::kWhenAvailable ||
-        _changeStreamSpec.getFullDocument() == FullDocumentModeEnum::kRequired;
-}
+    : _changeStreamSpec(spec), _expCtx(expCtx), _resumeToken(resolveResumeToken(expCtx, spec)) {}
 
 ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
                                                                  Value txnOpIndexVal,
@@ -267,9 +257,19 @@ ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
 ChangeStreamDefaultEventTransformation::ChangeStreamDefaultEventTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
-    : ChangeStreamEventTransformation(expCtx, spec) {
-    _supportedEvents = buildSupportedEvents();
-}
+    : ChangeStreamEventTransformation(expCtx, spec),
+      _supportedEvents(buildSupportedEvents()),
+      // Determine whether the user requested a point-in-time pre-image, which will affect this
+      // stage's output.
+      _preImageRequested(_changeStreamSpec.getFullDocumentBeforeChange() !=
+                         FullDocumentBeforeChangeModeEnum::kOff),
+      // Determine whether the user requested a point-in-time post-image, which will affect this
+      // stage's output.
+      _postImageRequested(_changeStreamSpec.getFullDocument() ==
+                              FullDocumentModeEnum::kWhenAvailable ||
+                          _changeStreamSpec.getFullDocument() == FullDocumentModeEnum::kRequired),
+      _emitFromMigrateField(_changeStreamSpec.getShowMigrationEvents() &&
+                            changeStreamsEmitFromMigrate.loadRelaxed()) {}
 
 ChangeStreamEventTransformation::SupportedEvents
 ChangeStreamDefaultEventTransformation::buildSupportedEvents() const {
@@ -297,6 +297,7 @@ ChangeStreamDefaultEventTransformation::buildSupportedEvents() const {
 }
 
 std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDependencies() const {
+    // Fields that are accessed by default.
     std::set<std::string> accessedFields = {
         std::string{repl::OplogEntry::kOpTypeFieldName},
         std::string{repl::OplogEntry::kTimestampFieldName},
@@ -308,13 +309,26 @@ std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDepend
         std::string{repl::OplogEntry::kTxnNumberFieldName},
         std::string{DocumentSourceChangeStream::kTxnOpIndexField},
         std::string{repl::OplogEntry::kWallClockTimeFieldName},
-        std::string{DocumentSourceChangeStream::kCommitTimestampField},
         std::string{repl::OplogEntry::kTidFieldName}};
 
+    // Fields that are only accessed when pre- or post-images are selected.
     if (_preImageRequested || _postImageRequested) {
         accessedFields.insert(std::string{DocumentSourceChangeStream::kApplyOpsIndexField});
         accessedFields.insert(std::string{DocumentSourceChangeStream::kApplyOpsTsField});
     }
+
+    // 'fromMigrate' field is only accessed if the change stream is opened with the flag
+    // 'showMigrationEvents' and the server parameter 'changeStreamsEmitFromMigrate' is enabled.
+    if (_emitFromMigrateField) {
+        accessedFields.insert(std::string{DocumentSourceChangeStream::kFromMigrateField});
+    }
+
+    // The commit timestamp is only needed if the change stream is opened with the flag
+    // 'showCommitTimestamp'.
+    if (_changeStreamSpec.getShowCommitTimestamp()) {
+        accessedFields.insert(std::string{DocumentSourceChangeStream::kCommitTimestampField});
+    }
+
     return accessedFields;
 }
 
@@ -743,6 +757,15 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
     if (!nsType.empty()) {
         doc.addField(DocumentSourceChangeStream::kNsTypeField, Value(nsType));
+    }
+
+    // If migration events should be returned, add a field 'fromMigrate' to the result event if case
+    // the 'fromMigrate' field is set for the oplog entry.
+    if (_emitFromMigrateField) {
+        if (auto value = input.getField(DocumentSourceChangeStream::kFromMigrateField);
+            value.getType() == BSONType::boolean) {
+            doc.addField(DocumentSourceChangeStream::kFromMigrateField, Value{value.getBool()});
+        }
     }
 
     return doc.freeze();

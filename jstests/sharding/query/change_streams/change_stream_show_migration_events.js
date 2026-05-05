@@ -2,24 +2,40 @@
 //
 // @tags: [
 //   requires_majority_read_concern,
+//   requires_sharding,
 //   uses_change_streams,
 // ]
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+const is90OrHigher = MongoRunner.compareBinVersions(lastLTSFCV, "9.0") >= 0;
+
 function checkEvents(changeStream, cursor, expectedEvents) {
-    expectedEvents.forEach((event) => {
+    expectedEvents.forEach((event, i) => {
         let next = changeStream.getOneChange(cursor);
         assert.eq(next.operationType, event["operationType"]);
         assert.eq(next.documentKey, {_id: event["_id"]});
+
+        if (!isMultiversion || is90OrHigher) {
+            assert.eq(
+                next.fromMigrate,
+                event["fromMigrate"],
+                `got wrong 'fromMigrate' value. actual event: ${tojsononeline(next)}, expected event: ${tojsononeline(event)}`,
+            );
+        }
     });
 }
 
-function makeEvent(docId, opType) {
+function makeEvent(docId, opType, fromMigrate = undefined) {
     assert(typeof docId === "number");
     assert(typeof opType === "string" && (opType === "insert" || opType === "delete"));
-    return {_id: docId, operationType: opType};
+    let doc = {_id: docId, operationType: opType};
+    if ((!isMultiversion || is90OrHigher) && fromMigrate) {
+        doc.fromMigrate = fromMigrate;
+    }
+    return doc;
 }
 
 // TODO WT-3864: Re-enable test for LSM once transaction visibility bug in LSM is resolved.
@@ -87,9 +103,9 @@ assert.commandWorked(
     }),
 );
 
-let shardZeroEventsBeforeNewShard = [makeEvent(0, "insert"), makeEvent(20, "insert")];
-let shardZeroEventsAfterNewShard = [makeEvent(20, "delete")];
-let shardOneEvents = [makeEvent(20, "insert")];
+let shardZeroEventsBeforeNewShard = [makeEvent(0, "insert", undefined), makeEvent(20, "insert", undefined)];
+let shardZeroEventsAfterNewShard = [makeEvent(20, "delete", true)];
+let shardOneEvents = [makeEvent(20, "insert", true)];
 
 // Check that each change stream returns the expected events.
 checkEvents(changeStreamTestShardZero, changeStreamShardZero, shardZeroEventsBeforeNewShard);
@@ -118,13 +134,18 @@ assert.commandWorked(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}
 assert.commandWorked(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(mongosColl.insert({_id: 22}, {writeConcern: {w: "majority"}}));
 
-let shardZeroEvents = [makeEvent(1, "insert"), makeEvent(0, "delete"), makeEvent(1, "delete"), makeEvent(-2, "insert")];
+let shardZeroEvents = [
+    makeEvent(1, "insert", undefined),
+    makeEvent(0, "delete", true),
+    makeEvent(1, "delete", true),
+    makeEvent(-2, "insert", undefined),
+];
 shardOneEvents = [
-    makeEvent(21, "insert"),
-    makeEvent(0, "insert"),
-    makeEvent(1, "insert"),
-    makeEvent(2, "insert"),
-    makeEvent(22, "insert"),
+    makeEvent(21, "insert", undefined),
+    makeEvent(0, "insert", true),
+    makeEvent(1, "insert", true),
+    makeEvent(2, "insert", undefined),
+    makeEvent(22, "insert", undefined),
 ];
 
 // Check that each change stream returns the expected events.
@@ -164,25 +185,25 @@ assert.commandWorked(mongosColl.insert({_id: 24}, {writeConcern: {w: "majority"}
 const clustered = mongosColl.getIndexes()[0].clustered;
 
 // Check that each change stream returns the expected events.
-shardZeroEvents = [makeEvent(-3, "insert"), makeEvent(-3, "delete"), makeEvent(-2, "delete")];
+shardZeroEvents = [makeEvent(-3, "insert", undefined), makeEvent(-3, "delete", true), makeEvent(-2, "delete", true)];
 shardOneEvents = clustered
     ? [
-          makeEvent(3, "insert"),
-          makeEvent(23, "insert"),
-          makeEvent(-3, "insert"), // Clustered order.
-          makeEvent(-2, "insert"),
-          makeEvent(-4, "insert"),
-          makeEvent(4, "insert"),
-          makeEvent(24, "insert"),
+          makeEvent(3, "insert", undefined),
+          makeEvent(23, "insert", undefined),
+          makeEvent(-3, "insert", true), // Clustered order.
+          makeEvent(-2, "insert", true),
+          makeEvent(-4, "insert", undefined),
+          makeEvent(4, "insert", undefined),
+          makeEvent(24, "insert", undefined),
       ]
     : [
-          makeEvent(3, "insert"),
-          makeEvent(23, "insert"),
-          makeEvent(-2, "insert"),
-          makeEvent(-3, "insert"), // Non-clustered order.
-          makeEvent(-4, "insert"),
-          makeEvent(4, "insert"),
-          makeEvent(24, "insert"),
+          makeEvent(3, "insert", undefined),
+          makeEvent(23, "insert", undefined),
+          makeEvent(-2, "insert", true),
+          makeEvent(-3, "insert", true), // Non-clustered order.
+          makeEvent(-4, "insert", undefined),
+          makeEvent(4, "insert", undefined),
+          makeEvent(24, "insert", undefined),
       ];
 
 checkEvents(changeStreamTestShardZero, changeStreamShardZero, shardZeroEvents);
@@ -207,7 +228,11 @@ assert.commandWorked(mongosColl.insert({_id: -5}, {writeConcern: {w: "majority"}
 assert.commandWorked(mongosColl.insert({_id: 5}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(mongosColl.insert({_id: 25}, {writeConcern: {w: "majority"}}));
 
-shardOneEvents = [makeEvent(-5, "insert"), makeEvent(5, "insert"), makeEvent(25, "insert")];
+shardOneEvents = [
+    makeEvent(-5, "insert", undefined),
+    makeEvent(5, "insert", undefined),
+    makeEvent(25, "insert", undefined),
+];
 
 changeStreamTestShardZero.assertNoChange(changeStreamShardZero);
 checkEvents(changeStreamTestShardOne, changeStreamShardOne, shardOneEvents);
@@ -225,38 +250,38 @@ assert.commandWorked(mongosColl.insert({_id: -6}, {writeConcern: {w: "majority"}
 assert.commandWorked(mongosColl.insert({_id: 6}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(mongosColl.insert({_id: 26}, {writeConcern: {w: "majority"}}));
 
-let shardOneEventsBeforeNewShard = [makeEvent(16, "insert")];
+let shardOneEventsBeforeNewShard = [makeEvent(16, "insert", undefined)];
 let shardOneEventsAfterNewShard = [
-    makeEvent(16, "delete"),
-    makeEvent(20, "delete"),
-    makeEvent(21, "delete"),
-    makeEvent(22, "delete"),
-    makeEvent(23, "delete"),
-    makeEvent(24, "delete"),
-    makeEvent(25, "delete"),
-    makeEvent(-6, "insert"),
-    makeEvent(6, "insert"),
+    makeEvent(16, "delete", true),
+    makeEvent(20, "delete", true),
+    makeEvent(21, "delete", true),
+    makeEvent(22, "delete", true),
+    makeEvent(23, "delete", true),
+    makeEvent(24, "delete", true),
+    makeEvent(25, "delete", true),
+    makeEvent(-6, "insert", undefined),
+    makeEvent(6, "insert", undefined),
 ];
 let newShardEvents = clustered
     ? [
-          makeEvent(16, "insert"), // Clustered order.
-          makeEvent(20, "insert"),
-          makeEvent(21, "insert"),
-          makeEvent(22, "insert"),
-          makeEvent(23, "insert"),
-          makeEvent(24, "insert"),
-          makeEvent(25, "insert"),
-          makeEvent(26, "insert"),
+          makeEvent(16, "insert", true), // Clustered order.
+          makeEvent(20, "insert", true),
+          makeEvent(21, "insert", true),
+          makeEvent(22, "insert", true),
+          makeEvent(23, "insert", true),
+          makeEvent(24, "insert", true),
+          makeEvent(25, "insert", true),
+          makeEvent(26, "insert", undefined),
       ]
     : [
-          makeEvent(20, "insert"),
-          makeEvent(21, "insert"),
-          makeEvent(22, "insert"),
-          makeEvent(23, "insert"),
-          makeEvent(24, "insert"),
-          makeEvent(25, "insert"),
-          makeEvent(16, "insert"), // Non-clustered order.
-          makeEvent(26, "insert"),
+          makeEvent(20, "insert", true),
+          makeEvent(21, "insert", true),
+          makeEvent(22, "insert", true),
+          makeEvent(23, "insert", true),
+          makeEvent(24, "insert", true),
+          makeEvent(25, "insert", true),
+          makeEvent(16, "insert", true), // Non-clustered order.
+          makeEvent(26, "insert", undefined),
       ];
 
 // Check that each change stream returns the expected events.

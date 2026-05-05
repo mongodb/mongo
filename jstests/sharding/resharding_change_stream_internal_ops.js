@@ -14,6 +14,8 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+
 // Use a higher frequency for periodic noops to speed up the test.
 const reshardingTest = new ReshardingTest({
     numDonors: 2,
@@ -91,12 +93,18 @@ reshardingTest.withReshardingInBackground(
             operationType: "reshardBegin",
             ns: {db: kDbName, coll: collName},
         };
+        if (!isMultiversion) {
+            expectedReshardBeginEvent.fromMigrate = true;
+        }
 
         const reshardBeginDonor0Event = cstDonor0.getNextChanges(
             changeStreamsCursorDonor0,
             1,
             false /* skipFirstBatch */,
         );
+        if (isMultiversion) {
+            delete reshardBeginDonor0Event[0].fromMigrate;
+        }
 
         assertChangeStreamEventEq(reshardBeginDonor0Event[0], expectedReshardBeginEvent);
 
@@ -105,6 +113,10 @@ reshardingTest.withReshardingInBackground(
             1,
             false /* skipFirstBatch */,
         );
+        if (isMultiversion) {
+            delete reshardBeginDonor1Event[0].fromMigrate;
+        }
+
         assertChangeStreamEventEq(reshardBeginDonor1Event[0], expectedReshardBeginEvent);
     },
     {
@@ -138,12 +150,18 @@ reshardingTest.withReshardingInBackground(
                 reshardingUUID: reshardingUUID,
                 operationType: "reshardDoneCatchUp",
             };
+            if (!isMultiversion) {
+                expectedReshardDoneCatchUpEvent.fromMigrate = true;
+            }
 
             const reshardDoneCatchUpEvent = cstRecipient0.getNextChanges(
                 changeStreamsCursorRecipient0,
                 1,
                 false /* skipFirstBatch */,
             )[0];
+            if (isMultiversion) {
+                delete reshardDoneCatchUpEvent.fromMigrate;
+            }
 
             // Ensure that the 'reshardingDoneCatchUp' event has an 'ns' field of the format
             // '{ns: kDbName, coll: "system.resharding.<>"}.

@@ -237,6 +237,10 @@ public:
     // "collection", "view" or "timeseries". Will only be exposed if 'showExpandedEvents' is used.
     static constexpr StringData kNsTypeField = "nsType"_sd;
 
+    // The name of both the "migration marker" field in oplog entries and the output field in change
+    // events if the change stream is opened with 'showMigrationEvents=true'.
+    static constexpr StringData kFromMigrateField = "fromMigrate"_sd;
+
     // The name of this stage.
     static constexpr StringData kStageName = "$changeStream"_sd;
 

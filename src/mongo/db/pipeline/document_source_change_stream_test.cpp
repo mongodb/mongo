@@ -1324,7 +1324,36 @@ TEST_F(ChangeStreamStageTest, TransformInsertFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrations) {
-    bool fromMigrate = true;
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+
+    constexpr bool fromMigrate = true;
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
+                                 nss,                            // namespace
+                                 BSON("x" << 2 << "_id" << 1),   // o
+                                 testUuid(),                     // uuid
+                                 fromMigrate,                    // fromMigrate
+                                 BSON("_id" << 1 << "x" << 2));  // o2
+
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
+    Document expectedInsert{
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), BSON("_id" << 1 << "x" << 2), DSChangeStream::kInsertOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"x", 2}, {"_id", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},  // _id first
+        {DSChangeStream::kFromMigrateField, true},
+    };
+    checkTransformation(insert, expectedInsert, spec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrationsDontEmitFromMigrate) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+
+    constexpr bool fromMigrate = true;
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
                                  nss,                            // namespace
                                  BSON("x" << 2 << "_id" << 1),   // o
@@ -1688,7 +1717,36 @@ TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrateShowMigrations) {
-    bool fromMigrate = true;
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+
+    constexpr bool fromMigrate = true;
+    BSONObj o = BSON("_id" << 1);
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      fromMigrate,          // fromMigrate
+                                      BSON("_id" << 1));    // o2
+
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
+    Document expectedDelete{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
+        {DSChangeStream::kFromMigrateField, true},
+    };
+
+    checkTransformation(deleteEntry, expectedDelete, spec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrateShowMigrationsDontEmitFromMigrate) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+
+    constexpr bool fromMigrate = true;
     BSONObj o = BSON("_id" << 1);
     auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
                                       nss,                  // namespace
@@ -1956,6 +2014,7 @@ TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
             {DSChangeStream::kWallTimeField, Date_t()},
             {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
             {DSChangeStream::kOperationDescriptionField, opDesc},
+            {DSChangeStream::kFromMigrateField, false},
         };
 
         if (eventType == DSChangeStream::kNewShardDetectedOpType) {
@@ -1973,6 +2032,40 @@ TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+
+    auto uuid = UUID::gen();
+    auto reshardingUuid = UUID::gen();
+
+    ReshardBeginChangeEventO2Field o2Field{nss, reshardingUuid};
+    auto reshardingBegin = makeOplogEntry(OpTypeEnum::kNoop,
+                                          nss,
+                                          BSONObj(),
+                                          uuid,
+                                          true,  // fromMigrate
+                                          o2Field.toBSON());
+
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true, showExpandedEvents: true}}");
+
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
+    Document expectedReshardingBegin{
+        {DSChangeStream::kReshardingUuidField, reshardingUuid},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, uuid, opDesc, DSChangeStream::kReshardBeginOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardBeginOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, uuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+        {DSChangeStream::kFromMigrateField, true},
+    };
+    checkTransformation(reshardingBegin, expectedReshardingBegin, spec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformReshardBeginDontEmitFromMigrate) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+
     auto uuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
 
@@ -2034,6 +2127,48 @@ TEST_F(ChangeStreamStageTest, TransformReshardBlockingWrites) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+
+    auto existingUuid = UUID::gen();
+    auto reshardingUuid = UUID::gen();
+    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss, existingUuid);
+
+    ReshardDoneCatchUpChangeEventO2Field o2Field{temporaryNs, reshardingUuid};
+    auto reshardDoneCatchUp = makeOplogEntry(OpTypeEnum::kNoop,
+                                             temporaryNs,
+                                             BSONObj(),
+                                             reshardingUuid,
+                                             true,  // fromMigrate
+                                             o2Field.toBSON());
+
+    auto spec = fromjson(
+        "{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true, "
+        "showExpandedEvents: true}}");
+    auto expCtx = getExpCtx();
+    expCtx->setNamespaceString(temporaryNs);
+
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
+    Document expectedReshardingDoneCatchUp{
+        {DSChangeStream::kReshardingUuidField, reshardingUuid},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, reshardingUuid, opDesc, DSChangeStream::kReshardDoneCatchUpOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardDoneCatchUpOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, reshardingUuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", temporaryNs.db_forTest()}, {"coll", temporaryNs.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+        {DSChangeStream::kFromMigrateField, true},
+    };
+
+    checkTransformation(reshardDoneCatchUp, expectedReshardingDoneCatchUp, spec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpDontEmitFromMigrate) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
     auto temporaryNs = resharding::constructTemporaryReshardingNss(nss, existingUuid);
@@ -4659,6 +4794,36 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrations) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+
+    bool fromMigrate = true;
+    BSONObj o = BSON("_id" << 1 << "x" << 2);
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      fromMigrate,          // fromMigrate
+                                      boost::none);         // o2
+
+    // Delete
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
+    Document expectedDelete{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+        {DSChangeStream::kFromMigrateField, true},
+    };
+
+    checkTransformation(deleteEntry, expectedDelete, spec);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrationsDontEmitFromMigrate) {
+    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+
     bool fromMigrate = true;
     BSONObj o = BSON("_id" << 1 << "x" << 2);
     auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type

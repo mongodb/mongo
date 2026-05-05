@@ -79,12 +79,6 @@ protected:
     const DocumentSourceChangeStreamSpec _changeStreamSpec;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     ResumeTokenData _resumeToken;
-
-    // Set to true if the pre-image should be included in the output documents.
-    bool _preImageRequested = false;
-
-    // Set to true if the post-image should be included in the output documents.
-    bool _postImageRequested = false;
 };
 
 /*
@@ -129,6 +123,24 @@ private:
      * 'o2' field value.
      */
     ChangeStreamEventTransformation::SupportedEvents _supportedEvents;
+
+    /**
+     * Set to true if the pre-image should be included in the output documents.
+     */
+    const bool _preImageRequested = false;
+
+    /**
+     * Set to true if the post-image should be included in the output documents.
+     */
+    const bool _postImageRequested = false;
+
+    /**
+     * If set to 'true', the change stream will emit a 'fromMigrate' field with a value of 'true'
+     * for all events originating from a migration. This requires the change stream to be opened
+     * with the 'showMigrationEvents' flag and also the 'changeStreamsEmitFromMigrate' server
+     * parameter to be enabled.
+     */
+    const bool _emitFromMigrateField = false;
 };
 
 /**

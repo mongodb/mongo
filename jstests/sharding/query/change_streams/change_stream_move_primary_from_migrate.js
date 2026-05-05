@@ -97,7 +97,7 @@ describe("$changeStream", function () {
         // history. Before movePrimary, the recipient shard (shard1) has no data for this
         // database, so v2 does not open a cursor there. The fromMigrate:true
         // create/createIndexes events are written to shard1's oplog during the clone phase
-        // — before the v2 reader detects the movePrimary control event and opens a new
+        // - before the v2 reader detects the movePrimary control event and opens a new
         // cursor on shard1 at clusterTime+1 (after the control event), missing the earlier
         // fromMigrate events. With v1, cursors are opened on all shards from the start, so
         // shard1's cursor captures those events as they are written.
@@ -122,10 +122,6 @@ describe("$changeStream", function () {
         assert.commandWorked(db[untrackedCollName].insertOne(sentinelDoc));
 
         if (showSystemEvents) {
-            // TODO SERVER-88167: Once fromMigrate is exposed in change stream event
-            // documents, add fromMigrate: true to these expected events to directly
-            // verify the flag.
-            //
             // movePrimary replays create and createIndexes on the recipient shard.
             // Untracked collections get both create + createIndexes (full clone).
             // Tracked collections (unsplittable, sharded) get only create
