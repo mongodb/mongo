@@ -476,7 +476,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         running_at_start = self.is_running()
         if not running_at_start:
             self.logger.warning(
-                "All members of the sharded cluster were expected to be running, " "but weren't."
+                "All members of the sharded cluster were expected to be running, but weren't."
             )
 
         # If we're killing or aborting to archive data files, stopping the balancer will execute
@@ -1128,7 +1128,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.info("Successfully stopped the mongos on port {:d}".format(self.port))
         else:
             self.logger.warning(
-                "Stopped the mongos on port {:d}. " "Process exited with code {:d}.".format(
+                "Stopped the mongos on port {:d}. Process exited with code {:d}.".format(
                     self.port, exit_code
                 )
             )

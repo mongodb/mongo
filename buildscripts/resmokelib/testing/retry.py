@@ -82,3 +82,35 @@ def with_naive_retry(func, timeout=100, extra_retryable_error_codes=None):
     raise ExecutionTimeout(
         f"Operation exceeded time limit after {timeout} seconds, last error: {last_exc}"
     )
+
+
+def with_predicate_retry(func, is_transient, timeout=30.0, sleep_secs=1.0, on_retry=None):
+    """
+    Retry execution of `func` while `is_transient(exc)` is True, up to `timeout` seconds.
+
+    Use for non-pymongo transients (e.g. gRPC subprocess errors, Docker compose unavailability)
+    where the caller decides which exceptions are retryable.
+
+    :param func: Zero-arg callable to invoke.
+    :param is_transient: Callable taking the raised exception, returning True iff retryable.
+    :param timeout: Maximum total wall time to retry, seconds.
+    :param sleep_secs: Sleep between attempts, seconds.
+    :param on_retry: Optional callback `(attempt: int, exc: Exception) -> None` invoked
+                    on each transient failure before sleeping. Use for visibility.
+    """
+    last_exc = None
+    attempt = 0
+    start = time.monotonic()
+    while time.monotonic() - start < timeout:
+        attempt += 1
+        try:
+            return func()
+        except Exception as exc:
+            last_exc = exc
+            if not is_transient(exc):
+                raise
+            if on_retry is not None:
+                on_retry(attempt, exc)
+        time.sleep(sleep_secs)
+
+    raise last_exc
