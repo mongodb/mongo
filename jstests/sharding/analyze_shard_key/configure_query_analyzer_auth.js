@@ -7,6 +7,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 function testConfigureQueryAnalyzer(conn) {
     const dbName = "testDb";
@@ -19,6 +20,7 @@ function testConfigureQueryAnalyzer(conn) {
     const adminDb = conn.getDB("admin");
     assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
     assert(adminDb.auth("super", "super"));
+    QuerySamplingUtil.awaitHMACKeys(conn);
     const testDb = adminDb.getSiblingDB(dbName);
     assert.commandWorked(testDb.createCollection(collName0));
     assert.commandWorked(testDb.createCollection(collName1));
@@ -112,6 +114,7 @@ function testRefreshQueryAnalyzerConfiguration(conn) {
     // Verify that a user with the internal role is authorized to run the
     // _refreshQueryAnalyzerConfiguration command.
     assert(adminDb.auth("super", "super"));
+    QuerySamplingUtil.awaitHMACKeys(conn);
     assert.commandWorked(
         adminDb.runCommand({_refreshQueryAnalyzerConfiguration: 1, name: conn.host, numQueriesExecutedPerSecond: 1}),
     );

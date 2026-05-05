@@ -440,6 +440,25 @@ export var QuerySamplingUtil = (function () {
         return numDocs;
     }
 
+    /**
+     * Wait until the cluster's HMAC signing keys are visible in a majority-committed snapshot.
+     */
+    function awaitHMACKeys(conn) {
+        const adminDb = conn.getDB("admin");
+        assert.soon(() => {
+            const res = adminDb.runCommand({
+                find: "system.keys",
+                filter: {purpose: "HMAC"},
+                readConcern: {level: "majority"},
+            });
+            if (!res.ok && res.code === ErrorCodes.KeyNotFound) {
+                return false;
+            }
+            assert.commandWorked(res);
+            return res.cursor.firstBatch.length >= 2;
+        }, "Timed out waiting for HMAC cluster time keys to be majority-committed");
+    }
+
     return {
         getCollectionUuid,
         generateRandomCollation,
@@ -463,5 +482,6 @@ export var QuerySamplingUtil = (function () {
         runCmdsOnRepeat,
         getNumSampledQueryDocuments,
         getNumSampledQueryDiffDocuments,
+        awaitHMACKeys,
     };
 })();
