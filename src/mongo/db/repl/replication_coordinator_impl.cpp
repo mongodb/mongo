@@ -1540,11 +1540,6 @@ void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* op
     _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
     _updateMemberStateFromTopologyCoordinator(lk);
 
-    // Now that _canAcceptNonLocalWrites is true, signal oplog waiters of the new primary no-op.
-    // This ensures that restored oplog cursors obey oplog visibility rules and cannot read the
-    // no-op entry until the new primary's oplog visibility point advances enough to include it.
-    signalOplogWaiters();
-
     LOGV2(21331,
           "Transition to primary complete; database writes are now permitted",
           "term"_attr = _termShadow.load());

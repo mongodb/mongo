@@ -56,8 +56,6 @@ constexpr int kDelayMillis = 100;
 
 }  // namespace
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingVisibility);
-
 void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    const KVEngine& engine,
                                    RecordStore& oplog,
@@ -249,15 +247,6 @@ WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVi
 
     invariant(_triggerOplogVisibilityUpdate);
     _triggerOplogVisibilityUpdate = false;
-
-    if (MONGO_unlikely(hangBeforeUpdatingVisibility.shouldFail())) {
-        LOGV2(12020500, "hangBeforeUpdatingVisibility failpoint enabled");
-        auto opCtx = cc().makeOperationContext();
-        // we need to unlock the oplogVisibilityMutex so writes can succeed on the primary.
-        lk.unlock();
-        hangBeforeUpdatingVisibility.pauseWhileSet(opCtx.get());
-        lk.lock();
-    }
 
     // Fetch the all_durable timestamp from the storage engine, which is guaranteed not to have
     // any holes behind it in-memory.

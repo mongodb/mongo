@@ -643,6 +643,10 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
                 opCtx, BSON(kNewPrimaryMsgField << kNewPrimaryMsg));
             wuow.commit();
         });
+    // As far as the storage system is concerned, we're still secondary here, and will be until we
+    // change readWriteAbility.  So new and resumed lock-free reads will read from lastApplied.  We
+    // just advanced lastApplied by writing the no-op, so we need to signal oplog waiters.
+    signalOplogWaiters();
     const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     fassert(28665, loadLastOpTimeAndWallTimeResult);
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
