@@ -143,7 +143,7 @@ private:
 
     // Returns true when the server is allowed to be selected. Rejects:
     //   - servers in the caller-provided excludedHosts list (e.g. retry blocklists), and
-    //   - servers tagged as injectors (processType: INJECTOR), which belong to a standby
+    //   - servers tagged as injectors (_internalProcessType: INJECTOR), which belong to a standby
     //     cluster's replica set and are kept in the topology for replication/heartbeat
     //     tracking but must never receive client commands.
     static bool passesExclusionFilters(const std::vector<HostAndPort>& excludedHosts,

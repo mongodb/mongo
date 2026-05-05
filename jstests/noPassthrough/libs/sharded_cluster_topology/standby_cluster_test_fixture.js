@@ -1,7 +1,7 @@
 /**
  * Test fixture for simulating a standby cluster's config server. Construction launches a normal
  * ShardingTest; `transitionToStandby()` then converts the config server replica set into a
- * non-configsvr "standby" replica set with node 0 tagged `processType: INJECTOR`.
+ * non-configsvr "standby" replica set with node 0 tagged `_internalProcessType: INJECTOR`.
  *
  * After the transition, a `failCommand` failpoint is enabled on node 0 that fails every command
  * except the small wire-protocol allowlist the real injector handles (hello, isMaster, ismaster,
@@ -134,7 +134,7 @@ export class StandbyClusterTestFixture {
         // newly-allocated ports, and remove the configsvr field. Only node 0 is electable
         // (priority 1; others priority 0), so it deterministically wins the election and becomes
         // primary -- this mirrors a real standby cluster where the injector is always primary.
-        // Node 0 is tagged with processType: INJECTOR so the topology matches production: the
+        // Node 0 is tagged with _internalProcessType: INJECTOR so the topology matches production: the
         // RSM keeps the INJECTOR-tagged primary visible for replication purposes but excludes it
         // from server selection, forcing client traffic to the secondaries.
         const newMembers = existingConfig.members.map((member, idx) => {
@@ -144,7 +144,7 @@ export class StandbyClusterTestFixture {
             newMember.host = hostParts.join(":");
             newMember.priority = idx === 0 ? 1 : 0;
             if (idx === 0) {
-                newMember.tags = {processType: "INJECTOR"};
+                newMember.tags = {_internalProcessType: "INJECTOR"};
             }
             return newMember;
         });
