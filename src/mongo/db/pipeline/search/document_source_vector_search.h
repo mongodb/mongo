@@ -58,6 +58,27 @@ public:
         return kStageName.rawData();
     }
 
+    /**
+     * Used exclusively by query analysis to replace the filter predicate with one rewritten with
+     * encryption placeholders. The provided functor accepts the parsed filter MatchExpression and
+     * returns the rewritten expression as serialized BSON, or an empty BSONObj if no rewrite
+     * occurred. Returns true if the filter was replaced, false otherwise.
+     */
+    bool rebuildWithNewFilterForFLE(std::function<BSONObj(const MatchExpression&)> fn) {
+        auto filterElem = _stageSpec.getField(kFilterFieldName);
+        if (!filterElem) {
+            return false;
+        }
+        auto filterExpression =
+            uassertStatusOK(MatchExpressionParser::parse(filterElem.Obj(), pExpCtx));
+        if (auto rewrittenFilter = fn(*filterExpression); !rewrittenFilter.isEmpty()) {
+            _stageSpec = _stageSpec.removeField(kFilterFieldName)
+                             .addFields(BSON(kFilterFieldName << rewrittenFilter));
+            return true;
+        }
+        return false;
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         DistributedPlanLogic logic;
         logic.shardsStage = this;
@@ -84,8 +105,7 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
-        return make_intrusive<DocumentSourceVectorSearch>(
-            expCtx, _taskExecutor, _originalSpec.copy());
+        return make_intrusive<DocumentSourceVectorSearch>(expCtx, _taskExecutor, _stageSpec.copy());
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -160,8 +180,8 @@ private:
     // The limit that we send to mongot is received and stored on the '_request' object above.
     boost::optional<long long> _limit;
 
-    // Keep track of the original request BSONObj's extra fields in case there were fields mongod
+    // Keep track of the request BSONObj's extra fields in case there were fields mongod
     // doesn't know about that mongot will need later.
-    BSONObj _originalSpec;
+    BSONObj _stageSpec;
 };
 }  // namespace mongo

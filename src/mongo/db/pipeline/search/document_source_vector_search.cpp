@@ -60,8 +60,8 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     BSONObj originalSpec)
     : DocumentSource(kStageName, expCtx),
       _taskExecutor(taskExecutor),
-      _originalSpec(originalSpec.getOwned()) {
-    if (auto limitElem = _originalSpec.getField(kLimitFieldName)) {
+      _stageSpec(originalSpec.getOwned()) {
+    if (auto limitElem = _stageSpec.getField(kLimitFieldName)) {
         uassert(
             8575100, "Expected limit field to be a number in $vectorSearch", limitElem.isNumber());
         _limit = limitElem.safeNumberLong();
@@ -74,22 +74,20 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
 
 Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        return Value(Document{{kStageName, opts.serializeLiteral(_originalSpec)}});
+        return Value(Document{{kStageName, opts.serializeLiteral(_stageSpec)}});
     }
 
     // We don't want mongos to make a remote call to mongot even though it can generate explain
     // output.
     if (!opts.verbosity || pExpCtx->inMongos) {
-        return Value(Document{{kStageName, _originalSpec}});
+        return Value(Document{{kStageName, _stageSpec}});
     }
 
     BSONObj explainInfo = _explainResponse.isEmpty()
-        ? search_helpers::getVectorSearchExplainResponse(
-              pExpCtx, _originalSpec, _taskExecutor.get())
+        ? search_helpers::getVectorSearchExplainResponse(pExpCtx, _stageSpec, _taskExecutor.get())
         : _explainResponse;
 
-    auto explainObj =
-        _originalSpec.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
+    auto explainObj = _stageSpec.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
 
     // Redact queryVector (embeddings field) if it exists to avoid including all
     // embeddings values and keep explainObj data concise.
@@ -158,14 +156,14 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
 
     if (pExpCtx->explain) {
         _explainResponse = search_helpers::getVectorSearchExplainResponse(
-            pExpCtx, _originalSpec, _taskExecutor.get());
+            pExpCtx, _stageSpec, _taskExecutor.get());
         return DocumentSource::GetNextResult::makeEOF();
     }
 
     // If this is the first call, establish the cursor.
     if (!_cursor) {
         _cursor.emplace(
-            search_helpers::establishVectorSearchCursor(pExpCtx, _originalSpec, _taskExecutor));
+            search_helpers::establishVectorSearchCursor(pExpCtx, _stageSpec, _taskExecutor));
     }
 
     return getNextAfterSetup();
@@ -212,7 +210,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
     auto executor = executor::getMongotTaskExecutor(pExpCtx->opCtx->getServiceContext());
 
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
-        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
+        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _stageSpec.getOwned())};
 
     auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(pExpCtx);
     auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
