@@ -24,7 +24,7 @@ except ImportError:
     import re  # type: ignore
 
 ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
-MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
+MAXIMUM_CODE = 99999999  # JIRA Ticket + XX
 
 # pylint: disable=invalid-name
 codes = []  # type: ignore
