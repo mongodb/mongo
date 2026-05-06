@@ -68,6 +68,8 @@ public:
     void filterTags(std::vector<ServerDescriptionPtr>* servers, const TagSet& tagSet);
 
 private:
+    static PseudoRandom& _random();
+
     void _getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                               TopologyDescriptionPtr topologyDescription,
                               ReadPreferenceSetting effectiveCriteria,
@@ -199,7 +201,6 @@ private:
     };
 
     SdamConfiguration _config;
-    static thread_local PseudoRandom _random;
 };
 
 // This is used to filter out servers based on their current latency measurements.

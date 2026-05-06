@@ -61,7 +61,10 @@
 namespace mongo::sdam {
 MONGO_FAIL_POINT_DEFINE(sdamServerSelectorIgnoreLatencyWindow);
 
-thread_local PseudoRandom ServerSelector::_random = PseudoRandom(SecureRandom().nextInt64());
+PseudoRandom& ServerSelector::_random() {
+    thread_local PseudoRandom random = PseudoRandom(SecureRandom().nextInt64());
+    return random;
+}
 
 ServerSelector::ServerSelector(const SdamConfiguration& config) : _config(config) {}
 
@@ -233,7 +236,7 @@ boost::optional<std::vector<ServerDescriptionPtr>> ServerSelector::selectServers
 
         // latency window should always leave at least one result
         invariant(results.size());
-        std::shuffle(std::begin(results), std::end(results), _random.urbg());
+        std::shuffle(std::begin(results), std::end(results), _random().urbg());
         return results;
     }
 
@@ -242,7 +245,7 @@ boost::optional<std::vector<ServerDescriptionPtr>> ServerSelector::selectServers
 
 ServerDescriptionPtr ServerSelector::_randomSelect(
     const std::vector<ServerDescriptionPtr>& servers) const {
-    return servers[_random.nextInt64(servers.size())];
+    return servers[_random().nextInt64(servers.size())];
 }
 
 boost::optional<ServerDescriptionPtr> ServerSelector::selectServer(

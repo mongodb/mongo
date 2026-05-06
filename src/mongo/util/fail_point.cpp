@@ -69,7 +69,10 @@ MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())
 }
 
 /** The per-thread PRNG used by fail-points. */
-thread_local PseudoRandom threadPrng{SecureRandom().nextInt64()};
+PseudoRandom& threadPrng() {
+    thread_local PseudoRandom threadPrng{SecureRandom().nextInt64()};
+    return threadPrng;
+}
 
 template <typename Pred>
 void spinWait(const Pred& pred) {
@@ -93,7 +96,7 @@ void spinWait(const Pred& pred) {
 }  // namespace
 
 void FailPoint::setThreadPRNGSeed(int32_t seed) {
-    threadPrng = PseudoRandom(seed);
+    threadPrng() = PseudoRandom(seed);
 }
 
 FailPoint::FailPoint(std::string name, bool immortal) : _immortal(immortal) {
@@ -149,7 +152,7 @@ bool FailPoint::Impl::_evaluateByMode() {
         case alwaysOn:
             return true;
         case random:
-            return std::uniform_int_distribution<int>{}(threadPrng.urbg()) < _modeValue.load();
+            return std::uniform_int_distribution<int>{}(threadPrng().urbg()) < _modeValue.load();
         case nTimes:
             if (_modeValue.subtractAndFetch(1) <= 0)
                 _disable();
