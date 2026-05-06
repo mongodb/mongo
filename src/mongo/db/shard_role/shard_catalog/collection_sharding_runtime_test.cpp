@@ -815,6 +815,50 @@ TEST_F(CollectionShardingRuntimeTest, WaiterFunctionalityWakesEarlierVersions) {
     future.get();
 }
 
+TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingUntrackedAuthoritative) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    ASSERT_EQ(ChunkVersion::UNTRACKED() <=> ChunkVersion::UNTRACKED(),
+              std::partial_ordering::unordered);
+
+    auto future = csr.registerWaiterForChunkVersion(
+        opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
+
+    ASSERT_FALSE(future.isReady());
+
+    csr.setFilteringMetadata_authoritative(opCtx,
+                                           CollectionMetadata::UNTRACKED(),
+                                           CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+
+    ASSERT_TRUE(future.isReady());
+    future.get();
+}
+
+TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingTrackedZeroChunksAuthoritative) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    auto metadata = makeShardedMetadata(opCtx);
+    auto trackedZeroChunks = metadata.getShardPlacementVersion();
+    ASSERT_EQ(trackedZeroChunks.majorVersion(), 0u);
+    ASSERT_EQ(trackedZeroChunks.minorVersion(), 0u);
+    ASSERT_NE(trackedZeroChunks, ChunkVersion::UNTRACKED());
+
+    ASSERT_EQ(trackedZeroChunks <=> trackedZeroChunks, std::partial_ordering::unordered);
+
+    auto future =
+        csr.registerWaiterForChunkVersion(opCtx, ShardVersionFactory::make(trackedZeroChunks));
+
+    ASSERT_FALSE(future.isReady());
+
+    csr.setFilteringMetadata_authoritative(
+        opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+
+    ASSERT_TRUE(future.isReady());
+    future.get();
+}
+
 class CollectionShardingRuntimeTestWithMockedLoader
     : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:
