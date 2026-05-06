@@ -11,6 +11,9 @@
  *   does_not_support_stepdowns,
  *   # moveCollection can't run during FCV transitions
  *   cannot_run_during_upgrade_downgrade,
+ *   # The target shard may start draining between getRandomShardName and moveCollection
+ *   # in suites that dynamically add/remove shards.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {getRandomShardName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";

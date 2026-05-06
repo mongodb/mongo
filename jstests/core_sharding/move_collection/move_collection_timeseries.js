@@ -10,6 +10,9 @@
  *   cannot_run_during_upgrade_downgrade,
  *   # TODO(SERVER-119777): Ensure test does not leak cursors.
  *   can_leak_idle_cursors,
+ *   # The target shard may start draining between getRandomShardName and moveCollection
+ *   # in suites that dynamically add/remove shards.
+ *   assumes_stable_shard_list,
  * ]
  */
 
