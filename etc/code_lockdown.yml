@@ -124,6 +124,7 @@ groups:
       - "SLS - Control Services"
       - "SLS - Log Service"
       - "SLS - Page Services"
+      - "Backup - DS"
     slack_tags:
       - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
       - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
@@ -259,6 +260,14 @@ teams:
       - "<@U0Z7JD2G4>" # siyuan.zhou@mongodb.com - Lead
     thresholds: # Reduced Quotas for SLS
       hot: 3
+      cold: 3
+  - name: "Backup - DS"
+    slack_tags:
+      - "<@UDWBB4ZQV>" # xiang.gao@mongodb.com - Director
+      - "<@U09M548NXL4>" # bahy.morgan@mongodb.com - Lead
+      - "<!subteam^S09TA7LBTNX>" # @backup-ds-oncall
+    thresholds:
+      hot: 1
       cold: 3
 
   # Query teams
