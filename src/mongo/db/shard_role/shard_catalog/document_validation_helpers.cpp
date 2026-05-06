@@ -64,6 +64,20 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                 return Status(ErrorCodes::BadValue,
                               "Validator can not be changed when Validation level is 'constraint'");
             }
+            if (newLevel == ValidationLevelEnum::constraint) {
+                if (!opts.validationLevel ||
+                    (opts.validationLevel != ValidationLevelEnum::strict &&
+                     opts.validationLevel != ValidationLevelEnum::constraint)) {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        "validationLevel can only be changed to 'constraint' from 'strict'");
+                }
+                if (newValidator) {
+                    return Status(ErrorCodes::BadValue,
+                                  "Cannot change the validator in the same collMod that upgrades "
+                                  "validationLevel to 'constraint'");
+                }
+            }
         }
     }
     return Status::OK();

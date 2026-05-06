@@ -80,15 +80,15 @@ function validationActionMustNotBeWarn() {
 function upgradeToConstraintWithValidator() {
     myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(myDb.createCollection(collName, {writeConcern: {w: "majority"}}));
+
+    // Starting from strict.
     assert.commandWorked(
         myDb.runCommand({
             "collMod": collName,
-            validator: validator,
-            validationLevel: "constraint",
+            validationLevel: "strict",
             writeConcern: {w: "majority"},
         }),
     );
-
     assert.commandFailed(
         myDb.runCommand({
             "collMod": collName,
@@ -104,6 +104,14 @@ function constraintOnExistingCollection() {
     assert.commandWorked(myDb.createCollection(collName, {writeConcern: {w: "majority"}}));
 
     // Warn is incompatible with constraint.
+    assert.commandWorked(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "strict",
+            validationAction: "warn",
+            writeConcern: {w: "majority"},
+        }),
+    );
     assert.commandFailed(
         myDb.runCommand({
             "collMod": collName,
@@ -117,13 +125,13 @@ function constraintOnExistingCollection() {
         myDb.runCommand({
             "collMod": collName,
             validationLevel: "strict",
+            validator: validator,
             writeConcern: {w: "majority"},
         }),
     );
     assert.commandWorked(
         myDb.runCommand({
             "collMod": collName,
-            validator: validator,
             validationLevel: "constraint",
             validationAction: "errorAndLog",
             writeConcern: {w: "majority"},
@@ -152,6 +160,16 @@ function noSchemaRuleChanges() {
     assert.commandFailed(
         myDb.runCommand({"collMod": collName, writeConcern: {w: "majority"}, validator: {b: {$exists: true}}}),
     );
+    // Same rejection when validationLevel:"constraint" is passed explicitly alongside the validator
+    // change (exercises the upgrade-path check in addition to the at-constraint guard).
+    assert.commandFailed(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "constraint",
+            validator: {b: {$exists: true}},
+            writeConcern: {w: "majority"},
+        }),
+    );
     // Rules changes are ok if we also downgrade to strict.
     assert.commandWorked(
         myDb.runCommand({
@@ -161,8 +179,8 @@ function noSchemaRuleChanges() {
             validator: {b: {$exists: true}},
         }),
     );
-    // Rules changes are also ok if we also upgrading from strict.
-    assert.commandWorked(
+    // Rules changes must be done before upgrading to constraint.
+    assert.commandFailed(
         myDb.runCommand({
             "collMod": collName,
             validationLevel: "constraint",
@@ -235,6 +253,114 @@ function noBypassDocValidation() {
     );
 }
 
+function canUpgradeToConstraintWithoutChangingValidator() {
+    myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
+    assert.commandWorked(
+        myDb.createCollection(collName, {
+            validator: validator,
+            validationLevel: "strict",
+            writeConcern: {w: "majority"},
+        }),
+    );
+    assert.commandWorked(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "constraint",
+            writeConcern: {w: "majority"},
+        }),
+    );
+}
+
+function canUpgradeToConstraintWithNoValidator() {
+    myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
+    assert.commandWorked(
+        myDb.createCollection(collName, {
+            validationLevel: "strict",
+            writeConcern: {w: "majority"},
+        }),
+    );
+    assert.commandWorked(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "constraint",
+            writeConcern: {w: "majority"},
+        }),
+    );
+}
+
+function canUpgradeToConstraintWithNoValidatorWithErrorAction() {
+    myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
+    assert.commandWorked(
+        myDb.createCollection(collName, {
+            validationLevel: "strict",
+            validationAction: "error",
+            writeConcern: {w: "majority"},
+        }),
+    );
+    assert.commandWorked(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "constraint",
+            writeConcern: {w: "majority"},
+        }),
+    );
+}
+
+function cannotUpgradeToConstraintFromModerate() {
+    myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
+    assert.commandWorked(
+        myDb.createCollection(collName, {
+            validator: validator,
+            validationLevel: "moderate",
+            writeConcern: {w: "majority"},
+        }),
+    );
+    assert.commandFailed(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "constraint",
+            writeConcern: {w: "majority"},
+        }),
+    );
+}
+
+function cannotUpgradeToConstraintFromOff() {
+    myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
+    assert.commandWorked(
+        myDb.createCollection(collName, {
+            validator: validator,
+            validationLevel: "off",
+            writeConcern: {w: "majority"},
+        }),
+    );
+    assert.commandFailed(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "constraint",
+            writeConcern: {w: "majority"},
+        }),
+    );
+}
+
+function cannotUpgradeToConstraintFromImplicitStrict() {
+    // A collection created without an explicit validationLevel is implicitly 'strict'. Upgrading to
+    // 'constraint' requires the level to be explicitly set to 'strict' first.
+    myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
+    assert.commandWorked(
+        myDb.createCollection(collName, {
+            validator: validator,
+            writeConcern: {w: "majority"},
+        }),
+    );
+    assert.commandFailed(
+        myDb.runCommand({
+            "collMod": collName,
+            validationLevel: "constraint",
+            writeConcern: {w: "majority"},
+        }),
+    );
+}
+
 upgradeToConstraintWithValidator();
 validationActionMustNotBeWarn();
 downgradeConstraintToStrict();
@@ -242,9 +368,14 @@ noSchemaRuleChanges();
 constraintOnExistingCollection();
 noNonConformingDocs();
 noBypassDocValidation();
+canUpgradeToConstraintWithoutChangingValidator();
+canUpgradeToConstraintWithNoValidator();
+canUpgradeToConstraintWithNoValidatorWithErrorAction();
+cannotUpgradeToConstraintFromModerate();
+cannotUpgradeToConstraintFromOff();
+cannotUpgradeToConstraintFromImplicitStrict();
 // TODO SERVER-123709 add case to make sure we can't upgrade with non compliant docs on both rs and
 // sharding.
-// TODO SERVER-123713 add case for upgrading from validationLevel moderate or off.
 
 // avoid downgrade problems (collections with constraint validationLevel can't be downgraded)
 myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});

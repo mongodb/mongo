@@ -21,6 +21,37 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "constraint_validation_level_upgrade",
+    srcs = [
+        "constraint_validation_level_upgrade.cpp",
+    ],
+    hdrs = [
+        "constraint_validation_level_upgrade.h",
+    ],
+    deps = [
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/commands:standalone",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
+        "//src/mongo/db/query/client_cursor:cursor_response_idl",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/rpc",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "constraint_validation_level_upgrade_test",
+    srcs = [
+        "constraint_validation_level_upgrade_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":constraint_validation_level_upgrade",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "doc_validation_test",
     srcs = [
