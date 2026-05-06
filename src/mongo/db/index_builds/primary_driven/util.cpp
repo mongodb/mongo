@@ -113,12 +113,6 @@ Status start(OperationContext* opCtx,
             opCtx, index, LazyRecordStore::CreateMode::immediate, descriptor.unique()};
 
         CollectionQueryInfo::get(writableColl).rebuildIndexData(opCtx, writableColl);
-        CollectionIndexUsageTrackerDecoration::write(writableColl)
-            .unregisterIndex(descriptor.indexName());
-        CollectionIndexUsageTrackerDecoration::write(writableColl)
-            .registerIndex(descriptor.indexName(),
-                           descriptor.keyPattern(),
-                           IndexFeatures::make(&descriptor, coll.nss().isOnInternalDb()));
 
         audit::logCreateIndex(opCtx->getClient(),
                               &index.spec,
@@ -184,6 +178,13 @@ Status commit(OperationContext* opCtx,
         if (multikey[i]) {
             entry->setMultikey(opCtx, writer.get(), {}, *multikey[i]);
         }
+
+        CollectionIndexUsageTrackerDecoration::write(writableColl)
+            .unregisterIndex(index.getIndexName());
+        CollectionIndexUsageTrackerDecoration::write(writableColl)
+            .registerIndex(entry->descriptor()->indexName(),
+                           entry->descriptor()->keyPattern(),
+                           IndexFeatures::make(entry->descriptor(), coll.nss().isOnInternalDb()));
 
         auto& collectionQueryInfo = CollectionQueryInfo::get(writableColl);
         collectionQueryInfo.clearQueryCache(opCtx, writer.get());

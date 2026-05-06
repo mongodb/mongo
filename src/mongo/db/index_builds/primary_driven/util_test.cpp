@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -325,6 +326,13 @@ TEST_F(UtilTest, Commit) {
         EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].constraintViolationsIdent));
     }
     EXPECT_FALSE(engine.hasIdent(ru, indexBuildIdent));
+
+    // Verify indexes are present in the tracker after commit.
+    const auto usageStats =
+        CollectionIndexUsageTrackerDecoration::getUsageStats(coll.getCollectionPtr().get());
+    for (auto&& index : indexes) {
+        ASSERT_TRUE(usageStats.count(index.getIndexName()));
+    }
 
     ASSERT_TRUE(opObserver().lastCommitArgs);
     auto& args = *opObserver().lastCommitArgs;
