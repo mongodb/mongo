@@ -210,6 +210,12 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                                      const UUID& collUUID,
                                      const ChunkRange& range,
                                      const ChunkVersion& preMigrationChunkVersion) {
+    {
+        // TODO (SERVER-125984): Remove this once migration recovery do not follow this path.
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->setNonAuthoritative();
+    }
+
     ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
     ensureChunkVersionIsGreaterThanRequest.setDbName(DatabaseName::kAdmin);
     ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
