@@ -75,6 +75,13 @@ try {
     print("Non-secondaryOk'd connection failed.");
 }
 
+// Restart the node we stopped earlier so the replica set has a primary again. Without this,
+// the checks/hooks run by st.stop() may fail to reach the primary.
+// Use stepUp() explicitly because ReplSetTest sets electionTimeoutMillis to 24h to suppress
+// spurious elections, so no automatic election fires after the restart.
+const restartedNode = rst.restart(primary);
+rst.stepUp(restartedNode, {awaitReplicationBeforeStepUp: false});
+
 // TODO (SERVER-83433): Add back the test coverage for running db hash check on replica
 // set that is fsync locked and has replica set endpoint enabled.
 st.stop({skipValidation: st.isReplicaSetEndpointActive()});
