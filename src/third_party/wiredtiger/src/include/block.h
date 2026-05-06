@@ -278,12 +278,23 @@ struct __wt_bm {
  *	Block manager file handle.
  */
 struct __wt_block {
+    /*
+     * The fields up to and including hashq must match the layout of WT_BLOCK_DISAGG exactly. The
+     * shared-prefix invariant is enforced by static_asserts in verify_build.h.
+     *
+     * Ideally we would split this into a public/private structure, similar to session handles, and
+     * customize file and disagg handles as necessary. That's invasive so save the grunt work for
+     * now.
+     */
+
+    /* ===== Begin shared prefix with WT_BLOCK_DISAGG ===== */
     const char *name;  /* Name */
     uint32_t objectid; /* Object id */
     uint32_t ref;      /* References */
 
     TAILQ_ENTRY(__wt_block) q;     /* Linked list of handles */
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
+    /* ===== End shared prefix with WT_BLOCK_DISAGG ===== */
 
     WT_FH *fh;            /* Backing file handle */
     wt_off_t size;        /* Storage size */
@@ -459,17 +470,22 @@ struct __wt_block_header {
  */
 struct __wt_block_disagg {
     /*
-     * The structure needs to exactly match the WT_BLOCK structure, since it can be treated as one
-     * for connection caching and a few other things. For custom fields, see below. Ideally we would
-     * split this into a public/private structure, similar to session handles, and customize file
-     * and disagg handles as necessary. That's invasive so save the grunt work for now.
+     * The fields up to and including hashq must match the layout of WT_BLOCK exactly. The
+     * shared-prefix invariant is enforced by static_asserts in verify_build.h.
+     *
+     * Ideally we would split this into a public/private structure, similar to session handles, and
+     * customize file and disagg handles as necessary. That's invasive so save the grunt work for
+     * now.
      */
+
+    /* ===== Begin shared prefix with WT_BLOCK ===== */
     const char *name;  /* Name */
     uint32_t objectid; /* Object id */
     uint32_t ref;      /* References */
 
     TAILQ_ENTRY(__wt_block) q;     /* Linked list of handles */
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
+    /* ===== End shared prefix with WT_BLOCK ===== */
 
     /* Custom disaggregated fields. */
     uint64_t tableid;

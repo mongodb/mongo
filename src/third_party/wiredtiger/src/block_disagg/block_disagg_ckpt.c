@@ -19,7 +19,6 @@ __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *sessio
   WT_ITEM *root_image, WT_PAGE_BLOCK_META *block_meta, size_t page_image_size, WT_CKPT *ckpt)
 {
     WT_BLOCK_DISAGG_ADDRESS_COOKIE root_cookie;
-    WT_DECL_RET;
     uint32_t checksum, size;
     uint8_t *endp;
 
@@ -45,11 +44,8 @@ __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *sessio
          * page, and currently we rely on this assumption to discard older checkpoint root page when
          * the checkpoint becomes redundant.
          */
-        ret = __wti_block_disagg_write_internal(session, block_disagg, root_image, block_meta,
-          page_image_size, &size, &checksum, true, true);
-        if (ret != 0)
-            WT_RET_PANIC(
-              session, ret, "Disaggregated storage checkpoint failed to write root page.");
+        WT_RET(__wti_block_disagg_write_internal(session, block_disagg, root_image, block_meta,
+          page_image_size, &size, &checksum, true, true));
         __wt_page_header_byteswap((void *)root_image->data);
 
         /* Initialize and pack the address cookie for the root page. */
@@ -128,7 +124,7 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *md_cursor;
     WT_DECL_RET;
-    wt_timestamp_t checkpoint_timestamp;
+    wt_timestamp_t checkpoint_timestamp, schema_epoch;
     size_t len;
     char *stable_uri, *table_name;
     const char *md_value;
@@ -179,7 +175,9 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
         /* Get the config we want to print to the metadata file */
         WT_ERR(__wt_config_getones(session, md_value, "checkpoint", &cval));
         checkpoint_timestamp = conn->disaggregated_storage.cur_checkpoint_timestamp;
-        WT_ERR(__wt_disagg_put_checkpoint_meta(session, cval.str, cval.len, checkpoint_timestamp));
+        schema_epoch = conn->disaggregated_storage.cur_schema_epoch;
+        WT_ERR(__wt_disagg_put_checkpoint_meta(
+          session, cval.str, cval.len, checkpoint_timestamp, schema_epoch));
     } else {
         /* Extract the table/layered component name, if applicable. */
         if (WT_SUFFIX_MATCH(block_disagg->name, ".wt")) {

@@ -3644,7 +3644,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      * not need to wait because it only verifies the local metadata file, which is not a shared
      * table and has no dependency on disagg initialization.
      */
-    if (verify_meta && __wt_conn_is_disagg(session))
+    if (verify_meta)
         WT_ERR(__wt_verify_disagg_database_size(session));
 
     /*

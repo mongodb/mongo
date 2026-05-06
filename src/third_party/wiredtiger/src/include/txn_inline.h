@@ -959,7 +959,7 @@ __wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
     }
 
     /* If we have a version cursor open, use the pinned timestamp when it is opened. */
-    if (S2C(session)->version_cursor_count > 0) {
+    if (__wt_atomic_load_uint32_acquire(&S2C(session)->version_cursor_count) > 0) {
         *pinned_tsp = txn_global->version_cursor_pinned_timestamp;
         return;
     }

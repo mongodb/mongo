@@ -1038,7 +1038,7 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
 
     /* Freeze pinned timestamp when we open the first version cursor. */
     __wt_writelock(session, &txn_global->rwlock);
-    if (conn->version_cursor_count == 0) {
+    if (__wt_atomic_load_uint32_relaxed(&conn->version_cursor_count) == 0) {
         __wt_txn_pinned_timestamp(session, &pinned_ts);
         txn_global->version_cursor_pinned_timestamp = pinned_ts;
     }

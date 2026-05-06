@@ -218,7 +218,6 @@ GetLastError
 GetModuleHandleExW
 GetProcAddress
 Getters
-Gh
 Github
 Golomb
 HANDLEOPS
@@ -271,7 +270,6 @@ LOGREC
 LOGSCAN
 LOGSLOT
 LRU
-LSAN
 LSB
 LSBs
 LSM
@@ -686,6 +684,8 @@ blkcache
 blkincr
 blkmod
 blkmods
+blockhash
+blockqh
 bm
 bmd
 bms
@@ -1088,6 +1088,7 @@ handleops
 handlep
 hardcoded
 hashmap
+hashq
 hashsize
 hashtable
 havesize

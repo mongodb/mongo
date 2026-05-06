@@ -181,6 +181,23 @@ class test_layered76(wttest.WiredTigerTestCase):
         # plus the sum of btree checkpoint sizes.
         self.reopen_conn(config=self.conn_config + ',verify_metadata=true')
 
+    def test_verify_db_size_follower_no_pickup(self):
+        self.session.create(self.uri, self.create_session_config)
+
+        cursor = self.session.open_cursor(self.uri)
+        for i in range(100):
+            cursor[i] = 'value' + str(i)
+        cursor.close()
+        self.session.checkpoint()
+        self.close_conn()
+
+        # Reopen as follower without supplying checkpoint meta. No pickup happens during
+        # open, so the in-memory database size stays 0 while the local metadata still
+        # records the checkpoint just taken. The verify call must be skipped until a
+        # pickup populates database size, otherwise it reports a spurious size mismatch.
+        self.open_conn(
+          config=self.conn_config + ',disaggregated=(role="follower"),verify_metadata=true')
+
     def test_verify_db_size_multi_table(self):
         uris = [
             'layered:test_layered76_a',

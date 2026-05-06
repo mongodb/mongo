@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int __checkpoint_disagg_advance(WT_SESSION_IMPL *, wt_timestamp_t, bool);
-static int __checkpoint_disagg_put(WT_SESSION_IMPL *, wt_timestamp_t);
+static int __checkpoint_disagg_put(WT_SESSION_IMPL *, wt_timestamp_t, wt_timestamp_t);
 static int __checkpoint_drop_list_execute(WT_SESSION_IMPL *session, WT_ITEM *drop_list);
 static int __checkpoint_fsync_post(
   WT_SESSION_IMPL *, const char *[], WT_DATA_HANDLE *, WT_DATA_HANDLE *);
@@ -1098,6 +1098,13 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, WT_CHECKPOINT_DB
         txn_shared->read_timestamp = WT_TS_NONE;
     }
 
+    /* Set the disaggregated schema epoch for the in-progress checkpoint. */
+    if (ckpt_cfg->use_timestamp && !F_ISSET(conn, WT_CONN_RECOVERING))
+        __wt_atomic_store_uint64_release(&txn_global->checkpoint_disagg_schema_epoch,
+          __wt_get_stable_disaggregated_schema_epoch(session));
+    else
+        __wt_atomic_store_uint64_release(&txn_global->checkpoint_disagg_schema_epoch, WT_TS_NONE);
+
     __wt_writeunlock(session, &txn_global->rwlock);
 
     /* Wait for the commit generation to drain before bumping the snapshot. */
@@ -1544,14 +1551,15 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_ISOLATION saved_isolation;
     wt_off_t hs_size;
-    wt_timestamp_t ckpt_tmp_ts;
+    wt_timestamp_t ckpt_tmp_ts, ckpt_disagg_schema_epoch;
     uint64_t drop_size, generation;
-    char ts_string[WT_TS_INT_STRING_SIZE];
+    char schema_epoch_string[WT_TS_INT_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
     bool failed, tracking;
 
     WT_CLEAR(ckpt_cfg);
     WT_CLEAR(precise_ckpt_saved_triggers);
     conn = S2C(session);
+    ckpt_disagg_schema_epoch = WT_TS_NONE;
     ckpt_tmp_ts = WT_TS_NONE;
     drop_size = 0;
     hs_size = 0;
@@ -1663,15 +1671,22 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      */
     WT_ACQUIRE_READ_WITH_BARRIER(ckpt_tmp_ts, txn_global->checkpoint_timestamp);
 
+    /* Save the schema epoch. */
+    ckpt_disagg_schema_epoch =
+      __wt_atomic_load_uint64_acquire(&txn_global->checkpoint_disagg_schema_epoch);
+
     /*
-     * Save the checkpoint timestamp in the disaggregated storage struct, as we'll need it during
-     * the checkpoint resolve of the shared metadata table.
+     * Save the checkpoint timestamp and the schema epoch in the disaggregated storage struct, as
+     * we'll need them during the checkpoint resolve of the shared metadata table.
      */
     conn->disaggregated_storage.cur_checkpoint_timestamp = ckpt_tmp_ts;
+    conn->disaggregated_storage.cur_schema_epoch = ckpt_disagg_schema_epoch;
     if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader)
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
-          "Starting disaggregated storage checkpoint with timestamp: %" PRIu64 " %s", ckpt_tmp_ts,
-          __wt_timestamp_to_string(ckpt_tmp_ts, ts_string));
+          "Starting disaggregated storage checkpoint with timestamp: %" PRIu64
+          " %s and schema epoch: %" PRIu64 " %s",
+          ckpt_tmp_ts, __wt_timestamp_to_string(ckpt_tmp_ts, ts_string), ckpt_disagg_schema_epoch,
+          __wt_timestamp_to_string(ckpt_disagg_schema_epoch, schema_epoch_string));
 
     WT_ASSERT(session, txn->isolation == WT_ISO_SNAPSHOT);
 
@@ -1719,8 +1734,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
         WT_WITH_SCHEMA_LOCK(
           session, ret = __checkpoint_process_disagg_metadata(session, &drop_size));
-        WT_ERR_MSG_CHK(session, ret,
-          "Disaggregated storage checkpoint failed while processing shared metadata queue");
+        WT_ERR(ret);
     }
 
     /*
@@ -1820,13 +1834,13 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     __checkpoint_stats(session);
 
     /*
-     * If timestamps defined the checkpoint's content, set the saved last checkpoint timestamp,
-     * otherwise clear it. We clear it for a couple of reasons: applications can query it and we
-     * don't want to lie, and we use it to decide if WT_CONNECTION.rollback_to_stable is an allowed
-     * operation. For the same reason, don't set it to WT_TS_NONE when the checkpoint timestamp is
-     * WT_TS_NONE, set it to 1 so we can tell the difference.
+     * If timestamps defined the checkpoint's content, set the saved last checkpoint timestamp and
+     * schema epoch, otherwise clear them. We clear the timestamp for a couple of reasons:
+     * applications can query it and we don't want to lie, and we use it to decide if
+     * WT_CONNECTION.rollback_to_stable is an allowed operation.
      */
     if (ckpt_cfg.use_timestamp) {
+        conn->txn_global.last_ckpt_disaggregated_schema_epoch = ckpt_disagg_schema_epoch;
         conn->txn_global.last_ckpt_timestamp = ckpt_tmp_ts;
         /*
          * MongoDB assumes the checkpoint timestamp will be initialized with WT_TS_NONE. In such
@@ -1838,8 +1852,10 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
          */
         if (conn->txn_global.last_ckpt_timestamp == WT_TS_NONE)
             conn->txn_global.last_ckpt_timestamp = conn->txn_global.recovery_timestamp;
-    } else
+    } else {
+        conn->txn_global.last_ckpt_disaggregated_schema_epoch = WT_TS_NONE;
         conn->txn_global.last_ckpt_timestamp = WT_TS_NONE;
+    }
 
     /* Disaggregated storage database size accounting. */
     __checkpoint_update_disagg_database_size(session, drop_size);
@@ -1880,16 +1896,6 @@ err:
 
     if (F_ISSET(txn, WT_TXN_RUNNING)) {
         /*
-         * In disaggregated storage, a checkpoint failure is unrecoverable once the checkpoint
-         * transaction has started. The transaction cannot be safely rolled back, panic before
-         * attempting the rollback.
-         */
-        if (failed && __wt_conn_is_disagg(session))
-            WT_RET_PANIC(session, ret,
-              "Disaggregated storage checkpoint failed, unable to rollback, panic to avoid "
-              "corruption");
-
-        /*
          * Clear the dhandle so the visibility check doesn't get confused about the snap min. Don't
          * bother restoring the handle since it doesn't make sense to carry a handle across a
          * checkpoint.
@@ -1911,7 +1917,7 @@ err:
       "%s", "Checkpoint log stage operation failed");
 
     if (!failed)
-        WT_TRET(__checkpoint_disagg_put(session, ckpt_tmp_ts));
+        WT_TRET(__checkpoint_disagg_put(session, ckpt_tmp_ts, ckpt_disagg_schema_epoch));
     WT_TRET(__checkpoint_disagg_advance(session, ckpt_tmp_ts, !failed && ret == 0));
 
     WT_TRET(__checkpoint_teardown(session, failed, saved_isolation));
@@ -2033,15 +2039,6 @@ __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
     if (ret != 0 && flush)
         WT_IGNORE_RET(
           __wt_panic(session, ret, "checkpoint can not fail when flush_tier is enabled"));
-    /*
-     * In disaggregated storage, a checkpoint failure once the checkpoint transaction has started is
-     * unrecoverable: there is no WAL to replay from, and checkpoint metadata may already have been
-     * written to the durable object storage. Rolling back the in-memory transaction would leave the
-     * object storage ahead of the in-memory state, which is permanent corruption. Panic instead.
-     */
-    if (ret != 0 && __wt_conn_is_disagg(session) && F_ISSET(session->txn, WT_TXN_RUNNING))
-        WT_ERR_PANIC(
-          session, ret, "Disaggregated storage checkpoint failed, panic to avoid corruption");
     WT_ERR(ret);
 
     /* Trigger the checkpoint cleanup thread to remove the obsolete pages. */
@@ -2698,7 +2695,8 @@ err:
  *     writes any new encryption key data information
  */
 static int
-__checkpoint_disagg_put(WT_SESSION_IMPL *session, wt_timestamp_t ckpt_ts)
+__checkpoint_disagg_put(
+  WT_SESSION_IMPL *session, wt_timestamp_t ckpt_ts, wt_timestamp_t ckpt_disagg_schema_epoch)
 {
     WT_DECL_RET;
 
@@ -2708,13 +2706,14 @@ __checkpoint_disagg_put(WT_SESSION_IMPL *session, wt_timestamp_t ckpt_ts)
         return (0);
 
     /*
-     * If the stable timestamp advanced, ensure that we reflect it in the checkpoint metadata in
-     * disaggregated storage, even if there were no other changes. Also check for any updated key
-     * encryption information.
+     * If the stable timestamp or the disaggregated schema epoch advanced, ensure that we reflect it
+     * in the checkpoint metadata in disaggregated storage, even if there were no other changes.
+     * Also check for any updated key encryption information.
      */
     if (conn->disaggregated_storage.num_meta_put_at_ckpt_begin ==
         conn->disaggregated_storage.num_meta_put &&
-      ckpt_ts != conn->disaggregated_storage.last_checkpoint_timestamp) {
+      (ckpt_ts != conn->disaggregated_storage.last_checkpoint_timestamp ||
+        ckpt_disagg_schema_epoch != conn->disaggregated_storage.last_checkpoint_schema_epoch)) {
         __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "%s",
           "Update requested for disaggregated storage checkpoint metadata because the stable "
           "timestamp advanced");
@@ -2724,12 +2723,9 @@ __checkpoint_disagg_put(WT_SESSION_IMPL *session, wt_timestamp_t ckpt_ts)
          * will retry on the next checkpoint. Therefore, it is okay to continue.
          */
         if (conn->key_provider != NULL)
-            WT_TRET_MSG(session, __wt_disagg_put_crypt_helper(session), "%s",
-              "Disaggregated storage checkpoint failed to write encryption metadata");
-        WT_TRET_MSG(session,
-          __wt_disagg_put_checkpoint_meta(
-            session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_ts),
-          "%s", "Disaggregated storage checkpoint failed to write checkpoint metadata");
+            WT_TRET(__wt_disagg_put_crypt_helper(session));
+        WT_TRET(__wt_disagg_put_checkpoint_meta(session,
+          conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_ts, ckpt_disagg_schema_epoch));
     }
 
     return (ret);

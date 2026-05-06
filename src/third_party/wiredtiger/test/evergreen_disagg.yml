@@ -545,7 +545,7 @@ variables:
       - func: "fetch artifacts"
       - func: "format test disagg"
         vars:
-          format_args: disagg.mode=switch runs.timer=10:15
+          format_args: disagg.mode=switch runs.timer=10:15 ops.prepare=1
           times: 5
 
   # FIXME-WT-16113: Consolidate this logic in test/format itself.
@@ -557,7 +557,7 @@ variables:
       - func: "format test disagg"
         vars:
           # Validate data with a non-layered table.
-          format_args: disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
+          format_args: disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10 ops.prepare=1
           times: 5
 
   - &format-stress-test-disagg-multi
@@ -649,7 +649,7 @@ tasks:
       - func: "upload artifact"
       - func: "cleanup"
 
-  # FIXME-WT-16394: Enable disagg switch mode on all platforms once failures have been resolved.
+  # FIXME-WT-17380: Enable disagg switch mode (prepared-enabled) on all platforms once failures have been resolved.
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]

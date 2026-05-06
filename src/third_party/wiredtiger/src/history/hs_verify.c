@@ -148,24 +148,55 @@ err:
 static int
 __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_CURSOR *ds_cursor, *hs_cursor;
     WT_DECL_ITEM(buf);
+    WT_DECL_ITEM(ds_uri_buf);
     WT_DECL_RET;
     WT_ITEM key;
     wt_timestamp_t hs_start_ts;
     uint64_t hs_counter;
     uint32_t btree_id;
     char *uri_data;
+    const char *ds_checkpoint_name, *hs_checkpoint_name, *hs_uri;
+    bool is_follower;
 
     WT_CLEAR(key);
+    conn = S2C(session);
     ds_cursor = hs_cursor = NULL;
     hs_start_ts = WT_TS_NONE;
     hs_counter = 0;
     btree_id = WT_BTREE_ID_INVALID;
     uri_data = NULL;
+    ds_checkpoint_name = hs_checkpoint_name = hs_uri = NULL;
+    is_follower = __wt_conn_is_disagg(session) && !conn->layered_table_manager.leader;
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
-    WT_ERR(__wt_curhs_open_ext(session, hs_id, 0, NULL, NULL, &hs_cursor));
+
+    /*
+     * On a disaggregated follower, open both the history store and data store from their latest
+     * stable checkpoints. A follower cannot dirty pages, so opening live disaggregated handles
+     * would trigger the leader-only assertion when page-read re-instantiates stop-timestamp
+     * records.
+     */
+    if (is_follower) {
+        WT_HS_ID_TO_URI(session, hs_id, hs_uri);
+        /* The local history store does not require checkpoint-based access on follower. */
+        if (WT_URI_IS_STABLE(hs_uri)) {
+            WT_ERR_NOTFOUND_OK(
+              __wt_meta_checkpoint_last_name(session, hs_uri, &hs_checkpoint_name, NULL, NULL),
+              true);
+            /* No checkpoint yet means the history store is empty; nothing to verify. */
+            if (ret == WT_NOTFOUND) {
+                ret = 0;
+                goto err;
+            }
+            /* Only needed when verifying the shared history store on the follower. */
+            WT_ERR(__wt_scr_alloc(session, 0, &ds_uri_buf));
+        }
+    }
+
+    WT_ERR(__wt_curhs_open_ext(session, hs_id, 0, hs_checkpoint_name, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
     /* Position the hs cursor on the first record. */
@@ -178,20 +209,27 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
     /* Go through the history store and validate each btree. */
     while (ret == 0) {
         __wt_free(session, uri_data);
+        __wt_free(session, ds_checkpoint_name);
         /*
          * The cursor is positioned either from above or left over from the internal call on the
          * first key of a new btree id.
          */
         WT_ERR(hs_cursor->get_key(hs_cursor, &btree_id, &key, &hs_start_ts, &hs_counter));
         if ((ret = __wt_metadata_btree_id_to_uri(session, btree_id, &uri_data)) != 0) {
-            F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+            F_SET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION);
             WT_ERR_PANIC(session, ret,
               "Unable to find btree id %" PRIu32
               " in the metadata file for the associated key '%s'.",
               btree_id, __wt_buf_set_printable(session, key.data, key.size, false, buf));
         }
 
-        WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
+        if (is_follower && WT_URI_IS_STABLE(uri_data)) {
+            WT_ERR(
+              __wt_meta_checkpoint_last_name(session, uri_data, &ds_checkpoint_name, NULL, NULL));
+            WT_ERR(__wt_buf_fmt(session, ds_uri_buf, "%s/%s", uri_data, ds_checkpoint_name));
+            WT_ERR(__wt_open_cursor(session, ds_uri_buf->data, NULL, NULL, &ds_cursor));
+        } else
+            WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
         F_SET(ds_cursor, WT_CURSOR_RAW_OK);
 
         /* Note that the following call moves the hs cursor internally. */
@@ -208,6 +246,9 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
     }
 err:
     __wt_scr_free(session, &buf);
+    __wt_scr_free(session, &ds_uri_buf);
+    __wt_free(session, ds_checkpoint_name);
+    __wt_free(session, hs_checkpoint_name);
     __wt_free(session, uri_data);
     if (ds_cursor != NULL)
         WT_TRET(ds_cursor->close(ds_cursor));

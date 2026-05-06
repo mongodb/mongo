@@ -129,10 +129,6 @@ testutil_deduce_build_dir(TEST_OPTS *opts)
     char *token;
     int index;
 
-    /* Nothing to deduce if the caller already specified the build directory (e.g. via -b). */
-    if (opts->build_dir != NULL)
-        return;
-
     if (getcwd(pwd, sizeof(pwd)) == NULL)
         testutil_die(ENOENT, "No such directory");
 

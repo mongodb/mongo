@@ -23,7 +23,7 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
      * Once a tree is no longer empty, eviction should pay attention to it, and it's no longer
      * possible to bulk-load into it.
      */
-    if (!btree->original)
+    if (!__wt_atomic_load_uint8_acquire(&btree->original))
         return;
 
     /*

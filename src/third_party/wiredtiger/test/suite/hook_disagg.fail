@@ -15,7 +15,6 @@ test_dump03.py
 test_dump04.py
 test_dump05.py
 test_dupc.py
-test_durable_ts01.py  # FIXME: WT-15370
 test_durable_ts03.py
 test_empty.py
 test_encrypt06.py

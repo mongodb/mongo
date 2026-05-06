@@ -2893,6 +2893,10 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
     WT_RET(__wt_msg(session, "stable timestamp: %s",
       __wt_timestamp_to_string(
         __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp), ts_string)));
+    WT_RET(__wt_msg(session, "stable disaggregated schema epoch: %s",
+      __wt_timestamp_to_string(
+        __wt_atomic_load_uint64_relaxed(&txn_global->stable_disaggregated_schema_epoch),
+        ts_string)));
     WT_RET(__wt_msg(
       session, "has_durable_timestamp: %s", txn_global->has_durable_timestamp ? "yes" : "no"));
     WT_RET(__wt_msg(session, "has_oldest_timestamp: %s",
@@ -2901,6 +2905,9 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
       session, "has_pinned_timestamp: %s", txn_global->has_pinned_timestamp ? "yes" : "no"));
     WT_RET(__wt_msg(session, "has_stable_timestamp: %s",
       __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp) ? "yes" : "no"));
+    WT_RET(__wt_msg(session, "has_stable_disaggregated_schema_epoch: %s",
+      __wt_atomic_load_bool_relaxed(&txn_global->has_stable_disaggregated_schema_epoch) ? "yes" :
+                                                                                          "no"));
     WT_RET(__wt_msg(session, "oldest_is_pinned: %s",
       __wt_atomic_load_bool_relaxed(&txn_global->oldest_is_pinned) ? "yes" : "no"));
     WT_RET(__wt_msg(session, "stable_is_pinned: %s",

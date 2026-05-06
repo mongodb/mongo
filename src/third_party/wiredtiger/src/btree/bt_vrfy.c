@@ -304,6 +304,14 @@ __wt_verify_disagg_database_size(WT_SESSION_IMPL *session)
     uint64_t database_size, ckpt_size, total_size;
     const char *uri, *value;
 
+    /*
+     * Skip the check when no checkpoint has been picked up yet: the in-memory database size is
+     * populated only by checkpoint pickup, so a follower that opens before its first reconfigure
+     * would otherwise see database size as 0 against a non-empty local metadata.
+     */
+    if (!__wt_disagg_has_picked_up_checkpoint(session))
+        return (0);
+
     conn = S2C(session);
     cursor = NULL;
     total_size = 0;

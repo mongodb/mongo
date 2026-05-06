@@ -1008,8 +1008,7 @@ connection_runtime_config = [
         'aggressive_stash_free', 'aggressive_sweep', 'backup_rename', 'checkpoint_evict_page',
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'commit_transaction_slow',
         'compact_slow', 'conn_close_stress_log_printf', 'evict_reposition',
-        'failpoint_disagg_checkpoint_queue_drain', 'failpoint_eviction_split',
-        'failpoint_history_store_delete_key_from_ts',
+        'failpoint_eviction_split', 'failpoint_history_store_delete_key_from_ts',
         'failpoint_rec_before_wrapup', 'failpoint_rec_split_write',
         'history_store_checkpoint_delay', 'history_store_search',
         'history_store_sweep_race', 'live_restore_clean_up', 'open_index_slow', 'prefetch_1',
@@ -2244,7 +2243,9 @@ methods = {
         that all timestamps up to and including that value have been committed (possibly
         bounded by the application-set \c durable timestamp); \c backup_checkpoint returns
         the stable timestamp of the checkpoint pinned for an open backup cursor; \c last_checkpoint
-        returns the timestamp of the most recent stable checkpoint; \c oldest_timestamp returns the
+        returns the timestamp of the most recent stable checkpoint;
+        \c last_disaggregated_schema_epoch returns the schema epoch from the most recent
+        disaggregated storage checkpoint; \c oldest_timestamp returns the
         most recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp; \c oldest_reader
         returns the minimum of the read timestamps of all active readers; \c pinned returns
         the minimum of the \c oldest_timestamp and the read timestamps of all active readers;
@@ -2255,9 +2256,9 @@ methods = {
         WT_CONNECTION::set_timestamp. (The \c oldest and \c stable arguments are deprecated
         short-hand for \c oldest_timestamp and \c stable_timestamp, respectively.) See @ref
         timestamp_global_api''',
-        choices=['all_durable','backup_checkpoint','last_checkpoint','oldest',
-            'oldest_reader','oldest_timestamp','pinned','recovery','stable',
-            'stable_disaggregated_schema_epoch','stable_timestamp']),
+        choices=['all_durable','backup_checkpoint','last_checkpoint',
+            'last_disaggregated_schema_epoch','oldest','oldest_reader','oldest_timestamp',
+            'pinned','recovery','stable','stable_disaggregated_schema_epoch','stable_timestamp']),
 ]),
 
 'WT_CONNECTION.set_timestamp' : Method([

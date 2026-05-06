@@ -32,6 +32,24 @@ static_assert(
   sizeof(WT_REF) == WT_REF_SIZE, "size of WT_REF did not match expected size WT_REF_SIZE");
 
 /*
+ * WT_BLOCK_DISAGG shares its leading prefix with WT_BLOCK because instances of both are inserted
+ * into conn->blockhash / conn->blockqh and traversed there through a WT_BLOCK * pointer. The shared
+ * prefix ends at hashq; private disaggregated fields follow. Mismatched offsets in this prefix lead
+ * to silent struct-aliasing bugs. The asserts below pin the offsets of every shared field so any
+ * reordering or insertion in either struct breaks the build.
+ */
+static_assert(offsetof(WT_BLOCK_DISAGG, name) == offsetof(WT_BLOCK, name),
+  "WT_BLOCK_DISAGG::name must alias WT_BLOCK::name");
+static_assert(offsetof(WT_BLOCK_DISAGG, objectid) == offsetof(WT_BLOCK, objectid),
+  "WT_BLOCK_DISAGG::objectid must alias WT_BLOCK::objectid");
+static_assert(offsetof(WT_BLOCK_DISAGG, ref) == offsetof(WT_BLOCK, ref),
+  "WT_BLOCK_DISAGG::ref must alias WT_BLOCK::ref");
+static_assert(offsetof(WT_BLOCK_DISAGG, q) == offsetof(WT_BLOCK, q),
+  "WT_BLOCK_DISAGG::q must alias WT_BLOCK::q");
+static_assert(offsetof(WT_BLOCK_DISAGG, hashq) == offsetof(WT_BLOCK, hashq),
+  "WT_BLOCK_DISAGG::hashq must alias WT_BLOCK::hashq");
+
+/*
  * WT_UPDATE is special: we arrange fields to avoid padding within the structure but it could be
  * padded at the end depending on the timestamp size. Further check that the data field in the
  * update structure is where we expect it.

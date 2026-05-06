@@ -490,9 +490,12 @@ __disagg_finalize_checkpoint_meta(WT_SESSION_IMPL *session,
 
     /* Update the timestamps. */
     __wt_atomic_store_uint64_release(
+      &conn->disaggregated_storage.last_checkpoint_schema_epoch, metadata->schema_epoch);
+    __wt_atomic_store_uint64_release(
       &conn->disaggregated_storage.last_checkpoint_timestamp, metadata->checkpoint_timestamp);
     __wt_atomic_store_uint64_release(
       &conn->disaggregated_storage.last_checkpoint_oldest_timestamp, metadata->oldest_timestamp);
+    conn->txn_global.last_ckpt_disaggregated_schema_epoch = metadata->schema_epoch;
     conn->txn_global.last_ckpt_timestamp = metadata->checkpoint_timestamp;
 
     /* Set the database size. */
@@ -529,7 +532,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     WT_ITEM metadata_buf;
     WT_TIMER pickup_timer;
     uint64_t current_meta_lsn, pickup_elapsed_ms;
-    char ts_string[2][WT_TS_INT_STRING_SIZE];
+    char ts_string[3][WT_TS_INT_STRING_SIZE];
 
     conn = S2C(session);
 
@@ -579,11 +582,12 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Picking up disaggregated storage checkpoint: metadata_lsn=%" PRIu64 ", timestamp=%" PRIu64
-      " %s"
-      ", oldest_timestamp=%" PRIu64 " %s, largest_file_id=%" PRIu32 ", root=\"%.*s\"",
+      " %s, oldest_timestamp=%" PRIu64 " %s, schema_epoch=%" PRIu64 " %s, largest_file_id=%" PRIu32
+      ", root=\"%.*s\"",
       ckpt_meta->metadata_lsn, metadata.checkpoint_timestamp,
       __wt_timestamp_to_string(metadata.checkpoint_timestamp, ts_string[0]),
       metadata.oldest_timestamp, __wt_timestamp_to_string(metadata.oldest_timestamp, ts_string[1]),
+      metadata.schema_epoch, __wt_timestamp_to_string(metadata.schema_epoch, ts_string[2]),
       metadata.largest_file_id, (int)metadata.checkpoint_len, metadata.checkpoint);
 
     /* Load crypt key data with the key provider extension, if any. */
@@ -1076,13 +1080,6 @@ __wt_disagg_shared_metadata_queue_process(WT_SESSION_IMPL *session)
               __shared_metadata_op_to_string(entry->metadata_op));
             entry->deferred = false;
             continue;
-        }
-
-        /* Failpoint: inject error to test panic handling during queue processing. */
-        if (FLD_ISSET(conn->timing_stress_flags,
-              WT_TIMING_STRESS_FAILPOINT_DISAGG_CHECKPOINT_QUEUE_DRAIN)) {
-            ret = __wt_set_return(session, WT_ERROR);
-            goto err;
         }
 
         WT_ERR(__disagg_shared_metadata_op(session, entry));
@@ -1624,6 +1621,19 @@ __wt_conn_is_disagg(WT_SESSION_IMPL *session)
     disagg = &conn->disaggregated_storage;
 
     return (disagg->page_log_meta != NULL);
+}
+
+/*
+ * __wt_disagg_has_picked_up_checkpoint --
+ *     Return whether this connection is using disaggregated storage and has picked up a checkpoint.
+ */
+bool
+__wt_disagg_has_picked_up_checkpoint(WT_SESSION_IMPL *session)
+{
+    WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
+
+    return (__wt_conn_is_disagg(session) &&
+      __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_meta_lsn) != WT_DISAGG_LSN_NONE);
 }
 
 /*

@@ -36,8 +36,6 @@ from wiredtiger import stat
 # Timestamps: Test setting and querying the stable disaggregated schema epoch.
 class test_timestamp29(wttest.WiredTigerTestCase):
 
-    conn_config = 'statistics=(all)'
-
     def get_stat(self, stat_name):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         value = stat_cursor[stat_name][2]
@@ -60,7 +58,11 @@ class test_timestamp29(wttest.WiredTigerTestCase):
                 time.sleep(0.1)
         self.assertEqual(value, expected_value)
 
-    def test_timestamp29(self):
+    def test_base(self):
+        '''
+        Test setting and querying the stable disaggregated schema epoch, including validation of
+        legal and illegal transitions and the corresponding statistics.
+        '''
         # When not yet set, querying the epoch returns 0.
         self.assertEpochEqual(0)
 
