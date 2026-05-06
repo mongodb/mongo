@@ -52,7 +52,8 @@ public:
         const UUID& collectionUUID,
         const std::vector<IndexBuildInfo>& indexes,
         const UUID& buildUUID,
-        const ResumeIndexInfo& resumeInfo) override;
+        const ResumeIndexInfo& resumeInfo,
+        IndexBuildOptions indexBuildOptions) override;
 
     Status voteAbortIndexBuild(OperationContext* opCtx,
                                const UUID& buildUUID,

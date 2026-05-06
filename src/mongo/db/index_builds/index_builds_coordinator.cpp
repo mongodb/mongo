@@ -2134,16 +2134,34 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
     const bool resumablePdibEnabled =
         feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
             vCtx, fcvSnapshot);
+    const bool pdibEnabled =
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot);
 
     for (auto&& [buildUUID, build] :
          index_builds::primary_driven::registry(opCtx->getServiceContext()).all()) {
 
-        // TODO(SERVER-125682): Attempt to resume primary-driven index build.
         bool resumeSucceeded = false;
         if (resumablePdibEnabled && build.indexBuildIdent) {
             try {
                 auto resumeInfo =
                     index_builds::primary_driven::resumeInfo(opCtx, *build.indexBuildIdent);
+
+                invariant(pdibEnabled);
+                IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
+                    // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
+                    .indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven,
+                    .indexBuildProtocol = IndexBuildProtocol::kPrimaryDriven,
+                    .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)};
+
+                // This spawns a new thread and returns immediately.
+                [[maybe_unused]] auto fut = uassertStatusOK(resumeIndexBuild(opCtx,
+                                                                             build.dbName,
+                                                                             build.collectionUUID,
+                                                                             build.indexes,
+                                                                             buildUUID,
+                                                                             resumeInfo,
+                                                                             indexBuildOptions));
                 resumeSucceeded = true;
                 activeIndexBuilds.incrementResumeSucceeded(resumeInfo.getPhase());
             } catch (const DBException& e) {
@@ -2151,9 +2169,11 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
                 LOGV2(12500301,
                       "Index build: failed to resume, aborting instead",
                       "buildUUID"_attr = buildUUID,
+                      "collectionUUID"_attr = build.collectionUUID,
                       "error"_attr = e);
             }
         }
+
         if (!resumeSucceeded) {
             uassertStatusOK(index_builds::primary_driven::abort(
                 opCtx,
@@ -2165,7 +2185,7 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
                 {ErrorCodes::InterruptedDueToReplStateChange,
                  "Aborting primary-driven index build upon step up"}));
             LOGV2(11130400,
-                  "Aborted primary-driven index build upon step up",
+                  "Index build: failed to resume primary-driven index build, aborting instead",
                   "buildUUID"_attr = buildUUID);
         }
     }
@@ -2316,8 +2336,13 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         try {
             // This spawns a new thread and returns immediately. These index builds will resume and
             // wait for a commit or abort to be replicated.
-            [[maybe_unused]] auto fut = uassertStatusOK(
-                resumeIndexBuild(opCtx, nss->dbName(), collUUID, indexes, buildUUID, resumeInfo));
+            [[maybe_unused]] auto fut = uassertStatusOK(resumeIndexBuild(opCtx,
+                                                                         nss->dbName(),
+                                                                         collUUID,
+                                                                         indexes,
+                                                                         buildUUID,
+                                                                         resumeInfo,
+                                                                         IndexBuildOptions{}));
             successfullyResumed.insert(buildUUID);
         } catch (const DBException& e) {
             LOGV2(4841701,
@@ -2626,6 +2651,10 @@ void IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly(bool sleep) {
 
 void IndexBuildsCoordinator::verifyNoIndexBuilds_forTestOnly() const {
     activeIndexBuilds.verifyNoIndexBuilds_forTestOnly();
+}
+
+void IndexBuildsCoordinator::awaitStepUpThread_forTestOnly() {
+    _stepUpThread.join();
 }
 
 // static
@@ -3399,7 +3428,9 @@ void IndexBuildsCoordinator::_resumeHybridIndexBuildFromPhase(
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     const ResumeIndexInfo& resumeInfo) {
-    invariant(indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kHybrid);
+    // TODO(SERVER-109664): Make this check for simply IndexBuildMethodEnum::kHybrid
+    invariant(indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kHybrid ||
+              indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven);
 
     if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kInitialized ||
         resumeInfo.getPhase() == IndexBuildPhaseEnum::kCollectionScan) {

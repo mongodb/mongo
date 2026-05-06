@@ -290,8 +290,9 @@ IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
                                                const UUID& collectionUUID,
                                                const std::vector<IndexBuildInfo>& indexes,
                                                const UUID& buildUUID,
-                                               const ResumeIndexInfo& resumeInfo) {
-    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
+                                               const ResumeIndexInfo& resumeInfo,
+                                               IndexBuildOptions indexBuildOptions) {
+    // TODO(SERVER-126057): Rename this enum such that it represents resuming, not startup.
     indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
     return _startIndexBuild(
         opCtx, dbName, collectionUUID, indexes, buildUUID, indexBuildOptions, resumeInfo);
@@ -403,7 +404,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     if (indexBuildOptions.applicationMode == ApplicationMode::kStartupRepair) {
         // Two phase index build recovery goes through a different set-up procedure because we will
         // either resume the index build or the original index will be dropped first.
-        invariant(indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kTwoPhase);
+        invariant(indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kTwoPhase ||
+                  indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kPrimaryDriven);
         auto status = Status::OK();
         if (resumeInfo) {
             status = _setUpResumeIndexBuild(

@@ -53,7 +53,8 @@ IndexBuildsCoordinatorMock::resumeIndexBuild(OperationContext* opCtx,
                                              const UUID& collectionUUID,
                                              const std::vector<IndexBuildInfo>& indexes,
                                              const UUID& buildUUID,
-                                             const ResumeIndexInfo& resumeInfo) {
+                                             const ResumeIndexInfo& resumeInfo,
+                                             IndexBuildOptions indexBuildOptions) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

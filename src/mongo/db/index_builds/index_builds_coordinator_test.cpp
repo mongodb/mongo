@@ -34,6 +34,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
@@ -621,6 +623,92 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
         opCtx, singlePhaseUUID, IndexBuildProtocol::kSinglePhase);
     ASSERT_FALSE(
         indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
+}
+
+TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenResumes) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO(SERVER-124910): Remove.
+    RAIIServerParameterControllerForTest ffPDIBResume(
+        "featureFlagResumablePrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    auto opObserver = OpObserverMock::install(opCtx);
+    auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.StepUpPrimaryDrivenResumes");
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, CollectionOptions()));
+
+    // Avoid the empty collection index build optimization.
+    auto collectionUUID = [&] {
+        auto collection = getCollectionExclusive(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, collection.getCollectionPtr(), BSON("_id" << 1)));
+        wuow.commit();
+        return collection.uuid();
+    }();
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    std::vector<IndexBuildInfo> indexes;
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"), "index-1", *storageEngine);
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"), "index-2", *storageEngine);
+
+    auto buildUUID = UUID::gen();
+    auto resumeStateIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_OK(index_builds::primary_driven::start(
+        opCtx, nss.dbName(), collectionUUID, buildUUID, indexes, resumeStateIdent));
+
+    // Persist basic resume state.
+    {
+        ResumeIndexInfo resumeIndexInfo;
+        resumeIndexInfo.setBuildUUID(buildUUID);
+        resumeIndexInfo.setPhase(IndexBuildPhaseEnum::kInitialized);
+        resumeIndexInfo.setCollectionUUID(collectionUUID);
+        std::vector<IndexStateInfo> indexStateInfos;
+        for (auto&& indexBuildInfo : indexes) {
+            IndexStateInfo indexInfo;
+            indexInfo.setSpec(indexBuildInfo.spec);
+            indexInfo.setIsMultikey(false);
+            indexInfo.setMultikeyPaths({});
+            indexInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
+            indexInfo.setSkippedRecordTrackerTable(indexBuildInfo.skippedRecordsIdent);
+            indexInfo.setStorageIdentifier(indexBuildInfo.sorterIdent);
+            indexStateInfos.push_back(indexInfo);
+        }
+        resumeIndexInfo.setIndexes(indexStateInfos);
+        auto obj = resumeIndexInfo.toBSON();
+
+        WriteUnitOfWork wuow(opCtx);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        auto rs = storageEngine->getEngine()->getInternalRecordStore(
+            ru, resumeStateIdent, KeyFormat::Long);
+        ASSERT_OK(rs->insertRecord(opCtx, ru, obj.objdata(), obj.objsize(), Timestamp()));
+        wuow.commit();
+    }
+
+    // Step-up to primary, expecting the index build to be resumed, not aborted.
+    indexBuildsCoord->onStepUp(opCtx);
+    indexBuildsCoord->awaitStepUpThread_forTestOnly();
+    indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
+
+    // Verify that the op observer was called, that it was given the expected idents, and that the
+    // specified idents were actually used.
+    std::vector<std::string> idents;
+    for (auto& indexBuildInfo : indexes) {
+        idents.push_back(indexBuildInfo.indexIdent);
+    }
+
+    auto collection = getCollectionExclusive(opCtx, nss);
+    ASSERT_EQ(opObserver->startIndexBuildIdents, idents);
+    ASSERT(collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
+        opCtx, opObserver->startIndexBuildIdents[0]));
+    ASSERT(collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
+        opCtx, opObserver->startIndexBuildIdents[1]));
 }
 
 }  // namespace

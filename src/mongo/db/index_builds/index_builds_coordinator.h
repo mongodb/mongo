@@ -191,7 +191,8 @@ public:
         const UUID& collectionUUID,
         const std::vector<IndexBuildInfo>& indexes,
         const UUID& buildUUID,
-        const ResumeIndexInfo& resumeInfo) = 0;
+        const ResumeIndexInfo& resumeInfo,
+        IndexBuildOptions indexBuildOptions) = 0;
 
     /**
      * Resumes and restarts index builds for recovery. Anything that fails to resume will be started
@@ -515,6 +516,8 @@ public:
     void sleepIndexBuilds_forTestOnly(bool sleep);
 
     void verifyNoIndexBuilds_forTestOnly() const;
+
+    void awaitStepUpThread_forTestOnly();
 
     /**
      * Preprocesses a list of index specs and idents to normalize them and remove any indexes which
