@@ -67,7 +67,6 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(failfirstOplogEntryFetcherCallback);
 
-const Seconds SyncSourceResolver::kFetcherTimeout(30);
 const Seconds SyncSourceResolver::kFetcherErrorDenylistDuration(10);
 const Seconds SyncSourceResolver::kOplogEmptyDenylistDuration(10);
 const Seconds SyncSourceResolver::kFirstOplogEntryEmptyDenylistDuration(10);
@@ -200,8 +199,9 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
             return _firstOplogEntryFetcherCallback(response, candidate, earliestOpTimeSeen);
         },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
-        kFetcherTimeout /* find network timeout */,
-        kFetcherTimeout /* getMore network timeout */);
+        Milliseconds(syncSourceResolverFindFetcherTimeoutMillis.load()) /* find network timeout */,
+        Milliseconds(
+            syncSourceResolverFindFetcherTimeoutMillis.load()) /* getMore network timeout */);
 }
 
 std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndPort candidate,
@@ -224,8 +224,9 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
             return _requiredOpTimeFetcherCallback(response, candidate, earliestOpTimeSeen, rbid);
         },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
-        kFetcherTimeout /* find network timeout */,
-        kFetcherTimeout /* getMore network timeout */);
+        Milliseconds(syncSourceResolverFindFetcherTimeoutMillis.load()) /* find network timeout */,
+        Milliseconds(
+            syncSourceResolverFindFetcherTimeoutMillis.load()) /* getMore network timeout */);
 }
 
 Status SyncSourceResolver::_scheduleFetcher(std::unique_ptr<Fetcher> fetcher) {
@@ -404,7 +405,11 @@ Status SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime ea
 
     invariant(_state == State::kRunning);
     auto handle = _taskExecutor->scheduleRemoteCommand(
-        {candidate, DatabaseName::kAdmin, BSON("replSetGetRBID" << 1), nullptr, kFetcherTimeout},
+        {candidate,
+         DatabaseName::kAdmin,
+         BSON("replSetGetRBID" << 1),
+         nullptr,
+         Milliseconds(syncSourceResolverFindFetcherTimeoutMillis.load())},
         [=, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
             _rbidRequestCallback(candidate, earliestOpTimeSeen, rbidReply);
         });

@@ -953,6 +953,18 @@ server_parameters:
             gte: 1000
         redact: false
 
+    syncSourceResolverFindFetcherTimeoutMillis:
+        description: >-
+            The maximum amount of time that the fetcher in the sync source resolver will wait
+            for the find to return. This value is adjustable to allow users to minimize
+            the amount of time the resolver will spend waiting for a sync source candidate to respond.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: syncSourceResolverFindFetcherTimeoutMillis
+        default: 30000
+        redact: false
+
+
 feature_flags:
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.
