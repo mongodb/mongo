@@ -15,7 +15,7 @@ for details on how it works.
 
 In order to generate a task, we typically create a placeholder task. By convention the name of
 these tasks should end in "_gen". Most of the time, generated tasks should inherit the
-[gen_task_template](https://github.com/10gen/mongo/blob/31864e3866ce9cc54c08463019846ded2ad9e6e5/etc/evergreen_yml_components/definitions.yml#L99-L107)
+[gen_task_template](https://github.com/mongodb/mongo/blob/31864e3866ce9cc54c08463019846ded2ad9e6e5/etc/evergreen_yml_components/definitions.yml#L99-L107)
 which configures the required dependencies.
 
 The placeholder tasks needs to have the "generate resmoke tasks" function as one of its `commands`.

@@ -949,7 +949,7 @@ For retry images saved in the image collection, the source will "downconvert" op
 `needsRetryImage: true` into two oplog entries, simulating the old format. As chunk migrations use
 internal commands, [this downconverting procedure](https://github.com/mongodb/mongo/blob/0beb0cacfcaf7b24259207862e1d0d489e1c16f1/src/mongo/db/s/session_catalog_migration_source.cpp#L58-L97)
 is installed under the hood. For resharding and tenant migrations, a new aggregation stage,
-[_internalFindAndModifyImageLookup](https://github.com/10gen/mongo/blob/e27dfa10b994f6deff7c59a122b87771cdfa8aba/src/mongo/db/pipeline/document_source_find_and_modify_image_lookup.cpp#L61),
+[_internalFindAndModifyImageLookup](https://github.com/mongodb/mongo/blob/e27dfa10b994f6deff7c59a122b87771cdfa8aba/src/mongo/db/pipeline/document_source_find_and_modify_image_lookup.cpp#L61),
 was introduced to perform the identical substitution. In order for this stage to have a valid timestamp
 to assign to the forged no-op oplog entry as result of the "downconvert", we must always assign an
 extra oplog slot when writing the original retryable findAndModify oplog entry with
