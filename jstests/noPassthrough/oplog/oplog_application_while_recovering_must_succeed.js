@@ -24,15 +24,17 @@ const oplogApplicationResults = ["Success", "CrudError", "NamespaceNotFound"];
 
 function runTest(op, result) {
     jsTestLog(`Testing "${op}" oplog application during recovery that finishes with "${result}".`);
-    const rst = new ReplSetTest({nodes: 1});
+    // On Windows builds, triggering a failure will result in writing a minidump, disable this on
+    // every (re)start by passing it as a startup parameter rather than a runtime setParameter.
+    // Gated on _isWindows() because win32MinidumpEnabled is only registered on Windows builds —
+    // passing it on other platforms makes mongod fail with "Unknown --setParameter".
+    const rst = new ReplSetTest({
+        nodes: 1,
+        nodeOptions: _isWindows() ? {setParameter: {win32MinidumpEnabled: false}} : {},
+    });
     rst.startSet();
     rst.initiate();
     let conn = rst.getPrimary();
-
-    // On Windows builds, triggering a failure will result in writing a minidump, disable this.
-    for (const replicaConnection of [rst.getPrimary(), ...rst.getSecondaries()]) {
-        replicaConnection.getDB("test").adminCommand({setParameter: 1, win32MinidumpEnabled: false});
-    }
 
     // Construct a valid oplog entry.
     function constructOplogEntry(oplog) {
