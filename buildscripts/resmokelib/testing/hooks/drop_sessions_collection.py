@@ -299,6 +299,38 @@ class _DropSessionsCollectionThread(threading.Thread):
             with_naive_retry(
                 lambda: self._refresh_sessions_collection(fixture), extra_retryable_error_codes=[26]
             )
+
+            # In sharded clusters, the refreshLogicalSessionCacheNow command may prematurely return if a stepdown event
+            # occurs while the underlying shardCollection operation has already released the critical section
+            # on config.system.sessions, but has yet to complete other post-commit operations.
+            # Poll the 'config.system.sharding_ddl_coordinators' to ensure it gets drained before leaving this method.
+            if not hasattr(fixture, "configsvr") or fixture.configsvr is None:
+                return
+
+            config_primary = fixture.configsvr.get_primary().mongo_client()
+            config_db = config_primary.get_database(
+                "config",
+                read_concern=pymongo.read_concern.ReadConcern(level="majority"),
+                write_concern=pymongo.write_concern.WriteConcern(w="majority"),
+            )
+
+            for _ in range(60):
+                any_recovery_doc = config_db.system.sharding_ddl_coordinators.count_documents(
+                    {
+                        "_id.namespace": "config.system.sessions",
+                        "_id.operationType": {"$regex": "^createCollection"},
+                    }
+                )
+                if any_recovery_doc == 0:
+                    break
+
+                time.sleep(1)
+            else:
+                raise errors.ServerFailure(
+                    "Timed out after 1 minute waiting for config.system.sharding_ddl_coordinators "
+                    "to drain createCollection entries for config.system.sessions"
+                )
+
         except pymongo.errors.OperationFailure as err:
             if err.code != 64:
                 raise err
