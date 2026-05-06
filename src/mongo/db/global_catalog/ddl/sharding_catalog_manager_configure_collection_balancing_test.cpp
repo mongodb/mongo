@@ -111,25 +111,9 @@ protected:
                                       boost::optional<bool> defragmentCollection,
                                       boost::optional<bool> enableAutoMerger,
                                       boost::optional<bool> enableBalancing) {
-        auto future = launchAsync([&] {
-            ThreadClient client(getServiceContext()->getService());
-            auto opCtx = cc().makeOperationContext();
-            ShardingCatalogManager::get(opCtx.get())
-                ->configureCollectionBalancing(opCtx.get(),
-                                               nss,
-                                               chunkSizeMB,
-                                               defragmentCollection,
-                                               enableAutoMerger,
-                                               enableBalancing);
-        });
-
-        // mock response to _flushRoutingTableCacheUpdatesWithWriteConcern
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT(request.cmdObj["_flushRoutingTableCacheUpdatesWithWriteConcern"]);
-            return BSON("ok" << 1);
-        });
-
-        future.default_timed_get();
+        auto opCtx = operationContext();
+        ShardingCatalogManager::get(opCtx)->configureCollectionBalancing(
+            opCtx, nss, chunkSizeMB, defragmentCollection, enableAutoMerger, enableBalancing);
     }
 
     BSONObj getCollectionDocument(NamespaceString nss) {

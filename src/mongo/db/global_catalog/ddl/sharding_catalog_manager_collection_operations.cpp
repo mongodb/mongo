@@ -519,45 +519,19 @@ void ShardingCatalogManager::configureCollectionBalancing(
         // migrations
         Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-        withTransaction(opCtx,
-                        NamespaceString::kConfigsvrCollectionsNamespace,
-                        [this, &nss, &update](OperationContext* opCtx, TxnNumber txnNumber) {
-                            const auto query = BSON(
-                                CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+        const auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                     nss, SerializationContext::stateDefault()));
-                            const auto res = writeToConfigDocumentInTxn(
-                                opCtx,
-                                NamespaceString::kConfigsvrCollectionsNamespace,
-                                BatchedCommandRequest::buildUpdateOp(
-                                    NamespaceString::kConfigsvrCollectionsNamespace,
-                                    query,
-                                    update /* update */,
-                                    false /* upsert */,
-                                    false /* multi */),
-                                txnNumber);
-                            const auto numDocsModified = UpdateOp::parseResponse(res).getN();
-                            uassert(ErrorCodes::NamespaceNotSharded,
-                                    str::stream() << "Expected to match one doc for query " << query
-                                                  << " but matched " << numDocsModified,
-                                    numDocsModified == 1);
-
-                            bumpCollectionMinorVersionInTxn(opCtx, nss, txnNumber);
-                        });
-        // Now any migrations that change the list of shards will see the results of the transaction
-        // during refresh, so it is safe to release the chunk lock.
+        const auto didUpdate = uassertStatusOK(_localCatalogClient->updateConfigDocument(
+            opCtx,
+            NamespaceString::kConfigsvrCollectionsNamespace,
+            query,
+            update,
+            false /* upsert */,
+            defaultMajorityWriteConcernDoNotUse()));
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Expected to match one doc for query " << query,
+                didUpdate);
     }
-
-    const auto cm = uassertStatusOK(
-        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    std::set<ShardId> shardsIds;
-    cm.getAllShardIds(&shardsIds);
-
-    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    sharding_util::tellShardsToRefreshCollection(
-        opCtx,
-        {std::make_move_iterator(shardsIds.begin()), std::make_move_iterator(shardsIds.end())},
-        nss,
-        executor);
 
     Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
 
