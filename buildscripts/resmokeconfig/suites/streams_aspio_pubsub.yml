@@ -8,6 +8,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_auth_error.js
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_publish_error.js
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_gwproxy.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_benchmark_tpcc.js
 
 executor:
   fixture:
