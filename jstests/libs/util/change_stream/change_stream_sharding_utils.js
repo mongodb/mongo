@@ -70,7 +70,7 @@ function getCurrentClusterTime(conn, dbName) {
  * @param {boolean} [configShard=false] - If true, one shard doubles as the config server
  * @returns {ShardingTest} The configured sharding test
  */
-function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = false) {
+function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = false, mongosOptions = {}) {
     const isMultiversion =
         Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
     // TODO (SERVER-125025): remove the failpoint.
@@ -98,6 +98,7 @@ function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = f
                 },
             },
         },
+        ...mongosOptions,
     };
     if (!configShard) {
         stOptions.config = 1;

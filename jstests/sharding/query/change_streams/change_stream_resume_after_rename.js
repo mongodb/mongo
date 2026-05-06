@@ -15,6 +15,7 @@ import {
     ChangeStreamTest,
     ChangeStreamWatchMode,
     cursorCommentFilter,
+    waitForClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
 import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
@@ -30,7 +31,6 @@ import {
     buildExpectedEvents,
     createMatcher,
     createShardingTest,
-    getCurrentClusterTime,
     runTeardownSteps,
 } from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {
@@ -101,7 +101,10 @@ describe("$changeStream", function () {
             }),
         ];
         const expectedEvents = buildExpectedEvents(commands, ChangeStreamWatchMode.kCollection);
-        const startTime = getCurrentClusterTime(st.s);
+        // Wait for cluster time on the config server to advance to a point so that a change
+        // stream opened with startAtOperationTime = startTime is not considered a future
+        // cluster time.
+        const startTime = waitForClusterTime(st.s.getDB("admin"), st);
 
         // Open a change stream on the rename target collection BEFORE running the writer to
         // observe v2 targeter retargeting from the DB primary to the non-primary shard.
@@ -170,20 +173,18 @@ describe("$changeStream", function () {
             expectInvalidate: true,
         });
 
-        // Verify the v2 targeter places cursors on shard1 for testColl_renamed by opening
-        // a fresh stream. The original cursor's post-rename placement is unobservable
-        // because the rename-target invalidate closes its shard cursors before any
-        // inspection window; a new cursor on the now-existing collection takes the
-        // direct-target path and is observable.
-        const verifyComment = "verify_post_rename_placement";
+        // Verify the v2 targeter opens a cursor on shard1 only for testColl_renamed.
+        // waitForClusterTime ensures initialization completes on the first getMore without
+        // entering the Waiting state, so no log-based assertion is needed.
+        const verifyTime = waitForClusterTime(st.s.getDB("admin"), st);
         const verifyCursor = csTest.startWatchingChanges({
-            pipeline: [{$changeStream: {version: "v2"}}],
+            pipeline: [{$changeStream: {version: "v2", startAtOperationTime: verifyTime}}],
             collection: targetColl,
-            aggregateOptions: {comment: verifyComment, cursor: {batchSize: 0}},
+            aggregateOptions: {cursor: {batchSize: 0}},
         });
-        // Drive a getMore so shard cursors materialize and become idle.
         csTest.assertNoChange(verifyCursor);
-        assertOpenCursors(st, [shards[1]._id], /*expectedConfigCursor=*/ false, cursorCommentFilter(verifyComment));
+        // Confirm the cursor landed on shard1 only.
+        assertOpenCursors(st, [shards[1]._id], /*expectedConfigCursor=*/ false, {ns: `${testDb}.${targetColl}`});
 
         // Clean up the lingering testColl_renamed so afterEach's dropDatabase doesn't trip
         // on a surprise collection (the rename command no longer drops it for us).
