@@ -846,14 +846,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 acquireCriticalSectionOnParticipantsFor(fromNss);
                 acquireCriticalSectionOnParticipantsFor(toNss);
 
-                // 2. Define stable values for:
-                // - The new epoch for FROM, once renamed to TO.
-                // - The identity of the shard that will notify change stream readers of FROM once
-                //   the operation gets committed.
-                if (!_doc.getRenamedCollectionEpoch()) {
+                // 2. Define a stable value for the identity of the shard that will notify change
+                // stream readers of FROM once the operation gets committed.
+                if (!_doc.getChangeStreamsNotifier()) {
                     auto newDoc = _doc;
 
-                    newDoc.setRenamedCollectionEpoch(OID::gen());
                     auto changeStreamsNotifierForSource =
                         getChangeStreamNotifierShardIdFor(_doc.getSourceUUID().value());
                     LOGV2(10488802,
@@ -1013,13 +1010,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     return now.clusterTime().asTimestamp();
                 }();
 
-                const auto renamedCollectionEpoch = [&] {
-                    if (preciseChangeStreamTargeterEnabled) {
-                        return _doc.getRenamedCollectionEpoch().value();
-                    }
-
-                    return OID::gen();
-                }();
+                const auto renamedCollectionEpoch = OID::gen();
 
                 const auto session = getNewSession(opCtx);
                 renameCollectionMetadataInTransaction(opCtx,
