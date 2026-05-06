@@ -393,6 +393,18 @@ MONGO_MOD_PRIVATE void commitRefineCollectionShardKeyToShardCatalog(
     const CancellationToken& token);
 
 /**
+ *  Commits a collMod operation to the shard catalog by sending the command
+ * `_shardsvrCommitCollModCollectionMetadata` to all given shards.
+ */
+MONGO_MOD_PRIVATE void commitCollModCollectionMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
+/**
  *  Commits a dropCollection operation to the shard catalog by sending the command
  * `_shardsvrCommitDropCollectionMetadata` to all given shards.
  */

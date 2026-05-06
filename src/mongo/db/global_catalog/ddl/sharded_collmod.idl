@@ -63,4 +63,11 @@ commands:
             performViewChange:
                 type: optionalBool
                 description: "Whether should perform view catalog change, set only for commands sent to the primary shard"
+            clearCollMetadata:
+                type: optionalBool
+                description: >-
+                    If true, the filtering collection metadata will be cleared when releasing the
+                    critical section. When the shard is collection authoritative, the coordinator
+                    sets this to false because the commit phase updates the shard catalog with
+                    current information.
         reply_type: CollModReply

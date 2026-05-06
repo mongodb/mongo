@@ -1114,6 +1114,7 @@ const allTestCases = {
         _shardsvrRecreateRangeDeletionTasksParticipant: {skip: "TODO"},
         _shardsvrRefineCollectionShardKey: {skip: "TODO"},
         _shardsvrCommitRefineCollectionShardKey: {skip: "internal command"},
+        _shardsvrCommitCollModCollectionMetadata: {skip: "internal command"},
         _shardsvrCommitDropCollectionMetadata: {skip: "internal command"},
         _shardsvrCommitCreateCollectionMetadata: {skip: "internal command"},
         _shardsvrRenameCollection: {skip: "TODO"},

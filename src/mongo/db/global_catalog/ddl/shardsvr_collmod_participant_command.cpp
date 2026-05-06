@@ -79,14 +79,22 @@ namespace {
 void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
                                           ShardingRecoveryService* service,
                                           const NamespaceString& bucketNs,
-                                          const BSONObj& reason) {
+                                          const BSONObj& reason,
+                                          bool clearMetadata) {
+    std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
+    if (clearMetadata) {
+        actionPtr = std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+    } else {
+        actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+    }
+
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant) {
         // Use an AlternativeClientRegion because releasing a RecoverableCriticalSection
         // triggers an update with `multi: true`, which cannot be executed inside a
         // transaction.
         auto newClient = getGlobalServiceContext()->getService()->makeClient(
-            "ShardsvrMovePrimaryExitCriticalSection");
+            "ShardsvrCollModParticipantCommandExitCriticalSection");
         AlternativeClientRegion acr(newClient);
         auto newOpCtx = CancelableOperationContext(
             cc().makeOperationContext(),
@@ -98,7 +106,7 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
             bucketNs,
             reason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            ShardingRecoveryService::FilteringMetadataClearer());
+            *actionPtr);
     } else {
         // No need to create a new operation context if no session is checked-out
         service->releaseRecoverableCriticalSection(
@@ -106,7 +114,7 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
             bucketNs,
             reason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            ShardingRecoveryService::FilteringMetadataClearer());
+            *actionPtr);
     }
 }
 
@@ -236,7 +244,9 @@ public:
                 // operation context will cause a dead lock since the session has been already
                 // checked-out. We prevent the issue by using a new operation context with an
                 // empty session.
-                releaseCriticalSectionInEmptySession(opCtx, service, bucketNs, reason);
+                const bool clearMetadata = request().getClearCollMetadata().value_or(true);
+                releaseCriticalSectionInEmptySession(
+                    opCtx, service, bucketNs, reason, clearMetadata);
             }
 
             BSONObjBuilder builder;

@@ -9,6 +9,7 @@
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -52,12 +53,19 @@ describe("Authoritative collection metadata vs DDLs", function () {
         [st.rs0, st.rs1].forEach((rs) => rs.nodes.forEach(fn));
     }
 
-    function assertShardCatalogOnNode(node, ns, {expectedUuid, expectedKey, expectedChunks}) {
+    function assertShardCatalogOnNode(node, ns, {expectedUuid, expectedKey, expectedChunks, expectedTimeseriesFields}) {
         const label = node.host;
         const meta = getShardCatalogCollMetadata(node, ns);
         assert.neq(null, meta, `${label}: missing collection metadata in shard catalog`);
         assert.eq(expectedUuid.toString(), meta.uuid.toString(), `${label}: uuid mismatch`);
         assert.eq(tojson(expectedKey), tojson(meta.key), `${label}: shard key mismatch`);
+        if (expectedTimeseriesFields) {
+            assert.eq(
+                tojson(expectedTimeseriesFields),
+                tojson(meta.timeseriesFields),
+                `${label}: time-series fields mismatch`,
+            );
+        }
 
         const shardChunks = getShardCatalogChunks(node, expectedUuid);
         assert.eq(expectedChunks.length, shardChunks.length, `${label}: chunk count mismatch`);
@@ -276,6 +284,75 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     });
                 });
             }
+        });
+    });
+
+    describe("collMod", function () {
+        it("updates shard catalog time-series fields and chunk versions", function () {
+            const db = setupDb("collmod_ts");
+            const collName = "ts";
+            const coll = db.getCollection(collName);
+            const ns = coll.getFullName();
+
+            assert.commandWorked(
+                db.createCollection(collName, {
+                    timeseries: {timeField: "time", metaField: "tag", granularity: "seconds"},
+                }),
+            );
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {tag: 1}}));
+
+            const ddlNs = getTimeseriesCollForDDLOps(db, coll).getFullName();
+            assert.commandWorked(db.adminCommand({split: ddlNs, middle: {meta: 0}}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ddlNs, find: {meta: 1}, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(
+                coll.insert([
+                    {time: ISODate("2026-01-01T00:00:00.000Z"), tag: -1},
+                    {time: ISODate("2026-01-01T00:00:00.000Z"), tag: 1},
+                ]),
+            );
+
+            const originalGlobalMeta = getGlobalCatalogCollMetadata(ddlNs);
+            const originalGlobalChunks = getAllGlobalCatalogChunks(originalGlobalMeta.uuid);
+            assert.eq(2, originalGlobalChunks.length, `${ddlNs}: expected two chunks before collMod`);
+
+            assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: "minutes"}}));
+
+            const globalMeta = getGlobalCatalogCollMetadata(ddlNs);
+            assert.neq(null, globalMeta, `${ddlNs}: missing global catalog metadata after collMod`);
+            assert.eq("minutes", globalMeta.timeseriesFields.granularity);
+
+            const allGlobalChunks = getAllGlobalCatalogChunks(globalMeta.uuid);
+            assert.eq(2, allGlobalChunks.length, `${ddlNs}: expected two chunks after collMod`);
+            for (let i = 0; i < allGlobalChunks.length; i++) {
+                assert.neq(
+                    tojson(originalGlobalChunks[i].lastmod),
+                    tojson(allGlobalChunks[i].lastmod),
+                    `${ddlNs}: expected chunk ${i} version to change after collMod`,
+                );
+            }
+
+            st.awaitReplicationOnShards();
+
+            [
+                {rs: st.rs0, shardName: st.shard0.shardName},
+                {rs: st.rs1, shardName: st.shard1.shardName},
+            ].forEach(({rs, shardName}) => {
+                const shardGlobalChunks = getGlobalCatalogChunks(globalMeta.uuid, shardName);
+                assert.gt(shardGlobalChunks.length, 0, `Expected at least one chunk on ${shardName}`);
+
+                assertInMemoryMetadataSharded(rs.getPrimary(), ddlNs, globalMeta.key);
+
+                rs.nodes.forEach((node) => {
+                    assertShardCatalogOnNode(node, ddlNs, {
+                        expectedUuid: globalMeta.uuid,
+                        expectedKey: globalMeta.key,
+                        expectedChunks: shardGlobalChunks,
+                        expectedTimeseriesFields: globalMeta.timeseriesFields,
+                    });
+                });
+            });
         });
     });
 

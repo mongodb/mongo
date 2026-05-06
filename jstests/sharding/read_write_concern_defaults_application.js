@@ -190,6 +190,7 @@ let testCases = {
     _shardsvrRecreateRangeDeletionTasksParticipant: {skip: "internal command"},
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrCommitRefineCollectionShardKey: {skip: "internal command"},
+    _shardsvrCommitCollModCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitDropCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitCreateCollectionMetadata: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},

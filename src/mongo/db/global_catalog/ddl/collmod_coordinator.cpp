@@ -47,19 +47,23 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/idl/idl_parser.h"
@@ -117,6 +121,54 @@ void _appendResponseCollModIndexChanges(
     // that the user receives {ok: 1} instead.
     BSONObj filteredResponse = firstShardResponse.removeField("ok");
     result.appendElements(CommandHelpers::filterCommandReplyForPassthrough(filteredResponse));
+}
+
+void commitToGlobalCatalog(OperationContext* opCtx,
+                           const DatabaseName& dbName,
+                           const NamespaceString& nss,
+                           const CollModRequest& collModRequest) {
+    ConfigsvrCollMod request(nss, collModRequest);
+    generic_argument_util::setMajorityWriteConcern(request);
+
+    const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    uassertStatusOK(
+        Shard::CommandResponse::getEffectiveStatus(configShard->runCommandWithIndefiniteRetries(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            dbName,
+            request.toBSON(),
+            Shard::RetryPolicy::kIdempotent)));
+}
+
+template <typename GetSessionFn>
+void commitToShardCatalog(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const std::vector<ShardId>& participantsOwningChunks,
+                          const ShardId& primaryShard,
+                          bool isPrimaryOwningChunks,
+                          GetSessionFn&& getSession,
+                          const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                          const CancellationToken& token) {
+    if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
+    }
+
+    std::vector<ShardId> involvedShards = participantsOwningChunks;
+    if (isPrimaryOwningChunks) {
+        involvedShards.push_back(primaryShard);
+    }
+
+    const auto session = getSession();
+    sharding_ddl_util::commitCollModCollectionMetadataToShardCatalog(
+        opCtx, nss, involvedShards, session, executor, token);
+
+    // The DB primary shard must always know that a collection is tracked, even when it does not own
+    // any chunks.
+    if (!isPrimaryOwningChunks) {
+        shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss);
+    }
 }
 
 }  // namespace
@@ -336,6 +388,18 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
+
+                    // When shards are authoritative, there is no need to clear the filtering
+                    // metadata upon releasing the critical section; the commit phase is responsible
+                    // for updating the shard catalog with current information. This flag is
+                    // evaluated at insertion time because on secondaries, metadata is cleared
+                    // during the onDelete of the critical section document.
+                    if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        blockCRUDOperationsRequest.setClearCollMetadata(false);
+                    }
+
                     auto opts =
                         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
                             **executor, token, blockCRUDOperationsRequest);
@@ -349,7 +413,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kUpdateConfig,
-            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 collModBeforeConfigServerUpdate.pauseWhileSet();
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
@@ -357,17 +421,20 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
                     hasTimeseriesOptions(_request)) {
-                    ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
-                    generic_argument_util::setMajorityWriteConcern(request);
+                    commitToGlobalCatalog(
+                        opCtx, nss().dbName(), _collInfo->nsForTargeting, _request);
 
-                    const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-                    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
-                        configShard->runCommandWithIndefiniteRetries(
-                            opCtx,
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            nss().dbName(),
-                            request.toBSON(),
-                            Shard::RetryPolicy::kIdempotent)));
+                    commitToShardCatalog(
+                        opCtx,
+                        _collInfo->nsForTargeting,
+                        _shardingInfo->participantsOwningChunks,
+                        _shardingInfo->primaryShard,
+                        _shardingInfo->isPrimaryOwningChunks,
+                        [&] { return getNewSession(opCtx); },
+                        executor,
+                        token);
+
+                    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                 }
             }))
         .then(_buildPhaseHandler(
@@ -422,6 +489,13 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         bool needsUnblock =
                             _collInfo->timeSeriesOptions && hasTimeseriesOptions(_request);
                         request.setNeedsUnblock(needsUnblock);
+                        if (needsUnblock) {
+                            const bool isDDLAuthoritative =
+                                feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                                    VersionContext::getDecoration(opCtx),
+                                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                            request.setClearCollMetadata(!isDDLAuthoritative);
+                        }
 
                         std::vector<AsyncRequestsSender::Response> responses;
 

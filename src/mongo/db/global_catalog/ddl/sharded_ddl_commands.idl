@@ -1067,6 +1067,16 @@ commands:
         api_version: ""
         reply_type: OkReply
 
+    _shardsvrCommitCollModCollectionMetadata:
+        command_name: _shardsvrCommitCollModCollectionMetadata
+        cpp_name: ShardsvrCommitCollModCollectionMetadata
+        description: "Internal command to commit collMod collection metadata into the shard catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply
+
     _shardsvrCommitDropCollectionMetadata:
         command_name: _shardsvrCommitDropCollectionMetadata
         cpp_name: ShardsvrCommitDropCollectionMetadata

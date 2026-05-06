@@ -139,6 +139,7 @@ const allCommands = {
     _shardsvrReshardRecipientCriticalSectionStarted: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrCommitRefineCollectionShardKey: {skip: isPrimaryOnly},
+    _shardsvrCommitCollModCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitDropCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitCreateCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
