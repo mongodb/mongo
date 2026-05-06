@@ -1334,6 +1334,7 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/repl/clang_checked",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",

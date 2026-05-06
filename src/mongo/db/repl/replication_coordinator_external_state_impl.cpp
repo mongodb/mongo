@@ -228,7 +228,9 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
     ReplicationProcess* replicationProcess)
     : _service(service),
       _storageInterface(storageInterface),
-      _replicationProcess(replicationProcess) {
+      _replicationProcess(replicationProcess),
+      _taskExecutor(makeTaskExecutor(service, "ReplCoordExternExecutorPool", "ReplCoordExtern")),
+      _workerPool(makeReplWorkerPool()) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
@@ -242,7 +244,7 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 
-    std::unique_lock<std::mutex> lk(_threadMutex);
+    clang_checked::unique_lock<ThreadMutex> lk(_threadMutex);
 
     // We've shut down the external state, don't start again.
     if (_inShutdown)
@@ -339,10 +341,14 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     storageEngine->notifyReplStartupRecoveryComplete(*shard_role_details::getRecoveryUnit(opCtx));
 }
 
+// Uses NO_THREAD_SAFETY_ANALYSIS because this function temporarily unlocks and re-locks
+// _threadMutex (via the unique_lock reference), which clang's thread safety analysis cannot model.
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
-    OperationContext* opCtx, std::unique_lock<std::mutex>& lock) {
-    // Make sue no other _stopDataReplication calls are in progress.
-    _dataReplicationStopped.wait(lock, [this]() { return !_stoppingDataReplication; });
+    OperationContext* opCtx,
+    clang_checked::unique_lock<ThreadMutex>& lock) MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
+    // Make sure no other _stopDataReplication calls are in progress.
+    _dataReplicationStopped.wait(
+        lock, [this]() MONGO_LOCKING_REQUIRES(_threadMutex) { return !_stoppingDataReplication; });
     _stoppingDataReplication = true;
 
     auto oldSSF = std::move(_syncSourceFeedbackThread);
@@ -351,9 +357,10 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
     auto oldBgSync = std::move(_bgSync);
     auto oldWriter = std::move(_oplogWriter);
     auto oldApplier = std::move(_oplogApplier);
-    auto oldWorkerPool = std::move(_workerPool);
     auto oldWriterExecutor = std::move(_oplogWriterTaskExecutor);
     auto oldApplierExecutor = std::move(_oplogApplierTaskExecutor);
+    auto oldWriterShutdownFuture = std::move(_oplogWriterShutdownFuture);
+    auto oldApplierShutdownFuture = std::move(_oplogApplierShutdownFuture);
     lock.unlock();
 
     // The _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it
@@ -394,9 +401,9 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
     // for OplogWriter to finish before shutting down the OplogApplier and its buffer,
     // to make sure that no more oplog entries will be written.
     if (oldWriter) {
-        _oplogWriterShutdownFuture.get();
+        oldWriterShutdownFuture.get();
     } else if (oldApplier) {
-        _oplogApplierShutdownFuture.get();
+        oldApplierShutdownFuture.get();
     }
 
     if (oldWriter && oldApplier) {
@@ -409,16 +416,15 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
     }
 
     if (oldWriter && oldApplier) {
-        _oplogApplierShutdownFuture.get();
+        oldApplierShutdownFuture.get();
     }
 
     // Once the writer pool's shutdown() is called, scheduling new tasks will return error, so
     // we shutdown writer pool after the applier exits to avoid new tasks being scheduled.
-    if (oldWorkerPool) {
-        LOGV2(5698300, "Stopping replication applier writer pool");
-        oldWorkerPool->shutdown();
-        oldWorkerPool->join();
-    }
+    // _workerPool is a const member (immutable pointer), so no lock is needed.
+    LOGV2(5698300, "Stopping replication applier writer pool");
+    _workerPool->shutdown();
+    _workerPool->join();
 
     if (oldWriterExecutor) {
         LOGV2(8569802, "Stopping replication writer executor threads");
@@ -443,7 +449,7 @@ JournalListener* ReplicationCoordinatorExternalStateImpl::getReplicationJournalL
 }
 
 void ReplicationCoordinatorExternalStateImpl::startThreads() {
-    std::lock_guard<std::mutex> lk(_threadMutex);
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     if (_startedThreads) {
         return;
     }
@@ -463,16 +469,13 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
         makeTaskExecutor(_service, "OplogApplierExecutorPool", "OplogApplier");
     _oplogApplierTaskExecutor->startup();
 
-    _taskExecutor = makeTaskExecutor(_service, "ReplCoordExternExecutorPool", "ReplCoordExtern");
     _taskExecutor->startup();
-
-    _workerPool = makeReplWorkerPool();
 
     _startedThreads = true;
 }
 
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
-    std::unique_lock<std::mutex> lk(_threadMutex);
+    clang_checked::unique_lock<ThreadMutex> lk(_threadMutex);
     _inShutdown = true;
     if (!_startedThreads) {
         return;
@@ -481,6 +484,8 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     _stopDataReplication(opCtx, lk);
 
     LOGV2(21307, "Stopping replication storage threads");
+    // _taskExecutor is a const member (immutable pointer), so it can be used safely
+    // without the lock and without capturing to a local.
     _taskExecutor->shutdown();
     lk.unlock();
 
@@ -494,8 +499,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     _noopWriter->stopWritingPeriodicNoops();
 
     // We should wait for _taskExecutor outside of _threadMutex, in case some of its task would take
-    // data base locks. It is safe to access _taskExecutor outside of _threadMutex because once
-    // _startedThreads is set to true, the _taskExecutor pointer never changes.
+    // data base locks.
     _taskExecutor->join();
 
     // The oplog truncate after point must be cleared, if we are still primary for shutdown, so
@@ -578,6 +582,7 @@ void ReplicationCoordinatorExternalStateImpl::onWriterDrainComplete(OperationCon
                   AdmissionContext::Priority::kExempt,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     if (_oplogApplyBuffer) {
         _oplogApplyBuffer->enterDrainMode();
     }
@@ -589,6 +594,7 @@ void ReplicationCoordinatorExternalStateImpl::onApplierDrainComplete(OperationCo
                   AdmissionContext::Priority::kExempt,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
     // We call exitDrainMode() on both buffers, since onWriterDrainComplete() does not call
     // exitDrainMode() on the write buffer.
@@ -1038,14 +1044,14 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
-    std::lock_guard<std::mutex> lk(_threadMutex);
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->clearSyncTarget();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopProducer() {
-    std::lock_guard<std::mutex> lk(_threadMutex);
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->stop(false);
     }
@@ -1061,7 +1067,7 @@ void ReplicationCoordinatorExternalStateImpl::stopProducer() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
-    std::lock_guard<std::mutex> lk(_threadMutex);
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
     // We call exitDrainMode() on both buffers, but it is possible that the apply buffer is
     // not even in drain mode when exitDrainMode() is called, which can happen if the node
@@ -1079,14 +1085,14 @@ void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::notifyOtherMemberDataChanged() {
-    std::lock_guard<std::mutex> lk(_threadMutex);
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->notifySyncSourceSelectionDataChanged();
     }
 }
 
 bool ReplicationCoordinatorExternalStateImpl::tooStale() {
-    std::lock_guard<std::mutex> lk(_threadMutex);
+    clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
     if (_bgSync) {
         return _bgSync->tooStale();
     }
