@@ -270,6 +270,15 @@ void upgradeDowngradeViewlessTimeseriesInShardedCluster(OperationContext* opCtx,
                             "timeseries collection",
                             "isUpgrade"_attr = isUpgrade,
                             logAttrs(nss));
+            } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+                // Collection was dropped and a plain (non-timeseries) view was created with the
+                // same name since enumeration. The namespace is no longer a convertible timeseries
+                // collection, so skip it.
+                LOGV2_DEBUG(12585001,
+                            2,
+                            "Skipping timeseries conversion for namespace that became a plain view",
+                            "isUpgrade"_attr = isUpgrade,
+                            logAttrs(nss));
             } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketMetadataInconsistent>&) {
                 // Collection has metadata inconsistencies, permanently skip it across all
                 // retry iterations since this condition won't resolve with retries.
