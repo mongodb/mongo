@@ -40,9 +40,12 @@
 #include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -358,6 +361,11 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 }();
 
                 if (_doc.getOriginalCollection().has_value()) {
+                    const bool isAuthoritative =
+                        feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
                     {
                         const auto session = getNewSession(opCtx);
                         // Delete the sharding catalog entries referring the previous incarnation
@@ -369,6 +377,20 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                             defaultMajorityWriteConcernDoNotUse(),
                             session,
                             **executor);
+                    }
+
+                    // Drop the previous incarnation of the collection from the shard catalog on
+                    // every shard.
+                    if (isAuthoritative) {
+                        const auto session = getNewSession(opCtx);
+                        sharding_ddl_util::commitDropCollectionMetadataToShardCatalog(
+                            opCtx,
+                            nss(),
+                            _doc.getOriginalCollection()->getUuid(),
+                            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+                            session,
+                            executor,
+                            token);
                     }
 
                     const auto [coll, chunkDescriptor] =
@@ -387,6 +409,22 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         **executor,
                         getNewSession(opCtx),
                         std::move(createCollectionOnShardingCatalogOps));
+
+                    // Install the new incarnation of the collection in the shard catalog.
+                    if (isAuthoritative) {
+                        const auto session = getNewSession(opCtx);
+                        sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                            opCtx, nss(), {*(_doc.getDataShard())}, session, executor, token);
+
+                        // The DB primary shard must always know that the collection is tracked,
+                        // even when it does not own any chunks. Persist a chunkless placeholder
+                        // locally so that disk recovery can tell a chunkless-tracked collection
+                        // apart from an untracked one.
+                        const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                        if (primaryShardId != *_doc.getDataShard()) {
+                            shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss());
+                        }
+                    }
 
                     // Checkpoint the configTime to ensure that, in the case of a stepdown/crash,
                     // the new primary will start-up from a configTime that is inclusive of the
@@ -425,12 +463,32 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSectionOnCoordinator,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                // When the original collection was tracked and shards are authoritative, the
+                // shard catalog commit phase has already updated the in-memory filtering
+                // metadata on the DB primary with the new incarnation of the collection; there
+                // is no need to clear it upon releasing the critical section.
+                // When the original collection was not tracked, there is no need to clear the
+                // filtering metadata upon releasing the critical section because no changes to the
+                // global / shard catalog were made.
+                const bool isAuthoritative =
+                    feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+                std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
+                if (isAuthoritative) {
+                    actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+                } else {
+                    actionPtr =
+                        std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+                }
+
                 ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx,
                     nss(),
                     _critSecReason,
                     defaultMajorityWriteConcernDoNotUse(),
-                    ShardingRecoveryService::FilteringMetadataClearer(),
+                    *actionPtr,
                     true /* throwIfReasonDiffers */);
             }))
         .onError(
@@ -506,8 +564,25 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             if (_doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator) {
+                // On the abort path no changes have been committed to the global catalog, so when
+                // shards are authoritative the filtering metadata is still accurate and there is no
+                // need to invalidate it.
+
                 if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
                     _exitCriticalSectionOnDataShard(opCtx, executor, token);
+                }
+
+                const bool isAuthoritative =
+                    feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+                std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
+                if (isAuthoritative) {
+                    actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+                } else {
+                    actionPtr =
+                        std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
                 }
 
                 ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
@@ -515,7 +590,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
                     nss(),
                     _critSecReason,
                     defaultMajorityWriteConcernDoNotUse(),
-                    ShardingRecoveryService::NoCustomAction(),
+                    *actionPtr,
                     false /* throwIfReasonDiffers */);
             }
         });
@@ -529,6 +604,16 @@ void ConvertToCappedCoordinator::_enterCriticalSectionOnDataShard(
     ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
     blockCRUDOperationsRequest.setBlockType(blockType);
     blockCRUDOperationsRequest.setReason(_critSecReason);
+
+    // When shards are authoritative, there is no need to clear the filtering metadata upon
+    // releasing the critical section; the commit phase is responsible for updating the shard
+    // catalog with current information. This flag is evaluated at insertion time because on
+    // secondaries, metadata is cleared during the onDelete of the critical section document.
+    if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        blockCRUDOperationsRequest.setClearCollMetadata(false);
+    }
 
     generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
@@ -545,6 +630,16 @@ void ConvertToCappedCoordinator::_exitCriticalSectionOnDataShard(
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
+
+    // When shards are authoritative, there is no need to clear the filtering metadata upon
+    // releasing the critical section; the commit phase is responsible for updating the shard
+    // catalog (both durable and in-memory) with current information on both primary and secondary
+    // nodes.
+    if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        unblockCRUDOperationsRequest.setClearCollMetadata(false);
+    }
 
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,

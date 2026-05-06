@@ -342,4 +342,141 @@ describe("Authoritative collection metadata vs DDLs", function () {
             });
         });
     });
+
+    describe("convertToCapped", function () {
+        // For a convertToCapped on a tracked unsplittable collection: no node must retain chunks
+        // for the original UUID, the data shard must hold the new UUID's entry with real chunks,
+        // the DB primary must hold the new UUID's entry (chunkless if it is not the data shard),
+        // and any other shard must have no entry for the collection.
+        function assertShardCatalogAfterConvertToCapped(
+            ns,
+            {dataShardRs, primaryRs, newUuid, originalUuid, unsplittableKey},
+        ) {
+            // The old UUID must be gone from every shard's chunk catalog.
+            forEachNodeOnAllShards((node) => {
+                assert.eq(
+                    0,
+                    getShardCatalogChunks(node, originalUuid).length,
+                    `${node.host}: stale chunks for original uuid still present`,
+                );
+            });
+
+            const newGlobalChunks = getAllGlobalCatalogChunks(newUuid);
+            assert.eq(1, newGlobalChunks.length, `Expected 1 chunk after convertToCapped on ${ns}`);
+
+            // Data shard must carry the new UUID with the authoritative chunks.
+            dataShardRs.nodes.forEach((node) => {
+                assertShardCatalogOnNode(node, ns, {
+                    expectedUuid: newUuid,
+                    expectedKey: unsplittableKey,
+                    expectedChunks: newGlobalChunks,
+                });
+            });
+
+            if (primaryRs !== dataShardRs) {
+                // Primary is not the data shard: it owns no real chunks but must carry a chunkless
+                // placeholder so disk recovery recognize the collection as tracked.
+                primaryRs.nodes.forEach((node) => {
+                    const meta = getShardCatalogCollMetadata(node, ns);
+                    assert.neq(null, meta, `${node.host}: chunkless primary is missing collection metadata`);
+                    assert.eq(
+                        newUuid.toString(),
+                        meta.uuid.toString(),
+                        `${node.host}: chunkless primary still has old uuid`,
+                    );
+
+                    const shardChunks = getShardCatalogChunks(node, newUuid);
+                    assert.eq(
+                        1,
+                        shardChunks.length,
+                        `${node.host}: chunkless primary must carry exactly one placeholder chunk`,
+                    );
+                });
+            }
+
+            // Any shard that is neither the data shard nor the DB primary must have no entry at
+            // all for the collection.
+            [st.rs0, st.rs1].forEach((rs) => {
+                if (rs === dataShardRs || rs === primaryRs) {
+                    return;
+                }
+                rs.nodes.forEach((node) => {
+                    assertShardCatalogAbsentOnNode(node, ns, newUuid);
+                });
+            });
+        }
+
+        const kUnsplittableShardKey = {_id: 1};
+
+        it("updates shard catalog when data shard is the DB primary", function () {
+            const db = setupDb("capped_primary");
+            const ns = `${db.getName()}.coll`;
+
+            // Tracked, unsplittable collection living on the DB primary.
+            assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}));
+
+            const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
+
+            assert.commandWorked(db.runCommand({convertToCapped: "coll", size: 1024}));
+
+            const newMeta = getGlobalCatalogCollMetadata(ns);
+            assert.neq(null, newMeta, `${ns}: missing in global catalog after convertToCapped`);
+            assert.neq(
+                originalUuid.toString(),
+                newMeta.uuid.toString(),
+                "convertToCapped must reissue the collection UUID",
+            );
+
+            st.awaitReplicationOnShards();
+
+            assertShardCatalogAfterConvertToCapped(ns, {
+                dataShardRs: st.rs0,
+                primaryRs: st.rs0,
+                newUuid: newMeta.uuid,
+                originalUuid: originalUuid,
+                unsplittableKey: kUnsplittableShardKey,
+            });
+        });
+
+        it("updates shard catalog when data shard differs from the DB primary", function () {
+            const db = setupDb("capped_nonprimary");
+            const ns = `${db.getName()}.coll`;
+
+            // Tracked, unsplittable collection moved to a shard that is not the DB primary.
+            assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+
+            const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
+
+            assert.commandWorked(db.runCommand({convertToCapped: "coll", size: 1024}));
+
+            const newMeta = getGlobalCatalogCollMetadata(ns);
+            assert.neq(null, newMeta);
+            assert.neq(originalUuid.toString(), newMeta.uuid.toString());
+
+            st.awaitReplicationOnShards();
+
+            assertShardCatalogAfterConvertToCapped(ns, {
+                dataShardRs: st.rs1,
+                primaryRs: st.rs0,
+                newUuid: newMeta.uuid,
+                originalUuid: originalUuid,
+                unsplittableKey: kUnsplittableShardKey,
+            });
+        });
+
+        it("subsequent drop cleans up shard catalog on all nodes", function () {
+            // Guarantees convertToCapped leaves the shard catalog in a state from which a normal
+            // drop can fully clean up, covering the drop-after-capped path end-to-end.
+            const db = setupDb("capped_then_drop");
+            const ns = `${db.getName()}.coll`;
+
+            assert.commandWorked(db.coll.insert([{x: 1}]));
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+            assert.commandWorked(db.runCommand({convertToCapped: "coll", size: 1024}));
+
+            dropCollectionAndAssertCleanup(db, "coll");
+        });
+    });
 });
