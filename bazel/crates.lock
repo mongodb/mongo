@@ -1,5 +1,5 @@
 {
-  "checksum": "62ca5177d0a4cca5b8b4a2a74bcddd80c933b4f53e5ac79a9bbaac62e3c8e063",
+  "checksum": "09e089e4d857eb519291450cae1e356a0e8486203c17893a9ded5d57f1857484",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -17706,6 +17706,7 @@
             "cranelift",
             "debug-builtins",
             "demangle",
+            "gc",
             "logging",
             "parallel-compilation",
             "pooling-allocator",
@@ -17959,6 +17960,7 @@
             "component-model-async",
             "coredump",
             "cranelift",
+            "gc",
             "logging",
             "parallel-compilation",
             "pooling-allocator",

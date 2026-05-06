@@ -58,6 +58,7 @@ std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(cons
     wt::Config config;
     config.wasm_component_model(true);
     config.epoch_interruption(true);
+    config.wasm_exceptions(true);
 
     wt::Engine engine(std::move(config));
 
@@ -177,7 +178,7 @@ bool MozJSWasmBridge::initialize() {
     LOGV2_DEBUG(11542332, 2, "Wasm Bridge Initializing", "ok"_attr = isInitialized());
     wc::Val optionsArg(wc::Record({{"heap-size-mb", wc::Val(_jsHeapLimitMB)}}));
     _callFunc(*_initEngineFunc, &result, 1, std::move(optionsArg));
-    if (_isResultOk(result)) {
+    if (_assertWitResult(result)) {
         _state.store(State::Initialized);
     } else {
         LOGV2_DEBUG(11542356,
@@ -195,10 +196,7 @@ void MozJSWasmBridge::shutdown() {
     wc::Val result(wc::WitResult::ok(std::nullopt));
     LOGV2_DEBUG(11542334, 2, "Wasm Bridge Shutting Down");
     _callFuncNoArgs(*_shutdownEngineFunc, &result, 1);
-    uassert(ErrorCodes::JSInterpreterFailure,
-            str::stream() << "Wasm Bridge failed shutdown: "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload()),
-            _isResultOk(result));
+    _assertWitResult(result, "Wasm Bridge failed shutdown");
     LOGV2_DEBUG(11542333, 2, "Wasm Bridge Shutdown");
     _state.store(State::Uninitialized);
 }
@@ -210,11 +208,9 @@ uint64_t MozJSWasmBridge::createFunction(std::string_view source) {
     uassert(11542310,
             str::stream() << "Failed to call to create JS function " << std::string(source),
             _callFunc(*_createFunctionFunc, &result, 1, std::move(srcArg)));
-    uassert(ErrorCodes::JSInterpreterFailure,
-            str::stream() << "Failed to create JS function "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload())
-                          << " :: source = " << std::string(source),
-            _isResultOk(result));
+    _assertWitResult(result,
+                     str::stream()
+                         << "Failed to create JS function :: source = " << std::string(source));
     const wc::Val* payload = result.get_result().payload();
     invariant(payload && payload->is_u64() && payload->get_u64());
     LOGV2_DEBUG(11542330,
@@ -236,12 +232,8 @@ StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle,
         return Status{ErrorCodes::Error{11542313},
                       str::stream() << "Failed to call to invoke JS function number " << handle};
     }
-    if (!_isResultOk(result))
-        return Status{ErrorCodes::JSInterpreterFailure,
-                      str::stream()
-                          << "Failed to invoke JS function "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload())
-                          << " :: function id = " << handle};
+    _assertWitResult(result,
+                     str::stream() << "Failed to invoke JS function :: function id = " << handle);
     if (ignoreReturn)
         return BSONObj();
     return _getReturnValueBson();
@@ -255,11 +247,10 @@ void MozJSWasmBridge::setGlobal(std::string_view name, const BSONObj& value) {
     uassert(11542312,
             str::stream() << "Failed to call to set global JS variable " << std::string(name),
             _callFunc(*_setGlobalFunc, &result, 1, std::move(nameArg), std::move(valueArg)));
-    uassert(11542300,
-            str::stream() << "Failed to set global JS variable "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload())
-                          << " :: name = " << std::string(name),
-            _isResultOk(result));
+    _assertWitResult(result,
+                     str::stream()
+                         << "Failed to set global JS variable :: name = " << std::string(name),
+                     ErrorCodes::Error{11542300});
 }
 
 void MozJSWasmBridge::setGlobalValue(std::string_view name, const BSONObj& value) {
@@ -271,11 +262,10 @@ void MozJSWasmBridge::setGlobalValue(std::string_view name, const BSONObj& value
     uassert(11542316,
             str::stream() << "Failed to call to set global JS value variable " << std::string(name),
             _callFunc(*_setGlobalValueFunc, &result, 1, std::move(nameArg), std::move(valueArg)));
-    uassert(11542317,
-            str::stream() << "Failed to set global JS value variable "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload())
-                          << " :: name = " << std::string(name),
-            _isResultOk(result));
+    _assertWitResult(result,
+                     str::stream() << "Failed to set global JS value variable :: name = "
+                                   << std::string(name),
+                     ErrorCodes::Error{11542317});
 }
 
 void MozJSWasmBridge::setupEmit(boost::optional<int64_t> byteLimit) {
@@ -288,10 +278,7 @@ void MozJSWasmBridge::setupEmit(boost::optional<int64_t> byteLimit) {
     }
     wc::Val arg = wc::WitOption(stdArg);
     _callFunc(*_setupEmitFunc, &result, 1, std::move(arg));
-    uassert(ErrorCodes::JSInterpreterFailure,
-            str::stream() << "Wasm Bridge failed to setup-emit: "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload()),
-            _isResultOk(result));
+    _assertWitResult(result, "Wasm Bridge failed to setup-emit");
 }
 
 void MozJSWasmBridge::invokeMap(uint64_t handle, const BSONObj& args) {
@@ -302,11 +289,8 @@ void MozJSWasmBridge::invokeMap(uint64_t handle, const BSONObj& args) {
     uassert(11542319,
             str::stream() << "Failed to call to invoke JS function number " << handle,
             _callFunc(*_invokeMapFunc, &result, 1, std::move(arg0), std::move(arg1)));
-    uassert(ErrorCodes::JSInterpreterFailure,
-            str::stream() << "Failed to invoke JS function "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload())
-                          << " :: function id = " << handle,
-            _isResultOk(result));
+    _assertWitResult(result,
+                     str::stream() << "Failed to invoke JS function :: function id = " << handle);
 }
 
 bool MozJSWasmBridge::invokePredicate(uint64_t handle, const BSONObj& args) {
@@ -317,11 +301,8 @@ bool MozJSWasmBridge::invokePredicate(uint64_t handle, const BSONObj& args) {
     uassert(11542339,
             str::stream() << "Failed to call to invoke JS function number " << handle,
             _callFunc(*_invokePredicateFunc, &result, 1, std::move(arg0), std::move(arg1)));
-    uassert(ErrorCodes::JSInterpreterFailure,
-            str::stream() << "Failed to invoke JS function "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload())
-                          << " :: function id = " << handle,
-            _isResultOk(result));
+    _assertWitResult(result,
+                     str::stream() << "Failed to invoke JS predicate :: function id = " << handle);
     const wc::Val* payload = result.get_result().payload();
     invariant(payload && payload->is_bool());
     return payload->get_bool();
@@ -344,10 +325,7 @@ BSONObj MozJSWasmBridge::drainEmitBuffer() {
     _assertUsable();
     wc::Val result(wc::WitResult::ok(std::nullopt));
     _callFuncNoArgs(*_drainEmitBufferFunc, &result, 1);
-    uassert(ErrorCodes::JSInterpreterFailure,
-            str::stream() << "Wasm Bridge failed to drain emit: "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload()),
-            _isResultOk(result));
+    _assertWitResult(result, "Wasm Bridge failed to drain emit");
     return _extractBSON(result);
 }
 
@@ -373,23 +351,38 @@ BSONObj MozJSWasmBridge::getGlobal(std::string_view name, bool implicitNull) {
         b.appendNull("__value");
         return b.obj();
     }
-    uassert(11542301,
-            str::stream() << "Failed to get global JS variable "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload())
-                          << " :: name = " << std::string(name),
-            _isResultOk(result));
+    _assertWitResult(result,
+                     str::stream()
+                         << "Failed to get global JS variable :: name = " << std::string(name),
+                     ErrorCodes::Error{11542301});
     return _extractBSON(result);
 }
 
-bool MozJSWasmBridge::_isResultOk(const wc::Val& result) {
+bool MozJSWasmBridge::_assertWitResult(const wc::Val& result,
+                                       std::string errorPrefix,
+                                       ErrorCodes::Error code) {
     if (wasm_helpers::isResultOk(result))
         return true;
     const wc::Val* payload = result.get_result().payload();
-    if (payload) {
-        if (wasm_helpers::isFatalWitError(*payload))
-            _state.store(State::Trapped);
-        else if (wasm_helpers::isOomWitError(*payload))
-            _state.store(State::OOM);
+    if (!payload) {
+        return false;
+    }
+
+    if (wasm_helpers::isFatalWitError(*payload)) {
+        _state.store(State::Trapped);
+    } else if (wasm_helpers::isOomWitError(*payload)) {
+        _state.store(State::OOM);
+    }
+
+    if (auto mongoCode = wasm_helpers::mozJSErrorCode(*payload);
+        mongoCode != ErrorCodes::JSInterpreterFailure) {
+        code = mongoCode;
+    }
+
+    if (!errorPrefix.empty()) {
+        uasserted(code,
+                  str::stream() << errorPrefix << ": "
+                                << wasm_helpers::translateMozJSError(*payload));
     }
     return false;
 }
@@ -415,13 +408,9 @@ BSONObj MozJSWasmBridge::_extractBSON(const wc::Val& result) {
 BSONObj MozJSWasmBridge::_getReturnValueBson() {
     // Uses getGlobal which does not preserve JS array types (arrays become BSON objects with
     // numeric keys). Use getReturnValueWrapped() when array type preservation matters.
-    // getGlobal also fails when the return value is undefined (e.g., a function with no return
-    // statement). Return an empty object in that case to match MozJS behavior.
-    try {
-        return getGlobal(kReturnValue, true);
-    } catch (const DBException&) {
-        return BSONObj();
-    }
+    // When the return value is undefined (e.g., a function with no return statement),
+    // getGlobal returns {"__value": null} via its implicitNull=true path rather than throwing.
+    return getGlobal(kReturnValue, true);
 }
 
 BSONObj MozJSWasmBridge::getReturnValueWrapped() {
@@ -430,10 +419,7 @@ BSONObj MozJSWasmBridge::getReturnValueWrapped() {
     uassert(11542350,
             "Failed to call get-return-value-bson",
             _callFuncNoArgs(*_getReturnValueBsonFunc, &result, 1));
-    uassert(11542351,
-            str::stream() << "Failed to get return value BSON "
-                          << wasm_helpers::translateMozJSError(*result.get_result().payload()),
-            _isResultOk(result));
+    _assertWitResult(result, "Failed to get return value BSON", ErrorCodes::Error{11542351});
     return _extractBSON(result);
 }
 

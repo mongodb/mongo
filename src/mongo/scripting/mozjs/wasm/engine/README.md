@@ -27,7 +27,6 @@ Key files in this directory:
 | `engine.h / engine.cpp` | `MozJSScriptEngine` — owns the SpiderMonkey runtime, prototype installer, function handle table |
 | `api.cpp`               | Implements each WIT export; bridges WIT types to `MozJSScriptEngine`                            |
 | `error.h / error.cpp`   | `ExecutionCheck` — wraps JSAPI calls and captures exceptions into `wasm_mozjs_error_t`          |
-| `exception_stubs.cpp`   | C++ exception / RTTI stubs (WASM has no native exception support)                               |
 | `utils.h`               | `cabi_realloc` helper and string utilities                                                      |
 | `engine_test.cpp`       | Unit tests — loads the `.wasm` module via Wasmtime's component model                            |
 | `linkset.bzl`           | `cc_linkset` Starlark rule for collecting linker inputs into response files                     |

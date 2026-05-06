@@ -32,6 +32,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
@@ -184,9 +186,9 @@ void WasmtimeImplScope::injectNative(const char* field, NativeFunction func, voi
 
     _emitCallback = func;
     _emitCallbackData = data;
-    // Set 16 MB byte limit for the emit buffer,
-    // which is allocated inside WASM linear memory.
-    _bridge->setupEmit(16 * 1024 * 1024);
+    // Margin lets WASM buffer one over-limit doc so the host's EmitState sees
+    // it during drain and can throw, instead of WASM silently dropping it.
+    _bridge->setupEmit(internalQueryMaxJsEmitBytes.load() + BSONObjMaxInternalSize);
 }
 
 BSONObj WasmtimeImplScope::_resolveGlobal(const char* field) const {

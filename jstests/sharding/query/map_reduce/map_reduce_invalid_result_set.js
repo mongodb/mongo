@@ -2,7 +2,9 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
-//   requires_scripting
+//   requires_scripting,
+//   # TODO SERVER-116053: Add support for mapReduce.
+//   mozjs_wasm_unsupported,
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

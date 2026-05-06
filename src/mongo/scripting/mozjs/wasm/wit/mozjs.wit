@@ -38,6 +38,11 @@ interface mozjs {
 
     line: u32,
     column: u32,
+
+    /// MongoDB ErrorCodes::Error value, non-zero when the error originated from
+    /// a DBException (e.g. uassert). Allows the bridge to rethrow with the
+    /// original error code rather than always mapping to JSInterpreterFailure.
+    mongo-code: u32,
   }
 
   type ok = u16;

@@ -137,9 +137,15 @@ private:
     // Triggers an epoch increment to interrupt WASM execution.
     void _signalInterrupt();
 
-    // Checks the WIT result and latches _trapped when the error code is fatal
-    // (e-oom or e-internal).
-    bool _isResultOk(const wc::Val& result);
+    // Inspects the WIT result and handles all error cases:
+    //   - mongo C++ exception (mozJSErrorCode != JSInterpreterFailure): overrides code, throws
+    //   - fatal WIT error (e-oom, e-internal): latches Trapped
+    //   - non-fatal OOM (e-runtime + OOM msg): latches OOM
+    // If errorPrefix is non-empty, uasserts with errorPrefix+translateMozJSError for any failure.
+    // If errorPrefix is empty, returns false on failure so the caller can decide (e.g. log).
+    bool _assertWitResult(const wc::Val& result,
+                          std::string errorPrefix = {},
+                          ErrorCodes::Error code = ErrorCodes::JSInterpreterFailure);
 
     // Calls a WASM function with the given arguments. Latches _state and
     // uasserts on wasmtime traps so callers don't need explicit trap handling.

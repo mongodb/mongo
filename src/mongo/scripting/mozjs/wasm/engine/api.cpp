@@ -90,6 +90,8 @@ static void fill_wit_error(exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* out,
 
     out->line = in.line;
     out->column = in.column;
+
+    out->mongo_code = in.mongo_error_code;
 }
 
 static bool return_err(exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err,
@@ -101,6 +103,31 @@ static bool return_err(exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err,
     mongo::mozjs::wasm::clear_error(native_err);
     // wit-bindgen C convention: return false means error (adapter does: is_err = !retval)
     return false;
+}
+
+// Catches DBException before it escapes the WASM component boundary as an unhandled
+// exception/trap. Converts it to a WIT error with the original MongoDB error code preserved
+// so the bridge can rethrow with the exact code (e.g. BadValue) instead of a trap code.
+//
+// err is never null: the WIT canonical ABI always provides non-null storage for both
+// arms of a result<T, E> return type.
+template <typename F>
+static bool run_safely(F&& f, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
+    invariant(err);
+    try {
+        return std::forward<F>(f)();
+    } catch (const mongo::DBException& ex) {
+        mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+        e.code = mongo::mozjs::wasm::SM_E_RUNTIME;
+        e.mongo_error_code = static_cast<uint32_t>(ex.code());
+        mongo::mozjs::wasm::set_string(&e.msg, &e.msg_len, ex.what());
+        return return_err(err, &e);
+    } catch (const std::exception& ex) {
+        mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+        e.code = mongo::mozjs::wasm::SM_E_RUNTIME;
+        mongo::mozjs::wasm::set_string(&e.msg, &e.msg_len, ex.what());
+        return return_err(err, &e);
+    }
 }
 
 // Returns false on allocation failure so callers can propagate OOM errors.
@@ -164,75 +191,92 @@ extern "C" bool exports_mongo_mozjs_mozjs_initialize_engine(
     exports_mongo_mozjs_mozjs_wasm_mozjs_startup_options_t* options,
     exports_mongo_mozjs_mozjs_ok_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
-    mongo::mozjs::wasm::wasm_mozjs_startup_options_t opt{};
-    opt.heapSize = options->heap_size_mb > 0 ? options->heap_size_mb : kDefaultHeapSizeMB;
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            mongo::mozjs::wasm::wasm_mozjs_startup_options_t opt{};
+            opt.heapSize = options->heap_size_mb > 0 ? options->heap_size_mb : kDefaultHeapSizeMB;
 
-    int64_t rc = mongo::mozjs::wasm::g_engine.init(&opt, &e);
+            int64_t rc = mongo::mozjs::wasm::g_engine.init(&opt, &e);
 
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = 0;  // Set the ok value
-        return true;
-    }
-    return return_err(err, &e);
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;  // Set the ok value
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_shutdown_engine(
     exports_mongo_mozjs_mozjs_ok_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
-    int64_t rc = mongo::mozjs::wasm::g_engine.shutdown(&e);
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        g_function_count = 0;
-        if (ret)
-            *ret = 0;
-        return true;
-    }
-    return return_err(err, &e);
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            int64_t rc = mongo::mozjs::wasm::g_engine.shutdown(&e);
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                g_function_count = 0;
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_interrupt_current_op(
     exports_mongo_mozjs_mozjs_ok_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
-    int64_t rc = mongo::mozjs::wasm::g_engine.interrupt(&e);
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = 0;
-        return true;
-    }
-    return return_err(err, &e);
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            int64_t rc = mongo::mozjs::wasm::g_engine.interrupt(&e);
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_create_function(
     api_list_u8_t* source,
     exports_mongo_mozjs_mozjs_function_handle_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    const uint8_t* bytes = source ? source->ptr : nullptr;
-    size_t len = source ? source->len : 0;
+            const uint8_t* bytes = source ? source->ptr : nullptr;
+            size_t len = source ? source->len : 0;
 
-    if (len > kMaxJsSourceSize) {
-        e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
-        mongo::mozjs::wasm::set_string(&e.msg, &e.msg_len, "JS source exceeds maximum size (1 MB)");
-        return return_err(err, &e);
-    }
+            if (len > kMaxJsSourceSize) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                mongo::mozjs::wasm::set_string(
+                    &e.msg, &e.msg_len, "JS source exceeds maximum size (1 MB)");
+                return return_err(err, &e);
+            }
 
-    if (g_function_count >= kMaxFunctions) {
-        e.code = mongo::mozjs::wasm::SM_E_NOMEM;
-        mongo::mozjs::wasm::set_string(
-            &e.msg, &e.msg_len, "Maximum function count reached (10000)");
-        return return_err(err, &e);
-    }
+            if (g_function_count >= kMaxFunctions) {
+                e.code = mongo::mozjs::wasm::SM_E_NOMEM;
+                mongo::mozjs::wasm::set_string(
+                    &e.msg, &e.msg_len, "Maximum function count reached (10000)");
+                return return_err(err, &e);
+            }
 
-    uint64_t handle = 0;
-    int64_t rc = mongo::mozjs::wasm::g_engine.createFunction(bytes, len, &handle, &e);
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        g_function_count++;
-        *ret = static_cast<exports_mongo_mozjs_mozjs_function_handle_t>(handle);
-        return true;
-    }
-    return return_err(err, &e);
+            uint64_t handle = 0;
+            int64_t rc = mongo::mozjs::wasm::g_engine.createFunction(bytes, len, &handle, &e);
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                g_function_count++;
+                *ret = static_cast<exports_mongo_mozjs_mozjs_function_handle_t>(handle);
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_invoke_function(
@@ -240,50 +284,59 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_function(
     api_list_u8_t* bson,
     exports_mongo_mozjs_mozjs_ok_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    if (handle == 0) {
-        e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
-        return return_err(err, &e);
-    }
+            if (handle == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
 
-    mongo::BSONObj argsObj;
-    if (bson && bson->ptr && bson->len > 0) {
-        if (!validate_bson(bson->ptr, bson->len, &e)) {
+            mongo::BSONObj argsObj;
+            if (bson && bson->ptr && bson->len > 0) {
+                if (!validate_bson(bson->ptr, bson->len, &e)) {
+                    return return_err(err, &e);
+                }
+                argsObj = mongo::BSONObj(reinterpret_cast<const char*>(bson->ptr));
+            }
+
+            mongo::BSONObj outBson;
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokeFunction(
+                static_cast<uint64_t>(handle), std::move(argsObj), &outBson, &e));
+
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
             return return_err(err, &e);
-        }
-        argsObj = mongo::BSONObj(reinterpret_cast<const char*>(bson->ptr));
-    }
-
-    mongo::BSONObj outBson;
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokeFunction(
-        static_cast<uint64_t>(handle), std::move(argsObj), &outBson, &e));
-
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = 0;
-        return true;
-    }
-    return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_get_return_value_bson(
     api_list_u8_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
-    mongo::BSONObj out;
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            mongo::BSONObj out;
 
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.getReturnValueBson(&out, &e));
-    if (rc != mongo::mozjs::wasm::SM_OK) {
-        return return_err(err, &e);
-    }
+            auto rc =
+                static_cast<int64_t>(mongo::mozjs::wasm::g_engine.getReturnValueBson(&out, &e));
+            if (rc != mongo::mozjs::wasm::SM_OK) {
+                return return_err(err, &e);
+            }
 
-    if (!list_u8_dup(ret, reinterpret_cast<const uint8_t*>(out.objdata()), out.objsize())) {
-        e.code = mongo::mozjs::wasm::SM_E_NOMEM;
-        mongo::mozjs::wasm::set_string(
-            &e.msg, &e.msg_len, "OOM: failed to allocate BSON return buffer");
-        return return_err(err, &e);
-    }
-    return true;
+            if (!list_u8_dup(ret, reinterpret_cast<const uint8_t*>(out.objdata()), out.objsize())) {
+                e.code = mongo::mozjs::wasm::SM_E_NOMEM;
+                mongo::mozjs::wasm::set_string(
+                    &e.msg, &e.msg_len, "OOM: failed to allocate BSON return buffer");
+                return return_err(err, &e);
+            }
+            return true;
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_set_global(
@@ -291,56 +344,64 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global(
     api_list_u8_t* bson_value,
     exports_mongo_mozjs_mozjs_ok_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    if (!name || name->len == 0) {
-        e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
-        return return_err(err, &e);
-    }
+            if (!name || name->len == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
 
-    mongo::BSONObj valueObj;
-    if (bson_value && bson_value->ptr && bson_value->len > 0) {
-        if (!validate_bson(bson_value->ptr, bson_value->len, &e)) {
+            mongo::BSONObj valueObj;
+            if (bson_value && bson_value->ptr && bson_value->len > 0) {
+                if (!validate_bson(bson_value->ptr, bson_value->len, &e)) {
+                    return return_err(err, &e);
+                }
+                valueObj = mongo::BSONObj(reinterpret_cast<const char*>(bson_value->ptr));
+            }
+
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setGlobal(
+                reinterpret_cast<const char*>(name->ptr), name->len, valueObj, &e));
+
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
             return return_err(err, &e);
-        }
-        valueObj = mongo::BSONObj(reinterpret_cast<const char*>(bson_value->ptr));
-    }
-
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setGlobal(
-        reinterpret_cast<const char*>(name->ptr), name->len, valueObj, &e));
-
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = 0;
-        return true;
-    }
-    return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_get_global(
     api_string_t* name, api_list_u8_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    if (!name || name->len == 0) {
-        e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
-        return return_err(err, &e);
-    }
+            if (!name || name->len == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
 
-    mongo::BSONObj out;
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.getGlobal(
-        reinterpret_cast<const char*>(name->ptr), name->len, &out, &e));
+            mongo::BSONObj out;
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.getGlobal(
+                reinterpret_cast<const char*>(name->ptr), name->len, &out, &e));
 
-    if (rc != mongo::mozjs::wasm::SM_OK) {
-        return return_err(err, &e);
-    }
+            if (rc != mongo::mozjs::wasm::SM_OK) {
+                return return_err(err, &e);
+            }
 
-    if (!list_u8_dup(ret, reinterpret_cast<const uint8_t*>(out.objdata()), out.objsize())) {
-        e.code = mongo::mozjs::wasm::SM_E_NOMEM;
-        mongo::mozjs::wasm::set_string(
-            &e.msg, &e.msg_len, "OOM: failed to allocate global return buffer");
-        return return_err(err, &e);
-    }
-    return true;
+            if (!list_u8_dup(ret, reinterpret_cast<const uint8_t*>(out.objdata()), out.objsize())) {
+                e.code = mongo::mozjs::wasm::SM_E_NOMEM;
+                mongo::mozjs::wasm::set_string(
+                    &e.msg, &e.msg_len, "OOM: failed to allocate global return buffer");
+                return return_err(err, &e);
+            }
+            return true;
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_set_global_value(
@@ -348,49 +409,58 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global_value(
     api_list_u8_t* bson_element,
     exports_mongo_mozjs_mozjs_ok_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    if (!name || name->len == 0) {
-        e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
-        return return_err(err, &e);
-    }
+            if (!name || name->len == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
 
-    mongo::BSONObj valueObj;
-    if (bson_element && bson_element->ptr && bson_element->len > 0) {
-        if (!validate_bson(bson_element->ptr, bson_element->len, &e)) {
+            mongo::BSONObj valueObj;
+            if (bson_element && bson_element->ptr && bson_element->len > 0) {
+                if (!validate_bson(bson_element->ptr, bson_element->len, &e)) {
+                    return return_err(err, &e);
+                }
+                valueObj = mongo::BSONObj(reinterpret_cast<const char*>(bson_element->ptr));
+            }
+
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setGlobalValue(
+                reinterpret_cast<const char*>(name->ptr), name->len, valueObj, &e));
+
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
             return return_err(err, &e);
-        }
-        valueObj = mongo::BSONObj(reinterpret_cast<const char*>(bson_element->ptr));
-    }
-
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setGlobalValue(
-        reinterpret_cast<const char*>(name->ptr), name->len, valueObj, &e));
-
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = 0;
-        return true;
-    }
-    return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_setup_emit(
     int64_t* maybe_byte_limit,
     exports_mongo_mozjs_mozjs_ok_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    bool hasLimit = (maybe_byte_limit != nullptr);
-    int64_t limit = hasLimit ? *maybe_byte_limit : 0;
+            bool hasLimit = (maybe_byte_limit != nullptr);
+            int64_t limit = hasLimit ? *maybe_byte_limit : 0;
 
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setupEmit(limit, hasLimit, &e));
+            auto rc =
+                static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setupEmit(limit, hasLimit, &e));
 
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = 0;
-        return true;
-    }
-    return return_err(err, &e);
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_invoke_predicate(
@@ -398,31 +468,35 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_predicate(
     api_list_u8_t* document,
     bool* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    if (handle == 0) {
-        e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
-        return return_err(err, &e);
-    }
+            if (handle == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
 
-    mongo::BSONObj docObj;
-    if (document && document->ptr && document->len > 0) {
-        if (!validate_bson(document->ptr, document->len, &e)) {
+            mongo::BSONObj docObj;
+            if (document && document->ptr && document->len > 0) {
+                if (!validate_bson(document->ptr, document->len, &e)) {
+                    return return_err(err, &e);
+                }
+                docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr));
+            }
+
+            bool result = false;
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokePredicate(
+                static_cast<uint64_t>(handle), std::move(docObj), &result, &e));
+
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = result;
+                return true;
+            }
             return return_err(err, &e);
-        }
-        docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr));
-    }
-
-    bool result = false;
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokePredicate(
-        static_cast<uint64_t>(handle), std::move(docObj), &result, &e));
-
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = result;
-        return true;
-    }
-    return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_invoke_map(
@@ -430,46 +504,55 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_map(
     api_list_u8_t* document,
     exports_mongo_mozjs_mozjs_ok_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
-    if (handle == 0) {
-        e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
-        return return_err(err, &e);
-    }
+            if (handle == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
 
-    mongo::BSONObj docObj;
-    if (document && document->ptr && document->len > 0) {
-        if (!validate_bson(document->ptr, document->len, &e)) {
+            mongo::BSONObj docObj;
+            if (document && document->ptr && document->len > 0) {
+                if (!validate_bson(document->ptr, document->len, &e)) {
+                    return return_err(err, &e);
+                }
+                docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr));
+            }
+
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokeMap(
+                static_cast<uint64_t>(handle), std::move(docObj), &e));
+
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
             return return_err(err, &e);
-        }
-        docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr));
-    }
-
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokeMap(
-        static_cast<uint64_t>(handle), std::move(docObj), &e));
-
-    if (rc == mongo::mozjs::wasm::SM_OK) {
-        if (ret)
-            *ret = 0;
-        return true;
-    }
-    return return_err(err, &e);
+        },
+        err);
 }
 
 extern "C" bool exports_mongo_mozjs_mozjs_drain_emit_buffer(
     api_list_u8_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
-    mongo::mozjs::wasm::wasm_mozjs_error_t e{};
-    mongo::BSONObj out;
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            mongo::BSONObj out;
 
-    auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.drainEmitBuffer(&out, &e));
-    if (rc != mongo::mozjs::wasm::SM_OK) {
-        return return_err(err, &e);
-    }
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.drainEmitBuffer(&out, &e));
+            if (rc != mongo::mozjs::wasm::SM_OK) {
+                return return_err(err, &e);
+            }
 
-    if (!list_u8_dup(ret, reinterpret_cast<const uint8_t*>(out.objdata()), out.objsize())) {
-        e.code = mongo::mozjs::wasm::SM_E_NOMEM;
-        mongo::mozjs::wasm::set_string(&e.msg, &e.msg_len, "OOM: failed to allocate emit buffer");
-        return return_err(err, &e);
-    }
-    return true;
+            if (!list_u8_dup(ret, reinterpret_cast<const uint8_t*>(out.objdata()), out.objsize())) {
+                e.code = mongo::mozjs::wasm::SM_E_NOMEM;
+                mongo::mozjs::wasm::set_string(
+                    &e.msg, &e.msg_len, "OOM: failed to allocate emit buffer");
+                return return_err(err, &e);
+            }
+            return true;
+        },
+        err);
 }

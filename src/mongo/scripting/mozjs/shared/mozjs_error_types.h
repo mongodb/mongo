@@ -83,6 +83,11 @@ typedef struct {
     uint32_t line;
     uint32_t column;
     err_code_t code;
+
+    // Non-zero when the error originated from a DBException (e.g. uassert).
+    // Holds the ErrorCodes::Error value so the bridge can rethrow with the
+    // original code rather than always mapping to JSInterpreterFailure.
+    uint32_t mongo_error_code;
 } wasm_mozjs_error_t;
 
 }  // namespace wasm

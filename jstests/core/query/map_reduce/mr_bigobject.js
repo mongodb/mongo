@@ -9,6 +9,8 @@
 //   requires_fastcount,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
+//   # TODO SERVER-116053: Add support for mapReduce.
+//   mozjs_wasm_unsupported,
 // ]
 const coll = db.mr_bigobject;
 coll.drop();

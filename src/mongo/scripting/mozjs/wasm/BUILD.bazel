@@ -67,7 +67,6 @@ mongo_cc_library(
         "//src/mongo/scripting/mozjs/wasm/engine:api.cpp",
         "//src/mongo/scripting/mozjs/wasm/engine:engine.cpp",
         "//src/mongo/scripting/mozjs/wasm/engine:error.cpp",
-        "//src/mongo/scripting/mozjs/wasm/engine:exception_stubs.cpp",
     ],
     hdrs = [
         ":api.h",
@@ -252,6 +251,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:server_options",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/scripting:scripting_common",
         "//src/mongo/util/concurrency:spin_lock",
         "@crates//:wasmtime_c",

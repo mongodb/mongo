@@ -65,6 +65,7 @@ inline void clear_error(wasm_mozjs_error_t* e) {
     e->code = SM_OK;
     e->line = 0;
     e->column = 0;
+    e->mongo_error_code = 0;
 }
 
 // Execution check helper for error handling

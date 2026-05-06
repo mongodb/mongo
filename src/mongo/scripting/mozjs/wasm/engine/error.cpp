@@ -29,6 +29,8 @@
 
 #include "error.h"
 
+#include "mongo/scripting/mozjs/common/exception.h"
+
 #include "js/ErrorReport.h"
 #include "js/Exception.h"
 
@@ -47,6 +49,21 @@ void ExecutionCheck::capture(err_code_t fallback) {
         return;
 
     _out->code = SM_E_PENDING_EXCEPTION;
+
+    // Before consuming the exception via ErrorReportBuilder, check whether it
+    // is a MongoStatusInfo object.  statusToJSException() round-trips a
+    // DBException through JS as a MongoStatusInfo, so jsExceptionToStatus()
+    // can recover the original ErrorCodes::Error.  We save it in
+    // mongo_error_code so the bridge can rethrow with the right code.
+    {
+        JS::RootedValue excn(_cx);
+        if (JS_GetPendingException(_cx, &excn)) {
+            Status status = jsExceptionToStatus(_cx, excn, ErrorCodes::JSInterpreterFailure, "");
+            if (status.code() != ErrorCodes::JSInterpreterFailure) {
+                _out->mongo_error_code = static_cast<uint32_t>(status.code());
+            }
+        }
+    }
 
     JS::ExceptionStack exnStack(_cx);
     if (!JS::StealPendingExceptionStack(_cx, &exnStack)) {

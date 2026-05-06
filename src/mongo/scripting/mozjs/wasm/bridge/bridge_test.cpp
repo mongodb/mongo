@@ -2491,6 +2491,72 @@ TEST_F(WasmMozJSBridgeTest, ServerParam_DefaultLimitAllowsExecution) {
     ASSERT_TRUE(result.isOK());
 }
 
+// ---------------------------------------------------------------------------
+// Within-JS::Call exception tests (ExecutionCheck::capture() boundary)
+// ---------------------------------------------------------------------------
+
+// NumberLong.compare() with no args hits uassert(ErrorCodes::BadValue, ...) in the C++ binding
+// compiled into the WASM binary — a reliable trigger for the capture-cpp-exception path.
+// Three named JS wrappers around the native compare() call so the captured SpiderMonkey stack
+// contains multiple identifiable named frames.
+constexpr auto kNestedCallToNumberLongCompare =
+    "function() {"
+    " function c() { NumberLong(1).compare(); }"
+    " function b() { c(); }"
+    " function a() { b(); }"
+    " a();"
+    "}";
+
+TEST_F(WasmMozJSBridgeTest, CppMongoExceptionPreservesCodeAndMessage) {
+    // C++ MongoDB exceptions thrown inside WASM are wrapped in JSExceptionInfo so the JS stack is
+    // attached. The original error code and message are preserved inExpand commentComment on lines
+    // R2512 to R2513 JSExceptionInfo::originalError.
+    auto handle = createFunction(kNestedCallToNumberLongCompare);
+    ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
+}
+
+TEST_F(WasmMozJSBridgeTest, CppMongoExceptionDoesNotTrapBridge) {
+    // A C++ exception caught cleanly at the WASM boundary (via ExecutionCheck) should not mark
+    // the bridge as Trapped; the engine remains usable for subsequent calls.
+    auto handle = createFunction(kNestedCallToNumberLongCompare);
+    ASSERT_THROWS(invokeFunction(handle, BSONObj()), DBException);
+    ASSERT_FALSE(_bridge->hasTrapped());
+    // The function itself still throws the same error on re-invocation.
+    ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
+}
+
+// ---------------------------------------------------------------------------
+// post-JS::Call exception tests (runSafely boundary)
+// ---------------------------------------------------------------------------
+
+// JS::Call succeeds (the function returns normally), but the returned value is an invalid
+// Timestamp whose fields have been set to out-of-range values. toBSON() detects the invalid
+// fields and throws DBException(BadValue) during BSON serialization — after JS::Call has
+// already returned true and ExecutionCheck has already cleared. runSafely catches this at
+// the extern "C" boundary and converts it to a WIT error with mongo_error_code set, so the
+// bridge can rethrow with the original BadValue code rather than a trap code.
+constexpr auto kReturnInvalidTimestamp =
+    "function() {"
+    " let ts = Timestamp(1, 1);"
+    " ts.t = 20000000000;"  // overflows uint32_t — invalid Timestamp
+    " return ts;"
+    "}";
+
+TEST_F(WasmMozJSBridgeTest, PostJsCallExceptionPreservesCode) {
+    auto handle = createFunction(kReturnInvalidTimestamp);
+    ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
+}
+
+TEST_F(WasmMozJSBridgeTest, PostJsCallExceptionDoesNotTrapBridge) {
+    // A DBException caught cleanly at the WASM boundary (via runSafely after JS::Call) should
+    // not mark the bridge as Trapped; the engine remains usable for subsequent calls.
+    auto handle = createFunction(kReturnInvalidTimestamp);
+    ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
+    ASSERT_FALSE(_bridge->hasTrapped());
+    // The function itself still throws the same error on re-invocation.
+    ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
+}
+
 }  // namespace
 }  // namespace wasm
 }  // namespace mozjs

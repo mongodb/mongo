@@ -93,6 +93,18 @@ std::string translateMozJSError(const wc::Val& mozJSError) {
     return ss.str();
 }
 
+ErrorCodes::Error mozJSErrorCode(const wc::Val& mozJSError) {
+    if (!mozJSError.is_record())
+        return ErrorCodes::JSInterpreterFailure;
+
+    const auto* mc = findField("mongo-code", mozJSError.get_record());
+    if (mc && mc->is_u32()) {
+        if (auto code = mc->get_u32(); code != 0)
+            return ErrorCodes::Error(code);
+    }
+    return ErrorCodes::JSInterpreterFailure;
+}
+
 wc::Func getMozjsFunc(wc::Instance& instance,
                       wt::Store::Context ctx,
                       std::string_view ifaceName,

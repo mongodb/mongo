@@ -3,6 +3,8 @@
 //
 // @tags: [
 //   requires_scripting,
+//   # TODO SERVER-116053: Add support for mapReduce.
+//   mozjs_wasm_unsupported,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

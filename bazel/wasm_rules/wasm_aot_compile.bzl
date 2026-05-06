@@ -1,4 +1,4 @@
-"""Rule to AOT-compile a WASM component using the wasmtime CLI by default.
+"""Rule to AOT-compile a WASM component using the wasmtime CLI.
 
 The wasmtime serialized format embeds engine configuration metadata. The tool
 that produces the .cwasm must be built with the same wasmtime library build
@@ -34,10 +34,10 @@ def _aot_compile_wasm_impl(ctx):
             "-C",
             "cache=no",
             # -W sets wasmtime runtime options.
-            # Thes options must match the options we pass at
+            # These options must match the options we pass at
             # startup or else starting the module will throw.
             "-W",
-            "epoch-interruption=y",
+            "epoch-interruption=y,exceptions=y",
         ],
         mnemonic = "WasmAotCompile",
         progress_message = "AOT compiling %s" % input_file.short_path,

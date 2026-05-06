@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -48,8 +49,12 @@ namespace wasm_helpers {
 
 std::vector<uint8_t> readWasmFile(const std::string& path);
 
-// Translates errors coming from the MozJS interpreter.
+// Translates a WIT wasm-mozjs-error record to a human-readable string.
 std::string translateMozJSError(const wc::Val& mozJSError);
+
+// Extracts the mongo-code field from a wasm-mozjs-error record.
+// Returns JSInterpreterFailure if the field is absent or zero.
+ErrorCodes::Error mozJSErrorCode(const wc::Val& mozJSError);
 
 const wc::Val* findField(std::string_view name, const wc::Record& record);
 

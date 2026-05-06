@@ -428,6 +428,7 @@ crate.spec(
         "stack-switching",
         "winch",
         "pulley",
+        "gc",
     ],
     package = "wasmtime-cli",
     version = "=44.0.1",
