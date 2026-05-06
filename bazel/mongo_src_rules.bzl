@@ -34,6 +34,8 @@ load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 load("//bazel/auto_header:auto_header.bzl", "binary_srcs_with_all_headers", "build_selects_and_flat_files", "concat_selects", "dedupe_preserve_order", "maybe_all_headers", "maybe_compute_auto_headers", "strings_only")
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 
+COMPILEDB_TAG = "mongo_compiledb"
+
 # These will throw an error if the following condition is not met:
 # (libunwind == on && os == linux) || libunwind == off || libunwind == auto
 LIBUNWIND_DEPS = select({
@@ -456,7 +458,7 @@ def mongo_cc_library(
         copts = copts,
         cxxopts = cxxopts,
         data = data,
-        tags = tags + ["mongo_library", "check_symbol_target"],
+        tags = tags + ["mongo_library", "check_symbol_target", COMPILEDB_TAG],
         linkopts = linkopts,
         linkstatic = select({
             "@platforms//os:windows": True,
@@ -708,7 +710,7 @@ def _mongo_cc_binary_and_test(
     # we dont want the intermediate build targets to be picked up by tags
     # so we empty it out
     original_tags = list(args["tags"])
-    args["tags"] = ["intermediate_debug"] + [
+    args["tags"] = ["intermediate_debug", COMPILEDB_TAG] + [
         tag + "_debug" if
         # Transformations via `test_exec_properties` have already been applied at this point.
         # Need to leave cpu tags unchanged, since more parsing validation is done deeper in bazel.

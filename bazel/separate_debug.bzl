@@ -31,17 +31,20 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     if len(input_files) == 0:
         return None, None, None, None
     if ctx.attr.type == "library":
-        for file in ctx.attr.binary_with_debug.files.to_list():
+        shared_input = None
+        for file in input_files:
             if file.path.endswith(WITH_DEBUG_SUFFIX + static_ext):
                 static_lib = file
+            elif file.path.endswith(WITH_DEBUG_SUFFIX + shared_ext):
+                shared_input = file
 
         if ctx.attr.cc_shared_library != None:
             for file in ctx.attr.cc_shared_library.files.to_list():
                 if file.path.endswith(WITH_DEBUG_SUFFIX + shared_ext):
                     shared_lib = file
 
-        if file.path.endswith(WITH_DEBUG_SUFFIX + shared_ext) or shared_lib:
-            basename = file.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext)]
+        if shared_input or shared_lib:
+            basename = shared_input.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext)] if shared_input else ""
             if shared_lib:
                 basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext + CC_SHARED_LIBRARY_SUFFIX)]
 
@@ -53,7 +56,7 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
             else:
                 debug_info = None
             output_bin = ctx.actions.declare_file(basename + shared_ext)
-            input_bin = file
+            input_bin = shared_input
             if shared_lib:
                 input_bin = shared_lib
         else:
@@ -61,7 +64,7 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
             output_bin = None
             input_bin = None
     elif ctx.attr.type == "program":
-        program_bin = ctx.attr.binary_with_debug.files.to_list()[0]
+        program_bin = input_files[0]
 
         basename = program_bin.basename[:-len(WITH_DEBUG_SUFFIX)]
         if ctx.attr.enabled:
@@ -157,6 +160,7 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
             linker_input_deps.append(dep[CcInfo].linking_context.linker_inputs)
 
         if shared_lib or static_lib:
+            binary_linker_inputs = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()
             if shared_lib:
                 so_path = shared_lib.path.replace(ctx.bin_dir.path + "/", "")
             else:
@@ -180,8 +184,8 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
             #
             # This solution may break in the case where a base dependency contains only one positional argument,
             # but this should never happen since we will always inject at least one non positional argument globally.
-            cur_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags
-            for dep in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[1:]:
+            cur_flags = list(binary_linker_inputs[0].user_link_flags)
+            for dep in binary_linker_inputs[1:]:
                 for i in range(len(cur_flags)):
                     dep_flags = dep.user_link_flags
                     if dep_flags and cur_flags:
@@ -237,7 +241,8 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
     #   cc_library's linkopts field for both static and dynamic transitive link opts
     #   cc_shared_library's user_link_flags field for dynamic non-transitive link opts
     all_user_link_flags = dict()
-    for input in ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list():
+    binary_linker_inputs = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()
+    for input in binary_linker_inputs:
         for flag in input.user_link_flags:
             all_user_link_flags[flag] = True
 
@@ -350,14 +355,15 @@ def linux_extraction(ctx, cc_toolchain, inputs):
     # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
     # output set.
     dynamic_deps_runfiles = ctx.runfiles(files = [])
+    transitive_debug_files = get_transitive_debug_files(ctx.attr.deps)
     if ctx.attr.type == "program":
         dynamic_deps = get_transitive_dyn_libs(ctx.attr.deps)
-        dynamic_deps_runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles.merge(ctx.runfiles(files = get_transitive_dyn_libs(ctx.attr.deps)))
+        dynamic_deps_runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles.merge(ctx.runfiles(files = dynamic_deps))
         outputs.extend(dynamic_deps)
 
     provided_info = [
         DefaultInfo(
-            files = depset(outputs, transitive = [depset(get_transitive_debug_files(ctx.attr.deps))]),
+            files = depset(outputs, transitive = [depset(transitive_debug_files)]),
             runfiles = dynamic_deps_runfiles,
             executable = output_bin if ctx.attr.type == "program" else None,
         ),
@@ -437,7 +443,7 @@ def macos_extraction(ctx, cc_toolchain, inputs):
     dynamic_deps_runfiles = ctx.runfiles(files = [])
     if ctx.attr.type == "program":
         dynamic_deps = get_transitive_dyn_libs(ctx.attr.deps)
-        dynamic_deps_runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles.merge(ctx.runfiles(files = get_transitive_dyn_libs(ctx.attr.deps)))
+        dynamic_deps_runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles.merge(ctx.runfiles(files = dynamic_deps))
         outputs.extend(dynamic_deps)
 
     provided_info = [
@@ -483,10 +489,10 @@ def windows_extraction(ctx, cc_toolchain, inputs):
     output_dynamic_library = None
 
     if len(input_file):
-        basename = ctx.attr.binary_with_debug.files.to_list()[0].basename[:-len(WITH_DEBUG_SUFFIX + ext)]
+        basename = input_file[0].basename[:-len(WITH_DEBUG_SUFFIX + ext)]
         output = ctx.actions.declare_file(basename + ext)
 
-        for input in ctx.attr.binary_with_debug.files.to_list():
+        for input in input_file:
             ext = "." + input.extension
 
             basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
@@ -516,6 +522,7 @@ def windows_extraction(ctx, cc_toolchain, inputs):
                     )
 
         if pdb:
+            pdb_files = pdb.to_list()
             if ctx.attr.cc_shared_library != None:
                 basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ".pdb")]
                 pdb_output = ctx.actions.declare_file(basename + ".dll.pdb")
@@ -526,7 +533,7 @@ def windows_extraction(ctx, cc_toolchain, inputs):
 
             ctx.actions.symlink(
                 output = pdb_output,
-                target_file = pdb.to_list()[0],
+                target_file = pdb_files[0],
             )
 
         if ctx.attr.shared_archive:

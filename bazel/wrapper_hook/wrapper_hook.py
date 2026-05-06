@@ -160,8 +160,9 @@ def main():
 
     os.chmod(os.environ.get("MONGO_BAZEL_WRAPPER_ARGS"), 0o644)
     with open(os.environ.get("MONGO_BAZEL_WRAPPER_ARGS"), "w") as f:
-        f.write("\n".join(args))
-        f.write("\n")
+        if args:
+            f.write("\n".join(args))
+            f.write("\n")
 
 
 if __name__ == "__main__":
