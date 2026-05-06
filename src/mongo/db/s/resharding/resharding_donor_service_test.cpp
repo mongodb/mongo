@@ -375,10 +375,19 @@ public:
     void notifyRecipientsDoneCloning(OperationContext* opCtx,
                                      DonorStateMachine& donor,
                                      const ReshardingDonorDocument& donorDoc) {
+        notifyRecipientsDoneCloningNoWait(opCtx, donor, donorDoc);
+        if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
+                .isEnabledAndIgnoreFCVUnsafe()) {
+            ASSERT_OK(donor.awaitInDonatingOplogEntries().waitNoThrow(opCtx));
+        }
+    }
+
+    void notifyRecipientsDoneCloningNoWait(OperationContext* opCtx,
+                                           DonorStateMachine& donor,
+                                           const ReshardingDonorDocument& donorDoc) {
         if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
                 .isEnabledAndIgnoreFCVUnsafe()) {
             donor.onCoordinatorStateAdvanced(CoordinatorStateEnum::kApplying);
-            ASSERT_OK(donor.awaitInDonatingOplogEntries().waitNoThrow(opCtx));
         } else {
             _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kApplying);
         }
@@ -777,7 +786,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
             switch (state) {
                 case DonorStateEnum::kDonatingOplogEntries: {
                     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-                    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+                    notifyRecipientsDoneCloningNoWait(opCtx.get(), *donor, doc);
                     break;
                 }
                 case DonorStateEnum::kPreparingToBlockWrites: {

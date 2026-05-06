@@ -1726,10 +1726,14 @@ TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringCloning) {
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringApplying) {
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kApplying, kTellAllDonorsToRefresh);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringBlockingWrites) {
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kBlockingWrites,
                                         kTellAllDonorsToRefresh);
 }
