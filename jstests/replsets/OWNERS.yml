@@ -39,6 +39,15 @@ filters:
   - "all_commands_downgrading_to_upgraded.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "profile_or_find_no_such_db_secondary.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "profile_secondary_differ_case_lazy_init.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "profile_stepdown_race_condition.js":
+    approvers:
+      - 10gen/query-integration-observability
   - "*change_stream*":
     approvers:
       - 10gen/query-execution-change-streams

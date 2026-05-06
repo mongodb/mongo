@@ -38,49 +38,96 @@
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangAfterCanAcceptNonLocalWritesCheckInProfile);
+
 namespace {
 
 Status _setProfileSettings(OperationContext* opCtx,
                            Database* db,
                            const DatabaseName& dbName,
+                           auto& dbProfileSettings,
                            ProfileSettings newSettings) {
-    invariant(db);
 
-    auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
-    auto currSettings = dbProfileSettings.getDatabaseProfileSettings(dbName);
-
-    if (currSettings == newSettings) {
-        return Status::OK();
-    }
 
     if (newSettings.level == 0) {
-        // No need to create the profile collection.
         dbProfileSettings.setDatabaseProfileSettings(dbName, newSettings);
+        // No need to create the profile collection.
         return Status::OK();
     }
 
-    // Can't support profiling without supporting capped collections.
-    if (!opCtx->getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "the storage engine doesn't support profiling.");
+    // Create the profile colllection if possible.
+    if (db) {
+        Status status = profile_collection::createProfileCollection(opCtx, db);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
-    Status status = profile_collection::createProfileCollection(opCtx, db);
-    if (!status.isOK()) {
-        return status;
-    }
-
+    // Set the settings.
+    // Must not set settings if creating profile collection failed.
     dbProfileSettings.setDatabaseProfileSettings(dbName, newSettings);
 
     return Status::OK();
 }
 
+ProfileSettings _computeNew(OperationContext* opCtx,
+                            const ProfileSettings& oldSettings,
+                            const ProfileCmdRequest& request,
+                            int64_t profilingLevel) {
+    ProfileSettings newSettings = oldSettings;
+    if (profilingLevel >= 0 && profilingLevel <= 2) {
+        newSettings.level = profilingLevel;
+    }
+    if (auto filterOrUnset = request.getFilter()) {
+        if (auto filter = filterOrUnset->obj) {
+            // filter: <match expression>
+            newSettings.filter = std::make_shared<ProfileFilterImpl>(
+                *filter, ExpressionContextBuilder{}.opCtx(opCtx).build());
+        } else {
+            // filter: "unset"
+            newSettings.filter = nullptr;
+        }
+    }
+    if (auto slowOpInProgMS = request.getSlowinprogms()) {
+        newSettings.slowOpInProgressThreshold = Milliseconds(*slowOpInProgMS);
+    }
+    return newSettings;
+}
+
+bool _canProfile(OperationContext* opCtx,
+                 const ProfileSettings& newSettings,
+                 const ProfileSettings& oldSettings) {
+    // Short circuit if we have nothing to do.
+    if (newSettings == oldSettings) {
+        return false;
+    }
+
+    uassert(ErrorCodes::CommandNotSupported,
+            "the storage engine doesn't support profiling.",
+            opCtx->getServiceContext()->getStorageEngine()->supportsCappedCollections());
+
+    return true;
+}
+
+Database* _maybeCreateDB(OperationContext* opCtx, const DatabaseName& dbName) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->canAcceptNonLocalWrites()) {
+        hangAfterCanAcceptNonLocalWritesCheckInProfile.pauseWhileSet();
+        // Primary or standalone: create the database for profiling.
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        return databaseHolder->openDb(opCtx, dbName);
+    }
+    return nullptr;
+}
 
 /**
  * Sets the profiling level, logging/profiling threshold, and logging/profiling sample rate for the
@@ -120,32 +167,21 @@ protected:
         auto oldSettings = dbProfileSettings.getDatabaseProfileSettings(dbName);
 
         if (!readOnly) {
+            // Construct new settings.
+            auto newSettings = _computeNew(opCtx, oldSettings, request, profilingLevel);
+
+            if (!_canProfile(
+                    opCtx, newSettings, dbProfileSettings.getDatabaseProfileSettings(dbName))) {
+                return oldSettings;
+            }
+
+            // Try to create database if we can.
             if (!db) {
-                // When setting the profiling level, create the database if it didn't already exist.
-                // When just reading the profiling level, we do not create the database.
-                auto databaseHolder = DatabaseHolder::get(opCtx);
-                db = databaseHolder->openDb(opCtx, dbName);
+                db = _maybeCreateDB(opCtx, dbName);
             }
 
-            auto newSettings = oldSettings;
-            if (profilingLevel >= 0 && profilingLevel <= 2) {
-                newSettings.level = profilingLevel;
-            }
-            if (auto filterOrUnset = request.getFilter()) {
-                if (auto filter = filterOrUnset->obj) {
-                    // filter: <match expression>
-                    newSettings.filter = std::make_shared<ProfileFilterImpl>(
-                        *filter, ExpressionContextBuilder{}.opCtx(opCtx).build());
-                } else {
-                    // filter: "unset"
-                    newSettings.filter = nullptr;
-                }
-            }
-            if (auto slowOpInProgMS = request.getSlowinprogms()) {
-                newSettings.slowOpInProgressThreshold = Milliseconds(*slowOpInProgMS);
-            }
-
-            uassertStatusOK(_setProfileSettings(opCtx, db, dbName, newSettings));
+            // Set the settings.
+            uassertStatusOK(_setProfileSettings(opCtx, db, dbName, dbProfileSettings, newSettings));
         }
 
         return oldSettings;

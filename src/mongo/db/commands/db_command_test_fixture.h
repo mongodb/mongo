@@ -49,6 +49,7 @@ public:
         auto replCoord =
             std::make_unique<repl::ReplicationCoordinatorMock>(service, repl::ReplSettings{});
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        replCoord->setCanAcceptNonLocalWrites(true);
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
         repl::createOplog(opCtx);
     }

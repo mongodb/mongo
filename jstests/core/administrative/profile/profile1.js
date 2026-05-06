@@ -88,6 +88,7 @@ try {
     testDb.getCollection("system.profile").drop();
     assert.eq(0, testDb.runCommand({profile: -1}).was, "F");
 
+    // Uncapped collections fail to set profile settings.
     testDb.createCollection("system.profile");
     assert.eq(0, testDb.runCommand({profile: 2}).ok);
     assert.eq(0, testDb.runCommand({profile: -1}).was, "G");
