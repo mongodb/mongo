@@ -1333,7 +1333,10 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
     createTestCollection(opCtx, kTestNss);
     auto collUuid = UUID::gen();
     CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, makeShardedMetadata(opCtx, collUuid));
+        ->setFilteringMetadata_authoritative(
+            opCtx,
+            makeShardedMetadata(opCtx, collUuid),
+            CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
 
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
@@ -1347,10 +1350,8 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
-        // TODO (SERVER-124360): Switch back to the authoritative state once the CSS
-        // authoritative flag is safe to enable on shard-catalog-committing DDLs.
         ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
+                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     }
 }
 

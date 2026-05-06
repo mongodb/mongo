@@ -251,9 +251,8 @@ void updateShardCatalogCache(OperationContext* opCtx,
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    // TODO (SERVER-124360): Switch back to the authoritative setter once the CSS authoritative
-    // flag is safe to enable on shard-catalog-committing DDLs.
-    scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, std::move(ownedMetadata));
+    scopedCsr->setFilteringMetadata_authoritative(
+        opCtx, std::move(ownedMetadata), CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
 }
 
 void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
@@ -261,9 +260,7 @@ void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
                                                 const UUID& uuid) {
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    // TODO (SERVER-124360): Switch back to the authoritative clear once the CSS authoritative
-    // flag is safe to enable on shard-catalog-committing DDLs.
-    scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
+    scopedCsr->clearFilteringMetadataForDroppedCollection_authoritative(opCtx, uuid);
 }
 
 }  // namespace

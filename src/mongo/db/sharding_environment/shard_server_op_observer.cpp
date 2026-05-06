@@ -742,12 +742,12 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
         recoverer->onOplogEntry(opCtx, op.getTimestamp(), entry);
     } else {
-        // TODO (SERVER-124360): Switch back to the authoritative clears once the CSS
-        // authoritative flag is safe to enable on shard-catalog-committing DDLs.
+        const auto collectionUuid = *op.getUuid();
         if (entry.getForDroppedCollection()) {
-            scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
+            scopedCsr->clearFilteringMetadataForDroppedCollection_authoritative(opCtx,
+                                                                                collectionUuid);
         } else {
-            scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+            scopedCsr->clearFilteringMetadata_authoritative(opCtx, collectionUuid);
         }
     }
 }
