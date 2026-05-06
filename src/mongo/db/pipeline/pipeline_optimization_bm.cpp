@@ -284,16 +284,16 @@ static std::vector<BSONObj> makeHoistBenchmarkPipeline(const BSONObj& projection
 }
 
 /// Returns stage names of the optimized pipeline.
-static std::vector<StringData> stageNamesAfterOptimization(
+static std::vector<std::string> stageNamesAfterOptimization(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContextForTest>& expCtx) {
     auto pipeline =
         pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
-    std::vector<StringData> names;
+    std::vector<std::string> names;
     for (auto& source : pipeline->getSources()) {
-        names.push_back(source->getSourceName());
+        names.emplace_back(source->getSourceName());
     }
     return names;
 }
@@ -301,7 +301,7 @@ static std::vector<StringData> stageNamesAfterOptimization(
 template <typename MakeProjection>
 static void runHoistBenchmark(benchmark::State& state,
                               boost::intrusive_ptr<ExpressionContextForTest>& expCtx,
-                              std::vector<StringData> expectedStageNames,
+                              std::vector<std::string> expectedStageNames,
                               MakeProjection makeProjection) {
     // Always perform the rewrite for any number of paths.
     feature_flags::gFeatureFlagImprovedDepsAnalysis.setForServerParameter(true);
