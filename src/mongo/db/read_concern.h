@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -92,5 +93,11 @@ Status waitForLinearizableReadConcern(OperationContext* opCtx, Milliseconds read
  */
 Status waitForSpeculativeMajorityReadConcern(OperationContext* opCtx,
                                              repl::SpeculativeMajorityReadInfo speculativeReadInfo);
+
+/**
+ * Best-effort schedules a no-op write via the `appendOplogNote` command on the primary of this
+ * replica set, in order to advance this node's last-written cluster time to at least `clusterTime`.
+ */
+Status makeNoopWriteToAdvanceClusterTime(OperationContext* opCtx, LogicalTime clusterTime);
 
 }  // namespace MONGO_MOD_PUB mongo

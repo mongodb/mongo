@@ -44,6 +44,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -1185,26 +1186,6 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                       << nss.toStringForErrorMsg() << "; last retry reason: " << lastRetryReason);
 }
 
-void FilteringMetadataCache::_tryNoopWriteToAdvanceMajorityCommitPoint(OperationContext* opCtx) {
-    try {
-        auto selfShard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-            opCtx, ShardingState::get(opCtx)->shardId()));
-
-        auto cmdResponse = uassertStatusOK(selfShard->runCommand(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            BSON("appendOplogNote"
-                 << 1 << "data" << BSON("msg" << "waitForConfigTimeOrChunkVersionChange")
-                 << WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Acknowledged),
-            Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponse.commandStatus);
-    } catch (const DBException& ex) {
-        LOGV2_DEBUG(
-            12307904, 2, "Best-effort noop write to primary failed", "error"_attr = ex.toStatus());
-    }
-}
-
 void FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(
     OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& chunkVersion) {
 
@@ -1239,8 +1220,11 @@ void FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(
             .get(opCtx);
     };
 
-    // TODO (SERVER-123844): Remove the noop write once the configTime liveness issue is fixed.
-    _tryNoopWriteToAdvanceMajorityCommitPoint(opCtx);
+    // Best-effort: the shared helper batches concurrent callers, waits briefly for replication to
+    // catch up on secondaries, and retries on failure. The majority commit point follows the
+    // last-written OpTime, so advancing it is sufficient to unblock the majority read concern wait
+    // above.
+    makeNoopWriteToAdvanceClusterTime(opCtx, configTime).ignore();
 
     waitForEither();
 

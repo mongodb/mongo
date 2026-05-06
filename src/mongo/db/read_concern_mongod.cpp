@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
@@ -146,9 +147,7 @@ private:
 /**
  *  Schedule a write via appendOplogNote command to the primary of this replica set.
  */
-Status makeNoopWriteIfNeeded(OperationContext* opCtx,
-                             LogicalTime clusterTime,
-                             const DatabaseName& dbName) {
+Status makeNoopWriteToAdvanceClusterTimeImpl(OperationContext* opCtx, LogicalTime clusterTime) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord->getSettings().isReplSet());
 
@@ -404,7 +403,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                                       << "; current clusterTime: " << clusterTime.toString()};
             }
 
-            auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime, dbName);
+            auto status = makeNoopWriteToAdvanceClusterTimeImpl(opCtx, *targetClusterTime);
             if (!status.isOK()) {
                 LOGV2(20990,
                       "Failed noop write",
@@ -668,6 +667,8 @@ auto waitForLinearizableReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATI
     waitForLinearizableReadConcern, waitForLinearizableReadConcernImpl);
 auto waitForSpeculativeMajorityReadConcernRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
     waitForSpeculativeMajorityReadConcern, waitForSpeculativeMajorityReadConcernImpl);
+auto makeNoopWriteToAdvanceClusterTimeRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    makeNoopWriteToAdvanceClusterTime, makeNoopWriteToAdvanceClusterTimeImpl);
 }  // namespace
 
 }  // namespace mongo

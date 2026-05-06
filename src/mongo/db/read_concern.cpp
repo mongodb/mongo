@@ -62,4 +62,9 @@ Status waitForSpeculativeMajorityReadConcern(
     return w(opCtx, speculativeReadInfo);
 }
 
+Status makeNoopWriteToAdvanceClusterTime(OperationContext* opCtx, LogicalTime clusterTime) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(makeNoopWriteToAdvanceClusterTime);
+    return w(opCtx, clusterTime);
+}
+
 }  // namespace mongo

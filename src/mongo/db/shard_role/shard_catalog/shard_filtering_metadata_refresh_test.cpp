@@ -58,7 +58,6 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
-const HostAndPort kSelfShardHostAndPort{"selfShardHost", 12345};
 
 std::pair<CollectionType, std::vector<ChunkType>> makeShardedMetadataForDisk(
     OperationContext* opCtx, int nChunks, ShardId shardId) {
@@ -128,37 +127,6 @@ protected:
             replicationCoordinator()->setMyLastWrittenOpTimeAndWallTimeForward({opTime, Date_t()});
         }
         replicationCoordinator()->setCurrentCommittedSnapshotOpTime(opTime);
-    }
-
-    void addSelfShardToRegistry() {
-        addRemoteShards({{kMyShardName, kSelfShardHostAndPort}});
-    }
-
-    /**
-     * Answers the appendOplogNote noop issued by _waitForConfigTimeOrChunkVersionChange when the
-     * self-shard is registered as a remote HostAndPort (see addSelfShardToRegistry). Must run on a
-     * different thread than the code that calls runCommand (e.g. pair with launchAsync).
-     */
-    void expectAppendOplogNoteNoopFromSelfShard() {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(kSelfShardHostAndPort, request.target);
-            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
-            ASSERT_TRUE(request.cmdObj.hasField("appendOplogNote"));
-            return BSON("ok" << 1);
-        });
-    }
-
-    /**
-     * Runs onCollectionPlacementVersionMismatch on an async task and serves the self-shard
-     * appendOplogNote from the mock network (required whenever recovery reaches the configTime /
-     * chunk-version wait after addSelfShardToRegistry).
-     */
-    Status onShardVersionMismatchExpectSelfShardNoop(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     boost::optional<ChunkVersion> received) {
-        auto future = launchAsync([&] { return onShardVersionMismatch(opCtx, nss, received); });
-        expectAppendOplogNoteNoopFromSelfShard();
-        return future.default_timed_get();
     }
 
     void populateDiskCatalog(OperationContext* opCtx,
@@ -314,9 +282,7 @@ TEST_F(AuthoritativeRefreshFixture,
     ASSERT_EQ(statsAfterFirst.getIntField("diskRecoveriesPerformed"), 1);
     ASSERT_EQ(statsAfterFirst.getIntField("recoverersCreated"), 1);
 
-    addSelfShardToRegistry();
-    ASSERT_OK(
-        onShardVersionMismatchExpectSelfShardNoop(opCtx, kTestNss, ChunkVersion::UNTRACKED()));
+    ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, ChunkVersion::UNTRACKED()));
 
     auto statsAfterSecond = getStatistics(opCtx);
     ASSERT_EQ(statsAfterSecond.getIntField("diskRecoveriesPerformed"), 1)
@@ -371,8 +337,7 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
         csr->clearFilteringMetadata_authoritative(opCtx);
     }
 
-    addSelfShardToRegistry();
-    auto status = onShardVersionMismatchExpectSelfShardNoop(opCtx, kTestNss, higherVersion);
+    auto status = onShardVersionMismatch(opCtx, kTestNss, higherVersion);
     ASSERT_OK(status);
 
     auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
@@ -417,7 +382,6 @@ TEST_F(AuthoritativeRefreshFixture, NonAuthoritativeTransitionDuringRecoveryRetu
     auto* opCtx = operationContext();
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
-    addSelfShardToRegistry();
 
     {
         auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
@@ -428,8 +392,6 @@ TEST_F(AuthoritativeRefreshFixture, NonAuthoritativeTransitionDuringRecoveryRetu
 
     auto* fp = globalFailPointRegistry().find("hangBeforePlacementVersionCriticalSectionWait");
     auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
-
-    stdx::thread noopResponder([&] { expectAppendOplogNoteNoopFromSelfShard(); });
 
     stdx::thread recoveryThread([&] {
         auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgFlip");
@@ -451,7 +413,6 @@ TEST_F(AuthoritativeRefreshFixture, NonAuthoritativeTransitionDuringRecoveryRetu
     fp->setMode(FailPoint::off);
 
     recoveryThread.join();
-    noopResponder.join();
 
     auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
     ASSERT_EQ(csr->getAuthoritativeState(),

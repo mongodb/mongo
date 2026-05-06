@@ -242,11 +242,6 @@ private:
                                             const ChunkVersion& receivedShardVersion);
 
     /**
-     * Sends a best-effort noop write to the primary to advance the majority commit point.
-     */
-    void _tryNoopWriteToAdvanceMajorityCommitPoint(OperationContext* opCtx);
-
-    /**
      * Handles the case where router's shard version (receivedShardVersion) and shard's shard
      * version (wantedShardVersion) are not directly comparable (e.g. one tracked, one untracked).
      * Blocks until one of:
