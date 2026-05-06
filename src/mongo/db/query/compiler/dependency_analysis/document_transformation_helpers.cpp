@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::document_transformation {
@@ -49,6 +50,12 @@ public:
     }
     boost::intrusive_ptr<Expression> getExpression() const override {
         return _expr;
+    }
+    bool canLeafBeArray() const override {
+        if (const auto* c = dynamic_cast<const ExpressionConstant*>(_expr.get())) {
+            return c->getValue().isArray();
+        }
+        return true;
     }
 
 private:

@@ -138,6 +138,9 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
+    void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const override;
+
     /**
      * Reports the StageConstraints of this $lookup instance. A $lookup constructed with pipeline
      * syntax will inherit certain constraints from the stages in its pipeline.

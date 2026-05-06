@@ -62,6 +62,7 @@
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
@@ -687,6 +688,23 @@ DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const
                              pathsModifiedByUnwind.paths.end());
     }
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
+}
+
+void DocumentSourceLookUp::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    using namespace mongo::document_transformation;
+    if (_unwindSrc) {
+        // After $lookup+$unwind the 'as' field holds one document from the subpipeline
+        // (or null/absent for preserveNullAndEmptyArrays), never an array.
+        visitor(NonArrayModifyPath{_as.fullPath(), false});
+        if (const auto& idxPath = _unwindSrc->indexPath()) {
+            // includeArrayIndex is a numeric position, never an array.
+            visitor(NonArrayModifyPath{idxPath->fullPath(), false});
+        }
+        return;
+    }
+    // Without an absorbed $unwind the 'as' field is an array.
+    describeGetModPathsReturn(visitor, getModifiedPaths());
 }
 
 DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(

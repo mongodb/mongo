@@ -128,6 +128,12 @@ public:
     /// Returns the Expression which determines the new value.
     virtual boost::intrusive_ptr<Expression> getExpression() const;
 
+    /// Returns true if the value at the leaf path element can be an array.
+    /// Note: This is not the same as saying the path cannot be an array.
+    virtual bool canLeafBeArray() const {
+        return true;
+    }
+
 private:
     const StringData _path;
 };

@@ -37,6 +37,24 @@
 
 namespace mongo::document_transformation {
 
+/**
+ * A subclass for a modification which will never evaluate to an array.
+ * Example:
+ * {$lookup: {as: 'a.b.c'}} {$unwind: '$a.b.c'} - "$a.b.c" never evaluates to an array
+ */
+class NonArrayModifyPath final : public ModifyPath {
+public:
+    NonArrayModifyPath(StringData path, bool canLeafBeArray)
+        : ModifyPath(path), _canLeafBeArray(canLeafBeArray) {}
+
+    bool canLeafBeArray() const override {
+        return _canLeafBeArray;
+    }
+
+private:
+    bool _canLeafBeArray;
+};
+
 namespace detail {
 
 void describeProjectedPath(DocumentOperationVisitor& visitor, StringData path, bool isInclusion);

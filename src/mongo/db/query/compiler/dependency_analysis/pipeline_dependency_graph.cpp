@@ -420,17 +420,6 @@ private:
 
 static_assert(document_transformation::DescribesDocumentTransformation<DocumentSourceInfo>);
 
-bool canExpressionEvaluateToArray(const Expression& expr) {
-    if (auto* constantExpr = dynamic_cast<const ExpressionConstant*>(&expr)) {
-        return constantExpr->getValue().isArray();
-    }
-    return true;
-}
-
-void updateMetadataFromExpression(FieldMetadata& metadata, const Expression& expr) {
-    metadata.canFieldBeArray = canExpressionEvaluateToArray(expr);
-}
-
 void updateMetadataForMissingValue(FieldMetadata& metadata) {
     metadata.canFieldBeArray = false;
     metadata.knownToBeMissing = true;
@@ -520,6 +509,17 @@ bool defaultCanPathBeArray(StringData path) {
     return true;
 }
 
+namespace {
+/// Wrapper for the PathArrayness API passed into the graph as CanPathBeArray.
+struct CanPathBeArrayForNss {
+    bool operator()(StringData path) const {
+        return expCtx.canPathBeArrayForNss(FieldRef(path), nss);
+    }
+    ExpressionContext& expCtx;
+    const NamespaceString& nss;
+};
+}  // namespace
+
 class DependencyGraph::Impl {
 public:
     explicit Impl(const DocumentSourceContainer& container,
@@ -599,6 +599,10 @@ public:
             case FieldMatchType::kExact:
                 return canPrefixContainArrays(prefix) || _fields[fieldId].metadata.canFieldBeArray;
             case FieldMatchType::kShadowed: {
+                if (canPrefixContainArrays(prefix) || _fields[fieldId].metadata.canFieldBeArray) {
+                    return true;
+                }
+
                 // If the shadowing field comes from a stage with a sub-pipeline (e.g. $lookup),
                 // resolve the suffix path against the sub-pipeline's graph.
                 ScopeId declaringScopeId = _fields[fieldId].declaringScope;
@@ -613,10 +617,6 @@ public:
                 // Check if the shadowing field has an alias to a collection path. If so, resolve
                 // the full path and query the PathArrayness API with it.
                 if (auto* alias = getAlias(fieldId)) {
-                    if (canPrefixContainArrays(prefix) ||
-                        _fields[fieldId].metadata.canFieldBeArray) {
-                        return true;
-                    }
                     auto suffix = skipPathComponents(path, prefix.size() + 1);
                     return _canPathBeArray(buildDottedPath(*alias, suffix));
                 }
@@ -1095,15 +1095,17 @@ private:
                     FieldMetadata metadata{};
                     if (p.isRemoved()) {
                         updateMetadataForMissingValue(metadata);
-                    } else if (auto expr = p.getExpression()) {
-                        updateMetadataFromExpression(metadata, *expr);
-                        deps = processExpressionDependencies(*expr, parentScope);
                     } else {
-                        // If the modification is not determined by an expression, we cannot get
-                        // more precise dependency information. The stage dependencies will always
-                        // be a superset of any modified path dependencies, so we can use those.
-                        // Example: {$unwind: '$x'}
-                        deps = depsFromStage;
+                        metadata.canFieldBeArray = p.canLeafBeArray();
+                        if (auto expr = p.getExpression()) {
+                            deps = processExpressionDependencies(*expr, parentScope);
+                        } else {
+                            // If the modification is not determined by an expression, we cannot get
+                            // more precise dependency information. The stage dependencies will
+                            // always be a superset of any modified path dependencies, so we can use
+                            // those. Example: {$unwind: '$x'}
+                            deps = depsFromStage;
+                        }
                     }
                     declareField(scopeId, parsedPath, std::move(deps), std::move(metadata));
                 },
@@ -1249,17 +1251,11 @@ private:
         if (!subPipeline) {
             return;
         }
-        CanPathBeArray subPipelineCanPathBeArray = defaultCanPathBeArray;
-        if (auto expCtx = ds->getExpCtx()) {
-            if (auto subExpCtx = ds->getSubpipelineExpCtx()) {
-                subPipelineCanPathBeArray = [expCtx, subExpCtx](StringData path) -> bool {
-                    return expCtx->canPathBeArrayForNss(FieldRef(path),
-                                                        subExpCtx->getNamespaceString());
-                };
-            }
-        }
-        _subpipelineGraphs.push_back(
-            std::make_unique<DependencyGraph>(*subPipeline, std::move(subPipelineCanPathBeArray)));
+        auto subExpCtx = ds->getSubpipelineExpCtx();
+        tassert(12414601, "Expected to have subpipeline expression context", subExpCtx);
+        auto& mainExpCtx = *ds->getExpCtx();
+        _subpipelineGraphs.push_back(std::make_unique<DependencyGraph>(
+            *subPipeline, CanPathBeArrayForNss{mainExpCtx, subExpCtx->getNamespaceString()}));
         _stages[stageId].subpipelineGraph = _subpipelineGraphs.back().get();
     }
 
@@ -1781,21 +1777,10 @@ DependencyGraphContext::DependencyGraphContext(ExpressionContext& expCtx,
                                                DocumentSourceContainer& container)
     : _expCtx(expCtx), _container(container) {}
 
-namespace {
-/// Wrapper for the PathArrayness API passed into the graph as CanPathBeArray.
-/// Queries the ExpressionContext's own resident namespace (getNamespaceString()).
-struct CanPathBeArrayForExpCtxNss {
-    bool operator()(StringData path) const {
-        return expCtx.canPathBeArrayForNss(FieldRef(path), expCtx.getNamespaceString());
-    }
-    ExpressionContext& expCtx;
-};
-}  // namespace
-
 std::unique_ptr<DependencyGraph> DependencyGraphContext::createGraph(
     DocumentSourceContainer::const_iterator endIt) const {
     return std::make_unique<DependencyGraph>(
-        _container, endIt, CanPathBeArrayForExpCtxNss{_expCtx});
+        _container, endIt, CanPathBeArrayForNss{_expCtx, _expCtx.getNamespaceString()});
 }
 
 const DependencyGraph& DependencyGraphContext::getGraph(

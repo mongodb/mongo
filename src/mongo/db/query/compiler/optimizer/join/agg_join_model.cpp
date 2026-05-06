@@ -227,7 +227,7 @@ Status addExprJoinPredicates(MutableJoinGraph& graph,
  * while tracking "as" path arrayness. Note: 'expCtx' must be non-const since the arrayness check
  * updates state that provides a non-multikey guarantee for any field we check the arrayness of.
  *
- * TODO SERVER-123929: replace this function once dependency analysis supports tracking arrayness of
+ * TODO SERVER-125693: replace this function once dependency analysis supports tracking arrayness of
  * lookup "as" fields.
  */
 bool canPipelinePathBeArray(const pipeline::dependency_graph::DependencyGraph& pipelineBaseCollDeps,
