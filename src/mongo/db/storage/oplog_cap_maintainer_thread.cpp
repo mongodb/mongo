@@ -235,10 +235,9 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.
         oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
-        invariant(oplogTruncateMarkers);
     }
 
-    if (!oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx)) {
+    if (!oplogTruncateMarkers || !oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx)) {
         // Oplog went away or we timed out waiting for oplog space to reclaim.
         return false;
     }
@@ -363,6 +362,15 @@ void OplogCapMaintainerThread::run() {
                     auto oplogTruncateMarkers =
                         _createInitialMarkers(_uniqueCtx->get(), *oplog->getRecordStore());
                     invariant(oplogTruncateMarkers);
+
+                    // Hold lock while setting truncate markers to avoid race with thread shutdown.
+                    std::lock_guard<std::mutex> opCtxLk(_opCtxMutex);
+                    {
+                        std::unique_lock<std::mutex> lk(_stateMutex);
+                        if (_shuttingDown) {
+                            return;
+                        }
+                    }
                     LocalOplogInfo::get(_uniqueCtx->get())
                         ->setTruncateMarkers(std::move(oplogTruncateMarkers));
 
@@ -465,18 +473,47 @@ std::shared_ptr<OplogTruncateMarkers> OplogCapMaintainerThread::_createInitialMa
     return std::make_shared<OplogTruncateMarkers>(std::move(initialMarkers), *rs.oplog());
 }
 
+void OplogCapMaintainerThread::_clearTruncationMarkers(const Status& reason) {
+    // supportsAsyncOplogMarkerGeneration() determines whether the cap maintainer thread created the
+    // truncation markers, and whether it's responsible for clearing them during shutdown.
+    if (!rss::ReplicatedStorageService::get(_uniqueCtx->get())
+             .getPersistenceProvider()
+             .supportsAsyncOplogMarkerGeneration()) {
+        return;
+    }
+
+    auto* oplogInfo = LocalOplogInfo::get(_uniqueCtx->get());
+    if (!oplogInfo) {
+        return;
+    }
+
+    auto markers = oplogInfo->getTruncateMarkers();
+    if (markers) {
+        LOGV2(12511001,
+              "Killing oplog truncation markers during cap maintainer thread shutdown.",
+              "reason"_attr = reason,
+              "numMarkers"_attr = markers->numMarkers());
+
+        // Calling kill() on the markers wakes up the thread if it was waiting on them, allowing it
+        // to exit immediately rather than on the next wakeup cycle.
+        markers->kill();
+        oplogInfo->setTruncateMarkers(nullptr);
+    }
+}
 
 void OplogCapMaintainerThread::shutdown(const Status& reason) {
     LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread", "reason"_attr = reason);
     {
+        // Hold lock while setting _shuttingDown to avoid race with setting initial markers.
         std::lock_guard<std::mutex> lk(_opCtxMutex);
         if (_uniqueCtx) {
+            _clearTruncationMarkers(reason);
+
             std::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
             _uniqueCtx->get()->markKilled(reason.code());
         }
-    }
-    {
-        std::lock_guard<std::mutex> lk(_stateMutex);
+
+        std::lock_guard<std::mutex> stateLk(_stateMutex);
         _shuttingDown = true;
         _shutdownReason = reason;
     }

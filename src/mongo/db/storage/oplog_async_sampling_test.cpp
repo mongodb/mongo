@@ -42,12 +42,15 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/db/storage/oplog_truncation.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -61,6 +64,8 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 namespace repl {
@@ -281,6 +286,115 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_SynchronousPathWhenAsyncDi
     ASSERT(oplogTruncateMarkers);
     ASSERT_LT(0U, oplogTruncateMarkers->numMarkers());
 }
+
+// Test that oplog cap maintainer thread kills the truncation markers if it instantiated them for
+// async sampling.
+TEST_F(AsyncOplogTruncationTest, ShutdownKillsMarkersAndClearsLocalOplogInfo) {
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", true);
+
+    // Populate the oplog so initial marker generation produces a real, non-empty markers object.
+    insertOplog(1, 100);
+
+    // Pin the thread at the top of its main loop via the existing failpoint. This ensures that
+    // by the time we call shutdown(), the thread has finished initial marker creation and
+    // installed the markers into LocalOplogInfo, and is no longer touching them from
+    // `_deleteExcessDocuments`.
+    auto* hangFp = globalFailPointRegistry().find("hangOplogCapMaintainerThread");
+    ASSERT(hangFp);
+    auto timesEnteredBefore = hangFp->setMode(FailPoint::alwaysOn);
+
+    auto thread = std::make_unique<OplogCapMaintainerThread>();
+    auto* threadRaw = thread.get();
+    OplogCapMaintainerThread::set(getServiceContext(), std::move(thread));
+    threadRaw->go();
+
+    // Wait for initial markers to be installed, then wait for the thread to actually enter the
+    // pause so shutdown() isn't racing the thread's loop prologue.
+    std::shared_ptr<OplogTruncateMarkers> installedMarkers;
+    for (int i = 0; i < 200 && !installedMarkers; ++i) {  // up to ~20s
+        installedMarkers = LocalOplogInfo::get(getOperationContext())->getTruncateMarkers();
+        if (!installedMarkers) {
+            sleepmillis(100);
+        }
+    }
+    ASSERT(installedMarkers) << "Thread did not install truncate markers within timeout";
+    ASSERT_FALSE(installedMarkers->isDead());
+    hangFp->waitForTimesEntered(timesEnteredBefore + 1);
+
+    // Keep our own reference to the installed markers so we can observe isDead() after
+    // shutdown() clears the LocalOplogInfo slot.
+    threadRaw->shutdown(
+        Status(ErrorCodes::InterruptedDueToReplStateChange, "test step-down reason"));
+
+    // 1. The markers instance we captured was kill()'d during shutdown(). A killed markers
+    //    object is the signal that any waiter in awaitHas...OrDead should unwind via _isDead.
+    ASSERT_TRUE(installedMarkers->isDead());
+
+    // 2. The LocalOplogInfo slot has been nulled out, so any post-stepdown getTruncateMarkers()
+    //    call (e.g. from the oplog write path's invariant check) sees no markers.
+    ASSERT_FALSE(LocalOplogInfo::get(getOperationContext())->getTruncateMarkers());
+
+    hangFp->setMode(FailPoint::off);
+}
+
+// Tests oplog cap maintainer shutdown without hanging the thread with a failpoint. Runs multiple
+// iterations with varying delays so shutdown() races the thread in different states — idle inside
+// awaitHas...OrDead, holding the global lock inside _deleteExcessDocuments, between loop
+// iterations, etc. Each iteration installs a fresh thread, lets it produce initial markers,
+// then immediately shuts it down and checks the post-shutdown state.
+TEST_F(AsyncOplogTruncationTest, ShutdownRacesWithLiveCapMaintainerThread) {
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", true);
+
+    insertOplog(1, 100);
+
+    // Per-iteration delay between "markers installed" and shutdown(). 0 reproduces "shut
+    // down immediately after initial creation"; larger values give the thread time to reach
+    // awaitHas...OrDead or cycle through the main loop.
+    const std::vector<int> kIterationDelayMillis{0, 0, 1, 5, 10, 25, 50, 100};
+
+    for (size_t i = 0; i < kIterationDelayMillis.size(); ++i) {
+        auto thread = std::make_unique<OplogCapMaintainerThread>();
+        auto* threadRaw = thread.get();
+        OplogCapMaintainerThread::set(getServiceContext(), std::move(thread));
+        threadRaw->go();
+
+        // Wait until the thread has finished initial marker creation and installed the
+        // markers into LocalOplogInfo. That's the signal that _uniqueCtx is set, so
+        // shutdown()'s async-branch code will actually run.
+        std::shared_ptr<OplogTruncateMarkers> installedMarkers;
+
+        size_t waitMs = 0;
+        for (; waitMs < 2000 && !installedMarkers; waitMs += 2) {
+            installedMarkers = LocalOplogInfo::get(getOperationContext())->getTruncateMarkers();
+            if (!installedMarkers) {
+                sleepmillis(2);
+            }
+        }
+        LOGV2(12511002, "Installed markers", "waitMs"_attr = waitMs - 2);
+
+        ASSERT(installedMarkers) << "i=" << i << ": thread did not install markers within timeout";
+        ASSERT_FALSE(installedMarkers->isDead()) << "i=" << i;
+
+        if (kIterationDelayMillis[i] > 0) {
+            sleepmillis(kIterationDelayMillis[i]);
+        }
+
+        threadRaw->shutdown(
+            Status(ErrorCodes::InterruptedDueToReplStateChange, "race-test step-down"));
+
+        // Regardless of which state the thread was in when shutdown() landed, the three
+        // end-state invariants must hold: kill() ran on the markers, LocalOplogInfo was
+        // nulled out, and the thread has cleanly joined.
+        ASSERT_TRUE(installedMarkers->isDead())
+            << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
+        ASSERT_FALSE(LocalOplogInfo::get(getOperationContext())->getTruncateMarkers())
+            << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
+        ASSERT_FALSE(threadRaw->running()) << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
+    }
+}
+
 
 }  // namespace repl
 }  // namespace mongo

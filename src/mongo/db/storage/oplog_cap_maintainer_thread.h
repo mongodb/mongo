@@ -91,6 +91,13 @@ private:
     virtual std::shared_ptr<OplogTruncateMarkers> _createInitialMarkers(OperationContext* opCtx,
                                                                         RecordStore& rs) const;
 
+
+    /*
+     * If the cap maintainer thread is responsible for clearing the truncation markers, shut them
+     * down and clear them from persistent state. Must be called while holding mutex on _uniqueCtx.
+     */
+    void _clearTruncationMarkers(const Status& reason);
+
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
     mutable std::mutex _opCtxMutex;
 
