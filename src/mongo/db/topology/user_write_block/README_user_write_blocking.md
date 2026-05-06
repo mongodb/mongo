@@ -29,7 +29,7 @@ when user write blocking is enabled. On internal requests (i.e. from other `mong
 instances in the sharded cluster/replica set), the request originator propagates `WriteBlockBypass`
 [through the request metadata](https://github.com/mongodb/mongo/blob/182616b7b45a1e360839c612c9ee8acaa130fe17/src/mongo/rpc/metadata.cpp#L115).
 On external requests, `WriteBlockBypass` is enabled
-[if the authenticated user is privileged to bypass user writes](https://github.com/mongodb/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/user_write_block_bypass.cpp#L60-L63).
+[if the authenticated user is privileged to bypass user writes](https://github.com/mongodb/mongo/blob/07c3d2ebcd3ca8127ed5a5aaabf439b57697b530/src/mongo/db/write_block_bypass.cpp#L60-L63).
 The `AuthorizationSession`, which is responsible for maintaining the authorization state, keeps
 track of whether the user has the privilege to bypass user write blocking by
 [updating a cached variable upon any changes to the authorization state](https://github.com/mongodb/mongo/blob/e4032fe5c39f1974c76de4cefdc07d98ab25aeef/src/mongo/db/auth/authorization_session_impl.cpp#L1119-L1121).

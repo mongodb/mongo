@@ -42,7 +42,7 @@
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/user_write_block/block_replica_set_writes_gen.h"
-#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
+#include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

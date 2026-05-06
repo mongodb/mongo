@@ -344,15 +344,6 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
-            # Indicates whether write-based commands should be allowed even if the server is blocking
-            # user writes as part of replica set write blocking mode.
-            # Authorization: This field can only be set if the client possesses action type `internal`
-            # or `bypassReplicaSetWriteBlocking` on the `cluster` resource.
-            mayBypassReplicaSetWriteBlocking:
-                type: bool
-                forward_to_shards: false
-                optional: true
-                stability: "internal"
             # Specifies whether or not database names are expected to be prefixed with a tenantID
             # in command requests. The multitenancySupport flag needs to be enabled for expectPrefix
             # to take effect. Note that since serverless is deprecated, this will likely be removed

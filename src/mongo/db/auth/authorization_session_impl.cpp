@@ -1058,10 +1058,6 @@ bool AuthorizationSessionImpl::mayBypassWriteBlockingMode() const {
     return MONGO_unlikely(_nonTenantClusterActions.contains(ActionType::bypassWriteBlockingMode));
 }
 
-bool AuthorizationSessionImpl::mayBypassReplicaSetWriteBlocking() const {
-    return _nonTenantClusterActions.contains(ActionType::bypassReplicaSetWriteBlocking);
-}
-
 bool AuthorizationSessionImpl::isExpired() const {
     return _expiredUserName.has_value();
 }

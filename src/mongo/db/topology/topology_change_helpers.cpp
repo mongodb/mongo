@@ -102,7 +102,7 @@
 #include "mongo/db/topology/topology_change_helpers.h"
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_critical_section_document_gen.h"
-#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
+#include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/write_concern_options.h"

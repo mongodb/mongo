@@ -46,9 +46,9 @@ namespace mongo {
  * on disk and it's in-memory representation is kept in sync with the persisted state through an
  * OpObserver that reacts to the inserts/updates/deletes on the persisted document.
  *
- * User write blocking can occur at two levels: cluster level or replica set level. At the cluster
- * level, user writes are blocked globally across the entire cluster, whereas at the replica set
- * level, user writes are blocked only locally on the affected replicaset.
+ * User write blocking can occur at two levels: cluster level or shard level. At the cluster level,
+ * user writes are blocked globally across the entire cluster, whereas at the shard level, user
+ * writes are blocked only locally on the affected shard.
  *
  * On replicaSets, enable blocking is depicted by transition (1); and disable blocking is depicted
  * by transition (2):

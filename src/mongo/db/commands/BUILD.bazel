@@ -1058,7 +1058,6 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_impl",
         "//src/mongo/db/shard_role/shard_catalog:database_holder",
-        "//src/mongo/db/sharding_environment:sharding_feature_flags",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",

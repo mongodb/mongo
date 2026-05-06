@@ -70,7 +70,7 @@
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log_attr.h"

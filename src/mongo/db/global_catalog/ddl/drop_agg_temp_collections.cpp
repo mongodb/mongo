@@ -37,7 +37,7 @@
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/util/log_and_backoff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

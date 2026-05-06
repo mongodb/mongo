@@ -53,7 +53,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"

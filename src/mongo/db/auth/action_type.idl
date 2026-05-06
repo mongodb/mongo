@@ -61,7 +61,6 @@ enums:
             bypassDefaultMaxTimeMS: "bypassDefaultMaxTimeMS"
             bypassDocumentValidation: "bypassDocumentValidation"
             bypassWriteBlockingMode: "bypassWriteBlockingMode"
-            bypassReplicaSetWriteBlocking: "bypassReplicaSetWriteBlocking"
             changeCustomData: "changeCustomData"
             changePassword: "changePassword"
             changeOwnPassword: "changeOwnPassword"

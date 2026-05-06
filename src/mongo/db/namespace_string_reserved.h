@@ -308,7 +308,7 @@
     /*  Namespace for storing feature compatibility version changes block documents */             \
     X(kBlockFCVChangesNamespace, DatabaseName::kConfig, "system.block_fcv_changes"_sd)             \
                                                                                                    \
-    /*  Namespace for storing replica set write block critical section documents */                \
+    /*  Namespace for storing replica set writes block critical section documents */               \
     X(kReplicaSetWritesCriticalSectionsNamespace,                                                  \
       DatabaseName::kConfig,                                                                       \
       "replica_set_writes_critical_section"_sd)                                                    \

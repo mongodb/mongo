@@ -35,7 +35,7 @@ selector:
     # TODO SERVER-99091 re-enable this test to get coverage of switching between plan ranker modes.
     - jstests/core/query/query_knob_correctness_pbt.js
 
-    # Replica set write block is not supported on standalone.
+    # Shard level user writes block is not supported on standalone.
     - jstests/core/administrative/block_replica_set_writes.js
 
   exclude_with_any_tags:

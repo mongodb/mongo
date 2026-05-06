@@ -34,7 +34,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

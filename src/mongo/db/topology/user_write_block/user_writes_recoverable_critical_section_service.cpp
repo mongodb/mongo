@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
+#include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,7 +50,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
-#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_writes_critical_section_document_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_critical_section_document_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -518,19 +517,13 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
     });
 
     // Recover the persisted replica set writes critical section documents and restore the
-    // state into memory.
+    // state into memory
     PersistentTaskStore<ReplicaSetWriteBlockingCriticalSectionDocument> replicaSetWritesStore(
         NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
     replicaSetWritesStore.forEach(
         opCtx, BSONObj{}, [&opCtx](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
             invariant(doc.getNss().isEmpty());
-            if (doc.getEnabled()) {
-                ReplicaSetWriteBlockState::get(opCtx)->enableReplicaSetWriteBlocking(
-                    doc.getReplicaSetWritesBlockReason());
-            }
-            if (!doc.getAllowDeletions()) {
-                ReplicaSetWriteBlockState::get(opCtx)->enableReplicaSetDeletionsBlocking();
-            }
+            // TODO(SERVER-120970): restore the state into memory
             return true;
         });
 
