@@ -43,7 +43,13 @@ const st = new ShardingTest({
             },
         },
     ],
-    rs: {nodes: 1, setParameter: {logComponentVerbosity: tojson({sharding: 2})}},
+    rs: {
+        nodes: 1,
+        setParameter: {
+            queryAnalysisSamplerConfigurationRefreshSecs,
+            logComponentVerbosity: tojson({sharding: 2}),
+        },
+    },
 });
 
 const dbName = "testDb";
