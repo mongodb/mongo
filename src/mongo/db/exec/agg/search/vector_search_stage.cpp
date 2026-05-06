@@ -51,7 +51,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceVectorSearchToStageFn(
     return make_intrusive<exec::agg::VectorSearchStage>(documentSource->kStageName,
                                                         documentSource->getExpCtx(),
                                                         documentSource->_taskExecutor,
-                                                        documentSource->_originalSpec.copy(),
+                                                        documentSource->_stageSpec.copy(),
                                                         std::move(execStatsWrapper));
 }
 
